@@ -1,0 +1,52 @@
+{
+  "name": "type-guards",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Runtime type guards and validators for Router6",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/router6.git"
+  },
+  "keywords": [
+    "router6",
+    "type-guards",
+    "validators",
+    "runtime-types"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --ext .ts modules/ tests/ --fix --max-warnings 0",
+    "test": "vitest run",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
+    "test:mutation": "stryker run",
+    "test:mutation:report": "open reports/mutation-report.html",
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "router6-types": "workspace:^"
+  }
+}

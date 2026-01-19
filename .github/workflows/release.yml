@@ -1,0 +1,146 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 1.0.0)"
+        required: true
+        type: string
+
+# NOTE: This workflow uses npm Trusted Publishing with OIDC (OpenID Connect)
+# No NPM_TOKEN secret is required - authentication is handled via GitHub's OIDC tokens
+#
+# Prerequisites:
+# 1. npm CLI >= 11.5.1 (included with Node.js 24+)
+# 2. Each package must be configured with Trusted Publisher on npmjs.com
+#    Add Trusted Publisher with these settings:
+#      * Provider: GitHub Actions
+#      * Organization/User: greydragon888
+#      * Repository: router6
+#      * Workflow: release.yml
+#      * Environment: (leave empty)
+#
+# Documentation: https://docs.npmjs.com/trusted-publishers/
+#
+# NOTE: pnpm does not support OIDC Trusted Publishing (see https://github.com/pnpm/pnpm/issues/9812)
+# We use pnpm for install/build but npm for publish.
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write # Required for OIDC Trusted Publishing
+
+jobs:
+  release:
+    name: Release to NPM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          # NOTE: Do NOT use registry-url here!
+          # It creates .npmrc with ${NODE_AUTH_TOKEN} which conflicts with OIDC Trusted Publishing.
+          # npm CLI v11.5.1+ automatically detects OIDC and uses it for authentication.
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm run build
+
+      - name: Run tests
+        run: pnpm run test
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Update package versions
+        run: |
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              echo "Updating version in $dir"
+              cd "$dir"
+              npm version "${{ steps.version.outputs.VERSION }}" --no-git-tag-version --allow-same-version
+              cd ../..
+            fi
+          done
+
+      - name: Verify packages
+        run: |
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              echo "=== $name ==="
+              cd "$dir"
+              npm pack --dry-run
+              cd ../..
+              echo ""
+            fi
+          done
+
+      - name: Debug OIDC environment
+        run: |
+          echo "=== GitHub Context ==="
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Workflow: ${{ github.workflow }}"
+          echo ""
+          echo "=== OIDC Environment Variables ==="
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL: ${ACTIONS_ID_TOKEN_REQUEST_URL:-NOT SET}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN: ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+SET (${#ACTIONS_ID_TOKEN_REQUEST_TOKEN} chars)}"
+          echo ""
+          echo "=== npm Configuration ==="
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+
+      - name: Publish all packages to NPM
+        run: |
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              private=$(node -p "require('./${dir}package.json').private || false")
+
+              if [ "$private" = "true" ]; then
+                echo "⏭️ Skipping $name (private package)"
+              else
+                echo "📦 Publishing $name..."
+                cd "$dir"
+                npm publish --provenance --access public --registry https://registry.npmjs.org
+                cd ../..
+              fi
+            fi
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ env.VERSION }}
+          tag_name: v${{ env.VERSION }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(env.VERSION, '-') }}

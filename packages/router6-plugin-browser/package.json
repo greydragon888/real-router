@@ -1,0 +1,60 @@
+{
+  "name": "router6-plugin-browser",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "description": "Browser integration plugin for router6 with History API, hash routing, and popstate support",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/router6.git"
+  },
+  "keywords": [
+    "router6",
+    "browser",
+    "history",
+    "hash-routing",
+    "popstate",
+    "navigation"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/greydragon888/router6",
+  "bugs": {
+    "url": "https://github.com/greydragon888/router6/issues"
+  },
+  "scripts": {
+    "test": "vitest",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --ext .ts modules/ tests/ --fix --max-warnings 0",
+    "publint": "publint"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "router6": "workspace:^",
+    "type-guards": "workspace:^"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.6.3",
+    "jsdom": "27.2.0"
+  }
+}

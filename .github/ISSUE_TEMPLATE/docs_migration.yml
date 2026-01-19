@@ -1,0 +1,15 @@
+name: 📚 Docs / Migration Guide
+description: Add or update documentation
+title: "[Docs]: "
+labels: ["📚 docs"]
+body:
+    - type: textarea
+      attributes:
+          label: What needs documentation?
+          description: Describe the section or area
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: Suggestions / Draft
+          description: Add your notes or structure here

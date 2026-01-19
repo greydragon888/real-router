@@ -1,0 +1,27 @@
+name: 🐛 Bug Report
+description: Report a reproducible bug in router6
+title: "[Bug]: "
+labels: [bug]
+body:
+    - type: textarea
+      attributes:
+          label: What happened?
+          description: Describe the bug and what you expected to happen.
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: Reproduction steps
+          description: How can we reproduce this issue? (Code snippets, steps, etc.)
+      validations:
+          required: true
+    - type: input
+      attributes:
+          label: Environment
+          description: e.g., Node 20, npm 10, browser, etc.
+      validations:
+          required: false
+    - type: textarea
+      attributes:
+          label: Additional context
+          description: Add any other info or logs here

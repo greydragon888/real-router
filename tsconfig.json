@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["vitest/globals", "node"],
+    "paths": {
+      "router6": ["packages/router6/modules/index.ts"],
+      "router6-types": ["packages/router6-types/modules/index.ts"],
+      "router6-helpers": ["packages/router6-helpers/modules/index.ts"],
+      "router6-plugin-browser": [
+        "packages/router6-plugin-browser/modules/index.ts"
+      ],
+      "router6-plugin-listeners": [
+        "packages/router6-plugin-listeners/modules/index.ts"
+      ],
+      "router6-plugin-logger": [
+        "packages/router6-plugin-logger/modules/index.ts"
+      ],
+      "router6-plugin-persistent-params": [
+        "packages/router6-plugin-persistent-params/modules/index.ts"
+      ],
+      "react-router6": ["packages/react-router6/modules/index.ts"],
+      "type-guards": ["packages/type-guards/modules/index.ts"],
+      "route-tree": ["packages/route-tree/modules/index.ts"],
+      "search-params": ["packages/search-params/modules/index.ts"]
+    },
+    "target": "ESNext",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "useUnknownInCatchVariables": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "tsBuildInfoFile": "./.tsbuildinfo",
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules", "dist", "packages/*/dist"]
+}

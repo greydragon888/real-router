@@ -1,0 +1,57 @@
+{
+  "name": "router6-plugin-logger",
+  "version": "1.0.0",
+  "type": "commonjs",
+  "description": "Development logging plugin for router6 with transition tracking and performance metrics",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/router6.git"
+  },
+  "keywords": [
+    "router6",
+    "logger",
+    "debugging",
+    "development",
+    "console",
+    "monitoring"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/router6/issues"
+  },
+  "homepage": "https://github.com/greydragon888/router6",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --ext .ts modules/ tests/ --fix --max-warnings 0",
+    "test:mutation": "stryker run",
+    "test:mutation:report": "open reports/mutation-report.html",
+    "publint": "publint"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "router6": "workspace:^"
+  }
+}

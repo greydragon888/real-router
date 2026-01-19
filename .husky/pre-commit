@@ -1,0 +1,5 @@
+scripts/add-package-paths.sh
+
+time pnpm build
+
+node scripts/analyze-bundle.mjs

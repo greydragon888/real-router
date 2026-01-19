@@ -1,0 +1,19 @@
+name: ✨ Feature Request
+description: Suggest a new feature or improvement
+title: "[Feature]: "
+labels: ["💡 enhancement"]
+body:
+    - type: textarea
+      attributes:
+          label: What's the feature?
+          description: Describe the feature or idea
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: Why is it useful?
+          description: Explain how it improves the router or DX
+    - type: textarea
+      attributes:
+          label: Additional context
+          description: Diagrams, links, or related ideas

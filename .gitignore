@@ -1,0 +1,63 @@
+node_modules
+coverage
+npm-debug.log
+init-tdd-flow.sh
+
+packages/**/dist
+packages/**/.turbo
+packages/**/.vitest
+packages/**/coverage
+.changelog
+.DS_Store
+
+dist
+.turbo
+.vitest
+.claude
+.bench
+.vitest-bench
+.bundle-reports
+
+*.tsbuildinfo
+.tsbuildinfo*
+git-diff-report.md
+.bundle-cache/
+logs/*.log
+
+CLAUDE.md
+
+# TypeScript compiled artifacts
+vitest.config.mjs
+vitest.config.d.mts
+tsup.config.mjs
+tsup.config.d.mts
+tsup.base.mjs
+tsup.base.d.mts
+packages/*/vitest.config.mjs
+packages/*/vitest.config.d.mts
+packages/*/tsup.config.mjs
+packages/*/tsup.config.d.mts
+packages/*/modules/**/*.js
+packages/*/tests/**/*.js
+
+# Environment variables
+.env
+.env.local
+
+# Stryker mutation testing
+stryker-reports/
+.stryker-tmp/
+stryker.log
+.vitest-stryker/
+packages/*/reports/
+packages/**/.vitest-stryker
+stryker.temp.config.mjs
+stryker*.config.mjs.map
+
+# ESLint cache
+.eslintcache
+packages/**/.eslintcache
+
+# Local scripts and tools
+scripts/
+tools/
