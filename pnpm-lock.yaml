@@ -163,19 +163,19 @@ importers:
   packages/route-tree:
     dependencies:
       search-params:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../search-params
 
   packages/router6:
     dependencies:
       route-tree:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../route-tree
       router6-types:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../router6-types
       type-guards:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../type-guards
 
   packages/router6-benchmarks:
@@ -184,7 +184,7 @@ importers:
         specifier: 8.0.1
         version: 8.0.1
       router6:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../router6
     devDependencies:
       mitata:
@@ -203,7 +203,7 @@ importers:
         specifier: workspace:^
         version: link:../router6
       type-guards:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../type-guards
     devDependencies:
       '@testing-library/jest-dom':
@@ -225,7 +225,7 @@ importers:
         specifier: workspace:^
         version: link:../router6
       type-guards:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../type-guards
 
   packages/router6-types: {}
@@ -235,7 +235,7 @@ importers:
   packages/type-guards:
     dependencies:
       router6-types:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../router6-types
 
   tools/property-test-agent:
