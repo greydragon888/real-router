@@ -1,0 +1,21 @@
+name: 🟢 Good First Issue
+description: Simple task for new contributors
+title: "[Good First Issue]: "
+labels: ["🟢 good first issue"]
+body:
+    - type: textarea
+      attributes:
+          label: What’s the task?
+          description: Describe clearly what needs to be done
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: Where to find it in the code?
+          description: Point to the relevant file or function
+      validations:
+          required: false
+    - type: textarea
+      attributes:
+          label: Additional notes
+          description: Add hints, links, or code references

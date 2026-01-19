@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": ["modules", "tests"],
+  "references": [
+    { "path": "./tsconfig.node.json" }
+  ]
+}

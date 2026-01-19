@@ -1,0 +1,53 @@
+{
+  "name": "route-tree",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Named route tree with matching and path building",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/router6.git"
+  },
+  "keywords": [
+    "route tree",
+    "named route",
+    "route matching"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/router6/issues"
+  },
+  "homepage": "https://github.com/greydragon888/router6",
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint modules/ tests/ --fix",
+    "test": "vitest run",
+    "test:mutation": "stryker run",
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "search-params": "workspace:^"
+  }
+}

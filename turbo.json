@@ -1,0 +1,68 @@
+{
+  "$schema": "./node_modules/turbo/schema.json",
+  "daemon": false,
+  "globalDependencies": [
+    "tsconfig.json",
+    "prettier.config.*",
+    "pnpm-lock.yaml",
+    "tsup.base.*",
+    "eslint.config.*",
+    "vitest.config.*"
+  ],
+  "globalEnv": ["BENCH_ROUTER"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build", "test"],
+      "outputs": ["dist/**"],
+      "inputs": [
+        "modules/**/*.{ts,tsx}",
+        "tsup.config.*",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "env": ["NODE_ENV"],
+      "cache": true
+    },
+    "test": {
+      "dependsOn": ["lint", "type-check"],
+      "outputs": [],
+      "inputs": [
+        "modules/**/*.{ts,tsx}",
+        "tests/**/*.{ts,tsx}",
+        "vitest.config.*",
+        "**/*.test.{ts,tsx}",
+        "**/*.spec.{ts,tsx}"
+      ],
+      "env": ["NODE_ENV", "CI"],
+      "cache": true
+    },
+    "lint": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx,js,jsx}",
+        "!dist/**",
+        "!coverage/**",
+        "eslint.config.*"
+      ],
+      "cache": true
+    },
+    "type-check": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "**/*.{ts,tsx}",
+        "!dist/**",
+        "tsconfig.json",
+        "**/tsconfig.json"
+      ],
+      "cache": true
+    },
+    "publint": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "inputs": ["dist/**", "package.json"],
+      "cache": true
+    }
+  }
+}

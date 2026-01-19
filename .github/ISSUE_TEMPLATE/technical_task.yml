@@ -1,0 +1,15 @@
+name: 🔧 Technical Task
+description: For refactors, infra work, or migration tasks
+title: "[Task]: "
+labels: ["🔧 infra"]
+body:
+    - type: textarea
+      attributes:
+          label: What needs to be done?
+          description: Describe the task in detail
+      validations:
+          required: true
+    - type: textarea
+      attributes:
+          label: Related context
+          description: e.g., links to roadmap or related issues

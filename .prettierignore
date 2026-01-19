@@ -1,1 +1,5 @@
-packages/*/dist
+dist
+coverage
+node_modules
+*.tsbuildinfo
+package-lock.json
