@@ -41,18 +41,18 @@ Router6 delivers **1.8x to 22x faster** hot-path operations compared to router5:
 ## Installation
 
 ```bash
-npm install router6
+npm install real-router
 # or
-pnpm add router6
+pnpm add real-router
 # or
-yarn add router6
+yarn add real-router
 ```
 
 ## Quick Start
 
 ```typescript
-import { createRouter } from "router6";
-import { browserPlugin } from "router6-plugin-browser";
+import { createRouter } from "real-router";
+import { browserPlugin } from "real-router-plugin-browser";
 
 const routes = [
   { name: "home", path: "/" },
@@ -73,7 +73,7 @@ router.navigate("users.profile", { id: "123" });
 ### With React
 
 ```tsx
-import { RouterProvider, useRoute, Link } from "react-router6";
+import { RouterProvider, useRoute, Link } from "react-real-router";
 
 function App() {
   const { route } = useRoute();
@@ -158,8 +158,8 @@ import createRouter from "router5";
 const router = createRouter(routes);
 router.add({ name: "new", path: "/new" });
 
-// router6
-import { createRouter } from "router6";
+// real-router
+import { createRouter } from "real-router";
 const router = createRouter(routes);
 router.addRoute({ name: "new", path: "/new" });
 ```

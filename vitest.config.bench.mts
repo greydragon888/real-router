@@ -48,7 +48,7 @@ export default mergeConfig(
       unstubGlobals: false,
 
       // No setup files by default for benchmarks
-      // Packages can override this if needed (e.g., react-router6)
+      // Packages can override this if needed (e.g., react-real-router)
       setupFiles: [],
 
       // Timeouts for long benchmarks

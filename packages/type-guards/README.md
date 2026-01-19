@@ -93,7 +93,7 @@ if (isStateStrict(value)) {
 ```typescript
 import { isParams, isParamsStrict } from "type-guards";
 
-// Flexible validation - allows nested objects (router6 core)
+// Flexible validation - allows nested objects (real-router core)
 if (isParams(routeParams)) {
   router.setState(routeParams);
 }
@@ -195,7 +195,7 @@ isParams(frozen); // true
 isRouteName("users.profile", "navigate"); // OK
 isRouteName("admin_panel", "navigate"); // OK
 isRouteName("api-v2", "navigate"); // OK
-isRouteName("@@router6/UNKNOWN", "navigate"); // OK - system route
+isRouteName("@@real-router/UNKNOWN", "navigate"); // OK - system route
 
 isRouteName(".users", "navigate"); // throws - leading dot
 isRouteName("users..profile", "navigate"); // throws - consecutive dots

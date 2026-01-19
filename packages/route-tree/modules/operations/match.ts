@@ -124,7 +124,7 @@ const DEFAULT_CONFIG: MatchConfig = {
  * Matches a URL path and returns raw segments.
  *
  * Returns raw segments and params without building the state name.
- * Use this when you need to build the state yourself (e.g., in router6).
+ * Use this when you need to build the state yourself (e.g., in real-router).
  *
  * @param tree - Route tree to match against
  * @param path - URL path to match

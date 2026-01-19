@@ -1,10 +1,10 @@
 /**
  * Realistic Usage Benchmarks
  *
- * Tests matchSegments with options patterns that match real router6 usage.
+ * Tests matchSegments with options patterns that match real real-router usage.
  * Purpose: Validate if pre-computed config caching in match.ts is effective.
  *
- * Key insight: router6 always passes 4-5 options, bypassing single-option cache paths.
+ * Key insight: real-router always passes 4-5 options, bypassing single-option cache paths.
  */
 
 import { barplot, bench, summary } from "mitata";
@@ -52,8 +52,8 @@ const singleOption: MatchOptions = {
   strictTrailingSlash: true,
 };
 
-// Pattern 3: Real router6 options (bypasses all caches, 4+ fields)
-// Based on packages/router6/modules/core/routes.ts:165-171
+// Pattern 3: Real real-router options (bypasses all caches, 4+ fields)
+// Based on packages/real-router/modules/core/routes.ts:165-171
 const router6RealOptions: MatchOptions = {
   trailingSlashMode: "default",
   caseSensitive: false,
@@ -85,11 +85,11 @@ barplot(() => {
       matchSegments(tree, SHALLOW_PATH, singleOption);
     });
 
-    bench("shallow: router6 real (4 fields, no cache)", () => {
+    bench("shallow: real-router real (4 fields, no cache)", () => {
       matchSegments(tree, SHALLOW_PATH, router6RealOptions);
     });
 
-    bench("shallow: router6 + query (5 fields, no cache)", () => {
+    bench("shallow: real-router + query (5 fields, no cache)", () => {
       matchSegments(tree, SHALLOW_PATH, router6WithQueryParams);
     });
   });
@@ -106,11 +106,11 @@ barplot(() => {
       matchSegments(tree, DEEP_PATH, singleOption);
     });
 
-    bench("deep: router6 real (4 fields, no cache)", () => {
+    bench("deep: real-router real (4 fields, no cache)", () => {
       matchSegments(tree, DEEP_PATH, router6RealOptions);
     });
 
-    bench("deep: router6 + query (5 fields, no cache)", () => {
+    bench("deep: real-router + query (5 fields, no cache)", () => {
       matchSegments(tree, DEEP_PATH, router6WithQueryParams);
     });
   });
@@ -131,14 +131,14 @@ barplot(() => {
       matchSegments(tree, DEEP_PATH, noOptions);
     });
 
-    bench("config: router6 pattern", () => {
+    bench("config: real-router pattern", () => {
       matchSegments(tree, DEEP_PATH, router6RealOptions);
     });
 
-    // Pre-created options object (simulates router6 caching options)
+    // Pre-created options object (simulates real-router caching options)
     const cachedOptions = { ...router6RealOptions };
 
-    bench("config: router6 pre-cached object", () => {
+    bench("config: real-router pre-cached object", () => {
       matchSegments(tree, DEEP_PATH, cachedOptions);
     });
   });

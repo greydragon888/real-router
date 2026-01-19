@@ -19,7 +19,7 @@ export default defineConfig({
       // Workspace dependencies - resolve through node_modules symlinks
       "router6-types": path.resolve(
         import.meta.dirname,
-        "./node_modules/router6-types",
+        "./node_modules/real-router-types",
       ),
     },
   },

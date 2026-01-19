@@ -1,7 +1,7 @@
 // @ts-check
 
 // ============================================
-// ESLint Configuration for router6-benchmarks
+// ESLint Configuration for real-router-benchmarks
 // Extends root config with benchmark-specific overrides
 // ============================================
 

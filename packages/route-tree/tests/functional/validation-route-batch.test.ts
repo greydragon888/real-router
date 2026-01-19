@@ -151,7 +151,7 @@ describe("validateRoute", () => {
     it("should accept system routes with @@ prefix", () => {
       expect(() => {
         validateRoute(
-          { name: "@@router6/UNKNOWN", path: "/unknown" },
+          { name: "@@real-router/UNKNOWN", path: "/unknown" },
           methodName,
         );
       }).not.toThrowError();

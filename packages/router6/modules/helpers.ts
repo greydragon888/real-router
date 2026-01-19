@@ -1,4 +1,4 @@
-// packages/router6/modules/helpers.ts
+// packages/real-router/modules/helpers.ts
 
 import type { BuildOptions, TrailingSlashMode } from "route-tree";
 import type { State, Options } from "router6-types";
@@ -169,9 +169,9 @@ export function freezeStateInPlace<T extends State>(state: T): T {
 // =============================================================================
 
 /**
- * Maps router6 trailingSlash option to route-tree's trailingSlashMode.
+ * Maps real-router trailingSlash option to route-tree's trailingSlashMode.
  *
- * @param trailingSlash - router6 trailing slash option
+ * @param trailingSlash - real-router trailing slash option
  * @returns route-tree trailing slash mode
  * @internal
  */
@@ -192,10 +192,10 @@ function mapTrailingSlashMode(
 }
 
 /**
- * Creates route-tree BuildOptions from router6 Options.
+ * Creates route-tree BuildOptions from real-router Options.
  * Used for buildPath caching in routerLifecycle.ts.
  *
- * @param options - router6 options
+ * @param options - real-router options
  * @returns route-tree build options
  */
 export function createBuildOptions(options: Options): BuildOptions {

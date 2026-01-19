@@ -1,7 +1,7 @@
 // @ts-check
 
 // ============================================
-// ESLint 9.39+ Configuration for react-router6
+// ESLint 9.39+ Configuration for react-real-router
 // Extends root config which includes:
 // - globalIgnores helper (ESLint 9.30+)
 // - linterOptions with reportUnusedDisableDirectives

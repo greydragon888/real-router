@@ -96,9 +96,9 @@ echo -e "${YELLOW}[Step 4] Preparing...${NC}"
 mkdir -p "$RESULTS_DIR"
 cd "$SCRIPT_DIR"
 
-# Build router6
+# Build real-router
 echo "Building router6..."
-pnpm --filter router6 build >/dev/null 2>&1
+pnpm --filter real-router build >/dev/null 2>&1
 echo -e "${GREEN}router6 built successfully${NC}"
 
 # -----------------------------------------------------------------------------
@@ -120,11 +120,11 @@ echo ""
 echo -e "${YELLOW}Cooling down ${COOLDOWN}s before router6...${NC}"
 sleep $COOLDOWN
 
-# --- router6 ---
+# --- real-router ---
 echo ""
 echo -e "${BLUE}--- Testing router6 ---${NC}"
 RESULT_FILE_R6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
-BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
     npx tsx modules/index.ts 2>&1 | tee "$RESULT_FILE_R6"
 
 # -----------------------------------------------------------------------------

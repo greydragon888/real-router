@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/executeMiddleware.ts
+// packages/real-router/modules/transition/executeMiddleware.ts
 
 import { isState } from "type-guards";
 
@@ -37,7 +37,7 @@ function safeCallback(
     callback(error, state);
   } catch (error_) {
     console.error(
-      "router6:middleware",
+      "real-router:middleware",
       "Error in middleware callback:",
       error_,
     );
@@ -99,7 +99,7 @@ export const executeMiddleware = (
 
       if (hasChanged) {
         console.error(
-          "router6:middleware",
+          "real-router:middleware",
           "Warning: State mutated during middleware execution",
           { from: currentState, to: newState },
         );

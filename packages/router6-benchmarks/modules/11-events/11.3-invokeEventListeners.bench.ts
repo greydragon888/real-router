@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/11-events/11.3-invokeEventListeners.bench.ts
+// packages/real-router-benchmarks/modules/11-events/11.3-invokeEventListeners.bench.ts
 
 import { bench } from "mitata";
 

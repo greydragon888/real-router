@@ -1,4 +1,4 @@
-// packages/react-router6/modules/index.ts
+// packages/react-real-router/modules/index.ts
 
 // Components
 export { BaseLink } from "./components/BaseLink";

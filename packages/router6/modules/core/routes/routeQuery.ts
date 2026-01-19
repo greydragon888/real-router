@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routes/routeQuery.ts
+// packages/real-router/modules/core/routes/routeQuery.ts
 
 import { routeTreeToDefinitions } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
@@ -130,7 +130,7 @@ export function withRouteQuery<Dependencies extends DefaultDependencies>(
     // Root node ("") is not considered a parent of any named route
     if (name === "") {
       console.warn(
-        '[router6] isActiveRoute("") called with empty string. ' +
+        '[real-router] isActiveRoute("") called with empty string. ' +
           "The root node is not considered active for any named route. " +
           "To check if router has active state, use: router.getState() !== undefined",
       );

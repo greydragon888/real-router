@@ -1,4 +1,4 @@
-// packages/react-router6/modules/hooks/useRoute.tsx
+// packages/react-real-router/modules/hooks/useRoute.tsx
 
 import { useContext } from "react";
 

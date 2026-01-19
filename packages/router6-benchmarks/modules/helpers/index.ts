@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/helpers/index.ts
+// packages/real-router-benchmarks/modules/helpers/index.ts
 
 export { do_not_optimize } from "mitata";
 

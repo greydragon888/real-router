@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/makeError.ts
+// packages/real-router/modules/transition/makeError.ts
 
 import type { RouterError } from "router6";
 

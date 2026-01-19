@@ -1,4 +1,4 @@
-// packages/react-router6/modules/hooks/useStableValue.tsx
+// packages/react-real-router/modules/hooks/useStableValue.tsx
 
 import { useMemo } from "react";
 

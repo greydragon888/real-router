@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/01-navigation-basic/1.2-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/01-navigation-basic/1.2-edge-cases.bench.ts
 
 import { bench } from "mitata";
 
@@ -13,7 +13,7 @@ const alternatingRoutes = ["about", "home"];
 
 // 1.2.1 Navigation with empty parameters
 // router5: strictly validates required parameters, throws error on {}
-// router6: handles empty parameters more flexibly with query params
+// real-router: handles empty parameters more flexibly with query params
 if (!IS_ROUTER5) {
   const routes: Route[] = [
     { name: "home", path: "/" },
@@ -36,7 +36,7 @@ if (!IS_ROUTER5) {
 
 // 1.2.2 Navigation with null parameter values
 // router5: considers null/undefined as missing parameters, requires all mandatory ones
-// router6: handles 0/false/"" as valid values (null/undefined treated as missing for query params)
+// real-router: handles 0/false/"" as valid values (null/undefined treated as missing for query params)
 if (!IS_ROUTER5) {
   const routes: Route[] = [
     { name: "home", path: "/" },

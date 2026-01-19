@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/modules/utils.ts
+// packages/real-router-plugin-persistent-params/modules/utils.ts
 
 import { isPrimitiveValue } from "type-guards";
 

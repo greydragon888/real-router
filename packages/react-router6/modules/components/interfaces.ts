@@ -1,4 +1,4 @@
-// packages/react-router6/modules/components/interfaces.ts
+// packages/react-real-router/modules/components/interfaces.ts
 
 import type { HTMLAttributes, MouseEventHandler } from "react";
 import type {

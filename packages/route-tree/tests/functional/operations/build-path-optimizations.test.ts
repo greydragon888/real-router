@@ -1107,9 +1107,9 @@ describe("buildPath R6/R7 fast path optimization", () => {
       expect(path).toBe("/users/list");
     });
 
-    it("should handle router6-style options with all defaults", () => {
-      // Simulates router6's createBuildOptions output with all defaults
-      // Note: router6 passes only defined values, undefined properties are omitted
+    it("should handle real-router-style options with all defaults", () => {
+      // Simulates real-router's createBuildOptions output with all defaults
+      // Note: real-router passes only defined values, undefined properties are omitted
       const router6StyleOptions = {
         trailingSlashMode: "default" as const,
         queryParamsMode: "default" as const,

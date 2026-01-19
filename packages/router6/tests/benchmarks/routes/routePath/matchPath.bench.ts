@@ -71,7 +71,7 @@ function generateWideRoutes(count: number): Route[] {
 }
 
 /**
- * Creates a router with standard options (mimics real router6 usage).
+ * Creates a router with standard options (mimics real real-router usage).
  */
 function createTestRouter(routes: Route[], options = {}): Router {
   return createRouter(routes, options);

@@ -42,7 +42,7 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:middleware",
+        "real-router:middleware",
         "Error in middleware callback:",
         expect.any(Error),
       );
@@ -81,7 +81,7 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:middleware",
+        "real-router:middleware",
         "Error in middleware callback:",
         expect.any(Error),
       );
@@ -132,7 +132,7 @@ describe("transition/executeMiddleware", () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:middleware",
+        "real-router:middleware",
         "Error in middleware callback:",
         expect.any(Error),
       );
@@ -171,7 +171,7 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:middleware",
+        "real-router:middleware",
         "Error in middleware callback:",
         expect.any(Error),
       );

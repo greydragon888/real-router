@@ -99,9 +99,9 @@ describe("nameToIDs", () => {
   describe("System routes (@@-prefixed bypass validation)", () => {
     it("should handle system routes as atomic values (no segmentation)", () => {
       // System routes use / instead of . and are treated as single values
-      const result = nameToIDs("@@router6/UNKNOWN_ROUTE");
+      const result = nameToIDs("@@real-router/UNKNOWN_ROUTE");
 
-      expect(result).toStrictEqual(["@@router6/UNKNOWN_ROUTE"]);
+      expect(result).toStrictEqual(["@@real-router/UNKNOWN_ROUTE"]);
     });
 
     it("should bypass pattern validation for system routes with special chars", () => {
@@ -112,9 +112,9 @@ describe("nameToIDs", () => {
     });
 
     it("should allow uppercase in system routes", () => {
-      const result = nameToIDs("@@router6/NOT_FOUND");
+      const result = nameToIDs("@@real-router/NOT_FOUND");
 
-      expect(result).toStrictEqual(["@@router6/NOT_FOUND"]);
+      expect(result).toStrictEqual(["@@real-router/NOT_FOUND"]);
     });
   });
 

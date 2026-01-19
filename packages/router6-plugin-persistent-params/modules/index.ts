@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/modules/index.ts
+// packages/real-router-plugin-persistent-params/modules/index.ts
 
 export { PersistentParamsConfig } from "./types";
 

@@ -21,23 +21,23 @@ When users interact with browser controls or manually change the URL, it updates
 
 ```bash
 # npm
-npm install router6-plugin-browser
+npm install real-router-plugin-browser
 
 # yarn
-yarn add router6-plugin-browser
+yarn add real-router-plugin-browser
 
 # pnpm
-pnpm add router6-plugin-browser
+pnpm add real-router-plugin-browser
 
 # bun
-bun add router6-plugin-browser
+bun add real-router-plugin-browser
 ```
 
 ## Quick Start
 
 ```typescript
-import { createRouter } from "router6";
-import browserPlugin from "router6-plugin-browser";
+import { createRouter } from "real-router";
+import browserPlugin from "real-router-plugin-browser";
 
 const router = createRouter([
   { name: "home", path: "/" },
@@ -457,7 +457,7 @@ The plugin works in server environments with automatic fallback:
 
 ```typescript
 // Server-side rendering
-import browserPlugin from "router6-plugin-browser";
+import browserPlugin from "real-router-plugin-browser";
 
 const router = createRouter(routes);
 router.usePlugin(browserPlugin());
@@ -760,7 +760,7 @@ import browserPlugin, {
   type HistoryState,
   isState,
   isHistoryState,
-} from "router6-plugin-browser";
+} from "real-router-plugin-browser";
 
 // Type-safe configuration
 const options: BrowserPluginOptions = {
@@ -818,7 +818,7 @@ browserPlugin({
 });
 
 // Console warning:
-// [router6-plugin-browser] preserveHash ignored in hash mode
+// [real-router-plugin-browser] preserveHash ignored in hash mode
 ```
 
 ```javascript
@@ -828,7 +828,7 @@ browserPlugin({
 });
 
 // Console warning:
-// [router6-plugin-browser] hashPrefix ignored in history mode
+// [real-router-plugin-browser] hashPrefix ignored in history mode
 ```
 
 #### 3. Physical Property Removal

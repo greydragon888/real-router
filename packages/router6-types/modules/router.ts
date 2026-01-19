@@ -1,4 +1,4 @@
-// packages/router6-types/modules/router.ts
+// packages/real-router-types/modules/router.ts
 
 import type {
   State,

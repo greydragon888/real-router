@@ -9,19 +9,19 @@ Core router implementation for Router6.
 ## Installation
 
 ```bash
-npm install router6
+npm install real-router
 # or
-pnpm add router6
+pnpm add real-router
 # or
-yarn add router6
+yarn add real-router
 # or
-bun add router6
+bun add real-router
 ```
 
 ## Quick Start
 
 ```typescript
-import { createRouter } from "router6";
+import { createRouter } from "real-router";
 
 const routes = [
   { name: "home", path: "/" },
@@ -323,7 +323,7 @@ Removes an event listener.
 Registers a plugin.
 
 ```typescript
-import { browserPlugin } from "router6-plugin-browser";
+import { browserPlugin } from "real-router-plugin-browser";
 
 router.usePlugin(browserPlugin());
 ```

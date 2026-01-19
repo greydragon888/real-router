@@ -1,4 +1,4 @@
-// packages/router6/modules/constants.ts
+// packages/real-router/modules/constants.ts
 
 import type {
   EventToNameMap,
@@ -14,7 +14,7 @@ import type {
  *
  * @internal
  */
-export const ROOT_TREE_SYMBOL = Symbol("router6.routeTree");
+export const ROOT_TREE_SYMBOL = Symbol("real-router.routeTree");
 
 /**
  * Internal Symbol for storing route definitions.
@@ -22,7 +22,7 @@ export const ROOT_TREE_SYMBOL = Symbol("router6.routeTree");
  *
  * @internal
  */
-export const ROUTE_DEFINITIONS_SYMBOL = Symbol("router6.routeDefinitions");
+export const ROUTE_DEFINITIONS_SYMBOL = Symbol("real-router.routeDefinitions");
 
 /**
  * Internal Symbol for storing resolved forwardTo chains cache.
@@ -46,14 +46,16 @@ export const ROUTE_DEFINITIONS_SYMBOL = Symbol("router6.routeDefinitions");
  * See: .claude/issues/1-dx-improve-rfc-list/rfc-7-route-guard-check.md
  * See: .claude/issues/2-fsm-migration-rfc-list/rfc-8-cache-manager.md
  */
-export const RESOLVED_FORWARD_MAP_SYMBOL = Symbol("router6.resolvedForwardMap");
+export const RESOLVED_FORWARD_MAP_SYMBOL = Symbol(
+  "real-router.resolvedForwardMap",
+);
 
 /**
  * Internal Symbol for storing root path.
  *
  * @internal
  */
-export const ROOT_PATH_SYMBOL = Symbol("router6.rootPath");
+export const ROOT_PATH_SYMBOL = Symbol("real-router.rootPath");
 
 /**
  * Internal Symbol for storing router configuration.
@@ -61,7 +63,7 @@ export const ROOT_PATH_SYMBOL = Symbol("router6.rootPath");
  *
  * @internal
  */
-export const CONFIG_SYMBOL = Symbol("router6.config");
+export const CONFIG_SYMBOL = Symbol("real-router.config");
 
 /**
  * @deprecated Use ROOT_TREE_SYMBOL instead
@@ -101,7 +103,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
  * Special route names and identifiers.
  */
 export const constants: Constants = {
-  UNKNOWN_ROUTE: "@@router6/UNKNOWN_ROUTE", // Special route for 404/not found states
+  UNKNOWN_ROUTE: "@@real-router/UNKNOWN_ROUTE", // Special route for 404/not found states
 };
 
 /**

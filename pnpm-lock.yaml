@@ -136,13 +136,13 @@ importers:
         version: 19.2.3
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
       router6-helpers:
         specifier: workspace:^
-        version: link:../router6-helpers
+        version: link:../real-router-helpers
       router6-plugin-browser:
         specifier: workspace:^
-        version: link:../router6-plugin-browser
+        version: link:../real-router-plugin-browser
     devDependencies:
       '@testing-library/dom':
         specifier: 10.4.0
@@ -173,7 +173,7 @@ importers:
         version: link:../route-tree
       router6-types:
         specifier: workspace:^
-        version: link:../router6-types
+        version: link:../real-router-types
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -185,7 +185,7 @@ importers:
         version: 8.0.1
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
     devDependencies:
       mitata:
         specifier: 1.0.34
@@ -195,13 +195,13 @@ importers:
     dependencies:
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
 
   packages/router6-plugin-browser:
     dependencies:
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -217,13 +217,13 @@ importers:
     dependencies:
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
 
   packages/router6-plugin-persistent-params:
     dependencies:
       router6:
         specifier: workspace:^
-        version: link:../router6
+        version: link:../real-router
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -236,7 +236,7 @@ importers:
     dependencies:
       router6-types:
         specifier: workspace:^
-        version: link:../router6-types
+        version: link:../real-router-types
 
   tools/property-test-agent:
     dependencies:

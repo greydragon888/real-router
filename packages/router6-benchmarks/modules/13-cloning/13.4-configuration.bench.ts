@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/13-cloning/13.4-configuration.bench.ts
+// packages/real-router-benchmarks/modules/13-cloning/13.4-configuration.bench.ts
 
 import { bench } from "mitata";
 

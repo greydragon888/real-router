@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/helpers/create-router.ts
+// packages/real-router-benchmarks/modules/helpers/create-router.ts
 
 import { createRouter } from "./router-adapter";
 

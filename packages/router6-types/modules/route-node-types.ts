@@ -1,9 +1,9 @@
-// packages/router6-types/modules/route-node-types.ts
+// packages/real-router-types/modules/route-node-types.ts
 
 /**
  * Route Node Type Definitions — Minimal Public API.
  *
- * This module exports ONLY the essential types used by router6:
+ * This module exports ONLY the essential types used by real-router:
  * - QueryParamsMode, QueryParamsOptions
  * - RouteTreeState
  *

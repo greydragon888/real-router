@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/03-dependencies/3.4-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/03-dependencies/3.4-edge-cases.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/tests/unit/utils.test.ts
+// packages/real-router-plugin-persistent-params/tests/unit/utils.test.ts
 
 import { describe, it, expect } from "vitest";
 

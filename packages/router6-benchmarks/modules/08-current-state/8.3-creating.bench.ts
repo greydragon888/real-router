@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/08-current-state/8.3-creating.bench.ts
+// packages/real-router-benchmarks/modules/08-current-state/8.3-creating.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

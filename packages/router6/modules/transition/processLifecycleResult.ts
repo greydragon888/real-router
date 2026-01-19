@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/processLifecycleResult.ts
+// packages/real-router/modules/transition/processLifecycleResult.ts
 
 /* eslint-disable promise/always-return, promise/no-callback-in-promise */
 import { isPromise, isState } from "type-guards";

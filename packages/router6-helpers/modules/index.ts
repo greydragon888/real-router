@@ -1,4 +1,4 @@
-// packages/router6-helpers/modules/index.ts
+// packages/real-router-helpers/modules/index.ts
 
 export { startsWithSegment, endsWithSegment, includesSegment } from "./helpers";
 

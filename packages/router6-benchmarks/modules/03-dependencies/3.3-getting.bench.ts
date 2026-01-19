@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/03-dependencies/3.3-getting.bench.ts
+// packages/real-router-benchmarks/modules/03-dependencies/3.3-getting.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

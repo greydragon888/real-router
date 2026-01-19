@@ -914,11 +914,11 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       // System routes bypass pattern validation but don't exist
-      router.removeRoute("@@router6/UNKNOWN");
+      router.removeRoute("@@real-router/UNKNOWN");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
-        'Route "@@router6/UNKNOWN" not found. No changes made.',
+        'Route "@@real-router/UNKNOWN" not found. No changes made.',
       );
 
       warnSpy.mockRestore();

@@ -1,4 +1,4 @@
-// packages/router6/modules/createRouter.ts
+// packages/real-router/modules/createRouter.ts
 
 import { CONFIG_SYMBOL } from "./constants";
 import { withDependencies } from "./core/dependencies";

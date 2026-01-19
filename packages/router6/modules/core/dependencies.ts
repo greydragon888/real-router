@@ -1,4 +1,4 @@
-// packages/router6/modules/core/dependencies.ts
+// packages/real-router/modules/core/dependencies.ts
 
 import { getTypeDescription } from "../helpers";
 

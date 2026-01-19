@@ -36,7 +36,7 @@ export const commonConfig = defineConfig({
   test: {
     /**
      * Test environment - default to node
-     * Packages can override this (e.g., react-router6 uses jsdom)
+     * Packages can override this (e.g., react-real-router uses jsdom)
      */
     environment: "node",
 

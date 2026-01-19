@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routes/routeTree.ts
+// packages/real-router/modules/core/routes/routeTree.ts
 
 import {
   createRouteTree,
@@ -68,7 +68,7 @@ function validateUpdatesObject(updates: unknown): void {
     Array.isArray(updates)
   ) {
     throw new TypeError(
-      `[router6] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
+      `[real-router] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
     );
   }
 }
@@ -85,7 +85,7 @@ function validateDefaultParams(defaultParams: unknown): void {
     (typeof defaultParams !== "object" || Array.isArray(defaultParams))
   ) {
     throw new TypeError(
-      `[router6] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
+      `[real-router] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
     );
   }
 }
@@ -105,14 +105,14 @@ function validateParamsTransformer(
 
   if (typeof value !== "function") {
     throw new TypeError(
-      `[router6] updateRoute: ${fieldName} must be a function or null, got ${typeof value}`,
+      `[real-router] updateRoute: ${fieldName} must be a function or null, got ${typeof value}`,
     );
   }
 
   // Async functions break matchPath/buildPath (they return Promise instead of Params)
   if (value.constructor.name === "AsyncFunction") {
     throw new TypeError(
-      `[router6] updateRoute: ${fieldName} cannot be an async function`,
+      `[real-router] updateRoute: ${fieldName} cannot be an async function`,
     );
   }
 }
@@ -165,7 +165,7 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
 
       if (!fromSegments) {
         throw new Error(
-          `[router6] forward: source route "${fromRoute}" does not exist`,
+          `[real-router] forward: source route "${fromRoute}" does not exist`,
         );
       }
 
@@ -174,7 +174,7 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
 
       if (!toSegments) {
         throw new Error(
-          `[router6] forward: target route "${toRoute}" does not exist`,
+          `[real-router] forward: target route "${toRoute}" does not exist`,
         );
       }
 
@@ -191,7 +191,7 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
 
       if (missingParams.length > 0) {
         throw new Error(
-          `[router6] forward: target route "${toRoute}" requires params ` +
+          `[real-router] forward: target route "${toRoute}" requires params ` +
             `[${missingParams.join(", ")}] that are not available in source route "${fromRoute}"`,
         );
       }
@@ -578,7 +578,7 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
 
       if (!segments) {
         throw new ReferenceError(
-          `[router6] updateRoute: route "${name}" does not exist`,
+          `[real-router] updateRoute: route "${name}" does not exist`,
         );
       }
 

@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/02-navigation-plugins/2.3-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/02-navigation-plugins/2.3-edge-cases.bench.ts
 
 /* eslint-disable @typescript-eslint/no-shadow */
 import { bench } from "mitata";
@@ -168,7 +168,7 @@ const alternatingRoutes = ["about", "home"];
 
 // 2.3.11 Cancelling navigation during middleware execution
 // router5: navigate() does not reliably return a cancel function
-// router6: navigate() always returns a cancel function
+// real-router: navigate() always returns a cancel function
 const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 if (!IS_ROUTER5) {

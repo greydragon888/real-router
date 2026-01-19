@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/01-navigation-basic/1.1-success.bench.ts
+// packages/real-router-benchmarks/modules/01-navigation-basic/1.1-success.bench.ts
 
 import { bench } from "mitata";
 

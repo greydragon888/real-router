@@ -1,4 +1,4 @@
-// packages/router6/modules/core/middleware.ts
+// packages/real-router/modules/core/middleware.ts
 
 import { getTypeDescription } from "../helpers";
 

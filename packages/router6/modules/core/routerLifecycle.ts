@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routerLifecycle.ts
+// packages/real-router/modules/core/routerLifecycle.ts
 
 import { isState } from "type-guards";
 

@@ -1737,17 +1737,17 @@ describe("Browser Plugin", () => {
 
       expect(() => {
         router.replaceHistoryState("nonexistent");
-      }).toThrowError("[router6] Cannot replace state");
+      }).toThrowError("[real-router] Cannot replace state");
     });
   });
 
   describe("Real-world Plugin Compatibility", () => {
     /**
      * Integration tests verify that browserPlugin works correctly
-     * with other router6 plugins in real-world scenarios.
+     * with other real-router plugins in real-world scenarios.
      */
 
-    describe("Integration with other router6 plugins", () => {
+    describe("Integration with other real-router plugins", () => {
       it("works with loggerPlugin - basic compatibility", () => {
         const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
 
@@ -2224,7 +2224,7 @@ describe("Browser Plugin", () => {
 
         circularParams.self = circularParams; // Circular reference
 
-        // router6 now validates params structure and rejects circular references
+        // real-router now validates params structure and rejects circular references
         // to prevent DataCloneError during history.pushState/replaceState in browsers.
         // Circular references are not serializable and should be caught early.
         expect(() => {

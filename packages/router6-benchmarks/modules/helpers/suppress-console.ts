@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/helpers/suppress-console.ts
+// packages/real-router-benchmarks/modules/helpers/suppress-console.ts
 
 /**
  * Suppress console output during benchmarks.

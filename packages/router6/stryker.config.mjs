@@ -1,5 +1,5 @@
 /**
- * Stryker mutation testing configuration for router6
+ * Stryker mutation testing configuration for real-router
  *
  * Standalone config - does not extend base to avoid sandbox resolution issues.
  *
@@ -16,7 +16,7 @@ export default {
     "@stryker-mutator/typescript-checker",
   ],
 
-  // Mutate router6 source files
+  // Mutate real-router source files
   mutate: [
     "modules/**/*.ts",
     "!modules/index.ts", // Barrel export - skip

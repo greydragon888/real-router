@@ -1,4 +1,4 @@
-// packages/react-router6/modules/RouterProvider.tsx
+// packages/react-real-router/modules/RouterProvider.tsx
 
 import { useMemo, useSyncExternalStore } from "react";
 

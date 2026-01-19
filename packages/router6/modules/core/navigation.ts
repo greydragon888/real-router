@@ -1,4 +1,4 @@
-// packages/router6/modules/core/navigation.ts
+// packages/real-router/modules/core/navigation.ts
 
 import { getTypeDescription, isNavigationOptions } from "type-guards";
 

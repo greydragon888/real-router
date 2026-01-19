@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routes/routeConfig.ts
+// packages/real-router/modules/core/routes/routeConfig.ts
 
 import { getSegmentsByName } from "route-tree";
 import { isParams, getTypeDescription } from "type-guards";
@@ -504,7 +504,7 @@ export function registerRouteForward<Dependencies extends DefaultDependencies>(
     // canActivate will be ignored because forwardTo is an alias, not a transition
     if (route.canActivate) {
       console.warn(
-        `[router6] Route "${route.name}" has both forwardTo and canActivate. ` +
+        `[real-router] Route "${route.name}" has both forwardTo and canActivate. ` +
           `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
           `Move canActivate to the target route "${route.forwardTo}".`,
       );
@@ -760,7 +760,7 @@ export function createApplyForwardToUpdate(
 
     if (!toSegments) {
       throw new Error(
-        `[router6] updateRoute: forwardTo target "${toRoute}" does not exist`,
+        `[real-router] updateRoute: forwardTo target "${toRoute}" does not exist`,
       );
     }
 
@@ -773,7 +773,7 @@ export function createApplyForwardToUpdate(
 
     if (missingParams.length > 0) {
       throw new Error(
-        `[router6] updateRoute: forwardTo target "${toRoute}" requires params ` +
+        `[real-router] updateRoute: forwardTo target "${toRoute}" requires params ` +
           `[${missingParams.join(", ")}] that are not available in source route "${name}"`,
       );
     }

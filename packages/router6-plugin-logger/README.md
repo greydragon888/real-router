@@ -10,23 +10,23 @@ A plugin for logging router events to the console. Provides flexible logging lev
 
 ```bash
 # npm
-npm install router6-plugin-logger
+npm install real-router-plugin-logger
 
 # yarn
-yarn add router6-plugin-logger
+yarn add real-router-plugin-logger
 
 # pnpm
-pnpm add router6-plugin-logger
+pnpm add real-router-plugin-logger
 
 # bun
-bun add router6-plugin-logger
+bun add real-router-plugin-logger
 ```
 
 ## Quick Start
 
 ```typescript
-import { createRouter } from "router6";
-import { loggerPlugin } from "router6-plugin-logger";
+import { createRouter } from "real-router";
+import { loggerPlugin } from "real-router-plugin-logger";
 
 const router = createRouter(routes);
 
@@ -66,7 +66,7 @@ router.usePlugin(loggerPlugin);
 Factory for creating a plugin with custom configuration.
 
 ```typescript
-import { loggerPluginFactory } from "router6-plugin-logger";
+import { loggerPluginFactory } from "real-router-plugin-logger";
 
 router.usePlugin(
   loggerPluginFactory({
@@ -358,8 +358,8 @@ router.navigate("users.view", { id: "123" });
 
 ```typescript
 import { describe, it, beforeEach } from "vitest";
-import { createRouter } from "router6";
-import { loggerPluginFactory } from "router6-plugin-logger";
+import { createRouter } from "real-router";
+import { loggerPluginFactory } from "real-router-plugin-logger";
 
 describe("Router tests", () => {
   let router;
@@ -382,7 +382,7 @@ describe("Router tests", () => {
 The plugin is fully typed:
 
 ```typescript
-import type { LoggerPluginConfig, LogLevel } from "router6-plugin-logger";
+import type { LoggerPluginConfig, LogLevel } from "real-router-plugin-logger";
 
 const config: LoggerPluginConfig = {
   level: "transitions",

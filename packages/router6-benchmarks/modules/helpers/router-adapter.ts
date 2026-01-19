@@ -1,8 +1,8 @@
-// packages/router6-benchmarks/modules/helpers/router-adapter.ts
+// packages/real-router-benchmarks/modules/helpers/router-adapter.ts
 
 import type { Router, Route, Options, DefaultDependencies } from "router6";
 
-const ROUTER_NAME = process.env.BENCH_ROUTER ?? "router6";
+const ROUTER_NAME = process.env.BENCH_ROUTER ?? "real-router";
 
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment */
 const routerModule =
@@ -10,11 +10,11 @@ const routerModule =
 /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment */
 
 /**
- * Unified options for fair benchmarking between router5 and router6.
+ * Unified options for fair benchmarking between router5 and real-router.
  *
  * These options normalize the behavior differences between routers:
- * - queryParamsMode: router5 defaults to "default", router6 to "loose"
- * - allowNotFound: router5 defaults to false, router6 to true
+ * - queryParamsMode: router5 defaults to "default", real-router to "loose"
+ * - allowNotFound: router5 defaults to false, real-router to true
  *
  * Using router5 defaults as baseline for comparison.
  */

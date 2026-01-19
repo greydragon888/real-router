@@ -1,4 +1,4 @@
-// packages/router6-plugin-browser/modules/types.ts
+// packages/real-router-plugin-browser/modules/types.ts
 
 import type { DoneFn, State } from "router6";
 
@@ -217,7 +217,7 @@ export interface Browser {
 
 /**
  * History state object stored in browser history.
- * Extends router6 State with additional properties that may be set by external code.
+ * Extends real-router State with additional properties that may be set by external code.
  */
 export type HistoryState = State & Record<string, unknown>;
 

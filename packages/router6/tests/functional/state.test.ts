@@ -352,7 +352,7 @@ describe("core/state", () => {
     describe("argument validation", () => {
       // Validation removed from areStatesEqual for performance optimization.
       // States are validated at creation time (makeState, buildState).
-      // See: packages/router6/.claude/OPTIMIZATION-RECOMMENDATIONS.md
+      // See: packages/real-router/.claude/OPTIMIZATION-RECOMMENDATIONS.md
 
       it("does not throw for null/undefined states", () => {
         const validState = router.makeState("home", {}, "/home");

@@ -9,13 +9,13 @@ React integration for [router6](https://github.com/greydragon888/router6) - hook
 ## Installation
 
 ```bash
-npm install react-router6 router6 router6-plugin-browser
+npm install react-real-router real-router real-router-plugin-browser
 # or
-pnpm add react-router6 router6 router6-plugin-browser
+pnpm add react-real-router real-router real-router-plugin-browser
 # or
-yarn add react-router6 router6 router6-plugin-browser
+yarn add react-real-router real-router real-router-plugin-browser
 # or
-bun add react-router6 router6 router6-plugin-browser
+bun add react-real-router real-router real-router-plugin-browser
 ```
 
 ### Peer Dependencies
@@ -27,9 +27,9 @@ bun add react-router6 router6 router6-plugin-browser
 ## Quick Start
 
 ```tsx
-import { createRouter } from "router6";
-import { browserPlugin } from "router6-plugin-browser";
-import { RouterProvider, useRoute, Link } from "react-router6";
+import { createRouter } from "real-router";
+import { browserPlugin } from "real-router-plugin-browser";
+import { RouterProvider, useRoute, Link } from "react-real-router";
 import { createRoot } from "react-dom/client";
 
 // Define routes
@@ -78,7 +78,7 @@ createRoot(document.getElementById("root")!).render(
 Provides router instance and state to all child components via React Context.
 
 ```tsx
-import { RouterProvider } from "react-router6";
+import { RouterProvider } from "react-real-router";
 
 <RouterProvider router={router}>
   <App />
@@ -97,7 +97,7 @@ import { RouterProvider } from "react-router6";
 Returns the router instance from context.
 
 ```tsx
-import { useRouter } from "react-router6";
+import { useRouter } from "react-real-router";
 
 function NavigateButton() {
   const router = useRouter();
@@ -111,7 +111,7 @@ function NavigateButton() {
 Returns the current route state and previous route. Re-renders on every route change.
 
 ```tsx
-import { useRoute } from "react-router6";
+import { useRoute } from "react-real-router";
 
 function CurrentRoute() {
   const { route, previousRoute } = useRoute();
@@ -136,7 +136,7 @@ function CurrentRoute() {
 Optimized hook that only re-renders when the specified route node changes. Ideal for nested route structures.
 
 ```tsx
-import { useRouteNode } from "react-router6";
+import { useRouteNode } from "react-real-router";
 
 function UsersSection() {
   // Only re-renders when routes starting with "users" change
@@ -165,7 +165,7 @@ function UsersSection() {
 Navigation link component with automatic active state detection.
 
 ```tsx
-import { Link } from "react-router6";
+import { Link } from "react-real-router";
 
 <Link
   routeName="users.profile"
@@ -198,7 +198,7 @@ import { Link } from "react-router6";
 Same as `Link`, but re-renders on every route change. Use when you need the link to update based on current route state.
 
 ```tsx
-import { ConnectedLink } from "react-router6";
+import { ConnectedLink } from "react-real-router";
 
 <ConnectedLink routeName="dashboard" activeClassName="nav-active">
   Dashboard
@@ -210,7 +210,7 @@ import { ConnectedLink } from "react-router6";
 Low-level link component that requires router instance as prop. Useful for custom implementations.
 
 ```tsx
-import { BaseLink, useRouter } from "react-router6";
+import { BaseLink, useRouter } from "react-real-router";
 
 function CustomLink({ to, children }) {
   const router = useRouter();
@@ -228,7 +228,7 @@ function CustomLink({ to, children }) {
 For advanced use cases, you can access contexts directly:
 
 ```tsx
-import { RouterContext, RouteContext } from "react-router6";
+import { RouterContext, RouteContext } from "react-real-router";
 import { useContext } from "react";
 
 function CustomComponent() {
@@ -244,7 +244,7 @@ function CustomComponent() {
 Full TypeScript support with generics for route parameters:
 
 ```tsx
-import type { Params } from "router6";
+import type { Params } from "real-router";
 
 interface UserParams extends Params {
   id: string;

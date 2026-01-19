@@ -1,4 +1,4 @@
-// packages/react-router6/modules/utils.ts
+// packages/react-real-router/modules/utils.ts
 
 import type { MouseEvent } from "react";
 import type { Params, Router, State } from "router6";

@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/03-dependencies/3.1-initialization.bench.ts
+// packages/real-router-benchmarks/modules/03-dependencies/3.1-initialization.bench.ts
 
 import { bench } from "mitata";
 

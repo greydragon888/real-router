@@ -136,7 +136,7 @@ export function buildPath(
 
   // Fast path: no params, default options - try pre-computed staticPath
   // R6 optimization: use hasOwnKeys instead of Object.keys().length (avoids array allocation)
-  // R7 optimization: check option VALUES not just keys (enables fast path for router6)
+  // R7 optimization: check option VALUES not just keys (enables fast path for real-router)
   const hasParams = hasOwnKeys(params);
   const hasNonDefaults = hasNonDefaultOptions(options);
 

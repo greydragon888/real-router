@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/mergeStates.ts
+// packages/real-router/modules/transition/mergeStates.ts
 
 import type { Params, State, StateMeta } from "router6-types";
 

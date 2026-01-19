@@ -1,4 +1,4 @@
-// packages/router6/modules/core/state.ts
+// packages/real-router/modules/core/state.ts
 
 import { getSegmentsByName } from "route-tree";
 import {
@@ -344,7 +344,7 @@ export function withState<Dependencies extends DefaultDependencies>(
    * Creates a state for an unmatched (404) route.
    *
    * Used when no route matches the requested path.
-   * The state name is set to `constants.UNKNOWN_ROUTE` ("@@router6/UNKNOWN_ROUTE").
+   * The state name is set to `constants.UNKNOWN_ROUTE` ("@@real-router/UNKNOWN_ROUTE").
    *
    * @param path - The unmatched URL path
    * @param options - Optional navigation options (reload, replace, etc.)
@@ -353,7 +353,7 @@ export function withState<Dependencies extends DefaultDependencies>(
    * @example
    * ```typescript
    * const notFound = router.makeNotFoundState('/non-existent-page');
-   * // { name: '@@router6/UNKNOWN_ROUTE', params: { path: '/non-existent-page' }, ... }
+   * // { name: '@@real-router/UNKNOWN_ROUTE', params: { path: '/non-existent-page' }, ... }
    * ```
    */
   router.makeNotFoundState = (
@@ -501,7 +501,7 @@ export function withState<Dependencies extends DefaultDependencies>(
     validateState(childState, "areStatesDescendants");
 
     console.warn(
-      "[router6] areStatesDescendants is deprecated and will be removed in the next major version. " +
+      "[real-router] areStatesDescendants is deprecated and will be removed in the next major version. " +
         "Use router.isActiveRoute() instead.",
     );
 

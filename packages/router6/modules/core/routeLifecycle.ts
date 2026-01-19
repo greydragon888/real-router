@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routeLifecycle.ts
+// packages/real-router/modules/core/routeLifecycle.ts
 
 import { isBoolean, validateRouteName } from "type-guards";
 

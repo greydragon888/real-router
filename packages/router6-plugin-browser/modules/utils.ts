@@ -1,4 +1,4 @@
-// packages/router6-plugin-browser/modules/utils.ts
+// packages/real-router-plugin-browser/modules/utils.ts
 
 import { errorCodes, events } from "router6";
 import { isStateStrict as isState } from "type-guards";

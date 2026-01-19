@@ -1,4 +1,4 @@
-// packages/router6/modules/internals.ts
+// packages/real-router/modules/internals.ts
 
 /**
  * Typed accessors for internal router storage.

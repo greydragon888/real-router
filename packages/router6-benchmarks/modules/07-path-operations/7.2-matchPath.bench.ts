@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/07-path-operations/7.2-matchPath.bench.ts
+// packages/real-router-benchmarks/modules/07-path-operations/7.2-matchPath.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 
@@ -13,7 +13,7 @@ const routes: Route[] = [
   {
     name: "users",
     path: "/users",
-    // router6: allows any child name (user.profile works even though parent is "users")
+    // real-router: allows any child name (user.profile works even though parent is "users")
     // router5: requires relative child names ("profile"), automatically builds full name "users.profile"
     children: [
       {

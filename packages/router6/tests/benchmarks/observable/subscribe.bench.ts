@@ -302,7 +302,7 @@ boxplot(() => {
 // REACT INTEGRATION PATTERNS
 // ============================================================================
 
-// Simulates RouterProvider pattern from router6/modules/RouterProvider.tsx
+// Simulates RouterProvider pattern from real-router/modules/RouterProvider.tsx
 function simulateRouterProviderPattern(
   router: ReturnType<typeof createRouter>,
 ) {
@@ -320,7 +320,7 @@ function simulateRouterProviderPattern(
   return { getCurrentState: () => currentState, unsubscribe };
 }
 
-// Simulates useRouterSubscription pattern from router6/modules/hooks/useRouterSubscription.tsx
+// Simulates useRouterSubscription pattern from real-router/modules/hooks/useRouterSubscription.tsx
 function simulateUseRouterSubscriptionPattern<T>(
   router: ReturnType<typeof createRouter>,
   selector: (sub?: SubscribeState) => T,

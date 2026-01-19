@@ -1,4 +1,4 @@
-// packages/router6-plugin-browser/modules/plugin.ts
+// packages/real-router-plugin-browser/modules/plugin.ts
 
 import { isStateStrict as isState } from "type-guards";
 
@@ -24,7 +24,7 @@ import type {
 import type { PluginFactory, Router, RouterError, State } from "router6";
 
 /**
- * Browser plugin factory for router6.
+ * Browser plugin factory for real-router.
  * Integrates router with browser history API.
  *
  * Features:
@@ -246,7 +246,7 @@ export function browserPluginFactory(
 
       if (!state) {
         throw new Error(
-          `[router6] Cannot replace state: route "${name}" is not found`,
+          `[real-router] Cannot replace state: route "${name}" is not found`,
         );
       }
 

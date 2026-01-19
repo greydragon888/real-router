@@ -30,7 +30,7 @@ import {
  * validateRouteName("", "add");                        // ok (root node)
  * validateRouteName("home", "add");                    // ok
  * validateRouteName("users.profile", "add");           // ok
- * validateRouteName("@@router6/UNKNOWN_ROUTE", "add"); // ok (system route)
+ * validateRouteName("@@real-router/UNKNOWN_ROUTE", "add"); // ok (system route)
  *
  * @example
  * // Invalid names (throws)
@@ -74,7 +74,7 @@ export function validateRouteName(
     );
   }
 
-  // System routes bypass validation (e.g., @@router6/UNKNOWN_ROUTE)
+  // System routes bypass validation (e.g., @@real-router/UNKNOWN_ROUTE)
   // SECURITY NOTE: System routes are currently created ONLY in router code,
   // not from user input. If this changes, add sanitization for <>"'&\x00-\x1F
   if (name.startsWith("@@")) {

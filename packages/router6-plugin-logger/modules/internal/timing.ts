@@ -1,4 +1,4 @@
-// packages/router6-plugin-logger/modules/internal/timing.ts
+// packages/real-router-plugin-logger/modules/internal/timing.ts
 
 /**
  * Function that returns high-resolution timestamp in milliseconds.

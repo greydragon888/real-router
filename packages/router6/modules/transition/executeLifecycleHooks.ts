@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/executeLifecycleHooks.ts
+// packages/real-router/modules/transition/executeLifecycleHooks.ts
 
 import { isState } from "type-guards";
 
@@ -36,7 +36,11 @@ function safeCallback(
   try {
     callback(error, state);
   } catch (error_) {
-    console.error("router6:lifecycle", "Error in lifecycle callback:", error_);
+    console.error(
+      "real-router:lifecycle",
+      "Error in lifecycle callback:",
+      error_,
+    );
   }
 }
 
@@ -127,7 +131,7 @@ export const executeLifecycleHooks = (
 
       if (hasChanged) {
         console.error(
-          "router6:transition",
+          "real-router:transition",
           "Warning: State mutated during transition",
           { from: currentState, to: newState },
         );

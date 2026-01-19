@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/05-router-options/5.2-modification.bench.ts
+// packages/real-router-benchmarks/modules/05-router-options/5.2-modification.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 
