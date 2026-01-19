@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/12-stress-testing/12.2-route-scaling.bench.ts
+// packages/real-router-benchmarks/modules/12-stress-testing/12.2-route-scaling.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/modules/types.ts
+// packages/real-router-plugin-persistent-params/modules/types.ts
 
 /**
  * Configuration for persistent parameters' plugin.

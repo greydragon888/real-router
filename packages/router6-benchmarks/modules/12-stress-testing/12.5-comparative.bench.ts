@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/12-stress-testing/12.5-comparative.bench.ts
+// packages/real-router-benchmarks/modules/12-stress-testing/12.5-comparative.bench.ts
 
 import { bench } from "mitata";
 

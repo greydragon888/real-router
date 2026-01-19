@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/10-start-stop/10.4-lifecycle-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/10-start-stop/10.4-lifecycle-edge-cases.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

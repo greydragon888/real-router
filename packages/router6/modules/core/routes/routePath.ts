@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routes/routePath.ts
+// packages/real-router/modules/core/routes/routePath.ts
 
 import {
   createRouteTree,
@@ -39,7 +39,7 @@ import type {
  * @internal
  * @todo RFC-1: Replace with direct #options field access from internal contour.
  */
-const BUILD_OPTIONS_CACHE_SYMBOL = Symbol("router6.buildOptionsCache");
+const BUILD_OPTIONS_CACHE_SYMBOL = Symbol("real-router.buildOptionsCache");
 
 /**
  * Type for router with cached buildOptions.
@@ -73,7 +73,7 @@ export function initBuildOptionsCache<Dependencies extends DefaultDependencies>(
 const DEFAULT_ROUTE_NAME = "";
 
 /**
- * Creates RouteNode match options from router6 options.
+ * Creates RouteNode match options from real-router options.
  */
 function createMatchOptions(options: Options): MatchOptions {
   return {
@@ -135,7 +135,7 @@ export function withRoutePath<Dependencies extends DefaultDependencies>(
     // Early validation for better DX (fail-fast with clear message)
     if (!isString(route) || route === "") {
       throw new TypeError(
-        `[router6] buildPath: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
+        `[real-router] buildPath: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
       );
     }
 
@@ -184,7 +184,7 @@ export function withRoutePath<Dependencies extends DefaultDependencies>(
     // Early validation for better DX (fail-fast with clear message)
     if (!isString(route) || route === "") {
       throw new TypeError(
-        `[router6] buildPathWithSegments: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
+        `[real-router] buildPathWithSegments: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
       );
     }
 
@@ -241,7 +241,7 @@ export function withRoutePath<Dependencies extends DefaultDependencies>(
     // Early validation for better DX (fail-fast with clear message)
     if (!isString(path)) {
       throw new TypeError(
-        `[router6] matchPath: path must be a string, got ${typeof path}`,
+        `[real-router] matchPath: path must be a string, got ${typeof path}`,
       );
     }
 
@@ -250,7 +250,7 @@ export function withRoutePath<Dependencies extends DefaultDependencies>(
     // Use full set of options supported by RouteNode
     const matchOptions = createMatchOptions(options);
 
-    // Use low-level API: get segments and build state in router6
+    // Use low-level API: get segments and build state in real-router
     const matchResult = matchSegments(getRouteTree(router), path, matchOptions);
 
     if (matchResult) {

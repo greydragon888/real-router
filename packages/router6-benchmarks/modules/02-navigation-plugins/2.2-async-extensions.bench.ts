@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/02-navigation-plugins/2.2-async-extensions.bench.ts
+// packages/real-router-benchmarks/modules/02-navigation-plugins/2.2-async-extensions.bench.ts
 
 import { bench } from "mitata";
 

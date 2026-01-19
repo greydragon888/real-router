@@ -1,4 +1,4 @@
-// packages/router6-plugin-browser/modules/browser.ts
+// packages/real-router-plugin-browser/modules/browser.ts
 
 import { isHistoryState } from "type-guards";
 

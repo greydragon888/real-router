@@ -35,23 +35,23 @@ router.navigate("cart", { id: "2" });
 
 ```bash
 # npm
-npm install router6-plugin-persistent-params
+npm install real-router-plugin-persistent-params
 
 # yarn
-yarn add router6-plugin-persistent-params
+yarn add real-router-plugin-persistent-params
 
 # pnpm
-pnpm add router6-plugin-persistent-params
+pnpm add real-router-plugin-persistent-params
 
 # bun
-bun add router6-plugin-persistent-params
+bun add real-router-plugin-persistent-params
 ```
 
 ## Quick Start
 
 ```typescript
-import { createRouter } from "router6";
-import persistentParamsPlugin from "router6-plugin-persistent-params";
+import { createRouter } from "real-router";
+import persistentParamsPlugin from "real-router-plugin-persistent-params";
 
 const router = createRouter([
   { name: "home", path: "/" },
@@ -463,8 +463,8 @@ router.navigate("products", { category: "books" });
 ### Combination with Other Plugins
 
 ```typescript
-import browserPlugin from "router6-plugin-browser";
-import loggerPlugin from "router6-plugin-logger";
+import browserPlugin from "real-router-plugin-browser";
+import loggerPlugin from "real-router-plugin-logger";
 
 router.usePlugin(browserPlugin());
 router.usePlugin(loggerPlugin());
@@ -499,7 +499,7 @@ The plugin is fully typed:
 ```typescript
 import persistentParamsPlugin, {
   type PersistentParamsConfig,
-} from "router6-plugin-persistent-params";
+} from "real-router-plugin-persistent-params";
 
 // Configuration types
 const config1: PersistentParamsConfig = ["mode", "lang"];

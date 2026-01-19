@@ -64,5 +64,5 @@ describe("ConnectedLink component", () => {
     expect(a.getAttribute("href")).toStrictEqual("/home");
     expect(a.className).toContain("custom-class");
   });
-  // add test for the state packages/router6-plugin-browser/modules/browser.ts:87
+  // add test for the state packages/real-router-plugin-browser/modules/browser.ts:87
 });

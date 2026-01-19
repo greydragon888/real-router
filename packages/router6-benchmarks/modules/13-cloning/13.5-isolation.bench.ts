@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/13-cloning/13.5-isolation.bench.ts
+// packages/real-router-benchmarks/modules/13-cloning/13.5-isolation.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

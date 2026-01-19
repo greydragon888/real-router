@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/modules/constants.ts
+// packages/real-router-plugin-persistent-params/modules/constants.ts
 
 /**
  * Symbol to mark router as initialized with this plugin.

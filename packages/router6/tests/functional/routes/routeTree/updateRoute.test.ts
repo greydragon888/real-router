@@ -57,7 +57,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-from", { forwardTo: "nonexistent" }),
       ).toThrowError(
-        '[router6] updateRoute: forwardTo target "nonexistent" does not exist',
+        '[real-router] updateRoute: forwardTo target "nonexistent" does not exist',
       );
     });
 
@@ -76,7 +76,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-static", { forwardTo: "ur-param" }),
       ).toThrowError(
-        '[router6] updateRoute: forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
+        '[real-router] updateRoute: forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
       );
     });
 
@@ -398,7 +398,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("nonexistent", { defaultParams: { x: 1 } }),
       ).toThrowError(
-        '[router6] updateRoute: route "nonexistent" does not exist',
+        '[real-router] updateRoute: route "nonexistent" does not exist',
       );
     });
 
@@ -477,7 +477,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-null-test", null as unknown as object),
       ).toThrowError(
-        "[router6] updateRoute: updates must be an object, got null",
+        "[real-router] updateRoute: updates must be an object, got null",
       );
     });
 
@@ -487,13 +487,13 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-prim-test", "string" as unknown as object),
       ).toThrowError(
-        "[router6] updateRoute: updates must be an object, got string",
+        "[real-router] updateRoute: updates must be an object, got string",
       );
 
       expect(() =>
         router.updateRoute("ur-prim-test", 123 as unknown as object),
       ).toThrowError(
-        "[router6] updateRoute: updates must be an object, got number",
+        "[real-router] updateRoute: updates must be an object, got number",
       );
     });
 
@@ -503,7 +503,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-arr-test", [] as unknown as object),
       ).toThrowError(
-        "[router6] updateRoute: updates must be an object, got array",
+        "[real-router] updateRoute: updates must be an object, got array",
       );
     });
 
@@ -516,7 +516,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: "string" as unknown as Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: defaultParams must be an object or null, got string",
+        "[real-router] updateRoute: defaultParams must be an object or null, got string",
       );
 
       // Not an object (number)
@@ -525,7 +525,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: 123 as unknown as Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: defaultParams must be an object or null, got number",
+        "[real-router] updateRoute: defaultParams must be an object or null, got number",
       );
 
       // Array is not valid for defaultParams
@@ -534,7 +534,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: [] as unknown as Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: defaultParams must be an object or null, got array",
+        "[real-router] updateRoute: defaultParams must be an object or null, got array",
       );
 
       // Function is not valid for defaultParams
@@ -543,7 +543,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: (() => ({})) as unknown as Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: defaultParams must be an object or null, got function",
+        "[real-router] updateRoute: defaultParams must be an object or null, got function",
       );
     });
 
@@ -556,7 +556,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           decodeParams: "string" as unknown as (params: Params) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: decodeParams must be a function or null, got string",
+        "[real-router] updateRoute: decodeParams must be a function or null, got string",
       );
 
       // Not a function (object)
@@ -565,7 +565,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           decodeParams: {} as unknown as (params: Params) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: decodeParams must be a function or null, got object",
+        "[real-router] updateRoute: decodeParams must be a function or null, got object",
       );
 
       // Not a function (number)
@@ -574,7 +574,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           decodeParams: 42 as unknown as (params: Params) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: decodeParams must be a function or null, got number",
+        "[real-router] updateRoute: decodeParams must be a function or null, got number",
       );
     });
 
@@ -587,7 +587,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           encodeParams: "string" as unknown as (params: Params) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: encodeParams must be a function or null, got string",
+        "[real-router] updateRoute: encodeParams must be a function or null, got string",
       );
 
       // Not a function (array)
@@ -596,7 +596,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           encodeParams: [] as unknown as (params: Params) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: encodeParams must be a function or null, got object",
+        "[real-router] updateRoute: encodeParams must be a function or null, got object",
       );
     });
 
@@ -612,7 +612,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           ) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: decodeParams cannot be an async function",
+        "[real-router] updateRoute: decodeParams cannot be an async function",
       );
     });
 
@@ -628,7 +628,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           ) => Params,
         }),
       ).toThrowError(
-        "[router6] updateRoute: encodeParams cannot be an async function",
+        "[real-router] updateRoute: encodeParams cannot be an async function",
       );
     });
 
@@ -740,7 +740,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-solo.missing", { defaultParams: { x: 1 } }),
       ).toThrowError(
-        '[router6] updateRoute: route "ur-solo.missing" does not exist',
+        '[real-router] updateRoute: route "ur-solo.missing" does not exist',
       );
     });
   });

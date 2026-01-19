@@ -1,4 +1,4 @@
-// packages/react-router6/modules/components/ConnectedLink.tsx
+// packages/react-real-router/modules/components/ConnectedLink.tsx
 
 import { useRoute } from "react-router6";
 

@@ -736,7 +736,7 @@ export default tsEslint.config(
     files: [
       "**/*.bench.ts",
       "**/*.mitata.ts",
-      "**/router6-benchmarks/modules/**/*.ts",
+      "**/real-router-benchmarks/modules/**/*.ts",
       "**/tests/benchmarks/**/*.ts",
     ],
     rules: {

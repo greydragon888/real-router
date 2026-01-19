@@ -1,6 +1,6 @@
-// packages/router6-plugin-browser/modules/index.ts
+// packages/real-router-plugin-browser/modules/index.ts
 
-// Public API exports for router6-plugin-browser
+// Public API exports for real-router-plugin-browser
 
 import type { Params, State } from "router6";
 
@@ -19,7 +19,7 @@ export type {
 export { isStateStrict as isState, isHistoryState } from "type-guards";
 
 /**
- * Module augmentation for router6.
+ * Module augmentation for real-router.
  * Extends Router interface with browser plugin methods.
  */
 declare module "router6" {

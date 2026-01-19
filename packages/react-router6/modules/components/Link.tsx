@@ -1,4 +1,4 @@
-// packages/react-router6/modules/components/Link.tsx
+// packages/react-real-router/modules/components/Link.tsx
 
 import { useRouter } from "react-router6";
 

@@ -1,4 +1,4 @@
-// packages/router6-types/modules/base.ts
+// packages/real-router-types/modules/base.ts
 
 // Note: RouteTreeState is exported from route-node-types.ts
 // It uses RouteParams as default type parameter.
@@ -39,9 +39,9 @@ export type StateMetaInput<P extends Params = Params> = Omit<
 
 /**
  * RouterError interface describing the public API of the RouterError class.
- * The actual class implementation is in the router6 package.
+ * The actual class implementation is in the real-router package.
  * This interface enables structural typing compatibility between
- * router6-types and router6 packages.
+ * real-router-types and real-router packages.
  */
 export interface RouterError extends Error {
   [key: string]: unknown;

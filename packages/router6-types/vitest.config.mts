@@ -2,7 +2,7 @@ import { mergeConfig, defineProject } from "vitest/config";
 import unitConfig from "../../vitest.config.unit.mjs";
 
 /**
- * Vitest configuration for router6-types package
+ * Vitest configuration for real-router-types package
  * Extends root unit config with Node.js environment
  */
 export default mergeConfig(

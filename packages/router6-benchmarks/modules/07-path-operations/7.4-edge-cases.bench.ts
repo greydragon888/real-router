@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/07-path-operations/7.4-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/07-path-operations/7.4-edge-cases.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

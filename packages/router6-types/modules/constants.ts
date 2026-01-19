@@ -1,4 +1,4 @@
-// packages/router6-types/modules/constants.ts
+// packages/real-router-types/modules/constants.ts
 
 /**
  * Plugin lifecycle method names

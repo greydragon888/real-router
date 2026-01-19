@@ -7,7 +7,7 @@
  * - Depth scaling (1-10 levels)
  * - Real-world patterns (useRouteNode, sidebar, fast navigation)
  *
- * This method is used by router6's useRouteNode hook to determine
+ * This method is used by real-router's useRouteNode hook to determine
  * if a component should re-render on route changes.
  */
 
@@ -127,7 +127,7 @@ boxplot(() => {
       router.shouldUpdateNode("users.view.details.settings");
     });
 
-    // Simulate WeakMap caching pattern from router6
+    // Simulate WeakMap caching pattern from real-router
     const cache = new Map<string, ReturnType<typeof router.shouldUpdateNode>>();
 
     bench("factory: cached lookup (WeakMap pattern)", () => {
@@ -151,7 +151,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(CORE_ROUTES);
 
-    // Pre-create predicates (as in router6)
+    // Pre-create predicates (as in real-router)
     const rootPredicate = router.shouldUpdateNode("");
     const usersPredicate = router.shouldUpdateNode("users");
     const usersViewPredicate = router.shouldUpdateNode(ROUTE_USERS_VIEW);

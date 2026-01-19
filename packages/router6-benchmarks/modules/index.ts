@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/index.ts
+// packages/real-router-benchmarks/modules/index.ts
 
 /**
  * Router6 Benchmarks Entry Point
@@ -78,8 +78,8 @@ import "./13-cloning/13.6-edge-cases.bench";
 // Run benchmarks and save results
 // ============================================================================
 
-// Determine router version from environment (router5 or router6)
-const routerVersion = process.env.BENCH_ROUTER ?? "router6";
+// Determine router version from environment (router5 or real-router)
+const routerVersion = process.env.BENCH_ROUTER ?? "real-router";
 
 const OUTPUT_DIR = fileURLToPath(
   // @ts-expect-error - import.meta.url is supported by tsx runtime

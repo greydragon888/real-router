@@ -7,10 +7,10 @@ const __dirname = dirname(__filename);
 
 /**
  * Vitest конфигурация для Stryker mutation testing
- * Router6-plugin-logger зависит от logger, router6, router6-types
+ * Router6-plugin-logger зависит от logger, real-router, real-router-types
  *
  * КРИТИЧНО: относительный путь для ЭТОГО пакета, absolute для dependencies!
- * - router6-plugin-logger: ./modules (мутированный код в sandbox)
+ * - real-router-plugin-logger: ./modules (мутированный код в sandbox)
  * - workspace deps: абсолютные пути к ОРИГИНАЛЬНОМУ коду
  */
 export default defineConfig({
@@ -23,11 +23,11 @@ export default defineConfig({
       "router6-plugin-logger": resolve(__dirname, "./modules/index.ts"),
       // Workspace deps: ABSOLUTE = original unmutated code (work!)
       logger:
-        "/Users/olegivanov/WebstormProjects/router6/packages/logger/modules/index.ts",
+        "/Users/olegivanov/WebstormProjects/real-router/packages/logger/modules/index.ts",
       router5:
-        "/Users/olegivanov/WebstormProjects/router6/packages/router5/modules/index.ts",
+        "/Users/olegivanov/WebstormProjects/real-router/packages/router5/modules/index.ts",
       "router5-types":
-        "/Users/olegivanov/WebstormProjects/router6/packages/router5-types/modules/index.ts",
+        "/Users/olegivanov/WebstormProjects/real-router/packages/router5-types/modules/index.ts",
     },
   },
 

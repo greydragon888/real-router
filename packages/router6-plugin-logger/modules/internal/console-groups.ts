@@ -1,4 +1,4 @@
-// packages/router6-plugin-logger/modules/internal/console-groups.ts
+// packages/real-router-plugin-logger/modules/internal/console-groups.ts
 
 /**
  * Checks if console.group is supported in the current environment.

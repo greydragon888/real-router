@@ -70,7 +70,7 @@ boxplot(() => {
     });
 
     bench("validateRouteName: system route", () => {
-      validateRouteName("@@router6/UNKNOWN_ROUTE", methodName);
+      validateRouteName("@@real-router/UNKNOWN_ROUTE", methodName);
     });
 
     bench("validateRouteName: system route (short)", () => {

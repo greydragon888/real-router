@@ -47,7 +47,7 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:lifecycle",
+        "real-router:lifecycle",
         "Error in lifecycle callback:",
         expect.any(Error),
       );
@@ -88,7 +88,7 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:lifecycle",
+        "real-router:lifecycle",
         "Error in lifecycle callback:",
         expect.any(Error),
       );
@@ -142,7 +142,7 @@ describe("transition/executeLifecycleHooks", () => {
       });
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:lifecycle",
+        "real-router:lifecycle",
         "Error in lifecycle callback:",
         expect.any(Error),
       );
@@ -183,7 +183,7 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        "router6:lifecycle",
+        "real-router:lifecycle",
         "Error in lifecycle callback:",
         expect.any(Error),
       );

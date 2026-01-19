@@ -1,4 +1,4 @@
-// packages/router6-helpers/modules/routeRelation.ts
+// packages/real-router-helpers/modules/routeRelation.ts
 
 /**
  * Checks if two routes are related in the hierarchy.

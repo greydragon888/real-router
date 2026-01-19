@@ -1,4 +1,4 @@
-// packages/react-router6/modules/constants.ts
+// packages/react-real-router/modules/constants.ts
 
 /**
  * Stable empty object for default params

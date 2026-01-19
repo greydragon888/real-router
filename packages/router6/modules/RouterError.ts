@@ -1,4 +1,4 @@
-// packages/router6/modules/RouterError.ts
+// packages/real-router/modules/RouterError.ts
 
 import { errorCodes } from "./constants";
 import { deepFreezeState } from "./helpers";
@@ -26,7 +26,7 @@ export class RouterError extends Error {
   [key: string]: unknown;
 
   // Using public properties to ensure structural compatibility
-  // with RouterError interface in router6-types
+  // with RouterError interface in real-router-types
   readonly segment: string | undefined;
   readonly path: string | undefined;
   readonly redirect: State | undefined;

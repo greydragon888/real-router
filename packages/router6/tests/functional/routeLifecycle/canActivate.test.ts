@@ -285,12 +285,12 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should allow system routes with @@ prefix", () => {
       expect(() => {
-        router.canActivate("@@router6/UNKNOWN_ROUTE", false);
+        router.canActivate("@@real-router/UNKNOWN_ROUTE", false);
       }).not.toThrowError();
 
       const [, activateFns] = router.getLifecycleFunctions();
 
-      expectTypeOf(activateFns.get("@@router6/UNKNOWN_ROUTE")!).toBeFunction();
+      expectTypeOf(activateFns.get("@@real-router/UNKNOWN_ROUTE")!).toBeFunction();
     });
 
     it("should register guard for nonexistent route without error", () => {

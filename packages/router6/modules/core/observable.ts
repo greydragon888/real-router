@@ -1,4 +1,4 @@
-// packages/router6/modules/core/observable.ts
+// packages/real-router/modules/core/observable.ts
 
 import { isNavigationOptions, isState } from "type-guards";
 

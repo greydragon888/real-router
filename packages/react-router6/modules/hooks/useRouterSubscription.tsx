@@ -1,4 +1,4 @@
-// packages/react-router6/modules/hooks/useRouterSubscription.tsx
+// packages/react-real-router/modules/hooks/useRouterSubscription.tsx
 
 import { useCallback, useRef, useSyncExternalStore } from "react";
 

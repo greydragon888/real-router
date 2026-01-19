@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/13-cloning/13.6-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/13-cloning/13.6-edge-cases.bench.ts
 
 import { bench, do_not_optimize } from "mitata";
 

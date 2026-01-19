@@ -1,4 +1,4 @@
-// packages/router6-plugin-persistent-params/modules/plugin.ts
+// packages/real-router-plugin-persistent-params/modules/plugin.ts
 
 import { PLUGIN_MARKER } from "./constants";
 import {
@@ -284,7 +284,7 @@ export function persistentParamsPluginFactory(
         } catch (error) {
           // Log error but don't break navigation
           console.error(
-            "router6-plugin-persistent-params",
+            "real-router-plugin-persistent-params",
             "Error updating persistent params:",
             error,
           );
@@ -309,7 +309,7 @@ export function persistentParamsPluginFactory(
           delete (router as Record<symbol, boolean>)[PLUGIN_MARKER];
         } catch (error) {
           console.error(
-            "router6-plugin-persistent-params",
+            "real-router-plugin-persistent-params",
             "Error during teardown:",
             error,
           );

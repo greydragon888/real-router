@@ -1,4 +1,4 @@
-// packages/router6-types/modules/index.ts
+// packages/real-router-types/modules/index.ts
 
 // Route node types
 export type {
@@ -52,5 +52,5 @@ export type {
   ErrorCodeToValueMap,
 } from "./constants";
 
-// Note: RouterError type is a forward declaration matching the class in router6 package
-// Use import { RouterError } from "router6" for the actual class implementation
+// Note: RouterError type is a forward declaration matching the class in real-router package
+// Use import { RouterError } from "real-router" for the actual class implementation

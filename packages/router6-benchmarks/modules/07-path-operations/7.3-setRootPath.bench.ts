@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/07-path-operations/7.3-setRootPath.bench.ts
+// packages/real-router-benchmarks/modules/07-path-operations/7.3-setRootPath.bench.ts
 
 import { bench } from "mitata";
 

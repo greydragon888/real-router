@@ -1,4 +1,4 @@
-// packages/router6-plugin-browser/modules/constants.ts
+// packages/real-router-plugin-browser/modules/constants.ts
 
 /**
  * Internal type for default options.
@@ -50,4 +50,4 @@ export const defaultOptions: DefaultBrowserPluginOptions = {
  */
 export const source = "popstate";
 
-export const LOGGER_CONTEXT = "router6-plugin-browser";
+export const LOGGER_CONTEXT = "real-router-plugin-browser";

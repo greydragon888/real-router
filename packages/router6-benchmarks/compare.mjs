@@ -194,7 +194,7 @@ function formatMemory(kb) {
 
 /**
  * Format percentage difference with color and multiplier for large differences
- * Negative diff = router6 better (green), positive = router6 worse (red)
+ * Negative diff = real-router better (green), positive = real-router worse (red)
  * @param {string} type - "time" or "memory" to use appropriate labels
  */
 function formatDiff(diff, r5Value = null, r6Value = null, type = "time") {
@@ -209,10 +209,10 @@ function formatDiff(diff, r5Value = null, r6Value = null, type = "time") {
     const ratio = r5Value / r6Value;
 
     if (ratio >= 2) {
-      // router6 is 2x+ better
+      // real-router is 2x+ better
       return `${color}${sign}${diff.toFixed(2)}% (${ratio.toFixed(1)}x ${betterLabel})${RESET}`;
     } else if (ratio <= 0.5) {
-      // router6 is 2x+ worse
+      // real-router is 2x+ worse
       return `${color}${sign}${diff.toFixed(2)}% (${(1 / ratio).toFixed(1)}x ${worseLabel})${RESET}`;
     }
   }

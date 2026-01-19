@@ -176,7 +176,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): Options[] => {
  *
  * @example
  * ```ts
- * // packages/router6-plugin-browser/tsup.config.mts
+ * // packages/real-router-plugin-browser/tsup.config.mts
  * export default createBrowserConfig();
  * ```
  */
@@ -190,7 +190,7 @@ export const createBrowserConfig = (
  *
  * @example
  * ```ts
- * // packages/router6/tsup.config.mts
+ * // packages/real-router/tsup.config.mts
  * export default createIsomorphicConfig();
  * ```
  */

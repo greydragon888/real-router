@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/wrapSyncError.ts
+// packages/real-router/modules/transition/wrapSyncError.ts
 
 /**
  * Error metadata structure for transition errors.

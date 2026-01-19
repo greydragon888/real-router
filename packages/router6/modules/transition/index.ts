@@ -1,4 +1,4 @@
-// packages/router6/modules/transition/index.ts
+// packages/real-router/modules/transition/index.ts
 
 import { RouterError, constants, errorCodes } from "router6";
 

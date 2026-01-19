@@ -1,4 +1,4 @@
-// packages/router6/modules/typeGuards.ts
+// packages/real-router/modules/typeGuards.ts
 
 /**
  * Re-export common type guards from centralized type-guards package

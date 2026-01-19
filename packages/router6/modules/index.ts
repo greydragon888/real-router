@@ -1,6 +1,6 @@
-// packages/router6/modules/index.ts
+// packages/real-router/modules/index.ts
 
-// Types (re-exported from router6-types)
+// Types (re-exported from real-router-types)
 export type {
   ActivationFn,
   ActivationFnFactory,

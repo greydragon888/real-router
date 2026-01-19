@@ -1,4 +1,4 @@
-// packages/react-router6/modules/hooks/useRouteNode.tsx
+// packages/react-real-router/modules/hooks/useRouteNode.tsx
 
 import { useCallback, useMemo } from "react";
 

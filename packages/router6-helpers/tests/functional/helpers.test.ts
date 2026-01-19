@@ -9,7 +9,7 @@ import {
 
 import type { State } from "router6";
 
-describe("router6-helpers", () => {
+describe("real-router-helpers", () => {
   describe("startsWithSegment", () => {
     describe("basic functionality", () => {
       it("should return true if a route starts with a segment", () => {

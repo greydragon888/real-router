@@ -8,7 +8,7 @@
  * - Depth scaling (shallow, medium, deep route hierarchies)
  * - Real-world patterns (nav bar, sidebar, breadcrumb)
  *
- * This is a hot path method called by router6's useIsActiveRoute hook
+ * This is a hot path method called by real-router's useIsActiveRoute hook
  * on every route change for every Link component.
  */
 

@@ -30,7 +30,7 @@ describe("core/routes/routePath/matchPath", () => {
         TypeError,
       );
       expect(() => router.matchPath(null as unknown as string)).toThrowError(
-        "[router6] matchPath: path must be a string, got object",
+        "[real-router] matchPath: path must be a string, got object",
       );
     });
 
@@ -41,7 +41,7 @@ describe("core/routes/routePath/matchPath", () => {
       expect(() =>
         router.matchPath(undefined as unknown as string),
       ).toThrowError(
-        "[router6] matchPath: path must be a string, got undefined",
+        "[real-router] matchPath: path must be a string, got undefined",
       );
     });
 
@@ -50,7 +50,7 @@ describe("core/routes/routePath/matchPath", () => {
         TypeError,
       );
       expect(() => router.matchPath(123 as unknown as string)).toThrowError(
-        "[router6] matchPath: path must be a string, got number",
+        "[real-router] matchPath: path must be a string, got number",
       );
     });
 
@@ -59,7 +59,7 @@ describe("core/routes/routePath/matchPath", () => {
         TypeError,
       );
       expect(() => router.matchPath({} as unknown as string)).toThrowError(
-        "[router6] matchPath: path must be a string, got object",
+        "[real-router] matchPath: path must be a string, got object",
       );
     });
 

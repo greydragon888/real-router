@@ -22,7 +22,7 @@ describe("core/routes/routeTree/forward", () => {
       router.addRoute({ name: "target", path: "/target" });
 
       expect(() => router.forward("nonexistent", "target")).toThrowError(
-        '[router6] forward: source route "nonexistent" does not exist',
+        '[real-router] forward: source route "nonexistent" does not exist',
       );
     });
 
@@ -30,7 +30,7 @@ describe("core/routes/routeTree/forward", () => {
       router.addRoute({ name: "source", path: "/source" });
 
       expect(() => router.forward("source", "nonexistent")).toThrowError(
-        '[router6] forward: target route "nonexistent" does not exist',
+        '[real-router] forward: target route "nonexistent" does not exist',
       );
     });
 
@@ -41,7 +41,7 @@ describe("core/routes/routeTree/forward", () => {
       expect(() =>
         router.forward("fwd-static-source", "fwd-param-target"),
       ).toThrowError(
-        '[router6] forward: target route "fwd-param-target" requires params [id] that are not available in source route "fwd-static-source"',
+        '[real-router] forward: target route "fwd-param-target" requires params [id] that are not available in source route "fwd-static-source"',
       );
     });
 
@@ -55,7 +55,7 @@ describe("core/routes/routeTree/forward", () => {
       expect(() =>
         router.forward("fwd-list-source", "fwd-item-target"),
       ).toThrowError(
-        '[router6] forward: target route "fwd-item-target" requires params [category, id] that are not available in source route "fwd-list-source"',
+        '[real-router] forward: target route "fwd-item-target" requires params [category, id] that are not available in source route "fwd-list-source"',
       );
     });
 
@@ -66,7 +66,7 @@ describe("core/routes/routeTree/forward", () => {
       expect(() =>
         router.forward("fwd-root-source", "fwd-files-target"),
       ).toThrowError(
-        '[router6] forward: target route "fwd-files-target" requires params [path] that are not available in source route "fwd-root-source"',
+        '[real-router] forward: target route "fwd-files-target" requires params [path] that are not available in source route "fwd-root-source"',
       );
     });
 
@@ -130,7 +130,7 @@ describe("core/routes/routeTree/forward", () => {
       expect(() =>
         router.forward("fwd-teams.all", "fwd-orgs.info"),
       ).toThrowError(
-        '[router6] forward: target route "fwd-orgs.info" requires params [orgId] that are not available in source route "fwd-teams.all"',
+        '[real-router] forward: target route "fwd-orgs.info" requires params [orgId] that are not available in source route "fwd-teams.all"',
       );
     });
   });

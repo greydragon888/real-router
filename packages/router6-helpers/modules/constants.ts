@@ -1,4 +1,4 @@
-// packages/router6-helpers/modules/constants.ts
+// packages/real-router-helpers/modules/constants.ts
 
 /**
  * Maximum allowed segment length (10,000 characters)

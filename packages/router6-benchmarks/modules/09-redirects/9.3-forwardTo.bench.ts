@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/09-redirects/9.3-forwardTo.bench.ts
+// packages/real-router-benchmarks/modules/09-redirects/9.3-forwardTo.bench.ts
 
 import { bench } from "mitata";
 

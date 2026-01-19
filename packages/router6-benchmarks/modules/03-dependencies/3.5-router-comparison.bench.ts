@@ -1,13 +1,13 @@
-// packages/router6-benchmarks/modules/03-dependencies/3.5-router-comparison.bench.ts
+// packages/real-router-benchmarks/modules/03-dependencies/3.5-router-comparison.bench.ts
 
 /**
  * Router5 vs Router6 Dependency Access Comparison
  *
- * This file compares dependency access performance between router5 and router6.
+ * This file compares dependency access performance between router5 and real-router.
  * Both routers support dependencies passed to createRouter() and accessed via
  * getDependency() in middleware, guards, and plugins.
  *
- * Note: setDependency/removeDependency are router6-only APIs.
+ * Note: setDependency/removeDependency are real-router-only APIs.
  * These tests use the common API available in both routers.
  */
 
@@ -21,7 +21,7 @@ const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 /**
  * API Compatibility:
- * - router6: factory receives (router, getDependency) where getDependency is a function
+ * - real-router: factory receives (router, getDependency) where getDependency is a function
  * - router5: factory receives (router, dependencies) where dependencies is the object
  *
  * This helper normalizes the API to always use getDependency function style.
@@ -540,15 +540,15 @@ const alternatingRoutes = ["about", "home"];
   ).gc("inner");
 }
 
-// router6-only tests for dynamic dependency management
-// These tests demonstrate router6's extended dependency API
+// real-router-only tests for dynamic dependency management
+// These tests demonstrate real-router's extended dependency API
 
-// 3.5.14 Batch: setDependency/removeDependency cycle (router6 only)
+// 3.5.14 Batch: setDependency/removeDependency cycle (real-router only)
 if (!IS_ROUTER5) {
   const router = createRouter(routes, {}, testDependencies);
 
   bench(
-    "3.5.14 Batch: setDependency/removeDependency cycle (1000 iterations, router6 only)",
+    "3.5.14 Batch: setDependency/removeDependency cycle (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
         // @ts-expect-error - test dependency
@@ -560,12 +560,12 @@ if (!IS_ROUTER5) {
   ).gc("inner");
 }
 
-// 3.5.15 Batch: getDependency direct access (router6 only)
+// 3.5.15 Batch: getDependency direct access (real-router only)
 if (!IS_ROUTER5) {
   const router = createRouter(routes, {}, testDependencies);
 
   bench(
-    "3.5.15 Batch: getDependency direct access (1000 iterations, router6 only)",
+    "3.5.15 Batch: getDependency direct access (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
         do_not_optimize(router.getDependency("authService"));
@@ -574,13 +574,13 @@ if (!IS_ROUTER5) {
   ).gc("inner");
 }
 
-// 3.5.16 Batch: hasDependency check (router6 only)
+// 3.5.16 Batch: hasDependency check (real-router only)
 if (!IS_ROUTER5) {
   const router = createRouter(routes, {}, testDependencies);
   const keys = ["authService", "nonExistent"];
 
   bench(
-    "3.5.16 Batch: hasDependency check (1000 iterations, router6 only)",
+    "3.5.16 Batch: hasDependency check (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
         // @ts-expect-error - test dependency
@@ -590,7 +590,7 @@ if (!IS_ROUTER5) {
   ).gc("inner");
 }
 
-// 3.5.17 Batch: setDependencies/resetDependencies cycle (router6 only)
+// 3.5.17 Batch: setDependencies/resetDependencies cycle (real-router only)
 if (!IS_ROUTER5) {
   const simpleRoutes: Route[] = [
     { name: "home", path: "/" },
@@ -602,7 +602,7 @@ if (!IS_ROUTER5) {
   const depsSets = [deps1, deps2];
 
   bench(
-    "3.5.17 Batch: setDependencies/resetDependencies cycle (1000 iterations, router6 only)",
+    "3.5.17 Batch: setDependencies/resetDependencies cycle (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
         router.setDependencies(depsSets[i % 2]);

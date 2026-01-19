@@ -1,4 +1,4 @@
-// packages/react-router6/modules/hooks/useIsActiveRoute.tsx
+// packages/react-real-router/modules/hooks/useIsActiveRoute.tsx
 
 import { useCallback, useMemo, useRef } from "react";
 import { areRoutesRelated } from "router6-helpers";

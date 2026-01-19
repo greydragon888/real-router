@@ -1,4 +1,4 @@
-// packages/router6-plugin-logger/modules/types.ts
+// packages/real-router-plugin-logger/modules/types.ts
 
 /**
  * Represents differences between two parameter objects.
@@ -52,7 +52,7 @@ export interface LoggerPluginConfig {
    * Custom context name for logger.
    * Useful when running multiple routers.
    *
-   * @default 'router6-plugin-logger'
+   * @default 'real-router-plugin-logger'
    */
   context?: string;
 }

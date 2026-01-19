@@ -1,11 +1,11 @@
-// packages/router6/modules/core/stateBuilder.ts
+// packages/real-router/modules/core/stateBuilder.ts
 
 /**
  * State Builder Utilities.
  *
  * Functions for building RouteTreeState from raw route segments.
  * This module handles the conversion from low-level route-node data
- * to the higher-level state representation used by router6.
+ * to the higher-level state representation used by real-router.
  *
  * @module core/stateBuilder
  */

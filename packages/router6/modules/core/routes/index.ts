@@ -1,4 +1,4 @@
-// packages/router6/modules/core/routes.ts
+// packages/real-router/modules/core/routes.ts
 
 import { withRoutePath } from "./routePath";
 import { withRouteQuery } from "./routeQuery";

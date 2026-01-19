@@ -178,7 +178,7 @@ export interface PersistentParamsPluginOptions {
 
 /**
  * Creates a simplified persistent params plugin.
- * Lighter version of router6-plugin-persistent-params for testing.
+ * Lighter version of real-router-plugin-persistent-params for testing.
  *
  * @example
  * router.usePlugin(createPersistentParamsPlugin({ params: ["lang", "theme"] }));
@@ -282,7 +282,7 @@ export interface LoggerPluginOptions {
 
 /**
  * Creates a simplified logger plugin.
- * Lighter version of router6-plugin-logger for testing.
+ * Lighter version of real-router-plugin-logger for testing.
  *
  * @example
  * const logs: string[] = [];

@@ -1,4 +1,4 @@
-// packages/router6-helpers/modules/index.ts
+// packages/real-router-helpers/modules/index.ts
 
 import {
   MAX_SEGMENT_LENGTH,
@@ -69,7 +69,7 @@ const makeSegmentTester = (start: string, end: string) => {
   // eslint-disable-next-line sonarjs/function-return-type
   return (route: State | string, segment?: string | null) => {
     // Extract route name, handling both string and State object inputs
-    // State.name is always string by router6 type definition
+    // State.name is always string by real-router type definition
     const name = typeof route === "string" ? route : route.name;
 
     if (typeof name !== "string") {

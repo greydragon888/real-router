@@ -731,8 +731,8 @@ describe("Persistent params plugin", () => {
       });
 
       it("should reject functions as parameter values", () => {
-        // Note: router6 core validates params in buildStateWithSegments before
-        // plugin's forwardState interception, so error message comes from router6
+        // Note: real-router core validates params in buildStateWithSegments before
+        // plugin's forwardState interception, so error message comes from real-router
         expect(() => {
           router.navigate("route1", {
             id: "1",
@@ -783,10 +783,10 @@ describe("Persistent params plugin", () => {
       });
 
       it("should only process own properties", () => {
-        // Note: router6 core now validates that params have standard prototype
+        // Note: real-router core now validates that params have standard prototype
         // (null or Object.prototype) in isParams(). Objects created with
         // Object.create(customProto) are rejected before plugin processing.
-        // This test verifies that router6 rejects such objects.
+        // This test verifies that real-router rejects such objects.
         const params = Object.create({ inherited: "value" });
 
         params.mode = "dev";
@@ -1010,7 +1010,7 @@ describe("Persistent params plugin", () => {
       unsubscribe();
 
       expect(consoleError).toHaveBeenCalledWith(
-        "router6-plugin-persistent-params",
+        "real-router-plugin-persistent-params",
         "Error during teardown:",
         expect.any(Error),
       );
@@ -1019,7 +1019,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should propagate errors from params getters during validation", () => {
-      // Note: router6 core validates params in isParams() which reads all values.
+      // Note: real-router core validates params in isParams() which reads all values.
       // If a getter throws, the error propagates directly without wrapping.
       // This test verifies error propagation behavior.
       router.usePlugin(persistentParamsPlugin(["mode"]));
@@ -1039,7 +1039,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should propagate non-Error thrown values from params getters", () => {
-      // Note: router6 core validates params in isParams() which reads all values.
+      // Note: real-router core validates params in isParams() which reads all values.
       // If a getter throws a non-Error value, it propagates directly.
       router.usePlugin(persistentParamsPlugin(["mode"]));
       router.start();
@@ -1089,7 +1089,7 @@ describe("Persistent params plugin", () => {
       );
 
       expect(consoleError).toHaveBeenCalledWith(
-        "router6-plugin-persistent-params",
+        "real-router-plugin-persistent-params",
         "Error updating persistent params:",
         expect.any(Error),
       );

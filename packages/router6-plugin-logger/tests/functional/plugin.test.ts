@@ -7,7 +7,7 @@ import type { Router } from "router6";
 
 const noop = () => {};
 
-describe("router6-plugin-logger", () => {
+describe("real-router-plugin-logger", () => {
   let router: Router;
   let loggerSpy: ReturnType<typeof vi.spyOn>;
   let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -51,7 +51,7 @@ describe("router6-plugin-logger", () => {
       router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         "Router started",
       );
     });
@@ -63,7 +63,7 @@ describe("router6-plugin-logger", () => {
       router.stop();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         "Router stopped",
       );
     });
@@ -75,7 +75,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         "Transition: home → users",
         expect.objectContaining({
           from: expect.objectContaining({ name: "home" }),
@@ -91,7 +91,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining("Transition success"),
         expect.any(Object),
       );
@@ -106,7 +106,7 @@ describe("router6-plugin-logger", () => {
       });
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining("Transition error"),
         expect.any(Object),
       );
@@ -131,7 +131,7 @@ describe("router6-plugin-logger", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining("Transition cancelled"),
         expect.any(Object),
       );
@@ -144,7 +144,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining("home → users"),
         expect.any(Object),
       );
@@ -247,7 +247,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringMatching(/Transition success \(\d+\.\d+μs\)/),
         expect.any(Object),
       );
@@ -263,7 +263,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users");
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringMatching(/Transition error: .+ \(\d+\.\d+[mμ]s\)/),
         expect.any(Object),
       );
@@ -285,7 +285,7 @@ describe("router6-plugin-logger", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       expect(warnSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringMatching(/Transition cancelled \(\d+\.\d+[mμ]s\)/),
         expect.any(Object),
       );
@@ -417,7 +417,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users.view", { id: "123" });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining("users.view"),
         expect.any(Object),
       );
@@ -452,7 +452,7 @@ describe("router6-plugin-logger", () => {
       router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         "Router started",
       );
     });
@@ -470,7 +470,7 @@ describe("router6-plugin-logger", () => {
       router.navigate("users.view", { id: "456" });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         expect.stringContaining('Changed: { id: "123" → "456" }'),
       );
     });
@@ -522,7 +522,7 @@ describe("router6-plugin-logger", () => {
       router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "router6-plugin-logger",
+        "real-router-plugin-logger",
         "Router started",
       );
     });

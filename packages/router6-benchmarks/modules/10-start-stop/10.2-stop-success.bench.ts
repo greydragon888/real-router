@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/10-start-stop/10.2-stop-success.bench.ts
+// packages/real-router-benchmarks/modules/10-start-stop/10.2-stop-success.bench.ts
 
 import { bench } from "mitata";
 

@@ -1,4 +1,4 @@
-// packages/router6-plugin-logger/modules/plugin.ts
+// packages/real-router-plugin-logger/modules/plugin.ts
 
 import { DEFAULT_CONFIG } from "./constants";
 import {
@@ -12,16 +12,16 @@ import { now } from "./internal/timing";
 import type { PluginFactory, RouterError, State } from "router6";
 
 /**
- * Creates a logger plugin for router6.
+ * Creates a logger plugin for real-router.
  *
  * Configuration is managed through the logger singleton.
  * Use `logger.configure()` to customize logging behavior before starting the router.
  *
- * @returns Plugin factory function for router6
+ * @returns Plugin factory function for real-router
  *
  * @example
  * ```ts
- * import { loggerPluginFactory } from "router6-plugin-logger";
+ * import { loggerPluginFactory } from "real-router-plugin-logger";
  *
  * // Configure logger before using the plugin
  * logger.configure({

@@ -1,4 +1,4 @@
-// packages/router6/modules/transitionPath.ts
+// packages/real-router/modules/transitionPath.ts
 
 import { validateState } from "type-guards";
 

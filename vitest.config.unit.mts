@@ -19,7 +19,7 @@ export default mergeConfig(
     test: {
       /**
        * Coverage configuration
-       * Enabled with strict 100% thresholds (router6 standard)
+       * Enabled with strict 100% thresholds (real-router standard)
        */
       coverage: {
         enabled: true,

@@ -3,7 +3,7 @@
  *
  * Основана на успешном опыте router-error:
  * ✅ Vitest runner + perTest coverage
- * ✅ Absolute paths для workspace dependencies (logger, router6, router6-types)
+ * ✅ Absolute paths для workspace dependencies (logger, real-router, real-router-types)
  * ✅ Incremental mode для кеширования
  * ✅ Без "tests slash-star-star" в ignorePatterns
  *

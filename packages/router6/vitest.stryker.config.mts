@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 /**
- * Vitest configuration for Stryker mutation testing (router6)
+ * Vitest configuration for Stryker mutation testing (real-router)
  *
  * Standalone config - does not extend base to avoid sandbox resolution issues.
  * Optimized for mutation testing speed and isolation.

@@ -1,4 +1,4 @@
-// packages/router6/modules/core/options.ts
+// packages/real-router/modules/core/options.ts
 
 import { isObjKey, isString } from "type-guards";
 

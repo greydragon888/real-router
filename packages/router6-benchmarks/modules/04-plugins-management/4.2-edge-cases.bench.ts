@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/04-plugins-management/4.2-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/04-plugins-management/4.2-edge-cases.bench.ts
 
 import { bench } from "mitata";
 

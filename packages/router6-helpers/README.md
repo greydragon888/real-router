@@ -19,13 +19,13 @@
 ## Installation
 
 ```bash
-npm install router6-helpers
+npm install real-router-helpers
 # or
-pnpm add router6-helpers
+pnpm add real-router-helpers
 # or
-yarn add router6-helpers
+yarn add real-router-helpers
 # or
-bun add router6-helpers
+bun add real-router-helpers
 ```
 
 ## Quick Start
@@ -36,7 +36,7 @@ import {
   endsWithSegment,
   includesSegment,
   areRoutesRelated,
-} from "router6-helpers";
+} from "real-router-helpers";
 
 // Check if route starts with segment
 startsWithSegment("users.profile.edit", "users"); // true
@@ -267,7 +267,7 @@ const showBreadcrumb = areRoutesRelated(currentRoute, basePath);
 ### Active Navigation Menu
 
 ```typescript
-import { startsWithSegment } from 'router6-helpers';
+import { startsWithSegment } from 'real-router-helpers';
 
 function NavigationMenu({ currentRoute }) {
   const menuItems = [
@@ -294,7 +294,7 @@ function NavigationMenu({ currentRoute }) {
 ### Breadcrumbs
 
 ```typescript
-import { startsWithSegment } from 'router6-helpers';
+import { startsWithSegment } from 'real-router-helpers';
 
 function Breadcrumbs({ currentRoute }) {
   const segments = currentRoute.split('.');
@@ -325,7 +325,7 @@ function Breadcrumbs({ currentRoute }) {
 ### Route Guards
 
 ```typescript
-import { startsWithSegment } from "router6-helpers";
+import { startsWithSegment } from "real-router-helpers";
 
 const adminGuard = (router) => (toState, fromState, done) => {
   if (startsWithSegment(toState, "admin") && !userHasAdminRole()) {
@@ -341,7 +341,7 @@ router.useMiddleware(adminGuard);
 ### Conditional Rendering
 
 ```typescript
-import { includesSegment, endsWithSegment } from 'router6-helpers';
+import { includesSegment, endsWithSegment } from 'real-router-helpers';
 
 function PageLayout({ route, children }) {
   return (
@@ -364,7 +364,7 @@ function PageLayout({ route, children }) {
 ### Analytics Tracking
 
 ```typescript
-import { startsWithSegment, includesSegment } from "router6-helpers";
+import { startsWithSegment, includesSegment } from "real-router-helpers";
 
 router.subscribe((state) => {
   const routeName = state.route.name;
@@ -453,8 +453,8 @@ try {
 Full TypeScript support with type definitions included.
 
 ```typescript
-import type { State } from "router6";
-import { startsWithSegment } from "router6-helpers";
+import type { State } from "real-router";
+import { startsWithSegment } from "real-router-helpers";
 
 // Type inference works correctly
 const result: boolean = startsWithSegment("route", "segment");
@@ -527,7 +527,7 @@ The `redirect` helper has been removed. Use router guards instead:
 New helper function for checking route hierarchy:
 
 ```typescript
-import { areRoutesRelated } from 'router6-helpers';
+import { areRoutesRelated } from 'real-router-helpers';
 
 areRoutesRelated('users', 'users.profile');     // true (parent-child)
 areRoutesRelated('users.profile', 'users');     // true (child-parent)

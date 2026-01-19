@@ -1,4 +1,4 @@
-// packages/router6-benchmarks/modules/09-redirects/9.5-edge-cases.bench.ts
+// packages/real-router-benchmarks/modules/09-redirects/9.5-edge-cases.bench.ts
 
 import { bench } from "mitata";
 
