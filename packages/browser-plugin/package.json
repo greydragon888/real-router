@@ -55,7 +55,7 @@
     "type-guards": "workspace:^"
   },
   "devDependencies": {
-    "@testing-library/jest-dom": "6.6.3",
-    "jsdom": "27.2.0"
+    "@testing-library/jest-dom": "6.9.1",
+    "jsdom": "27.4.0"
   }
 }
