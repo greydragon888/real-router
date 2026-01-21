@@ -40,7 +40,7 @@ jobs:
         id: pr_sizes
         run: |
           echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          pnpm size --json 2>/dev/null || echo "[]"
+          pnpm size --json 2>/dev/null >> $GITHUB_OUTPUT || echo "[]" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Checkout base branch
@@ -59,7 +59,7 @@ jobs:
         id: base_sizes
         run: |
           echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          pnpm size --json 2>/dev/null || echo "[]"
+          pnpm size --json 2>/dev/null >> $GITHUB_OUTPUT || echo "[]" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Compare and comment
