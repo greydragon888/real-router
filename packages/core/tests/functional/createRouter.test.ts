@@ -99,4 +99,50 @@ describe("createRouter", () => {
       expect(router.getOptions().defaultRoute).toBe("home");
     });
   });
+
+  describe("with logger config (lines 52-56)", () => {
+    it("should configure logger when valid logger config is passed", () => {
+      const callback = vi.fn();
+
+      // Should not throw - valid logger config
+      expect(() =>
+        createRouter([], { logger: { level: "error-only", callback } }),
+      ).not.toThrowError();
+    });
+
+    it("should configure logger with level only", () => {
+      expect(() =>
+        createRouter([], { logger: { level: "warn-error" } }),
+      ).not.toThrowError();
+    });
+
+    it("should configure logger with callback only", () => {
+      expect(() =>
+        createRouter([], { logger: { callback: () => {} } }),
+      ).not.toThrowError();
+    });
+
+    it("should throw TypeError for invalid logger config", () => {
+      expect(() =>
+        createRouter([], { logger: { invalid: true } as any }),
+      ).toThrowError(TypeError);
+    });
+
+    it("should throw for invalid logger level", () => {
+      expect(() =>
+        createRouter([], { logger: { level: "invalid" as any } }),
+      ).toThrowError("Invalid logger level");
+    });
+
+    it("should not have logger in options after configuration", () => {
+      const router = createRouter([], {
+        logger: { level: "all" },
+        defaultRoute: "home",
+      });
+
+      // logger should be deleted from options after configure
+      expect(router.getOptions()).not.toHaveProperty("logger");
+      expect(router.getOptions().defaultRoute).toBe("home");
+    });
+  });
 });

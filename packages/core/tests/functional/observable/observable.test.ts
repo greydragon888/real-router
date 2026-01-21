@@ -1,4 +1,5 @@
-import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+import { logger } from "logger";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
 
@@ -96,7 +97,7 @@ describe("core/observable", () => {
       it("should not break other listeners if one throws", () => {
         const goodCb = vi.fn();
         const badCb = vi.fn(() => {
-          vi.spyOn(console, "error").mockImplementation(noop);
+          vi.spyOn(logger, "error").mockImplementation(noop);
 
           throw new Error("listener failed");
         });
@@ -455,7 +456,7 @@ describe("core/observable", () => {
     });
 
     it("should warn when removing non-existent listener (line 281)", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // First add a listener to make the set non-empty
       const cb1 = vi.fn();
@@ -682,7 +683,7 @@ describe("core/observable", () => {
 
     describe("deduplication", () => {
       it("should prevent duplicate subscription with same observer object", () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
         const observer = { next: vi.fn() };
 
         const sub1 = getObservableRouter()[$$observable]().subscribe(observer, {
@@ -694,15 +695,17 @@ describe("core/observable", () => {
 
         // Should return existing subscription
         expect(sub1.unsubscribe).toBe(sub2.unsubscribe);
+        // Logger format: logger.warn(context, message)
         expect(warnSpy).toHaveBeenCalledWith(
-          "[router.observable] Duplicate subscription prevented. Same observer already subscribed.",
+          "router.observable",
+          expect.stringContaining("Duplicate subscription prevented"),
         );
 
         warnSpy.mockRestore();
       });
 
       it("should return closed status from duplicate subscription", () => {
-        vi.spyOn(console, "warn").mockImplementation(() => {});
+        vi.spyOn(logger, "warn").mockImplementation(() => {});
         const observer = { next: vi.fn() };
 
         const sub1 = getObservableRouter()[$$observable]().subscribe(observer, {
@@ -743,9 +746,7 @@ describe("core/observable", () => {
 
     describe("error isolation", () => {
       it("should isolate errors in observer.next()", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
         const badObserver = {
           next: () => {
             throw new Error("observer error");
@@ -777,7 +778,7 @@ describe("core/observable", () => {
       });
 
       it("should call error handler when next() throws", () => {
-        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.spyOn(logger, "error").mockImplementation(() => {});
         const errorSpy = vi.fn();
         const observer = {
           next: () => {
@@ -801,9 +802,7 @@ describe("core/observable", () => {
       });
 
       it("should catch errors in error handler itself", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
         const observer = {
           next: () => {
             throw new Error("next error");
@@ -859,9 +858,7 @@ describe("core/observable", () => {
       });
 
       it("should catch errors in complete()", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
         const subscription = getObservableRouter()
           [$$observable]()
           .subscribe({

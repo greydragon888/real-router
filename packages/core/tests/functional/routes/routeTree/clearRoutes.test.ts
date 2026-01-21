@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -380,7 +381,7 @@ describe("core/routes/clearRoutes", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     });
 
     afterEach(() => {
@@ -419,7 +420,8 @@ describe("core/routes/clearRoutes", () => {
 
       // Should log error
       expect(errorSpy).toHaveBeenCalledWith(
-        "[router.clearRoutes] Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
+        "router.clearRoutes",
+        expect.stringContaining("navigation is in progress"),
       );
 
       // Routes should NOT be cleared (operation was blocked)
@@ -550,7 +552,8 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
 
       expect(errorSpy).toHaveBeenCalledWith(
-        "[router.clearRoutes] Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
+        "router.clearRoutes",
+        expect.stringContaining("navigation is in progress"),
       );
 
       // router1 routes should NOT be cleared

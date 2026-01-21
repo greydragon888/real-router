@@ -1,8 +1,10 @@
+import { logger } from "logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createRouter } from "@real-router/core";
 
 import type { Route, Router } from "@real-router/core";
+import type { LogCallback } from "logger";
 
 const routes: Route[] = [
   { name: "home", path: "/" },
@@ -115,11 +117,20 @@ describe("SSR race conditions", () => {
   });
 
   describe("runtime protection - concurrent navigation warning", () => {
-    let warnSpy: ReturnType<typeof vi.spyOn>;
+    let logCallback: ReturnType<typeof vi.fn>;
+    let originalConfig: ReturnType<typeof logger.getConfig>;
     let router: Router;
 
     beforeEach(() => {
-      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // Save original config
+      originalConfig = logger.getConfig();
+
+      // Configure logger with callback to capture warnings
+      logCallback = vi.fn();
+      logger.configure({
+        level: "all",
+        callback: logCallback as LogCallback,
+      });
 
       router = createRouter(routes, defaultOptions);
       router.start();
@@ -127,7 +138,8 @@ describe("SSR race conditions", () => {
 
     afterEach(() => {
       router.stop();
-      warnSpy.mockRestore();
+      // Restore original config
+      logger.configure(originalConfig);
     });
 
     it("should warn when navigate called during active async navigation", async () => {
@@ -151,11 +163,12 @@ describe("SSR race conditions", () => {
       });
 
       // Check that concurrent navigation warning was logged
-      const concurrentWarning = warnSpy.mock.calls.find(
-        (call: unknown[]) =>
-          typeof call[0] === "string" &&
-          call[0].includes("[router.navigate]") &&
-          call[0].includes("Concurrent navigation"),
+      const calls = logCallback.mock.calls as Parameters<LogCallback>[];
+      const concurrentWarning = calls.find(
+        (call) =>
+          call[0] === "warn" &&
+          call[1] === "router.navigate" &&
+          call[2].includes("Concurrent navigation"),
       );
 
       expect(concurrentWarning).toBeDefined();
@@ -164,17 +177,18 @@ describe("SSR race conditions", () => {
     it("should not warn for sequential navigations", () => {
       // First navigation (sync)
       router.navigate("admin");
-      warnSpy.mockClear();
+      logCallback.mockClear();
 
       // Second navigation (sync, after first completed)
       router.navigate("public");
 
       // No concurrent navigation warning
-      const concurrentWarnings = warnSpy.mock.calls.filter(
-        (call: unknown[]) =>
-          typeof call[0] === "string" &&
-          call[0].includes("[router.navigate]") &&
-          call[0].includes("Concurrent navigation"),
+      const allCalls = logCallback.mock.calls as Parameters<LogCallback>[];
+      const concurrentWarnings = allCalls.filter(
+        (call) =>
+          call[0] === "warn" &&
+          call[1] === "router.navigate" &&
+          call[2].includes("Concurrent navigation"),
       );
 
       expect(concurrentWarnings).toHaveLength(0);

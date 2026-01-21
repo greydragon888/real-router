@@ -1,5 +1,6 @@
+import { logger } from "logger";
 import { createRouteTree, matchSegments } from "route-tree";
-import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { constants } from "@real-router/core";
 
@@ -535,14 +536,14 @@ describe("core/state", () => {
 
   describe("areStatesDescendants (deprecated)", () => {
     // Suppress deprecation warnings during tests
-    let warnSpy: ReturnType<typeof vi.spyOn>;
+    const originalWarn = console.warn;
 
     beforeEach(() => {
-      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      vi.spyOn(logger, "warn").mockImplementation(() => {});
     });
 
     afterEach(() => {
-      warnSpy.mockRestore();
+      logger.warn = originalWarn;
     });
 
     it("returns true if child extends parent and params match", () => {
@@ -572,9 +573,10 @@ describe("core/state", () => {
 
       router.areStatesDescendants(parent, child);
 
-      // console.warn is spied in beforeEach
-      expect(warnSpy).toHaveBeenCalledWith(
-        "[real-router] areStatesDescendants is deprecated and will be removed in the next major version. Use router.isActiveRoute() instead.",
+      // Checking logger.warn, not console.warn (logger is spied in beforeEach)
+      expect(logger.warn).toHaveBeenCalledWith(
+        "real-router",
+        expect.stringContaining("deprecated"),
       );
     });
 

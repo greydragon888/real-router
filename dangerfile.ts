@@ -310,12 +310,14 @@ function showSummary() {
 // Run all checks
 // =============================================================================
 
-checkImplementationNotes();
-checkArchitecturalChanges();
-checkChangeset();
-checkPRSize();
-checkPRDescription();
-checkLockfileSync();
-checkTestCoverage();
-await checkConsoleStatements();
-showSummary();
+void (async () => {
+  checkImplementationNotes();
+  checkArchitecturalChanges();
+  checkChangeset();
+  checkPRSize();
+  checkPRDescription();
+  checkLockfileSync();
+  checkTestCoverage();
+  await checkConsoleStatements();
+  showSummary();
+})();

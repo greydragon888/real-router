@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -75,7 +76,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
       it("should catch errors in listeners and log them to console", () => {
         const errorMessage = "Test listener error";
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
 
         const failingListener = vi.fn(() => {
@@ -93,7 +94,8 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         );
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          "[Router] Error in listener for $$start:",
+          "Router",
+          "Error in listener for $$start:",
           expect.any(Error),
         );
         expect(workingListener).toHaveBeenCalledWith(toState, fromState);
@@ -103,7 +105,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
 
       it("should continue executing remaining listeners when one listener throws an error", () => {
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
 
         const listener1 = vi.fn();
@@ -316,7 +318,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
       it("should terminate execution at validation stage when toState is missing", () => {
         const fromState = { name: "contact", params: {}, path: "/contact" };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -478,7 +480,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
       it("should not log any console errors when validation fails before listener execution", () => {
         const fromState = { name: "profile", params: {}, path: "/profile" };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -525,7 +527,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         const toState = { name: "settings", params: {}, path: "/settings" };
         const fromState = { name: "home", params: {}, path: "/home" };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(noop);
 
         // No listeners registered, so invokeFor should handle empty array

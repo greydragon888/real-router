@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -22,7 +23,7 @@ describe("invokeEventListeners - Exception handling", () => {
 
   describe("exception handling in one of the listeners", () => {
     it("should catch and log exception from first listener", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const errorMessage = "First listener exception";
       const throwingListener = vi.fn(() => {
@@ -35,11 +36,17 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
+      // Logger format: logger.error(context, message, error)
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $start:",
+        expect.any(Error),
+      );
       expect(throwingListener).toHaveBeenCalledWith();
     });
 
     it("should execute second listener normally after first listener throws", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const throwingListener = vi.fn(() => {
         throw new Error("First listener error");
@@ -57,7 +64,7 @@ describe("invokeEventListeners - Exception handling", () => {
     });
 
     it("should not interrupt method execution due to listener error", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const throwingListener = vi.fn(() => {
         throw new Error("Listener error");
@@ -76,7 +83,11 @@ describe("invokeEventListeners - Exception handling", () => {
     });
 
     it("should output error message to console with event name", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
+      const loggerErrorCalls: any[][] = [];
+
+      vi.spyOn(logger, "error").mockImplementation((...args) => {
+        loggerErrorCalls.push(args);
+      });
 
       const specificError = new Error("Specific listener error");
       const throwingListener = vi.fn(() => {
@@ -87,15 +98,15 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
-      expect(errorSpy).toHaveBeenCalledTimes(1);
-      expect(errorSpy).toHaveBeenCalledWith(
-        "[Router] Error in listener for $start:",
-        specificError,
-      );
+      // Logger format: logger.error(context, message, error)
+      expect(loggerErrorCalls).toHaveLength(1);
+      expect(loggerErrorCalls[0][0]).toBe("Router");
+      expect(loggerErrorCalls[0][1]).toBe("Error in listener for $start:");
+      expect(loggerErrorCalls[0][2]).toBe(specificError);
     });
 
     it("should handle multiple failing listeners in sequence", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const error1 = new Error("First error");
       const error2 = new Error("Second error");
@@ -114,14 +125,14 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
-      expect(console.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledTimes(2);
       expect(throwingListener1).toHaveBeenCalledWith();
       expect(throwingListener2).toHaveBeenCalledWith();
       expect(workingListener).toHaveBeenCalledWith();
     });
 
     it("should handle different types of errors in listeners", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const typeErrorListener = vi.fn(() => {
         throw new TypeError("Type error in listener");
@@ -142,7 +153,7 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
-      expect(console.error).toHaveBeenCalledTimes(3);
+      expect(logger.error).toHaveBeenCalledTimes(3);
       expect(typeErrorListener).toHaveBeenCalledWith();
       expect(rangeErrorListener).toHaveBeenCalledWith();
       expect(stringErrorListener).toHaveBeenCalledWith();
@@ -150,7 +161,7 @@ describe("invokeEventListeners - Exception handling", () => {
     });
 
     it("should preserve execution order despite errors", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const executionOrder: string[] = [];
 
@@ -184,11 +195,11 @@ describe("invokeEventListeners - Exception handling", () => {
         "listener3",
         "listener4",
       ]);
-      expect(console.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledTimes(2);
     });
 
     it("should handle errors in listeners for transition events", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = {
         name: "dashboard",
@@ -207,12 +218,18 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
+      // Logger format: logger.error(context, message, error)
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $$start:",
+        expect.any(Error),
+      );
       expect(throwingListener).toHaveBeenCalledWith(toState, fromState);
       expect(workingListener).toHaveBeenCalledWith(toState, fromState);
     });
 
     it("should handle async listener errors properly", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const asyncThrowingListener = vi.fn(async () => {
         await Promise.resolve();
@@ -233,7 +250,7 @@ describe("invokeEventListeners - Exception handling", () => {
     });
 
     it("should handle RouterError thrown from listener", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const routerError = new RouterError("LISTENER_ERROR", {
         message: "Router error from listener",
@@ -249,12 +266,18 @@ describe("invokeEventListeners - Exception handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
+      // Logger format: logger.error(context, message, error)
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $start:",
+        routerError,
+      );
       expect(throwingListener).toHaveBeenCalledWith();
       expect(workingListener).toHaveBeenCalledWith();
     });
 
     it("should not affect router state when listener throws error", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const initialState = router.getState();
 

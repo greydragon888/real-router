@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/observable.ts
 
+import { logger } from "logger";
 import { isNavigationOptions, isState } from "type-guards";
 
 import { events, RouterError } from "@real-router/core";
@@ -74,7 +75,7 @@ function invokeFor<E extends EventName>(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- Function.prototype.apply requires Function type
       Function.prototype.apply.call(cb as Function, undefined, args);
     } catch (error) {
-      console.error(`[Router] Error in listener for ${eventName}:`, error);
+      logger.error("Router", `Error in listener for ${eventName}:`, error);
     }
   }
 }
@@ -407,8 +408,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
     if (!deleted) {
       // Need for debugging purposes, as it is not an error to remove a listener that was never added.
       // This can happen if the listener was already removed or never added.
-      console.warn(
-        `[Router] Attempted to remove non-existent listener for "${eventName}". ` +
+      logger.warn(
+        "Router",
+        `Attempted to remove non-existent listener for "${eventName}". ` +
           `This might indicate a memory leak or incorrect cleanup logic.`,
       );
     }
@@ -431,8 +433,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
     }
 
     if (set.size === 1000) {
-      console.warn(
-        `[router.addEventListener] Warning: Event "${eventName}" has ${set.size} listeners. ` +
+      logger.warn(
+        "router.addEventListener",
+        `Warning: Event "${eventName}" has ${set.size} listeners. ` +
           `This might indicate a memory leak.`,
       );
     }
@@ -582,8 +585,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
         const existing = observerSubscriptions.get(normalizedObserver);
 
         if (existing?.active) {
-          console.warn(
-            `[router.observable] Duplicate subscription prevented. Same observer already subscribed.`,
+          logger.warn(
+            "router.observable",
+            "Duplicate subscription prevented. Same observer already subscribed.",
           );
 
           return {
@@ -616,8 +620,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
             try {
               normalizedObserver.next(value);
             } catch (error) {
-              console.error(
-                `[router.observable] Error in observer.next:`,
+              logger.error(
+                "router.observable",
+                "Error in observer.next:",
                 error,
               );
 
@@ -626,8 +631,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
                 try {
                   normalizedObserver.error(error);
                 } catch (errorHandlerError) {
-                  console.error(
-                    `[router.observable] Error in observer.error:`,
+                  logger.error(
+                    "router.observable",
+                    "Error in observer.error:",
                     errorHandlerError,
                   );
                 }
@@ -666,8 +672,9 @@ export function withObservability<Dependencies extends DefaultDependencies>(
               try {
                 normalizedObserver.complete();
               } catch (error) {
-                console.error(
-                  `[router.observable] Error in observer.complete:`,
+                logger.error(
+                  "router.observable",
+                  "Error in observer.complete:",
                   error,
                 );
               }

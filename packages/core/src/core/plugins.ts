@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/plugins.ts
 
+import { logger } from "logger";
 import { isObjKey } from "type-guards";
 
 import { events as EVENTS_CONST, plugins as PLUGINS_CONST } from "../constants";
@@ -57,13 +58,9 @@ const validatePluginsSize = (
 
   // Graduated warnings for early problem detection
   if (newSize >= PLUGIN_LIMITS.ERROR) {
-    console.error(
-      `[${LOGGER_CONTEXT_FOR_PLUGINS}] ${newSize} plugins registered!`,
-    );
+    logger.error(LOGGER_CONTEXT_FOR_PLUGINS, `${newSize} plugins registered!`);
   } else if (newSize >= PLUGIN_LIMITS.WARN) {
-    console.warn(
-      `[${LOGGER_CONTEXT_FOR_PLUGINS}] ${newSize} plugins registered`,
-    );
+    logger.warn(LOGGER_CONTEXT_FOR_PLUGINS, `${newSize} plugins registered`);
   }
 };
 
@@ -120,8 +117,9 @@ function validatePluginBatch<Dependencies extends DefaultDependencies>(
     }
 
     if (seenInBatch.has(plugin)) {
-      console.warn(
-        `[${LOGGER_CONTEXT_FOR_PLUGINS}] Duplicate factory in batch, will be registered once`,
+      logger.warn(
+        LOGGER_CONTEXT_FOR_PLUGINS,
+        "Duplicate factory in batch, will be registered once",
       );
     } else {
       seenInBatch.add(plugin);
@@ -178,8 +176,9 @@ export function withPlugins<
         try {
           cleanup();
         } catch (cleanupError) {
-          console.error(
-            `[${LOGGER_CONTEXT_FOR_PLUGINS}] Cleanup error:`,
+          logger.error(
+            LOGGER_CONTEXT_FOR_PLUGINS,
+            "Cleanup error:",
             cleanupError,
           );
         }
@@ -213,8 +212,9 @@ export function withPlugins<
         try {
           cleanup();
         } catch (error) {
-          console.error(
-            `[${LOGGER_CONTEXT_FOR_PLUGINS}] Error during cleanup:`,
+          logger.error(
+            LOGGER_CONTEXT_FOR_PLUGINS,
+            "Error during cleanup:",
             error,
           );
         }
@@ -253,13 +253,15 @@ export function withPlugins<
           );
 
           if (methodName === PLUGINS_CONST.ROUTER_START && router.isStarted()) {
-            console.warn(
-              `[${LOGGER_CONTEXT_FOR_PLUGINS}] Router already started, onStart will not be called`,
+            logger.warn(
+              LOGGER_CONTEXT_FOR_PLUGINS,
+              "Router already started, onStart will not be called",
             );
           }
         } else {
-          console.warn(
-            `[${LOGGER_CONTEXT_FOR_PLUGINS}] Property '${methodName}' is not a function, skipping`,
+          logger.warn(
+            LOGGER_CONTEXT_FOR_PLUGINS,
+            `Property '${methodName}' is not a function, skipping`,
           );
         }
       }

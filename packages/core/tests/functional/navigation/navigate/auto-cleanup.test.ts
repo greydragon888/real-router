@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
@@ -26,7 +27,7 @@ describe("router.navigate() - auto cleanup", () => {
     let routerWithAutoCleanUp: Router;
 
     beforeEach(() => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       // Create router with autoCleanUp enabled
       routerWithAutoCleanUp = createRouter(

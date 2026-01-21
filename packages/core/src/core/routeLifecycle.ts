@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/routeLifecycle.ts
 
+import { logger } from "logger";
 import { isBoolean, validateRouteName } from "type-guards";
 
 import { getTypeDescription } from "../helpers";
@@ -58,13 +59,15 @@ function checkHandlerCount(currentSize: number, methodName: string): void {
   }
 
   if (currentSize >= LIFECYCLE_LIMITS.ERROR) {
-    console.error(
-      `[router.${methodName}] ${currentSize} lifecycle handlers registered! ` +
+    logger.error(
+      `router.${methodName}`,
+      `${currentSize} lifecycle handlers registered! ` +
         `This is excessive. Hard limit at ${LIFECYCLE_LIMITS.HARD_LIMIT}.`,
     );
   } else if (currentSize >= LIFECYCLE_LIMITS.WARN) {
-    console.warn(
-      `[router.${methodName}] ${currentSize} lifecycle handlers registered. ` +
+    logger.warn(
+      `router.${methodName}`,
+      `${currentSize} lifecycle handlers registered. ` +
         `Consider consolidating logic.`,
     );
   }
@@ -154,8 +157,9 @@ export function withRouteLifecycle<
 
     if (isOverwrite) {
       // Warn about overwrites for debugging
-      console.warn(
-        `[router.${methodName}] Overwriting existing ${type} handler for route "${name}"`,
+      logger.warn(
+        `router.${methodName}`,
+        `Overwriting existing ${type} handler for route "${name}"`,
       );
     } else {
       // Check limit only for new handlers
@@ -353,8 +357,9 @@ export function withRouteLifecycle<
     const functionDeleted = canDeactivateFunctions.delete(name);
 
     if (!silent && !factoryDeleted && !functionDeleted) {
-      console.warn(
-        `[router.clearCanDeactivate] No canDeactivate handler found for route "${name}"`,
+      logger.warn(
+        "router.clearCanDeactivate",
+        `No canDeactivate handler found for route "${name}"`,
       );
     }
 
@@ -390,8 +395,9 @@ export function withRouteLifecycle<
     const functionDeleted = canActivateFunctions.delete(name);
 
     if (!silent && !factoryDeleted && !functionDeleted) {
-      console.warn(
-        `[router.clearCanActivate] No canActivate handler found for route "${name}"`,
+      logger.warn(
+        "router.clearCanActivate",
+        `No canActivate handler found for route "${name}"`,
       );
     }
 

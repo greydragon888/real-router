@@ -1,6 +1,6 @@
 {
   "name": "@real-router/logger-plugin",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "commonjs",
   "description": "Development logging plugin with transition tracking and performance metrics",
   "main": "./dist/cjs/index.js",
@@ -53,6 +53,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "logger": "workspace:^"
   }
 }

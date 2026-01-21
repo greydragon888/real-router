@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -444,7 +445,7 @@ describe("invokeEventListeners - Sequential event calls", () => {
     });
 
     it("should handle error recovery in sequential event processing", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const executionResults: string[] = [];
       const toState = { name: "recovery", params: {}, path: "/recovery" };
@@ -483,7 +484,7 @@ describe("invokeEventListeners - Sequential event calls", () => {
         "error",
         "working", // ROUTER_STOP
       ]);
-      expect(console.error).toHaveBeenCalledTimes(3);
+      expect(logger.error).toHaveBeenCalledTimes(3);
     });
 
     it("should preserve argument immutability across sequential calls", () => {

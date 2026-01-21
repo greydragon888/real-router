@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -37,7 +38,7 @@ describe("invokeEventListeners - Undefined return", () => {
     });
 
     it("should ignore returned undefined value", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const undefinedReturningListener = vi.fn(() => {
         return;
@@ -51,7 +52,7 @@ describe("invokeEventListeners - Undefined return", () => {
 
       expect(undefinedReturningListener).toHaveBeenCalledWith();
       expect(subsequentListener).toHaveBeenCalledWith();
-      expect(console.error).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
     });
 
     it("should continue processing normally after undefined return", () => {
@@ -84,9 +85,9 @@ describe("invokeEventListeners - Undefined return", () => {
     });
 
     it("should not perform any additional actions for undefined return", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
-      vi.spyOn(console, "log").mockImplementation(noop);
-      vi.spyOn(console, "warn").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
+      vi.spyOn(logger, "log").mockImplementation(noop);
+      vi.spyOn(logger, "warn").mockImplementation(noop);
 
       const undefinedReturningListener = vi.fn(() => {
         return;
@@ -96,10 +97,10 @@ describe("invokeEventListeners - Undefined return", () => {
 
       router.invokeEventListeners(events.ROUTER_STOP);
 
-      // Using console spies since we're checking if any logging occurred
-      expect(console.error).not.toHaveBeenCalled();
-      expect(console.log).not.toHaveBeenCalled();
-      expect(console.warn).not.toHaveBeenCalled();
+      // Using logger spies since we're checking if any logging occurred
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.log).not.toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
       expect(undefinedReturningListener).toHaveBeenCalledWith();
     });
 

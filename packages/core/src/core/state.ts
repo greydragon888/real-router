@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/state.ts
 
+import { logger } from "logger";
 import { getSegmentsByName } from "route-tree";
 import {
   isNavigationOptions,
@@ -500,9 +501,10 @@ export function withState<Dependencies extends DefaultDependencies>(
     validateState(parentState, "areStatesDescendants");
     validateState(childState, "areStatesDescendants");
 
-    console.warn(
-      `[real-router] areStatesDescendants is deprecated and will be removed in the next major version. ` +
-        `Use router.isActiveRoute() instead.`,
+    logger.warn(
+      "real-router",
+      "areStatesDescendants is deprecated and will be removed in the next major version. " +
+        "Use router.isActiveRoute() instead.",
     );
 
     // Check if childState.name starts with "parentState.name."

@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RouterError } from "@real-router/core";
@@ -211,8 +212,10 @@ describe("core/observable/addEventListener", () => {
 
   // 🔴 CRITICAL: Listener limits (1000 warning, 10000 error)
   describe("listener limits", () => {
-    it("should warn when adding 1001st listener (set.size === 1000)", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    it("should warn when adding 1001st listener (set.size === 1000)", async () => {
+      // Import logger to mock it
+      const { logger } = await import("logger");
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // Register exactly 1000 listeners
       for (let i = 0; i < 1000; i++) {
@@ -225,9 +228,7 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, () => {});
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[router.addEventListener]"),
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
+        "router.addEventListener",
         expect.stringContaining("1000 listeners"),
       );
 
@@ -306,7 +307,7 @@ describe("core/observable/addEventListener", () => {
     });
 
     it("should log errors from failing listeners", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const error = new Error("Test error");
       const cb = vi.fn(() => {
         throw error;
@@ -315,8 +316,10 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, cb);
       router.invokeEventListeners(events.ROUTER_START);
 
+      // Logger format: logger.error(context, message, error)
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[Router] Error in listener"),
+        "Router",
+        expect.stringContaining("Error in listener"),
         error,
       );
 

@@ -747,7 +747,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("navigation warnings", () => {
     it("should error when updating route during active navigation", async () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const { logger } = await import("logger");
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
       let resolveCanActivate: () => void;
       const canActivatePromise = new Promise<void>((resolve) => {
@@ -777,9 +778,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-async", { defaultParams: { page: 1 } });
 
       expect(errorSpy).toHaveBeenCalledWith(
-        expect.stringMatching(
-          /\[router\.updateRoute\].*navigation is in progress/,
-        ),
+        "router.updateRoute",
+        expect.stringContaining("navigation is in progress"),
       );
 
       // Config should be updated (we only log error, don't block)
@@ -794,8 +794,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       errorSpy.mockRestore();
     });
 
-    it("should not log error when updating route without active navigation", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    it("should not log error when updating route without active navigation", async () => {
+      const { logger } = await import("logger");
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
       router.addRoute({ name: "ur-no-warn", path: "/ur-no-warn" });
 
