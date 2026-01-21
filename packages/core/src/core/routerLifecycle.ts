@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/routerLifecycle.ts
 
+import { logger } from "logger";
 import { isState } from "type-guards";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
@@ -218,7 +219,7 @@ export function withRouterLifecycle<Dependencies extends DefaultDependencies>(
 
     const protectedDone = (err?: RouterError, state?: State) => {
       if (callbackInvoked) {
-        console.warn(`[real-router] Callback already invoked`);
+        logger.warn("real-router", "Callback already invoked");
 
         return;
       }

@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import {
   describe,
   beforeEach,
@@ -411,7 +412,7 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
         const fromState = { name: "help", params: {}, path: "/help" };
         const navigationOptions: NavigationOptions = { replace: true };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -498,7 +499,7 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
         const toState = { name: "settings", params: {}, path: "/settings" };
         const fromState = { name: "account", params: {}, path: "/account" };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -787,7 +788,7 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
           message: "Validation failed",
         });
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -924,7 +925,7 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
         const fromState = { name: "account", params: {}, path: "/account" };
         const primitiveArg = "primitive value";
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -1195,7 +1196,7 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
         const fromState = { name: "support", params: {}, path: "/support" };
         const nullArg = null;
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 

@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import {
   describe,
   beforeEach,
@@ -5,7 +6,6 @@ import {
   it,
   expect,
   expectTypeOf,
-  vi,
 } from "vitest";
 
 import { errorCodes, RouterError } from "@real-router/core";
@@ -158,7 +158,7 @@ describe("core/middleware", () => {
     });
 
     it("should redirect if middleware returns a new state", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const targetState = {
         name: "home",
@@ -180,8 +180,8 @@ describe("core/middleware", () => {
 
     it("should log a warning if state is changed during transition", () => {
       const mutate = transitionMutateMiddleware;
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
+      vi.spyOn(logger, "error").mockImplementation(noop);
       router.stop();
       router.useMiddleware(() => mutate);
 
@@ -193,10 +193,10 @@ describe("core/middleware", () => {
         expect(err).toBe(undefined);
       });
 
-      expect(errorSpy).toHaveBeenCalled();
+      // Checking logger.error, not console.error (logger is spied above)
+      expect(logger.error).toHaveBeenCalled();
 
       router.clearMiddleware();
-      errorSpy.mockRestore();
     });
 
     it("should fail transition if middleware returns an error", () => {
@@ -718,7 +718,7 @@ describe("core/middleware", () => {
       });
 
       it("should log warning when unsubscribe called after clearMiddleware", () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
         const factory = () => transitionMiddleware;
 

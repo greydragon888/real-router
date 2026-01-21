@@ -1,5 +1,6 @@
 // packages/real-router/modules/transition/executeMiddleware.ts
 
+import { logger } from "logger";
 import { isState } from "type-guards";
 
 import { errorCodes, RouterError } from "@real-router/core";
@@ -36,8 +37,9 @@ function safeCallback(
   try {
     callback(error, state);
   } catch (error_) {
-    console.error(
-      `[real-router:middleware] Error in middleware callback:`,
+    logger.error(
+      "real-router:middleware",
+      "Error in middleware callback:",
       error_,
     );
   }
@@ -97,8 +99,9 @@ export const executeMiddleware = (
         newState.path !== currentState.path;
 
       if (hasChanged) {
-        console.error(
-          `[real-router:middleware] Warning: State mutated during middleware execution`,
+        logger.error(
+          "real-router:middleware",
+          "Warning: State mutated during middleware execution",
           { from: currentState, to: newState },
         );
       }

@@ -8,6 +8,9 @@
       "@real-router/browser-plugin": [
         "packages/browser-plugin/src/index.ts"
       ],
+      "@real-router/logger-plugin": [
+        "packages/logger-plugin/src/index.ts"
+      ],
       "@real-router/persistent-params-plugin": [
         "packages/persistent-params-plugin/src/index.ts"
       ],
@@ -15,7 +18,8 @@
       "core-types": ["packages/core-types/src/index.ts"],
       "type-guards": ["packages/type-guards/src/index.ts"],
       "route-tree": ["packages/route-tree/src/index.ts"],
-      "search-params": ["packages/search-params/src/index.ts"]
+      "search-params": ["packages/search-params/src/index.ts"],
+      "logger": ["packages/logger/src/index.ts"]
     },
     "target": "ESNext",
     "module": "NodeNext",

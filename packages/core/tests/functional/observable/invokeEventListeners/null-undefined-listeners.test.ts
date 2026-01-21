@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -66,7 +67,7 @@ describe("invokeEventListeners - Null and undefined listeners", () => {
     });
 
     it("should not generate errors when processing empty listeners", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const workingListener = vi.fn();
 
@@ -83,7 +84,7 @@ describe("invokeEventListeners - Null and undefined listeners", () => {
 
       router.invokeEventListeners(events.ROUTER_STOP);
 
-      expect(console.error).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
       expect(workingListener).toHaveBeenCalledWith();
     });
 

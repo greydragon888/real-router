@@ -1,5 +1,6 @@
 // packages/real-router/modules/transition/executeLifecycleHooks.ts
 
+import { logger } from "logger";
 import { isState } from "type-guards";
 
 import { errorCodes, RouterError } from "@real-router/core";
@@ -36,7 +37,7 @@ function safeCallback(
   try {
     callback(error, state);
   } catch (error_) {
-    console.error(`[core:lifecycle] Error in lifecycle callback:`, error_);
+    logger.error("core:lifecycle", "Error in lifecycle callback:", error_);
   }
 }
 
@@ -126,8 +127,9 @@ export const executeLifecycleHooks = (
         newState.path !== currentState.path;
 
       if (hasChanged) {
-        console.error(
-          `[core:transition] Warning: State mutated during transition`,
+        logger.error(
+          "core:transition",
+          "Warning: State mutated during transition",
           { from: currentState, to: newState },
         );
       }

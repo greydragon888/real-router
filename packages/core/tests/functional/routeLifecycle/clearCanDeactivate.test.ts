@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
@@ -132,19 +133,21 @@ describe("core/route-lifecycle/clearCanDeactivate", () => {
 
   describe("warning behavior", () => {
     it("should log warning when handler not found", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       router.clearCanDeactivate("nonExistentRoute");
 
+      // Logger format: logger.warn(context, message)
       expect(warnSpy).toHaveBeenCalledWith(
-        '[router.clearCanDeactivate] No canDeactivate handler found for route "nonExistentRoute"',
+        "router.clearCanDeactivate",
+        expect.stringContaining("No canDeactivate handler found"),
       );
 
       warnSpy.mockRestore();
     });
 
     it("should not log warning when handler exists and is deleted", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       router.canDeactivate("existingRoute", true);
 

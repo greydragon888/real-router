@@ -17,6 +17,7 @@ import type {
   QueryParamsOptions,
   RouteTreeState,
 } from "./route-node-types";
+import type { LoggerConfig } from "logger";
 
 /**
  * Extended build result that includes segments for path building.
@@ -177,6 +178,13 @@ export interface Options {
    * @default false
    */
   rewritePathOnMatch: boolean;
+
+  /**
+   * Logger configuration.
+   *
+   * @default undefined
+   */
+  logger?: Partial<LoggerConfig>;
 }
 
 export type ActivationFn = (

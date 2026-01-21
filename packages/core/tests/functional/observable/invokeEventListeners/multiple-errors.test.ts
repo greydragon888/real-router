@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -24,7 +25,7 @@ describe("invokeEventListeners - Multiple errors", () => {
     it("should handle each error separately", () => {
       const consoleErrorCalls: any[][] = [];
 
-      vi.spyOn(console, "error").mockImplementation((...args) => {
+      vi.spyOn(logger, "error").mockImplementation((...args) => {
         consoleErrorCalls.push(args);
       });
 
@@ -53,18 +54,16 @@ describe("invokeEventListeners - Multiple errors", () => {
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
       expect(consoleErrorCalls).toHaveLength(2);
-      expect(consoleErrorCalls[0][0]).toBe(
-        "[Router] Error in listener for $$start:",
-      );
-      expect(consoleErrorCalls[0][1]).toBe(error1);
-      expect(consoleErrorCalls[1][0]).toBe(
-        "[Router] Error in listener for $$start:",
-      );
-      expect(consoleErrorCalls[1][1]).toBe(error2);
+      expect(consoleErrorCalls[0][0]).toBe("Router");
+      expect(consoleErrorCalls[0][1]).toBe("Error in listener for $$start:");
+      expect(consoleErrorCalls[0][2]).toBe(error1);
+      expect(consoleErrorCalls[1][0]).toBe("Router");
+      expect(consoleErrorCalls[1][1]).toBe("Error in listener for $$start:");
+      expect(consoleErrorCalls[1][2]).toBe(error2);
     });
 
     it("should log all errors to console", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = {
         name: "profile",
@@ -87,21 +86,23 @@ describe("invokeEventListeners - Multiple errors", () => {
 
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
-      expect(console.error).toHaveBeenCalledTimes(2);
-      expect(console.error).toHaveBeenNthCalledWith(
+      expect(logger.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenNthCalledWith(
         1,
-        "[Router] Error in listener for $$start:",
+        "Router",
+        "Error in listener for $$start:",
         expect.any(TypeError),
       );
-      expect(console.error).toHaveBeenNthCalledWith(
+      expect(logger.error).toHaveBeenNthCalledWith(
         2,
-        "[Router] Error in listener for $$start:",
+        "Router",
+        "Error in listener for $$start:",
         expect.any(RangeError),
       );
     });
 
     it("should execute correct listener successfully despite multiple errors", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "settings", params: {}, path: "/settings" };
       const fromState = { name: "account", params: {}, path: "/account" };
@@ -127,7 +128,7 @@ describe("invokeEventListeners - Multiple errors", () => {
     });
 
     it("should continue processing despite multiple errors", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "orders", params: {}, path: "/orders" };
       const fromState = { name: "cart", params: {}, path: "/cart" };
@@ -160,11 +161,11 @@ describe("invokeEventListeners - Multiple errors", () => {
       }).not.toThrowError();
 
       expect(executionOrder).toStrictEqual(["error1", "working", "error2"]);
-      expect(console.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledTimes(2);
     });
 
     it("should handle mixed error types in multiple listeners", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "help", params: {}, path: "/help" };
       const fromState = { name: "support", params: {}, path: "/support" };
@@ -187,22 +188,24 @@ describe("invokeEventListeners - Multiple errors", () => {
 
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
-      expect(console.error).toHaveBeenCalledTimes(2);
-      expect(console.error).toHaveBeenNthCalledWith(
+      expect(logger.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenNthCalledWith(
         1,
-        "[Router] Error in listener for $$start:",
+        "Router",
+        "Error in listener for $$start:",
         expect.any(Error),
       );
-      expect(console.error).toHaveBeenNthCalledWith(
+      expect(logger.error).toHaveBeenNthCalledWith(
         2,
-        "[Router] Error in listener for $$start:",
+        "Router",
+        "Error in listener for $$start:",
         routerError,
       );
       expect(workingListener).toHaveBeenCalledWith(toState, fromState);
     });
 
     it("should handle alternating error and success pattern", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "contact", params: {}, path: "/contact" };
       const fromState = { name: "about", params: {}, path: "/about" };
@@ -245,7 +248,7 @@ describe("invokeEventListeners - Multiple errors", () => {
         "work2",
         "throw3",
       ]);
-      expect(console.error).toHaveBeenCalledTimes(3);
+      expect(logger.error).toHaveBeenCalledTimes(3);
       expect(workingListener1).toHaveBeenCalledWith(toState, fromState);
       expect(workingListener2).toHaveBeenCalledWith(toState, fromState);
     });
@@ -253,7 +256,7 @@ describe("invokeEventListeners - Multiple errors", () => {
     it("should handle errors with different message patterns", () => {
       const consoleErrorCalls: any[][] = [];
 
-      vi.spyOn(console, "error").mockImplementation((...args) => {
+      vi.spyOn(logger, "error").mockImplementation((...args) => {
         consoleErrorCalls.push(args);
       });
 
@@ -285,16 +288,16 @@ describe("invokeEventListeners - Multiple errors", () => {
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
       expect(consoleErrorCalls).toHaveLength(3);
-      expect(consoleErrorCalls[0][1].message).toBe(
+      expect(consoleErrorCalls[0][2].message).toBe(
         "Detailed error message with context",
       );
-      expect(consoleErrorCalls[1][1].message).toBe("");
-      expect(consoleErrorCalls[2][1]).toBe("String error message");
+      expect(consoleErrorCalls[1][2].message).toBe("");
+      expect(consoleErrorCalls[2][2]).toBe("String error message");
       expect(workingListener).toHaveBeenCalledWith(toState, fromState);
     });
 
     it("should maintain listener execution order despite multiple errors", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "admin", params: {}, path: "/admin" };
       const fromState = {
@@ -335,11 +338,11 @@ describe("invokeEventListeners - Multiple errors", () => {
       router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
       expect(callOrder).toStrictEqual([1, 2, 3, 4, 5]);
-      expect(console.error).toHaveBeenCalledTimes(3);
+      expect(logger.error).toHaveBeenCalledTimes(3);
     });
 
     it("should not affect router state with multiple listener errors", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const toState = { name: "reports", params: {}, path: "/reports" };
       const fromState = {
@@ -366,7 +369,7 @@ describe("invokeEventListeners - Multiple errors", () => {
       const stateAfterErrors = router.getState();
 
       expect(stateAfterErrors).toStrictEqual(initialState);
-      expect(console.error).toHaveBeenCalledTimes(2);
+      expect(logger.error).toHaveBeenCalledTimes(2);
     });
   });
 });

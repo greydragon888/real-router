@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createTestRouter } from "../../../helpers";
@@ -256,7 +257,7 @@ describe("router.navigate() - promise resolve values", () => {
 
   describe("guards and middleware returning valid State", () => {
     beforeEach(() => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
     });
 
     describe("canDeactivate returns valid State", () => {
@@ -572,7 +573,7 @@ describe("router.navigate() - promise resolve values", () => {
 
   describe("guards and middleware returning Promise.resolve(State)", () => {
     beforeEach(() => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
     });
 
     describe("canDeactivate returns Promise.resolve(State)", () => {

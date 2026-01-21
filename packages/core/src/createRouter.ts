@@ -1,5 +1,7 @@
 // packages/real-router/modules/createRouter.ts
 
+import { logger } from "logger";
+
 import { CONFIG_SYMBOL } from "./constants";
 import { withDependencies } from "./core/dependencies";
 import { withMiddleware } from "./core/middleware";
@@ -11,6 +13,7 @@ import { withRouteLifecycle } from "./core/routeLifecycle";
 import { withRouterLifecycle } from "./core/routerLifecycle";
 import { withRoutes } from "./core/routes";
 import { withState } from "./core/state";
+import { isLoggerConfig } from "./typeGuards";
 
 import type {
   Config,
@@ -41,6 +44,12 @@ export const createRouter = <
   options: Partial<Options> = {},
   dependencies: Dependencies = {} as Dependencies,
 ): Router<Dependencies> => {
+  if (options.logger && isLoggerConfig(options.logger)) {
+    logger.configure(options.logger);
+
+    delete options.logger;
+  }
+
   const config: Config = {
     decoders: {},
     encoders: {},

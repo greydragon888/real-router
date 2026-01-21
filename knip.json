@@ -28,7 +28,9 @@
   "ignoreWorkspaces": [],
   "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
   "ignoreDependencies": [
+    "logger",
     "core-types",
+    "@real-router/logger-plugin",
     "@real-router/persistent-params-plugin",
     "@stryker-mutator/api",
     "jsdom"

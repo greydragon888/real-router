@@ -52,6 +52,7 @@
   "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^",
+    "logger": "workspace:^",
     "type-guards": "workspace:^"
   },
   "devDependencies": {

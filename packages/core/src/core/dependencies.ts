@@ -1,5 +1,7 @@
 // packages/real-router/modules/core/dependencies.ts
 
+import { logger } from "logger";
+
 import { getTypeDescription } from "../helpers";
 
 import type { DefaultDependencies, Router } from "core-types";
@@ -25,13 +27,15 @@ function checkDependencyCount(deps: object, methodName: string): void {
   const currentCount = Object.keys(deps).length;
 
   if (currentCount === DEPENDENCY_LIMITS.WARN) {
-    console.warn(
-      `[router.${methodName}] ${DEPENDENCY_LIMITS.WARN} dependencies registered. ` +
+    logger.warn(
+      `router.${methodName}`,
+      `${DEPENDENCY_LIMITS.WARN} dependencies registered. ` +
         `Consider if all are necessary.`,
     );
   } else if (currentCount === DEPENDENCY_LIMITS.ERROR) {
-    console.error(
-      `[router.${methodName}] ${DEPENDENCY_LIMITS.ERROR} dependencies registered! ` +
+    logger.error(
+      `router.${methodName}`,
+      `${DEPENDENCY_LIMITS.ERROR} dependencies registered! ` +
         `This indicates architectural problems. ` +
         `Hard limit at ${DEPENDENCY_LIMITS.HARD_LIMIT}.`,
     );
@@ -94,8 +98,9 @@ export function withDependencies<
     }
 
     if (overwrittenKeys.length > 0) {
-      console.warn(
-        `[router.setDependencies] Overwritten:`,
+      logger.warn(
+        "router.setDependencies",
+        "Overwritten:",
         overwrittenKeys.join(", "),
       );
     }
@@ -134,8 +139,9 @@ export function withDependencies<
           Number.isNaN(oldValue) && Number.isNaN(dependencyValue);
 
         if (isChanging && !bothAreNaN) {
-          console.warn(
-            `[router.setDependency] Router dependency already exists and is being overwritten:`,
+          logger.warn(
+            "router.setDependency",
+            "Router dependency already exists and is being overwritten:",
             dependencyName,
           );
         }
@@ -176,8 +182,9 @@ export function withDependencies<
       dependencyName: keyof Dependencies,
     ): Router<Dependencies> => {
       if (!Object.hasOwn(routerDependencies, dependencyName)) {
-        console.warn(
-          `[router.removeDependency] Attempted to remove non-existent dependency: "${getTypeDescription(dependencyName)}"`,
+        logger.warn(
+          `router.removeDependency`,
+          `Attempted to remove non-existent dependency: "${getTypeDescription(dependencyName)}"`,
         );
       }
 

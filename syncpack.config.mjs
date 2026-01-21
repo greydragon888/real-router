@@ -17,7 +17,7 @@ export default {
     {
       label: "Workspace packages use workspace:^",
       packages: ["**"],
-      dependencies: ["@real-router/*", "core-types", "route-tree", "type-guards", "search-params"],
+      dependencies: ["@real-router/*", "core-types", "route-tree", "type-guards", "logger", "search-params"],
       dependencyTypes: ["prod", "dev", "peer"],
       range: "workspace:^",
     },
