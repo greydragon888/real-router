@@ -8,7 +8,7 @@
  * - Configuration patterns
  */
 
-import { bench, boxplot, summary } from "mitata";
+import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { logger } from "logger";
 
@@ -206,7 +206,7 @@ boxplot(() => {
       });
       logger.log(CONTEXT, MESSAGE);
 
-      count;
+      do_not_optimize(count);
     });
   });
 });

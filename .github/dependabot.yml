@@ -67,3 +67,9 @@ updates:
     labels:
       - "ci"
       - "automated"
+    ignore:
+      # codeql-action v3.30.4+ and v4 require Enterprise features (custom properties API)
+      # Bug introduced 2025-09-19: https://github.com/github/codeql-action/commit/4f9b2f7
+      # Last working version: v3.30.3
+      - dependency-name: "github/codeql-action"
+        versions: [">3.30.3"]
