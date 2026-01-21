@@ -160,6 +160,7 @@ const safelyEncodePath = (path: string): string => {
   try {
     return encodeURI(decodeURI(path));
   } catch (error) {
+    // codeql[js/tainted-format-string] - False positive: console.warn doesn't interpret format specifiers
     console.warn(`[${LOGGER_CONTEXT}] Could not encode path "${path}"`, error);
 
     return path;

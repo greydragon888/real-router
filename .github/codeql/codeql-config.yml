@@ -1,0 +1,22 @@
+name: "CodeQL Config"
+
+# Paths to exclude from analysis
+paths-ignore:
+  # Tests
+  - "**/tests/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  # Benchmarks
+  - "**/benchmarks/**"
+  - "**/*.bench.ts"
+  # Build artifacts
+  - "**/dist/**"
+  - "**/node_modules/**"
+  - "**/coverage/**"
+  # Config files
+  - "**/*.config.ts"
+  - "**/*.config.mts"
+  - "**/*.config.js"
+  - "**/*.config.mjs"
