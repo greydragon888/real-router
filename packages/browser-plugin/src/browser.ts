@@ -160,7 +160,7 @@ const safelyEncodePath = (path: string): string => {
   try {
     return encodeURI(decodeURI(path));
   } catch (error) {
-    console.warn(`[${LOGGER_CONTEXT}] Could not encode path "${path}"`, error); // lgtm[js/tainted-format-string]
+    console.warn(`[${LOGGER_CONTEXT}] Could not encode path "${path}"`, error);
 
     return path;
   }

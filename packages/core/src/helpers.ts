@@ -19,7 +19,6 @@ export { getTypeDescription } from "type-guards";
  */
 function isState(value: unknown): value is State {
   if (typeof value !== "object" || value === null) {
-    // lgtm[js/comparison-between-incompatible-types]
     return false;
   }
 
