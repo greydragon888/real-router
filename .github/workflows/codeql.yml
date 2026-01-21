@@ -24,9 +24,8 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
-          languages: javascript
+          languages: javascript-typescript
           queries: +security-extended,security-and-quality
-          config-file: .github/codeql/codeql-config.yml
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v4
