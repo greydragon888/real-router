@@ -1,5 +1,6 @@
 // packages/real-router/modules/transitionPath.ts
 
+import { logger } from "logger";
 import { validateState } from "type-guards";
 
 import type { Params, State } from "core-types";
@@ -132,8 +133,9 @@ function extractSegmentParams(name: string, state: State): SegmentParams {
       // Warn about unsupported complex types (arrays, nested objects)
       // Note: After null check and primitive check, only objects remain here.
       // symbol/function/bigint are rejected by isParams validation before reaching this code.
-      console.warn(
-        `[transitionPath.extractSegmentParams] Unsupported param type for key "${key}": ${typeof value}. ` +
+      logger.warn(
+        "transitionPath.extractSegmentParams",
+        `Unsupported param type for key "${key}": ${typeof value}. ` +
           `Only primitives (string, number, boolean) are supported.`,
         typeof value,
       );

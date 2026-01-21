@@ -134,6 +134,26 @@ Show differences in route parameters when navigating within the same route.
 - ❌ Not shown when navigating between different routes
 - ❌ Not shown when parameters are identical
 
+### `usePerformanceMarks`
+
+Use Performance API to create marks and measures. Enables integration with browser DevTools Performance tab.
+
+- `false` **(default)** - disabled
+- `true` - create performance marks and measures
+
+**Created marks:**
+
+- `router:transition-start:{from}→{to}`
+- `router:transition-end:{from}→{to}` (success)
+- `router:transition-cancel:{from}→{to}` (cancelled)
+- `router:transition-error:{from}→{to}` (error)
+
+**Created measures:**
+
+- `router:transition:{from}→{to}` (success)
+- `router:transition-cancelled:{from}→{to}` (cancelled)
+- `router:transition-failed:{from}→{to}` (error)
+
 ### `context`
 
 Context name for logs. Useful when working with multiple routers.
@@ -214,6 +234,19 @@ import {
   type LoggerPluginConfig,
   type LogLevel,
 } from "@real-router/logger-plugin";
+```
+
+## Server-Side Rendering
+
+For high-precision timing in Node.js, polyfill `performance` globally:
+
+```typescript
+// server.ts (Node.js entry point)
+import { performance } from "perf_hooks";
+
+if (typeof globalThis.performance === "undefined") {
+  globalThis.performance = performance;
+}
 ```
 
 ## Related Packages

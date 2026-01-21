@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
@@ -153,7 +154,7 @@ describe("router.start() - error handling", () => {
 
   describe("protectedDone callback guard", () => {
     it("should warn and ignore second callback invocation via navigateToDefault", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
       const userCallback = vi.fn();
 
       // Issue #50: start() now uses a local navigateToDefault that calls navigateToState
@@ -176,7 +177,8 @@ describe("router.start() - error handling", () => {
       // User callback should only be called once
       expect(userCallback).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        "[real-router] Callback already invoked",
+        "real-router",
+        "Callback already invoked",
       );
 
       warnSpy.mockRestore();
@@ -184,7 +186,7 @@ describe("router.start() - error handling", () => {
     });
 
     it("should warn and ignore second callback invocation via navigateToState", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
       const userCallback = vi.fn();
 
       // Mock navigateToState to call callback twice
@@ -206,7 +208,8 @@ describe("router.start() - error handling", () => {
       // User callback should only be called once
       expect(userCallback).toHaveBeenCalledTimes(1);
       expect(warnSpy).toHaveBeenCalledWith(
-        "[real-router] Callback already invoked",
+        "real-router",
+        "Callback already invoked",
       );
 
       warnSpy.mockRestore();
@@ -217,13 +220,11 @@ describe("router.start() - error handling", () => {
   describe("error handling edge cases", () => {
     describe("event listener exceptions", () => {
       // NOTE: Event listener exceptions are CAUGHT by invokeFor() in observable.ts
-      // and logged via console.error(). They do NOT propagate to caller.
+      // and logged via logger.error(). They do NOT propagate to caller.
       // This is correct behavior - protects router from user code errors.
 
       it("should catch and log exception from ROUTER_START event listener", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws
         router.addEventListener(events.ROUTER_START, () => {
@@ -239,9 +240,10 @@ describe("router.start() - error handling", () => {
         expect(router.isStarted()).toBe(true);
         expect(router.getState()).toBeDefined();
 
-        // Error should be logged (format: console.error("[Router] Error in listener for <event>:", Error))
+        // Error should be logged (format: logger.error("Router", "Error in listener for <event>:", Error))
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringMatching(/\[Router\] Error in listener for/),
+          "Router",
+          expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
 
@@ -249,9 +251,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch and log exception from TRANSITION_SUCCESS event listener", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws on TRANSITION_SUCCESS
         router.addEventListener(events.TRANSITION_SUCCESS, () => {
@@ -268,7 +268,8 @@ describe("router.start() - error handling", () => {
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringMatching(/\[Router\] Error in listener for/),
+          "Router",
+          expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
 
@@ -276,9 +277,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch and log exception from TRANSITION_ERROR event listener", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         router.setOption("allowNotFound", false);
 
@@ -297,7 +296,8 @@ describe("router.start() - error handling", () => {
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
-          expect.stringMatching(/\[Router\] Error in listener for/),
+          "Router",
+          expect.stringMatching(/Error in listener for/),
           expect.any(Error),
         );
 
@@ -311,9 +311,7 @@ describe("router.start() - error handling", () => {
       // This documents ACTUAL behavior (defensive coding).
 
       it("should catch TypeError when string callback is invoked", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // TypeScript prevents this at compile time, but runtime catches it
         expect(() => {
@@ -331,9 +329,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch TypeError when object callback is invoked", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         expect(() => {
           // @ts-expect-error - testing invalid callback type
@@ -347,9 +343,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should catch TypeError when number callback is invoked", () => {
-        const errorSpy = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => {});
+        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         expect(() => {
           // @ts-expect-error - testing invalid callback type

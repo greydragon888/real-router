@@ -1,4 +1,5 @@
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import { loggerPluginFactory as loggerPlugin } from "@real-router/logger-plugin";
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
 import {
   describe,
@@ -1749,6 +1750,26 @@ describe("Browser Plugin", () => {
      */
 
     describe("Integration with other real-router plugins", () => {
+      it("works with loggerPlugin - basic compatibility", () => {
+        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
+
+        // Use both plugins together (common production scenario)
+        router.usePlugin(loggerPlugin());
+        router.usePlugin(browserPluginFactory({}, mockedBrowser));
+
+        router.start();
+        router.navigate("users.list");
+
+        // Both plugins should work without conflicts
+        expect(router.getState()?.name).toBe("users.list");
+        expect(currentHistoryState?.name).toBe("users.list");
+
+        // Logger should have logged the transition
+        expect(consoleLogSpy).toHaveBeenCalled();
+
+        consoleLogSpy.mockRestore();
+      });
+
       it("works with persistentParamsPlugin - preserves query params", () => {
         const persistParams = ["lang", "theme"];
 
@@ -1777,8 +1798,11 @@ describe("Browser Plugin", () => {
         expect(url).toContain("theme=dark");
       });
 
-      it("handles multiple plugins together (real-world scenario)", () => {
-        // Production-like setup with multiple plugins
+      it("handles all three plugins together (real-world scenario)", () => {
+        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
+
+        // Production-like setup with all plugins
+        router.usePlugin(loggerPlugin());
         router.usePlugin(persistentParamsPlugin(["sessionId"]));
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
@@ -1798,6 +1822,9 @@ describe("Browser Plugin", () => {
         expect(router.getState()?.params.id).toBe("42");
         expect(router.getState()?.params.sessionId).toBe("abc123"); // Persisted
         expect(currentHistoryState?.name).toBe("users.view"); // Browser updated
+        expect(consoleLogSpy).toHaveBeenCalled(); // Logger logged
+
+        consoleLogSpy.mockRestore();
       });
 
       it("browser plugin does not interfere with custom plugin hooks", () => {

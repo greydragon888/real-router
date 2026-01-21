@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -330,14 +331,15 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("root node and boolean validation", () => {
       it("should handle root node empty string and warn", () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         // Root node ("") is not considered a parent of any named route
         expect(router.isActiveRoute("")).toBe(false);
 
         // Should warn about empty string usage
         expect(warnSpy).toHaveBeenCalledWith(
-          '[real-router] isActiveRoute("") called with empty string. The root node is not considered active for any named route. To check if router has active state, use: router.getState() !== undefined',
+          "real-router",
+          expect.stringContaining('isActiveRoute("") called with empty string'),
         );
 
         warnSpy.mockClear();

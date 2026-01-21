@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
@@ -109,7 +110,7 @@ describe("core/dependencies/setDependency", () => {
 
   // 🟡 IMPORTANT: Warning on overwrite
   it("should warn when overwriting existing dependency", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.setDependency("foo", 1);
     warnSpy.mockClear();
@@ -120,16 +121,16 @@ describe("core/dependencies/setDependency", () => {
 
     const callArgs = warnSpy.mock.calls[0];
 
-    // Console format: console.warn("[context] message", ...args)
-    expect(callArgs[0]).toContain("[router.setDependency]");
-    expect(callArgs[0]).toContain("overwritten");
-    expect(callArgs[1]).toBe("foo");
+    // Logger format: logger.warn(context, message, ...args)
+    expect(callArgs[0]).toBe("router.setDependency");
+    expect(callArgs[1]).toContain("overwritten");
+    expect(callArgs[2]).toBe("foo");
 
     warnSpy.mockRestore();
   });
 
   it("should not warn when setting new dependency", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     // @ts-expect-error: testing new key
     router.setDependency("newDep", "value");
@@ -141,7 +142,7 @@ describe("core/dependencies/setDependency", () => {
 
   // 🟡 IMPORTANT: Idempotency
   it("should not warn when setting same value repeatedly", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.setDependency("foo", 42 as number);
     warnSpy.mockClear();
@@ -155,7 +156,7 @@ describe("core/dependencies/setDependency", () => {
   });
 
   it("should handle NaN idempotency correctly", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.setDependency("foo", Number.NaN);
     warnSpy.mockClear();

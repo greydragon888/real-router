@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -121,9 +122,9 @@ describe("invokeEventListeners - Empty listeners handling", () => {
     });
 
     it("should not cause any side effects when no listeners exist", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
-      const logSpy = vi.spyOn(console, "log").mockImplementation(noop);
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
+      vi.spyOn(logger, "log").mockImplementation(noop);
+      vi.spyOn(logger, "warn").mockImplementation(noop);
 
       // Register and remove listeners
       const sideEffectListener = vi.fn();
@@ -142,19 +143,15 @@ describe("invokeEventListeners - Empty listeners handling", () => {
       const finalState = router.getState();
 
       // No logging output should occur
-      expect(errorSpy).not.toHaveBeenCalled();
-      expect(logSpy).not.toHaveBeenCalled();
-      expect(warnSpy).not.toHaveBeenCalled();
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.log).not.toHaveBeenCalled();
+      expect(logger.warn).not.toHaveBeenCalled();
 
       // Router state should remain unchanged
       expect(finalState).toStrictEqual(initialState);
 
       // Listener should not have been called
       expect(sideEffectListener).not.toHaveBeenCalled();
-
-      errorSpy.mockRestore();
-      logSpy.mockRestore();
-      warnSpy.mockRestore();
     });
 
     it("should handle multiple event types with empty listener arrays", () => {

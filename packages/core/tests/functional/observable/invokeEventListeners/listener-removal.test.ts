@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -265,7 +266,7 @@ describe("invokeEventListeners - Listener removal", () => {
     });
 
     it("should handle error in listener that removes itself", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const executionOrder: string[] = [];
       let unsubscribe: Unsubscribe;
@@ -295,8 +296,9 @@ describe("invokeEventListeners - Listener removal", () => {
         "errorAndRemove-beforeError",
         "normal",
       ]);
-      expect(console.error).toHaveBeenCalledWith(
-        "[Router] Error in listener for $start:",
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $start:",
         expect.any(Error),
       );
       expect(normalListener).toHaveBeenCalledWith();

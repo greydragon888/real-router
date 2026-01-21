@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/routes/routeTree.ts
 
+import { logger } from "logger";
 import {
   createRouteTree,
   getSegmentsByName,
@@ -152,8 +153,9 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
      * @throws {Error} If target route requires parameters not available in source route
      */
     router.forward = (fromRoute, toRoute) => {
-      console.warn(
-        `[router.forward] Method is deprecated. Use \`forwardTo\` property in route configuration instead.`,
+      logger.warn(
+        "router.forward",
+        "Method is deprecated. Use `forwardTo` property in route configuration instead.",
       );
 
       // Get route tree for validation
@@ -366,8 +368,9 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
         if (isExactMatch || isParentOfCurrent) {
           const suffix = isExactMatch ? "" : ` (current: "${currentName}")`;
 
-          console.warn(
-            `[router.removeRoute] Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
+          logger.warn(
+            "router.removeRoute",
+            `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
           );
 
           return router;
@@ -379,8 +382,9 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
       // is the navigation target. After FSM migration (RFC-2), this will be improved
       // with RouterState.TRANSITIONING that tracks the target route.
       if (router.isNavigating()) {
-        console.warn(
-          `[router.removeRoute] Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
+        logger.warn(
+          "router.removeRoute",
+          `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
         );
       }
 
@@ -388,8 +392,9 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
       const wasRemoved = removeFromDefinitions(routeDefinitions, name);
 
       if (!wasRemoved) {
-        console.warn(
-          `[router.removeRoute] Route "${name}" not found. No changes made.`,
+        logger.warn(
+          "router.removeRoute",
+          `Route "${name}" not found. No changes made.`,
         );
 
         return router;
@@ -423,8 +428,9 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
      */
     router.clearRoutes = (): Router<Dependencies> => {
       if (router.isNavigating()) {
-        console.error(
-          `[router.clearRoutes] Cannot clear routes while navigation is in progress. Wait for navigation to complete.`,
+        logger.error(
+          "router.clearRoutes",
+          "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
         );
 
         return router;
@@ -580,9 +586,10 @@ export function withRouteTree<Dependencies extends DefaultDependencies>(
       // Warn if modifying config during navigation
       // Changes apply immediately but may cause inconsistent behavior
       if (router.isNavigating()) {
-        console.error(
-          `[router.updateRoute] Route "${name}" config modified while navigation is in progress. ` +
-            `Changes will apply immediately and may affect the current transition.`,
+        logger.error(
+          "router.updateRoute",
+          `Route "${name}" config modified while navigation is in progress. ` +
+            "Changes will apply immediately and may affect the current transition.",
         );
       }
 

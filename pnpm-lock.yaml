@@ -207,11 +207,16 @@ importers:
         specifier: workspace:^
         version: link:../core
 
+  packages/logger: {}
+
   packages/logger-plugin:
     dependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      logger:
+        specifier: workspace:^
+        version: link:../logger
 
   packages/persistent-params-plugin:
     dependencies:

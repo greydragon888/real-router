@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import {
   describe,
   beforeEach,
@@ -553,7 +554,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
   describe("overwriting guards", () => {
     it("should log warning when overwriting existing guard", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       router.canActivate("route", true);
 
@@ -563,10 +564,9 @@ describe("core/route-lifecycle/canActivate", () => {
       // Second registration - should warn
       router.canActivate("route", false);
 
+      // Logger format: logger.warn(context, message)
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[router.canActivate]"),
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
+        "router.canActivate",
         expect.stringContaining("Overwriting"),
       );
 
@@ -889,7 +889,7 @@ describe("core/route-lifecycle/canActivate", () => {
     });
 
     it("should log warning at 50 handlers", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
       const tempRouter = createTestRouter();
       // Note: createTestRouter has 2 pre-registered canActivate handlers
 
@@ -921,7 +921,7 @@ describe("core/route-lifecycle/canActivate", () => {
     });
 
     it("should log error at 100 handlers", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(noop);
       const tempRouter = createTestRouter();
       // Note: createTestRouter has 2 pre-registered canActivate handlers
 

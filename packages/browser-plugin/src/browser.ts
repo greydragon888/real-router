@@ -1,5 +1,6 @@
 // packages/browser-plugin/modules/browser.ts
 
+import { logger } from "logger";
 import { isHistoryState } from "type-guards";
 
 import { LOGGER_CONTEXT } from "./constants";
@@ -160,7 +161,7 @@ const safelyEncodePath = (path: string): string => {
   try {
     return encodeURI(decodeURI(path));
   } catch (error) {
-    console.warn(`[${LOGGER_CONTEXT}] Could not encode path "${path}"`, error);
+    logger.warn(LOGGER_CONTEXT, `Could not encode path "${path}"`, error);
 
     return path;
   }
@@ -179,8 +180,9 @@ const getState = (): HistoryState | undefined => {
 
   // Validate state structure instead of throwing
   if (!isHistoryState(globalThis.history.state)) {
-    console.warn(
-      `[${LOGGER_CONTEXT}] History state is not a valid state object, ignoring`,
+    logger.warn(
+      LOGGER_CONTEXT,
+      "History state is not a valid state object, ignoring",
       globalThis.history.state,
     );
 
@@ -206,8 +208,9 @@ function createFallbackBrowser(): Browser {
 
   const warnOnce = (method: string) => {
     if (!hasWarned) {
-      console.warn(
-        `[${LOGGER_CONTEXT}] Browser plugin is running in a non-browser environment. ` +
+      logger.warn(
+        LOGGER_CONTEXT,
+        `Browser plugin is running in a non-browser environment. ` +
           `Method "${method}" is a no-op. ` +
           `This is expected for SSR, but may indicate misconfiguration if you expected browser behavior.`,
       );

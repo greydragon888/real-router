@@ -1,4 +1,5 @@
-import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+import { logger } from "logger";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
 
@@ -160,7 +161,7 @@ describe("core/dependencies/setDependencies", () => {
 
   // 🟡 IMPORTANT: Warnings for overwrites
   it("should warn with single message when overwriting multiple dependencies", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.setDependencies({ foo: 1, bar: "initial" });
     warnSpy.mockClear();
@@ -172,17 +173,17 @@ describe("core/dependencies/setDependencies", () => {
 
     const callArgs = warnSpy.mock.calls[0];
 
-    // Console format: console.warn("[context] message", ...args)
-    expect(callArgs[0]).toContain("[router.setDependencies]");
-    expect(callArgs[0]).toContain("Overwritten:");
-    expect(callArgs[1]).toContain("foo");
-    expect(callArgs[1]).toContain("bar");
+    // Logger format: logger.warn(context, message, ...args)
+    expect(callArgs[0]).toBe("router.setDependencies");
+    expect(callArgs[1]).toBe("Overwritten:");
+    expect(callArgs[2]).toContain("foo");
+    expect(callArgs[2]).toContain("bar");
 
     warnSpy.mockRestore();
   });
 
   it("should not warn when no overwrites occur", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.setDependencies({ foo: 1, bar: "test" });
     warnSpy.mockClear();

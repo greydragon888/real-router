@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import {
   describe,
   beforeEach,
@@ -442,7 +443,7 @@ describe("router.navigate() - concurrent navigation", () => {
     });
 
     it("should handle cancellation during redirect scenarios", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
       vi.useFakeTimers();
 
       // Set up redirect

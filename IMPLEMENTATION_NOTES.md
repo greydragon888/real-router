@@ -121,27 +121,18 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 
 ### Scope Sync
 
-Scopes in `commitlint.config.mjs` and `cz.config.js` must stay synchronized:
+`commitlint.config.mjs` is the single source of truth for commit types and scopes:
 
 ```javascript
-// Both files:
-scopes: [
-  "core",
-  "core-types",
-  "route-tree",
-  "search-params",
-  "type-guards",
-  "helpers",
-  "browser-plugin",
-  "logger-plugin",
-  "persistent-params-plugin",
-  "react",
-  "benchmarks",
-  "deps",
-  "config",
-  "ci",
-];
+// commitlint.config.mjs
+export const TYPES = ["feat", "fix", "docs", ...];
+export const SCOPES = ["core", "logger", "browser-plugin", ...];
+
+// cz.config.js imports from commitlint
+import { TYPES, SCOPES } from "./commitlint.config.mjs";
 ```
+
+To add a new scope, edit only `commitlint.config.mjs`.
 
 ### Release Type
 
@@ -377,6 +368,106 @@ test → depends on lint + type-check
 ```
 
 Build only runs after tests pass.
+
+## Logger Package
+
+### Why?
+
+**Isomorphic** — works in browser, Node.js, and environments without `console` (React Native, Electron, edge runtimes).
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Level filtering** | `all` → `warn-error` → `error-only` → `none` |
+| **Safe console access** | Checks `typeof console !== "undefined"` before output |
+| **Callback system** | Custom log handler for any environment |
+
+### Callback Use Cases
+
+```typescript
+// 1. Console emulation (environments without console)
+callback: (level, context, message) => {
+  NativeModules.Logger[level](`[${context}] ${message}`);
+}
+
+// 2. Error tracking (Sentry, etc.)
+callback: (level, context, message) => {
+  if (level === "error") Sentry.captureMessage(message);
+}
+
+// 3. Both: silent console + full monitoring
+{
+  level: "none",              // No console output
+  callbackIgnoresLevel: true, // Callback gets everything
+  callback: sendToMonitoring,
+}
+```
+
+### Configuration via Router
+
+```typescript
+const router = createRouter(routes, {
+  logger: { level: "error-only", callback: errorTracker },
+});
+```
+
+### Package Dependencies
+
+All packages using logger declare `"logger": "workspace:^"` dependency.
+
+Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`.
+
+## Logger Plugin Performance Tracking
+
+### Timing Display
+
+Transition duration with adaptive units:
+
+| Duration | Format | Example |
+|----------|--------|---------|
+| < 0.1ms | Microseconds | `(27.29μs)` |
+| ≥ 0.1ms | Milliseconds | `(15.00ms)` |
+
+### Time Provider
+
+Monotonic time source with environment-aware fallback:
+
+```
+Browser           → performance.now()
+Node.js 16+       → performance.now() from perf_hooks
+Node.js <16       → Date.now() with monotonic emulation
+```
+
+**Monotonic emulation** — `Date.now()` can go backwards (NTP sync, DST). Wrapper tracks `lastTimestamp` and adds offset if time decreases.
+
+### Performance API Integration
+
+Creates marks and measures for DevTools Performance tab:
+
+```
+Marks:
+├── router:transition-start:{from}→{to}
+├── router:transition-end:{from}→{to}     (success)
+├── router:transition-cancel:{from}→{to}  (cancelled)
+└── router:transition-error:{from}→{to}   (error)
+
+Measures:
+├── router:transition:{from}→{to}           (success)
+├── router:transition-cancelled:{from}→{to} (cancelled)
+└── router:transition-failed:{from}→{to}    (error)
+```
+
+**Safe API access** — checks `typeof performance.mark === "function"` before use.
+
+### SSR Note
+
+For high-precision timing in Node.js without global `performance`:
+
+```typescript
+import { performance } from "perf_hooks";
+globalThis.performance = performance;
+```
 
 ## Dependencies
 

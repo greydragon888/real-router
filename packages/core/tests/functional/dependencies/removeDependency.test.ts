@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
@@ -31,14 +32,15 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should warn when removing non-existent dependency", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     router.removeDependency("nonexistent" as "foo");
 
-    // Console format: console.warn("[context] message")
+    // Logger format: logger.warn(context, message)
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\[router\.removeDependency\].*Attempted to remove non-existent dependency/,
+      "router.removeDependency",
+      expect.stringContaining(
+        'Attempted to remove non-existent dependency: "string"',
       ),
     );
 
@@ -56,7 +58,7 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should be idempotent - safe to call multiple times", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     // First removal - should succeed
     router.removeDependency("foo");
@@ -66,11 +68,10 @@ describe("core/dependencies/removeDependency", () => {
     // Second removal - should warn but not throw
     router.removeDependency("foo");
 
-    // Console format: console.warn("[context] message")
+    // Logger format: logger.warn(context, message)
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\[router\.removeDependency\].*Attempted to remove non-existent dependency/,
-      ),
+      "router.removeDependency",
+      expect.stringContaining("Attempted to remove non-existent dependency"),
     );
 
     // Third removal - still safe
@@ -83,17 +84,16 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should handle type coercion for non-string parameters", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     // Number parameter
     // @ts-expect-error: testing number parameter
     router.removeDependency(123);
 
-    // Console format: console.warn("[context] message")
+    // Logger format: logger.warn(context, message)
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\[router\.removeDependency\].*Attempted to remove non-existent dependency/,
-      ),
+      "router.removeDependency",
+      expect.stringContaining("Attempted to remove non-existent dependency"),
     );
 
     warnSpy.mockClear();
@@ -103,9 +103,8 @@ describe("core/dependencies/removeDependency", () => {
     router.removeDependency(null);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\[router\.removeDependency\].*Attempted to remove non-existent dependency/,
-      ),
+      "router.removeDependency",
+      expect.stringContaining("Attempted to remove non-existent dependency"),
     );
 
     warnSpy.mockClear();
@@ -115,9 +114,8 @@ describe("core/dependencies/removeDependency", () => {
     router.removeDependency(undefined);
 
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringMatching(
-        /\[router\.removeDependency\].*Attempted to remove non-existent dependency/,
-      ),
+      "router.removeDependency",
+      expect.stringContaining("Attempted to remove non-existent dependency"),
     );
 
     warnSpy.mockRestore();
@@ -175,7 +173,7 @@ describe("core/dependencies/removeDependency", () => {
   });
 
   it("should allow safe cleanup without existence checks", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     // Cleanup pattern - no need to check if dependencies exist
     const cleanupDeps = ["dep1", "dep2", "dep3"] as const;

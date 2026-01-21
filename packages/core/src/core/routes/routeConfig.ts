@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/routes/routeConfig.ts
 
+import { logger } from "logger";
 import { getSegmentsByName } from "route-tree";
 import { isParams, getTypeDescription } from "type-guards";
 
@@ -503,8 +504,9 @@ export function registerRouteForward<Dependencies extends DefaultDependencies>(
     // Warn if route has both forwardTo and canActivate
     // canActivate will be ignored because forwardTo is an alias, not a transition
     if (route.canActivate) {
-      console.warn(
-        `[real-router] Route "${route.name}" has both forwardTo and canActivate. ` +
+      logger.warn(
+        "real-router",
+        `Route "${route.name}" has both forwardTo and canActivate. ` +
           `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
           `Move canActivate to the target route "${route.forwardTo}".`,
       );
