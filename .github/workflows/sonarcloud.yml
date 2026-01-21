@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [master]
 
+# Turbo Remote Cache
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+
 jobs:
   sonarcloud:
     name: SonarCloud
