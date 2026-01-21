@@ -176,6 +176,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      logger:
+        specifier: workspace:^
+        version: link:../logger
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -192,6 +195,9 @@ importers:
       core-types:
         specifier: workspace:^
         version: link:../core-types
+      logger:
+        specifier: workspace:^
+        version: link:../logger
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
