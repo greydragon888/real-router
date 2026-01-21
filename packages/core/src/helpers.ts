@@ -18,8 +18,7 @@ export { getTypeDescription } from "type-guards";
  * @internal
  */
 function isState(value: unknown): value is State {
-  // codeql[js/comparison-between-incompatible-types] - Required: typeof null === "object" in JavaScript
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== "object" || value === null) { // lgtm[js/comparison-between-incompatible-types]
     return false;
   }
 
