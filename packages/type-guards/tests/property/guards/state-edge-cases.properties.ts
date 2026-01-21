@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { isHistoryState, isStateStrict } from "type-guards";
 
@@ -26,14 +26,14 @@ describe("State Edge Cases (Uncovered Branches)", () => {
       return true;
     });
 
-    test("rejects null specifically", () => {
+    it("rejects null specifically", () => {
       // Line 133: value === null check
       expect(isHistoryState(null)).toBe(false);
 
       return true;
     });
 
-    test("rejects undefined specifically", () => {
+    it("rejects undefined specifically", () => {
       // Line 133: typeof value !== "object"
       expect(isHistoryState(undefined)).toBe(false);
 

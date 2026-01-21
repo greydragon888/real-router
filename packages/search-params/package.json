@@ -1,6 +1,6 @@
 {
   "name": "search-params",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Query string parsing and building with configurable strategies",
   "main": "./dist/cjs/index.js",
@@ -21,7 +21,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/greydragon888/router6.git"
+    "url": "git+https://github.com/greydragon888/real-router.git"
   },
   "keywords": [
     "query",
@@ -29,7 +29,8 @@
     "url",
     "parse",
     "build",
-    "search"
+    "search",
+    "real-router"
   ],
   "author": {
     "name": "Oleg Ivanov",
@@ -38,16 +39,16 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/greydragon888/router6/issues"
+    "url": "https://github.com/greydragon888/real-router/issues"
   },
-  "homepage": "https://github.com/greydragon888/router6",
+  "homepage": "https://github.com/greydragon888/real-router",
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
     "test:mutation": "stryker run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --ext .ts modules/ tests/ --fix --max-warnings 0"
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0"
   },
   "sideEffects": false
 }

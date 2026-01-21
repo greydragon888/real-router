@@ -1,0 +1,109 @@
+# Codecov Configuration
+# Docs: https://docs.codecov.com/docs/codecovyml-reference
+
+# Basic Settings
+codecov:
+  require_ci_to_pass: yes # Wait for CI to pass before reporting
+  notify:
+    wait_for_ci: yes # Wait for all CI checks before notifications
+    after_n_builds: 1 # Process after receiving all uploads
+
+# Coverage Configuration
+coverage:
+  precision: 2 # Decimal places for coverage percentage
+  round: down # Round down for conservative estimates
+  range: "90...100" # Green status range (strict)
+
+  # Coverage Status Checks
+  status:
+    project:
+      default:
+        target: 100% # Project must maintain 100% coverage
+        threshold: 1% # Allow 1% drop without failing
+        if_ci_failed: error # Fail if CI failed
+        informational: false # Block on failure
+        only_pulls: false # Run on all commits
+
+    patch:
+      default:
+        target: 100% # New code must have 100% coverage
+        threshold: 1% # Allow 1% variance
+        if_ci_failed: error
+        informational: false
+        only_pulls: true # Only for pull requests
+
+    changes:
+      default:
+        if_ci_failed: error
+        informational: false
+        only_pulls: true
+
+# Pull Request Comments Configuration
+comment:
+  layout: "header, diff, changes, suggestions, tree, footer"
+  behavior: default # Update existing comment
+  require_changes: false # Always show comment
+  require_base: false # Don't require base commit
+  require_head: true # Require head commit
+  require_bundle_changes: true # Only comment when bundle size changes
+  bundle_change_threshold: 1Kb # Warn on 1KB+ increase
+
+# Ignore paths (no coverage tracking)
+ignore:
+  - "**/tests/**" # Test files
+  - "**/*.test.ts" # Unit tests
+  - "**/*.test.tsx" # React tests
+  - "**/*.spec.ts" # Spec tests
+  - "**/*.spec.tsx" # React spec tests
+  - "**/*.bench.ts" # Benchmark files
+  - "**/dist/**" # Built files
+  - "**/coverage/**" # Coverage reports
+  - "**/*.config.ts" # Config files
+  - "**/*.config.mts" # Config files
+  - "**/*.config.mjs" # Config files
+  - "**/*.config.js" # Config files
+  - ".github/**" # GitHub workflows
+  - "docs/**" # Documentation
+  - "**/types.ts" # Type definitions
+  - "**/constants.ts" # Constants
+  - "**/index.ts" # Re-exports
+  - "**/__mocks__/**" # Mocks
+  - "**/__fixtures__/**" # Fixtures
+
+# Flags for organizing coverage by package
+flags:
+  core:
+    paths:
+      - packages/core/src/
+    carryforward: false
+  react:
+    paths:
+      - packages/react/src/
+    carryforward: false
+  browser-plugin:
+    paths:
+      - packages/browser-plugin/src/
+    carryforward: false
+  helpers:
+    paths:
+      - packages/helpers/src/
+    carryforward: false
+  route-tree:
+    paths:
+      - packages/route-tree/src/
+    carryforward: false
+
+# GitHub Checks Integration
+github_checks:
+  annotations: true # Show inline annotations on GitHub
+
+# Parser configuration for JavaScript/TypeScript
+parsers:
+  javascript:
+    enable_partials: true # Track partial coverage
+
+# Bundle Analysis Configuration
+# Docs: https://docs.codecov.com/docs/javascript-bundle-analysis
+bundle_analysis:
+  warning_threshold: "5%" # Warn if bundle increases by 5%
+  status: "informational" # Don't block PRs, just inform

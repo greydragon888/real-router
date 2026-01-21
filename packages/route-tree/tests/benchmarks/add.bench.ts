@@ -18,7 +18,7 @@
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
 import { generateDeepTree, generateWideTree } from "./helpers/generators";
-import { createRouteTreeBuilder } from "../../modules/builder";
+import { createRouteTreeBuilder } from "../../src/builder";
 
 /** Mitata state interface for generator benchmarks */
 interface BenchState {

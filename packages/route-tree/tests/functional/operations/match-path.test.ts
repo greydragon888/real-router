@@ -5,8 +5,8 @@
 import { describe, it, expect } from "vitest";
 
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
-import { getSegmentsByName } from "../../../modules/operations/query";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
+import { getSegmentsByName } from "../../../src/operations/query";
 
 describe("New API - matchPath", () => {
   it("should match simple path", () => {

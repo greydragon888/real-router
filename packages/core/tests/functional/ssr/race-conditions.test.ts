@@ -1,0 +1,251 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import { createRouter } from "@real-router/core";
+
+import type { Route, Router } from "@real-router/core";
+
+const routes: Route[] = [
+  { name: "home", path: "/" },
+  { name: "products", path: "/products/:id" },
+  { name: "users", path: "/users/:id" },
+  { name: "about", path: "/about", defaultParams: { tab: "info" } },
+  { name: "admin", path: "/admin" },
+  { name: "public", path: "/public" },
+];
+
+const defaultOptions = { defaultRoute: "home" };
+
+describe("SSR race conditions", () => {
+  describe("cloned router instance - solution", () => {
+    it("should isolate state between cloned instances", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+
+      // Two isolated clones (simulating two SSR requests)
+      const routerA = baseRouter.clone();
+      const routerB = baseRouter.clone();
+
+      routerA.start();
+      routerB.start();
+
+      // Navigate on separate instances (synchronous navigation)
+      routerA.navigate("products", { id: "123" });
+      routerB.navigate("users", { id: "456" });
+
+      // States are isolated - each router has its own state
+      expect(routerA.getState()?.name).toBe("products");
+      expect(routerA.getState()?.params.id).toBe("123");
+
+      expect(routerB.getState()?.name).toBe("users");
+      expect(routerB.getState()?.params.id).toBe("456");
+
+      routerA.stop();
+      routerB.stop();
+    });
+
+    it("should return correct route from cloned instance", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+
+      const clone1 = baseRouter.clone();
+      const clone2 = baseRouter.clone();
+
+      // getRoute on clones returns correct data
+      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+        tab: "info",
+      });
+      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+        tab: "info",
+      });
+    });
+
+    it("should isolate route configuration updates between clones", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+
+      const clone1 = baseRouter.clone();
+      const clone2 = baseRouter.clone();
+
+      // Modify one clone's route configuration
+      clone1.updateRoute("about", { defaultParams: { tab: "changed" } });
+
+      // Clone 1 sees the change
+      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+        tab: "changed",
+      });
+
+      // Clone 2 still has original value - isolated!
+      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+        tab: "info",
+      });
+    });
+
+    it("should isolate lifecycle handlers between clones", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+      const guardCallsClone1: string[] = [];
+      const guardCallsClone2: string[] = [];
+
+      const clone1 = baseRouter.clone();
+      const clone2 = baseRouter.clone();
+
+      // Add different guards to each clone
+      clone1.canActivate("admin", () => () => {
+        guardCallsClone1.push("clone1-admin");
+
+        return true;
+      });
+
+      clone2.canActivate("admin", () => () => {
+        guardCallsClone2.push("clone2-admin");
+
+        return true;
+      });
+
+      clone1.start();
+      clone2.start();
+
+      // Navigate both (synchronous)
+      clone1.navigate("admin");
+      clone2.navigate("admin");
+
+      // Each clone called its own guard
+      expect(guardCallsClone1).toStrictEqual(["clone1-admin"]);
+      expect(guardCallsClone2).toStrictEqual(["clone2-admin"]);
+
+      clone1.stop();
+      clone2.stop();
+    });
+  });
+
+  describe("runtime protection - concurrent navigation warning", () => {
+    let warnSpy: ReturnType<typeof vi.spyOn>;
+    let router: Router;
+
+    beforeEach(() => {
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+      router = createRouter(routes, defaultOptions);
+      router.start();
+    });
+
+    afterEach(() => {
+      router.stop();
+      warnSpy.mockRestore();
+    });
+
+    it("should warn when navigate called during active async navigation", async () => {
+      // Add async guard to make navigation async
+      router.canActivate("admin", () => async () => {
+        // Start another navigation while this one is in progress
+        router.navigate("public");
+        // Allow time for warning to be logged
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        return true;
+      });
+
+      // Start navigation (will be async due to guard)
+      await new Promise<void>((resolve) => {
+        router.navigate("admin", () => {
+          // This callback is called when admin navigation is cancelled
+          // or when it completes
+          resolve();
+        });
+      });
+
+      // Check that concurrent navigation warning was logged
+      const concurrentWarning = warnSpy.mock.calls.find(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("[router.navigate]") &&
+          call[0].includes("Concurrent navigation"),
+      );
+
+      expect(concurrentWarning).toBeDefined();
+    });
+
+    it("should not warn for sequential navigations", () => {
+      // First navigation (sync)
+      router.navigate("admin");
+      warnSpy.mockClear();
+
+      // Second navigation (sync, after first completed)
+      router.navigate("public");
+
+      // No concurrent navigation warning
+      const concurrentWarnings = warnSpy.mock.calls.filter(
+        (call: unknown[]) =>
+          typeof call[0] === "string" &&
+          call[0].includes("[router.navigate]") &&
+          call[0].includes("Concurrent navigation"),
+      );
+
+      expect(concurrentWarnings).toHaveLength(0);
+    });
+  });
+
+  describe("edge cases", () => {
+    it("should handle navigation cancellation correctly", async () => {
+      const router = createRouter(routes, defaultOptions);
+
+      router.start();
+
+      let secondNavCompleted = false;
+
+      // Add async guard to first route
+      router.canActivate("admin", () => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        return true;
+      });
+
+      // Start async navigation (first navigation will be cancelled)
+      router.navigate("admin");
+
+      // Immediately start second navigation (will cancel first)
+      router.navigate("public", () => {
+        secondNavCompleted = true;
+      });
+
+      // Wait for everything to settle
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Second navigation completed
+      expect(secondNavCompleted).toBe(true);
+      expect(router.getState()?.name).toBe("public");
+
+      router.stop();
+    });
+
+    it("should not leak state from clone to base router", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+      const clone = baseRouter.clone();
+
+      clone.start();
+      clone.navigate("admin");
+
+      expect(clone.getState()?.name).toBe("admin");
+
+      clone.stop();
+
+      // Base router is unaffected (was never started)
+      expect(baseRouter.getState()).toBeUndefined();
+    });
+
+    it("should maintain route tree independence between clones", () => {
+      const baseRouter = createRouter(routes, defaultOptions);
+
+      const clone1 = baseRouter.clone();
+      const clone2 = baseRouter.clone();
+
+      // Add route to clone1 only
+      clone1.addRoute({ name: "clone1only", path: "/clone1only" });
+
+      // Clone1 has the route
+      expect(clone1.hasRoute("clone1only")).toBe(true);
+
+      // Clone2 doesn't have it
+      expect(clone2.hasRoute("clone1only")).toBe(false);
+
+      // Base router doesn't have it
+      expect(baseRouter.hasRoute("clone1only")).toBe(false);
+    });
+  });
+});

@@ -1,6 +1,7 @@
 // packages/type-guards/tests/property/routes.properties.ts
 
 import { fc, test } from "@fast-check/vitest";
+import { describe, expect } from "vitest";
 
 import { isRouteName } from "type-guards";
 
@@ -9,7 +10,7 @@ describe("Route Guards - Property-Based Tests", () => {
     test.prop([fc.string()])(
       "accepts any string input without throwing",
       (name) => {
-        expect(() => isRouteName(name)).not.toThrow();
+        expect(() => isRouteName(name)).not.toThrowError();
       },
     );
 

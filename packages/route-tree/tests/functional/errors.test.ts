@@ -8,7 +8,7 @@ import {
   ParentNotFoundError,
   RouteNodeError,
   RouteNotFoundError,
-} from "../../modules/validation/errors";
+} from "../../src/validation/errors";
 
 describe("Error Classes", () => {
   describe("RouteNodeError", () => {

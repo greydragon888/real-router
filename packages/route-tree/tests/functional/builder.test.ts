@@ -6,7 +6,7 @@ import {
   createRouteTreeBuilder,
   DuplicateRouteError,
   InvalidRouteError,
-} from "../../modules/builder";
+} from "../../src/builder";
 
 describe("createRouteTree", () => {
   describe("basic tree creation", () => {

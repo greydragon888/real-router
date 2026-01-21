@@ -1,0 +1,57 @@
+{
+  "name": "@real-router/persistent-params-plugin",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "Persist query parameters across route transitions",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "real-router",
+    "params",
+    "persistence",
+    "query-params",
+    "url-params",
+    "state"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "test": "vitest",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "type-guards": "workspace:^"
+  }
+}

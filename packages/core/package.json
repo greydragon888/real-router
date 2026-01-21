@@ -1,0 +1,62 @@
+{
+  "name": "@real-router/core",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "A simple, powerful, view-agnostic, modular and extensible router",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "router",
+    "routing",
+    "html5",
+    "functional",
+    "reactive",
+    "universal",
+    "isomorphic",
+    "real-router"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run functional/",
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "test:mutation": "stryker run",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "route-tree": "workspace:^",
+    "core-types": "workspace:^",
+    "type-guards": "workspace:^"
+  }
+}

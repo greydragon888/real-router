@@ -1,0 +1,38 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "syncpack": {
+    "config": ["syncpack.config.{mjs,cjs,js}"]
+  },
+  "workspaces": {
+    ".": {
+      "entry": [
+        "scripts/*.{sh,mjs,ts}",
+        "*.mts",
+        "cz.config.js",
+        "dangerfile.ts",
+        ".changeset/*.md"
+      ],
+      "project": ["*.{ts,mts,js,mjs}"],
+      "ignoreDependencies": ["terser", "fast-check"]
+    },
+    "packages/*": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "vitest": {
+        "config": ["vitest.config.mts", "vitest.config.*.mts"]
+      },
+      "stryker": {
+        "config": ["stryker.config.mjs"]
+      }
+    }
+  },
+  "ignoreWorkspaces": [],
+  "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
+  "ignoreDependencies": [
+    "core-types",
+    "@real-router/persistent-params-plugin",
+    "@stryker-mutator/api",
+    "jsdom"
+  ],
+  "ignoreBinaries": ["tree", "tsx", "open"],
+  "ignoreExportsUsedInFile": true
+}

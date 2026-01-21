@@ -4,11 +4,11 @@
 
 import { describe, it, expect } from "vitest";
 
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
 import {
   getSegmentsByName,
   hasSegmentsByName,
-} from "../../../modules/operations/query";
+} from "../../../src/operations/query";
 
 describe("New API - query functions", () => {
   it("getSegmentsByName should return segments", () => {

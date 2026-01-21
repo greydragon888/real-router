@@ -4,7 +4,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("New API - createRouteTree", () => {
   it("should create a route tree from definitions", () => {

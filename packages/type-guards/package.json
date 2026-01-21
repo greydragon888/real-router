@@ -1,8 +1,8 @@
 {
   "name": "type-guards",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
-  "description": "Runtime type guards and validators for Router6",
+  "description": "Runtime type guards and validators for Real-Router",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
@@ -21,10 +21,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/greydragon888/router6.git"
+    "url": "git+https://github.com/greydragon888/real-router.git"
   },
   "keywords": [
-    "router6",
+    "real-router",
     "type-guards",
     "validators",
     "runtime-types"
@@ -38,7 +38,7 @@
   "scripts": {
     "build": "tsup",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --ext .ts modules/ tests/ --fix --max-warnings 0",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
     "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:mutation": "stryker run",
@@ -47,6 +47,6 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "router6-types": "workspace:^"
+    "core-types": "workspace:^"
   }
 }

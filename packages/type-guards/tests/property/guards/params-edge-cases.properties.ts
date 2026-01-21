@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { isParams } from "type-guards";
 
@@ -71,7 +71,7 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       return true;
     });
 
-    test("isParams accepts arrays containing only boolean", () => {
+    it("isParams accepts arrays containing only boolean", () => {
       expect(isParams({ a: [true, false, true] })).toBe(true);
       expect(isParams({ b: [false] })).toBe(true);
       expect(isParams({ c: [true, true, true, false, false] })).toBe(true);
@@ -111,7 +111,7 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       return true;
     });
 
-    test("isParams accepts arrays with nested objects", () => {
+    it("isParams accepts arrays with nested objects", () => {
       expect(isParams({ users: [{ id: 1 }, { id: 2 }] })).toBe(true);
       expect(isParams({ data: [{ name: "foo" }, { name: "bar" }] })).toBe(true);
       expect(
@@ -189,7 +189,7 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       },
     );
 
-    test("isParams accepts multi-level nesting", () => {
+    it("isParams accepts multi-level nesting", () => {
       expect(
         isParams({
           level1: {
@@ -264,7 +264,7 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       return true;
     });
 
-    test("isParams: real-world examples with uncovered branches", () => {
+    it("isParams: real-world examples with uncovered branches", () => {
       // Query params with flags
       expect(
         isParams({

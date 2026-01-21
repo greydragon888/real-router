@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect } from "vitest";
 
 import { validateState, isState } from "type-guards";
 
@@ -27,7 +27,7 @@ describe("State Validators - Property-Based Tests", () => {
         (state, method) => {
           expect(() => {
             validateState(state, method);
-          }).not.toThrow();
+          }).not.toThrowError();
 
           return true;
         },
@@ -38,7 +38,7 @@ describe("State Validators - Property-Based Tests", () => {
         (state, method) => {
           expect(() => {
             validateState(state, method);
-          }).not.toThrow();
+          }).not.toThrowError();
 
           return true;
         },
@@ -49,7 +49,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("does not throw exception for valid HistoryState", (state, method) => {
         expect(() => {
           validateState(state, method);
-        }).not.toThrow();
+        }).not.toThrowError();
 
         return true;
       });
@@ -61,7 +61,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("throws TypeError for invalid State objects", (state, method) => {
         expect(() => {
           validateState(state, method);
-        }).toThrow(TypeError);
+        }).toThrowError(TypeError);
 
         return true;
       });
@@ -71,7 +71,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("throws TypeError for primitives and non-objects", (value, method) => {
         expect(() => {
           validateState(value, method);
-        }).toThrow(TypeError);
+        }).toThrowError(TypeError);
 
         return true;
       });
@@ -81,7 +81,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState(null, method);
-          }).toThrow(TypeError);
+          }).toThrowError(TypeError);
 
           return true;
         },
@@ -92,7 +92,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState(undefined, method);
-          }).toThrow(TypeError);
+          }).toThrowError(TypeError);
 
           return true;
         },
@@ -105,6 +105,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("includes method name in error message", (value, method) => {
         try {
           validateState(value, method);
+
           // If no exception was thrown, fail the test
           expect.fail("Should have thrown an error");
         } catch (error) {
@@ -122,6 +123,7 @@ describe("State Validators - Property-Based Tests", () => {
         (value, method) => {
           try {
             validateState(value, method);
+
             expect.fail("Should have thrown an error");
           } catch (error) {
             expect(error).toBeInstanceOf(TypeError);
@@ -139,9 +141,11 @@ describe("State Validators - Property-Based Tests", () => {
       })("includes type description in error message", (value, method) => {
         try {
           validateState(value, method);
+
           expect.fail("Should have thrown an error");
         } catch (error) {
           expect(error).toBeInstanceOf(TypeError);
+
           const message = (error as Error).message;
 
           // Message should contain type description (null, undefined, string, number, etc.)
@@ -158,6 +162,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           try {
             validateState(null, method);
+
             expect.fail("Should have thrown an error");
           } catch (error) {
             expect(error).toBeInstanceOf(TypeError);
@@ -261,7 +266,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({}, method);
-          }).toThrow(TypeError);
+          }).toThrowError(TypeError);
 
           return true;
         },
@@ -272,7 +277,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home" }, method);
-          }).toThrow(TypeError);
+          }).toThrowError(TypeError);
 
           return true;
         },
@@ -283,7 +288,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home", params: {} }, method);
-          }).toThrow(TypeError);
+          }).toThrowError(TypeError);
 
           return true;
         },
@@ -294,7 +299,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home", params: {}, path: "/" }, method);
-          }).not.toThrow();
+          }).not.toThrowError();
 
           return true;
         },
@@ -314,7 +319,7 @@ describe("State Validators - Property-Based Tests", () => {
               },
               method,
             );
-          }).not.toThrow();
+          }).not.toThrowError();
 
           return true;
         },
@@ -330,7 +335,7 @@ describe("State Validators - Property-Based Tests", () => {
           // First validation
           expect(() => {
             validateState(state, method);
-          }).not.toThrow();
+          }).not.toThrowError();
 
           // Mutate state
           state.name = "mutated";
@@ -339,7 +344,7 @@ describe("State Validators - Property-Based Tests", () => {
           // Second validation should pass (mutated state is still valid)
           expect(() => {
             validateState(state, method);
-          }).not.toThrow();
+          }).not.toThrowError();
 
           return true;
         },

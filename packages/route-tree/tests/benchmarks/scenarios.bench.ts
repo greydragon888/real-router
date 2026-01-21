@@ -15,9 +15,9 @@ import {
   generateEnterpriseRoutes,
   generateSpaRoutes,
 } from "./helpers/generators";
-import { createRouteTree, createRouteTreeBuilder } from "../../modules/builder";
-import { buildPath } from "../../modules/operations/build";
-import { matchSegments } from "../../modules/operations/match";
+import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
+import { buildPath } from "../../src/operations/build";
+import { matchSegments } from "../../src/operations/match";
 
 // ============================================================================
 // SPA Application (~100 routes)

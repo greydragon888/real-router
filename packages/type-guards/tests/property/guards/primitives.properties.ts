@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   isString,
@@ -64,7 +64,7 @@ describe("Primitive Type Guards Properties", () => {
       return true;
     });
 
-    test("correctly distinguishes true and false", () => {
+    it("correctly distinguishes true and false", () => {
       expect(isBoolean(true)).toBe(true);
       expect(isBoolean(false)).toBe(true);
 
@@ -73,7 +73,7 @@ describe("Primitive Type Guards Properties", () => {
   });
 
   describe("isPromise", () => {
-    test("always returns true for real Promise", () => {
+    it("always returns true for real Promise", () => {
       expect(isPromise(Promise.resolve())).toBe(true);
       expect(
         isPromise(
@@ -171,7 +171,7 @@ describe("Primitive Type Guards Properties", () => {
       return true;
     });
 
-    test("correctly works with Symbol keys", () => {
+    it("correctly works with Symbol keys", () => {
       const sym = Symbol("test");
       const obj = { [sym]: 42 };
 
@@ -216,7 +216,7 @@ describe("Primitive Type Guards Properties", () => {
       return true;
     });
 
-    test("correctly handles 0 and -0", () => {
+    it("correctly handles 0 and -0", () => {
       expect(isPrimitiveValue(0)).toBe(true);
       expect(isPrimitiveValue(-0)).toBe(true);
 
@@ -246,7 +246,7 @@ describe("Primitive Type Guards Properties", () => {
       },
     );
 
-    test("determinism for identical values", () => {
+    it("determinism for identical values", () => {
       expect(isPrimitiveValue("test")).toBe(true);
       expect(isPrimitiveValue("test")).toBe(true);
       expect(isPrimitiveValue(123)).toBe(true);

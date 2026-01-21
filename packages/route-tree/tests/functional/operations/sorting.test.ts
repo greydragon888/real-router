@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
 
 describe("New API - sorting", () => {
   it("should sort routes by specificity", () => {

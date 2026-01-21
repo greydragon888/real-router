@@ -1,18 +1,32 @@
 {
-  "name": "router6",
+  "name": "real-router",
+  "version": "0.1.0",
   "type": "module",
   "description": "A real router. Just routing, nothing else.",
   "scripts": {
     "build": "turbo run build",
     "test": "turbo run test",
-    "lint": "turbo run lint",
-    "lint:fast": "eslint --concurrency=auto --cache 'packages/*/modules/**/*.{ts,tsx}' 'packages/*/tests/**/*.{ts,tsx}'",
-    "type-check": "turbo run type-check",
-    "publint": "turbo run publint",
     "test:coverage": "turbo run test -- --coverage",
-    "clean:all": "bash ./scripts/clean-all.sh",
-    "clean:deep": "scripts/clean-deep.sh",
-    "packages-structure": "find packages/*/modules -type f -name \"*.ts*\" -print | tree --fromfile"
+    "test:mutation": "stryker run",
+    "lint": "turbo run lint",
+    "lint:types": "turbo run lint:types",
+    "lint:package": "turbo run lint:package",
+    "lint:unused": "knip",
+    "lint:duplicates": "jscpd packages/*/src/",
+    "lint:deps": "syncpack lint",
+    "lint:deps:fix": "syncpack fix-mismatches && pnpm dedupe && pnpm install",
+    "lint:dedupe": "pnpm dedupe --check",
+    "type-check": "turbo run type-check",
+    "sonar": "dotenv -- sonar-scanner -Dsonar.login=$SONAR_TOKEN",
+    "sonar:local": "pnpm type-check && pnpm test:coverage && pnpm sonar",
+    "packages-structure": "find packages/*/src -type f -name \"*.ts*\" -print | tree --fromfile",
+    "prepare": "husky || true",
+    "size": "size-limit",
+    "commit": "czg",
+    "changeset": "changeset",
+    "version": "changeset version && node -e \"const v=require('./packages/core/package.json').version;const p=JSON.parse(require('fs').readFileSync('package.json'));p.version=v;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\\n');\"",
+    "release": "pnpm build && changeset publish",
+    "danger:local": "danger local --dangerfile dangerfile.ts"
   },
   "private": true,
   "publishConfig": {
@@ -20,7 +34,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/greydragon888/router6.git"
+    "url": "git+https://github.com/greydragon888/real-router.git"
   },
   "keywords": [
     "router",
@@ -37,27 +51,37 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/greydragon888/router6/issues"
+    "url": "https://github.com/greydragon888/real-router/issues"
   },
-  "homepage": "https://router5.js.org",
+  "homepage": "https://github.com/greydragon888/real-router#readme",
   "devDependencies": {
+    "@arethetypeswrong/cli": "0.18.2",
+    "@changesets/changelog-github": "0.5.2",
+    "@changesets/cli": "2.29.8",
     "@codspeed/vitest-plugin": "5.0.1",
+    "@commitlint/cli": "20.3.1",
+    "@commitlint/config-conventional": "20.3.1",
     "@eslint/js": "9.39.2",
     "@fast-check/vitest": "0.2.4",
+    "@size-limit/esbuild": "12.0.0",
+    "@size-limit/preset-small-lib": "12.0.0",
     "@stryker-mutator/core": "9.4.0",
     "@stryker-mutator/typescript-checker": "9.4.0",
     "@stryker-mutator/vitest-runner": "9.4.0",
     "@stylistic/eslint-plugin": "5.7.0",
-    "@types/node": "24.10.9",
+    "@types/node": "25.0.9",
     "@vitest/coverage-v8": "4.0.17",
     "@vitest/eslint-plugin": "1.6.6",
     "@vitest/ui": "4.0.17",
+    "czg": "1.12.0",
+    "danger": "13.0.5",
+    "dotenv-cli": "11.0.0",
     "eslint": "9.39.2",
     "eslint-config-prettier": "10.1.8",
     "eslint-config-turbo": "2.7.5",
     "eslint-import-resolver-typescript": "4.4.4",
     "eslint-plugin-import": "2.32.0",
-    "eslint-plugin-jsdoc": "62.0.0",
+    "eslint-plugin-jsdoc": "62.1.0",
     "eslint-plugin-no-only-tests": "3.3.0",
     "eslint-plugin-prettier": "5.5.5",
     "eslint-plugin-promise": "7.2.1",
@@ -69,9 +93,14 @@
     "eslint-plugin-vitest-globals": "1.5.0",
     "fast-check": "4.5.3",
     "husky": "9.1.7",
+    "jscpd": "4.0.7",
+    "knip": "5.82.0",
     "mitata": "1.0.34",
     "prettier": "3.8.0",
     "publint": "0.3.16",
+    "size-limit": "12.0.0",
+    "sonarqube-scanner": "4.3.4",
+    "syncpack": "13.0.4",
     "terser": "5.46.0",
     "tsup": "8.5.1",
     "turbo": "2.7.5",
@@ -82,10 +111,14 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "core-js",
       "esbuild",
       "fsevents",
       "unrs-resolver"
-    ]
+    ],
+    "overrides": {
+      "@types/node": "$@types/node"
+    }
   },
   "packageManager": "pnpm@10.24.0"
 }

@@ -1,5 +1,21 @@
-scripts/add-package-paths.sh
+#!/bin/sh
 
-time pnpm build
+# Exit on any error
+set -e
 
-node scripts/analyze-bundle.mjs
+echo "🔍 Running pre-commit checks..."
+
+# Run type checking, linting, and tests via turbo pipeline
+# (turbo caching makes lint-staged redundant)
+echo "🧪 Running tests (includes type-check and lint via turbo)..."
+pnpm test
+
+# Check for unused code
+echo "🧹 Checking for unused code..."
+pnpm lint:unused
+
+# Check for code duplication
+echo "📋 Checking for code duplication..."
+pnpm lint:duplicates
+
+echo "✅ Pre-commit checks passed!"

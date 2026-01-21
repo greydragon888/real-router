@@ -10,16 +10,16 @@ import path from "node:path";
 export default defineConfig({
   cacheDir: "./.vitest-stryker",
 
-  // Resolve package imports to local modules (required for Stryker sandbox)
+  // Resolve package imports to local src (required for Stryker sandbox)
   // The sandbox has node_modules symlinked to original, which contains workspace symlinks
   resolve: {
     alias: {
-      // Main package - resolve to local modules
-      "type-guards": path.resolve(import.meta.dirname, "./modules"),
+      // Main package - resolve to local src
+      "type-guards": path.resolve(import.meta.dirname, "./src"),
       // Workspace dependencies - resolve through node_modules symlinks
-      "router6-types": path.resolve(
+      "core-types": path.resolve(
         import.meta.dirname,
-        "./node_modules/real-router-types",
+        "./node_modules/core-types",
       ),
     },
   },

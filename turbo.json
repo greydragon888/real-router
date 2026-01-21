@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
   "daemon": false,
+  "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
   "globalDependencies": [
     "tsconfig.json",
     "prettier.config.*",
@@ -15,7 +16,7 @@
       "dependsOn": ["^build", "test"],
       "outputs": ["dist/**"],
       "inputs": [
-        "modules/**/*.{ts,tsx}",
+        "src/**/*.{ts,tsx}",
         "tsup.config.*",
         "tsconfig.json",
         "package.json"
@@ -27,13 +28,14 @@
       "dependsOn": ["lint", "type-check"],
       "outputs": [],
       "inputs": [
-        "modules/**/*.{ts,tsx}",
+        "src/**/*.{ts,tsx}",
         "tests/**/*.{ts,tsx}",
         "vitest.config.*",
         "**/*.test.{ts,tsx}",
         "**/*.spec.{ts,tsx}"
       ],
-      "env": ["NODE_ENV", "CI"],
+      "env": ["NODE_ENV"],
+      "passThroughEnv": ["CI"],
       "cache": true
     },
     "lint": {
@@ -58,7 +60,13 @@
       ],
       "cache": true
     },
-    "publint": {
+    "lint:package": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "inputs": ["dist/**", "package.json"],
+      "cache": true
+    },
+    "lint:types": {
       "dependsOn": ["build"],
       "outputs": [],
       "inputs": ["dist/**", "package.json"],

@@ -5,7 +5,7 @@
 
 > Query string parsing and building with configurable strategies.
 
-**⚠️ Internal Use Only:** This package is designed for use within the Router6 monorepo. External users should use `router6` package directly.
+**⚠️ Internal Use Only:** This package is designed for use within the Real-Router monorepo. External users should use `@real-router/core` package directly.
 
 ## Overview
 
@@ -123,9 +123,9 @@ keep("page=1&sort=name&limit=10", ["page", "limit"]);
 
 ```typescript
 interface Options {
-  arrayFormat?: "none" | "brackets" | "index" | "comma";
-  booleanFormat?: "none" | "string" | "empty-true";
-  nullFormat?: "default" | "hidden";
+  arrayFormat?: ArrayFormat;    // "none" | "brackets" | "index" | "comma"
+  booleanFormat?: BooleanFormat; // "none" | "string" | "empty-true"
+  nullFormat?: NullFormat;      // "default" | "hidden"
 }
 ```
 
@@ -166,6 +166,33 @@ How to encode null values.
 ## Types
 
 ```typescript
+import type {
+  // Format types
+  ArrayFormat,      // "none" | "brackets" | "index" | "comma"
+  BooleanFormat,    // "none" | "string" | "empty-true"
+  NullFormat,       // "default" | "hidden"
+
+  // Options
+  Options,          // { arrayFormat?, booleanFormat?, nullFormat? }
+  FinalOptions,     // Options with all fields required (internal)
+
+  // Parameter types
+  QueryParamPrimitive,  // string | number | boolean | null
+  QueryParamValue,      // QueryParamPrimitive | QueryParamPrimitive[]
+  SearchParams,         // Record<string, QueryParamValue | undefined>
+
+  // Response types
+  OmitResponse,     // { querystring, removedParams }
+  KeepResponse,     // { querystring, keptParams }
+
+  // Internal
+  DecodeResult,     // boolean | string | null
+} from "search-params";
+```
+
+### Type Definitions
+
+```typescript
 // Primitive types for query params
 type QueryParamPrimitive = string | number | boolean | null;
 
@@ -196,8 +223,8 @@ interface KeepResponse {
 
 ## Related Packages
 
-- [route-tree](../route-tree) — uses search-params for query handling
-- [router6](https://www.npmjs.com/package/router6) — core router
+- [route-tree](../route-tree) — uses search-params for query handling (internal)
+- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — core router
 
 ## License
 

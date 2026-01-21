@@ -1,0 +1,69 @@
+version: 2
+updates:
+  # Root workspace
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    open-pull-requests-limit: 10
+    groups:
+      # Group all development dependencies
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+      # Group ESLint and related packages
+      eslint:
+        patterns:
+          - "eslint*"
+          - "@eslint/*"
+          - "*eslint*"
+      # Group TypeScript related packages
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "tsup"
+      # Group testing libraries
+      testing:
+        patterns:
+          - "@testing-library/*"
+          - "vitest"
+          - "@vitest/*"
+          - "jsdom"
+      # Group Turbo related
+      turbo:
+        patterns:
+          - "turbo"
+          - "eslint-config-turbo"
+    reviewers:
+      - "greydragon888"
+    assignees:
+      - "greydragon888"
+    commit-message:
+      prefix: "chore"
+      prefix-development: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+    reviewers:
+      - "greydragon888"
+    assignees:
+      - "greydragon888"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci"
+      - "automated"

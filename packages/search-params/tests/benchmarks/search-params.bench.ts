@@ -10,7 +10,7 @@
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
-import { build, keep, omit, parse } from "../../modules";
+import { build, keep, omit, parse } from "../../src";
 
 /** Mitata state interface for generator benchmarks */
 interface BenchState {

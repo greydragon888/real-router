@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { validateRoutePath } from "../../modules/validation/routes";
+import { validateRoutePath } from "../../src/validation/routes";
 // eslint-disable-next-line vitest/no-mocks-import -- intentional: using mock factory, not vi.mock
 import {
   createMockRouteNode,

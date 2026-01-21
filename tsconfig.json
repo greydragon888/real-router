@@ -3,25 +3,19 @@
     "baseUrl": ".",
     "types": ["vitest/globals", "node"],
     "paths": {
-      "router6": ["packages/router6/modules/index.ts"],
-      "router6-types": ["packages/router6-types/modules/index.ts"],
-      "router6-helpers": ["packages/router6-helpers/modules/index.ts"],
-      "router6-plugin-browser": [
-        "packages/router6-plugin-browser/modules/index.ts"
+      "@real-router/core": ["packages/core/src/index.ts"],
+      "@real-router/helpers": ["packages/helpers/src/index.ts"],
+      "@real-router/browser-plugin": [
+        "packages/browser-plugin/src/index.ts"
       ],
-      "router6-plugin-listeners": [
-        "packages/router6-plugin-listeners/modules/index.ts"
+      "@real-router/persistent-params-plugin": [
+        "packages/persistent-params-plugin/src/index.ts"
       ],
-      "router6-plugin-logger": [
-        "packages/router6-plugin-logger/modules/index.ts"
-      ],
-      "router6-plugin-persistent-params": [
-        "packages/router6-plugin-persistent-params/modules/index.ts"
-      ],
-      "react-router6": ["packages/react-router6/modules/index.ts"],
-      "type-guards": ["packages/type-guards/modules/index.ts"],
-      "route-tree": ["packages/route-tree/modules/index.ts"],
-      "search-params": ["packages/search-params/modules/index.ts"]
+      "@real-router/react": ["packages/react/src/index.ts"],
+      "core-types": ["packages/core-types/src/index.ts"],
+      "type-guards": ["packages/type-guards/src/index.ts"],
+      "route-tree": ["packages/route-tree/src/index.ts"],
+      "search-params": ["packages/search-params/src/index.ts"]
     },
     "target": "ESNext",
     "module": "NodeNext",
