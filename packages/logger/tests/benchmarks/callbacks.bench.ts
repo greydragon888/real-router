@@ -9,7 +9,7 @@
  * - Heavy operations in callbacks
  */
 
-import { bench, boxplot, summary } from "mitata";
+import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { logger } from "logger";
 
@@ -183,7 +183,7 @@ boxplot(() => {
         }
       }
 
-      errorCount;
+      do_not_optimize(errorCount);
     });
 
     bench("Callback: monitoring with filtering", () => {
@@ -220,7 +220,7 @@ boxplot(() => {
         logger.error(CONTEXT, `error ${i}`);
       }
 
-      metrics;
+      do_not_optimize(metrics);
     });
   });
 });

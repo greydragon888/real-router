@@ -9,7 +9,7 @@
  * - High-load scenarios
  */
 
-import { bench, boxplot, summary } from "mitata";
+import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { logger } from "logger";
 
@@ -165,7 +165,7 @@ boxplot(() => {
         }
       }
 
-      errorCount;
+      do_not_optimize(errorCount);
     });
   });
 });
@@ -310,7 +310,7 @@ boxplot(() => {
         }
       }
 
-      errorStats;
+      do_not_optimize(errorStats);
     });
 
     bench("Real-world: telemetry collection", () => {
@@ -335,7 +335,7 @@ boxplot(() => {
         logger.error("Router", `Error ${i}`);
       }
 
-      telemetry;
+      do_not_optimize(telemetry);
     });
   });
 });
