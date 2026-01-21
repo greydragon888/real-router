@@ -446,7 +446,7 @@ export function getTransitionPath(
   // Determine intersection point (common ancestor)
   const intersection =
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    fromState && i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION; // lgtm[js/trivial-conditional]
+    fromState && i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION;
 
   return {
     intersection,
