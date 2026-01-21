@@ -7,7 +7,7 @@ set -e
 # =============================================================================
 
 # Require sudo upfront
-if [ "$EUID" -ne 0 ]; then
+if [[ "$EUID" -ne 0 ]]; then
     echo "This script requires sudo privileges. Please run with sudo."
     exit 1
 fi
@@ -30,7 +30,7 @@ cleanup() {
     echo -e "${YELLOW}[Cleanup] Restoring system state...${NC}"
 
     # Re-enable screensaver/display sleep
-    if [ -n "$CAFFEINATE_PID" ] && kill -0 "$CAFFEINATE_PID" 2>/dev/null; then
+    if [[ -n "$CAFFEINATE_PID" ]] && kill -0 "$CAFFEINATE_PID" 2>/dev/null; then
         kill "$CAFFEINATE_PID" 2>/dev/null || true
         echo -e "${GREEN}[Cleanup] Screensaver/sleep re-enabled${NC}"
     fi
@@ -52,7 +52,7 @@ echo -e "${YELLOW}[Step 1] Checking for heavy processes...${NC}"
 
 HEAVY_PROCESSES=$(ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 " (" $1 "%)"}' | head -5)
 
-if [ -n "$HEAVY_PROCESSES" ]; then
+if [[ -n "$HEAVY_PROCESSES" ]]; then
     echo -e "${RED}Warning: Heavy processes detected (>10% CPU):${NC}"
     echo "$HEAVY_PROCESSES"
     echo ""
