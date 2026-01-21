@@ -1,7 +1,7 @@
 /**
  * Realistic Usage Benchmarks
  *
- * Tests matchSegments with options patterns that match real real-router usage.
+ * Tests matchSegments with options patterns that match real-router usage.
  * Purpose: Validate if pre-computed config caching in match.ts is effective.
  *
  * Key insight: real-router always passes 4-5 options, bypassing single-option cache paths.
@@ -9,10 +9,10 @@
 
 import { barplot, bench, summary } from "mitata";
 
-import { createRouteTree } from "../../modules/builder";
-import { matchSegments } from "../../modules/operations/match";
+import { createRouteTree } from "../../src/builder";
+import { matchSegments } from "../../src/operations/match";
 
-import type { MatchOptions } from "../../modules/types";
+import type { MatchOptions } from "../../src/types";
 
 // =============================================================================
 // Test fixtures
@@ -52,17 +52,17 @@ const singleOption: MatchOptions = {
   strictTrailingSlash: true,
 };
 
-// Pattern 3: Real real-router options (bypasses all caches, 4+ fields)
+// Pattern 3: Real-Router options (bypasses all caches, 4+ fields)
 // Based on packages/real-router/modules/core/routes.ts:165-171
-const router6RealOptions: MatchOptions = {
+const realRouterRealOptions: MatchOptions = {
   trailingSlashMode: "default",
   caseSensitive: false,
   strictTrailingSlash: false,
   strongMatching: false,
 };
 
-// Pattern 4: Router6 with query params (common real-world case)
-const router6WithQueryParams: MatchOptions = {
+// Pattern 4: Real-Router with query params (common real-world case)
+const realRouterWithQueryParams: MatchOptions = {
   trailingSlashMode: "default",
   queryParamsMode: "default",
   caseSensitive: false,
@@ -86,11 +86,11 @@ barplot(() => {
     });
 
     bench("shallow: real-router real (4 fields, no cache)", () => {
-      matchSegments(tree, SHALLOW_PATH, router6RealOptions);
+      matchSegments(tree, SHALLOW_PATH, realRouterRealOptions);
     });
 
     bench("shallow: real-router + query (5 fields, no cache)", () => {
-      matchSegments(tree, SHALLOW_PATH, router6WithQueryParams);
+      matchSegments(tree, SHALLOW_PATH, realRouterWithQueryParams);
     });
   });
 });
@@ -107,11 +107,11 @@ barplot(() => {
     });
 
     bench("deep: real-router real (4 fields, no cache)", () => {
-      matchSegments(tree, DEEP_PATH, router6RealOptions);
+      matchSegments(tree, DEEP_PATH, realRouterRealOptions);
     });
 
     bench("deep: real-router + query (5 fields, no cache)", () => {
-      matchSegments(tree, DEEP_PATH, router6WithQueryParams);
+      matchSegments(tree, DEEP_PATH, realRouterWithQueryParams);
     });
   });
 });
@@ -132,11 +132,11 @@ barplot(() => {
     });
 
     bench("config: real-router pattern", () => {
-      matchSegments(tree, DEEP_PATH, router6RealOptions);
+      matchSegments(tree, DEEP_PATH, realRouterRealOptions);
     });
 
     // Pre-created options object (simulates real-router caching options)
-    const cachedOptions = { ...router6RealOptions };
+    const cachedOptions = { ...realRouterRealOptions };
 
     bench("config: real-router pre-cached object", () => {
       matchSegments(tree, DEEP_PATH, cachedOptions);

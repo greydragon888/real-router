@@ -10,12 +10,12 @@ import path from "node:path";
 export default defineConfig({
   cacheDir: "./.vitest-stryker",
 
-  // Resolve package imports to local modules (required for Stryker sandbox)
+  // Resolve package imports to local src (required for Stryker sandbox)
   // The sandbox has node_modules symlinked to original, which contains workspace symlinks
   resolve: {
     alias: {
-      // Main package - resolve to local modules
-      "route-tree": path.resolve(import.meta.dirname, "./modules"),
+      // Main package - resolve to local src
+      "route-tree": path.resolve(import.meta.dirname, "./src"),
       // Workspace dependencies - resolve through node_modules symlinks
       "search-params": path.resolve(
         import.meta.dirname,

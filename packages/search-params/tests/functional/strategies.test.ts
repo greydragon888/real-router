@@ -6,16 +6,16 @@ import {
   bracketsArrayStrategy,
   indexArrayStrategy,
   commaArrayStrategy,
-} from "../../modules/strategies/array";
+} from "../../src/strategies/array";
 import {
   noneBooleanStrategy,
   stringBooleanStrategy,
   emptyTrueBooleanStrategy,
-} from "../../modules/strategies/boolean";
+} from "../../src/strategies/boolean";
 import {
   defaultNullStrategy,
   hiddenNullStrategy,
-} from "../../modules/strategies/null";
+} from "../../src/strategies/null";
 
 describe("search-params strategies", () => {
   describe("boolean strategies", () => {

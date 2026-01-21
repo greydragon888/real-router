@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { isState, isStateStrict, isHistoryState } from "type-guards";
 
@@ -71,7 +71,7 @@ describe("State Type Guards Properties", () => {
       },
     );
 
-    test("handles null and undefined", () => {
+    it("handles null and undefined", () => {
       expect(isState(null)).toBe(false);
       expect(isState(undefined)).toBe(false);
 
@@ -169,7 +169,7 @@ describe("State Type Guards Properties", () => {
       },
     );
 
-    test("handles null and undefined", () => {
+    it("handles null and undefined", () => {
       expect(isStateStrict(null)).toBe(false);
       expect(isStateStrict(undefined)).toBe(false);
 
@@ -215,7 +215,7 @@ describe("State Type Guards Properties", () => {
       },
     );
 
-    test("handles null and undefined", () => {
+    it("handles null and undefined", () => {
       expect(isHistoryState(null)).toBe(false);
       expect(isHistoryState(undefined)).toBe(false);
 
@@ -260,7 +260,7 @@ describe("State Type Guards Properties", () => {
   });
 
   describe("Edge cases", () => {
-    test("State with valid name/path", () => {
+    it("State with valid name/path", () => {
       // isState now validates via isRequiredFields, empty strings are invalid
       expect(isState({ name: "home", path: "", params: {} })).toBe(true);
       // isHistoryState requires meta
@@ -286,7 +286,7 @@ describe("State Type Guards Properties", () => {
       return true;
     });
 
-    test("State with additional fields", () => {
+    it("State with additional fields", () => {
       const state = {
         name: "test",
         path: "/test",
@@ -317,7 +317,7 @@ describe("State Type Guards Properties", () => {
       },
     );
 
-    test("State with meta.redirected = true", () => {
+    it("State with meta.redirected = true", () => {
       const state = {
         name: "test",
         path: "/test",

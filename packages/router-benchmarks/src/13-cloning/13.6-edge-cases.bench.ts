@@ -1,0 +1,115 @@
+// packages/router-benchmarks/modules/13-cloning/13.6-edge-cases.bench.ts
+
+import { bench, do_not_optimize } from "mitata";
+
+import { createSimpleRouter, cloneRouter } from "../helpers";
+
+const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
+
+// 13.6.1 Chain of clones (clone -> clone -> clone)
+if (IS_ROUTER5) {
+  const router = createSimpleRouter();
+
+  bench("13.6.1 Chain of clones (clone -> clone -> clone)", () => {
+    const cloned1 = cloneRouter(router);
+    const cloned2 = cloneRouter(cloned1);
+    const cloned3 = cloneRouter(cloned2);
+
+    cloned3.start();
+    cloned3.navigate("about");
+
+    // Fallback: stop started clone
+    cloned3.stop();
+  }).gc("inner");
+} else {
+  const router = createSimpleRouter();
+
+  bench("13.6.1 Chain of clones (clone -> clone -> clone)", () => {
+    const cloned1 = router.clone();
+    const cloned2 = cloned1.clone();
+    const cloned3 = cloned2.clone();
+
+    cloned3.start();
+    cloned3.navigate("about");
+
+    // Fallback: stop started clone
+    cloned3.stop();
+  }).gc("inner");
+}
+
+// 13.6.2 Cloning a running router
+if (IS_ROUTER5) {
+  const router = createSimpleRouter();
+
+  router.start();
+  router.navigate("about");
+
+  bench("13.6.2 Cloning a running router", () => {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+
+    // Fallback: stop started clone
+    cloned.stop();
+  }).gc("inner");
+} else {
+  const router = createSimpleRouter();
+
+  router.start();
+  router.navigate("about");
+
+  bench("13.6.2 Cloning a running router", () => {
+    const cloned = router.clone();
+
+    cloned.start();
+
+    // Fallback: stop started clone
+    cloned.stop();
+  }).gc("inner");
+}
+
+// 13.6.3 Cloning during original navigation
+if (IS_ROUTER5) {
+  const router = createSimpleRouter();
+
+  router.useMiddleware(() => (_toState, _fromState, done) => {
+    // Clone during middleware execution
+    do_not_optimize(cloneRouter(router));
+
+    done();
+  });
+  router.start();
+
+  bench("13.6.3 Cloning during original navigation", () => {
+    router.navigate("about");
+  }).gc("inner");
+} else {
+  const router = createSimpleRouter();
+
+  router.useMiddleware(() => (_toState, _fromState, done) => {
+    // Clone during middleware execution
+    do_not_optimize(router.clone());
+
+    done();
+  });
+  router.start();
+
+  bench("13.6.3 Cloning during original navigation", () => {
+    router.navigate("about");
+  }).gc("inner");
+}
+
+// 13.6.4 Cloning basic router
+if (IS_ROUTER5) {
+  const router = createSimpleRouter();
+
+  bench("13.6.4 Cloning basic router", () => {
+    do_not_optimize(cloneRouter(router));
+  }).gc("inner");
+} else {
+  const router = createSimpleRouter();
+
+  bench("13.6.4 Cloning basic router", () => {
+    do_not_optimize(router.clone());
+  }).gc("inner");
+}

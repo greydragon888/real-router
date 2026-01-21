@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { isParams, isParamsStrict } from "type-guards";
 
@@ -40,7 +40,7 @@ describe("Params Type Guards Properties", () => {
       },
     );
 
-    test("returns true for empty object", () => {
+    it("returns true for empty object", () => {
       expect(isParams({})).toBe(true);
 
       return true;
@@ -107,7 +107,7 @@ describe("Params Type Guards Properties", () => {
       },
     );
 
-    test("returns true for empty object", () => {
+    it("returns true for empty object", () => {
       expect(isParamsStrict({})).toBe(true);
 
       return true;
@@ -183,7 +183,7 @@ describe("Params Type Guards Properties", () => {
   });
 
   describe("Edge cases", () => {
-    test("handles null and undefined", () => {
+    it("handles null and undefined", () => {
       expect(isParams(null)).toBe(false);
       expect(isParams(undefined)).toBe(false);
       expect(isParamsStrict(null)).toBe(false);
@@ -226,7 +226,7 @@ describe("Params Type Guards Properties", () => {
       return true;
     });
 
-    test("Params with numbers (including edge cases)", () => {
+    it("Params with numbers (including edge cases)", () => {
       expect(isParams({ a: 0 })).toBe(true);
       expect(isParams({ a: -0 })).toBe(true);
       expect(isParams({ a: Number.MAX_SAFE_INTEGER })).toBe(true);
@@ -248,7 +248,7 @@ describe("Params Type Guards Properties", () => {
       return true;
     });
 
-    test("handles special keys", () => {
+    it("handles special keys", () => {
       expect(isParams({ __proto__: "value" })).toBe(true);
       expect(isParams({ constructor: "value" })).toBe(true);
       expect(isParams({ toString: "value" })).toBe(true);

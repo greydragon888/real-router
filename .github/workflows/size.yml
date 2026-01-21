@@ -1,0 +1,170 @@
+name: Bundle Size
+
+on:
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  size:
+    name: Bundle Size Comparison
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build PR branch
+        run: pnpm build
+
+      - name: Get PR sizes
+        id: pr_sizes
+        run: |
+          echo "sizes<<EOF" >> $GITHUB_OUTPUT
+          pnpm size --json 2>/dev/null || echo "[]"
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Checkout base branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.base_ref }}
+          clean: false
+
+      - name: Install base dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build base branch
+        run: pnpm build
+
+      - name: Get base sizes
+        id: base_sizes
+        run: |
+          echo "sizes<<EOF" >> $GITHUB_OUTPUT
+          pnpm size --json 2>/dev/null || echo "[]"
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Compare and comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prSizes = JSON.parse(`${{ steps.pr_sizes.outputs.sizes }}` || '[]');
+            const baseSizes = JSON.parse(`${{ steps.base_sizes.outputs.sizes }}` || '[]');
+
+            const formatBytes = (bytes) => {
+              if (bytes === 0) return '0 B';
+              const k = 1024;
+              const sizes = ['B', 'KB', 'MB'];
+              const i = Math.floor(Math.log(bytes) / Math.log(k));
+              return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            };
+
+            const formatDiff = (pr, base) => {
+              if (!base) return '🆕 new';
+              const diff = pr - base;
+              const percent = base > 0 ? ((diff / base) * 100).toFixed(1) : 0;
+              if (diff === 0) return '0';
+              const emoji = diff > 0 ? '📈' : '📉';
+              const sign = diff > 0 ? '+' : '';
+              return `${emoji} ${sign}${formatBytes(diff)} (${sign}${percent}%)`;
+            };
+
+            // Create size map from base
+            const baseMap = new Map();
+            for (const item of baseSizes) {
+              baseMap.set(item.name, item.size);
+            }
+
+            // Build table rows
+            let rows = [];
+            let totalPr = 0;
+            let totalBase = 0;
+            let hasChanges = false;
+
+            for (const item of prSizes) {
+              const prSize = item.size;
+              const baseSize = baseMap.get(item.name) || 0;
+              totalPr += prSize;
+              totalBase += baseSize;
+
+              const diff = prSize - baseSize;
+              if (diff !== 0) hasChanges = true;
+
+              const status = item.passed === false ? '🔴' : '✅';
+              rows.push(`| ${status} ${item.name} | ${formatBytes(prSize)} | ${formatBytes(baseSize)} | ${formatDiff(prSize, baseSize)} |`);
+            }
+
+            // Build comment
+            let body = `## 📊 Bundle Size Report\n\n`;
+
+            if (prSizes.length === 0) {
+              body += `⚠️ Could not measure bundle sizes.\n`;
+            } else {
+              body += `| Status | Package | PR Size | Base Size | Diff |\n`;
+              body += `|--------|---------|---------|-----------|------|\n`;
+              body += rows.join('\n');
+              body += `\n\n`;
+
+              const totalDiff = totalPr - totalBase;
+              const totalPercent = totalBase > 0 ? ((totalDiff / totalBase) * 100).toFixed(1) : 0;
+              const totalEmoji = totalDiff > 0 ? '📈' : totalDiff < 0 ? '📉' : '➡️';
+              const totalSign = totalDiff > 0 ? '+' : '';
+
+              body += `**Total:** ${formatBytes(totalPr)} (${totalEmoji} ${totalSign}${formatBytes(totalDiff)}, ${totalSign}${totalPercent}%)\n\n`;
+
+              if (!hasChanges) {
+                body += `✅ No size changes detected.\n`;
+              }
+
+              // Check for failures
+              const failures = prSizes.filter(s => s.passed === false);
+              if (failures.length > 0) {
+                body += `\n⚠️ **Size limit exceeded for:** ${failures.map(f => f.name).join(', ')}\n`;
+              }
+            }
+
+            body += `\n<details><summary>ℹ️ Size limits configured in <code>.size-limit.json</code></summary>\n\n`;
+            body += `Run \`pnpm size\` locally to check bundle sizes.\n</details>`;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botComment = comments.find(c =>
+              c.user.type === 'Bot' && c.body.includes('📊 Bundle Size Report')
+            );
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+            // Also add to job summary
+            core.summary.addRaw(body).write();

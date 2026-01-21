@@ -10,9 +10,9 @@ import {
   buildFromPattern,
   buildPathOnce,
   compilePathPattern,
-} from "../../modules/parser/path-parser/buildPathFromPattern";
+} from "../../src/parser/path-parser/buildPathFromPattern";
 
-import type { CompiledPathPattern } from "../../modules/parser/path-parser/buildPathFromPattern";
+import type { CompiledPathPattern } from "../../src/parser/path-parser/buildPathFromPattern";
 
 describe("compilePathPattern", () => {
   describe("static patterns", () => {

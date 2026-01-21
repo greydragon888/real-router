@@ -21,8 +21,8 @@ import {
   generateRouteWithQueryParams,
   generateWideTree,
 } from "./helpers/generators";
-import { createRouteTree } from "../../modules/builder";
-import { matchSegments } from "../../modules/operations/match";
+import { createRouteTree } from "../../src/builder";
+import { matchSegments } from "../../src/operations/match";
 
 /** Mitata state interface for generator benchmarks */
 interface BenchState {

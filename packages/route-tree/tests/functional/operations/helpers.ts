@@ -2,15 +2,15 @@
  * Test helpers for operations tests.
  */
 
-import { matchSegments } from "../../../modules/operations/match";
-import { getMetaFromSegments } from "../../../modules/operations/meta";
+import { matchSegments } from "../../../src/operations/match";
+import { getMetaFromSegments } from "../../../src/operations/meta";
 
 import type {
   MatchOptions,
   RouteTree,
   RouteTreeState,
   RouteTreeStateMeta,
-} from "../../../modules/types";
+} from "../../../src/types";
 
 /**
  * Test helper - builds state from matchSegments result.
@@ -57,6 +57,6 @@ export function matchPath(
 export {
   getMetaFromSegments,
   buildParamTypeMap,
-} from "../../../modules/operations/meta";
+} from "../../../src/operations/meta";
 
-export { matchSegments } from "../../../modules/operations/match";
+export { matchSegments } from "../../../src/operations/match";

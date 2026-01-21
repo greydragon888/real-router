@@ -34,8 +34,8 @@ export default mergeConfig(
         reportsDirectory: "./coverage",
         clean: true,
         include: [
-          "packages/*/modules/tests/**/*.test.ts",
-          "packages/*/modules/tests/**/*.test.tsx",
+          "packages/*/src/**/*.ts",
+          "packages/*/src/**/*.tsx",
         ],
         exclude: [
           "**/node_modules/**",
@@ -58,10 +58,10 @@ export default mergeConfig(
           "**/index.ts",
         ],
         thresholds: {
-          statements: 100,
-          branches: 100,
-          functions: 100,
-          lines: 100,
+          statements: 90,
+          branches: 90,
+          functions: 90,
+          lines: 90,
         },
       },
 

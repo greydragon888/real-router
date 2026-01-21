@@ -1,6 +1,7 @@
 // packages/type-guards/tests/property/validators.properties.ts
 
 import { fc, test } from "@fast-check/vitest";
+import { describe, expect } from "vitest";
 
 import { validateRouteName, validateState } from "type-guards";
 
@@ -18,7 +19,7 @@ describe("Validators - Property-Based Tests", () => {
 
         expect(() => {
           validateRouteName(name, "test");
-        }).not.toThrow();
+        }).not.toThrowError();
       },
     );
 
@@ -27,7 +28,7 @@ describe("Validators - Property-Based Tests", () => {
       (name) => {
         expect(() => {
           validateRouteName(name, "test");
-        }).not.toThrow();
+        }).not.toThrowError();
       },
     );
 
@@ -43,10 +44,10 @@ describe("Validators - Property-Based Tests", () => {
     ])("throws TypeError for non-string values", (value) => {
       expect(() => {
         validateRouteName(value, "test");
-      }).toThrow(TypeError);
+      }).toThrowError(TypeError);
       expect(() => {
         validateRouteName(value, "test");
-      }).toThrow("[router.test]");
+      }).toThrowError("[router.test]");
     });
 
     test.prop([fc.constant("")])(
@@ -54,7 +55,7 @@ describe("Validators - Property-Based Tests", () => {
       (name) => {
         expect(() => {
           validateRouteName(name, "test");
-        }).not.toThrow();
+        }).not.toThrowError();
       },
     );
 
@@ -63,10 +64,10 @@ describe("Validators - Property-Based Tests", () => {
       (name) => {
         expect(() => {
           validateRouteName(name, "test");
-        }).toThrow(TypeError);
+        }).toThrowError(TypeError);
         expect(() => {
           validateRouteName(name, "test");
-        }).toThrow("whitespace");
+        }).toThrowError("whitespace");
       },
     );
 
@@ -75,10 +76,10 @@ describe("Validators - Property-Based Tests", () => {
       (name) => {
         expect(() => {
           validateRouteName(name, "test");
-        }).toThrow(TypeError);
+        }).toThrowError(TypeError);
         expect(() => {
           validateRouteName(name, "test");
-        }).toThrow("maximum length");
+        }).toThrowError("maximum length");
       },
     );
 
@@ -91,7 +92,7 @@ describe("Validators - Property-Based Tests", () => {
 
         expect(() => {
           validateRouteName(name, "test");
-        }).toThrow(TypeError);
+        }).toThrowError(TypeError);
       },
     );
 
@@ -101,7 +102,7 @@ describe("Validators - Property-Based Tests", () => {
         // Use invalid route name (whitespace) to trigger error
         expect(() => {
           validateRouteName(" ", methodName);
-        }).toThrow(`[router.${methodName}]`);
+        }).toThrowError(`[router.${methodName}]`);
       },
     );
   });
@@ -112,7 +113,7 @@ describe("Validators - Property-Based Tests", () => {
       (state) => {
         expect(() => {
           validateState(state, "test");
-        }).not.toThrow();
+        }).not.toThrowError();
       },
     );
 
@@ -128,10 +129,10 @@ describe("Validators - Property-Based Tests", () => {
     ])("throws TypeError for non-object values", (value) => {
       expect(() => {
         validateState(value, "test");
-      }).toThrow(TypeError);
+      }).toThrowError(TypeError);
       expect(() => {
         validateState(value, "test");
-      }).toThrow("[test]");
+      }).toThrowError("[test]");
     });
 
     test.prop([
@@ -143,10 +144,10 @@ describe("Validators - Property-Based Tests", () => {
     ])("throws for invalid name type", (state) => {
       expect(() => {
         validateState(state, "test");
-      }).toThrow(TypeError);
+      }).toThrowError(TypeError);
       expect(() => {
         validateState(state, "test");
-      }).toThrow("Invalid state");
+      }).toThrowError("Invalid state");
     });
 
     test.prop([
@@ -158,7 +159,7 @@ describe("Validators - Property-Based Tests", () => {
     ])("throws for invalid params type", (state) => {
       expect(() => {
         validateState(state, "test");
-      }).toThrow(TypeError);
+      }).toThrowError(TypeError);
     });
 
     test.prop([
@@ -170,7 +171,7 @@ describe("Validators - Property-Based Tests", () => {
     ])("throws for invalid path type", (state) => {
       expect(() => {
         validateState(state, "test");
-      }).toThrow(TypeError);
+      }).toThrowError(TypeError);
     });
 
     test.prop([fc.constantFrom("navigate", "matchPath", "setState")])(
@@ -178,7 +179,7 @@ describe("Validators - Property-Based Tests", () => {
       (methodName) => {
         expect(() => {
           validateState(null, methodName);
-        }).toThrow(`[${methodName}]`);
+        }).toThrowError(`[${methodName}]`);
       },
     );
   });

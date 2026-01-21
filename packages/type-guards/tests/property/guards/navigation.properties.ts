@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { isNavigationOptions } from "type-guards";
 
@@ -9,7 +9,7 @@ import {
   arbitraryInvalidTypes,
 } from "../helpers";
 
-import type { NavigationOptions } from "router6-types";
+import type { NavigationOptions } from "core-types";
 
 describe("Router Type Guards Properties", () => {
   describe("isNavigationOptions", () => {
@@ -22,7 +22,7 @@ describe("Router Type Guards Properties", () => {
       },
     );
 
-    test("returns true for empty object", () => {
+    it("returns true for empty object", () => {
       expect(isNavigationOptions({})).toBe(true);
 
       return true;
@@ -61,14 +61,14 @@ describe("Router Type Guards Properties", () => {
       },
     );
 
-    test("handles null and undefined", () => {
+    it("handles null and undefined", () => {
       expect(isNavigationOptions(null)).toBe(false);
       expect(isNavigationOptions(undefined)).toBe(false);
 
       return true;
     });
 
-    test("handles all optional fields", () => {
+    it("handles all optional fields", () => {
       expect(isNavigationOptions({ replace: true })).toBe(true);
       expect(isNavigationOptions({ reload: true })).toBe(true);
       expect(isNavigationOptions({ skipTransition: true })).toBe(true);
@@ -125,7 +125,7 @@ describe("Router Type Guards Properties", () => {
   });
 
   describe("Edge cases", () => {
-    test("NavigationOptions with null values", () => {
+    it("NavigationOptions with null values", () => {
       expect(isNavigationOptions({ replace: null as unknown as boolean })).toBe(
         false,
       );
@@ -141,7 +141,7 @@ describe("Router Type Guards Properties", () => {
       return true;
     });
 
-    test("NavigationOptions with undefined values", () => {
+    it("NavigationOptions with undefined values", () => {
       expect(isNavigationOptions({ replace: undefined })).toBe(true);
       expect(isNavigationOptions({ reload: undefined })).toBe(true);
       expect(isNavigationOptions({ state: undefined })).toBe(true);

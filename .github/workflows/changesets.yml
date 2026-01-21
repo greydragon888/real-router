@@ -1,0 +1,199 @@
+name: Changesets
+
+on:
+  push:
+    branches: [master]
+
+# Changesets Workflow for Automated Versioning and Publishing
+#
+# How it works:
+# 1. Developer creates a changeset: `pnpm changeset`
+# 2. Changeset file (.changeset/*.md) is committed and pushed
+# 3. This workflow creates/updates a "Version Packages" PR
+# 4. Maintainer reviews and merges the Release PR
+# 5. On next push to master, packages are published to npm
+#
+# OIDC Trusted Publishing:
+# - Uses npm Trusted Publishing with OIDC (no NPM_TOKEN required)
+# - Requires Node.js 24+ (npm >= 11.5.1)
+# - Each package must be configured on npmjs.com with Trusted Publisher:
+#   * Provider: GitHub Actions
+#   * Organization/User: greydragon888
+#   * Repository: real-router
+#   * Workflow: changesets.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  pull-requests: write
+  packages: write
+  id-token: write # Required for OIDC Trusted Publishing
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          # NOTE: Do NOT use registry-url here!
+          # It creates .npmrc with ${NODE_AUTH_TOKEN} which conflicts with OIDC.
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for changesets
+        id: check
+        run: |
+          # Check if there are any changeset files (excluding README)
+          CHANGESETS=$(find .changeset -name "*.md" ! -name "README.md" 2>/dev/null | wc -l | tr -d ' ')
+          echo "changesets_count=$CHANGESETS" >> $GITHUB_OUTPUT
+          echo "Found $CHANGESETS changeset(s)"
+
+      # If there are changesets, create/update the release PR
+      - name: Create Release PR
+        if: steps.check.outputs.changesets_count != '0'
+        uses: changesets/action@v1
+        with:
+          version: pnpm version
+          title: "chore(release): version packages"
+          commit: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # If no changesets, check if there are unpublished versions
+      - name: Check for unpublished packages
+        if: steps.check.outputs.changesets_count == '0'
+        id: unpublished
+        run: |
+          echo "Checking for unpublished package versions..."
+          UNPUBLISHED=""
+
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              local_version=$(node -p "require('./${dir}package.json').version")
+              private=$(node -p "require('./${dir}package.json').private || false")
+
+              if [ "$private" = "true" ]; then
+                echo "⏭️ $name is private, skipping"
+                continue
+              fi
+
+              # Check if this version exists on npm
+              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+
+              if [ "$local_version" != "$npm_version" ]; then
+                echo "📦 $name: local=$local_version, npm=$npm_version (needs publish)"
+                UNPUBLISHED="$UNPUBLISHED $name"
+              else
+                echo "✅ $name: $local_version (already published)"
+              fi
+            fi
+          done
+
+          if [ -n "$UNPUBLISHED" ]; then
+            echo "has_unpublished=true" >> $GITHUB_OUTPUT
+            echo "packages=$UNPUBLISHED" >> $GITHUB_OUTPUT
+          else
+            echo "has_unpublished=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Build and test before publishing
+      - name: Build packages
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        run: pnpm build
+
+      - name: Run tests
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        run: pnpm test
+
+      # Publish with OIDC Trusted Publishing
+      - name: Publish to npm
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        run: |
+          echo "=== OIDC Environment ==="
+          echo "npm version: $(npm --version)"
+          echo "node version: $(node --version)"
+          echo ""
+          echo "Publishing packages with OIDC Trusted Publishing..."
+
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              local_version=$(node -p "require('./${dir}package.json').version")
+              private=$(node -p "require('./${dir}package.json').private || false")
+
+              if [ "$private" = "true" ]; then
+                echo "⏭️ Skipping $name (private)"
+                continue
+              fi
+
+              # Check if needs publishing
+              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+
+              if [ "$local_version" != "$npm_version" ]; then
+                echo "📦 Publishing $name@$local_version..."
+                cd "$dir"
+                npm publish --provenance --access public --registry https://registry.npmjs.org
+                cd ../..
+                echo "✅ Published $name@$local_version"
+              fi
+            fi
+          done
+
+      # Create GitHub release for the published version
+      - name: Get release version and notes
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        id: release_version
+        run: |
+          # Get version from core package (main package)
+          VERSION=$(node -p "require('./packages/core/package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Extract release notes for current version from CHANGELOG
+          # Takes content between first ## heading and next ## heading (or EOF)
+          NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' packages/core/CHANGELOG.md)
+
+          # Handle multi-line output for GitHub Actions
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.release_version.outputs.version }}
+          name: v${{ steps.release_version.outputs.version }}
+          body: ${{ steps.release_version.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(steps.release_version.outputs.version, '-') }}
+
+      - name: Summary
+        run: |
+          echo "## Changesets Workflow Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.check.outputs.changesets_count }}" != "0" ]; then
+            echo "✏️ Found ${{ steps.check.outputs.changesets_count }} changeset(s)" >> $GITHUB_STEP_SUMMARY
+            echo "📝 Release PR created/updated" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.unpublished.outputs.has_unpublished }}" = "true" ]; then
+            echo "📦 Published packages:${{ steps.unpublished.outputs.packages }}" >> $GITHUB_STEP_SUMMARY
+            echo "🏷️ Created release: v${{ steps.release_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
+          fi

@@ -8,10 +8,10 @@
 
 import { describe, it, expect } from "vitest";
 
-import { build, keep, omit, parse, parseInto } from "../../modules";
-import { decodeValue } from "../../modules/decode";
-import { encode, encodeValue, makeOptions } from "../../modules/encode";
-import { getSearch } from "../../modules/utils";
+import { build, keep, omit, parse, parseInto } from "../../src";
+import { decodeValue } from "../../src/decode";
+import { encode, encodeValue, makeOptions } from "../../src/encode";
+import { getSearch } from "../../src/utils";
 
 describe("search-params", () => {
   // ===========================================================================

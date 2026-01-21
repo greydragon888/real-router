@@ -3,11 +3,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-> Runtime type validation utilities for Router6 ecosystem.
+> Runtime type validation utilities for Real-Router ecosystem.
 
-**⚠️ Internal Use Only:** This package is designed for use within the Router6 monorepo. External users should use `router6` package directly.
+**⚠️ Internal Use Only:** This package is designed for use within the Real-Router monorepo. External users should use `@real-router/core` package directly.
 
-Provides centralized type guards and validators for all Router6 core types with TypeScript type narrowing support.
+Provides centralized type guards and validators for all Real-Router core types with TypeScript type narrowing support.
 
 ## Features
 
@@ -93,7 +93,7 @@ if (isStateStrict(value)) {
 ```typescript
 import { isParams, isParamsStrict } from "type-guards";
 
-// Flexible validation - allows nested objects (real-router core)
+// Flexible validation - allows nested objects (@real-router/core)
 if (isParams(routeParams)) {
   router.setState(routeParams);
 }
@@ -137,7 +137,7 @@ return state;
 
 ### `isParams` vs `isParamsStrict`
 
-- **`isParams`**: Used in router6 core
+- **`isParams`**: Used in @real-router/core
 
   - Allows: primitives, arrays, nested objects
   - Use case: Internal state management
@@ -183,56 +183,39 @@ isParams(frozen); // true
 
 ## Route Name Validation Rules
 
-`isRouteName` validates:
+`isRouteName` validates (returns `true`/`false`):
 
-- Non-empty string
+- String type
+- Empty string is valid (represents root node)
 - Segments: `[a-zA-Z_][a-zA-Z0-9_-]*`
 - Dots (.) for hierarchy
 - No consecutive, leading, or trailing dots
 - System routes (@@prefix) bypass validation
 
 ```typescript
-isRouteName("users.profile", "navigate"); // OK
-isRouteName("admin_panel", "navigate"); // OK
-isRouteName("api-v2", "navigate"); // OK
-isRouteName("@@real-router/UNKNOWN", "navigate"); // OK - system route
+isRouteName("users.profile"); // true
+isRouteName("admin_panel"); // true
+isRouteName("api-v2"); // true
+isRouteName(""); // true (root node)
+isRouteName("@@real-router/UNKNOWN"); // true (system route)
 
-isRouteName(".users", "navigate"); // throws - leading dot
-isRouteName("users..profile", "navigate"); // throws - consecutive dots
-isRouteName("123user", "navigate"); // throws - starts with number
+isRouteName(".users"); // false (leading dot)
+isRouteName("users..profile"); // false (consecutive dots)
+isRouteName("123user"); // false (starts with number)
+isRouteName("users profile"); // false (contains space)
 ```
 
-## Route Path Validation Rules
-
-`isRoutePath` validates:
-
-- String type
-- Empty path allowed (grouping/root)
-- Must start with `/`, `~`, `?`, or be relative segment
-- No double slashes
-- Absolute paths (~) cannot be under parameterized parents
+`validateRouteName` performs the same checks but throws `TypeError` on failure:
 
 ```typescript
-isRoutePath("/users", "users", "add"); // OK
-isRoutePath("~about", "about", "add"); // OK - absolute
-isRoutePath("?query", "search", "add"); // OK - query
-isRoutePath("", "root", "add"); // OK - empty
-
-isRoutePath("//bad", "test", "add"); // throws - double slashes
+validateRouteName("users.profile", "navigate"); // OK
+validateRouteName(".users", "navigate"); // throws TypeError
 ```
-
-## Documentation
-
-Full documentation available on the [Router6 Wiki](https://github.com/greydragon888/router6/wiki):
-
-- [State](https://github.com/greydragon888/router6/wiki/State) — state type validation
-- [Params](https://github.com/greydragon888/router6/wiki/Params) — params type validation
-- [NavigationOptions](https://github.com/greydragon888/router6/wiki/NavigationOptions) — navigation options validation
 
 ## Related Packages
 
-- [router6](https://www.npmjs.com/package/router6) — core router implementation
-- [router6-types](https://www.npmjs.com/package/router6-types) — TypeScript type definitions
+- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — core router implementation
+- [core-types](.) — TypeScript type definitions (internal)
 
 ## License
 

@@ -18,11 +18,11 @@ export default {
 
   // Mutate type-guards source files
   mutate: [
-    "modules/**/*.ts",
-    "!modules/index.ts", // Barrel export - skip
-    "!modules/guards/index.ts", // Barrel export - skip
-    "!modules/validators/index.ts", // Barrel export - skip
-    "!modules/types.ts", // Type definitions - skip
+    "src/**/*.ts",
+    "!src/index.ts", // Barrel export - skip
+    "!src/guards/index.ts", // Barrel export - skip
+    "!src/validators/index.ts", // Barrel export - skip
+    "!src/types.ts", // Type definitions - skip
   ],
 
   // Vitest runner configuration

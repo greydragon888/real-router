@@ -20,7 +20,7 @@ import {
   buildFromPattern,
   type CompiledPathPattern,
   compilePathPattern,
-} from "../../modules/parser/path-parser/buildPathFromPattern";
+} from "../../src/parser/path-parser/buildPathFromPattern";
 
 // =============================================================================
 // Test Data

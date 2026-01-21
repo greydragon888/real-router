@@ -5,8 +5,8 @@
 import { describe, it, expect } from "vitest";
 
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
-import { buildPath } from "../../../modules/operations/build";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
+import { buildPath } from "../../../src/operations/build";
 
 describe("Coverage improvement tests", () => {
   describe("trailingSlashMode: never with non-root path", () => {

@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 
-import { Path } from "../../../modules/parser/path-parser";
+import { Path } from "../../../src/parser/path-parser";
 
 describe("Path instantiation", () => {
   it("should throw an error when instantiated without parameter", () => {

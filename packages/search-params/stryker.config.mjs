@@ -18,10 +18,10 @@ export default {
 
   // Mutate search-params source files
   mutate: [
-    "modules/**/*.ts",
-    "!modules/index.ts", // Barrel export - skip
-    "!modules/types.ts", // Type definitions - skip
-    "!modules/strategies/index.ts",
+    "src/**/*.ts",
+    "!src/index.ts", // Barrel export - skip
+    "!src/types.ts", // Type definitions - skip
+    "!src/strategies/index.ts",
   ],
 
   // Vitest runner configuration

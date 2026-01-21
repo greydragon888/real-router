@@ -5,7 +5,7 @@
  * for performance testing.
  */
 
-import type { RouteDefinition } from "../../../modules/types";
+import type { RouteDefinition } from "../../../src/types";
 
 /**
  * Generates a wide tree with N siblings on top-level.

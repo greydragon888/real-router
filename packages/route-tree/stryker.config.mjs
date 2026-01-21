@@ -18,15 +18,15 @@ export default {
 
   // Mutate route-tree source files
   mutate: [
-    "modules/**/*.ts",
-    "!modules/index.ts", // Barrel export - skip
-    "!modules/types.ts",
-    "!modules/builder/index.ts",
-    "!modules/builder/types.ts",
-    "modules/operations/index.ts",
-    "!modules/operations/types.ts",
-    "!modules/builder/sortTree.ts",
-    "!modules/parser/path-parser/**/*.ts",
+    "src/**/*.ts",
+    "!src/index.ts", // Barrel export - skip
+    "!src/types.ts",
+    "!src/builder/index.ts",
+    "!src/builder/types.ts",
+    "src/operations/index.ts",
+    "!src/operations/types.ts",
+    "!src/builder/sortTree.ts",
+    "!src/parser/path-parser/**/*.ts",
   ],
 
   // Vitest runner configuration

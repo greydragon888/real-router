@@ -1,0 +1,44 @@
+# CODEOWNERS for real-router
+# This file defines who is responsible for code in this repository
+
+# Default owner for everything in the repo
+* @greydragon888
+
+# All packages
+/packages/ @greydragon888
+
+# Core packages
+/packages/core/ @greydragon888
+/packages/core-types/ @greydragon888
+/packages/route-tree/ @greydragon888
+
+# Plugins
+/packages/browser-plugin/ @greydragon888
+/packages/logger-plugin/ @greydragon888
+/packages/persistent-params-plugin/ @greydragon888
+
+# Framework bindings
+/packages/react/ @greydragon888
+
+# Utilities
+/packages/helpers/ @greydragon888
+/packages/logger/ @greydragon888
+/packages/search-params/ @greydragon888
+/packages/type-guards/ @greydragon888
+
+# Benchmarks
+/packages/router-benchmarks/ @greydragon888
+
+# Documentation
+*.md @greydragon888
+/README.md @greydragon888
+
+# Configuration files
+/.github/ @greydragon888
+/package.json @greydragon888
+/pnpm-workspace.yaml @greydragon888
+/tsconfig*.json @greydragon888
+/turbo.json @greydragon888
+/vitest.config.* @greydragon888
+/eslint.config.* @greydragon888
+/tsup.base.* @greydragon888

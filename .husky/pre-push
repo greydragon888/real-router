@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Pre-push hook: ALL checks + additional validation before pushing
+#
+# Runs everything from pre-commit PLUS:
+# - build: Final build to ensure compilation
+# - lint:types: Validate TypeScript types in dist (arethetypeswrong)
+# - lint:package: Validate package.json exports (publint)
+
+set -e
+
+echo "🚀 Running pre-push checks..."
+
+# Run type checking, linting, and tests via turbo pipeline
+echo "🧪 Running tests (includes type-check and lint via turbo)..."
+pnpm test
+
+# Check for unused code
+echo "🧹 Checking for unused code..."
+pnpm lint:unused
+
+# Check for code duplication
+echo "📋 Checking for code duplication..."
+pnpm lint:duplicates
+
+# Check for duplicate dependencies
+echo "📦 Checking for duplicate dependencies..."
+pnpm lint:dedupe
+
+# Build the project to ensure it compiles
+echo "📦 Building project..."
+pnpm build
+
+# Validate TypeScript types in dist
+echo "🔷 Validating TypeScript types in dist..."
+pnpm lint:types
+
+# Validate package.json exports
+echo "📄 Validating package configuration..."
+pnpm lint:package
+
+echo "✅ All pre-push checks passed! Pushing to remote..."

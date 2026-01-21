@@ -35,6 +35,9 @@ export default tsEslint.config(
     "**/generated/**",
     "**/.DS_Store", // macOS system files
     "**/*.bak*", // Backup files
+    "**/*.mjs", // JS config files - no TypeScript type-checking needed
+    "cz.config.js", // cz-git configuration
+    ".changeset/**", // Changesets configuration and markdown files
   ]),
 
   // ============================================
@@ -453,6 +456,17 @@ export default tsEslint.config(
       "import/first": "error",
       "import/newline-after-import": "error",
       "import/no-default-export": "warn",
+      // Ensure all imports are declared in package.json dependencies
+      // Catches missing deps like "logger" that work due to hoisting
+      // Only for src/ files - tests have too many false positives in monorepo
+      "import/no-extraneous-dependencies": [
+        "error",
+        {
+          devDependencies: true,
+          optionalDependencies: false,
+          peerDependencies: true,
+        },
+      ],
       // v2.32.0: Enforce node: protocol for Node.js built-ins
       // This improves clarity and is required for some environments
       "import/enforce-node-protocol-usage": ["warn", "always"],
@@ -471,7 +485,7 @@ export default tsEslint.config(
   // - no-blank-block-descriptions rule
   {
     files: [
-      "**/modules/**/*.ts",
+      "**/src/**/*.ts",
       "!**/__tests__/**",
       "!**/*.test.ts",
       "!**/*.spec.ts",
@@ -672,7 +686,12 @@ export default tsEslint.config(
   // 13. VITEST CONFIGURATION (Test Files)
   // ============================================
   {
-    files: ["**/tests/**/*.test.ts"],
+    files: [
+      "**/tests/**/*.test.ts",
+      "**/tests/**/*.test.tsx",
+      "**/tests/**/*.properties.ts",
+      "**/tests/**/helpers.ts",
+    ],
     plugins: {
       vitest: vitestPlugin,
       "vitest-globals": vitestGlobals,
@@ -714,6 +733,7 @@ export default tsEslint.config(
       "@typescript-eslint/no-invalid-void-type": "off",
       "@typescript-eslint/no-shadow": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/unbound-method": "off", // Conflicts with expect.any() in Vitest
       "sonarjs/no-commented-code": "warn",
       "sonarjs/no-duplicate-string": "off",
       "sonarjs/function-return-type": "off",
@@ -722,10 +742,27 @@ export default tsEslint.config(
       "unicorn/consistent-function-scoping": "off",
       "import/no-default-export": "off",
       "import/no-unresolved": "off",
+      "import/no-extraneous-dependencies": "off",
       "prefer-const": "off",
       "prefer-rest-params": "off",
       // JSDoc rules relaxed for test files
       "jsdoc/informative-docs": "off",
+    },
+  },
+
+  // ============================================
+  // 13.1 PROPERTY-BASED TESTS (@fast-check/vitest)
+  // ============================================
+  {
+    files: ["**/tests/**/*.properties.ts"],
+    rules: {
+      // Property tests use different patterns than regular tests
+      "vitest/require-hook": "off",
+      "vitest/no-standalone-expect": "off",
+      "vitest/no-test-return-statement": "off",
+      // Property tests often need conditional assertions based on generated data
+      "vitest/no-conditional-in-test": "off",
+      "vitest/no-conditional-expect": "off",
     },
   },
 
@@ -736,7 +773,7 @@ export default tsEslint.config(
     files: [
       "**/*.bench.ts",
       "**/*.mitata.ts",
-      "**/real-router-benchmarks/modules/**/*.ts",
+      "**/router-benchmarks/src/**/*.ts",
       "**/tests/benchmarks/**/*.ts",
     ],
     rules: {
@@ -775,6 +812,7 @@ export default tsEslint.config(
       "@typescript-eslint/explicit-function-return-type": "off",
       "import/no-default-export": "off",
       "import/no-unresolved": "off",
+      "import/no-extraneous-dependencies": "off",
       // JSDoc rules relaxed for benchmarks
       "jsdoc/informative-docs": "off",
     },

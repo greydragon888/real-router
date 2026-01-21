@@ -20,7 +20,7 @@ on:
 #    Add Trusted Publisher with these settings:
 #      * Provider: GitHub Actions
 #      * Organization/User: greydragon888
-#      * Repository: router6
+#      * Repository: real-router
 #      * Workflow: release.yml
 #      * Environment: (leave empty)
 #

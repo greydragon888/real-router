@@ -88,7 +88,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): Options[] => {
 
   const commonConfig: Partial<Options> = {
     // Entry point
-    entry: ["modules/index.ts"],
+    entry: ["src/index.ts"],
 
     // Clean dist before build
     clean: true,
@@ -176,7 +176,7 @@ export const createConfig = (opts: CreateConfigOptions = {}): Options[] => {
  *
  * @example
  * ```ts
- * // packages/real-router-plugin-browser/tsup.config.mts
+ * // packages/browser-plugin/tsup.config.mts
  * export default createBrowserConfig();
  * ```
  */

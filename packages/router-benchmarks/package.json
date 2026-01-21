@@ -1,0 +1,21 @@
+{
+  "name": "router-benchmarks",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Benchmark tests for @real-router/core",
+  "scripts": {
+    "prebench": "pnpm --filter @real-router/core build",
+    "bench": "BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "bench:baseline": "BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "bench:current": "pnpm prebench && BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache src/ --fix --max-warnings 0"
+  },
+  "dependencies": {
+    "router5": "8.0.1",
+    "@real-router/core": "workspace:^"
+  },
+  "devDependencies": {
+    "mitata": "1.0.34"
+  }
+}

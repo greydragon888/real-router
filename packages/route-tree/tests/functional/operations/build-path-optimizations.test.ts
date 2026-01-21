@@ -5,9 +5,9 @@
 import { describe, it, expect } from "vitest";
 
 import { matchPath } from "./helpers";
-import { createRouteTree } from "../../../modules/builder/createRouteTree";
-import { buildPath } from "../../../modules/operations/build";
-import { matchSegments } from "../../../modules/operations/match";
+import { createRouteTree } from "../../../src/builder/createRouteTree";
+import { buildPath } from "../../../src/operations/build";
+import { matchSegments } from "../../../src/operations/match";
 
 describe("buildPath staticPath fast path", () => {
   const tree = createRouteTree("", "", [
@@ -1110,12 +1110,12 @@ describe("buildPath R6/R7 fast path optimization", () => {
     it("should handle real-router-style options with all defaults", () => {
       // Simulates real-router's createBuildOptions output with all defaults
       // Note: real-router passes only defined values, undefined properties are omitted
-      const router6StyleOptions = {
+      const realRouterStyleOptions = {
         trailingSlashMode: "default" as const,
         queryParamsMode: "default" as const,
       };
 
-      const path = buildPath(tree, "about", {}, router6StyleOptions);
+      const path = buildPath(tree, "about", {}, realRouterStyleOptions);
 
       expect(path).toBe("/about");
     });

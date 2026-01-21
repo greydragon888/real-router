@@ -3,9 +3,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-Named route tree with high-performance matching and path building for Router6.
+Named route tree with high-performance matching and path building for Real-Router.
 
-**⚠️ Internal Use Only:** This package is designed for use within the Router6 ecosystem. External users should use `router6` package directly.
+**⚠️ Internal Use Only:** This package is designed for use within the Real-Router ecosystem. External users should use `@real-router/core` package directly.
 
 ## Overview
 
@@ -31,19 +31,24 @@ Named route tree with high-performance matching and path building for Router6.
 ```typescript
 interface RouteTree {
   // Core
-  name: string;                    // "users"
-  path: string;                    // "/users/:id"
-  absolute: boolean;               // path starts with "~"
-  parser: PathParser | null;       // path parser
-  children: readonly RouteTree[];
+  readonly name: string;                    // "users"
+  readonly path: string;                    // "/users/:id"
+  readonly absolute: boolean;               // path starts with "~"
+  readonly parser: PathParser | null;       // path parser
+  readonly children: readonly RouteTree[];
 
   // Pre-computed caches
-  parent: RouteTree | null;
-  fullName: string;                // "users.profile"
-  staticPath: string | null;       // pre-built for parameterless routes
-  childrenByName: Map<string, RouteTree>;
-  staticChildrenByFirstSegment: Map<string, RouteTree[]>;
-  paramTypeMap: Record<string, "url" | "query">;
+  readonly parent: RouteTree | null;
+  readonly fullName: string;                // "users.profile"
+  readonly staticPath: string | null;       // pre-built for parameterless routes
+  readonly childrenByName: ReadonlyMap<string, RouteTree>;
+  readonly staticChildrenByFirstSegment: ReadonlyMap<string, readonly RouteTree[]>;
+  readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
+
+  // Additional caches
+  readonly nonAbsoluteChildren: readonly RouteTree[];
+  readonly absoluteDescendants: readonly RouteTree[];
+  readonly parentSegments: readonly RouteTree[];
 }
 ```
 
@@ -94,6 +99,7 @@ const result = matchSegments(tree, "/users/123/edit");
 
 ```typescript
 interface MatchOptions {
+  trailingSlashMode?: "default" | "never" | "always";
   strictTrailingSlash?: boolean;  // Require exact trailing slash match
   caseSensitive?: boolean;        // Case-sensitive matching
   strongMatching?: boolean;       // Strict segment boundaries
@@ -201,6 +207,45 @@ const definitions = routeTreeToDefinitions(tree);
 // → [{ name: "home", path: "/" }, { name: "users", path: "/users", children: [...] }]
 ```
 
+---
+
+### `nodeToDefinition(node)`
+
+Converts a single route tree node to a route definition.
+
+```typescript
+import { nodeToDefinition } from "route-tree";
+
+const definition = nodeToDefinition(usersNode);
+// → { name: "users", path: "/users", children: [...] }
+```
+
+## Type Exports
+
+```typescript
+import type {
+  // Core types
+  RouteTree,
+  RouteDefinition,
+
+  // Options
+  BuildOptions,
+  MatchOptions,
+  TreeBuildOptions,
+
+  // Results
+  MatchResult,
+  RouteTreeState,
+  RouteTreeStateMeta,
+  RouteParams,
+
+  // Mode types
+  TrailingSlashMode,
+  QueryParamsMode,
+  URLParamsEncodingType,
+} from "route-tree";
+```
+
 ## Path Patterns
 
 ### URL Parameters
@@ -275,12 +320,11 @@ Match complete: [usersNode, profileNode, editNode]
 
 ## Dependencies
 
-- `search-params` — query string parsing and building
+- `search-params` — query string parsing and building (internal package)
 
 ## Related Packages
 
-- [router6](https://www.npmjs.com/package/router6) — core router (uses route-tree internally)
-- [search-params](https://www.npmjs.com/package/search-params) — query string utilities
+- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — core router (uses route-tree internally)
 
 ## License
 
