@@ -46,7 +46,7 @@ jobs:
         run: echo "version=$(node -p \"require('./packages/core/package.json').version\")" >> $GITHUB_OUTPUT
 
       - name: SonarCloud Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v7
         with:
           args: >
             -Dsonar.projectVersion=${{ steps.version.outputs.version }}
