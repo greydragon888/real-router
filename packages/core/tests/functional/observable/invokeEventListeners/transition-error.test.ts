@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -257,7 +258,7 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
         const toState = { name: "orders", params: {}, path: "/orders" };
         const fromState = { name: "cart", params: {}, path: "/cart" };
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(noop);
         const listener = vi.fn();
 
@@ -409,7 +410,7 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
         const fromState = { name: "account", params: {}, path: "/account" };
         const regularError = new Error("Validation test error");
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -654,7 +655,7 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
         const fromState = { name: "login", params: {}, path: "/login" };
         const stringError = "Account access denied";
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 
@@ -750,7 +751,7 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
         const fromState = { name: "cart", params: {}, path: "/cart" };
         const nullError = null;
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const listener = vi.fn();
 

@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, it, expect, vi } from "vitest";
 
 import { RouterError } from "@real-router/core";
@@ -20,7 +21,7 @@ describe("transition/executeLifecycleHooks", () => {
 
   describe("safeCallback error handling", () => {
     it("should catch and log error when callback throws", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
       const hooks = new Map<string, ActivationFn>();
@@ -45,7 +46,8 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[core:lifecycle] Error in lifecycle callback:",
+        "core:lifecycle",
+        "Error in lifecycle callback:",
         expect.any(Error),
       );
 
@@ -53,7 +55,7 @@ describe("transition/executeLifecycleHooks", () => {
     });
 
     it("should catch and log error when callback throws after processing hooks", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -83,7 +85,8 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[core:lifecycle] Error in lifecycle callback:",
+        "core:lifecycle",
+        "Error in lifecycle callback:",
         expect.any(Error),
       );
 
@@ -91,7 +94,7 @@ describe("transition/executeLifecycleHooks", () => {
     });
 
     it("should catch and log error when callback throws on cancellation", async () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -134,7 +137,8 @@ describe("transition/executeLifecycleHooks", () => {
       });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[core:lifecycle] Error in lifecycle callback:",
+        "core:lifecycle",
+        "Error in lifecycle callback:",
         expect.any(Error),
       );
 
@@ -142,7 +146,7 @@ describe("transition/executeLifecycleHooks", () => {
     });
 
     it("should catch and log error when callback throws on hook error", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -172,7 +176,8 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[core:lifecycle] Error in lifecycle callback:",
+        "core:lifecycle",
+        "Error in lifecycle callback:",
         expect.any(Error),
       );
 

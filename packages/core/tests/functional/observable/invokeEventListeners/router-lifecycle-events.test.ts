@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events, RouterError } from "@real-router/core";
@@ -112,7 +113,7 @@ describe("invokeEventListeners - Router lifecycle events", () => {
 
       it("should catch and log errors from failing listeners without stopping execution", () => {
         const consoleErrorSpy = vi
-          .spyOn(console, "error")
+          .spyOn(logger, "error")
           .mockImplementation(() => {});
         const errorMessage = "ROUTER_START listener error";
 
@@ -127,7 +128,8 @@ describe("invokeEventListeners - Router lifecycle events", () => {
         router.invokeEventListeners(events.ROUTER_START);
 
         expect(consoleErrorSpy).toHaveBeenCalledWith(
-          "[Router] Error in listener for $start:",
+          "Router",
+          "Error in listener for $start:",
           expect.any(Error),
         );
         expect(failingListener).toHaveBeenCalledWith();
@@ -241,7 +243,7 @@ describe("invokeEventListeners - Router lifecycle events", () => {
       });
 
       it("should handle listener errors without stopping execution", () => {
-        vi.spyOn(console, "error").mockImplementation(noop);
+        vi.spyOn(logger, "error").mockImplementation(noop);
         const errorMessage = "ROUTER_STOP listener error";
 
         const failingListener = vi.fn().mockImplementation(() => {
@@ -258,8 +260,9 @@ describe("invokeEventListeners - Router lifecycle events", () => {
 
         router.invokeEventListeners(events.ROUTER_STOP);
 
-        expect(console.error).toHaveBeenCalledWith(
-          "[Router] Error in listener for $stop:",
+        expect(logger.error).toHaveBeenCalledWith(
+          "Router",
+          "Error in listener for $stop:",
           expect.any(Error),
         );
         expect(failingListener).toHaveBeenCalledWith();
@@ -473,7 +476,7 @@ describe("invokeEventListeners - Router lifecycle events", () => {
       });
 
       it("should preserve error handling when extra parameters are present", () => {
-        vi.spyOn(console, "error").mockImplementation(noop);
+        vi.spyOn(logger, "error").mockImplementation(noop);
 
         const extraParams = ["param1", { param: 2 }, 3];
 
@@ -488,8 +491,9 @@ describe("invokeEventListeners - Router lifecycle events", () => {
         // @ts-expect-error - Testing invalid parameters
         router.invokeEventListeners(events.ROUTER_START, ...extraParams);
 
-        expect(console.error).toHaveBeenCalledWith(
-          "[Router] Error in listener for $start:",
+        expect(logger.error).toHaveBeenCalledWith(
+          "Router",
+          "Error in listener for $start:",
           expect.any(Error),
         );
         expect(failingListener).toHaveBeenCalledWith();

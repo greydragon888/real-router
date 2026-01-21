@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -140,7 +141,7 @@ describe("core/dependencies (integration)", () => {
 
   describe("dependency limits (lines 29-48)", () => {
     it("should warn when reaching 20 dependencies (line 30)", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
       const routerWithDeps = withDependencies<Record<string, number>>({})(
         testRouter,
@@ -158,7 +159,7 @@ describe("core/dependencies (integration)", () => {
     });
 
     it("should error when reaching 50 dependencies (line 36)", () => {
-      const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
       const routerWithDeps = withDependencies<Record<string, number>>({})(
         testRouter,
@@ -171,9 +172,9 @@ describe("core/dependencies (integration)", () => {
       }
 
       expect(errorSpy).toHaveBeenCalled();
-      // Console format: console.error("[context] message")
-      // callArgs[0] is the combined message
-      expect(errorSpy.mock.calls[0][0]).toContain("50 dependencies");
+      // Logger format: logger.error(context, message)
+      // callArgs[0] is context, callArgs[1] is message
+      expect(errorSpy.mock.calls[0][1]).toContain("50 dependencies");
 
       errorSpy.mockRestore();
     });
@@ -196,7 +197,7 @@ describe("core/dependencies (integration)", () => {
     });
 
     it("should allow overwriting existing dependency at hard limit", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
       const routerWithDeps = withDependencies<Record<string, number>>({})(
         testRouter,
@@ -219,9 +220,9 @@ describe("core/dependencies (integration)", () => {
 
       // Warning about overwrite should have been logged
       expect(warnSpy).toHaveBeenCalledTimes(1);
-      // Console format: console.warn("[context] message", ...args)
-      // callArgs[0] is the combined message
-      expect(warnSpy.mock.calls[0][0]).toContain("being overwritten");
+      // Logger format: logger.warn(context, message, ...args)
+      // callArgs[0] is context, callArgs[1] is message
+      expect(warnSpy.mock.calls[0][1]).toContain("being overwritten");
 
       warnSpy.mockRestore();
     });

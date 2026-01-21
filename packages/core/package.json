@@ -57,6 +57,7 @@
   "dependencies": {
     "route-tree": "workspace:^",
     "core-types": "workspace:^",
-    "type-guards": "workspace:^"
+    "type-guards": "workspace:^",
+    "logger": "workspace:^"
   }
 }

@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -311,7 +312,7 @@ describe("invokeEventListeners - Clear all listeners", () => {
     });
 
     it("should handle errors in clearing listener without affecting others", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const executionTracker: string[] = [];
       const unsubscribeTargets: Unsubscribe[] = [];
@@ -349,6 +350,12 @@ describe("invokeEventListeners - Clear all listeners", () => {
         "surviving1",
         "surviving2",
       ]);
+      // Logger format: logger.error(context, message, error)
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $start:",
+        expect.any(Error),
+      );
     });
 
     it("should verify complete isolation through cloning", () => {

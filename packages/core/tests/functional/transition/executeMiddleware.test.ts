@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, it, expect, vi } from "vitest";
 
 import { executeMiddleware } from "../../../src/transition/executeMiddleware";
@@ -18,7 +19,7 @@ describe("transition/executeMiddleware", () => {
 
   describe("safeCallback error handling", () => {
     it("should catch and log error when callback throws with no middleware", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
       const middlewareFunctions: ActivationFn[] = [];
@@ -40,7 +41,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[real-router:middleware] Error in middleware callback:",
+        "real-router:middleware",
+        "Error in middleware callback:",
         expect.any(Error),
       );
 
@@ -48,7 +50,7 @@ describe("transition/executeMiddleware", () => {
     });
 
     it("should catch and log error when callback throws after middleware", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -76,7 +78,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[real-router:middleware] Error in middleware callback:",
+        "real-router:middleware",
+        "Error in middleware callback:",
         expect.any(Error),
       );
 
@@ -84,7 +87,7 @@ describe("transition/executeMiddleware", () => {
     });
 
     it("should catch and log error when callback throws on cancellation", async () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -124,7 +127,8 @@ describe("transition/executeMiddleware", () => {
       });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[real-router:middleware] Error in middleware callback:",
+        "real-router:middleware",
+        "Error in middleware callback:",
         expect.any(Error),
       );
 
@@ -132,7 +136,7 @@ describe("transition/executeMiddleware", () => {
     });
 
     it("should catch and log error when callback throws on middleware error", () => {
-      const loggerSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
@@ -160,7 +164,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "[real-router:middleware] Error in middleware callback:",
+        "real-router:middleware",
+        "Error in middleware callback:",
         expect.any(Error),
       );
 

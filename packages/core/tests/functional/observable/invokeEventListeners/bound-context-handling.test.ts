@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
@@ -320,7 +321,7 @@ describe("invokeEventListeners - Bound context handling", () => {
     });
 
     it("should handle error throwing from context-independent method", () => {
-      vi.spyOn(console, "error").mockImplementation(noop);
+      vi.spyOn(logger, "error").mockImplementation(noop);
 
       const errorThrowingObject = {
         errorMethod: vi.fn(function (this: any) {
@@ -340,6 +341,12 @@ describe("invokeEventListeners - Bound context handling", () => {
 
       router.invokeEventListeners(events.ROUTER_START);
 
+      // Logger format: logger.error(context, message, error)
+      expect(logger.error).toHaveBeenCalledWith(
+        "Router",
+        "Error in listener for $start:",
+        expect.any(Error),
+      );
       expect(errorThrowingObject.errorMethod).toHaveBeenCalledWith();
       expect(workingListener).toHaveBeenCalledWith();
     });

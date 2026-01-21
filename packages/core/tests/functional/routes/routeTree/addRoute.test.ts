@@ -1,3 +1,4 @@
+import { logger } from "logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
@@ -927,7 +928,7 @@ describe("core/routes/addRoute", () => {
 
     it("should warn when route has both forwardTo and canActivate", () => {
       // Spy on console.warn
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute([
         {
@@ -940,15 +941,15 @@ describe("core/routes/addRoute", () => {
       ]);
 
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[real-router]"),
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
+        "real-router",
         expect.stringContaining("forwardTo and canActivate"),
       );
       expect(warnSpy).toHaveBeenCalledWith(
+        "real-router",
         expect.stringContaining("redirectWithGuard"),
       );
       expect(warnSpy).toHaveBeenCalledWith(
+        "real-router",
         expect.stringContaining('target route "target"'),
       );
 
@@ -956,7 +957,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should not warn when route has only forwardTo without canActivate", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute([
         { name: "redirect", path: "/redirect", forwardTo: "target" },

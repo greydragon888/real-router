@@ -1,5 +1,7 @@
 // packages/real-router/modules/core/middleware.ts
 
+import { logger } from "logger";
+
 import { getTypeDescription } from "../helpers";
 
 import type {
@@ -96,15 +98,16 @@ function validateMiddlewareCount(newCount: number, currentSize: number): void {
 
   // Graduated warnings for early problem detection
   if (totalSize >= MIDDLEWARE_LIMITS.ERROR) {
-    console.error(
-      `[router.useMiddleware] ${totalSize} middleware registered! ` +
+    logger.error(
+      "router.useMiddleware",
+      `${totalSize} middleware registered! ` +
         `This is excessive and will impact performance. ` +
         `Hard limit at ${MIDDLEWARE_LIMITS.HARD_LIMIT}.`,
     );
   } else if (totalSize >= MIDDLEWARE_LIMITS.WARN) {
-    console.warn(
-      `[router.useMiddleware] ${totalSize} middleware registered. ` +
-        `Consider if all are necessary.`,
+    logger.warn(
+      "router.useMiddleware",
+      `${totalSize} middleware registered. ` + `Consider if all are necessary.`,
     );
   }
 }
@@ -194,8 +197,9 @@ export function withMiddleware<Dependencies extends DefaultDependencies>(
     } catch (error) {
       // Rollback: Clean up any successfully initialized middleware
       // This ensures atomicity - either all succeed or none are registered
-      console.error(
-        `[router.useMiddleware] Failed to initialize middleware, rolling back`,
+      logger.error(
+        "router.useMiddleware",
+        "Failed to initialize middleware, rolling back",
         error,
       );
 
@@ -217,8 +221,9 @@ export function withMiddleware<Dependencies extends DefaultDependencies>(
 
         if (!wasDeleted) {
           // This shouldn't happen but log for debugging
-          console.warn(
-            `[router.useMiddleware] Attempted to remove non-existent middleware factory. ` +
+          logger.warn(
+            "router.useMiddleware",
+            `Attempted to remove non-existent middleware factory. ` +
               `This might indicate a memory leak or incorrect cleanup logic.`,
           );
         }

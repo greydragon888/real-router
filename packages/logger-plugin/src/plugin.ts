@@ -1,5 +1,7 @@
 // packages/logger-plugin/modules/plugin.ts
 
+import { logger } from "logger";
+
 import { DEFAULT_CONFIG } from "./constants";
 import {
   createGroupManager,
@@ -14,12 +16,21 @@ import type { PluginFactory, RouterError, State } from "@real-router/core";
  * Creates a logger plugin for real-router.
  *
  * Configuration is managed through the logger singleton.
+ * Use `logger.configure()` to customize logging behavior before starting the router.
  *
  * @returns Plugin factory function for real-router
  *
  * @example
  * ```ts
- * import { loggerPluginFactory } from "@real-router/logger-plugin";
+ * import { logger } from "logger";
+ * import { loggerPluginFactory } from "real-router-logger-plugin";
+ *
+ * // Configure logger before using the plugin
+ * logger.configure({
+ *   level: "transitions",
+ *   showTiming: true,
+ *   context: "MyApp",
+ * });
  *
  * router.usePlugin(loggerPluginFactory());
  * ```
@@ -60,12 +71,12 @@ export function loggerPluginFactory(): PluginFactory {
 
     return {
       onStart() {
-        console.log(`[${config.context}] Router started`);
+        logger.log(config.context, "Router started");
       },
 
       onStop() {
         groups.close();
-        console.log(`[${config.context}] Router stopped`);
+        logger.log(config.context, "Router stopped");
       },
 
       onTransitionStart(toState: State, fromState?: State) {
@@ -74,19 +85,16 @@ export function loggerPluginFactory(): PluginFactory {
         const fromRoute = formatRouteName(fromState);
         const toRoute = formatRouteName(toState);
 
-        console.log(
-          `[${config.context}] Transition: ${fromRoute} → ${toRoute}`,
-          {
-            from: fromState,
-            to: toState,
-          },
-        );
+        logger.log(config.context, `Transition: ${fromRoute} → ${toRoute}`, {
+          from: fromState,
+          to: toState,
+        });
 
         logParamsIfNeeded(toState, fromState);
       },
 
       onTransitionSuccess(toState: State, fromState?: State) {
-        console.log(`[${config.context}] Transition success`, {
+        logger.log(config.context, "Transition success", {
           to: toState,
           from: fromState,
         });
@@ -95,7 +103,7 @@ export function loggerPluginFactory(): PluginFactory {
       },
 
       onTransitionCancel(toState: State, fromState?: State) {
-        console.warn(`[${config.context}] Transition cancelled`, {
+        logger.warn(config.context, "Transition cancelled", {
           to: toState,
           from: fromState,
         });
@@ -108,7 +116,7 @@ export function loggerPluginFactory(): PluginFactory {
         fromState: State | undefined,
         err: RouterError,
       ) {
-        console.error(`[${config.context}] Transition error: ${err.code}`, {
+        logger.error(config.context, `Transition error: ${err.code}`, {
           error: err,
           stack: err.stack,
           to: toState,

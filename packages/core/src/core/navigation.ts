@@ -1,5 +1,6 @@
 // packages/real-router/modules/core/navigation.ts
 
+import { logger } from "logger";
 import { getTypeDescription, isNavigationOptions } from "type-guards";
 
 import { events, errorCodes, constants, RouterError } from "@real-router/core";
@@ -31,7 +32,7 @@ function safeCallback(
   try {
     callback(...args);
   } catch (error) {
-    console.error(`[router.navigate] Error in navigation callback:`, error);
+    logger.error("router.navigate", "Error in navigation callback:", error);
   }
 }
 
@@ -116,9 +117,10 @@ export function withNavigation<Dependencies extends DefaultDependencies>(
   ): CancelFn => {
     // Warn about concurrent navigation (potential SSR race condition)
     if (navigating) {
-      console.warn(
-        `[router.navigate] Concurrent navigation detected on shared router instance. ` +
-          `For SSR, use router.clone() to create isolated instance per request.`,
+      logger.warn(
+        "router.navigate",
+        "Concurrent navigation detected on shared router instance. " +
+          "For SSR, use router.clone() to create isolated instance per request.",
       );
     }
 
