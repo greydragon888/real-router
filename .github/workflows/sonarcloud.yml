@@ -43,7 +43,9 @@ jobs:
 
       - name: Get version from core package
         id: version
-        run: echo "version=$(node -p \"require('./packages/core/package.json').version\")" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(node -p 'require("./packages/core/package.json").version')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v7
