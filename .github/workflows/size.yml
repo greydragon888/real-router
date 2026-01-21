@@ -58,7 +58,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Compare and comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const prSizes = JSON.parse(`${{ steps.pr_sizes.outputs.sizes }}` || '[]');
