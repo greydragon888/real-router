@@ -6,9 +6,38 @@
 
 Add internal isomorphic logger package for centralized logging
 
-- Create internal `logger` package with three severity levels (log, warn, error) and four threshold configurations (all, warn-error, error-only, none)
-- Support optional callback for custom log processing with `callbackIgnoresLevel` option
-- Add `options.logger` configuration support in `createRouter()` for global logger setup
-- Migrate `@real-router/core` from direct `console.*` calls to centralized logger
-- Migrate `@real-router/logger-plugin` to use internal logger instead of direct console output
-- Migrate `@real-router/browser-plugin` warning messages to centralized logger
+### New Features
+
+**Isomorphic Logger** — works in browser, Node.js, and environments without `console`:
+
+- Three severity levels: `log`, `warn`, `error`
+- Four threshold configurations: `all`, `warn-error`, `error-only`, `none`
+- Safe console access (checks `typeof console !== "undefined"`)
+- Optional callback for custom log processing (error tracking, analytics, console emulation)
+- `callbackIgnoresLevel` option to bypass level filtering for callbacks
+
+**Router Configuration:**
+
+```typescript
+const router = createRouter(routes, {
+  logger: {
+    level: "error-only",
+    callback: (level, context, message) => {
+      if (level === "error") Sentry.captureMessage(message);
+    },
+    callbackIgnoresLevel: true,
+  },
+});
+```
+
+### Changes by Package
+
+**@real-router/core:**
+- Add `options.logger` configuration support in `createRouter()`
+- Migrate all internal `console.*` calls to centralized logger
+
+**@real-router/browser-plugin:**
+- Migrate warning messages to centralized logger
+
+**@real-router/logger-plugin:**
+- Use internal logger instead of direct console output
