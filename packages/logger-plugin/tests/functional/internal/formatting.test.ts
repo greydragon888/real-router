@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { formatRouteName } from "../../../src/internal/formatting";
+import {
+  formatRouteName,
+  formatTiming,
+  createTransitionLabel,
+} from "../../../src/internal/formatting";
 
 import type { State } from "@real-router/core";
 
@@ -34,6 +38,103 @@ describe("formatting utilities", () => {
       const state = { name: "", params: {}, path: "/" } as State;
 
       expect(formatRouteName(state)).toBe("");
+    });
+  });
+
+  describe("formatTiming", () => {
+    const mockNow = vi.fn();
+
+    it("should return empty string when startTime is null", () => {
+      mockNow.mockReturnValue(100);
+
+      expect(formatTiming(null, mockNow)).toBe("");
+      expect(mockNow).not.toHaveBeenCalled();
+    });
+
+    it("should format microseconds for very fast operations (<0.1ms)", () => {
+      mockNow.mockReturnValue(100.05); // 50μs = 0.05ms
+
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toBe(" (50.00μs)");
+    });
+
+    it("should format milliseconds for normal operations (≥0.1ms)", () => {
+      mockNow.mockReturnValue(105.5); // 5.5ms
+
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toBe(" (5.50ms)");
+    });
+
+    it("should handle zero duration", () => {
+      mockNow.mockReturnValue(100);
+
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toBe(" (0.00μs)");
+    });
+
+    it("should handle large durations", () => {
+      mockNow.mockReturnValue(1100); // 1000ms = 1s
+
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toBe(" (1000.00ms)");
+    });
+
+    it("should use exactly 2 decimal places", () => {
+      mockNow.mockReturnValue(100.123_456);
+
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toMatch(/^\s\(\d+\.\d{2}[mμ]s\)$/);
+    });
+
+    it("should handle NaN from now() function", () => {
+      mockNow.mockReturnValue(Number.NaN);
+
+      expect(formatTiming(100, mockNow)).toBe(" (?)");
+    });
+
+    it("should handle negative duration", () => {
+      mockNow.mockReturnValue(50); // startTime = 100, now = 50
+
+      expect(formatTiming(100, mockNow)).toBe(" (?)");
+    });
+
+    it("should handle Infinity from now() function", () => {
+      mockNow.mockReturnValue(Infinity);
+
+      expect(formatTiming(100, mockNow)).toBe(" (?)");
+    });
+
+    it("should handle -Infinity from now() function", () => {
+      mockNow.mockReturnValue(-Infinity);
+      const result = formatTiming(100, mockNow);
+
+      expect(result).toBe(" (?)");
+    });
+  });
+
+  describe("createTransitionLabel", () => {
+    it("should create label with arrow separator", () => {
+      expect(createTransitionLabel("home", "users")).toBe("home→users");
+    });
+
+    it("should handle empty strings", () => {
+      expect(createTransitionLabel("", "users")).toBe("→users");
+      expect(createTransitionLabel("home", "")).toBe("home→");
+    });
+
+    it("should handle (none) placeholder", () => {
+      expect(createTransitionLabel("(none)", "users")).toBe("(none)→users");
+    });
+
+    it("should handle nested route names", () => {
+      expect(createTransitionLabel("users.list", "users.view")).toBe(
+        "users.list→users.view",
+      );
     });
   });
 });

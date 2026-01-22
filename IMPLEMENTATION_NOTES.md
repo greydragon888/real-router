@@ -311,16 +311,16 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 `.size-limit.json` defines per-package limits:
 
-| Package                                  | Limit |
-| ---------------------------------------- | ----- |
-| @real-router/core                        | 25 kB |
-| @real-router/react                       | 10 kB |
-| @real-router/browser-plugin              | 5 kB  |
-| @real-router/helpers                     | 3 kB  |
-| route-tree                               | 15 kB |
-| search-params                            | 5 kB  |
-| core-types, type-guards                  | 2 kB  |
-| logger-plugin, persistent-params | 3 kB  |
+| Package                            | Limit |
+|------------------------------------| ----- |
+| @real-router/core                  | 25 kB |
+| @real-router/react                 | 10 kB |
+| @real-router/browser-plugin        | 5 kB  |
+| @real-router/helpers               | 3 kB  |
+| route-tree                         | 15 kB |
+| search-params                      | 5 kB  |
+| core-types, type-guards            | 2 kB  |
+| logger-plugin, persistent-params   | 3 kB  |
 
 React package ignores `react` and `react-dom` from size calculation.
 
@@ -417,6 +417,57 @@ const router = createRouter(routes, {
 All packages using logger declare `"logger": "workspace:^"` dependency.
 
 Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logger-plugin`.
+
+## Logger Plugin Performance Tracking
+
+### Timing Display
+
+Transition duration with adaptive units:
+
+| Duration | Format | Example |
+|----------|--------|---------|
+| < 0.1ms | Microseconds | `(27.29μs)` |
+| ≥ 0.1ms | Milliseconds | `(15.00ms)` |
+
+### Time Provider
+
+Monotonic time source with environment-aware fallback:
+
+```
+Browser           → performance.now()
+Node.js 16+       → performance.now() from perf_hooks
+Node.js <16       → Date.now() with monotonic emulation
+```
+
+**Monotonic emulation** — `Date.now()` can go backwards (NTP sync, DST). Wrapper tracks `lastTimestamp` and adds offset if time decreases.
+
+### Performance API Integration
+
+Creates marks and measures for DevTools Performance tab:
+
+```
+Marks:
+├── router:transition-start:{from}→{to}
+├── router:transition-end:{from}→{to}     (success)
+├── router:transition-cancel:{from}→{to}  (cancelled)
+└── router:transition-error:{from}→{to}   (error)
+
+Measures:
+├── router:transition:{from}→{to}           (success)
+├── router:transition-cancelled:{from}→{to} (cancelled)
+└── router:transition-failed:{from}→{to}    (error)
+```
+
+**Safe API access** — checks `typeof performance.mark === "function"` before use.
+
+### SSR Note
+
+For high-precision timing in Node.js without global `performance`:
+
+```typescript
+import { performance } from "perf_hooks";
+globalThis.performance = performance;
+```
 
 ## Dependencies
 

@@ -7,8 +7,14 @@ import {
   createGroupManager,
   supportsConsoleGroups,
 } from "./internal/console-groups";
-import { formatRouteName } from "./internal/formatting";
+import {
+  formatRouteName,
+  formatTiming,
+  createTransitionLabel,
+} from "./internal/formatting";
 import { getParamsDiff, logParamsDiff } from "./internal/params-diff";
+import { createPerformanceTracker } from "./internal/performance-marks";
+import { now } from "./internal/timing";
 
 import type { PluginFactory, RouterError, State } from "@real-router/core";
 
@@ -42,12 +48,19 @@ import type { PluginFactory, RouterError, State } from "@real-router/core";
  * ```
  */
 export function loggerPluginFactory(): PluginFactory {
-  // eslint-disable-next-line unicorn/consistent-function-scoping -- factory pattern: closure captures config, groups
+  // eslint-disable-next-line unicorn/consistent-function-scoping -- factory pattern: closure captures config, groups, perf, transitionStartTime
   return () => {
     const config = DEFAULT_CONFIG;
 
     // Create helper managers
     const groups = createGroupManager(supportsConsoleGroups());
+    const perf = createPerformanceTracker(
+      config.usePerformanceMarks,
+      config.context,
+    );
+
+    // Transition state
+    let transitionStartTime: number | null = null;
 
     /**
      * Logs parameter differences when navigating within the same route.
@@ -71,20 +84,26 @@ export function loggerPluginFactory(): PluginFactory {
 
     return {
       onStart() {
+        perf.mark("router:start");
         logger.log(config.context, "Router started");
       },
 
       onStop() {
         groups.close();
+        perf.mark("router:stop");
+        perf.measure("router:lifetime", "router:start", "router:stop");
         logger.log(config.context, "Router stopped");
       },
 
       onTransitionStart(toState: State, fromState?: State) {
         groups.open("Router transition");
+        transitionStartTime = now();
 
         const fromRoute = formatRouteName(fromState);
         const toRoute = formatRouteName(toState);
+        const label = createTransitionLabel(fromRoute, toRoute);
 
+        perf.mark(`router:transition-start:${label}`);
         logger.log(config.context, `Transition: ${fromRoute} → ${toRoute}`, {
           from: fromState,
           to: toState,
@@ -94,21 +113,49 @@ export function loggerPluginFactory(): PluginFactory {
       },
 
       onTransitionSuccess(toState: State, fromState?: State) {
-        logger.log(config.context, "Transition success", {
+        const fromRoute = formatRouteName(fromState);
+        const toRoute = formatRouteName(toState);
+        const label = createTransitionLabel(fromRoute, toRoute);
+
+        perf.mark(`router:transition-end:${label}`);
+        perf.measure(
+          `router:transition:${label}`,
+          `router:transition-start:${label}`,
+          `router:transition-end:${label}`,
+        );
+
+        const timing = formatTiming(transitionStartTime, now);
+
+        logger.log(config.context, `Transition success${timing}`, {
           to: toState,
           from: fromState,
         });
 
         groups.close();
+        transitionStartTime = null;
       },
 
       onTransitionCancel(toState: State, fromState?: State) {
-        logger.warn(config.context, "Transition cancelled", {
+        const fromRoute = formatRouteName(fromState);
+        const toRoute = formatRouteName(toState);
+        const label = createTransitionLabel(fromRoute, toRoute);
+
+        perf.mark(`router:transition-cancel:${label}`);
+        perf.measure(
+          `router:transition-cancelled:${label}`,
+          `router:transition-start:${label}`,
+          `router:transition-cancel:${label}`,
+        );
+
+        const timing = formatTiming(transitionStartTime, now);
+
+        logger.warn(config.context, `Transition cancelled${timing}`, {
           to: toState,
           from: fromState,
         });
 
         groups.close();
+        transitionStartTime = null;
       },
 
       onTransitionError(
@@ -116,7 +163,20 @@ export function loggerPluginFactory(): PluginFactory {
         fromState: State | undefined,
         err: RouterError,
       ) {
-        logger.error(config.context, `Transition error: ${err.code}`, {
+        const fromRoute = formatRouteName(fromState);
+        const toRoute = formatRouteName(toState);
+        const label = createTransitionLabel(fromRoute, toRoute);
+
+        perf.mark(`router:transition-error:${label}`);
+        perf.measure(
+          `router:transition-failed:${label}`,
+          `router:transition-start:${label}`,
+          `router:transition-error:${label}`,
+        );
+
+        const timing = formatTiming(transitionStartTime, now);
+
+        logger.error(config.context, `Transition error: ${err.code}${timing}`, {
           error: err,
           stack: err.stack,
           to: toState,
@@ -124,10 +184,12 @@ export function loggerPluginFactory(): PluginFactory {
         });
 
         groups.close();
+        transitionStartTime = null;
       },
 
       teardown() {
         groups.close();
+        transitionStartTime = null;
       },
     };
   };

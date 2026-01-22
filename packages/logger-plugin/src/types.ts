@@ -11,6 +11,24 @@ export type LogLevel = "all" | "transitions" | "errors" | "none";
  */
 export interface LoggerPluginConfig {
   /**
+   * Use Performance API to create marks and measures.
+   * Enables integration with browser DevTools Performance tab.
+   *
+   * Creates marks:
+   * - `router:transition-start:{from}→{to}`
+   * - `router:transition-end:{from}→{to}` (success)
+   * - `router:transition-cancel:{from}→{to}` (cancelled)
+   * - `router:transition-error:{from}→{to}` (error)
+   *
+   * Creates measures:
+   * - `router:transition:{from}→{to}` (success)
+   * - `router:transition-cancelled:{from}→{to}` (cancelled)
+   * - `router:transition-failed:{from}→{to}` (error)
+   *
+   * @default false
+   */
+  usePerformanceMarks?: boolean;
+  /**
    * Logging level - controls what router events to log.
    *
    * - 'all': Log all router events (default)
@@ -21,6 +39,14 @@ export interface LoggerPluginConfig {
    * @default 'all'
    */
   level?: LogLevel;
+
+  /**
+   * Show execution time in milliseconds for transitions.
+   * Helps identify slow route changes.
+   *
+   * @default true
+   */
+  showTiming?: boolean;
 
   /**
    * Show diff of changed route parameters between transitions.
