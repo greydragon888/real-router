@@ -32,73 +32,20 @@ function createMonotonicDateNow(): TimeProvider {
 }
 
 /**
- * Type guard to check if error is an unexpected module loading error.
- * Returns false for expected "module not found" errors.
- *
- * @param err - Unknown error object
- * @returns True if error is unexpected and should be logged
+ * Initialize time provider based on environment.
+ * Uses performance.now() in modern environments (Node.js 16+, all browsers),
+ * falls back to monotonic Date.now() wrapper for edge cases.
  */
-export function isUnexpectedModuleError(
-  err: unknown,
-): err is NodeJS.ErrnoException {
-  return (
-    err !== null &&
-    typeof err === "object" &&
-    "code" in err &&
-    typeof (err as { code?: unknown }).code === "string" &&
-    (err as { code: string }).code !== "ERR_MODULE_NOT_FOUND" &&
-    (err as { code: string }).code !== "MODULE_NOT_FOUND"
-  );
-}
-
-/**
- * Logs warning for unexpected module loading errors.
- * Separated for testability.
- *
- * @param error - The error from module loading
- */
-export function warnUnexpectedModuleError(error: unknown): void {
-  if (isUnexpectedModuleError(error)) {
-    console.warn(
-      "[timing] Unexpected error loading perf_hooks, using Date.now() fallback:",
-      error,
-    );
-  }
-}
-
-/**
- * Initialize time provider based on environment
- */
-let nowFn: TimeProvider;
-
-nowFn = createMonotonicDateNow();
-
-if (
-  typeof performance !== "undefined" &&
-  typeof performance.now === "function"
-) {
-  // Browser or modern Node.js with global performance
-  nowFn = (): number => performance.now();
-} else {
-  // Node.js without global performance - try perf_hooks
-  // NOSONAR: Cannot use top-level await due to CJS compatibility
-  void (async (): Promise<void> => {
-    try {
-      const { performance: perfHooks } = await import("node:perf_hooks");
-
-      nowFn = (): number => perfHooks.now();
-    } catch (error) {
-      warnUnexpectedModuleError(error);
-    }
-  })();
-}
+const nowFn: TimeProvider =
+  typeof performance !== "undefined" && typeof performance.now === "function"
+    ? (): number => performance.now()
+    : createMonotonicDateNow();
 
 /**
  * Returns high-resolution monotonic timestamp.
  *
- * - Browser: performance.now() (~0.001ms precision)
- * - Node.js 16+: performance.now() from perf_hooks (~0.001ms precision)
- * - Node.js <16: Date.now() with monotonic emulation (~1ms precision)
+ * Uses performance.now() in modern environments (Node.js 16+, all browsers).
+ * Falls back to monotonic Date.now() wrapper (~1ms precision) for edge cases.
  *
  * @returns Timestamp in milliseconds
  */
