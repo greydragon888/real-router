@@ -37,8 +37,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Lint, Type Check & Test
-        run: pnpm turbo run lint type-check test --affected -- --coverage
+      - name: Lint & Type Check
+        run: pnpm turbo run lint type-check --affected
+
+      - name: Test with Coverage
+        run: pnpm turbo run test --affected -- --coverage
 
       - name: Build
         run: pnpm turbo run build --affected

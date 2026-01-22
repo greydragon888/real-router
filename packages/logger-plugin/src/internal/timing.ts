@@ -81,13 +81,16 @@ if (
   nowFn = (): number => performance.now();
 } else {
   // Node.js without global performance - try perf_hooks
-  /* eslint-disable promise/always-return */
-  void import("node:perf_hooks")
-    .then(({ performance: perfHooks }): void => {
+  // NOSONAR: Cannot use top-level await due to CJS compatibility
+  void (async (): Promise<void> => {
+    try {
+      const { performance: perfHooks } = await import("node:perf_hooks");
+
       nowFn = (): number => perfHooks.now();
-    })
-    .catch(warnUnexpectedModuleError);
-  /* eslint-enable promise/always-return */
+    } catch (error) {
+      warnUnexpectedModuleError(error);
+    }
+  })();
 }
 
 /**
