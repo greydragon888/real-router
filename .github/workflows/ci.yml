@@ -38,13 +38,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Lint & Type Check
-        run: pnpm turbo run lint type-check --affected
+        run: pnpm turbo run lint type-check ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
       - name: Test with Coverage
-        run: pnpm turbo run test --affected -- --coverage
+        run: pnpm turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }} -- --coverage
 
       - name: Build
-        run: pnpm turbo run build --affected
+        run: pnpm turbo run build ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
       - name: Check dependency consistency
         run: pnpm lint:deps
