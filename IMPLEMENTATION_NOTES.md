@@ -311,16 +311,16 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 `.size-limit.json` defines per-package limits:
 
-| Package                                  | Limit |
-| ---------------------------------------- | ----- |
-| @real-router/core                        | 25 kB |
-| @real-router/react                       | 10 kB |
-| @real-router/browser-plugin              | 5 kB  |
-| @real-router/helpers                     | 3 kB  |
-| route-tree                               | 15 kB |
-| search-params                            | 5 kB  |
-| core-types, type-guards                  | 2 kB  |
-| logger-plugin, persistent-params | 3 kB  |
+| Package                            | Limit |
+|------------------------------------| ----- |
+| @real-router/core                  | 25 kB |
+| @real-router/react                 | 10 kB |
+| @real-router/browser-plugin        | 5 kB  |
+| @real-router/helpers               | 3 kB  |
+| route-tree                         | 15 kB |
+| search-params                      | 5 kB  |
+| core-types, type-guards            | 2 kB  |
+| logger-plugin, persistent-params   | 3 kB  |
 
 React package ignores `react` and `react-dom` from size calculation.
 

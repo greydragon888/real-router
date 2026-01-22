@@ -13,7 +13,7 @@
   "globalEnv": ["BENCH_ROUTER"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build", "test"],
+      "dependsOn": ["^build"],
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
