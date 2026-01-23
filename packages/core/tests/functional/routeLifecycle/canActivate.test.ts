@@ -292,9 +292,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
       const [, activateFns] = router.getLifecycleFunctions();
 
-      expectTypeOf(
-        activateFns.get("@@router/UNKNOWN_ROUTE")!,
-      ).toBeFunction();
+      expectTypeOf(activateFns.get("@@router/UNKNOWN_ROUTE")!).toBeFunction();
     });
 
     it("should register guard for nonexistent route without error", () => {

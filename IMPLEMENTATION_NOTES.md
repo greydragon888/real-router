@@ -235,16 +235,16 @@ Cancels in-progress runs when new commit pushed.
 
 **Checks performed:**
 
-| Check                    | Trigger                              | Action          |
-| ------------------------ | ------------------------------------ | --------------- |
-| IMPLEMENTATION_NOTES.md  | Infrastructure files changed         | Warn            |
-| Changeset reminder       | Source files changed, no changeset   | Warn            |
-| PR size                  | >500 lines changed                   | Message/Warn    |
-| PR description           | Empty or short description           | Warn            |
-| Lockfile sync            | package.json changed, no lockfile    | Warn            |
-| Test coverage            | New source files without tests       | Message         |
-| Console statements       | console.log added to source files    | Warn            |
-| PR statistics            | Always                               | Markdown table  |
+| Check                   | Trigger                            | Action         |
+| ----------------------- | ---------------------------------- | -------------- |
+| IMPLEMENTATION_NOTES.md | Infrastructure files changed       | Warn           |
+| Changeset reminder      | Source files changed, no changeset | Warn           |
+| PR size                 | >500 lines changed                 | Message/Warn   |
+| PR description          | Empty or short description         | Warn           |
+| Lockfile sync           | package.json changed, no lockfile  | Warn           |
+| Test coverage           | New source files without tests     | Message        |
+| Console statements      | console.log added to source files  | Warn           |
+| PR statistics           | Always                             | Markdown table |
 
 **Skip checks:** Add `#trivial` to PR title or body.
 
@@ -311,16 +311,16 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 `.size-limit.json` defines per-package limits:
 
-| Package                            | Limit |
-|------------------------------------| ----- |
-| @real-router/core                  | 25 kB |
-| @real-router/react                 | 10 kB |
-| @real-router/browser-plugin        | 5 kB  |
-| @real-router/helpers               | 3 kB  |
-| route-tree                         | 15 kB |
-| search-params                      | 5 kB  |
-| core-types, type-guards            | 2 kB  |
-| logger-plugin, persistent-params   | 3 kB  |
+| Package                          | Limit |
+| -------------------------------- | ----- |
+| @real-router/core                | 25 kB |
+| @real-router/react               | 10 kB |
+| @real-router/browser-plugin      | 5 kB  |
+| @real-router/helpers             | 3 kB  |
+| route-tree                       | 15 kB |
+| search-params                    | 5 kB  |
+| core-types, type-guards          | 2 kB  |
+| logger-plugin, persistent-params | 3 kB  |
 
 React package ignores `react` and `react-dom` from size calculation.
 
@@ -377,11 +377,11 @@ Build only runs after tests pass.
 
 ### Features
 
-| Feature | Description |
-|---------|-------------|
-| **Level filtering** | `all` → `warn-error` → `error-only` → `none` |
+| Feature                 | Description                                           |
+| ----------------------- | ----------------------------------------------------- |
+| **Level filtering**     | `all` → `warn-error` → `error-only` → `none`          |
 | **Safe console access** | Checks `typeof console !== "undefined"` before output |
-| **Callback system** | Custom log handler for any environment |
+| **Callback system**     | Custom log handler for any environment                |
 
 ### Callback Use Cases
 
@@ -424,10 +424,10 @@ Migrated: `@real-router/core`, `@real-router/browser-plugin`, `@real-router/logg
 
 Transition duration with adaptive units:
 
-| Duration | Format | Example |
-|----------|--------|---------|
-| < 0.1ms | Microseconds | `(27.29μs)` |
-| ≥ 0.1ms | Milliseconds | `(15.00ms)` |
+| Duration | Format       | Example     |
+| -------- | ------------ | ----------- |
+| < 0.1ms  | Microseconds | `(27.29μs)` |
+| ≥ 0.1ms  | Milliseconds | `(15.00ms)` |
 
 ### Time Provider
 
@@ -486,3 +486,30 @@ globalThis.performance = performance;
 ```
 
 Forces all packages to use the same @types/node version from root.
+
+### Strict Peer Dependencies
+
+`.npmrc`:
+
+```ini
+auto-install-peers=true
+strict-peer-dependencies=true
+```
+
+**Why this combination:**
+
+| Setting                    | Value | Effect                                                  |
+| -------------------------- | ----- | ------------------------------------------------------- |
+| `auto-install-peers`       | true  | pnpm automatically selects compatible peer dep versions |
+| `strict-peer-dependencies` | true  | Peer dep conflicts = error (not warning)                |
+
+**Why not `auto-install-peers=false`:**
+
+Tried full strict mode but it broke React tests. When manually specifying react/react-dom versions (18.2.0 or 18.3.1), 2 tests failed. pnpm's auto-install-peers resolves complex version compatibility that's hard to replicate manually.
+
+**Issues found and fixed:**
+
+1. **Missing `react-dom` in peerDependencies** — `@real-router/react` had `react` but not `react-dom`
+2. **Hidden dependency on auto-install-peers** — Tests relied on pnpm selecting compatible React versions automatically
+
+**Result:** Peer dep conflicts now fail `pnpm install` instead of being silent warnings.
