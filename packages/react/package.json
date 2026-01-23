@@ -65,9 +65,10 @@
     "vitest-react-profiler": "1.12.0"
   },
   "peerDependencies": {
+    "@real-router/browser-plugin": "workspace:^",
     "@types/react": ">=18.0.0",
     "@types/react-dom": ">=18.0.0",
     "react": ">=18.0.0",
-    "@real-router/browser-plugin": "workspace:^"
+    "react-dom": ">=18.0.0"
   }
 }

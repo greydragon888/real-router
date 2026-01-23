@@ -1,22 +1,33 @@
 name: "CodeQL Config"
 
-# Paths to exclude from analysis
+# Paths to exclude from CodeQL analysis
 paths-ignore:
-  # Tests
-  - "**/tests/**"
-  - "**/*.test.ts"
-  - "**/*.test.tsx"
-  - "**/*.spec.ts"
-  - "**/*.spec.tsx"
-  # Benchmarks
+  # Benchmark tests - contain intentional edge cases and extreme inputs
   - "**/benchmarks/**"
   - "**/*.bench.ts"
-  # Build artifacts
-  - "**/dist/**"
+  - "**/*.bench.js"
+
+  # Test files may also contain intentional security anti-patterns
+  - "**/__tests__/**"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+
+  # Build artifacts and dependencies
   - "**/node_modules/**"
-  - "**/coverage/**"
-  # Config files
-  - "**/*.config.ts"
-  - "**/*.config.mts"
-  - "**/*.config.js"
-  - "**/*.config.mjs"
+  - "**/dist/**"
+  - "**/build/**"
+  - "**/.stryker-tmp/**"
+
+  # Documentation and config
+  - "**/*.md"
+  - "**/*.json"
+
+# Paths to include (optional - by default all non-excluded paths are included)
+paths:
+  - "packages/*/src/**"
+  - "packages/*/index.ts"
+
+# Queries to run
+queries:
+  - uses: security-extended
+  - uses: security-and-quality
