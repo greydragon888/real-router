@@ -7,7 +7,7 @@
 export type LogLevel = "all" | "transitions" | "errors" | "none";
 
 /**
- * Configuration options for the logger plugin.
+ * Configuration options for the logger-plugin.
  */
 export interface LoggerPluginConfig {
   /**
@@ -58,7 +58,7 @@ export interface LoggerPluginConfig {
   showParamsDiff?: boolean;
 
   /**
-   * Custom context name for logger.
+   * Custom context name for console.
    * Useful when running multiple routers.
    *
    * @default 'logger-plugin'
