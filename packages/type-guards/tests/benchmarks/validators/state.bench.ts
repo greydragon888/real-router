@@ -324,7 +324,7 @@ boxplot(() => {
     bench("validateState: system route", () => {
       validateState(
         {
-          name: "@@real-router/UNKNOWN_ROUTE",
+          name: "@@router/UNKNOWN_ROUTE",
           params: {},
           path: "/unknown",
         },

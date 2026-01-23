@@ -33,7 +33,7 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     it("should return raw path for UNKNOWN_ROUTE if path param is string", () => {
-      const path = router.buildPath("@@real-router/UNKNOWN_ROUTE", {
+      const path = router.buildPath("@@router/UNKNOWN_ROUTE", {
         path: "/not-found",
       });
 
@@ -41,7 +41,7 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     it("should return empty string for UNKNOWN_ROUTE if path param is not a string", () => {
-      const path = router.buildPath("@@real-router/UNKNOWN_ROUTE", {
+      const path = router.buildPath("@@router/UNKNOWN_ROUTE", {
         path: 404,
       });
 

@@ -445,7 +445,6 @@ describe("router.start() - arguments validation", () => {
         expect(currentState?.params).toStrictEqual({ id: "456" });
       });
 
-      // Fixed: https://github.com/greydragon888/real-router/issues/42
       // Now correctly validates state objects and returns ROUTE_NOT_FOUND error
       it("should handle start with invalid state object and callback", () => {
         router.setOption("allowNotFound", false);

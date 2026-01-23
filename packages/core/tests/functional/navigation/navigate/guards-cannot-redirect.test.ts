@@ -441,8 +441,7 @@ describe("router.navigate() - guards cannot redirect", () => {
   });
 
   /**
-   * Issue #52: Recursive event listeners execute unintended side-effect listeners
-   * https://github.com/greydragon888/real-router/issues/52
+   * IRecursive event listeners execute unintended side-effect listeners
    *
    * Problem: When a listener triggers navigation (redirect), ALL listeners execute
    * at each recursion level, including side-effect listeners (analytics, logging)

@@ -164,7 +164,7 @@ describe("core/routes/routeTree/hasRoute", () => {
 
     it("should pass validation for system routes (@@)", () => {
       // System routes bypass pattern validation but don't exist
-      expect(router.hasRoute("@@real-router/UNKNOWN_ROUTE")).toBe(false);
+      expect(router.hasRoute("@@router/UNKNOWN_ROUTE")).toBe(false);
       expect(router.hasRoute("@@custom/system")).toBe(false);
     });
 

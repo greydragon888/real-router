@@ -30,8 +30,7 @@ describe("router.start() - lifecycle events", () => {
         expect(startListener).toHaveBeenCalledTimes(1);
       });
 
-      // Issue #50: Two-phase start - ROUTER_START emits AFTER successful transition
-      // See: https://github.com/greydragon888/real-router/issues/50
+      // Issue: Two-phase start - ROUTER_START emits AFTER successful transition
       it("should emit ROUTER_START event after transition succeeds (two-phase start)", () => {
         const startListener = vi.fn();
         const transitionStartListener = vi.fn();

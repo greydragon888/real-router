@@ -287,13 +287,13 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should allow system routes with @@ prefix", () => {
       expect(() => {
-        router.canActivate("@@real-router/UNKNOWN_ROUTE", false);
+        router.canActivate("@@router/UNKNOWN_ROUTE", false);
       }).not.toThrowError();
 
       const [, activateFns] = router.getLifecycleFunctions();
 
       expectTypeOf(
-        activateFns.get("@@real-router/UNKNOWN_ROUTE")!,
+        activateFns.get("@@router/UNKNOWN_ROUTE")!,
       ).toBeFunction();
     });
 
