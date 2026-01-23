@@ -81,8 +81,13 @@ jobs:
           version: pnpm changeset version
           title: "release: version packages"
           commit: "release: version packages"
+          setupGitUser: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME: ${{ github.repository_owner }}
+          GIT_AUTHOR_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
+          GIT_COMMITTER_NAME: ${{ github.repository_owner }}
+          GIT_COMMITTER_EMAIL: ${{ github.repository_owner }}@users.noreply.github.com
 
       # If no changesets, check if there are unpublished versions
       - name: Check for unpublished packages
