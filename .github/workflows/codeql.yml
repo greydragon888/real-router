@@ -47,5 +47,5 @@ jobs:
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: moderate
-          deny-licenses: GPL-3.0, AGPL-3.0
+          config-file: ./.github/dependency-review-config.yml
           comment-summary-in-pr: always
