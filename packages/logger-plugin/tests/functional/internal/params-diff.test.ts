@@ -1,5 +1,4 @@
-import { logger } from "logger";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import {
   getParamsDiff,
@@ -123,7 +122,7 @@ describe("params-diff utilities", () => {
     let logSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      logSpy = vi.spyOn(logger, "log").mockImplementation(noop);
+      logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     });
 
     afterEach(() => {
@@ -140,8 +139,7 @@ describe("params-diff utilities", () => {
       logParamsDiff(diff, "test-context");
 
       expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        '  Changed: { id: "123" → "456" }',
+        '[test-context]  Changed: { id: "123" → "456" }',
       );
     });
 
@@ -155,8 +153,7 @@ describe("params-diff utilities", () => {
       logParamsDiff(diff, "test-context");
 
       expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        '  Added: {"tab":"settings"}',
+        '[test-context]  Added: {"tab":"settings"}',
       );
     });
 
@@ -170,8 +167,7 @@ describe("params-diff utilities", () => {
       logParamsDiff(diff, "test-context");
 
       expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        '  Removed: {"tab":"profile"}',
+        '[test-context]  Removed: {"tab":"profile"}',
       );
     });
 
@@ -185,16 +181,7 @@ describe("params-diff utilities", () => {
       logParamsDiff(diff, "test-context");
 
       expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        expect.stringContaining('Changed: { id: "123" → "456" }'),
-      );
-      expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        expect.stringContaining('Added: {"page":"2"}'),
-      );
-      expect(logSpy).toHaveBeenCalledWith(
-        "test-context",
-        expect.stringContaining('Removed: {"sort":"name"}'),
+        '[test-context]  Changed: { id: "123" → "456" }, Added: {"page":"2"}, Removed: {"sort":"name"}',
       );
     });
 
@@ -210,7 +197,7 @@ describe("params-diff utilities", () => {
 
       logParamsDiff(diff, "test-context");
 
-      const call = logSpy.mock.calls[0][1] as string;
+      const call = logSpy.mock.calls[0][0] as string;
 
       expect(call).toContain('id: "123" → "456"');
       expect(call).toContain('tab: "profile" → "settings"');
@@ -225,7 +212,9 @@ describe("params-diff utilities", () => {
 
       logParamsDiff(diff, "custom-context");
 
-      expect(logSpy).toHaveBeenCalledWith("custom-context", expect.any(String));
+      expect(logSpy).toHaveBeenCalledWith(
+        '[custom-context]  Changed: { id: "1" → "2" }',
+      );
     });
   });
 });

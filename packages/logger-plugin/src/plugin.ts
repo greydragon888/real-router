@@ -1,7 +1,5 @@
 // packages/logger-plugin/modules/plugin.ts
 
-import { logger } from "logger";
-
 import { DEFAULT_CONFIG } from "./constants";
 import {
   createGroupManager,
@@ -16,42 +14,71 @@ import { getParamsDiff, logParamsDiff } from "./internal/params-diff";
 import { createPerformanceTracker } from "./internal/performance-marks";
 import { now } from "./internal/timing";
 
+import type { LoggerPluginConfig, LogLevel } from "./types";
 import type { PluginFactory, RouterError, State } from "@real-router/core";
 
 /**
- * Creates a logger plugin for real-router.
+ * Checks if the given log type should be output based on the configured level.
  *
- * Configuration is managed through the logger singleton.
- * Use `logger.configure()` to customize logging behavior before starting the router.
+ * Level hierarchy:
+ * - 'all': log everything (start, stop, transitions, warnings, errors)
+ * - 'transitions': only transition events (start, success, cancel, error)
+ * - 'errors': only errors
+ * - 'none': nothing
+ */
+const shouldLog = (
+  level: LogLevel,
+  type: "lifecycle" | "transition" | "warning" | "error",
+): boolean => {
+  if (level === "none") {
+    return false;
+  }
+
+  if (level === "errors") {
+    return type === "error";
+  }
+
+  if (level === "transitions") {
+    return type === "transition" || type === "warning" || type === "error";
+  }
+
+  // level === 'all'
+  return true;
+};
+
+/**
+ * Creates a logger-plugin for real-router.
  *
+ * @param options - Plugin configuration options
  * @returns Plugin factory function for real-router
  *
  * @example
  * ```ts
- * import { logger } from "logger";
- * import { loggerPluginFactory } from "real-router-logger-plugin";
+ * import { loggerPluginFactory } from "@real-router/logger-plugin";
  *
- * // Configure logger before using the plugin
- * logger.configure({
- *   level: "transitions",
- *   showTiming: true,
- *   context: "MyApp",
- * });
- *
- * router.usePlugin(loggerPluginFactory());
- * ```
- *
- * @example
- * ```ts
  * // Use with default configuration
  * router.usePlugin(loggerPluginFactory());
+ *
+ * // Use with custom configuration
+ * router.usePlugin(loggerPluginFactory({
+ *   level: 'errors',           // only log errors
+ *   usePerformanceMarks: true, // enable Performance API
+ *   showTiming: false,         // disable timing info
+ *   showParamsDiff: false,     // disable params diff
+ *   context: 'my-router',      // custom context name
+ * }));
  * ```
  */
-export function loggerPluginFactory(): PluginFactory {
-  // eslint-disable-next-line unicorn/consistent-function-scoping -- factory pattern: closure captures config, groups, perf, transitionStartTime
-  return () => {
-    const config = DEFAULT_CONFIG;
+export function loggerPluginFactory(
+  options?: Partial<LoggerPluginConfig>,
+): PluginFactory {
+  // Merge options with defaults
+  const config: Required<LoggerPluginConfig> = {
+    ...DEFAULT_CONFIG,
+    ...options,
+  };
 
+  return () => {
     // Create helper managers
     const groups = createGroupManager(supportsConsoleGroups());
     const perf = createPerformanceTracker(
@@ -66,7 +93,7 @@ export function loggerPluginFactory(): PluginFactory {
      * Logs parameter differences when navigating within the same route.
      */
     const logParamsIfNeeded = (toState: State, fromState?: State): void => {
-      if (!fromState) {
+      if (!config.showParamsDiff || !fromState) {
         return;
       }
 
@@ -82,17 +109,35 @@ export function loggerPluginFactory(): PluginFactory {
       }
     };
 
+    /**
+     * Formats timing string based on config.
+     */
+    const getTiming = (): string => {
+      if (!config.showTiming) {
+        return "";
+      }
+
+      return formatTiming(transitionStartTime, now);
+    };
+
     return {
       onStart() {
         perf.mark("router:start");
-        logger.log(config.context, "Router started");
+
+        if (shouldLog(config.level, "lifecycle")) {
+          console.log(`[${config.context}] Router started`);
+        }
       },
 
       onStop() {
         groups.close();
+
         perf.mark("router:stop");
         perf.measure("router:lifetime", "router:start", "router:stop");
-        logger.log(config.context, "Router stopped");
+
+        if (shouldLog(config.level, "lifecycle")) {
+          console.log(`[${config.context}] Router stopped`);
+        }
       },
 
       onTransitionStart(toState: State, fromState?: State) {
@@ -104,12 +149,18 @@ export function loggerPluginFactory(): PluginFactory {
         const label = createTransitionLabel(fromRoute, toRoute);
 
         perf.mark(`router:transition-start:${label}`);
-        logger.log(config.context, `Transition: ${fromRoute} → ${toRoute}`, {
-          from: fromState,
-          to: toState,
-        });
 
-        logParamsIfNeeded(toState, fromState);
+        if (shouldLog(config.level, "transition")) {
+          console.log(
+            `[${config.context}] Transition: ${fromRoute} → ${toRoute}`,
+            {
+              from: fromState,
+              to: toState,
+            },
+          );
+
+          logParamsIfNeeded(toState, fromState);
+        }
       },
 
       onTransitionSuccess(toState: State, fromState?: State) {
@@ -124,12 +175,14 @@ export function loggerPluginFactory(): PluginFactory {
           `router:transition-end:${label}`,
         );
 
-        const timing = formatTiming(transitionStartTime, now);
+        if (shouldLog(config.level, "transition")) {
+          const timing = getTiming();
 
-        logger.log(config.context, `Transition success${timing}`, {
-          to: toState,
-          from: fromState,
-        });
+          console.log(`[${config.context}] Transition success${timing}`, {
+            to: toState,
+            from: fromState,
+          });
+        }
 
         groups.close();
         transitionStartTime = null;
@@ -147,12 +200,14 @@ export function loggerPluginFactory(): PluginFactory {
           `router:transition-cancel:${label}`,
         );
 
-        const timing = formatTiming(transitionStartTime, now);
+        if (shouldLog(config.level, "warning")) {
+          const timing = getTiming();
 
-        logger.warn(config.context, `Transition cancelled${timing}`, {
-          to: toState,
-          from: fromState,
-        });
+          console.warn(`[${config.context}] Transition cancelled${timing}`, {
+            to: toState,
+            from: fromState,
+          });
+        }
 
         groups.close();
         transitionStartTime = null;
@@ -174,14 +229,19 @@ export function loggerPluginFactory(): PluginFactory {
           `router:transition-error:${label}`,
         );
 
-        const timing = formatTiming(transitionStartTime, now);
+        if (shouldLog(config.level, "error")) {
+          const timing = getTiming();
 
-        logger.error(config.context, `Transition error: ${err.code}${timing}`, {
-          error: err,
-          stack: err.stack,
-          to: toState,
-          from: fromState,
-        });
+          console.error(
+            `[${config.context}] Transition error: ${err.code}${timing}`,
+            {
+              error: err,
+              stack: err.stack,
+              to: toState,
+              from: fromState,
+            },
+          );
+        }
 
         groups.close();
         transitionStartTime = null;
@@ -196,7 +256,7 @@ export function loggerPluginFactory(): PluginFactory {
 }
 
 /**
- * Default logger plugin instance with standard configuration.
+ * Default logger-plugin instance with standard configuration.
  * Provided for backward compatibility with existing code.
  *
  * @example
