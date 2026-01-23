@@ -70,7 +70,7 @@ router.navigate("products", { id: "123" });
 
 **Type Safety:** Options use discriminated union — `hashPrefix` and `preserveHash` are mutually exclusive at compile time.
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#3-configuration-options) for detailed option descriptions and examples.
+See [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-configuration-options) for detailed option descriptions and examples.
 
 ---
 
@@ -83,7 +83,7 @@ Build full URL with base path and hash prefix.\
 `name: string` — route name\
 `params?: Params` — route parameters\
 Returns: `string` — full URL\
-[Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#5-router-interaction)
+[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ```typescript
 const state = router.lastKnownState;
@@ -99,7 +99,7 @@ if (state) {
 Parse URL to router state.\
 `url: string` — URL to parse\
 Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#5-router-interaction)
+[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ```typescript
 router.navigate("page1");
@@ -117,7 +117,7 @@ Update browser URL without triggering navigation.\
 `params?: Params` — route parameters\
 `title?: string` — page title\
 Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#5-router-interaction)
+[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ```typescript
 router.replaceHistoryState("users", { id: "456" });
@@ -126,7 +126,7 @@ router.replaceHistoryState("users", { id: "456" });
 #### `router.lastKnownState: State | undefined`
 Last successful navigation state (readonly).\
 Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#5-router-interaction)
+[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ---
 
@@ -195,13 +195,13 @@ router.matchUrl("/path"); // Returns undefined
 
 ## Documentation
 
-Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin):
+Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin):
 
-- [Configuration Options](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#4-lifecycle-hooks)
-- [Router Methods](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#5-router-interaction)
-- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#8-behavior)
-- [Migration from router5](https://github.com/greydragon888/real-router/wiki/real-router-browser-plugin#11-migration-from-router5)
+- [Configuration Options](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-configuration-options)
+- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/browser-plugin#4-lifecycle-hooks)
+- [Router Methods](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
+- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/browser-plugin#8-behavior)
+- [Migration from router5](https://github.com/greydragon888/real-router/wiki/browser-plugin#11-migration-from-router5)
 
 ---
 

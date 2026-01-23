@@ -21,12 +21,12 @@ bun add @real-router/logger-plugin
 
 ```typescript
 import { createRouter } from "@real-router/core";
-import { loggerPlugin } from "@real-router/logger-plugin";
+import { loggerPluginFactory } from "@real-router/logger-plugin";
 
 const router = createRouter(routes);
 
 // Use with default settings
-router.usePlugin(loggerPlugin);
+router.usePlugin(loggerPluginFactory());
 
 router.start();
 ```
@@ -34,19 +34,36 @@ router.start();
 **Console output:**
 
 ```
-Router started
+[logger-plugin] Router started
 ▼ Router transition
-  Transition: home → users (1.23ms)
-  Transition success (1.23ms)
+  [logger-plugin] Transition: home → users {from: {...}, to: {...}}
+  [logger-plugin] Transition success (1.23ms) {to: {...}, from: {...}}
 ```
 
 ---
 
 ## API
 
+### `loggerPluginFactory(options?)`
+
+Factory for creating a plugin instance with optional configuration.
+
+```typescript
+import { loggerPluginFactory } from "@real-router/logger-plugin";
+
+// Default configuration
+router.usePlugin(loggerPluginFactory());
+
+// With custom options
+router.usePlugin(loggerPluginFactory({
+  level: "errors",
+  showTiming: false,
+}));
+```
+
 ### `loggerPlugin`
 
-Ready-to-use plugin instance with default settings.
+Ready-to-use plugin instance with default settings. Provided for backward compatibility.
 
 ```typescript
 import { loggerPlugin } from "@real-router/logger-plugin";
@@ -54,29 +71,47 @@ import { loggerPlugin } from "@real-router/logger-plugin";
 router.usePlugin(loggerPlugin);
 ```
 
-### `loggerPluginFactory()`
-
-Factory for creating a new plugin instance.
-
-```typescript
-import { loggerPluginFactory } from "@real-router/logger-plugin";
-
-router.usePlugin(loggerPluginFactory());
-```
-
 ---
 
 ## Configuration
 
-| Option                | Type       | Default                        | Description                                          |
-| --------------------- | ---------- | ------------------------------ | ---------------------------------------------------- |
-| `level`               | `LogLevel` | `"all"`                        | `"all"` \| `"transitions"` \| `"errors"` \| `"none"` |
-| `showTiming`          | `boolean`  | `true`                         | Show transition execution time (μs/ms)               |
-| `showParamsDiff`      | `boolean`  | `true`                         | Show param changes within same route                 |
-| `usePerformanceMarks` | `boolean`  | `false`                        | Create Performance API marks for DevTools            |
-| `context`             | `string`   | `"@real-router/logger-plugin"` | Log prefix for multiple routers                      |
+| Option                | Type       | Default           | Description                                          |
+| --------------------- | ---------- | ----------------- | ---------------------------------------------------- |
+| `level`               | `LogLevel` | `"all"`           | `"all"` \| `"transitions"` \| `"errors"` \| `"none"` |
+| `showTiming`          | `boolean`  | `true`            | Show transition execution time (μs/ms)               |
+| `showParamsDiff`      | `boolean`  | `true`            | Show param changes within same route                 |
+| `usePerformanceMarks` | `boolean`  | `false`           | Create Performance API marks for DevTools            |
+| `context`             | `string`   | `"logger-plugin"` | Log prefix for multiple routers                      |
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#3-configuration-options) for detailed descriptions.
+### Configuration Examples
+
+```typescript
+// With custom context for multiple routers
+router.usePlugin(loggerPluginFactory({
+  context: "main-router",
+}));
+
+// Performance profiling enabled
+router.usePlugin(loggerPluginFactory({
+  usePerformanceMarks: true,
+  showTiming: true,
+}));
+
+// Errors only (for production-like environments)
+router.usePlugin(loggerPluginFactory({
+  level: "errors",
+  showTiming: false,
+}));
+
+// Minimal output
+router.usePlugin(loggerPluginFactory({
+  level: "transitions",
+  showParamsDiff: false,
+  showTiming: false,
+}));
+```
+
+See [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin#3-configuration-options) for detailed descriptions.
 
 ---
 
@@ -85,8 +120,8 @@ See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-logger-
 ### Timing Display
 
 ```
-Transition success (15ms)      // normal
-Transition success (27.29μs)   // fast (<0.1ms)
+[logger-plugin] Transition success (15ms)      // normal
+[logger-plugin] Transition success (27.29μs)   // fast (<0.1ms)
 ```
 
 ### Parameter Diff
@@ -95,9 +130,9 @@ When navigating within the same route:
 
 ```
 ▼ Router transition
-  Transition: users.view → users.view
-  Changed: { id: "123" → "456" }, Added: {"sort":"name"}
-  Transition success (2.15ms)
+  [logger-plugin] Transition: users.view → users.view {from: {...}, to: {...}}
+  [logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
+  [logger-plugin] Transition success (2.15ms) {to: {...}, from: {...}}
 ```
 
 ### Performance API
@@ -108,7 +143,7 @@ With `usePerformanceMarks: true`, creates marks visible in DevTools Performance 
 - `router:transition-end:{from}→{to}`
 - `router:transition:{from}→{to}` (measure)
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#10-performance-marks-and-measures) for full list.
+See [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin#10-performance-marks-and-measures) for full list.
 
 ---
 
@@ -128,12 +163,12 @@ if (typeof globalThis.performance === "undefined") {
 
 ## Documentation
 
-Full documentation on [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin):
+Full documentation on [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin):
 
-- [Configuration Options](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#4-lifecycle-hooks)
-- [Performance Marks](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#10-performance-marks-and-measures)
-- [Migration from router5](https://github.com/greydragon888/real-router/wiki/real-router-logger-plugin#13-migration-from-router5)
+- [Configuration Options](https://github.com/greydragon888/real-router/wiki/logger-plugin#3-configuration-options)
+- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/logger-plugin#4-lifecycle-hooks)
+- [Performance Marks](https://github.com/greydragon888/real-router/wiki/logger-plugin#10-performance-marks-and-measures)
+- [Migration from router5](https://github.com/greydragon888/real-router/wiki/logger-plugin#13-migration-from-router5)
 
 ---
 

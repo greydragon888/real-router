@@ -1,5 +1,4 @@
-import { logger } from "logger";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import {
   supportsPerformanceAPI,
@@ -60,19 +59,16 @@ describe("performance-marks utilities", () => {
   });
 
   describe("createPerformanceTracker", () => {
-    // @ts-expect-error - SpyInstance type inference issue with beforeEach initialization
-    let markSpy: vi.SpyInstance;
-    // @ts-expect-error - SpyInstance type inference issue with beforeEach initialization
-    let measureSpy: vi.SpyInstance;
-    // @ts-expect-error - SpyInstance type inference issue with beforeEach initialization
-    let warnSpy: vi.SpyInstance;
+    let markSpy: ReturnType<typeof vi.spyOn>;
+    let measureSpy: ReturnType<typeof vi.spyOn>;
+    let warnSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       markSpy = vi.spyOn(performance, "mark").mockImplementation(noop as any);
       measureSpy = vi
         .spyOn(performance, "measure")
         .mockImplementation(noop as any);
-      warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
+      warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
     });
 
     afterEach(() => {
@@ -112,8 +108,7 @@ describe("performance-marks utilities", () => {
         }).not.toThrowError();
 
         expect(warnSpy).toHaveBeenCalledWith(
-          TEST_CONTEXT,
-          "Failed to create performance measure: test",
+          `[${TEST_CONTEXT}] Failed to create performance measure: test`,
           expect.any(Error),
         );
       });
@@ -205,8 +200,7 @@ describe("performance-marks utilities", () => {
         tracker.measure("test", "start", "end");
 
         expect(warnSpy).toHaveBeenCalledWith(
-          "custom-context",
-          expect.any(String),
+          expect.stringContaining("[custom-context]"),
           expect.any(Error),
         );
       });

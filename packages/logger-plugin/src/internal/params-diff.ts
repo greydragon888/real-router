@@ -1,7 +1,5 @@
 // packages/logger-plugin/modules/internal/params-diff.ts
 
-import { logger } from "logger";
-
 import type { Params } from "@real-router/core";
 
 export interface ParamsDiff {
@@ -63,7 +61,7 @@ export const getParamsDiff = (
  * Formats and logs parameter differences.
  *
  * @param diff - Object with differences
- * @param context - Context for logger
+ * @param context - Context for console
  */
 export const logParamsDiff = (diff: ParamsDiff, context: string): void => {
   const parts: string[] = [];
@@ -93,5 +91,5 @@ export const logParamsDiff = (diff: ParamsDiff, context: string): void => {
     parts.push(`Removed: ${JSON.stringify(diff.removed)}`);
   }
 
-  logger.log(context, `  ${parts.join(", ")}`);
+  console.log(`[${context}]  ${parts.join(", ")}`);
 };

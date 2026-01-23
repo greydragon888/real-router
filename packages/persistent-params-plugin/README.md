@@ -65,7 +65,7 @@ router.start();
 
 **Allowed value types:** `string`, `number`, `boolean`, `undefined` (to remove)
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#3-configuration-options) for details.
+See [Wiki](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#3-configuration-options) for details.
 
 ---
 
@@ -99,7 +99,7 @@ Explicit values override saved ones:
 router.navigate("page", { lang: "de" }); // URL: /page?lang=de
 ```
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#8-behavior) for edge cases and guarantees.
+See [Wiki](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#8-behavior) for edge cases and guarantees.
 
 ---
 
@@ -144,12 +144,12 @@ unsubscribe();
 
 ## Documentation
 
-Full documentation on [Wiki](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin):
+Full documentation on [Wiki](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin):
 
-- [Configuration Options](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#4-lifecycle-hooks)
-- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#8-behavior)
-- [Migration from router5](https://github.com/greydragon888/real-router/wiki/real-router-persistent-params-plugin#11-migration-from-router5)
+- [Configuration Options](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#3-configuration-options)
+- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#4-lifecycle-hooks)
+- [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#8-behavior)
+- [Migration from router5](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin#11-migration-from-router5)
 
 ---
 

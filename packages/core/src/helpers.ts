@@ -18,7 +18,8 @@ export { getTypeDescription } from "type-guards";
  * @internal
  */
 function isState(value: unknown): value is State {
-  if (typeof value !== "object" || value === null) {
+  // Check null first to avoid type narrowing issues (typeof null === "object" in JS)
+  if (value === null || typeof value !== "object") {
     return false;
   }
 

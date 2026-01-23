@@ -446,9 +446,8 @@ export function getTransitionPath(
   const toActivate = toStateIds.slice(i);
 
   // Determine intersection point (common ancestor)
-  const intersection =
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    fromState && i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION;
+  // Note: fromState is guaranteed to be defined here (early return on line 366)
+  const intersection = i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION;
 
   return {
     intersection,

@@ -1,7 +1,5 @@
 // packages/logger-plugin/modules/internal/performance-marks.ts
 
-import { logger } from "logger";
-
 /**
  * Checks if Performance API is supported in the current environment.
  */
@@ -59,9 +57,8 @@ export const createPerformanceTracker = (
       try {
         performance.measure(measureName, startMark, endMark);
       } catch (error) {
-        logger.warn(
-          context,
-          `Failed to create performance measure: ${measureName}`,
+        console.warn(
+          `[${context}] Failed to create performance measure: ${measureName}`,
           error,
         );
       }
