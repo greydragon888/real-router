@@ -696,8 +696,7 @@ describe("router.start() - error handling", () => {
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
 
-      // Issue #50: Two-phase start - Router is NOT started if transition fails
-      // See: https://github.com/greydragon888/real-router/issues/50
+      // Two-phase start - Router is NOT started if transition fails
       it("should NOT start router when transition fails (two-phase start)", () => {
         const navigateToStateSpy = vi.spyOn(router, "navigateToState");
 

@@ -1,20 +1,9 @@
 # @real-router/helpers
 
-[![npm version](https://badge.fury.io/js/@real-router%2Fhelpers.svg)](https://www.npmjs.com/package/@real-router/helpers)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-> High-performance route segment testing utilities for Real-Router
-
-## Overview
-
-`@real-router/helpers` provides efficient utilities for testing route name segments in Real-Router applications. These helpers are essential for:
-
-- Conditional rendering based on route hierarchy
-- Active navigation menu items
-- Breadcrumb construction
-- Route-based access guards
-- UI component visibility logic
+Route segment testing utilities for Real-Router. Useful for navigation menus, breadcrumbs, conditional rendering, and route guards.
 
 ## Installation
 
@@ -38,247 +27,113 @@ import {
   areRoutesRelated,
 } from "@real-router/helpers";
 
-// Check if route starts with segment
-startsWithSegment("users.profile.edit", "users"); // true
-startsWithSegment("admin.dashboard", "users"); // false
-
-// Check if route ends with segment
-endsWithSegment("users.profile.edit", "edit"); // true
-endsWithSegment("users.profile.edit", "view"); // false
-
-// Check if route includes segment anywhere
-includesSegment("users.profile.edit", "profile"); // true
-includesSegment("users.profile.edit", "admin"); // false
-
-// Check if routes are related (parent-child or same)
-areRoutesRelated("users", "users.list"); // true
-areRoutesRelated("users", "admin"); // false
+startsWithSegment("users.profile.edit", "users");     // true
+endsWithSegment("users.profile.edit", "edit");        // true
+includesSegment("users.profile.edit", "profile");     // true
+areRoutesRelated("users", "users.profile");           // true
 ```
 
-## API Reference
+---
 
-### `startsWithSegment(route, segment?)`
+## API
 
-Tests if a route name starts with the given segment.
+### `startsWithSegment(route: State | string, segment?: string | null): boolean | ((segment: string) => boolean)`
 
-**Parameters:**
-
-- `route: State | string` - Route state object or route name string
-- `segment?: string | null` - Segment to test (optional for curried form)
-
-**Returns:**
-
-- `boolean` - True if route starts with segment
-- `(segment: string) => boolean` - Tester function if segment omitted
-- `false` - If segment is null or empty string
-
-**Examples:**
+Tests if route name starts with segment.\
+`route: State | string` — route state object or route name string\
+`segment?: string | null` — segment to test (optional for curried form)\
+Returns: `boolean` (true if starts with segment, false if segment is null/empty) or `(segment: string) => boolean` (tester function if segment omitted)
 
 ```typescript
 // Direct usage
-startsWithSegment("users.list", "users"); // true
-startsWithSegment("users.list", "admin"); // false
-
-// Multi-segment matching
-startsWithSegment("users.profile.edit", "users.profile"); // true
+startsWithSegment("users.list", "users");           // true
+startsWithSegment("users.profile", "users.profile"); // true (multi-segment)
 
 // With State object
-const state = { name: "users.list", params: {}, path: "/users" };
-startsWithSegment(state, "users"); // true
+startsWithSegment({ name: "users.list", params: {}, path: "/" }, "users"); // true
 
 // Curried form
 const tester = startsWithSegment("users.profile.edit");
-tester("users"); // true
-tester("admin"); // false
-
-// Edge cases
-startsWithSegment("users", ""); // false
-startsWithSegment("users", null); // false
+tester("users");  // true
+tester("admin");  // false
 ```
 
-**Use Cases:**
+### `endsWithSegment(route: State | string, segment?: string | null): boolean | ((segment: string) => boolean)`
+
+Tests if route name ends with segment.\
+`route: State | string` — route state object or route name string\
+`segment?: string | null` — segment to test (optional for curried form)\
+Returns: `boolean` (true if ends with segment, false if segment is null/empty) or `(segment: string) => boolean` (tester function if segment omitted)
 
 ```typescript
-// Active navigation menu
-const isAdminSection = startsWithSegment(currentRoute, 'admin');
-
-// Conditional rendering
-{startsWithSegment(route, 'users') && <UsersToolbar />}
-
-// Access guards
-if (!startsWithSegment(route, 'admin')) {
-  throw new UnauthorizedError();
-}
-```
-
----
-
-### `endsWithSegment(route, segment?)`
-
-Tests if a route name ends with the given segment.
-
-**Parameters:**
-
-- `route: State | string` - Route state object or route name string
-- `segment?: string | null` - Segment to test (optional for curried form)
-
-**Returns:**
-
-- `boolean` - True if route ends with segment
-- `(segment: string) => boolean` - Tester function if segment omitted
-- `false` - If segment is null or empty string
-
-**Examples:**
-
-```typescript
-// Direct usage
-endsWithSegment("users.profile.edit", "edit"); // true
-endsWithSegment("users.profile.edit", "view"); // false
-
-// Multi-segment matching
-endsWithSegment("a.b.c.d", "c.d"); // true
+endsWithSegment("users.profile.edit", "edit");  // true
+endsWithSegment("a.b.c.d", "c.d");               // true (multi-segment)
 
 // Curried form
 const tester = endsWithSegment("users.list");
-tester("list"); // true
-tester("edit"); // false
+tester("list");  // true
 ```
 
-**Use Cases:**
+### `includesSegment(route: State | string, segment?: string | null): boolean | ((segment: string) => boolean)`
+
+Tests if route name includes segment anywhere.\
+`route: State | string` — route state object or route name string\
+`segment?: string | null` — segment to test (optional for curried form)\
+Returns: `boolean` (true if includes segment, false if segment is null/empty) or `(segment: string) => boolean` (tester function if segment omitted)
 
 ```typescript
-// Detect edit pages
-const isEditPage = endsWithSegment(route, 'edit');
-
-// Page type detection
-const pageType = ['view', 'edit', 'create'].find(
-  type => endsWithSegment(route, type)
-);
-
-// Conditional toolbar
-{endsWithSegment(route, 'edit') && <EditToolbar />}
-```
-
----
-
-### `includesSegment(route, segment?)`
-
-Tests if a route name includes the given segment anywhere in its path.
-
-**Parameters:**
-
-- `route: State | string` - Route state object or route name string
-- `segment?: string | null` - Segment to test (optional for curried form)
-
-**Returns:**
-
-- `boolean` - True if route includes segment
-- `(segment: string) => boolean` - Tester function if segment omitted
-- `false` - If segment is null or empty string
-
-**Examples:**
-
-```typescript
-// Direct usage
-includesSegment("admin.users.profile", "users"); // true
-includesSegment("admin.users.profile", "profile"); // true
-includesSegment("admin.users.profile", "settings"); // false
-
-// Multi-segment matching (contiguous)
-includesSegment("a.b.c.d", "b.c"); // true
-includesSegment("a.b.c.d", "a.c"); // false (not contiguous)
+includesSegment("admin.users.profile", "users");    // true
+includesSegment("a.b.c.d", "b.c");                   // true (contiguous)
+includesSegment("a.b.c.d", "a.c");                   // false (not contiguous)
 
 // Curried form
 const tester = includesSegment("admin.users.profile");
-tester("users"); // true
-tester("settings"); // false
+tester("users");     // true
+tester("settings");  // false
 ```
 
-**Use Cases:**
+### `areRoutesRelated(route1: string, route2: string): boolean`
+
+Tests if routes are in same hierarchy (parent-child, child-parent, or same).\
+`route1: string` — first route name\
+`route2: string` — second route name\
+Returns: `boolean` — true if routes are related (same, parent-child, or child-parent)
 
 ```typescript
-// Check if anywhere in users section
-const inUsersSection = includesSegment(route, "users");
-
-// Feature detection
-const hasProfileFeature = includesSegment(route, "profile");
-
-// Analytics tracking
-if (includesSegment(route, "checkout")) {
-  analytics.track("checkout_flow");
-}
-```
-
----
-
-### `areRoutesRelated(route1, route2)`
-
-Tests if two routes are related in the hierarchy (same, parent-child, or child-parent).
-
-**Parameters:**
-
-- `route1: string` - First route name
-- `route2: string` - Second route name
-
-**Returns:**
-
-- `boolean` - True if routes are related
-
-**Examples:**
-
-```typescript
-// Same route
-areRoutesRelated("users", "users"); // true
-
 // Parent-child relationship
-areRoutesRelated("users", "users.list"); // true
+areRoutesRelated("users", "users.list");       // true
 areRoutesRelated("users", "users.profile.edit"); // true
 
 // Child-parent relationship
-areRoutesRelated("users.list", "users"); // true
+areRoutesRelated("users.list", "users");       // true
 areRoutesRelated("users.profile.edit", "users"); // true
 
-// Different branches (not related)
-areRoutesRelated("users", "admin"); // false
-areRoutesRelated("users.list", "admin.dashboard"); // false
+// Same route
+areRoutesRelated("users", "users");            // true
 
 // Siblings (not related)
-areRoutesRelated("users.list", "users.view"); // false
-areRoutesRelated("users.profile", "users.settings"); // false
-```
+areRoutesRelated("users.list", "users.view");  // false
 
-**Use Cases:**
-
-```typescript
-// Optimized re-rendering (only update when route is related)
-const shouldUpdate = areRoutesRelated(newRoute, watchedRoute);
-
-// Navigation menu highlighting
-const isInSection = areRoutesRelated(currentRoute, "admin");
-
-// Breadcrumb visibility
-const showBreadcrumb = areRoutesRelated(currentRoute, basePath);
+// Different branches (not related)
+areRoutesRelated("users", "admin");            // false
 ```
 
 ---
 
-## Real-World Examples
+## Usage Examples
 
-### Active Navigation Menu
+### Navigation Menu
 
-```typescript
-import { startsWithSegment } from '@real-router/helpers';
-
+```tsx
 function NavigationMenu({ currentRoute }) {
-  const menuItems = [
-    { name: 'Dashboard', route: 'dashboard' },
-    { name: 'Users', route: 'users' },
-    { name: 'Settings', route: 'settings' },
+  const items = [
+    { name: "Dashboard", route: "dashboard" },
+    { name: "Users", route: "users" },
   ];
 
   return (
     <nav>
-      {menuItems.map(item => (
+      {items.map((item) => (
         <MenuItem
           key={item.route}
           active={startsWithSegment(currentRoute, item.route)}
@@ -291,44 +146,11 @@ function NavigationMenu({ currentRoute }) {
 }
 ```
 
-### Breadcrumbs
+### Route Guard
 
 ```typescript
-import { startsWithSegment } from '@real-router/helpers';
-
-function Breadcrumbs({ currentRoute }) {
-  const segments = currentRoute.split('.');
-  const breadcrumbs = segments.reduce((acc, segment, index) => {
-    const path = segments.slice(0, index + 1).join('.');
-    return [...acc, {
-      path,
-      label: segment,
-      isActive: path === currentRoute,
-    }];
-  }, []);
-
-  return (
-    <nav>
-      {breadcrumbs.map(crumb => (
-        <Breadcrumb
-          key={crumb.path}
-          active={crumb.isActive}
-        >
-          {crumb.label}
-        </Breadcrumb>
-      ))}
-    </nav>
-  );
-}
-```
-
-### Route Guards
-
-```typescript
-import { startsWithSegment } from "@real-router/helpers";
-
 const adminGuard = (router) => (toState, fromState, done) => {
-  if (startsWithSegment(toState, "admin") && !userHasAdminRole()) {
+  if (startsWithSegment(toState, "admin") && !isAdmin()) {
     done({ redirect: { name: "unauthorized" } });
   } else {
     done();
@@ -340,235 +162,61 @@ router.useMiddleware(adminGuard);
 
 ### Conditional Rendering
 
-```typescript
-import { startsWithSegment, includesSegment, endsWithSegment } from '@real-router/helpers';
-
-function PageLayout({ route, children }) {
+```tsx
+function Layout({ route, children }) {
   return (
     <div>
-      {/* Show admin sidebar only in admin section */}
-      {startsWithSegment(route, 'admin') && <AdminSidebar />}
-
-      {/* Show edit toolbar on edit pages */}
-      {endsWithSegment(route, 'edit') && <EditToolbar />}
-
-      {/* Show user profile widget in user-related pages */}
-      {includesSegment(route, 'users') && <UserProfileWidget />}
-
+      {startsWithSegment(route, "admin") && <AdminSidebar />}
+      {endsWithSegment(route, "edit") && <EditToolbar />}
       <main>{children}</main>
     </div>
   );
 }
 ```
 
-### Analytics Tracking
-
-```typescript
-import { startsWithSegment, includesSegment } from "@real-router/helpers";
-
-router.subscribe((state) => {
-  const routeName = state.route.name;
-
-  // Track section
-  if (startsWithSegment(routeName, "admin")) {
-    analytics.track("admin_section_view");
-  }
-
-  // Track feature usage
-  if (includesSegment(routeName, "checkout")) {
-    analytics.track("checkout_flow_step", {
-      step: routeName.split(".").pop(),
-    });
-  }
-});
-```
-
 ---
 
-## Validation & Security
+## Validation
 
-### Automatic Validation
+Segments are validated for security:
 
-All segment inputs are automatically validated for security and correctness:
-
-**Character Whitelist:**
-
-- Allowed: `a-z`, `A-Z`, `0-9`, `.` (dot), `-` (dash), `_` (underscore)
-- Disallowed: Special characters, spaces, slashes, etc.
-
-**Length Limits:**
-
-- Maximum segment length: 10,000 characters
-- Empty segments are rejected
-
-**Examples:**
+- **Allowed:** `a-z`, `A-Z`, `0-9`, `.`, `-`, `_`
+- **Max length:** 10,000 characters
+- **Empty/null:** Returns `false`
+- **Invalid chars:** Throws `TypeError`
 
 ```typescript
-// Valid segments
-startsWithSegment("route", "users"); // OK
-startsWithSegment("route", "admin-panel"); // OK
-startsWithSegment("route", "users_v2"); // OK
-startsWithSegment("route", "app.settings"); // OK
-
-// Invalid segments (throw TypeError)
-startsWithSegment("route", "invalid!char"); // Throws
-startsWithSegment("route", "has space"); // Throws
-startsWithSegment("route", "path/segment"); // Throws
-startsWithSegment("route", "ns:segment"); // Throws
-
-// Too long (throw RangeError)
-startsWithSegment("route", "a".repeat(10001)); // Throws
-
-// Empty (returns false)
-startsWithSegment("route", ""); // false
-startsWithSegment("route", null); // false
+startsWithSegment("route", "valid-segment_v2");  // OK
+startsWithSegment("route", "invalid!char");       // Throws TypeError
+startsWithSegment("route", "");                   // false
 ```
-
-### Error Handling
-
-```typescript
-try {
-  startsWithSegment("route", "invalid!segment");
-} catch (error) {
-  if (error instanceof TypeError) {
-    console.error("Invalid segment:", error.message);
-    // "Segment contains invalid characters. Allowed: a-z, A-Z, 0-9, dot (.), dash (-), underscore (_)"
-  }
-}
-
-try {
-  startsWithSegment("route", "a".repeat(10001));
-} catch (error) {
-  if (error instanceof RangeError) {
-    console.error("Segment too long:", error.message);
-    // "Segment exceeds maximum length of 10000 characters"
-  }
-}
-```
-
----
-
-## TypeScript Support
-
-Full TypeScript support with type definitions included.
-
-```typescript
-import type { State } from "@real-router/core";
-import { startsWithSegment } from "@real-router/helpers";
-
-// Type inference works correctly
-const result: boolean = startsWithSegment("route", "segment");
-
-// Curried form also typed
-const tester: (segment: string) => boolean = startsWithSegment("route");
-
-// Works with State objects
-const state: State = { name: "route", params: {}, path: "/route" };
-const matches: boolean = startsWithSegment(state, "segment");
-```
-
-### Type Definitions
-
-```typescript
-export interface SegmentTestFunction {
-  (route: State | string): (segment: string) => boolean;
-  (route: State | string, segment: string): boolean;
-  (route: State | string, segment: null): false;
-  (
-    route: State | string,
-    segment?: string | null,
-  ): boolean | ((segment: string) => boolean);
-}
-```
-
----
-
-## Documentation
-
-Full documentation available on the [Real-Router Wiki](https://github.com/greydragon888/real-router/wiki):
-
-- [startsWithSegment](https://github.com/greydragon888/real-router/wiki/startsWithSegment)
-- [endsWithSegment](https://github.com/greydragon888/real-router/wiki/endsWithSegment)
-- [includesSegment](https://github.com/greydragon888/real-router/wiki/includesSegment)
-- [areRoutesRelated](https://github.com/greydragon888/real-router/wiki/areRoutesRelated)
-
----
-
-## Related Packages
-
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) - Core router
-- [@real-router/react](https://www.npmjs.com/package/@real-router/react) - React integration
-- [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) - Browser integration
 
 ---
 
 ## Migration from router5-helpers
 
-### Import Changes
-
-```diff
-- import { startsWithSegment, endsWithSegment, includesSegment } from 'router5-helpers';
-+ import { startsWithSegment, endsWithSegment, includesSegment } from '@real-router/helpers';
-```
-
-### Removed: `redirect`
-
-The `redirect` helper has been removed. Use router guards instead:
-
-```diff
-- import { redirect } from 'router5-helpers';
--
-- router.canActivate('protected', () => redirect('login'));
-+ router.canActivate('protected', (toState, fromState, done) => {
-+   done({ redirect: { name: 'login' } });
-+ });
-```
-
-### New: `areRoutesRelated`
-
-New helper function for checking route hierarchy:
-
-```typescript
-import { areRoutesRelated } from "@real-router/helpers";
-
-areRoutesRelated("users", "users.profile"); // true (parent-child)
-areRoutesRelated("users.profile", "users"); // true (child-parent)
-areRoutesRelated("users", "admin"); // false (different branches)
-```
-
-### New: Input Validation
-
-@real-router/helpers validates segment inputs for security:
-
-```typescript
-// Valid segments
-startsWithSegment("route", "users");
-startsWithSegment("route", "admin-panel");
-
-// Throws TypeError (invalid characters)
-startsWithSegment("route", "invalid!char");
-startsWithSegment("route", "has space");
-```
-
-### Full Migration Example
-
 ```diff
 - import { startsWithSegment, redirect } from 'router5-helpers';
 + import { startsWithSegment } from '@real-router/helpers';
 
-  // Segment testing - unchanged
-  if (startsWithSegment(route, 'admin')) {
-    // ...
-  }
+// Segment testing — unchanged
+startsWithSegment(route, 'admin');
 
-  // Redirects - use guards instead
-- router.canActivate('old-page', () => redirect('new-page'));
-+ router.canActivate('old-page', (toState, fromState, done) => {
-+   done({ redirect: { name: 'new-page' } });
+// redirect removed — use guards:
+- router.canActivate('old', () => redirect('new'));
++ router.canActivate('old', (to, from, done) => {
++   done({ redirect: { name: 'new' } });
 + });
 ```
 
+**New:** `areRoutesRelated()` for hierarchy checks.
+
 ---
+
+## Related Packages
+
+- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
+- [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
 
 ## License
 

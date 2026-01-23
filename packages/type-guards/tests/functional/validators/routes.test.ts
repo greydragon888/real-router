@@ -92,7 +92,7 @@ describe("Route Validators", () => {
     describe("System routes (@@prefix)", () => {
       it("should bypass validation for system routes", () => {
         const systemRoutes = [
-          "@@real-router/UNKNOWN_ROUTE",
+          "@@router/UNKNOWN_ROUTE",
           "@@system/internal",
           "@@..invalid..normally",
           "@@123-starts-with-number",

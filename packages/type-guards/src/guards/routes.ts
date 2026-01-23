@@ -28,7 +28,7 @@ import {
  * isRouteName("users.profile");           // true
  * isRouteName("admin_panel");             // true
  * isRouteName("api-v2");                  // true
- * isRouteName("@@real-router/UNKNOWN_ROUTE"); // true (system route)
+ * isRouteName("@@router/UNKNOWN_ROUTE"); // true (system route)
  *
  * @example
  * // Invalid names

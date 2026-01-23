@@ -405,7 +405,6 @@ describe("router.start() - state object scenarios", () => {
 
     describe("invalid state object initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
-      // https://github.com/greydragon888/real-router/issues/42
       it("should return ROUTE_NOT_FOUND error for non-existent route name", () => {
         router.setOption("allowNotFound", false);
 
@@ -435,7 +434,6 @@ describe("router.start() - state object scenarios", () => {
       });
 
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
-      // https://github.com/greydragon888/real-router/issues/42
       it("should return ROUTE_NOT_FOUND error for completely invalid route name", () => {
         router.setOption("allowNotFound", false);
 
@@ -508,8 +506,7 @@ describe("router.start() - state object scenarios", () => {
         expect(router.getState()).toBeUndefined();
       });
 
-      // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
-      // https://github.com/greydragon888/real-router/issues/42
+      // Fix for issue: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error when params have invalid type", () => {
         router.setOption("allowNotFound", false);
 

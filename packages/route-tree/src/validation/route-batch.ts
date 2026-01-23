@@ -194,7 +194,7 @@ function validateRouteName(
     );
   }
 
-  // System routes bypass pattern validation (e.g., @@real-router/UNKNOWN_ROUTE)
+  // System routes bypass pattern validation (e.g., @@router/UNKNOWN_ROUTE)
   if (name.startsWith("@@")) {
     return;
   }

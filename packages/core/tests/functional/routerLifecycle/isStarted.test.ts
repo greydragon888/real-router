@@ -239,7 +239,6 @@ describe("isStarted", () => {
       router.start("/users", callback);
 
       // Two-phase start: Router is NOT started if transition fails
-      // See: https://github.com/greydragon888/real-router/issues/50
       expect(router.isStarted()).toBe(false);
       expect(callback).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -327,7 +326,6 @@ describe("isStarted", () => {
         middlewareSpy();
 
         // Two-phase start: isStarted() is false during transition
-        // See: https://github.com/greydragon888/real-router/issues/50
         expect(router.isStarted()).toBe(false);
 
         done();

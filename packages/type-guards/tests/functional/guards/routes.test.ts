@@ -37,7 +37,7 @@ describe("Route Type Guards", () => {
       });
 
       it("accepts system routes starting with @@", () => {
-        expect(isRouteName("@@real-router/UNKNOWN_ROUTE")).toBe(true);
+        expect(isRouteName("@@router/UNKNOWN_ROUTE")).toBe(true);
         expect(isRouteName("@@system")).toBe(true);
       });
     });
