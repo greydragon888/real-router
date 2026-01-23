@@ -198,6 +198,7 @@ jobs:
             const baseSizes = JSON.parse(`${{ steps.base_sizes.outputs.sizes }}` || '[]');
 
             const formatBytes = (bytes) => {
+              if (bytes == null || isNaN(bytes)) return '—';
               if (bytes === 0) return '0 B';
               const k = 1024;
               const sizes = ['B', 'KB', 'MB'];
@@ -206,7 +207,8 @@ jobs:
             };
 
             const formatDiff = (pr, base) => {
-              if (!base) return 'new';
+              if (pr == null || isNaN(pr)) return '—';
+              if (!base || isNaN(base)) return 'new';
               const diff = pr - base;
               const percent = base > 0 ? ((diff / base) * 100).toFixed(1) : 0;
               if (diff === 0) return '0';
@@ -225,16 +227,16 @@ jobs:
             let hasChanges = false;
 
             for (const item of prSizes) {
-              const prSize = item.size;
-              const baseSize = baseMap.get(item.name) || 0;
-              totalPr += prSize;
-              totalBase += baseSize;
+              const prSize = item.size ?? 0;
+              const baseSize = baseMap.get(item.name) ?? 0;
+              totalPr += isNaN(prSize) ? 0 : prSize;
+              totalBase += isNaN(baseSize) ? 0 : baseSize;
 
-              const diff = prSize - baseSize;
+              const diff = (isNaN(prSize) ? 0 : prSize) - (isNaN(baseSize) ? 0 : baseSize);
               if (diff !== 0) hasChanges = true;
 
-              const status = item.passed === false ? 'X' : 'OK';
-              rows.push(`| ${status} ${item.name} | ${formatBytes(prSize)} | ${formatBytes(baseSize)} | ${formatDiff(prSize, baseSize)} |`);
+              const status = item.passed === false ? '❌' : '✅';
+              rows.push(`| ${status} ${item.name} | ${formatBytes(item.size)} | ${formatBytes(baseMap.get(item.name))} | ${formatDiff(item.size, baseMap.get(item.name))} |`);
             }
 
             let body = `## Bundle Size Report\n\n`;
