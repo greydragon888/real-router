@@ -55,9 +55,11 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "route-tree": "workspace:^",
+    "@real-router/logger": "workspace:^"
+  },
+  "devDependencies": {
     "core-types": "workspace:^",
-    "type-guards": "workspace:^",
-    "logger": "workspace:^"
+    "route-tree": "workspace:^",
+    "type-guards": "workspace:^"
   }
 }

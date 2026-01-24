@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/dependencies.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 import { getTypeDescription } from "../helpers";
 

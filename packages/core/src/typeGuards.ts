@@ -3,7 +3,7 @@
 /**
  * Re-export common type guards from centralized type-guards package
  */
-import type { LoggerConfig, LogLevelConfig } from "logger";
+import type { LoggerConfig, LogLevelConfig } from "@real-router/logger";
 
 export {
   isObjKey,

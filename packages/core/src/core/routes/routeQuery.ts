@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/routes/routeQuery.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { routeTreeToDefinitions } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 

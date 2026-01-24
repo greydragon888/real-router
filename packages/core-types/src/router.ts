@@ -17,7 +17,7 @@ import type {
   QueryParamsOptions,
   RouteTreeState,
 } from "./route-node-types";
-import type { LoggerConfig } from "logger";
+import type { LoggerConfig } from "@real-router/logger";
 
 /**
  * Extended build result that includes segments for path building.

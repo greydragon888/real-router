@@ -1,4 +1,4 @@
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { createRouteTree, matchSegments } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 

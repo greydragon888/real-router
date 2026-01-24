@@ -71,6 +71,12 @@
       "outputs": [],
       "inputs": ["dist/**", "package.json"],
       "cache": true
+    },
+    "build:dts": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**/*.ts"],
+      "outputs": ["dist/**/*.d.ts", "dist/**/*.d.mts"],
+      "cache": true
     }
   }
 }

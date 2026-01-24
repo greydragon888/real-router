@@ -1,6 +1,6 @@
 // packages/real-router/modules/createRouter.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 import { CONFIG_SYMBOL } from "./constants";
 import { withDependencies } from "./core/dependencies";

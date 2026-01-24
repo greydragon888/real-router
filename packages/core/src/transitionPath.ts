@@ -1,6 +1,6 @@
 // packages/real-router/modules/transitionPath.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { validateState } from "type-guards";
 
 import type { Params, State } from "core-types";

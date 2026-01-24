@@ -51,7 +51,9 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/core": "workspace:^",
+    "@real-router/core": "workspace:^"
+  },
+  "devDependencies": {
     "type-guards": "workspace:^"
   }
 }

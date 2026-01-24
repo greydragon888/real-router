@@ -1,7 +1,7 @@
 import { test } from "@fast-check/vitest";
 import { describe, beforeEach, afterEach, expect } from "vitest";
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 import {
   contextArbitrary,

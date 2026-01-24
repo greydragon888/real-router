@@ -9,7 +9,6 @@
         "scripts/*.{sh,mjs,ts}",
         "*.mts",
         "cz.config.js",
-        "dangerfile.ts",
         ".changeset/*.md"
       ],
       "project": ["*.{ts,mts,js,mjs}"],
@@ -28,12 +27,13 @@
   "ignoreWorkspaces": [],
   "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
   "ignoreDependencies": [
-    "logger",
+    "@real-router/logger",
     "core-types",
     "@real-router/logger-plugin",
     "@real-router/persistent-params-plugin",
     "@stryker-mutator/api",
-    "jsdom"
+    "jsdom",
+    "dts-bundle-generator"
   ],
   "ignoreBinaries": ["tree", "tsx", "open"],
   "ignoreExportsUsedInFile": true

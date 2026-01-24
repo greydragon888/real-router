@@ -11,7 +11,7 @@
 
 import { bench, boxplot, summary } from "mitata";
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 // Suppress console output for benchmarks
 console.log = () => {};

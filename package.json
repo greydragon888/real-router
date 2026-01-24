@@ -4,7 +4,8 @@
   "type": "module",
   "description": "A real router. Just routing, nothing else.",
   "scripts": {
-    "build": "turbo run build",
+    "build": "turbo run build && turbo run build:dts",
+    "build:dts": "node scripts/generate-dts.mjs",
     "test": "turbo run test",
     "test:coverage": "turbo run test -- --coverage",
     "test:mutation": "stryker run",

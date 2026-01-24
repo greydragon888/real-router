@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/navigation.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { getTypeDescription, isNavigationOptions } from "type-guards";
 
 import { events, errorCodes, constants, RouterError } from "@real-router/core";

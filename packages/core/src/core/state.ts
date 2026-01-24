@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/state.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { getSegmentsByName } from "route-tree";
 import {
   isNavigationOptions,

@@ -39,5 +39,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ --fix"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/logger": "workspace:^"
+  }
 }

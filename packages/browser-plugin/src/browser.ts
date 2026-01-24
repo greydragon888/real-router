@@ -1,6 +1,6 @@
 // packages/browser-plugin/modules/browser.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isHistoryState } from "type-guards";
 
 import { LOGGER_CONTEXT } from "./constants";

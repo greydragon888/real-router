@@ -54,6 +54,6 @@
   "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^",
-    "logger": "workspace:^"
+    "@real-router/logger": "workspace:^"
   }
 }
