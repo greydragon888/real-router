@@ -31,17 +31,12 @@
     "limit": "5 kB"
   },
   {
-    "name": "core-types (ESM)",
-    "path": "packages/core-types/dist/esm/index.mjs",
-    "limit": "2 kB"
-  },
-  {
     "name": "type-guards (ESM)",
     "path": "packages/type-guards/dist/esm/index.mjs",
     "limit": "2 kB"
   },
   {
-    "name": "logger (ESM)",
+    "name": "@real-router/logger (ESM)",
     "path": "packages/logger/dist/esm/index.mjs",
     "limit": "3 kB"
   },
