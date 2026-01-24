@@ -94,6 +94,46 @@ jobs:
             fi
           done
 
+      - name: Replace workspace:^ with actual versions
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          echo "Replacing workspace:^ with version $VERSION in all package.json files..."
+
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              echo "Processing $name..."
+
+              # Replace workspace:^ in dependencies, devDependencies, and peerDependencies
+              PKG_PATH="./${dir}package.json" NEW_VERSION="^${VERSION}" node -e '
+                const fs = require("fs");
+                const pkgPath = process.env.PKG_PATH;
+                const newVersion = process.env.NEW_VERSION;
+                const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+                let modified = false;
+
+                for (const depType of ["dependencies", "devDependencies", "peerDependencies"]) {
+                  if (pkg[depType]) {
+                    for (const [dep, version] of Object.entries(pkg[depType])) {
+                      if (version === "workspace:^" || version === "workspace:*") {
+                        pkg[depType][dep] = newVersion;
+                        modified = true;
+                        console.log("  " + depType + "." + dep + ": " + version + " -> " + newVersion);
+                      }
+                    }
+                  }
+                }
+
+                if (modified) {
+                  fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+                  console.log("  ✓ Updated " + pkgPath);
+                } else {
+                  console.log("  No workspace: protocols found");
+                }
+              '
+            fi
+          done
+
       - name: Verify packages
         run: |
           for dir in packages/*/; do
