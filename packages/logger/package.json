@@ -1,6 +1,6 @@
 {
   "name": "@real-router/logger",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "commonjs",
   "description": "Isomorphic logger for Real-Router with level filtering and custom callbacks",
   "main": "./dist/cjs/index.js",
@@ -30,9 +30,7 @@
   "keywords": [
     "logger",
     "logging",
-    "isomorphic",
-    "router",
-    "real-router"
+    "isomorphic"
   ],
   "author": {
     "name": "Oleg Ivanov",
