@@ -1,5 +1,15 @@
 # @real-router/core
 
+## 0.2.1
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
 ## 0.2.0
 
 ### Minor Changes
