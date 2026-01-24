@@ -63,6 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
   - @real-router/core@0.2.0
 
+### @real-router/browser-plugin@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - type-guards@0.1.0
+  - @real-router/core@0.1.0
+
 ### @real-router/core@0.2.0
 
 ### Minor Changes
@@ -103,6 +115,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   **@real-router/logger-plugin:**
   - Use internal logger instead of direct console output
+
+### @real-router/core@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - type-guards@0.1.0
+  - core-types@0.1.0
+  - route-tree@0.1.0
+
+### @real-router/helpers@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+
+### @real-router/helpers@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @real-router/core@0.1.0
+
+### @real-router/logger-plugin@0.2.1
+
+### Patch Changes
+
+- [#15](https://github.com/greydragon888/real-router/pull/15) [`b83baf1`](https://github.com/greydragon888/real-router/commit/b83baf12f6a4d3e067d1c561ce72195fe9b3bd48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix logger-plugin configuration options being ignored
+  - Replace `logger` singleton with direct `console` calls to make plugin logs independent of router configuration
+  - Enable `loggerPluginFactory(options)` to accept configuration parameter
+  - Implement `level` option filtering (`all`, `transitions`, `errors`, `none`)
+  - Implement `showParamsDiff` option to control parameter diff logging
+  - Implement `showTiming` option to control timing information display
 
 ### @real-router/logger-plugin@0.2.0
 
@@ -193,6 +247,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
   - @real-router/core@0.2.0
+
+### @real-router/logger-plugin@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - logger@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/persistent-params-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+
+### @real-router/persistent-params-plugin@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - type-guards@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/react@1.0.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @real-router/browser-plugin@0.1.0
+  - @real-router/helpers@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/react@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+  - @real-router/browser-plugin@0.1.1
+  - @real-router/helpers@0.1.1
 
 ## [0.0.1] - 2025-01-20
 
