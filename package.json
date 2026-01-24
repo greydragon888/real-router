@@ -24,7 +24,7 @@
     "size": "size-limit",
     "commit": "czg",
     "changeset": "changeset",
-    "version": "changeset version && node -e \"const v=require('./packages/core/package.json').version;const p=JSON.parse(require('fs').readFileSync('package.json'));p.version=v;require('fs').writeFileSync('package.json',JSON.stringify(p,null,2)+'\\n');\"",
+    "version": "changeset version && node .changeset/sync-version.mjs && node .changeset/aggregate-changelog.mjs",
     "release": "pnpm build && changeset publish",
     "danger:local": "danger local --dangerfile dangerfile.ts"
   },

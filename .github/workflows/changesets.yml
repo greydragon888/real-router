@@ -170,33 +170,67 @@ jobs:
             fi
           done
 
-      # Create GitHub release for the published version
-      - name: Get release version and notes
+      # Create GitHub releases for each published package
+      - name: Create GitHub Releases
         if: steps.unpublished.outputs.has_unpublished == 'true'
-        id: release_version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get version from core package (main package)
-          VERSION=$(node -p "require('./packages/core/package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          RELEASES_CREATED=""
 
-          # Extract release notes for current version from CHANGELOG
-          # Takes content between first ## heading and next ## heading (or EOF)
-          NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' packages/core/CHANGELOG.md)
+          for dir in packages/*/; do
+            if [ -f "$dir/package.json" ]; then
+              name=$(node -p "require('./${dir}package.json').name")
+              version=$(node -p "require('./${dir}package.json').version")
+              private=$(node -p "require('./${dir}package.json').private || false")
 
-          # Handle multi-line output for GitHub Actions
-          echo "notes<<EOF" >> $GITHUB_OUTPUT
-          echo "$NOTES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+              if [ "$private" = "true" ]; then
+                continue
+              fi
 
-      - name: Create GitHub Release
-        if: steps.unpublished.outputs.has_unpublished == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.release_version.outputs.version }}
-          name: v${{ steps.release_version.outputs.version }}
-          body: ${{ steps.release_version.outputs.notes }}
-          draft: false
-          prerelease: ${{ contains(steps.release_version.outputs.version, '-') }}
+              # Check if this version was just published (compare with npm)
+              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+
+              if [ "$version" = "$npm_version" ]; then
+                # Extract package directory name for CHANGELOG path
+                pkg_dir=$(basename "$dir")
+                changelog_path="${dir}CHANGELOG.md"
+                tag="${name}@${version}"
+
+                # Check if release already exists
+                if gh release view "$tag" > /dev/null 2>&1; then
+                  echo "⏭️ Release $tag already exists, skipping"
+                  continue
+                fi
+
+                # Extract release notes from CHANGELOG (content between first ## and second ##)
+                if [ -f "$changelog_path" ]; then
+                  NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog_path")
+                else
+                  NOTES="Release ${version}"
+                fi
+
+                # Determine if prerelease
+                PRERELEASE_FLAG=""
+                if echo "$version" | grep -q "-"; then
+                  PRERELEASE_FLAG="--prerelease"
+                fi
+
+                echo "🏷️ Creating release: $tag"
+                gh release create "$tag" \
+                  --title "$name@$version" \
+                  --notes "$NOTES" \
+                  $PRERELEASE_FLAG
+
+                RELEASES_CREATED="$RELEASES_CREATED $tag"
+                echo "✅ Created release: $tag"
+              fi
+            fi
+          done
+
+          if [ -n "$RELEASES_CREATED" ]; then
+            echo "RELEASES_CREATED=$RELEASES_CREATED" >> $GITHUB_ENV
+          fi
 
       - name: Summary
         run: |
@@ -207,7 +241,9 @@ jobs:
             echo "📝 Release PR created/updated" >> $GITHUB_STEP_SUMMARY
           elif [ "${{ steps.unpublished.outputs.has_unpublished }}" = "true" ]; then
             echo "📦 Published packages:${{ steps.unpublished.outputs.packages }}" >> $GITHUB_STEP_SUMMARY
-            echo "🏷️ Created release: v${{ steps.release_version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+            if [ -n "$RELEASES_CREATED" ]; then
+              echo "🏷️ Created releases:$RELEASES_CREATED" >> $GITHUB_STEP_SUMMARY
+            fi
           else
             echo "✅ All packages are up to date" >> $GITHUB_STEP_SUMMARY
           fi
