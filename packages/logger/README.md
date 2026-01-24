@@ -1,49 +1,109 @@
-# logger
+# @real-router/logger
 
-Internal logging utility for Real-Router packages. Provides centralized logging with configurable output levels and custom handlers.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-**⚠️ Internal Use Only:** This package is designed for use within the Real-Router monorepo.
+Isomorphic logger for Real-Router with level filtering and custom callbacks. Works in browsers, Node.js, and any JavaScript runtime.
 
-## Features
+## Installation
 
-- **Level filtering**: Control which messages are output (`all`, `warn-error`, `error-only`, `none`)
-- **Custom callbacks**: Route logs to external services or replace console
-- **Flexible callback control**: Option to bypass level filtering for monitoring
-- **TypeScript**: Full type safety
+```bash
+npm install @real-router/logger
+# or
+pnpm add @real-router/logger
+# or
+yarn add @real-router/logger
+# or
+bun add @real-router/logger
+```
+
+## Quick Start
+
+```typescript
+import { logger } from "@real-router/logger";
+
+// Basic logging
+logger.log("App", "Application started");
+logger.warn("Auth", "Token expires in 5 minutes");
+logger.error("API", "Request failed", error);
+
+// Configure log level
+logger.configure({ level: "error-only" });
+```
+
+---
 
 ## API
 
-### Exports
+### `logger.log(context: string, message: string, ...args: unknown[]): void`
+
+Logs an informational message.\
+`context: string` — source identifier (e.g., "Router", "Auth")\
+`message: string` — log message\
+`...args: unknown[]` — additional data to log
 
 ```typescript
-// Singleton logger instance
-import { logger } from "logger";
+logger.log("Router", "Navigation started");
+logger.log("API", "Response received", { status: 200, data });
+```
 
-// Constants (for advanced use cases)
-import { LOG_LEVELS, LEVEL_CONFIGS } from "logger";
+### `logger.warn(context: string, message: string, ...args: unknown[]): void`
 
-// Types
+Logs a warning message.\
+`context: string` — source identifier\
+`message: string` — warning message\
+`...args: unknown[]` — additional data to log
+
+```typescript
+logger.warn("Router", "Deprecated route used", { route: "old-users" });
+```
+
+### `logger.error(context: string, message: string, ...args: unknown[]): void`
+
+Logs an error message.\
+`context: string` — source identifier\
+`message: string` — error message\
+`...args: unknown[]` — additional data to log
+
+```typescript
+logger.error("Router", "Navigation failed", error);
+```
+
+### `logger.configure(config: Partial<LoggerConfig>): void`
+
+Updates logger configuration.\
+`config: Partial<LoggerConfig>` — configuration options
+
+```typescript
+logger.configure({
+  level: "warn-error",
+  callback: (level, context, message, ...args) => {
+    Sentry.captureMessage(`[${context}] ${message}`);
+  },
+});
+```
+
+### `logger.getConfig(): LoggerConfig`
+
+Returns current logger configuration.
+
+```typescript
+const config = logger.getConfig();
+console.log(config.level); // "all"
+```
+
+---
+
+## Types
+
+```typescript
 import type {
   LogLevel,
   LogLevelConfig,
   LogCallback,
   LoggerConfig,
-} from "logger";
-```
+} from "@real-router/logger";
 
-### Methods
-
-```typescript
-logger.log(context: string, message: string, ...args: unknown[]): void
-logger.warn(context: string, message: string, ...args: unknown[]): void
-logger.error(context: string, message: string, ...args: unknown[]): void
-logger.configure(config: Partial<LoggerConfig>): void
-logger.getConfig(): LoggerConfig
-```
-
-### Types
-
-```typescript
 type LogLevel = "log" | "warn" | "error";
 type LogLevelConfig = "all" | "warn-error" | "error-only" | "none";
 
@@ -57,138 +117,136 @@ type LogCallback = (
 interface LoggerConfig {
   level: LogLevelConfig;
   callback?: LogCallback;
-  callbackIgnoresLevel?: boolean; // When true, callback bypasses level filter
+  callbackIgnoresLevel?: boolean;
 }
 ```
 
-### Constants
+---
+
+## Log Levels
+
+| Level          | Description                          |
+| -------------- | ------------------------------------ |
+| `"all"`        | Show all messages (log, warn, error) |
+| `"warn-error"` | Show warnings and errors only        |
+| `"error-only"` | Show errors only                     |
+| `"none"`       | Disable console output               |
 
 ```typescript
-// Numeric mapping for log severity levels (log: 0, warn: 1, error: 2)
-const LOG_LEVELS: Record<LogLevel, number>;
+// Development: show everything
+logger.configure({ level: "all" });
 
-// Numeric thresholds for config levels (all: 0, warn-error: 1, error-only: 2, none: 3)
-const LEVEL_CONFIGS: Record<LogLevelConfig, number>;
+// Production: errors only
+logger.configure({ level: "error-only" });
+
+// Silent mode with callback
+logger.configure({
+  level: "none",
+  callbackIgnoresLevel: true,
+  callback: (level, context, message) => {
+    externalLogger.send({ level, context, message });
+  },
+});
 ```
+
+---
+
+## Usage Examples
+
+### Error Tracking Integration
+
+```typescript
+import { logger } from "@real-router/logger";
+import * as Sentry from "@sentry/browser";
+
+logger.configure({
+  level: "warn-error",
+  callback: (level, context, message, ...args) => {
+    if (level === "error") {
+      Sentry.captureMessage(`[${context}] ${message}`, {
+        level: "error",
+        extra: { args },
+      });
+    }
+  },
+});
+```
+
+### Custom Console (React Native, Electron)
+
+```typescript
+logger.configure({
+  level: "none",
+  callbackIgnoresLevel: true,
+  callback: (level, context, message, ...args) => {
+    NativeModules.Logger[level](`[${context}] ${message}`, args);
+  },
+});
+```
+
+### Debug Library Integration
+
+```typescript
+import debug from "debug";
+
+logger.configure({
+  level: "none",
+  callbackIgnoresLevel: true,
+  callback: (level, context, message, ...args) => {
+    debug(`app:${context}:${level}`)(message, ...args);
+  },
+});
+```
+
+### Metrics Collection
+
+```typescript
+const metrics = { log: 0, warn: 0, error: 0 };
+
+logger.configure({
+  level: "error-only", // Console shows errors only
+  callbackIgnoresLevel: true, // Callback gets everything
+  callback: (level) => {
+    metrics[level]++;
+  },
+});
+```
+
+---
 
 ## Callback Behavior
 
-The `callbackIgnoresLevel` option controls when your callback is invoked:
+The `callbackIgnoresLevel` option controls callback invocation:
 
-- `callbackIgnoresLevel: false` (default): Callback respects level filter
-- `callbackIgnoresLevel: true`: Callback receives all messages regardless of level
+| Setting           | Behavior                                           |
+| ----------------- | -------------------------------------------------- |
+| `false` (default) | Callback respects level filter                     |
+| `true`            | Callback receives all messages regardless of level |
 
-This allows scenarios like:
+This enables scenarios like:
 
 - Disabling console but keeping error tracking
 - Collecting metrics for all logs while showing only errors
 - Using alternative logging libraries
 
-## Usage in Router
+---
 
-### Basic Logging
+## Context Convention
 
-```typescript
-logger.log("Router", "Navigation started");
-logger.warn("router.usePlugin", "51 plugins registered!");
-logger.error("Router.Navigation", "Failed to navigate", error);
-```
+Recommended context naming:
 
-### Context Convention
+- `"Router"` — General router messages
+- `"Router.Module"` — Module-specific (e.g., `"Router.Navigation"`)
+- `"router.method"` — Method-specific (e.g., `"router.usePlugin"`)
+- `"App"` — Application-level messages
+- `"Auth"`, `"API"`, etc. — Feature-specific contexts
 
-- `'Router'` - General router messages
-- `'Router.Module'` - Module-specific (e.g., `'Router.Navigation'`)
-- `'router.method'` - Method-specific (e.g., `'router.usePlugin'`)
+---
 
-## User Configuration
+## Related Packages
 
-Router users can configure logging through router options:
+- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
 
-### Basic Level Control
+## License
 
-```typescript
-const router = createRouter(routes, {
-  logger: {
-    level: "error-only", // Only show errors in production
-  },
-});
-```
-
-### Error Tracking Integration
-
-```typescript
-const router = createRouter(routes, {
-  logger: {
-    level: "warn-error",
-    callback: (level, context, message, ...args) => {
-      if (level === "error") {
-        Sentry.captureMessage(`[${context}] ${message}`, "error");
-      }
-    },
-  },
-});
-```
-
-### Custom Console Implementation
-
-Replace standard console in environments without it or when using alternative logging:
-
-```typescript
-// Using debug library
-const debug = require("debug");
-const router = createRouter(routes, {
-  logger: {
-    level: "none", // Disable standard console
-    callbackIgnoresLevel: true, // Always call callback
-    callback: (level, context, message, ...args) => {
-      const formatted = context ? `[${context}] ${message}` : message;
-      debug(`router:${level}`)(formatted, ...args);
-    },
-  },
-});
-```
-
-```typescript
-// Platform-specific logging (React Native, Electron)
-const router = createRouter(routes, {
-  logger: {
-    level: "none",
-    callbackIgnoresLevel: true,
-    callback: (level, context, message, ...args) => {
-      NativeModules.Logger[level](`[${context}] ${message}`, args);
-    },
-  },
-});
-```
-
-### Advanced: Monitoring + Filtering
-
-```typescript
-const router = createRouter(routes, {
-  logger: {
-    level: "all", // Show all in console
-    callbackIgnoresLevel: true, // But callback gets everything
-    callback: (level, context, message, ...args) => {
-      // Always collect metrics
-      metrics[level]++;
-
-      // Only send errors to monitoring
-      if (level === "error") {
-        errorTracker.capture({ context, message, args });
-      }
-
-      // Filter out known non-critical warnings
-      if (context === "Router.Deprecated" && level === "warn") {
-        return; // Don't track deprecation warnings
-      }
-    },
-  },
-});
-```
-
-## Development
-
-```bash
-pnpm test        # Run tests
-pnpm run build   # Build package
-```
+MIT © [Oleg Ivanov](https://github.com/greydragon888)

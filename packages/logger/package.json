@@ -1,7 +1,8 @@
 {
-  "name": "logger",
-  "version": "0.1.0",
-  "private": true,
+  "name": "@real-router/logger",
+  "version": "0.2.0",
+  "type": "commonjs",
+  "description": "Isomorphic logger for Real-Router with level filtering and custom callbacks",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
@@ -18,10 +19,19 @@
   "files": [
     "dist"
   ],
+  "homepage": "https://github.com/greydragon888/real-router",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/greydragon888/real-router.git"
   },
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "keywords": [
+    "logger",
+    "logging",
+    "isomorphic"
+  ],
   "author": {
     "name": "Oleg Ivanov",
     "email": "greydragon888@gmail.com",

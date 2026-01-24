@@ -1,4 +1,4 @@
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { describe, it, expect, vi } from "vitest";
 
 import { executeMiddleware } from "../../../src/transition/executeMiddleware";

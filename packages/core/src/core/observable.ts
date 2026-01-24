@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/observable.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isNavigationOptions, isState } from "type-guards";
 
 import { events, RouterError } from "@real-router/core";

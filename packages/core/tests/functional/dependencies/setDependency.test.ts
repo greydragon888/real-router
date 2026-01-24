@@ -1,4 +1,4 @@
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";

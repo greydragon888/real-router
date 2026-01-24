@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/plugins.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isObjKey } from "type-guards";
 
 import { events as EVENTS_CONST, plugins as PLUGINS_CONST } from "../constants";

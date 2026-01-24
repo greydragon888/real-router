@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/routeLifecycle.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isBoolean, validateRouteName } from "type-guards";
 
 import { getTypeDescription } from "../helpers";
