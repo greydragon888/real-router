@@ -19,23 +19,14 @@ const PACKAGES_DIR = join(ROOT_DIR, "packages");
 const ROOT_CHANGELOG = join(ROOT_DIR, "CHANGELOG.md");
 
 /**
- * Check if content has meaningful changes (not just dependency updates or initial release boilerplate)
+ * Check if content has any changes (excludes empty sections)
  */
 function hasMeaningfulChanges(content) {
   // Remove headers like "### Patch Changes", "### Minor Changes", etc.
   const withoutHeaders = content.replace(/^###?\s+\w+\s+Changes?\s*$/gm, "");
 
-  // Remove "Updated dependencies" lines and their sub-items (both @scoped and unscoped packages)
-  const withoutDepUpdates = withoutHeaders
-    .replace(/^-\s+Updated dependencies.*$/gm, "")
-    .replace(/^\s+-\s+@?[\w/-]+@[\d.]+\s*$/gm, "");
-
-  // Remove initial release boilerplate
-  const withoutBoilerplate = withoutDepUpdates
-    .replace(/^-\s+Initial public release.*$/gm, "");
-
-  // Check if there's any meaningful content left (non-empty lines that aren't just whitespace)
-  const meaningfulLines = withoutBoilerplate
+  // Check if there's any content left (non-empty lines that aren't just whitespace)
+  const meaningfulLines = withoutHeaders
     .split("\n")
     .filter((line) => line.trim() !== "");
 

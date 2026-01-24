@@ -49,16 +49,23 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 ## [2026-01-24]
 
 ### @real-router/core@0.2.0
+### Minor Changes
 - Feature X
 
-### @real-router/logger-plugin@0.2.1
-- Fix configuration options
+### @real-router/helpers@0.1.1
+### Patch Changes
+- Updated dependencies
 ```
 
+**Features:**
 - Runs after `changeset version`
-- Only includes public packages
-- Uses date-based sections
-- Idempotent (skips if date section exists)
+- Only includes public packages (skips private)
+- Includes ALL versions: initial releases, patches, dependency updates
+- Incremental — only adds new entries (checks existing `### package@version`)
+- Sorted by package name (alphabetical), then version (descending)
+- Uses date-based sections (`## [YYYY-MM-DD]`)
+
+**Script:** `.changeset/aggregate-changelog.mjs`
 
 ### Private Packages Versioning
 
