@@ -60,4 +60,5 @@ packages/**/.eslintcache
 
 # Local scripts and tools
 scripts/
+!scripts/generate-dts.mjs
 tools/
