@@ -31,10 +31,34 @@ Each package has its own version. NOT using `fixed` mode in changesets (where al
 Root `package.json` version is synced from `@real-router/core`:
 
 ```bash
-pnpm version  # runs changeset version + sync script
+pnpm version  # runs changeset version + sync + changelog aggregation
 ```
 
-This is cosmetic only - root package is private and never published.
+Scripts executed:
+1. `changeset version` — updates package versions and changelogs
+2. `.changeset/sync-version.mjs` — syncs root package.json version from core
+3. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
+
+Root package is private and never published (cosmetic only).
+
+### Changelog Aggregation
+
+Root `CHANGELOG.md` is auto-populated from package changelogs:
+
+```markdown
+## [2026-01-24]
+
+### @real-router/core@0.2.0
+- Feature X
+
+### @real-router/logger-plugin@0.2.1
+- Fix configuration options
+```
+
+- Runs after `changeset version`
+- Only includes public packages
+- Uses date-based sections
+- Idempotent (skips if date section exists)
 
 ### Private Packages Versioning
 
@@ -69,12 +93,12 @@ This is cosmetic only - root package is private and never published.
 - Requires Node.js 24+ (npm >= 11.5.1)
 - First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
 
-**Release Notes:**
-Extracted from `packages/core/CHANGELOG.md` (not auto-generated):
+**GitHub Releases:**
+Per-package releases — each published package gets its own GitHub release:
 
-```bash
-awk '/^## /{if(found) exit; found=1; next} found{print}' packages/core/CHANGELOG.md
-```
+- Tag format: `{package-name}@{version}` (e.g., `@real-router/core@0.2.0`)
+- Release notes extracted from each package's `CHANGELOG.md`
+- Skips if release already exists (idempotent)
 
 ### SonarCloud Version
 
