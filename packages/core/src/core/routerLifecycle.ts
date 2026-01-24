@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/routerLifecycle.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isState } from "type-guards";
 
 import { errorCodes, events, RouterError } from "@real-router/core";

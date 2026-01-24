@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/routes/routeTree.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import {
   createRouteTree,
   getSegmentsByName,

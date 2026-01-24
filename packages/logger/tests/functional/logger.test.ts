@@ -1,8 +1,8 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
-import type { LogCallback, LogLevelConfig } from "logger";
+import type { LogCallback, LogLevelConfig } from "@real-router/logger";
 
 const noop = () => {};
 

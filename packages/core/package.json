@@ -1,6 +1,6 @@
 {
   "name": "@real-router/core",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "commonjs",
   "description": "A simple, powerful, view-agnostic, modular and extensible router",
   "main": "./dist/cjs/index.js",
@@ -55,9 +55,11 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "route-tree": "workspace:^",
+    "@real-router/logger": "workspace:^"
+  },
+  "devDependencies": {
     "core-types": "workspace:^",
-    "type-guards": "workspace:^",
-    "logger": "workspace:^"
+    "route-tree": "workspace:^",
+    "type-guards": "workspace:^"
   }
 }

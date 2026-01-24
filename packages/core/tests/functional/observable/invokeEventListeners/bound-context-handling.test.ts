@@ -1,4 +1,4 @@
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";

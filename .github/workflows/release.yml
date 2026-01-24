@@ -162,17 +162,40 @@ jobs:
           echo "npm version: $(npm --version)"
           echo "node version: $(node --version)"
 
-      - name: Publish all packages to NPM
+      - name: Publish @real-router/logger first
+        run: |
+          cd packages/logger
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          private=$(node -p "require('./package.json').private || false")
+
+          if [ "$private" = "true" ]; then
+            echo "⏭️ Skipping $name (private package)"
+          elif npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "⏭️ Skipping $name@${version} (already published)"
+          else
+            echo "📦 Publishing $name@${version} FIRST (other packages depend on it)..."
+            npm publish --provenance --access public --registry https://registry.npmjs.org
+          fi
+          cd ../..
+
+      - name: Publish remaining packages to NPM
         run: |
           for dir in packages/*/; do
             if [ -f "$dir/package.json" ]; then
               name=$(node -p "require('./${dir}package.json').name")
+              version=$(node -p "require('./${dir}package.json').version")
               private=$(node -p "require('./${dir}package.json').private || false")
 
-              if [ "$private" = "true" ]; then
+              # Skip logger (already published in previous step) and private packages
+              if [ "$name" = "@real-router/logger" ]; then
+                echo "⏭️ Skipping $name (handled in previous step)"
+              elif [ "$private" = "true" ]; then
                 echo "⏭️ Skipping $name (private package)"
+              elif npm view "${name}@${version}" version >/dev/null 2>&1; then
+                echo "⏭️ Skipping $name@${version} (already published)"
               else
-                echo "📦 Publishing $name..."
+                echo "📦 Publishing $name@${version}..."
                 cd "$dir"
                 npm publish --provenance --access public --registry https://registry.npmjs.org
                 cd ../..

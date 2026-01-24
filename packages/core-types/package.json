@@ -1,6 +1,6 @@
 {
   "name": "core-types",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Shared TypeScript types for Real-Router ecosystem",
   "types": "./dist/esm/index.d.mts",
@@ -39,5 +39,8 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ --fix"
   },
-  "sideEffects": false
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/logger": "workspace:^"
+  }
 }

@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/routes/routeConfig.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { getSegmentsByName } from "route-tree";
 import { isParams, getTypeDescription } from "type-guards";
 

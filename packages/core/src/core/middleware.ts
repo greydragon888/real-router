@@ -1,6 +1,6 @@
 // packages/real-router/modules/core/middleware.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 import { getTypeDescription } from "../helpers";
 

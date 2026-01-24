@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, beforeEach, expect } from "vitest";
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 
 import {
   callbackArbitrary,
@@ -9,7 +9,7 @@ import {
   LOG_LEVEL_CONFIGS,
 } from "./helpers";
 
-import type { LogLevelConfig } from "logger";
+import type { LogLevelConfig } from "@real-router/logger";
 
 describe("Logger Configuration Properties", () => {
   beforeEach(() => {

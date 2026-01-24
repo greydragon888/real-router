@@ -1,8 +1,15 @@
 import { fc } from "@fast-check/vitest";
 
-import { LEVEL_CONFIGS, LOG_LEVELS as LOG_LEVELS_MAP } from "logger";
+import {
+  LEVEL_CONFIGS,
+  LOG_LEVELS as LOG_LEVELS_MAP,
+} from "@real-router/logger";
 
-import type { LogCallback, LogLevel, LogLevelConfig } from "logger";
+import type {
+  LogCallback,
+  LogLevel,
+  LogLevelConfig,
+} from "@real-router/logger";
 
 // ============================================================================
 // Constants
