@@ -3,10 +3,10 @@
 /**
  * Aggregates package changelogs into root CHANGELOG.md
  *
- * Reads the latest version section from each package's CHANGELOG.md
- * and adds them to the root CHANGELOG.md under the [Unreleased] section.
+ * Reads ALL version sections from each package's CHANGELOG.md
+ * and adds new ones to the root CHANGELOG.md under today's date section.
  *
- * Run: node scripts/aggregate-changelog.mjs
+ * Run: node .changeset/aggregate-changelog.mjs
  */
 
 import { readFileSync, writeFileSync, readdirSync, existsSync } from "fs";
@@ -19,19 +19,23 @@ const PACKAGES_DIR = join(ROOT_DIR, "packages");
 const ROOT_CHANGELOG = join(ROOT_DIR, "CHANGELOG.md");
 
 /**
- * Check if content has meaningful changes (not just dependency updates)
+ * Check if content has meaningful changes (not just dependency updates or initial release boilerplate)
  */
 function hasMeaningfulChanges(content) {
   // Remove headers like "### Patch Changes", "### Minor Changes", etc.
   const withoutHeaders = content.replace(/^###?\s+\w+\s+Changes?\s*$/gm, "");
 
-  // Remove "Updated dependencies" lines and their sub-items
+  // Remove "Updated dependencies" lines and their sub-items (both @scoped and unscoped packages)
   const withoutDepUpdates = withoutHeaders
     .replace(/^-\s+Updated dependencies.*$/gm, "")
-    .replace(/^\s+-\s+@[\w/-]+@[\d.]+\s*$/gm, "");
+    .replace(/^\s+-\s+@?[\w/-]+@[\d.]+\s*$/gm, "");
+
+  // Remove initial release boilerplate
+  const withoutBoilerplate = withoutDepUpdates
+    .replace(/^-\s+Initial public release.*$/gm, "");
 
   // Check if there's any meaningful content left (non-empty lines that aren't just whitespace)
-  const meaningfulLines = withoutDepUpdates
+  const meaningfulLines = withoutBoilerplate
     .split("\n")
     .filter((line) => line.trim() !== "");
 
@@ -39,63 +43,86 @@ function hasMeaningfulChanges(content) {
 }
 
 /**
- * Extract the latest version section from a CHANGELOG.md file
- * Returns { version, content } or null if no version found or no meaningful changes
+ * Extract ALL version sections from a CHANGELOG.md file
+ * Returns array of { version, content } objects
  */
-function extractLatestVersion(changelogPath) {
+function extractAllVersions(changelogPath) {
   if (!existsSync(changelogPath)) {
-    return null;
+    return [];
   }
 
   const content = readFileSync(changelogPath, "utf-8");
   const lines = content.split("\n");
 
-  let version = null;
+  const versions = [];
+  let currentVersion = null;
   let sectionLines = [];
-  let inSection = false;
 
   for (const line of lines) {
     // Match version heading: ## 0.2.1 or ## [0.2.1]
     const versionMatch = line.match(/^## \[?(\d+\.\d+\.\d+(?:-[a-zA-Z0-9.]+)?)\]?/);
 
     if (versionMatch) {
-      if (inSection) {
-        // We've hit the next version, stop
-        break;
+      // Save previous version if exists
+      if (currentVersion !== null) {
+        const sectionContent = trimSection(sectionLines);
+        if (hasMeaningfulChanges(sectionContent)) {
+          versions.push({
+            version: currentVersion,
+            content: sectionContent,
+          });
+        }
       }
-      version = versionMatch[1];
-      inSection = true;
+
+      currentVersion = versionMatch[1];
+      sectionLines = [];
       continue;
     }
 
-    if (inSection) {
+    if (currentVersion !== null) {
       sectionLines.push(line);
     }
   }
 
-  if (!version) {
-    return null;
+  // Don't forget the last version
+  if (currentVersion !== null) {
+    const sectionContent = trimSection(sectionLines);
+    if (hasMeaningfulChanges(sectionContent)) {
+      versions.push({
+        version: currentVersion,
+        content: sectionContent,
+      });
+    }
   }
 
-  // Trim empty lines from start and end
-  while (sectionLines.length > 0 && sectionLines[0].trim() === "") {
-    sectionLines.shift();
-  }
-  while (sectionLines.length > 0 && sectionLines[sectionLines.length - 1].trim() === "") {
-    sectionLines.pop();
-  }
+  return versions;
+}
 
-  const sectionContent = sectionLines.join("\n");
-
-  // Skip if no meaningful changes (only dependency updates)
-  if (!hasMeaningfulChanges(sectionContent)) {
-    return null;
+/**
+ * Trim empty lines from start and end of section
+ */
+function trimSection(lines) {
+  while (lines.length > 0 && lines[0].trim() === "") {
+    lines.shift();
   }
+  while (lines.length > 0 && lines[lines.length - 1].trim() === "") {
+    lines.pop();
+  }
+  return lines.join("\n");
+}
 
-  return {
-    version,
-    content: sectionContent,
-  };
+/**
+ * Extract existing package@version entries from root CHANGELOG.md
+ */
+function getExistingEntries(rootChangelog) {
+  const entries = new Set();
+  // Match ### @real-router/core@0.2.0 or ### package-name@1.0.0
+  const regex = /^### (@[\w/-]+@[\d.]+(?:-[a-zA-Z0-9.]+)?|[\w-]+@[\d.]+(?:-[a-zA-Z0-9.]+)?)/gm;
+  let match;
+  while ((match = regex.exec(rootChangelog)) !== null) {
+    entries.add(match[1]);
+  }
+  return entries;
 }
 
 /**
@@ -128,7 +155,16 @@ function isPrivatePackage(packageDir) {
 function main() {
   const today = new Date().toISOString().split("T")[0];
 
-  // Collect changes from all packages
+  // Read current root CHANGELOG
+  let rootChangelog = "";
+  if (existsSync(ROOT_CHANGELOG)) {
+    rootChangelog = readFileSync(ROOT_CHANGELOG, "utf-8");
+  }
+
+  // Get existing entries to avoid duplicates
+  const existingEntries = getExistingEntries(rootChangelog);
+
+  // Collect NEW changes from all packages
   const packageChanges = [];
 
   const packageDirs = readdirSync(PACKAGES_DIR, { withFileTypes: true })
@@ -147,27 +183,39 @@ function main() {
     }
 
     const changelogPath = join(packageDir, "CHANGELOG.md");
-    const latest = extractLatestVersion(changelogPath);
+    const allVersions = extractAllVersions(changelogPath);
 
-    if (latest && latest.content.trim()) {
-      packageChanges.push({
-        name: packageName,
-        version: latest.version,
-        content: latest.content,
-      });
+    for (const { version, content } of allVersions) {
+      const entryKey = `${packageName}@${version}`;
+
+      // Skip if already in root changelog
+      if (existingEntries.has(entryKey)) {
+        continue;
+      }
+
+      if (content.trim()) {
+        packageChanges.push({
+          name: packageName,
+          version,
+          content,
+        });
+      }
     }
   }
 
   if (packageChanges.length === 0) {
-    console.log("No package changes to aggregate");
+    console.log("No new package changes to aggregate");
     return;
   }
 
-  // Read current root CHANGELOG
-  let rootChangelog = "";
-  if (existsSync(ROOT_CHANGELOG)) {
-    rootChangelog = readFileSync(ROOT_CHANGELOG, "utf-8");
-  }
+  // Sort by package name, then by version (descending)
+  packageChanges.sort((a, b) => {
+    if (a.name !== b.name) {
+      return a.name.localeCompare(b.name);
+    }
+    // Compare versions: higher versions first
+    return b.version.localeCompare(a.version, undefined, { numeric: true });
+  });
 
   // Build new section
   const newSectionLines = [`## [${today}]`, ""];
@@ -181,29 +229,37 @@ function main() {
 
   const newSection = newSectionLines.join("\n");
 
-  // Check if this date section already exists
+  // Check if today's date section already exists
   const datePattern = new RegExp(`^## \\[${today}\\]`, "m");
-  if (datePattern.test(rootChangelog)) {
-    console.log(`Section [${today}] already exists in root CHANGELOG.md, skipping`);
-    return;
-  }
-
-  // Find first ## section (version entry) and insert before it
-  const firstSectionMatch = rootChangelog.match(/^## \[/m);
-
   let updatedChangelog;
-  if (firstSectionMatch) {
-    const insertPoint = rootChangelog.indexOf(firstSectionMatch[0]);
+
+  if (datePattern.test(rootChangelog)) {
+    // Insert new entries into existing date section
+    const dateMatch = rootChangelog.match(datePattern);
+    const insertPoint = rootChangelog.indexOf(dateMatch[0]) + dateMatch[0].length;
+
+    // Find content to insert (without the date header)
+    const contentToInsert = newSectionLines.slice(2).join("\n");
+
     updatedChangelog =
-      rootChangelog.slice(0, insertPoint) + newSection + "\n" + rootChangelog.slice(insertPoint);
+      rootChangelog.slice(0, insertPoint) + "\n\n" + contentToInsert + rootChangelog.slice(insertPoint);
   } else {
-    // No sections yet, append after header
-    const headerEnd = rootChangelog.indexOf("\n\n");
-    if (headerEnd > -1) {
+    // Find first ## section and insert before it
+    const firstSectionMatch = rootChangelog.match(/^## \[/m);
+
+    if (firstSectionMatch) {
+      const insertPoint = rootChangelog.indexOf(firstSectionMatch[0]);
       updatedChangelog =
-        rootChangelog.slice(0, headerEnd + 2) + newSection + "\n" + rootChangelog.slice(headerEnd + 2);
+        rootChangelog.slice(0, insertPoint) + newSection + "\n" + rootChangelog.slice(insertPoint);
     } else {
-      updatedChangelog = newSection + "\n\n" + rootChangelog;
+      // No sections yet, append after header
+      const headerEnd = rootChangelog.indexOf("\n\n");
+      if (headerEnd > -1) {
+        updatedChangelog =
+          rootChangelog.slice(0, headerEnd + 2) + newSection + "\n" + rootChangelog.slice(headerEnd + 2);
+      } else {
+        updatedChangelog = newSection + "\n\n" + rootChangelog;
+      }
     }
   }
 
