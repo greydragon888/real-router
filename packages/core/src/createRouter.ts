@@ -21,7 +21,7 @@ import type {
   Options,
   Route,
   Router,
-} from "core-types";
+} from "@real-router/types";
 
 type Enhancer<Dependencies extends DefaultDependencies = DefaultDependencies> =
   (router: Router<Dependencies>) => Router<Dependencies>;

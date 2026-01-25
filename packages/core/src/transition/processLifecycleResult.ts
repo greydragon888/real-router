@@ -5,7 +5,7 @@ import { isPromise, isState } from "type-guards";
 
 import { errorCodes, RouterError } from "@real-router/core";
 
-import type { DoneFn, State, ActivationFn } from "core-types";
+import type { DoneFn, State, ActivationFn } from "@real-router/types";
 
 // Helper: Lifecycle results Processing Function
 export const processLifecycleResult = (

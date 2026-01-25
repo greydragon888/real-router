@@ -4,7 +4,7 @@ import { logger } from "@real-router/logger";
 
 import { getTypeDescription } from "../helpers";
 
-import type { DefaultDependencies, Router } from "core-types";
+import type { DefaultDependencies, Router } from "@real-router/types";
 
 function validateStringKey(
   methodName: string,

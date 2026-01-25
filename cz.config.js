@@ -26,7 +26,7 @@ export default {
   scopeOverrides: {
     fix: [
       "core",
-      "core-types",
+      "types",
       "route-tree",
       "search-params",
       "type-guards",

@@ -28,12 +28,11 @@
   "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
   "ignoreDependencies": [
     "@real-router/logger",
-    "core-types",
+    "@real-router/types",
     "@real-router/logger-plugin",
     "@real-router/persistent-params-plugin",
     "@stryker-mutator/api",
-    "jsdom",
-    "dts-bundle-generator"
+    "jsdom"
   ],
   "ignoreBinaries": ["tree", "tsx", "open"],
   "ignoreExportsUsedInFile": true

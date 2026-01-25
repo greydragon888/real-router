@@ -3,7 +3,7 @@
 import { errorCodes } from "./constants";
 import { deepFreezeState } from "./helpers";
 
-import type { State } from "core-types";
+import type { State } from "@real-router/types";
 
 // Pre-compute Set of error code values for O(1) lookup in setCode()
 // This avoids creating array and doing linear search on every setCode() call

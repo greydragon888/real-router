@@ -137,6 +137,7 @@ jobs:
         run: pnpm test
 
       # Publish with OIDC Trusted Publishing
+      # Order matters: logger → types → core → rest
       - name: Publish to npm
         if: steps.unpublished.outputs.has_unpublished == 'true'
         run: |
@@ -144,30 +145,53 @@ jobs:
           echo "npm version: $(npm --version)"
           echo "node version: $(node --version)"
           echo ""
-          echo "Publishing packages with OIDC Trusted Publishing..."
 
+          publish_package() {
+            local dir=$1
+            local name=$(node -p "require('./${dir}package.json').name")
+            local local_version=$(node -p "require('./${dir}package.json').version")
+            local npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+
+            if [ "$local_version" != "$npm_version" ]; then
+              echo "📦 Publishing $name@$local_version..."
+              cd "$dir"
+              pnpm publish --provenance --access public --no-git-checks
+              cd ../..
+              echo "✅ Published $name@$local_version"
+              return 0
+            else
+              echo "⏭️ $name@$local_version already published"
+              return 1
+            fi
+          }
+
+          echo "Publishing packages in dependency order..."
+          echo ""
+
+          # 1. @real-router/logger (no @real-router deps)
+          publish_package "packages/logger/"
+
+          # 2. @real-router/types (depends on logger)
+          publish_package "packages/core-types/"
+
+          # 3. @real-router/core (depends on types, logger)
+          publish_package "packages/core/"
+
+          # 4. Remaining packages
           for dir in packages/*/; do
             if [ -f "$dir/package.json" ]; then
               name=$(node -p "require('./${dir}package.json').name")
-              local_version=$(node -p "require('./${dir}package.json').version")
               private=$(node -p "require('./${dir}package.json').private || false")
 
-              if [ "$private" = "true" ]; then
-                echo "⏭️ Skipping $name (private)"
+              # Skip already published and private packages
+              if [ "$name" = "@real-router/logger" ] || \
+                 [ "$name" = "@real-router/types" ] || \
+                 [ "$name" = "@real-router/core" ] || \
+                 [ "$private" = "true" ]; then
                 continue
               fi
 
-              # Check if needs publishing
-              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
-
-              if [ "$local_version" != "$npm_version" ]; then
-                echo "📦 Publishing $name@$local_version..."
-                cd "$dir"
-                # pnpm publish converts workspace:^ and uses npm publish internally (OIDC works)
-                pnpm publish --provenance --access public --no-git-checks
-                cd ../..
-                echo "✅ Published $name@$local_version"
-              fi
+              publish_package "$dir"
             fi
           done
 

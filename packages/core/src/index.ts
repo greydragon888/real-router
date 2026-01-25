@@ -25,7 +25,7 @@ export type {
   SubscribeState,
   Subscription,
   Unsubscribe,
-} from "core-types";
+} from "@real-router/types";
 
 export type { ErrorCodes, Constants } from "./constants";
 

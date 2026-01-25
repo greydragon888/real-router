@@ -1,4 +1,4 @@
-# core-types
+# @real-router/types
 
 ## 0.1.1
 

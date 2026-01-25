@@ -6,7 +6,7 @@ import type {
   ErrorCodeToValueMap,
   ErrorCodeKeys,
   ErrorCodeValues,
-} from "core-types";
+} from "@real-router/types";
 
 /**
  * Internal Symbol for storing the route tree.

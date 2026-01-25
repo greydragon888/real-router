@@ -13,7 +13,7 @@ import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { mergeStates } from "../../../src/transition/mergeStates";
 
-import type { State, StateMeta, Params } from "core-types";
+import type { State, StateMeta, Params } from "@real-router/types";
 
 // Helper to create a minimal valid State
 function createState(

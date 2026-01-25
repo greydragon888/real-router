@@ -3,7 +3,7 @@
 import { isParams, isParamsStrict } from "../guards/params";
 import { isRouteName } from "../guards/routes";
 
-import type { Params, StateMeta } from "core-types";
+import type { Params, StateMeta } from "@real-router/types";
 
 /**
  * Type guard for meta object fields if present.

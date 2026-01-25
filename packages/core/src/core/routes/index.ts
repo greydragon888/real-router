@@ -4,7 +4,7 @@ import { withRoutePath } from "./routePath";
 import { withRouteQuery } from "./routeQuery";
 import { withRouteTree } from "./routeTree";
 
-import type { Router, Route, DefaultDependencies } from "core-types";
+import type { Router, Route, DefaultDependencies } from "@real-router/types";
 
 /**
  * Adds comprehensive route management capabilities to a router instance.

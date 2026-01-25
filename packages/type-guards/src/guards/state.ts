@@ -2,7 +2,7 @@
 
 import { isMetaFields, isRequiredFields } from "../internal/meta-fields";
 
-import type { Params, State } from "core-types";
+import type { Params, State } from "@real-router/types";
 
 /**
  * Type guard for State object.

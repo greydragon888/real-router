@@ -20,7 +20,7 @@ import { createRouter, events } from "@real-router/core";
 
 import { RouterError } from "../../../src/RouterError";
 
-import type { NavigationOptions, State } from "core-types";
+import type { NavigationOptions, State } from "@real-router/types";
 
 // Minimal routes for router creation
 const routes = [

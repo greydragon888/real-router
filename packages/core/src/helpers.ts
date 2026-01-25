@@ -1,6 +1,6 @@
 // packages/real-router/modules/helpers.ts
 
-import type { State, Options } from "core-types";
+import type { State, Options } from "@real-router/types";
 import type { BuildOptions, TrailingSlashMode } from "route-tree";
 
 export { getTypeDescription } from "type-guards";

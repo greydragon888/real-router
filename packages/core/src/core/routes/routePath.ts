@@ -20,7 +20,7 @@ import type {
   Router,
   DefaultDependencies,
   Options,
-} from "core-types";
+} from "@real-router/types";
 import type {
   BuildOptions,
   MatchOptions,

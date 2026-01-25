@@ -13,7 +13,7 @@ import type {
   Plugin,
   PluginFactory,
   DefaultDependencies,
-} from "core-types";
+} from "@real-router/types";
 
 type EventMappingType = Record<
   (typeof PLUGINS_CONST)[keyof typeof PLUGINS_CONST],

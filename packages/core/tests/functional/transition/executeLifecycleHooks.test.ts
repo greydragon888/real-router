@@ -9,7 +9,7 @@ import type {
   State,
   ActivationFn,
   RouterError as RouterErrorType,
-} from "core-types";
+} from "@real-router/types";
 
 describe("transition/executeLifecycleHooks", () => {
   const createState = (name: string): State => ({
