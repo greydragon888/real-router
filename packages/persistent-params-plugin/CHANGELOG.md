@@ -1,5 +1,18 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+
 ## 0.1.3
 
 ### Patch Changes
