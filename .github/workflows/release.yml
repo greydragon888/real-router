@@ -175,7 +175,8 @@ jobs:
             echo "⏭️ Skipping $name@${version} (already published)"
           else
             echo "📦 Publishing $name@${version} FIRST (other packages depend on it)..."
-            npm publish --provenance --access public --registry https://registry.npmjs.org
+            # pnpm publish converts workspace:^ and uses npm publish internally (OIDC works)
+            pnpm publish --provenance --access public --no-git-checks
           fi
           cd ../..
 
@@ -197,7 +198,8 @@ jobs:
               else
                 echo "📦 Publishing $name@${version}..."
                 cd "$dir"
-                npm publish --provenance --access public --registry https://registry.npmjs.org
+                # pnpm publish converts workspace:^ and uses npm publish internally (OIDC works)
+                pnpm publish --provenance --access public --no-git-checks
                 cd ../..
               fi
             fi
