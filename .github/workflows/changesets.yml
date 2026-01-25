@@ -163,7 +163,8 @@ jobs:
               if [ "$local_version" != "$npm_version" ]; then
                 echo "📦 Publishing $name@$local_version..."
                 cd "$dir"
-                npm publish --provenance --access public --registry https://registry.npmjs.org
+                # pnpm publish converts workspace:^ and uses npm publish internally (OIDC works)
+                pnpm publish --provenance --access public --no-git-checks
                 cd ../..
                 echo "✅ Published $name@$local_version"
               fi
