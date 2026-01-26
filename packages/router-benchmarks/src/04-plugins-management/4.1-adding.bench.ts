@@ -2,9 +2,7 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
+import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 // 4.1.1 Adding single plugin with cleanup
 {

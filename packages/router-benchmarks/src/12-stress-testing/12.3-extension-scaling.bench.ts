@@ -2,9 +2,7 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter, createNestedRouter } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
+import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
 // 12.3.1 Navigation with 50 synchronous middleware
 {

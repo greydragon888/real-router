@@ -196,10 +196,10 @@ function formatMemory(kb) {
 
 /**
  * Format percentage difference with color and multiplier for large differences
- * Negative diff = real-router better (green), positive = real-router worse (red)
+ * Negative diff = better (green), positive = worse (red)
  * @param {number} diff - Percentage difference
- * @param {number|null} baselineValue - Baseline (router5) value for ratio calculation
- * @param {number|null} currentValue - Current (real-router) value for ratio calculation
+ * @param {number|null} baselineValue - Baseline value for ratio calculation
+ * @param {number|null} currentValue - Current value for ratio calculation
  * @param {string} type - "time" or "memory" to use appropriate labels
  */
 function formatDiff(
@@ -224,15 +224,22 @@ function formatDiff(
     const ratio = baselineValue / currentValue;
 
     if (ratio >= 2) {
-      // real-router is 2x+ better
       return `${color}${sign}${diff.toFixed(2)}% (${ratio.toFixed(1)}x ${betterLabel})${RESET}`;
     } else if (ratio <= 0.5) {
-      // real-router is 2x+ worse
       return `${color}${sign}${diff.toFixed(2)}% (${(1 / ratio).toFixed(1)}x ${worseLabel})${RESET}`;
     }
   }
 
   return `${color}${sign}${diff.toFixed(2)}%${RESET}`;
+}
+
+/**
+ * Format diff for compact display (no multiplier text)
+ */
+function formatDiffCompact(diff) {
+  const sign = diff > 0 ? "+" : "";
+  const color = diff > 0 ? RED : GREEN;
+  return `${color}${sign}${diff.toFixed(1)}%${RESET}`;
 }
 
 /**
@@ -304,9 +311,9 @@ function formatCategorySummary(categoryStats, type = "time") {
 }
 
 /**
- * Compare two benchmark results
+ * Compare two benchmark results (legacy mode)
  */
-function compareBenchmarks(baselineFile, currentFile) {
+function compareTwoBenchmarks(baselineFile, currentFile) {
   console.log(`${BOLD}${BLUE}=== Benchmark Comparison ===${RESET}\n`);
   console.log(`${GRAY}router5 (baseline): ${baselineFile}${RESET}`);
   console.log(`${GRAY}real-router (current): ${currentFile}${RESET}\n`);
@@ -473,39 +480,191 @@ function compareBenchmarks(baselineFile, currentFile) {
 }
 
 /**
- * Get latest benchmark pair
+ * Compare three benchmark results (router5 → router6 → real-router)
  */
-function getLatestBenchmarkPair() {
+function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
+  console.log(`${BOLD}${BLUE}=== Three-Way Benchmark Comparison ===${RESET}\n`);
+  console.log(`${GRAY}router5 (baseline): ${router5File}${RESET}`);
+  console.log(`${GRAY}router6: ${router6File}${RESET}`);
+  console.log(`${GRAY}real-router (current): ${realRouterFile}${RESET}\n`);
+
+  const router5Results = parseBenchmarkFile(join(RESULTS_DIR, router5File));
+  const router6Results = parseBenchmarkFile(join(RESULTS_DIR, router6File));
+  const realRouterResults = parseBenchmarkFile(join(RESULTS_DIR, realRouterFile));
+
+  // Performance comparison
+  console.log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
+  console.log("─".repeat(150));
+  console.log(
+    `${"Benchmark".padEnd(50)} ${"router5".padStart(12)} ${"router6".padStart(12)} ${"r6 vs r5".padStart(10)} ${"real-router".padStart(12)} ${"rr vs r5".padStart(10)} ${"rr vs r6".padStart(10)}`,
+  );
+  console.log("─".repeat(150));
+
+  let count = 0;
+  let r6VsR5Better = 0;
+  let rrVsR5Better = 0;
+  let rrVsR6Better = 0;
+
+  for (const [name, r5] of router5Results) {
+    const r6 = router6Results.get(name);
+    const rr = realRouterResults.get(name);
+
+    if (!r6 && !rr) {
+      console.log(`${YELLOW}⚠ ${name.padEnd(48)} ${RESET}${GRAY}missing in router6 and real-router${RESET}`);
+      continue;
+    }
+
+    count++;
+
+    const nameDisplay = name.length > 48 ? name.substring(0, 45) + "..." : name;
+    const r5Time = formatTime(r5.avgMicroseconds).padStart(12);
+
+    let r6Time = GRAY + "N/A".padStart(12) + RESET;
+    let r6VsR5Diff = GRAY + "N/A".padStart(10) + RESET;
+    if (r6) {
+      r6Time = formatTime(r6.avgMicroseconds).padStart(12);
+      const diff = ((r6.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
+      r6VsR5Diff = formatDiffCompact(diff).padStart(10);
+      if (diff < 0) r6VsR5Better++;
+    }
+
+    let rrTime = GRAY + "N/A".padStart(12) + RESET;
+    let rrVsR5Diff = GRAY + "N/A".padStart(10) + RESET;
+    let rrVsR6Diff = GRAY + "N/A".padStart(10) + RESET;
+    if (rr) {
+      rrTime = formatTime(rr.avgMicroseconds).padStart(12);
+      const diffVsR5 = ((rr.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
+      rrVsR5Diff = formatDiffCompact(diffVsR5).padStart(10);
+      if (diffVsR5 < 0) rrVsR5Better++;
+
+      if (r6) {
+        const diffVsR6 = ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) * 100;
+        rrVsR6Diff = formatDiffCompact(diffVsR6).padStart(10);
+        if (diffVsR6 < 0) rrVsR6Better++;
+      }
+    }
+
+    console.log(`${nameDisplay.padEnd(50)} ${r5Time} ${r6Time} ${r6VsR5Diff} ${rrTime} ${rrVsR5Diff} ${rrVsR6Diff}`);
+  }
+
+  console.log("─".repeat(150));
+
+  console.log(`\n${BOLD}Performance Summary:${RESET}`);
+  console.log(`  Total benchmarks: ${count}`);
+  console.log(`  router6 faster than router5: ${r6VsR5Better > count/2 ? GREEN : RED}${r6VsR5Better}${RESET} (${((r6VsR5Better / count) * 100).toFixed(1)}%)`);
+  console.log(`  real-router faster than router5: ${rrVsR5Better > count/2 ? GREEN : RED}${rrVsR5Better}${RESET} (${((rrVsR5Better / count) * 100).toFixed(1)}%)`);
+  console.log(`  real-router faster than router6: ${rrVsR6Better > count/2 ? GREEN : RED}${rrVsR6Better}${RESET} (${((rrVsR6Better / count) * 100).toFixed(1)}%)`);
+
+  // Memory comparison
+  console.log(`\n${BOLD}${CYAN}Memory Allocation Comparison${RESET}`);
+  console.log("─".repeat(150));
+  console.log(
+    `${"Benchmark".padEnd(50)} ${"router5".padStart(12)} ${"router6".padStart(12)} ${"r6 vs r5".padStart(10)} ${"real-router".padStart(12)} ${"rr vs r5".padStart(10)} ${"rr vs r6".padStart(10)}`,
+  );
+  console.log("─".repeat(150));
+
+  let memCount = 0;
+  let r6MemBetter = 0;
+  let rrMemVsR5Better = 0;
+  let rrMemVsR6Better = 0;
+
+  for (const [name, r5] of router5Results) {
+    if (!r5.memoryKb) continue;
+
+    const r6 = router6Results.get(name);
+    const rr = realRouterResults.get(name);
+
+    if ((!r6 || !r6.memoryKb) && (!rr || !rr.memoryKb)) continue;
+
+    memCount++;
+
+    const nameDisplay = name.length > 48 ? name.substring(0, 45) + "..." : name;
+    const r5Mem = formatMemory(r5.memoryKb).padStart(12);
+
+    let r6Mem = GRAY + "N/A".padStart(12) + RESET;
+    let r6MemDiff = GRAY + "N/A".padStart(10) + RESET;
+    if (r6 && r6.memoryKb) {
+      r6Mem = formatMemory(r6.memoryKb).padStart(12);
+      const diff = ((r6.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
+      r6MemDiff = formatDiffCompact(diff).padStart(10);
+      if (diff < 0) r6MemBetter++;
+    }
+
+    let rrMem = GRAY + "N/A".padStart(12) + RESET;
+    let rrMemVsR5 = GRAY + "N/A".padStart(10) + RESET;
+    let rrMemVsR6 = GRAY + "N/A".padStart(10) + RESET;
+    if (rr && rr.memoryKb) {
+      rrMem = formatMemory(rr.memoryKb).padStart(12);
+      const diffVsR5 = ((rr.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
+      rrMemVsR5 = formatDiffCompact(diffVsR5).padStart(10);
+      if (diffVsR5 < 0) rrMemVsR5Better++;
+
+      if (r6 && r6.memoryKb) {
+        const diffVsR6 = ((rr.memoryKb - r6.memoryKb) / r6.memoryKb) * 100;
+        rrMemVsR6 = formatDiffCompact(diffVsR6).padStart(10);
+        if (diffVsR6 < 0) rrMemVsR6Better++;
+      }
+    }
+
+    console.log(`${nameDisplay.padEnd(50)} ${r5Mem} ${r6Mem} ${r6MemDiff} ${rrMem} ${rrMemVsR5} ${rrMemVsR6}`);
+  }
+
+  console.log("─".repeat(150));
+
+  if (memCount > 0) {
+    console.log(`\n${BOLD}Memory Summary:${RESET}`);
+    console.log(`  Total benchmarks: ${memCount}`);
+    console.log(`  router6 uses less than router5: ${r6MemBetter > memCount/2 ? GREEN : RED}${r6MemBetter}${RESET} (${((r6MemBetter / memCount) * 100).toFixed(1)}%)`);
+    console.log(`  real-router uses less than router5: ${rrMemVsR5Better > memCount/2 ? GREEN : RED}${rrMemVsR5Better}${RESET} (${((rrMemVsR5Better / memCount) * 100).toFixed(1)}%)`);
+    console.log(`  real-router uses less than router6: ${rrMemVsR6Better > memCount/2 ? GREEN : RED}${rrMemVsR6Better}${RESET} (${((rrMemVsR6Better / memCount) * 100).toFixed(1)}%)`);
+  }
+}
+
+/**
+ * Get latest benchmark set (pair or triplet)
+ */
+function getLatestBenchmarkSet() {
   const files = readdirSync(RESULTS_DIR);
 
   // Group files by timestamp
-  const pairs = new Map();
+  const sets = new Map();
 
   for (const file of files) {
     if (!file.endsWith(".txt")) continue;
 
-    // Match new (router5/real-router) naming
-    const match = file.match(/^(\d{8}_\d{6})_(router5|real-router)\.txt$/);
+    // Match naming: router5, router6, real-router
+    const match = file.match(/^(\d{8}_\d{6})_(router5|router6|real-router)\.txt$/);
     if (!match) continue;
 
     const [, timestamp, version] = match;
 
-    if (!pairs.has(timestamp)) {
-      pairs.set(timestamp, {});
+    if (!sets.has(timestamp)) {
+      sets.set(timestamp, {});
     }
 
-    pairs.get(timestamp)[version] = file;
+    sets.get(timestamp)[version] = file;
   }
 
-  // Find latest complete pair
-  const timestamps = Array.from(pairs.keys()).sort().reverse();
+  // Find latest complete set (prefer triplet, fallback to pair)
+  const timestamps = Array.from(sets.keys()).sort().reverse();
 
   for (const timestamp of timestamps) {
-    const pair = pairs.get(timestamp);
-    if (pair["router5"] && pair["real-router"]) {
+    const set = sets.get(timestamp);
+    // Triplet: all three routers
+    if (set["router5"] && set["router6"] && set["real-router"]) {
       return {
-        baseline: pair["router5"],
-        current: pair["real-router"],
+        router5: set["router5"],
+        router6: set["router6"],
+        realRouter: set["real-router"],
+        type: "triplet",
+      };
+    }
+    // Pair: router5 and real-router only
+    if (set["router5"] && set["real-router"]) {
+      return {
+        baseline: set["router5"],
+        current: set["real-router"],
+        type: "pair",
       };
     }
   }
@@ -517,26 +676,36 @@ function getLatestBenchmarkPair() {
 const args = process.argv.slice(2);
 
 if (args.length === 0) {
-  // Use latest pair
-  const pair = getLatestBenchmarkPair();
+  // Use latest set (triplet or pair)
+  const set = getLatestBenchmarkSet();
 
-  if (!pair) {
+  if (!set) {
     console.error(
-      `${RED}Error: No complete benchmark pairs found in ${RESULTS_DIR}${RESET}`,
+      `${RED}Error: No complete benchmark sets found in ${RESULTS_DIR}${RESET}`,
     );
     process.exit(1);
   }
 
-  compareBenchmarks(pair.baseline, pair.current);
+  if (set.type === "triplet") {
+    compareThreeBenchmarks(set.router5, set.router6, set.realRouter);
+  } else {
+    compareTwoBenchmarks(set.baseline, set.current);
+  }
 } else if (args.length === 2) {
-  // Use specified files
-  compareBenchmarks(args[0], args[1]);
+  // Two files: pair comparison
+  compareTwoBenchmarks(args[0], args[1]);
+} else if (args.length === 3) {
+  // Three files: triplet comparison
+  compareThreeBenchmarks(args[0], args[1], args[2]);
 } else {
   console.error(
-    `${RED}Usage: ${process.argv[1]} [baseline_file current_file]${RESET}`,
+    `${RED}Usage: ${process.argv[1]} [router5_file router6_file real_router_file]${RESET}`,
   );
   console.error(
-    `${GRAY}If no files specified, uses the latest benchmark pair${RESET}`,
+    `${RED}   or: ${process.argv[1]} [baseline_file current_file]${RESET}`,
+  );
+  console.error(
+    `${GRAY}If no files specified, uses the latest benchmark set${RESET}`,
   );
   process.exit(1);
 }

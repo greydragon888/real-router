@@ -2,11 +2,9 @@
 
 import { bench } from "mitata";
 
-import { createRouter } from "../helpers";
+import { createRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 const routes: Route[] = [
   { name: "home", path: "/" },

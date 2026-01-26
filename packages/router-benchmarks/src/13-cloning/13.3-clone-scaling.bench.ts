@@ -6,11 +6,10 @@ import {
   createSimpleRouter,
   createNestedRouter,
   cloneRouter,
+  IS_ROUTER5,
 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 13.3.1 Cloning router with 10 routes
 if (IS_ROUTER5) {

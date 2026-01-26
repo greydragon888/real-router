@@ -279,7 +279,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - type-guards@0.1.0
   - @real-router/core@0.1.0
 
-### @real-router/react@1.0.0
+### @real-router/react@0.1.0
 
 ### Minor Changes
 

@@ -1,6 +1,22 @@
 # router-benchmarks
 
-Tools for comparing performance between router5 and @real-router/core.
+Tools for comparing performance between router5, router6, and @real-router/core.
+
+## System Requirements
+
+| Requirement | Details |
+|-------------|---------|
+| **OS** | macOS (optimized for Apple Silicon) |
+| **Node.js** | 20+ |
+| **Privileges** | `sudo` required for `bench-compare.sh` |
+| **Power** | Connect to power adapter for stable results |
+| **Applications** | Close Chrome, Telegram, Slack, Discord for best results |
+
+### Apple Silicon Notes
+
+The benchmark script uses `powermetrics --samplers thermal` to monitor thermal pressure levels:
+- `Nominal` — optimal for benchmarking
+- `Moderate`, `Heavy`, `Critical` — may affect results
 
 ## Quick Start
 
@@ -11,8 +27,14 @@ pnpm bench
 # Run benchmarks for router5 (baseline)
 pnpm bench:baseline
 
+# Run benchmarks for router6
+pnpm bench:router6
+
 # Build @real-router/core and run benchmarks
 pnpm bench:current
+
+# Check processes using >10% CPU
+pnpm cpu
 ```
 
 ## Scripts
@@ -23,46 +45,65 @@ pnpm bench:current
 | --------------------- | ------------------------------------ |
 | `pnpm bench`          | Run benchmarks for real-router       |
 | `pnpm bench:baseline` | Run benchmarks for router5           |
+| `pnpm bench:router6`  | Run benchmarks for router6           |
 | `pnpm bench:current`  | Build real-router and run benchmarks |
+| `pnpm cpu`            | Show processes using >10% CPU        |
 
-### `bench-compare.sh` - Running Comparative Benchmarks
+### `bench-compare.sh` - Comparative Benchmarks
 
-Automated script for running router5 and real-router benchmarks under optimal conditions.
-
-**Requirements:**
-
-- Run with `sudo` (to disable Spotlight indexing)
-- Automatic CPU load check (10% threshold)
-- Cooldown period between tests (default 60 seconds)
+Automated script for running router5, router6, and real-router benchmarks under optimal conditions.
 
 **Usage:**
 
 ```bash
-# With sudo privileges
+# Standard run
 sudo ./bench-compare.sh
 
-# With custom cooldown period
-sudo COOLDOWN=120 ./bench-compare.sh
+# With custom settings
+sudo COOLDOWN=120 MAX_COOLDOWN_WAIT=600 ./bench-compare.sh
 ```
+
+**Environment Variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `COOLDOWN` | 60 | Fallback cooldown in seconds (if thermal monitoring unavailable) |
+| `MAX_COOLDOWN_WAIT` | 300 | Maximum wait time for thermal cooldown (5 min) |
 
 **What the script does:**
 
-1. Checks for processes with CPU > 10%
-2. Disables Spotlight indexing and screensaver
-3. Runs benchmarks for router5
-4. Waits for cooldown period
-5. Runs benchmarks for real-router
-6. Restores system settings
-7. Saves results to `.bench-results/`
+1. **Pre-flight checks:**
+   - Checks power source (warns if running on battery)
+   - Checks for distracting apps (Chrome, Telegram, WebStorm, Slack, Discord, Spotify)
+   - Checks for processes with CPU > 10%
+   - Checks for thermal throttling
+
+2. **System optimization:**
+   - Disables screensaver/display sleep (`caffeinate`)
+   - Disables Spotlight indexing (`mdutil`)
+   - Disables Time Machine backups (`tmutil`)
+   - Purges file system caches (`sync && purge`)
+
+3. **Benchmark execution:**
+   - Runs benchmarks with high process priority (`nice -n -20`)
+   - Smart cooldown between tests (waits for thermal pressure = Nominal)
+   - Tests router5, router6, and real-router in sequence
+
+4. **Cleanup (always runs, even on error/interrupt):**
+   - Restores screensaver/sleep
+   - Restores Spotlight indexing
+   - Restores Time Machine
 
 **Results:**
 
-- `YYYYMMDD_HHMMSS_router5.txt` - router5 results
-- `YYYYMMDD_HHMMSS_real-router.txt` - real-router results
+Saved to `.bench-results/`:
+- `YYYYMMDD_HHMMSS_router5.txt`
+- `YYYYMMDD_HHMMSS_router6.txt`
+- `YYYYMMDD_HHMMSS_real-router.txt`
 
 ### `compare.mjs` - Results Analysis
 
-Script for comparing benchmark results between router5 and real-router.
+Script for comparing benchmark results.
 
 **Usage:**
 
@@ -79,8 +120,6 @@ node compare.mjs
 
 **Output:**
 
-The script shows:
-
 1. **Performance Comparison** - execution time comparison
    - Benchmark name
    - router5 time
@@ -96,8 +135,6 @@ The script shows:
    - Percentage difference (green = real-router uses less, red = uses more)
 
 4. **Memory Summary** - overall memory summary
-   - Number of tests with lower/higher consumption
-   - Average memory difference
 
 **Example output:**
 
@@ -124,8 +161,6 @@ Summary:
 
 ## Benchmark Categories
 
-The benchmarks are organized into categories:
-
 | #   | Category           | Description                                 |
 | --- | ------------------ | ------------------------------------------- |
 | 01  | Navigation Basic   | Simple navigation, parameters, edge cases   |
@@ -148,7 +183,7 @@ packages/router-benchmarks/
 ├── src/                         # Benchmark source files
 │   ├── index.ts                 # Entry point, runs all benchmarks
 │   ├── helpers/                 # Shared utilities
-│   │   ├── router-adapter.ts    # Adapter for router5/real-router
+│   │   ├── router-adapter.ts    # Adapter for router5/router6/real-router
 │   │   ├── create-router.ts     # Router factory
 │   │   └── suppress-console.ts  # Console suppression
 │   ├── 01-navigation-basic/     # Category benchmarks
@@ -165,7 +200,8 @@ packages/router-benchmarks/
 │   └── 13-cloning/
 ├── .bench/                      # JSON results per router
 │   ├── real-router/             # real-router results by category
-│   └── router5/                 # router5 results by category
+│   ├── router5/                 # router5 results by category
+│   └── router6/                 # router6 results by category
 ├── .bench-results/              # Text results from bench-compare.sh
 ├── bench-compare.sh             # Comparative benchmark runner
 ├── compare.mjs                  # Results analysis script
@@ -174,19 +210,13 @@ packages/router-benchmarks/
 └── README.md
 ```
 
-## Environment Variables
-
-| Variable       | Values                   | Description                     |
-| -------------- | ------------------------ | ------------------------------- |
-| `BENCH_ROUTER` | `real-router`, `router5` | Which router to benchmark       |
-| `COOLDOWN`     | number (seconds)         | Cooldown between benchmark runs |
-
 ## Recommendations
 
 1. **Run benchmarks under identical conditions:**
-   - Close unnecessary applications
+   - Close unnecessary applications (especially Chrome)
    - Use `sudo` for bench-compare.sh
-   - Let the system cool down between runs
+   - Connect MacBook to power adapter
+   - Let thermal pressure return to Nominal between runs
 
 2. **Interpreting results:**
    - Small differences (<5%) may be statistical noise
@@ -194,9 +224,9 @@ packages/router-benchmarks/
    - Compare results from multiple runs
 
 3. **Troubleshooting:**
-   - If results vary significantly between runs - check system load
-   - Increase COOLDOWN period for more stable results
-   - Run benchmarks on a MacBook connected to power
+   - If results vary significantly between runs — check `pnpm cpu` for heavy processes
+   - If thermal throttling detected — wait for system to cool down
+   - Increase `MAX_COOLDOWN_WAIT` for more stable results
 
 ## Technical Details
 
@@ -204,3 +234,4 @@ packages/router-benchmarks/
 - **Runtime**: tsx (TypeScript execution)
 - **Memory tracking**: Uses `--expose-gc` for heap measurements
 - **Results format**: JSON files per category in `.bench/`
+- **Thermal monitoring**: `powermetrics --samplers thermal` (Apple Silicon)
