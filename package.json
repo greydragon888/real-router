@@ -71,9 +71,9 @@
     "@stryker-mutator/vitest-runner": "9.4.0",
     "@stylistic/eslint-plugin": "5.7.1",
     "@types/node": "25.0.10",
-    "@vitest/coverage-v8": "4.0.17",
+    "@vitest/coverage-v8": "4.0.18",
     "@vitest/eslint-plugin": "1.6.6",
-    "@vitest/ui": "4.0.17",
+    "@vitest/ui": "4.0.18",
     "czg": "1.12.0",
     "danger": "13.0.5",
     "dotenv-cli": "11.0.0",
@@ -109,7 +109,7 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.53.1",
     "vite-tsconfig-paths": "6.0.5",
-    "vitest": "4.0.17"
+    "vitest": "4.0.18"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
