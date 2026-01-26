@@ -2,11 +2,9 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter, cloneRouter } from "../helpers";
+import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Params } from "router5/dist/types/base";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 13.4.1 Clone preserves defaultParams
 if (IS_ROUTER5) {

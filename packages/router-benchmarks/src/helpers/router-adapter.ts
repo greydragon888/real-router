@@ -1,4 +1,6 @@
-// packages/router-benchmarks/modules/helpers/router-adapter.ts
+// packages/router-benchmarks/src/helpers/router-adapter.ts
+
+import { ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
 
 import type {
   Router,
@@ -7,26 +9,21 @@ import type {
   DefaultDependencies,
 } from "@real-router/core";
 
-const ROUTER_NAME = process.env.BENCH_ROUTER ?? "real-router";
-
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment */
-const routerModule =
-  ROUTER_NAME === "router5" ? require("router5") : require("@real-router/core");
-/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment */
-
-/**
- * Unified options for fair benchmarking between router5 and real-router.
- *
- * These options normalize the behavior differences between routers:
- * - queryParamsMode: router5 defaults to "default", real-router to "loose"
- * - allowNotFound: router5 defaults to false, real-router to true
- *
- * Using router5 defaults as baseline for comparison.
- */
-export const UNIFIED_OPTIONS: Partial<Options> = {
-  queryParamsMode: "default",
-  allowNotFound: false,
-};
+/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
+const routerModule = (() => {
+  switch (ROUTER_NAME) {
+    case "router5": {
+      return require("router5");
+    }
+    case "router6": {
+      return require("router6");
+    }
+    default: {
+      return require("@real-router/core");
+    }
+  }
+})();
+/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
 type CreateRouterFn = <Dependencies extends DefaultDependencies = object>(
   routes?: Route<Dependencies>[],

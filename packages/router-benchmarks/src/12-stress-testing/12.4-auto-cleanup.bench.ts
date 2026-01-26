@@ -2,11 +2,9 @@
 
 import { bench } from "mitata";
 
-import { createNestedRouter } from "../helpers";
+import { createNestedRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 12.4.1 Navigation with auto-cleanup of 10 canDeactivate guards
 {

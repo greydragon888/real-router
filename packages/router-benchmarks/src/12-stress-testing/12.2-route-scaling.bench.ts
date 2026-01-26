@@ -2,11 +2,9 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter, createNestedRouter } from "../helpers";
+import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 12.2.1 Navigation in router with 100 routes
 if (IS_ROUTER5) {

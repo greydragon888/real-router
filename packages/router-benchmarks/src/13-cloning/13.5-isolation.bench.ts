@@ -2,9 +2,7 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter, cloneRouter } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
+import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 
 // 13.5.1 Clone state changes do not affect the original
 if (IS_ROUTER5) {

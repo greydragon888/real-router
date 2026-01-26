@@ -34,6 +34,6 @@
     "@stryker-mutator/api",
     "jsdom"
   ],
-  "ignoreBinaries": ["tree", "tsx", "open"],
+  "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk"],
   "ignoreExportsUsedInFile": true
 }

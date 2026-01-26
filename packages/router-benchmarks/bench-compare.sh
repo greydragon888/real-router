@@ -2,7 +2,7 @@
 set -e
 
 # =============================================================================
-# Router5 vs Real-Router Benchmark Comparison Script
+# Router5 vs Router6 vs Real-Router Benchmark Comparison Script
 # Optimized for macOS with Apple Silicon (M3 Pro)
 # =============================================================================
 
@@ -15,6 +15,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${SCRIPT_DIR}/.bench-results"
 COOLDOWN=${COOLDOWN:-60}
+MAX_COOLDOWN_WAIT=${MAX_COOLDOWN_WAIT:-300}
 ORIGINAL_USER="${SUDO_USER:-$USER}"
 
 # Colors
@@ -23,6 +24,95 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Smart cooldown - waits for CPU temperature to drop
+# Falls back to fixed cooldown if temperature cannot be read
+# Supports both Intel ("CPU die temperature") and Apple Silicon ("Die temperature")
+# Get thermal pressure level (Apple Silicon)
+# Returns: Nominal, Moderate, Heavy, Trapping, or Critical
+get_thermal_pressure() {
+    local output
+    output=$(sudo powermetrics --samplers thermal -i 1 -n 1 2>/dev/null)
+    echo "$output" | grep -i "pressure level" | awk -F': ' '{print $2}' | tr -d ' '
+}
+
+# Check for thermal throttling
+# Returns 0 if throttling detected, 1 if not
+check_throttling() {
+    local pressure
+    pressure=$(get_thermal_pressure)
+
+    if [[ -z "$pressure" ]]; then
+        return 1  # Cannot detect, assume OK
+    fi
+
+    # Nominal = OK, anything else = potential throttling
+    if [[ "$pressure" != "Nominal" ]]; then
+        return 0  # Throttling detected
+    fi
+
+    return 1  # No throttling
+}
+
+warn_if_throttling() {
+    local pressure
+    pressure=$(get_thermal_pressure)
+
+    if [[ -z "$pressure" ]]; then
+        return 1
+    fi
+
+    if [[ "$pressure" != "Nominal" ]]; then
+        echo -e "${RED}⚠️  WARNING: Thermal pressure is $pressure (not Nominal)${NC}"
+        echo -e "${RED}   Benchmark results may be unreliable.${NC}"
+        return 0
+    fi
+    return 1
+}
+
+wait_for_cooldown() {
+    local max_wait=${1:-300}  # Max 5 minutes
+    local elapsed=0
+
+    echo -e "${YELLOW}Waiting for thermal pressure to become Nominal (max: ${max_wait}s)...${NC}"
+
+    # First check if we can read thermal pressure at all
+    local initial_pressure
+    initial_pressure=$(get_thermal_pressure)
+
+    if [[ -z "$initial_pressure" ]]; then
+        echo -e "${YELLOW}Cannot read thermal pressure, using fixed cooldown (${COOLDOWN}s)${NC}"
+        sleep "$COOLDOWN"
+        return 0
+    fi
+
+    # If already Nominal, just do a short cooldown
+    if [[ "$initial_pressure" == "Nominal" ]]; then
+        echo -e "${GREEN}Thermal pressure already Nominal, short cooldown (30s)${NC}"
+        sleep 30
+        return 0
+    fi
+
+    while (( elapsed < max_wait )); do
+        local pressure
+        pressure=$(get_thermal_pressure)
+
+        echo -ne "\r  Thermal pressure: $pressure (elapsed: ${elapsed}s)    "
+
+        if [[ "$pressure" == "Nominal" ]]; then
+            echo ""
+            echo -e "${GREEN}Thermal pressure is Nominal, ready${NC}"
+            return 0
+        fi
+
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+
+    echo ""
+    echo -e "${YELLOW}Max wait time reached, continuing anyway (pressure: $pressure)${NC}"
+    return 0
+}
 
 # Cleanup function - runs even on error
 cleanup() {
@@ -38,23 +128,63 @@ cleanup() {
     # Restore Spotlight indexing
     sudo mdutil -i on / >/dev/null 2>&1 || true
     echo -e "${GREEN}[Cleanup] Spotlight indexing restored${NC}"
+
+    # Restore Time Machine
+    sudo tmutil enable >/dev/null 2>&1 || true
+    echo -e "${GREEN}[Cleanup] Time Machine restored${NC}"
 }
 
 # Set trap to ensure cleanup runs on exit, error, or interrupt
 trap cleanup EXIT INT TERM
 
 # -----------------------------------------------------------------------------
-# Step 1: Check heavy processes
+# Step 1: Check heavy processes and applications
 # -----------------------------------------------------------------------------
 echo -e "${BLUE}=== Router Benchmark Comparison ===${NC}"
 echo ""
-echo -e "${YELLOW}[Step 1] Checking for heavy processes...${NC}"
+echo -e "${YELLOW}[Step 1] Checking system state...${NC}"
 
+# Check power status
+POWER_SOURCE=$(pmset -g batt 2>/dev/null | head -1 | grep -o "'.*'" | tr -d "'")
+BATTERY_PERCENT=$(pmset -g batt 2>/dev/null | grep -o '[0-9]\+%' | tr -d '%')
+
+if [[ "$POWER_SOURCE" != "AC Power" ]]; then
+    echo -e "${RED}⚠️  WARNING: Running on battery power${NC}"
+    if [[ -n "$BATTERY_PERCENT" ]]; then
+        echo -e "${RED}   Battery level: ${BATTERY_PERCENT}%${NC}"
+    fi
+    echo -e "${RED}   Connect to power adapter for stable benchmark results.${NC}"
+    echo -e "${RED}   CPU may throttle on battery to save power.${NC}"
+    POWER_WARNING=1
+else
+    echo -e "${GREEN}Running on AC Power${NC}"
+    POWER_WARNING=0
+fi
+
+# Check for running applications that may affect benchmark stability
+DISTRACTING_APPS=""
+pgrep -q "Google Chrome" && DISTRACTING_APPS="${DISTRACTING_APPS}  - Google Chrome\n"
+pgrep -q "Telegram" && DISTRACTING_APPS="${DISTRACTING_APPS}  - Telegram\n"
+pgrep -q "webstorm" && DISTRACTING_APPS="${DISTRACTING_APPS}  - WebStorm\n"
+pgrep -q "Slack" && DISTRACTING_APPS="${DISTRACTING_APPS}  - Slack\n"
+pgrep -q "Discord" && DISTRACTING_APPS="${DISTRACTING_APPS}  - Discord\n"
+pgrep -q "Spotify" && DISTRACTING_APPS="${DISTRACTING_APPS}  - Spotify\n"
+
+if [[ -n "$DISTRACTING_APPS" ]]; then
+    echo -e "${YELLOW}Warning: The following apps may affect benchmark stability:${NC}"
+    echo -e "$DISTRACTING_APPS"
+fi
+
+# Check for heavy CPU processes
 HEAVY_PROCESSES=$(ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 " (" $1 "%)"}' | head -5)
 
 if [[ -n "$HEAVY_PROCESSES" ]]; then
     echo -e "${RED}Warning: Heavy processes detected (>10% CPU):${NC}"
     echo "$HEAVY_PROCESSES"
+fi
+
+# Prompt if any warnings
+if [[ -n "$DISTRACTING_APPS" || -n "$HEAVY_PROCESSES" || "$POWER_WARNING" -eq 1 ]]; then
     echo ""
     read -p "Continue anyway? (y/N) " -n 1 -r
     echo ""
@@ -62,6 +192,8 @@ if [[ -n "$HEAVY_PROCESSES" ]]; then
         echo "Aborted by user."
         exit 1
     fi
+else
+    echo -e "${GREEN}System state OK (AC power, no distracting apps or heavy processes)${NC}"
 fi
 
 # -----------------------------------------------------------------------------
@@ -70,8 +202,11 @@ fi
 echo ""
 echo -e "${YELLOW}[Step 2] System information${NC}"
 CHIP=$(system_profiler SPHardwareDataType 2>/dev/null | grep "Chip" | awk -F': ' '{print $2}')
+THERMAL_PRESSURE=$(get_thermal_pressure)
 echo "  Chip: $CHIP"
-echo "  Cooldown between routers: ${COOLDOWN}s"
+echo "  Power: ${POWER_SOURCE:-unknown}${BATTERY_PERCENT:+ (${BATTERY_PERCENT}%)}"
+echo "  Thermal pressure: ${THERMAL_PRESSURE:-unknown}"
+echo "  Cooldown: wait for Nominal (max ${MAX_COOLDOWN_WAIT}s, fallback ${COOLDOWN}s)"
 
 # -----------------------------------------------------------------------------
 # Step 3: Disable system distractions
@@ -87,6 +222,14 @@ echo -e "${GREEN}Screensaver/sleep disabled (PID: $CAFFEINATE_PID)${NC}"
 # Disable Spotlight indexing
 sudo mdutil -i off / >/dev/null 2>&1
 echo -e "${GREEN}Spotlight indexing disabled${NC}"
+
+# Disable Time Machine backups
+sudo tmutil disable >/dev/null 2>&1
+echo -e "${GREEN}Time Machine disabled${NC}"
+
+# Flush file system caches
+sync && sudo purge
+echo -e "${GREEN}File system caches purged${NC}"
 
 # -----------------------------------------------------------------------------
 # Step 4: Prepare
@@ -108,24 +251,47 @@ echo ""
 echo -e "${YELLOW}[Step 5] Running benchmarks...${NC}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
+# Check for throttling before starting
+if warn_if_throttling; then
+    read -p "Continue anyway? (y/N) " -n 1 -r
+    echo ""
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Aborted by user."
+        exit 1
+    fi
+fi
+
 # --- router5 (baseline) ---
 echo ""
 echo -e "${BLUE}--- Testing router5 (baseline) ---${NC}"
-RESULT_FILE_BASELINE="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
+RESULT_FILE_ROUTER5="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
+sync && sudo purge
 BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_BASELINE"
+    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER5"
 
 # --- Cooldown ---
 echo ""
-echo -e "${YELLOW}Cooling down ${COOLDOWN}s before real-router...${NC}"
-sleep "$COOLDOWN"
+wait_for_cooldown "$MAX_COOLDOWN_WAIT"
+
+# --- router6 ---
+echo ""
+echo -e "${BLUE}--- Testing router6 ---${NC}"
+RESULT_FILE_ROUTER6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
+sync && sudo purge
+BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER6"
+
+# --- Cooldown ---
+echo ""
+wait_for_cooldown "$MAX_COOLDOWN_WAIT"
 
 # --- real-router (current) ---
 echo ""
 echo -e "${BLUE}--- Testing real-router (current) ---${NC}"
-RESULT_FILE_CURRENT="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
+RESULT_FILE_REAL_ROUTER="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
+sync && sudo purge
 BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_CURRENT"
+    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER"
 
 # -----------------------------------------------------------------------------
 # Step 6: Fix file ownership (since script runs as root)
@@ -143,11 +309,10 @@ echo -e "${GREEN}=== Benchmark Complete ===${NC}"
 echo "Results saved to: $RESULTS_DIR"
 echo ""
 echo "Files:"
-echo "  router5 (baseline): $RESULT_FILE_BASELINE"
-echo "  real-router (current): $RESULT_FILE_CURRENT"
+echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
+echo "  router6: $RESULT_FILE_ROUTER6"
+echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
 
 echo ""
 echo -e "${BLUE}To compare results:${NC}"
 echo "  node compare.mjs"
-echo "  # or manually:"
-echo "  diff $RESULT_FILE_BASELINE $RESULT_FILE_CURRENT"
