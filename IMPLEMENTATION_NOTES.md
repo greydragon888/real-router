@@ -74,13 +74,15 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 ```json
 {
   "privatePackages": {
-    "version": true, // Version private packages (core-types, route-tree, etc.)
+    "version": true, // Version private packages (route-tree, search-params, etc.)
     "tag": false // Don't publish to npm
   }
 }
 ```
 
 **Why?** Public packages depend on private packages. Changesets needs to update versions in lock step, but shouldn't try to publish private packages.
+
+**Note:** `@real-router/types` (formerly `core-types`) is now a **public** package published to npm.
 
 ## Release Automation
 
@@ -121,10 +123,34 @@ pnpm publish --provenance --access public --no-git-checks
 - [pnpm workspaces docs](https://pnpm.io/workspaces) — workspace protocol conversion
 - [pnpm/pnpm#9812](https://github.com/pnpm/pnpm/issues/9812) — "pnpm publish runs npm publish under the hood"
 
+### Publish Order in changesets.yml
+
+Packages are published in dependency order:
+1. `@real-router/logger` (no @real-router deps)
+2. `@real-router/types` (no deps)
+3. `@real-router/core` (depends on types, logger)
+4. All other packages
+
+**Important:** The `publish_package` function must return `0` even when package is already published:
+```bash
+# ✅ CORRECT - skip is not an error
+echo "⏭️ $name@$local_version already published"
+return 0
+
+# ❌ WRONG - causes script to fail
+return 1
+```
+
 ### TypeScript Declarations Generation
 
-**Types package:** `@real-router/types` is a public package containing all shared types.
-All other packages import types from it, avoiding duplication.
+**Problem (Issue #21):** `dts-bundle-generator` inlined ALL types into each package's `.d.ts` file, making `Router` from `@real-router/core` and `Router` from `@real-router/browser-plugin` structurally identical but nominally different types:
+
+```typescript
+router.usePlugin(browserPluginFactory()); // ❌ TypeScript Error
+// Type 'PluginFactory<object>' is not assignable to type 'PluginFactory<object>'
+```
+
+**Solution:** Publish `@real-router/types` as a standalone public package. All packages import types from it.
 
 **JS bundling:** tsup with `noExternal` option bundles private packages:
 ```typescript
@@ -142,10 +168,20 @@ dts: {
 },
 ```
 
+**Results:**
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Total .d.ts lines | 12,080 | 3,793 | -69% |
+| core .d.ts | 1,807 | 216 | -88% |
+| browser-plugin .d.ts | 1,831 | 500 | -73% |
+| react .d.ts | 1,813 | 80 | -96% |
+
 This approach ensures:
 - Types are not duplicated across packages
 - Module augmentation works correctly
 - Type compatibility between packages (same type identity)
+
+**Removed:** `dts-bundle-generator` and `scripts/generate-dts.mjs` are no longer used.
 
 **GitHub Releases:**
 Per-package releases — each published package gets its own GitHub release:
@@ -397,7 +433,7 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 | @real-router/helpers             | 3 kB  |
 | route-tree                       | 15 kB |
 | search-params                    | 5 kB  |
-| core-types, type-guards          | 2 kB  |
+| @real-router/types, type-guards  | 2 kB  |
 | logger-plugin, persistent-params | 3 kB  |
 
 React package ignores `react` and `react-dom` from size calculation.
@@ -407,7 +443,7 @@ React package ignores `react` and `react-dom` from size calculation.
 `knip.json` ignores:
 
 - `terser`, `fast-check` (used but not detected)
-- `core-types`, `@real-router/persistent-params-plugin` (internal workspace deps)
+- `@real-router/persistent-params-plugin` (internal workspace deps)
 - `@stryker-mutator/api`, `jsdom` (test infrastructure)
 
 ### syncpack Configuration
