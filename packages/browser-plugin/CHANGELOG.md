@@ -1,5 +1,18 @@
 # @real-router/browser-plugin
 
+## 0.1.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+
 ## 0.1.4
 
 ### Patch Changes
