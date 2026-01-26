@@ -1,0 +1,111 @@
+name: Changeset Check
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".changeset/**"
+
+jobs:
+  check-pr-reference:
+    name: Check PR Reference
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check changesets for PR references
+        id: check
+        run: |
+          # Get changeset files added/modified in this PR
+          CHANGESETS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- '.changeset/*.md' | grep -v README.md || true)
+
+          if [ -z "$CHANGESETS" ]; then
+            echo "No changeset files in this PR"
+            echo "has_changesets=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "has_changesets=true" >> $GITHUB_OUTPUT
+          echo "Found changesets: $CHANGESETS"
+
+          # Check each changeset for #XX reference
+          MISSING_REFS=""
+          for file in $CHANGESETS; do
+            if [ -f "$file" ]; then
+              if ! grep -q '#[0-9]\+' "$file"; then
+                MISSING_REFS="$MISSING_REFS $file"
+              fi
+            fi
+          done
+
+          if [ -n "$MISSING_REFS" ]; then
+            echo "missing_refs=true" >> $GITHUB_OUTPUT
+            echo "files=$MISSING_REFS" >> $GITHUB_OUTPUT
+            echo "⚠️ Changesets without PR reference:$MISSING_REFS"
+          else
+            echo "missing_refs=false" >> $GITHUB_OUTPUT
+            echo "✅ All changesets have PR references"
+          fi
+
+      - name: Comment on PR
+        if: steps.check.outputs.missing_refs == 'true'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const files = `${{ steps.check.outputs.files }}`.trim().split(/\s+/);
+            const prNumber = context.issue.number;
+            const fileList = files.map(f => `- \`${f}\``).join('\n');
+
+            const body = [
+              '## ⚠️ Changeset Missing PR Reference',
+              '',
+              "The following changeset file(s) don't contain a PR/issue reference (`#XX`):",
+              '',
+              fileList,
+              '',
+              '**Why this matters:** PR references in changesets are used to link releases to their source tasks. This improves traceability in git history and release notes.',
+              '',
+              `**How to fix:** Edit the changeset description to include \`#${prNumber}\`:`,
+              '',
+              '```markdown',
+              '---',
+              '"@real-router/core": patch',
+              '---',
+              '',
+              `fix: description of the change (#${prNumber})`,
+              '```',
+              '',
+              'This is a **warning only** — the PR can still be merged.',
+            ].join('\n');
+
+            // Check for existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const marker = 'Changeset Missing PR Reference';
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }

@@ -73,14 +73,29 @@ jobs:
           echo "changesets_count=$CHANGESETS" >> $GITHUB_OUTPUT
           echo "Found $CHANGESETS changeset(s)"
 
+      # Extract PR/issue references from changeset files for Release PR title
+      - name: Extract PR references
+        if: steps.check.outputs.changesets_count != '0'
+        id: refs
+        run: |
+          # Find all #XX references in changeset files (excluding README)
+          REFS=$(grep -roh '#[0-9]\+' .changeset/*.md 2>/dev/null | sort -u | tr '\n' ' ' | xargs)
+          if [ -n "$REFS" ]; then
+            echo "refs= ($REFS)" >> $GITHUB_OUTPUT
+            echo "Found PR references: $REFS"
+          else
+            echo "refs=" >> $GITHUB_OUTPUT
+            echo "No PR references found in changesets"
+          fi
+
       # If there are changesets, create/update the release PR
       - name: Create Release PR
         if: steps.check.outputs.changesets_count != '0'
         uses: changesets/action@v1
         with:
           version: pnpm changeset version
-          title: "release: version packages"
-          commit: "release: version packages"
+          title: "release: version packages${{ steps.refs.outputs.refs }}"
+          commit: "release: version packages${{ steps.refs.outputs.refs }}"
           setupGitUser: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -137,63 +152,20 @@ jobs:
         run: pnpm test
 
       # Publish with OIDC Trusted Publishing
-      # Order matters: logger → types → core → rest
+      # changeset publish automatically:
+      # - Checks which versions are not on npm
+      # - Publishes in dependency order
+      # - Skips already published (warns, doesn't fail)
+      # - Creates git tags
+      # - Uses pnpm publish (detects from lockfile)
+      # Provenance is auto-generated with npm Trusted Publishing
       - name: Publish to npm
         if: steps.unpublished.outputs.has_unpublished == 'true'
-        run: |
-          echo "=== OIDC Environment ==="
-          echo "npm version: $(npm --version)"
-          echo "node version: $(node --version)"
-          echo ""
+        run: pnpm changeset publish
 
-          publish_package() {
-            local dir=$1
-            local name=$(node -p "require('./${dir}package.json').name")
-            local local_version=$(node -p "require('./${dir}package.json').version")
-            local npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
-
-            if [ "$local_version" != "$npm_version" ]; then
-              echo "📦 Publishing $name@$local_version..."
-              cd "$dir"
-              pnpm publish --provenance --access public --no-git-checks
-              cd ../..
-              echo "✅ Published $name@$local_version"
-              return 0
-            else
-              echo "⏭️ $name@$local_version already published"
-              return 0
-            fi
-          }
-
-          echo "Publishing packages in dependency order..."
-          echo ""
-
-          # 1. @real-router/logger (no @real-router deps)
-          publish_package "packages/logger/"
-
-          # 2. @real-router/types (no deps)
-          publish_package "packages/core-types/"
-
-          # 3. @real-router/core (depends on types, logger)
-          publish_package "packages/core/"
-
-          # 4. Remaining packages
-          for dir in packages/*/; do
-            if [ -f "$dir/package.json" ]; then
-              name=$(node -p "require('./${dir}package.json').name")
-              private=$(node -p "require('./${dir}package.json').private || false")
-
-              # Skip already published and private packages
-              if [ "$name" = "@real-router/logger" ] || \
-                 [ "$name" = "@real-router/types" ] || \
-                 [ "$name" = "@real-router/core" ] || \
-                 [ "$private" = "true" ]; then
-                continue
-              fi
-
-              publish_package "$dir"
-            fi
-          done
+      - name: Push git tags
+        if: steps.unpublished.outputs.has_unpublished == 'true'
+        run: git push --tags
 
       # Create GitHub releases for each published package
       - name: Create GitHub Releases
