@@ -70,7 +70,7 @@
     "@stryker-mutator/typescript-checker": "9.4.0",
     "@stryker-mutator/vitest-runner": "9.4.0",
     "@stylistic/eslint-plugin": "5.7.1",
-    "@types/node": "25.0.9",
+    "@types/node": "25.0.10",
     "@vitest/coverage-v8": "4.0.17",
     "@vitest/eslint-plugin": "1.6.6",
     "@vitest/ui": "4.0.17",
