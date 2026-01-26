@@ -1,6 +1,6 @@
 // packages/type-guards/modules/guards/navigation.ts
 
-import type { NavigationOptions } from "core-types";
+import type { NavigationOptions } from "@real-router/types";
 
 // Constant in module scope - created once, not on every call
 const NAVIGATION_OPTIONS_FIELDS = [

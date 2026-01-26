@@ -15,7 +15,7 @@ import type {
   State,
   DefaultDependencies,
   Router,
-} from "core-types";
+} from "@real-router/types";
 
 const noop = () => {};
 

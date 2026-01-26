@@ -2,7 +2,7 @@ import { fc } from "@fast-check/vitest";
 
 import { errorCodes } from "@real-router/core";
 
-import type { State } from "core-types";
+import type { State } from "@real-router/types";
 
 // ============================================================================
 // Constants

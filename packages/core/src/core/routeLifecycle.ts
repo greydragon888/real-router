@@ -10,7 +10,7 @@ import type {
   ActivationFnFactory,
   DefaultDependencies,
   Router,
-} from "core-types";
+} from "@real-router/types";
 
 /**
  * Lifecycle handler registry limits to prevent memory leaks.

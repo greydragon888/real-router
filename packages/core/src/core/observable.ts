@@ -17,7 +17,7 @@ import type {
   State,
   SubscribeFn,
   Unsubscribe,
-} from "core-types";
+} from "@real-router/types";
 
 /**
  * Symbol.observable polyfill declaration for TC39 proposal

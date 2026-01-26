@@ -15,7 +15,7 @@ import {
   CONFIG_SYMBOL,
 } from "./constants";
 
-import type { Router, DefaultDependencies, Config } from "core-types";
+import type { Router, DefaultDependencies, Config } from "@real-router/types";
 import type { RouteTree } from "route-tree";
 
 /**

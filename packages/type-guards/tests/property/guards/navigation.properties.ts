@@ -9,7 +9,7 @@ import {
   arbitraryInvalidTypes,
 } from "../helpers";
 
-import type { NavigationOptions } from "core-types";
+import type { NavigationOptions } from "@real-router/types";
 
 describe("Router Type Guards Properties", () => {
   describe("isNavigationOptions", () => {

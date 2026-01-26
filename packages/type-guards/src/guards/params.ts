@@ -1,6 +1,6 @@
 // packages/type-guards/modules/guards/params.ts
 
-import type { Params } from "core-types";
+import type { Params } from "@real-router/types";
 
 /**
  * Internal helper to check if value is serializable (no circular refs, functions, instances).

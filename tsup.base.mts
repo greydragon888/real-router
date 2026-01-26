@@ -149,9 +149,12 @@ export const createConfig = (opts: CreateConfigOptions = {}): Options[] => {
     ...commonConfig,
     format,
 
-    // Type definitions generated separately via dts-bundle-generator
-    // (tsup's dts doesn't properly bundle workspace dependencies)
-    dts: false,
+    // Generate type definitions alongside code
+    // ESM → dist/esm/index.d.mts
+    // CJS → dist/cjs/index.d.ts
+    dts: {
+      resolve: true, // Resolve types from dependencies
+    },
 
     // Output directory for each format
     outDir: `${OUT_DIR}/${format}`,

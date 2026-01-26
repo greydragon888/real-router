@@ -22,7 +22,7 @@ import type {
   Router,
   Route,
   DefaultDependencies,
-} from "core-types";
+} from "@real-router/types";
 
 // Constants
 const DEFAULT_ROUTE_NAME = "";

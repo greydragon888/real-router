@@ -17,7 +17,21 @@ import type {
   QueryParamsOptions,
   RouteTreeState,
 } from "./route-node-types";
-import type { LoggerConfig } from "@real-router/logger";
+
+// Logger types (duplicated from @real-router/logger to avoid dependency)
+type LogLevel = "log" | "warn" | "error";
+type LogLevelConfig = "all" | "warn-error" | "error-only" | "none";
+type LogCallback = (
+  level: LogLevel,
+  context: string,
+  message: string,
+  ...args: unknown[]
+) => void;
+interface LoggerConfig {
+  level: LogLevelConfig;
+  callback?: LogCallback | undefined;
+  callbackIgnoresLevel?: boolean;
+}
 
 /**
  * Extended build result that includes segments for path building.

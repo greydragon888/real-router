@@ -32,7 +32,7 @@ import {
   setResolvedForwardMap,
 } from "../../internals";
 
-import type { Router, Route, DefaultDependencies } from "core-types";
+import type { Router, Route, DefaultDependencies } from "@real-router/types";
 import type { RouteDefinition, RouteTree } from "route-tree";
 
 // Constants

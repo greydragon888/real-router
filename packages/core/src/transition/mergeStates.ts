@@ -1,6 +1,6 @@
 // packages/real-router/modules/transition/mergeStates.ts
 
-import type { Params, State, StateMeta } from "core-types";
+import type { Params, State, StateMeta } from "@real-router/types";
 
 /**
  * Merges two states with toState taking priority over fromState.

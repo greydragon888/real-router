@@ -55,10 +55,10 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/logger": "workspace:^"
+    "@real-router/logger": "workspace:^",
+    "@real-router/types": "workspace:^"
   },
   "devDependencies": {
-    "core-types": "workspace:^",
     "route-tree": "workspace:^",
     "type-guards": "workspace:^"
   }
