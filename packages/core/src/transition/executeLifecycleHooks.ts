@@ -15,7 +15,7 @@ import type {
   State,
   ActivationFn,
   RouterError as RouterErrorType,
-} from "core-types";
+} from "@real-router/types";
 
 /**
  * Strict callback type where state is always provided.

@@ -15,7 +15,7 @@ export const TYPES = [
 
 export const SCOPES = [
   "core",
-  "core-types",
+  "types",
   "route-tree",
   "search-params",
   "type-guards",

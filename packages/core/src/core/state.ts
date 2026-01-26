@@ -25,7 +25,7 @@ import type {
   SimpleState,
   State,
   StateMetaInput,
-} from "core-types";
+} from "@real-router/types";
 import type { RouteTree, RouteTreeState, RouteTreeStateMeta } from "route-tree";
 
 /**

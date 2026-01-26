@@ -13,7 +13,7 @@ import type {
   Params,
   Route,
   Router,
-} from "core-types";
+} from "@real-router/types";
 import type { RouteDefinition, RouteTree } from "route-tree";
 
 // ============================================================================

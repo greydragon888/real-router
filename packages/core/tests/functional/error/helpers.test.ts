@@ -6,7 +6,7 @@ import {
   freezeStateInPlace,
 } from "../../../src/helpers";
 
-import type { Options, Params, State } from "core-types";
+import type { Options, Params, State } from "@real-router/types";
 
 describe("deepFreezeState", () => {
   describe("basic functionality", () => {

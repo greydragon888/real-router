@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
-import type { Params, State } from "core-types";
+import type { Params, State } from "@real-router/types";
 
 describe("RouterError Circular References Properties", () => {
   describe("Handling circular references in params", () => {

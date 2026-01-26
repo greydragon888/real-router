@@ -1,6 +1,6 @@
 import { fc } from "@fast-check/vitest";
 
-import type { NavigationOptions, Params, State } from "core-types";
+import type { NavigationOptions, Params, State } from "@real-router/types";
 
 // ============================================================================
 // Arbitraries for Route Names and Paths

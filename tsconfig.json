@@ -15,7 +15,7 @@
         "packages/persistent-params-plugin/src/index.ts"
       ],
       "@real-router/react": ["packages/react/src/index.ts"],
-      "core-types": ["packages/core-types/src/index.ts"],
+      "@real-router/types": ["packages/core-types/src/index.ts"],
       "type-guards": ["packages/type-guards/src/index.ts"],
       "route-tree": ["packages/route-tree/src/index.ts"],
       "search-params": ["packages/search-params/src/index.ts"],

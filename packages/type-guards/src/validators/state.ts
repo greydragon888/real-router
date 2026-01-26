@@ -3,7 +3,7 @@
 import { isState } from "../guards";
 import { getTypeDescription } from "../utilities/type-description";
 
-import type { State } from "core-types";
+import type { State } from "@real-router/types";
 
 /**
  * Validates that a state has the correct structure.

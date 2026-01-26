@@ -4,7 +4,7 @@ import { isObjKey, isString } from "type-guards";
 
 import { getTypeDescription } from "../helpers";
 
-import type { DefaultDependencies, Options, Router } from "core-types";
+import type { DefaultDependencies, Options, Router } from "@real-router/types";
 
 const defaultOptions: Options = {
   defaultRoute: "",

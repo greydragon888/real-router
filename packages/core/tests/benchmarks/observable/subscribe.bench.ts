@@ -18,7 +18,11 @@ import { bench, boxplot, summary } from "mitata";
 
 import { createRouter, events } from "@real-router/core";
 
-import type { NavigationOptions, State, SubscribeState } from "core-types";
+import type {
+  NavigationOptions,
+  State,
+  SubscribeState,
+} from "@real-router/types";
 
 // Minimal routes for router creation
 const routes = [

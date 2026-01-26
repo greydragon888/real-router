@@ -12,7 +12,7 @@ import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { freezeStateInPlace } from "../../../src/helpers";
 
-import type { State, StateMeta, Params } from "core-types";
+import type { State, StateMeta, Params } from "@real-router/types";
 
 // Helper to create unfrozen state
 function createState(

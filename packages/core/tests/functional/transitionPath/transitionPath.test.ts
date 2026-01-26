@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { getTransitionPath } from "../../../src/transitionPath";
 import { makeState } from "../../helpers";
 
-import type { State } from "core-types";
+import type { State } from "@real-router/types";
 
 describe("transitionPath", () => {
   describe("Basic behavior", () => {

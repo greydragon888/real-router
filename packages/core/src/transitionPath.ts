@@ -3,7 +3,7 @@
 import { logger } from "@real-router/logger";
 import { validateState } from "type-guards";
 
-import type { Params, State } from "core-types";
+import type { Params, State } from "@real-router/types";
 
 /**
  * Parameters extracted from a route segment.

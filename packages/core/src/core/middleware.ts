@@ -10,7 +10,7 @@ import type {
   Middleware,
   MiddlewareFactory,
   Router,
-} from "core-types";
+} from "@real-router/types";
 
 /**
  * Gets a displayable name for a factory function.

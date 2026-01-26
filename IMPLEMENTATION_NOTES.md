@@ -99,6 +99,53 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 - Uses npm's native OIDC (no NPM_TOKEN secret needed)
 - Requires Node.js 24+ (npm >= 11.5.1)
 - First publish must be manual (`npm publish`) - can't configure Trusted Publisher before package exists
+- Trusted Publisher configured with workflow: `changesets.yml` (NOT `release.yml`)
+
+### Critical: Use `pnpm publish` NOT `npm publish`
+
+**Problem discovered (Issue #18):** `npm publish` does NOT convert `workspace:^` protocol to actual versions. Packages were published with literal `"@real-router/logger": "workspace:^"` in dependencies, causing `npm install` to fail.
+
+**Solution:** Use `pnpm publish` which:
+1. Converts `workspace:^` → `^0.2.0` (actual version)
+2. Internally calls `npm publish` (OIDC works)
+
+```bash
+# ❌ WRONG - publishes with workspace:^
+npm publish --provenance --access public
+
+# ✅ CORRECT - converts workspace protocol
+pnpm publish --provenance --access public --no-git-checks
+```
+
+**Sources:**
+- [pnpm workspaces docs](https://pnpm.io/workspaces) — workspace protocol conversion
+- [pnpm/pnpm#9812](https://github.com/pnpm/pnpm/issues/9812) — "pnpm publish runs npm publish under the hood"
+
+### TypeScript Declarations Generation
+
+**Types package:** `@real-router/types` is a public package containing all shared types.
+All other packages import types from it, avoiding duplication.
+
+**JS bundling:** tsup with `noExternal` option bundles private packages:
+```typescript
+// packages/core/tsup.config.mts
+export default createIsomorphicConfig({
+  noExternal: ["type-guards", "route-tree", "search-params"],
+});
+```
+
+**DTS generation:** tsup with `dts: { resolve: true }` generates type declarations:
+```typescript
+// tsup.base.mts
+dts: {
+  resolve: true, // Resolve types from dependencies
+},
+```
+
+This approach ensures:
+- Types are not duplicated across packages
+- Module augmentation works correctly
+- Type compatibility between packages (same type identity)
 
 **GitHub Releases:**
 Per-package releases — each published package gets its own GitHub release:
