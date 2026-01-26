@@ -1,7 +1,8 @@
 {
   "name": "@real-router/types",
-  "version": "0.1.1",
-  "description": "Shared TypeScript types for Real-Router ecosystem",
+  "version": "0.1.0",
+  "type": "commonjs",
+  "description": "Shared TypeScript types for Real Router ecosystem",
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
@@ -38,8 +39,5 @@
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ --fix"
   },
-  "sideEffects": false,
-  "dependencies": {
-    "@real-router/logger": "workspace:^"
-  }
+  "sideEffects": false
 }
