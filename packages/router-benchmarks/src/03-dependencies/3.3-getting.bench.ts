@@ -2,9 +2,7 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
+import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 // 3.3.1 Getting single dependency
 if (!IS_ROUTER5) {

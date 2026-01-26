@@ -1,18 +1,21 @@
 {
   "name": "router-benchmarks",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "private": true,
   "description": "Benchmark tests for @real-router/core",
   "scripts": {
     "prebench": "pnpm --filter @real-router/core build",
     "bench": "BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "bench:router6": "BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
     "bench:baseline": "BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
     "bench:current": "pnpm prebench && BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ --fix --max-warnings 0"
   },
   "dependencies": {
     "router5": "8.0.1",
+    "router6": "1.0.2",
     "@real-router/core": "workspace:^"
   },
   "devDependencies": {

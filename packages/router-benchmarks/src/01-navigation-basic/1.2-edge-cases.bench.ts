@@ -2,11 +2,9 @@
 
 import { bench } from "mitata";
 
-import { createRouter, createSimpleRouter } from "../helpers";
+import { createRouter, createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // Helper: routes to alternate between to avoid same-state short-circuit
 const alternatingRoutes = ["about", "home"];

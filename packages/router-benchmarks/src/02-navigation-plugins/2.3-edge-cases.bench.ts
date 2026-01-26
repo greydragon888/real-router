@@ -3,7 +3,7 @@
 /* eslint-disable @typescript-eslint/no-shadow */
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 // Helper: routes to alternate between to avoid same-state short-circuit
 const alternatingRoutes = ["about", "home"];
@@ -169,8 +169,6 @@ const alternatingRoutes = ["about", "home"];
 // 2.3.11 Cancelling navigation during middleware execution
 // router5: navigate() does not reliably return a cancel function
 // real-router: navigate() always returns a cancel function
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
-
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;

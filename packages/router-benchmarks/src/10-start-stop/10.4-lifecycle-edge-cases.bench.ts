@@ -2,11 +2,9 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createRouter, createSimpleRouter } from "../helpers";
+import { createRouter, createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 10.4.1 Starting immediately after router creation with stop
 {

@@ -2,11 +2,9 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter, createNestedRouter } from "../helpers";
+import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
-
-const IS_ROUTER5 = process.env.BENCH_ROUTER === "router5";
 
 // 12.5.1 Comparison: parameter count impact (0/5/10 parameters)
 {
