@@ -161,7 +161,7 @@ jobs:
               return 0
             else
               echo "⏭️ $name@$local_version already published"
-              return 1
+              return 0
             fi
           }
 
@@ -171,7 +171,7 @@ jobs:
           # 1. @real-router/logger (no @real-router deps)
           publish_package "packages/logger/"
 
-          # 2. @real-router/types (depends on logger)
+          # 2. @real-router/types (no deps)
           publish_package "packages/core-types/"
 
           # 3. @real-router/core (depends on types, logger)
