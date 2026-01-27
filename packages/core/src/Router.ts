@@ -1,14 +1,11 @@
 // packages/core/src/Router.ts
 
 /**
- * Router class - facade over legacy decorator-based router.
+ * Router class - facade with integrated namespaces.
  *
- * This is Phase 1 of RFC-1 "Fort Knox" architecture.
- * Creates an explicit facade that delegates all operations
- * to the legacy router while maintaining a stable public API.
- *
- * In future phases, the legacy router will be replaced with
- * namespace classes for true encapsulation.
+ * This is Phase 2 of RFC-1 "Fort Knox" architecture.
+ * Namespaces handle Options, Dependencies, Observable (events), and State storage.
+ * Remaining decorators handle complex functionality that depends on route tree.
  */
 
 import { logger } from "@real-router/logger";
@@ -20,16 +17,19 @@ import {
   ROOT_TREE_SYMBOL,
   ROUTE_DEFINITIONS_SYMBOL,
 } from "./constants";
-import { withDependencies } from "./core/dependencies";
 import { withMiddleware } from "./core/middleware";
 import { withNavigation } from "./core/navigation";
-import { withObservability } from "./core/observable";
-import { withOptions } from "./core/options";
 import { withPlugins } from "./core/plugins";
 import { withRouteLifecycle } from "./core/routeLifecycle";
 import { withRouterLifecycle } from "./core/routerLifecycle";
 import { withRoutes } from "./core/routes";
 import { withState } from "./core/state";
+import {
+  DependenciesNamespace,
+  ObservableNamespace,
+  OptionsNamespace,
+  StateNamespace,
+} from "./namespaces";
 import { isLoggerConfig } from "./typeGuards";
 
 import type {
@@ -40,6 +40,7 @@ import type {
   Config,
   DefaultDependencies,
   DoneFn,
+  EventName,
   EventsKeys,
   EventToNameMap,
   Middleware,
@@ -83,10 +84,22 @@ const pipe =
     fns.reduce((prev: LegacyRouter<Dependencies>, fn) => fn(prev), arg);
 
 /**
- * Router class that wraps the legacy decorator-based router.
+ * Router class with integrated namespace architecture.
  *
- * Each public method explicitly delegates to the internal legacy router.
- * Methods that return Router return `this` to enable method chaining.
+ * Namespaces provide:
+ * - OptionsNamespace: getOptions, setOption
+ * - DependenciesNamespace: get/set/remove dependencies
+ * - ObservableNamespace: event listeners, subscribe
+ * - StateNamespace: state storage (getState, setState, getPreviousState)
+ *
+ * Decorators still provide:
+ * - withState: makeState, buildState, forwardState, areStatesEqual, etc.
+ * - withRouterLifecycle: start, stop, isStarted
+ * - withRouteLifecycle: canActivate, canDeactivate
+ * - withNavigation: navigate, navigateToState
+ * - withPlugins: usePlugin
+ * - withMiddleware: useMiddleware
+ * - withRoutes: addRoute, removeRoute, etc.
  *
  * @internal This class implementation is internal. Use createRouter() instead.
  */
@@ -149,6 +162,16 @@ export class Router<
   }
   /* eslint-enable @typescript-eslint/member-ordering */
 
+  // ============================================================================
+  // Namespaces
+  // ============================================================================
+
+  readonly #options: OptionsNamespace;
+  readonly #dependencies: DependenciesNamespace<Dependencies>;
+  readonly #observable: ObservableNamespace;
+  readonly #state: StateNamespace;
+
+  // Legacy router for decorators not yet converted to namespaces
   readonly #legacyRouter: LegacyRouter<Dependencies>;
 
   /**
@@ -161,10 +184,34 @@ export class Router<
     options: Partial<Options> = {},
     dependencies: Dependencies = {} as Dependencies,
   ) {
+    // Configure logger if provided
     if (options.logger && isLoggerConfig(options.logger)) {
       logger.configure(options.logger);
       delete options.logger;
     }
+
+    // =========================================================================
+    // Validate inputs before creating namespaces
+    // =========================================================================
+
+    OptionsNamespace.validateOptions(options, "constructor");
+    DependenciesNamespace.validateDependenciesObject(
+      dependencies,
+      "constructor",
+    );
+
+    // =========================================================================
+    // Create Namespaces
+    // =========================================================================
+
+    this.#options = new OptionsNamespace(options);
+    this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
+    this.#observable = new ObservableNamespace();
+    this.#state = new StateNamespace();
+
+    // =========================================================================
+    // Build Uninitialized Router with Namespace-Backed Methods
+    // =========================================================================
 
     const config: Config = {
       decoders: {},
@@ -173,21 +220,165 @@ export class Router<
       forwardMap: {},
     };
 
+    // Store references for closures
+    const optionsNs = this.#options;
+    const dependenciesNs = this.#dependencies;
+    const observableNs = this.#observable;
+    const stateNs = this.#state;
+
+    // Create router object with namespace-backed methods
+    // These methods will be used by subsequent decorators
     const uninitializedRouter = {
       [CONFIG_SYMBOL]: config,
+
+      // =====================================================================
+      // Options (backed by OptionsNamespace)
+      // =====================================================================
+      getOptions: () => optionsNs.get(),
+      setOption: <K extends keyof Options>(
+        optionName: K,
+        value: Options[K],
+      ): LegacyRouter<Dependencies> => {
+        OptionsNamespace.validateOptionName(optionName, "setOption");
+        OptionsNamespace.validateOptionValue(optionName, value, "setOption");
+        optionsNs.set(optionName, value);
+
+        return uninitializedRouter as unknown as LegacyRouter<Dependencies>;
+      },
+
+      // =====================================================================
+      // Dependencies (backed by DependenciesNamespace)
+      // =====================================================================
+      setDependency: <K extends keyof Dependencies & string>(
+        dependencyName: K,
+        dependencyValue: Dependencies[K],
+      ): LegacyRouter<Dependencies> => {
+        DependenciesNamespace.validateName(dependencyName, "setDependency");
+        dependenciesNs.set(dependencyName, dependencyValue);
+
+        return uninitializedRouter as unknown as LegacyRouter<Dependencies>;
+      },
+      setDependencies: (
+        deps: Partial<Dependencies>,
+      ): LegacyRouter<Dependencies> => {
+        DependenciesNamespace.validateDependenciesObject(
+          deps,
+          "setDependencies",
+        );
+        dependenciesNs.setMultiple(deps);
+
+        return uninitializedRouter as unknown as LegacyRouter<Dependencies>;
+      },
+      getDependency: <K extends keyof Dependencies>(
+        dependencyName: K,
+      ): Dependencies[K] => {
+        DependenciesNamespace.validateName(dependencyName, "getDependency");
+
+        return dependenciesNs.get(dependencyName);
+      },
+      getDependencies: (): Partial<Dependencies> => dependenciesNs.getAll(),
+      removeDependency: (
+        dependencyName: keyof Dependencies,
+      ): LegacyRouter<Dependencies> => {
+        DependenciesNamespace.validateName(dependencyName, "removeDependency");
+        dependenciesNs.remove(dependencyName);
+
+        return uninitializedRouter as unknown as LegacyRouter<Dependencies>;
+      },
+      hasDependency: (dependencyName: keyof Dependencies): boolean => {
+        DependenciesNamespace.validateName(dependencyName, "hasDependency");
+
+        return dependenciesNs.has(dependencyName);
+      },
+      resetDependencies: (): LegacyRouter<Dependencies> => {
+        dependenciesNs.reset();
+
+        return uninitializedRouter as unknown as LegacyRouter<Dependencies>;
+      },
+
+      // =====================================================================
+      // Observable/Events (backed by ObservableNamespace)
+      // =====================================================================
+      invokeEventListeners: (
+        eventName: EventToNameMap[EventsKeys],
+        toState?: State,
+        fromState?: State,
+        arg?: RouterError | NavigationOptions,
+      ): void => {
+        ObservableNamespace.validateInvokeArgs(
+          eventName,
+          toState,
+          fromState,
+          arg,
+        );
+        observableNs.invoke(eventName as EventName, toState, fromState, arg);
+      },
+      hasListeners: (eventName: EventToNameMap[EventsKeys]): boolean => {
+        ObservableNamespace.validateEventName(eventName);
+
+        return observableNs.hasListeners(eventName);
+      },
+      removeEventListener: (
+        eventName: EventName,
+        cb: Plugin[keyof Plugin],
+      ): void => {
+        ObservableNamespace.validateListenerArgs(eventName, cb);
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+        observableNs.removeEventListener(eventName, cb as any);
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+      },
+      addEventListener: (
+        eventName: EventName,
+        cb: Plugin[keyof Plugin],
+      ): Unsubscribe => {
+        ObservableNamespace.validateListenerArgs(eventName, cb);
+
+        /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+        return observableNs.addEventListener(eventName, cb as any);
+        /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+      },
+      subscribe: (listener: SubscribeFn): Unsubscribe => {
+        ObservableNamespace.validateSubscribeListener(listener);
+
+        return observableNs.subscribe(listener);
+      },
+
+      // =====================================================================
+      // State Storage (backed by StateNamespace)
+      // Note: Complex state methods (makeState, etc.) added by withState
+      // =====================================================================
+      getState: <P extends Params = Params, MP extends Params = Params>():
+        | State<P, MP>
+        | undefined => stateNs.get<P, MP>(),
+      setState: (state: State | undefined): void => {
+        stateNs.set(state);
+      },
+      getPreviousState: <
+        P extends Params = Params,
+        MP extends Params = Params,
+      >(): State<P, MP> | undefined => stateNs.getPrevious<P, MP>(),
     };
 
+    // =========================================================================
+    // Apply Remaining Decorators
+    // =========================================================================
+    // Decorators removed (replaced by namespaces):
+    // - withOptions
+    // - withDependencies
+    // - withObservability
+    //
+    // withState is partially replaced - storage is in StateNamespace,
+    // but complex methods (makeState, buildState, etc.) still need decorator
+    // =========================================================================
+
     this.#legacyRouter = pipe<Dependencies>(
-      withOptions(options),
-      withDependencies(dependencies),
-      withObservability,
-      withState,
-      withRouterLifecycle,
-      withRouteLifecycle,
-      withNavigation,
-      withPlugins,
-      withMiddleware,
-      withRoutes(routes),
+      withState, // Adds makeState, buildState, forwardState, areStatesEqual, etc.
+      withRouterLifecycle, // Adds start, stop, isStarted - uses invokeEventListeners
+      withRouteLifecycle, // Adds canActivate, canDeactivate
+      withNavigation, // Adds navigate, navigateToState
+      withPlugins, // Adds usePlugin
+      withMiddleware, // Adds useMiddleware
+      withRoutes(routes), // Adds addRoute, removeRoute, etc.
     )(uninitializedRouter as unknown as LegacyRouter<Dependencies>);
   }
 
@@ -273,7 +464,7 @@ export class Router<
   }
 
   // ============================================================================
-  // State Management
+  // State Management (mixed: namespace + decorator)
   // ============================================================================
 
   makeState<P extends Params = Params, MP extends Params = Params>(
@@ -296,18 +487,22 @@ export class Router<
     return this.#legacyRouter.makeNotFoundState(path, options);
   }
 
+  // Delegated to legacyRouter (withState decorator manages state)
+  // Note: StateNamespace provides initial implementation but withState overwrites it
   getState<P extends Params = Params, MP extends Params = Params>():
     | State<P, MP>
     | undefined {
     return this.#legacyRouter.getState<P, MP>();
   }
 
+  // Delegated to legacyRouter (withState decorator manages state)
   setState<P extends Params = Params, MP extends Params = Params>(
     state?: State<P, MP>,
   ): void {
     this.#legacyRouter.setState<P, MP>(state);
   }
 
+  // Delegated to legacyRouter (withState decorator manages state)
   getPreviousState(): State | undefined {
     return this.#legacyRouter.getPreviousState();
   }
@@ -352,15 +547,17 @@ export class Router<
   }
 
   // ============================================================================
-  // Options
+  // Options (backed by OptionsNamespace)
   // ============================================================================
 
   getOptions(): Options {
-    return this.#legacyRouter.getOptions();
+    return this.#options.get();
   }
 
   setOption(option: keyof Options, value: Options[keyof Options]): this {
-    this.#legacyRouter.setOption(option, value);
+    OptionsNamespace.validateOptionName(option, "setOption");
+    OptionsNamespace.validateOptionValue(option, value, "setOption");
+    this.#options.set(option, value);
 
     return this;
   }
@@ -382,6 +579,9 @@ export class Router<
   }
 
   start(startPathOrState?: string | State | DoneFn, done?: DoneFn): this {
+    // Lock options when router starts
+    this.#options.lock();
+
     if (typeof startPathOrState === "function") {
       this.#legacyRouter.start(startPathOrState);
     } else if (startPathOrState !== undefined && done !== undefined) {
@@ -397,6 +597,8 @@ export class Router<
 
   stop(): this {
     this.#legacyRouter.stop();
+    // Unlock options when router stops
+    this.#options.unlock();
 
     return this;
   }
@@ -486,50 +688,57 @@ export class Router<
   }
 
   // ============================================================================
-  // Dependencies
+  // Dependencies (backed by DependenciesNamespace)
   // ============================================================================
 
   setDependency<K extends keyof Dependencies & string>(
     dependencyName: K,
     dependency: Dependencies[K],
   ): this {
-    this.#legacyRouter.setDependency(dependencyName, dependency);
+    DependenciesNamespace.validateName(dependencyName, "setDependency");
+    this.#dependencies.set(dependencyName, dependency);
 
     return this;
   }
 
   setDependencies(deps: Dependencies): this {
-    this.#legacyRouter.setDependencies(deps);
+    DependenciesNamespace.validateDependenciesObject(deps, "setDependencies");
+    this.#dependencies.setMultiple(deps);
 
     return this;
   }
 
   getDependency<K extends keyof Dependencies>(key: K): Dependencies[K] {
-    return this.#legacyRouter.getDependency(key);
+    DependenciesNamespace.validateName(key, "getDependency");
+
+    return this.#dependencies.get(key);
   }
 
   getDependencies(): Partial<Dependencies> {
-    return this.#legacyRouter.getDependencies();
+    return this.#dependencies.getAll();
   }
 
   removeDependency(dependencyName: keyof Dependencies): this {
-    this.#legacyRouter.removeDependency(dependencyName);
+    DependenciesNamespace.validateName(dependencyName, "removeDependency");
+    this.#dependencies.remove(dependencyName);
 
     return this;
   }
 
   hasDependency(dependencyName: keyof Dependencies): boolean {
-    return this.#legacyRouter.hasDependency(dependencyName);
+    DependenciesNamespace.validateName(dependencyName, "hasDependency");
+
+    return this.#dependencies.has(dependencyName);
   }
 
   resetDependencies(): this {
-    this.#legacyRouter.resetDependencies();
+    this.#dependencies.reset();
 
     return this;
   }
 
   // ============================================================================
-  // Events
+  // Events (backed by ObservableNamespace)
   // ============================================================================
 
   invokeEventListeners(
@@ -538,25 +747,35 @@ export class Router<
     fromState?: State,
     arg?: RouterError | NavigationOptions,
   ): void {
-    this.#legacyRouter.invokeEventListeners(eventName, toState, fromState, arg);
+    ObservableNamespace.validateInvokeArgs(eventName, toState, fromState, arg);
+    this.#observable.invoke(eventName as EventName, toState, fromState, arg);
   }
 
   hasListeners(eventName: EventToNameMap[EventsKeys]): boolean {
-    return this.#legacyRouter.hasListeners(eventName);
+    ObservableNamespace.validateEventName(eventName);
+
+    return this.#observable.hasListeners(eventName);
   }
 
   removeEventListener(
     eventName: EventToNameMap[EventsKeys],
     cb: Plugin[keyof Plugin],
   ): void {
-    this.#legacyRouter.removeEventListener(eventName, cb);
+    ObservableNamespace.validateListenerArgs(eventName as EventName, cb);
+    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+    this.#observable.removeEventListener(eventName as EventName, cb as any);
+    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
   }
 
   addEventListener(
     eventName: EventToNameMap[EventsKeys],
     cb: Plugin[keyof Plugin],
   ): Unsubscribe {
-    return this.#legacyRouter.addEventListener(eventName, cb);
+    ObservableNamespace.validateListenerArgs(eventName as EventName, cb);
+
+    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+    return this.#observable.addEventListener(eventName as EventName, cb as any);
+    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
   }
 
   // ============================================================================
@@ -643,11 +862,13 @@ export class Router<
   }
 
   // ============================================================================
-  // Subscription
+  // Subscription (backed by ObservableNamespace)
   // ============================================================================
 
   subscribe(listener: SubscribeFn): Unsubscribe {
-    return this.#legacyRouter.subscribe(listener);
+    ObservableNamespace.validateSubscribeListener(listener);
+
+    return this.#observable.subscribe(listener);
   }
 
   // ============================================================================
