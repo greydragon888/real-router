@@ -17,6 +17,42 @@ describe("core/routes/routeTree/forward", () => {
   });
 
   describe("validation", () => {
+    it("should throw if fromRoute is not a string", () => {
+      expect(() => router.forward(123 as any, "target")).toThrowError(
+        /Invalid fromRoute.*Expected non-empty string/,
+      );
+
+      expect(() => router.forward(null as any, "target")).toThrowError(
+        /Invalid fromRoute.*Expected non-empty string/,
+      );
+    });
+
+    it("should throw if fromRoute is empty string", () => {
+      expect(() => router.forward("", "target")).toThrowError(
+        /Invalid fromRoute.*Expected non-empty string/,
+      );
+    });
+
+    it("should throw if toRoute is not a string", () => {
+      router.addRoute({ name: "source", path: "/source" });
+
+      expect(() => router.forward("source", 456 as any)).toThrowError(
+        /Invalid toRoute.*Expected non-empty string/,
+      );
+
+      expect(() => router.forward("source", {} as any)).toThrowError(
+        /Invalid toRoute.*Expected non-empty string/,
+      );
+    });
+
+    it("should throw if toRoute is empty string", () => {
+      router.addRoute({ name: "source2", path: "/source2" });
+
+      expect(() => router.forward("source2", "")).toThrowError(
+        /Invalid toRoute.*Expected non-empty string/,
+      );
+    });
+
     it("should throw if source route does not exist", () => {
       router.addRoute({ name: "target", path: "/target" });
 

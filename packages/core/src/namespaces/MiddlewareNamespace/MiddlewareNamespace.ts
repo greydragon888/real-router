@@ -97,12 +97,6 @@ export class MiddlewareNamespace<
    * @param factories - Already validated by facade
    */
   use(...factories: MiddlewareFactory<Dependencies>[]): Unsubscribe {
-    if (!this.#router) {
-      throw new Error(
-        `[MiddlewareNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
     // Validate all factories upfront
     for (const [i, factory] of factories.entries()) {
       MiddlewareNamespace.validateFactory<Dependencies>(factory, i);
@@ -132,9 +126,12 @@ export class MiddlewareNamespace<
     try {
       for (const factory of factories) {
         // Bind getDependency to preserve 'this' context when called from factory
+
         const middleware = factory(
-          this.#router,
-          this.#router.getDependency.bind(this.#router),
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+          this.#router!,
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+          this.#router!.getDependency.bind(this.#router),
         );
 
         MiddlewareNamespace.validateMiddleware<Dependencies>(

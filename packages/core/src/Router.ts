@@ -463,6 +463,12 @@ export class Router<
     return this.#options.get();
   }
 
+  getOption<K extends keyof Options>(option: K): Options[K] {
+    OptionsNamespace.validateOptionName(option, "getOption");
+
+    return this.#options.getOption(option);
+  }
+
   setOption(option: keyof Options, value: Options[keyof Options]): this {
     OptionsNamespace.validateOptionName(option, "setOption");
     OptionsNamespace.validateOptionValue(option, value, "setOption");
@@ -900,8 +906,7 @@ export class Router<
     ) => this.navigateToState(toState, fromState, opts, callback, emitSuccess);
 
     // CloneNamespace needs access to collect cloning data and apply config
-    this.#clone.setRouter(
-      routerRef,
+    this.#clone.setCallbacks(
       // getCloneData: collect all data needed for cloning
       () => {
         const [canDeactivateFactories, canActivateFactories] =

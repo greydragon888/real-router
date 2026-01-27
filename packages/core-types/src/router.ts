@@ -434,8 +434,27 @@ export interface Router<
    * console.log('Trailing slash mode:', options.trailingSlash);
    *
    * @see {@link setOption} for modifying individual options
+   * @see {@link getOption} for retrieving a single option
    */
   getOptions: () => Options;
+
+  /**
+   * Gets a single configuration option value.
+   *
+   * @param option - The name of the option to get. Must be a valid option key.
+   * @returns The current value of the specified option.
+   *
+   * @throws {TypeError} If option name is not a string
+   * @throws {ReferenceError} If option name doesn't exist in Options interface
+   *
+   * @example
+   * const caseSensitive = router.getOption('caseSensitive');
+   * const trailingSlash = router.getOption('trailingSlash');
+   *
+   * @see {@link getOptions} for retrieving all options
+   * @see {@link setOption} for modifying options
+   */
+  getOption: <K extends keyof Options>(option: K) => Options[K];
 
   /**
    * Sets a single configuration option value.

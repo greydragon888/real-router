@@ -106,19 +106,6 @@ export class StateNamespace {
   readonly #urlParamsCache = new Map<string, string[]>();
 
   // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // =========================================================================
-
-  /**
-   * Validates state structure.
-   * Called by facade before setState.
-   */
-  /* c8 ignore next 3 -- static method, not currently used */
-  static validateState(state: unknown): asserts state is State {
-    validateState(state, "router.setState");
-  }
-
-  // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
 
@@ -168,33 +155,6 @@ export class StateNamespace {
     return this.#previousState as State<P, MP> | undefined;
   }
 
-  /**
-   * Generates the next state ID.
-   */
-  /* c8 ignore next 3 -- public API, not used internally */
-  nextId(): number {
-    return ++this.#stateId;
-  }
-
-  /**
-   * Gets the current state ID without incrementing.
-   */
-  /* c8 ignore next 3 -- public API, not used internally */
-  getCurrentId(): number {
-    return this.#stateId;
-  }
-
-  /**
-   * Resets state to initial values (for router stop/restart).
-   */
-  /* c8 ignore start -- currently unused, kept for future API */
-  reset(): void {
-    this.#frozenState = undefined;
-    this.#previousState = undefined;
-    // Note: stateId is NOT reset to maintain unique IDs across router lifecycles
-  }
-  /* c8 ignore stop */
-
   // =========================================================================
   // Dependency Injection
   // =========================================================================
@@ -221,13 +181,6 @@ export class StateNamespace {
     meta?: StateMetaInput<MP>,
     forceId?: number,
   ): State<P, MP> {
-    /* c8 ignore next 4 -- defensive check, always set by Router */
-    if (!this.#deps) {
-      throw new Error(
-        `[StateNamespace] Dependencies not set. Call setDependencies() first.`,
-      );
-    }
-
     // Validate name is a string
     if (!isString(name)) {
       throw new TypeError(
@@ -267,7 +220,8 @@ export class StateNamespace {
       : undefined;
 
     // Get default params from routes config, including ancestor routes
-    const defaultParamsConfig = this.#deps.getDefaultParams();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const defaultParamsConfig = this.#deps!.getDefaultParams();
 
     // Collect defaultParams from all ancestors (parent.child -> parent, parent.child)
     const segments = name.split(".");
@@ -293,7 +247,8 @@ export class StateNamespace {
     const state: State<P, MP> = {
       name,
       params: mergedParams,
-      path: path ?? this.#deps.buildPath(name, params),
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+      path: path ?? this.#deps!.buildPath(name, params),
       meta: madeMeta,
     };
 
@@ -343,13 +298,6 @@ export class StateNamespace {
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
-    /* c8 ignore next 4 -- defensive check, always set by Router */
-    if (!this.#deps) {
-      throw new Error(
-        `[StateNamespace] Dependencies not set. Call setDependencies() first.`,
-      );
-    }
-
     if (!state1 || !state2) {
       return !!state1 === !!state2;
     }
@@ -420,18 +368,14 @@ export class StateNamespace {
    * Gets URL params for a route name, using cache for performance.
    */
   #getUrlParams(name: string): string[] {
-    /* c8 ignore next 3 -- defensive check, always set by Router */
-    if (!this.#deps) {
-      return [];
-    }
-
     const cached = this.#urlParamsCache.get(name);
 
     if (cached !== undefined) {
       return cached;
     }
 
-    const result = this.#deps.getUrlParams(name);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const result = this.#deps!.getUrlParams(name);
 
     this.#urlParamsCache.set(name, result);
 

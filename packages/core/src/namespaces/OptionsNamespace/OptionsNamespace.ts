@@ -284,11 +284,4 @@ export class OptionsNamespace {
   unlock(): void {
     this.#locked = false;
   }
-
-  /**
-   * Returns whether options are locked.
-   */
-  isLocked(): boolean {
-    return this.#locked;
-  }
 }

@@ -145,4 +145,108 @@ describe("createRouter", () => {
       expect(router.getOptions().defaultRoute).toBe("home");
     });
   });
+
+  describe("browser plugin stubs", () => {
+    // These methods are stubs that throw unless browser-plugin is installed
+    // Using type assertions since these methods may not be in the public type definitions
+    interface RouterWithStubs {
+      buildUrl: (name: string, params?: Record<string, string>) => string;
+      matchUrl: (url: string) => unknown;
+      replaceHistoryState: (
+        name: string,
+        params?: Record<string, string>,
+        title?: string,
+      ) => void;
+    }
+
+    it("should throw error when buildUrl is called without browser plugin", () => {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+      ]) as unknown as RouterWithStubs;
+
+      expect(() => router.buildUrl("home")).toThrowError(
+        "[router.buildUrl] Browser plugin is not installed",
+      );
+      expect(() => router.buildUrl("home")).toThrowError(
+        'Called with route: "home"',
+      );
+    });
+
+    it("should throw error when matchUrl is called without browser plugin", () => {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+      ]) as unknown as RouterWithStubs;
+
+      expect(() => router.matchUrl("/home")).toThrowError(
+        "[router.matchUrl] Browser plugin is not installed",
+      );
+      expect(() => router.matchUrl("/home")).toThrowError(
+        'Called with URL: "/home"',
+      );
+    });
+
+    it("should throw error when replaceHistoryState is called without browser plugin", () => {
+      const router = createRouter([
+        { name: "home", path: "/home" },
+      ]) as unknown as RouterWithStubs;
+
+      expect(() => {
+        router.replaceHistoryState("home");
+      }).toThrowError(
+        "[router.replaceHistoryState] Browser plugin is not installed",
+      );
+      expect(() => {
+        router.replaceHistoryState("home");
+      }).toThrowError('Called with route: "home"');
+    });
+  });
+
+  describe("TC39 Observable spec", () => {
+    /**
+     * Symbol.observable polyfill - TC39 proposal with fallback
+     */
+    const $$observable: typeof Symbol.observable =
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check for environments without Symbol.observable
+      (typeof Symbol === "function" && Symbol.observable) ||
+      ("@@observable" as unknown as typeof Symbol.observable);
+
+    it("should expose observable via Symbol.observable on router instance", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+      const observableMethod = (router as unknown as Record<symbol, unknown>)[
+        $$observable
+      ];
+
+      expect(typeof observableMethod).toBe("function");
+    });
+
+    it("should return observable object from Symbol.observable method", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+      const observable = (router as unknown as Record<symbol, () => unknown>)[
+        $$observable
+      ]();
+
+      expect(observable).toBeDefined();
+      expect(typeof (observable as { subscribe: unknown }).subscribe).toBe(
+        "function",
+      );
+    });
+
+    it("should expose observable via Symbol.observable key (line 775)", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+
+      // In Node.js, Symbol.observable is undefined (TC39 proposal not yet standard)
+      // The class defines [Symbol.observable]() which evaluates to [undefined]()
+      // So the method is keyed by undefined (or by Symbol.observable if it exists)
+      const key = Symbol.observable; // undefined in Node.js
+
+      const observableMethod = (router as any)[key] as () => unknown;
+
+      expect(typeof observableMethod).toBe("function");
+
+      // Call the method with proper this binding to ensure full coverage
+      const observable = observableMethod.call(router);
+
+      expect(observable).toBeDefined();
+    });
+  });
 });

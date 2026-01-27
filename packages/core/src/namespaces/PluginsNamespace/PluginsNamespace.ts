@@ -103,12 +103,6 @@ export class PluginsNamespace<
    * @param factories - Already validated by facade
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
-    if (!this.#router) {
-      throw new Error(
-        `[PluginsNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
     // Validate all factories upfront
     for (const factory of factories) {
       PluginsNamespace.validateFactory<Dependencies>(factory);

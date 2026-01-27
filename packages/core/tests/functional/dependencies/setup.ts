@@ -1,7 +1,5 @@
 import { createRouter } from "@real-router/core";
 
-import { withDependencies } from "../../../src/core/dependencies";
-
 import type { Router } from "@real-router/core";
 
 /**
@@ -30,9 +28,8 @@ export const DEFAULT_DEPENDENCIES: Partial<TestDependencies> = {
 export function createDependenciesTestRouter(
   initialDeps: Partial<TestDependencies> = DEFAULT_DEPENDENCIES,
 ): Router<TestDependencies> {
-  const baseRouter = createRouter();
-  const routerWithDeps =
-    withDependencies<TestDependencies>(initialDeps)(baseRouter);
+  // Router now has built-in dependency management via DependenciesNamespace
+  const router = createRouter<TestDependencies>([], {}, initialDeps);
 
-  return routerWithDeps.start();
+  return router.start();
 }

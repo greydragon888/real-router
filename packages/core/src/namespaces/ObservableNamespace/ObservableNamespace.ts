@@ -483,7 +483,10 @@ export class ObservableNamespace {
     const observableObj: RouterObservable = {
       /**
        * TC39 Observable spec: [Symbol.observable]() returns self
+       * Note: In Node.js where Symbol.observable is undefined, $$observable falls
+       * back to "@@observable" string, and this method gets overwritten by line below.
        */
+      /* v8 ignore next 3 -- @preserve unreachable in Node.js: $$observable = "@@observable" when Symbol.observable is undefined */
       [$$observable]() {
         return observableObj;
       },

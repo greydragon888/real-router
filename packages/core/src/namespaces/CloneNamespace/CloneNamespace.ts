@@ -55,11 +55,6 @@ export class CloneNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   /**
-   * Reference to the source router.
-   */
-  #router: RouterInterface<Dependencies> | undefined;
-
-  /**
    * Function to get cloning data from the source router.
    */
   #getCloneData: (() => CloneData<Dependencies>) | undefined;
@@ -70,14 +65,12 @@ export class CloneNamespace<
   #applyConfig: ApplyConfigFn | undefined;
 
   /**
-   * Sets the router reference and cloning functions.
+   * Sets the cloning functions.
    */
-  setRouter(
-    router: RouterInterface<Dependencies>,
+  setCallbacks(
     getCloneData: () => CloneData<Dependencies>,
     applyConfig: ApplyConfigFn,
   ): void {
-    this.#router = router;
     this.#getCloneData = getCloneData;
     this.#applyConfig = applyConfig;
   }
@@ -92,15 +85,9 @@ export class CloneNamespace<
     dependencies: Dependencies | undefined,
     factory: RouterFactory<Dependencies>,
   ): RouterInterface<Dependencies> {
-    /* c8 ignore next 4 -- defensive check, always set by Router */
-    if (!this.#router || !this.#getCloneData || !this.#applyConfig) {
-      throw new Error(
-        `[CloneNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
     // Collect all data from source router
-    const data = this.#getCloneData();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const data = this.#getCloneData!();
 
     // Merge dependencies
     const mergedDeps = {
@@ -131,7 +118,8 @@ export class CloneNamespace<
     }
 
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
-    this.#applyConfig(
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    this.#applyConfig!(
       newRouter as unknown as RouterInterface,
       data.routeConfig,
       data.resolvedForwardMap,

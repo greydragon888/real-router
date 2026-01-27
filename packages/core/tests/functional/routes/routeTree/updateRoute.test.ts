@@ -1073,6 +1073,18 @@ describe("core/routes/routeTree/updateRoute", () => {
           router.updateRoute("ur-self", { forwardTo: "ur-self" }),
         ).toThrowError(/Circular forwardTo/);
       });
+
+      it("should reject forwardTo with invalid type (not string or null)", () => {
+        router.addRoute({ name: "ur-invalid-fwd", path: "/ur-invalid-fwd" });
+
+        expect(() =>
+          router.updateRoute("ur-invalid-fwd", { forwardTo: 123 as any }),
+        ).toThrowError(/forwardTo must be a string or null/);
+
+        expect(() =>
+          router.updateRoute("ur-invalid-fwd", { forwardTo: {} as any }),
+        ).toThrowError(/forwardTo must be a string or null/);
+      });
     });
 
     describe("atomicity (partial update scenarios)", () => {

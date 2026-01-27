@@ -45,36 +45,24 @@ describe("core/dependencies/hasDependency", () => {
     expect(router.hasDependency("foo")).toBe(true);
   });
 
-  it("should handle automatic type coercion for non-string parameters", () => {
-    // Numbers are coerced to strings
-    // @ts-expect-error: testing number parameter
-    expect(router.hasDependency(123)).toBe(false);
+  it("should throw TypeError for non-string parameters", () => {
+    // Numbers should throw
+    expect(() => {
+      // @ts-expect-error: testing number parameter
+      router.hasDependency(123);
+    }).toThrowError(TypeError);
 
-    // @ts-expect-error: setting number key
-    router.setDependency("123", "value");
+    // null should throw
+    expect(() => {
+      // @ts-expect-error: testing null parameter
+      router.hasDependency(null);
+    }).toThrowError(TypeError);
 
-    // @ts-expect-error: checking with number
-    expect(router.hasDependency(123)).toBe(true);
-
-    // null coerced to string 'null'
-    // @ts-expect-error: testing null parameter
-    expect(router.hasDependency(null)).toBe(false);
-
-    // @ts-expect-error: setting 'null' key
-    router.setDependency("null", "value");
-
-    // @ts-expect-error: checking with null
-    expect(router.hasDependency(null)).toBe(true);
-
-    // undefined coerced to string 'undefined'
-    // @ts-expect-error: testing undefined parameter
-    expect(router.hasDependency(undefined)).toBe(false);
-
-    // @ts-expect-error: setting 'undefined' key
-    router.setDependency("undefined", "value");
-
-    // @ts-expect-error: checking with undefined
-    expect(router.hasDependency(undefined)).toBe(true);
+    // undefined should throw
+    expect(() => {
+      // @ts-expect-error: testing undefined parameter
+      router.hasDependency(undefined);
+    }).toThrowError(TypeError);
   });
 
   it("should be case-sensitive for dependency names", () => {

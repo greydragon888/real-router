@@ -120,12 +120,6 @@ const resolveStartState = <Dependencies extends DefaultDependencies>(
 export class RouterLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  #started = false;
-  #active = false;
-
-  // Router reference for lifecycle operations (set after construction)
-  #router: Router<Dependencies> | undefined;
-
   // ═══════════════════════════════════════════════════════════════════════════
   // Functional references for cyclic dependencies
   // ═══════════════════════════════════════════════════════════════════════════
@@ -134,13 +128,20 @@ export class RouterLifecycleNamespace<
    * Functional reference to NavigationNamespace.navigateToState().
    * Must be set before calling start().
    */
-  navigateToState: (
+
+  navigateToState!: (
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
     callback: DoneFn,
     emitSuccess: boolean,
-  ) => CancelFn = () => noop;
+  ) => CancelFn;
+
+  #started = false;
+  #active = false;
+
+  // Router reference for lifecycle operations (set after construction)
+  #router: Router<Dependencies> | undefined;
 
   // =========================================================================
   // Dependency injection
@@ -177,13 +178,8 @@ export class RouterLifecycleNamespace<
    * Starts the router with an optional path or state.
    */
   start(...args: StartRouterArguments): void {
-    if (!this.#router) {
-      throw new Error(
-        `[RouterLifecycleNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
-    const router = this.#router;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const router = this.#router!;
     const options = router.getOptions();
     const [startPathOrState, done] = getStartRouterArguments(args);
 
@@ -401,13 +397,8 @@ export class RouterLifecycleNamespace<
    * Stops the router and resets state.
    */
   stop(): void {
-    if (!this.#router) {
-      throw new Error(
-        `[RouterLifecycleNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
-    const router = this.#router;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const router = this.#router!;
 
     // Issue #50: Always unset active flag when stopping
     // This cancels any in-flight transitions via isCancelled() check

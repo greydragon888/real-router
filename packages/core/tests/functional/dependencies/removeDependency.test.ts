@@ -83,42 +83,24 @@ describe("core/dependencies/removeDependency", () => {
     warnSpy.mockRestore();
   });
 
-  it("should handle type coercion for non-string parameters", () => {
-    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+  it("should throw TypeError for non-string parameters", () => {
+    // Number parameter should throw
+    expect(() => {
+      // @ts-expect-error: testing number parameter
+      router.removeDependency(123);
+    }).toThrowError(TypeError);
 
-    // Number parameter
-    // @ts-expect-error: testing number parameter
-    router.removeDependency(123);
+    // null parameter should throw
+    expect(() => {
+      // @ts-expect-error: testing null parameter
+      router.removeDependency(null);
+    }).toThrowError(TypeError);
 
-    // Logger format: logger.warn(context, message)
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining("Attempted to remove non-existent dependency"),
-    );
-
-    warnSpy.mockClear();
-
-    // null parameter
-    // @ts-expect-error: testing null parameter
-    router.removeDependency(null);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining("Attempted to remove non-existent dependency"),
-    );
-
-    warnSpy.mockClear();
-
-    // undefined parameter
-    // @ts-expect-error: testing undefined parameter
-    router.removeDependency(undefined);
-
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining("Attempted to remove non-existent dependency"),
-    );
-
-    warnSpy.mockRestore();
+    // undefined parameter should throw
+    expect(() => {
+      // @ts-expect-error: testing undefined parameter
+      router.removeDependency(undefined);
+    }).toThrowError(TypeError);
   });
 
   it("should handle empty string as valid key", () => {

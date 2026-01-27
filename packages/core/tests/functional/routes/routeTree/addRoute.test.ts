@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Params, Route, Router } from "@real-router/core";
 
 let router: Router;
 
@@ -170,6 +170,15 @@ describe("core/routes/addRoute", () => {
         children: [{ name: 123 as unknown as string, path: "/invalid" }],
       });
     }).toThrowError("[router.addRoute] Route name must be a string");
+  });
+
+  it("should throw when route name is empty string", () => {
+    expect(() => {
+      router.addRoute({
+        name: "",
+        path: "/empty-name",
+      });
+    }).toThrowError(/Route name cannot be empty/i);
   });
 
   it("should validate deeply nested children", () => {
@@ -616,6 +625,28 @@ describe("core/routes/addRoute", () => {
           ],
         });
       }).toThrowError(/decodeparams must be a function/i);
+    });
+
+    it("should throw when decodeParams is an async function", () => {
+      expect(() => {
+        router.addRoute({
+          name: "async-decoder",
+          path: "/async-decoder/:id",
+          // eslint-disable-next-line @typescript-eslint/require-await -- testing runtime validation
+          decodeParams: (async (params: Params) => params) as any,
+        });
+      }).toThrowError(/decodeparams cannot be async/i);
+    });
+
+    it("should throw when encodeParams is an async function", () => {
+      expect(() => {
+        router.addRoute({
+          name: "async-encoder",
+          path: "/async-encoder/:id",
+          // eslint-disable-next-line @typescript-eslint/require-await -- testing runtime validation
+          encodeParams: (async (params: Params) => params) as any,
+        });
+      }).toThrowError(/encodeparams cannot be async/i);
     });
   });
 
@@ -1197,6 +1228,38 @@ describe("core/routes/addRoute", () => {
             canActivate: { handler: () => true } as any,
           });
         }).toThrowError(/canactivate must be a function/i);
+      });
+    });
+
+    describe("canDeactivate type validation", () => {
+      it("should throw if canDeactivate is not a function", () => {
+        expect(() => {
+          router.addRoute({
+            name: "bad-deactivate-guard",
+            path: "/bad-deactivate-guard",
+            canDeactivate: "not a function" as any,
+          });
+        }).toThrowError(/candeactivate must be a function/i);
+      });
+
+      it("should throw if canDeactivate is null", () => {
+        expect(() => {
+          router.addRoute({
+            name: "null-deactivate-guard",
+            path: "/null-deactivate-guard",
+            canDeactivate: null as any,
+          });
+        }).toThrowError(/candeactivate must be a function/i);
+      });
+
+      it("should throw if canDeactivate is an object", () => {
+        expect(() => {
+          router.addRoute({
+            name: "object-deactivate-guard",
+            path: "/object-deactivate-guard",
+            canDeactivate: { handler: () => true } as any,
+          });
+        }).toThrowError(/candeactivate must be a function/i);
       });
     });
 

@@ -945,5 +945,76 @@ describe("core/options", () => {
       // The option may remain undefined or keep default
       expect(testRouter.getOptions().defaultRoute).toBe("home");
     });
+
+    it("should throw TypeError for array as options in createRouter (line 194)", () => {
+      expect(() => createRouter([], [] as any)).toThrowError(TypeError);
+      expect(() => createRouter([], [] as any)).toThrowError(
+        "Invalid options: expected plain object, got array",
+      );
+    });
+
+    it("should throw TypeError for class instance as options in createRouter (line 194)", () => {
+      class CustomOptions {
+        caseSensitive = true;
+      }
+
+      expect(() => createRouter([], new CustomOptions() as any)).toThrowError(
+        TypeError,
+      );
+      expect(() => createRouter([], new CustomOptions() as any)).toThrowError(
+        "Invalid options: expected plain object, got CustomOptions",
+      );
+    });
+  });
+
+  describe("getOption", () => {
+    it("should return a single option value", () => {
+      // Values should match getOptions()
+      expect(router.getOption("caseSensitive")).toBe(
+        router.getOptions().caseSensitive,
+      );
+      expect(router.getOption("trailingSlash")).toBe(
+        router.getOptions().trailingSlash,
+      );
+      expect(router.getOption("allowNotFound")).toBe(
+        router.getOptions().allowNotFound,
+      );
+    });
+
+    it("should return updated value after setOption", () => {
+      router.setOption("caseSensitive", true);
+
+      expect(router.getOption("caseSensitive")).toBe(true);
+    });
+
+    it("should throw TypeError for non-string option name", () => {
+      expect(() => {
+        // @ts-expect-error: testing invalid input
+        router.getOption(123);
+      }).toThrowError(TypeError);
+
+      expect(() => {
+        // @ts-expect-error: testing invalid input
+        router.getOption(null);
+      }).toThrowError(TypeError);
+    });
+
+    it("should throw ReferenceError for unknown option name", () => {
+      expect(() => {
+        // @ts-expect-error: testing unknown option
+        router.getOption("unknownOption");
+      }).toThrowError(ReferenceError);
+    });
+
+    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf for compile-time assertions
+    it("should be type-safe", () => {
+      const caseSensitive = router.getOption("caseSensitive");
+      const trailingSlash = router.getOption("trailingSlash");
+
+      expectTypeOf(caseSensitive).toEqualTypeOf<boolean>();
+      expectTypeOf(trailingSlash).toEqualTypeOf<
+        "strict" | "never" | "always" | "preserve"
+      >();
+    });
   });
 });

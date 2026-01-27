@@ -95,12 +95,6 @@ function parseNavigateArgs(
 export class NavigationNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  #navigating = false;
-  #cancelCurrentTransition: CancelFn | null = null;
-
-  // Router reference for navigation operations (set after construction)
-  #router: Router<Dependencies> | undefined;
-
   // ═══════════════════════════════════════════════════════════════════════════
   // Functional reference for cyclic dependency
   // ═══════════════════════════════════════════════════════════════════════════
@@ -109,7 +103,14 @@ export class NavigationNamespace<
    * Functional reference to RouterLifecycleNamespace.isStarted().
    * Must be set before calling navigate().
    */
-  isRouterStarted: () => boolean = () => false;
+
+  isRouterStarted!: () => boolean;
+
+  #navigating = false;
+  #cancelCurrentTransition: CancelFn | null = null;
+
+  // Router reference for navigation operations (set after construction)
+  #router: Router<Dependencies> | undefined;
 
   // =========================================================================
   // Dependency injection
@@ -157,13 +158,8 @@ export class NavigationNamespace<
     callback: DoneFn,
     emitSuccess: boolean,
   ): CancelFn {
-    if (!this.#router) {
-      throw new Error(
-        `[NavigationNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
-    const router = this.#router;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const router = this.#router!;
 
     // Warn about concurrent navigation (potential SSR race condition)
     if (this.#navigating) {
@@ -271,13 +267,8 @@ export class NavigationNamespace<
     optsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
-    if (!this.#router) {
-      throw new Error(
-        `[NavigationNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
-    const router = this.#router;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const router = this.#router!;
 
     // Parse polymorphic arguments first (needed for callback in error case)
     const { params, opts, callback } = parseNavigateArgs(
@@ -377,13 +368,8 @@ export class NavigationNamespace<
     optsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
-    if (!this.#router) {
-      throw new Error(
-        `[NavigationNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
-    const router = this.#router;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const router = this.#router!;
     const options = router.getOptions();
 
     if (!options.defaultRoute) {

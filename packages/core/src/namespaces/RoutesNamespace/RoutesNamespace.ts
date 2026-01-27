@@ -132,13 +132,16 @@ function extractParamsFromPaths(paths: readonly string[]): Set<string> {
 /**
  * Collects all path segments for a route from batch definitions.
  * Traverses parent routes to include inherited path segments.
+ *
+ * IMPORTANT: Callers MUST validate route existence before calling.
+ * This function assumes the route exists and will always be found.
  */
 function collectPathsToRoute<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   routeName: string,
   parentName = "",
   paths: string[] = [],
-): string[] | undefined {
+): string[] {
   for (const route of routes) {
     const fullName = parentName ? `${parentName}.${route.name}` : route.name;
     const currentPaths = [...paths, route.path];
@@ -148,20 +151,24 @@ function collectPathsToRoute<Dependencies extends DefaultDependencies>(
     }
 
     if (route.children && routeName.startsWith(`${fullName}.`)) {
-      const result = collectPathsToRoute(
+      // Route is a descendant of this node - recurse into children
+      // Since we validated existence, it WILL be found in this subtree
+      return collectPathsToRoute(
         route.children,
         routeName,
         fullName,
         currentPaths,
       );
-
-      if (result) {
-        return result;
-      }
     }
   }
 
-  return undefined;
+  // This point is unreachable when callers validate route existence.
+  // The route either matches directly or is found in the correct subtree.
+  // Throwing here catches internal bugs (e.g., inconsistent naming logic).
+  /* v8 ignore next 3 -- @preserve unreachable: callers validate existence */
+  throw new Error(
+    `[internal] collectPathsToRoute: route "${routeName}" not found - callers must validate existence first.`,
+  );
 }
 
 /**
@@ -322,48 +329,10 @@ export class RoutesNamespace<
   // =========================================================================
 
   /**
-   * Validates route name format.
-   */
-  static validateRouteName(
-    name: unknown,
-    methodName: string,
-  ): asserts name is string {
-    validateRouteName(name, methodName);
-  }
-
-  /**
    * Validates removeRoute arguments.
    */
   static validateRemoveRouteArgs(name: unknown): asserts name is string {
     validateRouteName(name, "removeRoute");
-  }
-
-  /**
-   * Validates params structure.
-   */
-  static validateParams(
-    params: unknown,
-    methodName: string,
-  ): asserts params is Params {
-    if (!isParams(params)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid params structure: ${getTypeDescription(params)}`,
-      );
-    }
-  }
-
-  /**
-   * Validates optional params (undefined is allowed).
-   */
-  static validateOptionalParams(
-    params: unknown,
-    methodName: string,
-  ): asserts params is Params | undefined {
-    if (params !== undefined && !isParams(params)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid params structure: ${getTypeDescription(params)}`,
-      );
-    }
   }
 
   /**
@@ -812,8 +781,8 @@ export class RoutesNamespace<
 
     // Use cached buildOptions if available
     const buildOptions =
-      this.#buildOptionsCache ??
-      createBuildOptions(options ?? this.#getDefaultOptions());
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
+      this.#buildOptionsCache ?? createBuildOptions(options!);
 
     return routeNodeBuildPath(this.#tree, route, encodedParams, buildOptions);
   }
@@ -832,7 +801,8 @@ export class RoutesNamespace<
       );
     }
 
-    const opts = options ?? this.#getDefaultOptions();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
+    const opts = options!;
     const matchOptions = createMatchOptions(opts);
     const matchResult = matchSegments(this.#tree, path, matchOptions);
 
@@ -854,33 +824,14 @@ export class RoutesNamespace<
         ? this.buildPath(routeName, routeParams, opts)
         : path;
 
-      // Create state using router's makeState if available
-      if (this.#router) {
-        return this.#router.makeState<P, MP>(
-          routeName,
-          routeParams,
-          builtPath,
-          {
-            params: meta as MP,
-            options: {},
-            source,
-            redirected: false,
-          },
-        );
-      }
-
-      // Fallback if router not set
-      return {
-        name: routeName,
-        params: routeParams,
-        path: builtPath,
-        meta: {
-          params: meta as MP,
-          options: {},
-          source,
-          redirected: false,
-        },
-      } as State<P, MP>;
+      // Create state using router's makeState
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- router is always set by Router.ts
+      return this.#router!.makeState<P, MP>(routeName, routeParams, builtPath, {
+        params: meta as MP,
+        options: {},
+        source,
+        redirected: false,
+      });
     }
 
     return undefined;
@@ -957,19 +908,9 @@ export class RoutesNamespace<
       validatedRouteNames.add(name);
     }
 
-    // Warn about empty string usage
-    if (name === "") {
-      logger.warn(
-        "real-router",
-        'isActiveRoute("") called with empty string. ' +
-          "The root node is not considered active for any named route. " +
-          "To check if router has active state, use: router.getState() !== undefined",
-      );
-
-      return false;
-    }
-
-    const activeState = this.#router?.getState();
+    // Note: empty string check is handled by Router.ts facade
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- router is always set by Router.ts
+    const activeState = this.#router!.getState();
 
     if (!activeState) {
       return false;
@@ -1085,16 +1026,6 @@ export class RoutesNamespace<
   }
 
   /**
-   * Sets config (used by clone).
-   */
-  setConfig(config: RouteConfig): void {
-    Object.assign(this.#config.decoders, config.decoders);
-    Object.assign(this.#config.encoders, config.encoders);
-    Object.assign(this.#config.defaultParams, config.defaultParams);
-    Object.assign(this.#config.forwardMap, config.forwardMap);
-  }
-
-  /**
    * Sets resolved forward map (used by clone).
    */
   setResolvedForwardMap(map: Record<string, string>): void {
@@ -1106,14 +1037,6 @@ export class RoutesNamespace<
    */
   cloneRoutes(): Route<Dependencies>[] {
     return routeTreeToDefinitions(this.#tree) as Route<Dependencies>[];
-  }
-
-  /**
-   * Returns a deep clone of stored route definitions.
-   * Preserves original structure including empty children arrays.
-   */
-  getDefinitions(): RouteDefinition[] {
-    return structuredClone(this.#definitions);
   }
 
   // =========================================================================
@@ -1129,12 +1052,11 @@ export class RoutesNamespace<
     targetName: string,
     methodName: "forward" | "updateRoute" = "updateRoute",
   ): void {
-    const sourceSegments = getSegmentsByName(this.#tree, sourceName);
-    const targetSegments = getSegmentsByName(this.#tree, targetName);
-
-    if (!sourceSegments || !targetSegments) {
-      return;
-    }
+    // Note: hasRoute() is always called before this method, so segments are guaranteed to exist
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasRoute() validates existence
+    const sourceSegments = getSegmentsByName(this.#tree, sourceName)!;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasRoute() validates existence
+    const targetSegments = getSegmentsByName(this.#tree, targetName)!;
 
     // Get source and target URL params using helper
     const sourceParams = this.#collectUrlParams(sourceSegments);
@@ -1359,27 +1281,6 @@ export class RoutesNamespace<
     }
 
     return params;
-  }
-
-  #getDefaultOptions(): Options {
-    // Use router's options if available, otherwise return minimal defaults
-    return (
-      this.#router?.getOptions() ?? {
-        defaultRoute: "",
-        defaultParams: {},
-        queryParams: {
-          nullFormat: "default",
-          arrayFormat: "none",
-          booleanFormat: "none",
-        },
-        caseSensitive: false,
-        trailingSlash: "preserve",
-        urlParamsEncoding: "default",
-        queryParamsMode: "loose",
-        allowNotFound: true,
-        rewritePathOnMatch: true,
-      }
-    );
   }
 
   #validateAndCacheForwardMap(): void {
@@ -1834,48 +1735,25 @@ export class RoutesNamespace<
               }
             }
           }
-        } else if (topLevelBatch) {
+        } else {
           // Target is in batch - extract params from batch route definitions
+          // topLevelBatch is always defined here because:
+          // Target is in batch - batchNames.has(forwardTo) is true here
+          // topLevelBatch is always defined when batchNames has the target
           const targetPaths = collectPathsToRoute(
-            topLevelBatch,
+            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set on first call
+            topLevelBatch!,
             route.forwardTo,
           );
 
-          targetParams = targetPaths
-            ? extractParamsFromPaths(targetPaths)
-            : new Set<string>();
-        } else {
-          targetParams = new Set<string>();
+          targetParams = extractParamsFromPaths(targetPaths);
         }
 
         // Get source's params - from current route and all ancestors
-        let sourceParams: Set<string>;
-
-        if (topLevelBatch) {
-          // Get all paths from root to source in batch
-          const sourcePaths = collectPathsToRoute(topLevelBatch, fullName);
-
-          sourceParams = sourcePaths
-            ? extractParamsFromPaths(sourcePaths)
-            : new Set<string>();
-        } else {
-          // Fallback: extract from current path and tree ancestors
-          sourceParams = extractParamsFromPath(route.path);
-
-          if (parentPrefix !== "") {
-            const parentSegments = getSegmentsByName(this.#tree, parentPrefix);
-
-            if (parentSegments) {
-              for (const segment of parentSegments) {
-                if (segment.parser) {
-                  for (const param of segment.parser.urlParams) {
-                    sourceParams.add(param);
-                  }
-                }
-              }
-            }
-          }
-        }
+        // topLevelBatch is always defined (set on first call at line 1590)
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set on first call
+        const sourcePaths = collectPathsToRoute(topLevelBatch!, fullName);
+        const sourceParams = extractParamsFromPaths(sourcePaths);
 
         // Check for missing params
         const missingParams = [...targetParams].filter(
@@ -1961,11 +1839,6 @@ export class RoutesNamespace<
     targetMap: Record<string, string>,
   ): void {
     for (const route of routes) {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
-      if (!route || typeof route !== "object") {
-        continue;
-      }
-
       const fullName = parentPrefix
         ? `${parentPrefix}.${route.name}`
         : route.name;

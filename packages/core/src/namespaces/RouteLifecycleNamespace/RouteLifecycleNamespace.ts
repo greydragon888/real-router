@@ -235,12 +235,6 @@ export class RouteLifecycleNamespace<
     functions: Map<string, ActivationFn>,
     methodName: string,
   ): void {
-    if (!this.#router) {
-      throw new Error(
-        `[RouteLifecycleNamespace] Router not set. Call setRouter() first.`,
-      );
-    }
-
     // Prevent self-modification during factory compilation
     if (this.#registering.has(name)) {
       throw new Error(
@@ -272,9 +266,12 @@ export class RouteLifecycleNamespace<
 
     try {
       // Bind getDependency to preserve 'this' context when called from factory
+
       const fn = factory(
-        this.#router,
-        this.#router.getDependency.bind(this.#router),
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+        this.#router!,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+        this.#router!.getDependency.bind(this.#router),
       );
 
       if (typeof fn !== "function") {
