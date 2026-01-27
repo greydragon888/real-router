@@ -28,6 +28,7 @@ import { getTransitionPath } from "../../transitionPath";
 import type { RouteConfig } from "./types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
+  ActivationFnFactory,
   DefaultDependencies,
   Options,
   Params,
@@ -203,6 +204,13 @@ export class RoutesNamespace<
     null,
   ) as Record<string, string>;
 
+  // Pending canActivate handlers that need to be registered after router is set
+  // Key: route name, Value: canActivate factory
+  readonly #pendingCanActivate = new Map<
+    string,
+    ActivationFnFactory<Dependencies>
+  >();
+
   #rootPath = "";
   #tree: RouteTree;
   #buildOptionsCache: BuildOptions | undefined;
@@ -229,6 +237,9 @@ export class RoutesNamespace<
     // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
     // Note: canActivate handlers are registered later when #lifecycleNamespace is set
     this.#registerAllRouteHandlers(routes);
+
+    // Validate and cache forwardTo chains (detect cycles)
+    this.#validateAndCacheForwardMap();
   }
 
   // =========================================================================
@@ -264,10 +275,19 @@ export class RoutesNamespace<
   // =========================================================================
 
   /**
-   * Sets the router reference.
+   * Sets the router reference and registers pending canActivate handlers.
+   * canActivate handlers from initial routes are deferred until router is set.
    */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
+
+    // Register pending canActivate handlers that were deferred during construction
+    for (const [routeName, handler] of this.#pendingCanActivate) {
+      router.canActivate(routeName, handler);
+    }
+
+    // Clear pending handlers after registration
+    this.#pendingCanActivate.clear();
   }
 
   /**
@@ -373,6 +393,75 @@ export class RoutesNamespace<
     this.#validateAndCacheForwardMap();
 
     return true;
+  }
+
+  /**
+   * Updates a route's configuration in place without rebuilding the tree.
+   * This is used by Router.updateRoute to directly modify config entries
+   * without destroying other routes' forwardMap references.
+   *
+   * @param name - Route name
+   * @param updates - Config updates to apply
+   * @param updates.forwardTo - Forward target route name (null to clear)
+   * @param updates.defaultParams - Default parameters (null to clear)
+   * @param updates.decodeParams - Params decoder function (null to clear)
+   * @param updates.encodeParams - Params encoder function (null to clear)
+   */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- simple config updates
+  updateRouteConfig(
+    name: string,
+    updates: {
+      forwardTo?: string | null | undefined;
+      defaultParams?: Params | null | undefined;
+      decodeParams?: ((params: Params) => Params) | null | undefined;
+      encodeParams?: ((params: Params) => Params) | null | undefined;
+    },
+  ): void {
+    // Update forwardTo
+    if (updates.forwardTo !== undefined) {
+      if (updates.forwardTo === null) {
+        delete this.#config.forwardMap[name];
+      } else {
+        this.#config.forwardMap[name] = updates.forwardTo;
+      }
+
+      this.#validateAndCacheForwardMap();
+    }
+
+    // Update defaultParams
+    if (updates.defaultParams !== undefined) {
+      if (updates.defaultParams === null) {
+        delete this.#config.defaultParams[name];
+      } else {
+        this.#config.defaultParams[name] = updates.defaultParams;
+      }
+    }
+
+    // Update decoders with fallback wrapper
+    // Runtime guard: fallback to params if decoder returns undefined (bad user code)
+    if (updates.decodeParams !== undefined) {
+      if (updates.decodeParams === null) {
+        delete this.#config.decoders[name];
+      } else {
+        const decoder = updates.decodeParams;
+
+        this.#config.decoders[name] = (params: Params): Params =>
+          (decoder(params) as Params | undefined) ?? params;
+      }
+    }
+
+    // Update encoders with fallback wrapper
+    // Runtime guard: fallback to params if encoder returns undefined (bad user code)
+    if (updates.encodeParams !== undefined) {
+      if (updates.encodeParams === null) {
+        delete this.#config.encoders[name];
+      } else {
+        const encoder = updates.encodeParams;
+
+        this.#config.encoders[name] = (params: Params): Params =>
+          (encoder(params) as Params | undefined) ?? params;
+      }
+    }
   }
 
   /**
@@ -728,10 +817,18 @@ export class RoutesNamespace<
   }
 
   /**
-   * Creates a clone of the routes for a new router.
+   * Creates a clone of the routes for a new router (from tree).
    */
   cloneRoutes(): Route<Dependencies>[] {
     return routeTreeToDefinitions(this.#tree) as Route<Dependencies>[];
+  }
+
+  /**
+   * Returns a deep clone of stored route definitions.
+   * Preserves original structure including empty children arrays.
+   */
+  getDefinitions(): RouteDefinition[] {
+    return structuredClone(this.#definitions);
   }
 
   // =========================================================================
@@ -835,9 +932,15 @@ export class RoutesNamespace<
     route: Route<Dependencies>,
     fullName: string,
   ): void {
-    // Register canActivate
-    if (route.canActivate && this.#lifecycleNamespace) {
-      this.#lifecycleNamespace.registerCanActivate(fullName, route.canActivate);
+    // Register canActivate via router API (allows tests to spy on router.canActivate)
+    if (route.canActivate) {
+      if (this.#router) {
+        // Router is available, register immediately
+        this.#router.canActivate(fullName, route.canActivate);
+      } else {
+        // Router not set yet, store for later registration
+        this.#pendingCanActivate.set(fullName, route.canActivate);
+      }
     }
 
     // Register forwardTo
@@ -845,13 +948,15 @@ export class RoutesNamespace<
       this.#registerForwardTo(route, fullName);
     }
 
-    // Register transformers
+    // Register transformers with fallback wrapper
     if (route.decodeParams) {
-      this.#config.decoders[fullName] = route.decodeParams;
+      this.#config.decoders[fullName] = (params: Params): Params =>
+        route.decodeParams?.(params) ?? params;
     }
 
     if (route.encodeParams) {
-      this.#config.encoders[fullName] = route.encodeParams;
+      this.#config.encoders[fullName] = (params: Params): Params =>
+        route.encodeParams?.(params) ?? params;
     }
 
     // Register defaults
@@ -865,7 +970,8 @@ export class RoutesNamespace<
       logger.warn(
         "real-router",
         `Route "${fullName}" has both forwardTo and canActivate. ` +
-          `canActivate will be ignored because forwardTo creates a redirect.`,
+          `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
+          `Move canActivate to the target route "${route.forwardTo}".`,
       );
     }
 

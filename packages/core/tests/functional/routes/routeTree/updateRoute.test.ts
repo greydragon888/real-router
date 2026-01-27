@@ -779,7 +779,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.addRoute({
         name: "ur-parent",
         path: "/ur-parent",
-        children: [{ name: "child", path: "/:id" }],
+        children: [{ name: "child", path: "/child" }],
       });
 
       router.updateRoute("ur-parent.child", { defaultParams: { tab: "info" } });

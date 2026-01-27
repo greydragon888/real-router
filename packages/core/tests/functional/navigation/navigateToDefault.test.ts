@@ -731,19 +731,19 @@ describe("navigateToDefault", () => {
     it("should preserve defaultParams type and structure", () => {
       const callback = vi.fn();
 
-      // Test different types of parameters
+      // Test different types of valid parameters (plain objects only)
+      // Note: Date and RegExp have custom prototypes and are not valid params
       const testCases = [
         { id: 123 },
         { name: "test", active: true },
         { items: [1, 2, 3], config: { nested: true } },
-        { date: new Date("2023-01-01"), regex: /test/ },
+        { stringParam: "value", numberParam: 42, boolParam: false },
       ];
 
       testCases.forEach((defaultParams) => {
         callback.mockClear();
 
         router.setOption("defaultRoute", "users");
-        // @ts-expect-error for testing
         router.setOption("defaultParams", defaultParams);
 
         router.navigateToDefault(callback);
@@ -755,9 +755,8 @@ describe("navigateToDefault", () => {
             params: defaultParams,
           }),
         );
-
-        router.stop();
       });
+      // router.stop() is called in afterEach
     });
 
     it("should NOT be affected by mutation of defaultParams after setting", () => {
@@ -829,9 +828,7 @@ describe("navigateToDefault", () => {
 
       callback.mockClear();
 
-      router.stop();
-
-      // Change defaultParams and navigate again
+      // Change defaultParams and navigate again (router stays started)
       router.setOption("defaultParams", { id: 2, new: "param" });
 
       router.navigateToDefault(callback);
@@ -1384,7 +1381,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
 
       // Test multiple dynamic changes
-      router.setOption("defaultRoute", "dashboard");
+      router.setOption("defaultRoute", "settings");
       router.setOption("defaultParams", { view: "summary" });
 
       router.navigateToDefault(callback);
@@ -1392,7 +1389,7 @@ describe("navigateToDefault", () => {
       expect(callback).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
-          name: "dashboard",
+          name: "settings",
           params: { view: "summary" },
         }),
       );
@@ -1400,7 +1397,7 @@ describe("navigateToDefault", () => {
       callback.mockClear();
 
       // Change again and test
-      router.setOption("defaultRoute", "admin.panel");
+      router.setOption("defaultRoute", "admin.dashboard");
       router.setOption("defaultParams", { tab: "users", filter: "active" });
 
       router.navigateToDefault({ replace: true }, callback);
@@ -1408,7 +1405,7 @@ describe("navigateToDefault", () => {
       expect(callback).toHaveBeenCalledWith(
         undefined,
         expect.objectContaining({
-          name: "admin.panel",
+          name: "admin.dashboard",
           params: { tab: "users", filter: "active" },
           meta: expect.objectContaining({
             options: expect.objectContaining({ replace: true }),
@@ -1487,8 +1484,8 @@ describe("navigateToDefault", () => {
 
       expect(router.isStarted()).toBe(true);
 
-      // Should work normally after restart
-      router.navigateToDefault(callback);
+      // Should work normally after restart (with reload to avoid SAME_STATES)
+      router.navigateToDefault({ reload: true }, callback);
 
       expect(callback).toHaveBeenCalledWith(
         undefined,

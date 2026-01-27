@@ -29,6 +29,9 @@ describe("core/route-lifecycle/canActivate", () => {
   });
 
   it("should block navigation if route cannot be activated", () => {
+    // Set up canActivate guard to block admin route
+    router.canActivate("admin", false);
+
     router.navigate("home");
 
     router.navigate("admin", (err) => {

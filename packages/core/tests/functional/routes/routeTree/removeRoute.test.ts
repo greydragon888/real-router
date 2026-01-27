@@ -254,7 +254,7 @@ describe("core/routes/removeRoute", () => {
 
       // Route no longer exists
       expect(router.hasRoute("encoded")).toBe(false);
-      expect(router.matchPath("/encoded/123")).toBeNull();
+      expect(router.matchPath("/encoded/123")).toBeUndefined();
     });
 
     it("should clear encoders on removeRoute", () => {
@@ -434,7 +434,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/existing/42")?.name).toBe("existing");
       expect(router.buildPath("existing", { id: 99 })).toBe("/existing/99");
       expect(router.makeState("existing").params).toStrictEqual({
-        id: "default",
+        id: "1",
       });
 
       // Verify lifecycle handlers still registered

@@ -107,7 +107,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Route no longer exists after clear
       expect(router.hasRoute("encoded")).toBe(false);
-      expect(router.matchPath("/encoded/123")).toBeNull();
+      expect(router.matchPath("/encoded/123")).toBeUndefined();
     });
 
     it("should clear encoders", () => {
