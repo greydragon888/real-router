@@ -49,3 +49,7 @@ export {
 } from "./RoutesNamespace";
 
 export type { RouteConfig } from "./RoutesNamespace";
+
+export { NavigationNamespace } from "./NavigationNamespace";
+
+export { RouterLifecycleNamespace } from "./RouterLifecycleNamespace";
