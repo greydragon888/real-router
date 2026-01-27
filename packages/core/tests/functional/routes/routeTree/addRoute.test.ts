@@ -7,7 +7,6 @@ import {
   RESOLVED_FORWARD_MAP_SYMBOL,
   ROUTE_DEFINITIONS_SYMBOL,
 } from "../../../../src/constants";
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Route, Router } from "@real-router/core";
@@ -90,7 +89,7 @@ describe("core/routes/addRoute", () => {
     expect(spyCanActivate).toHaveBeenCalledWith("secure", canActivateFactory);
   });
 
-  it("should register forwardTo in forwardMap", () => {
+  it("should register forwardTo and redirect during navigation", () => {
     router.addRoute([
       {
         name: "old-route",
@@ -103,7 +102,10 @@ describe("core/routes/addRoute", () => {
       },
     ]);
 
-    expect(getConfig(router).forwardMap["old-route"]).toBe("new-route");
+    // forwardState follows the forward rule and returns the resolved state
+    const state = router.forwardState("old-route", {});
+
+    expect(state.name).toBe("new-route"); // Redirect happened
   });
 
   it("should register decodeParams and call it during matchPath", () => {
@@ -119,7 +121,7 @@ describe("core/routes/addRoute", () => {
 
     const state = router.matchPath("/item/123");
 
-    expect(getConfig(router).decoders.item).toBeInstanceOf(Function);
+    // Test behavior: decodeParams was called and transformed the params
     expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
     expect(state?.params).toStrictEqual({ id: "123", decoded: true });
   });
@@ -137,7 +139,7 @@ describe("core/routes/addRoute", () => {
 
     router.buildPath("item", { id: "123" });
 
-    expect(getConfig(router).encoders.item).toBeInstanceOf(Function);
+    // Test behavior: encodeParams was called
     expect(encodeParams).toHaveBeenCalledWith({ id: "123" });
   });
 
@@ -307,12 +309,12 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('Path "/path-conflict" is already defined');
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
+    // Test behavior: route doesn't exist
+    expect(router.hasRoute("pre-validation-test")).toBe(false);
+
     const [, canActivate] = router.getLifecycleFactories();
 
     expect(canActivate).not.toHaveProperty("pre-validation-test");
-    expect(getConfig(router).decoders).not.toHaveProperty(
-      "pre-validation-test",
-    );
   });
 
   it("should throw on duplicate path within same batch", () => {
@@ -389,7 +391,10 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      expect(getConfig(router).forwardMap["container.redirect"]).toBe("target");
+      // forwardState follows the forward rule for nested routes
+      const state = router.forwardState("container.redirect", {});
+
+      expect(state.name).toBe("target");
     });
 
     it("should register decodeParams for children routes", () => {
@@ -409,8 +414,6 @@ describe("core/routes/addRoute", () => {
           },
         ],
       });
-
-      expect(getConfig(router).decoders["api.resource"]).toBeDefined();
 
       const state = router.matchPath("/api/resource/123");
 
@@ -436,8 +439,6 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      expect(getConfig(router).encoders["api.item"]).toBeDefined();
-
       router.buildPath("api.item", { id: "456" });
 
       expect(childEncoder).toHaveBeenCalledWith({ id: "456" });
@@ -456,10 +457,10 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      expect(getConfig(router).defaultParams["search.results"]).toStrictEqual({
-        page: 1,
-        limit: 10,
-      });
+      // Default params should be applied when creating state without params
+      const state = router.makeState("search.results");
+
+      expect(state.params).toStrictEqual({ page: 1, limit: 10 });
     });
 
     it("should register all handlers for parent and children in same call", () => {
@@ -485,10 +486,14 @@ describe("core/routes/addRoute", () => {
 
       expect(canActivateFactories.wrapper).toBeDefined();
       expect(canActivateFactories["wrapper.inner"]).toBeDefined();
-      expect(getConfig(router).defaultParams.wrapper).toStrictEqual({
+
+      // Default params should be applied when creating state without params
+      const wrapperState = router.makeState("wrapper");
+      const innerState = router.makeState("wrapper.inner");
+
+      expect(wrapperState.params).toStrictEqual({ parentParam: "value" });
+      expect(innerState.params).toStrictEqual({
         parentParam: "value",
-      });
-      expect(getConfig(router).defaultParams["wrapper.inner"]).toStrictEqual({
         childParam: "value",
       });
     });
@@ -915,15 +920,19 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ id: "123" });
     });
 
-    it("should handle forward() on router with empty forwardMap", () => {
-      // Create router with routes, then set empty forwardMap
-      getConfig(router).forwardMap = {};
+    it("should allow adding forwards dynamically via forward()", () => {
+      router.addRoute([
+        { name: "oldRoute", path: "/old" },
+        { name: "newRoute", path: "/new" },
+      ]);
 
-      // Forward should work even if forwardMap was empty
-      router.forward("home", "users");
+      // Use forward() API to dynamically add a redirect
+      router.forward("oldRoute", "newRoute");
 
-      expect(getConfig(router).forwardMap.home).toBe("users");
-      expect(getResolvedForwardMap(router).home).toBe("users");
+      // Verify behavior: forwardState should follow the new rule
+      const state = router.forwardState("oldRoute", {});
+
+      expect(state.name).toBe("newRoute");
     });
 
     it("should warn when route has both forwardTo and canActivate", () => {
@@ -1287,17 +1296,32 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      // Verify all registrations
+      // Verify canActivate registration
       const [, canActivateFactories] = router.getLifecycleFactories();
 
       expect(canActivateFactories.complete).toBeDefined();
       expect(canActivateFactories["complete.nested"]).toBeDefined();
-      expect(getConfig(router).decoders.complete).toBeDefined();
-      expect(getConfig(router).encoders.complete).toBeDefined();
-      expect(getConfig(router).defaultParams.complete).toStrictEqual({
-        id: "default",
-      });
-      expect(getConfig(router).forwardMap.complete).toBe("target");
+
+      // Verify decodeParams works
+      const matchedState = router.matchPath("/complete/123");
+
+      expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
+      expect(matchedState?.params).toStrictEqual({ id: "123", decoded: true });
+
+      // Verify encodeParams works
+      router.buildPath("complete", { id: "456" });
+
+      expect(encodeParams).toHaveBeenCalledWith({ id: "456" });
+
+      // Verify defaultParams works
+      const defaultState = router.makeState("complete");
+
+      expect(defaultState.params).toStrictEqual({ id: "default" });
+
+      // Verify forwardTo works
+      const forwardedState = router.forwardState("complete", { id: "789" });
+
+      expect(forwardedState.name).toBe("target");
     });
 
     it("should handle adding route to deeply nested parent via dot-notation", () => {

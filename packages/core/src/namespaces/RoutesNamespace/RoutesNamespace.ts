@@ -226,8 +226,9 @@ export class RoutesNamespace<
       this.#definitions,
     );
 
-    // Register handlers for all routes
-    // Note: This will be called by Router after setRouter() is called
+    // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
+    // Note: canActivate handlers are registered later when #lifecycleNamespace is set
+    this.#registerAllRouteHandlers(routes);
   }
 
   // =========================================================================
@@ -512,7 +513,12 @@ export class RoutesNamespace<
   }
 
   /**
-   * Applies forwardTo and returns resolved state.
+   * Applies forwardTo and returns resolved state with merged defaultParams.
+   *
+   * Merges params in order:
+   * 1. Source route defaultParams
+   * 2. Provided params
+   * 3. Target route defaultParams (after resolving forwardTo)
    */
   forwardState<P extends Params = Params>(
     name: string,
@@ -520,7 +526,26 @@ export class RoutesNamespace<
   ): { name: string; params: P } {
     const resolvedName = this.#resolvedForwardMap[name] ?? name;
 
-    return { name: resolvedName, params };
+    // Merge source route's defaultParams with provided params
+    const paramsWithSource = Object.hasOwn(this.#config.defaultParams, name)
+      ? { ...this.#config.defaultParams[name], ...params }
+      : { ...params };
+
+    // If forwarded to different route, merge target's defaultParams
+    if (
+      resolvedName !== name &&
+      Object.hasOwn(this.#config.defaultParams, resolvedName)
+    ) {
+      return {
+        name: resolvedName,
+        params: {
+          ...this.#config.defaultParams[resolvedName],
+          ...paramsWithSource,
+        } as P,
+      };
+    }
+
+    return { name: resolvedName, params: paramsWithSource };
   }
 
   /**

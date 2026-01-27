@@ -1,6 +1,5 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -75,7 +74,8 @@ describe("core/routes/routeTree/forward", () => {
       router.addRoute({ name: "newUser", path: "/new-user/:id" });
 
       expect(() => router.forward("oldUser", "newUser")).not.toThrowError();
-      expect(getConfig(router).forwardMap.oldUser).toBe("newUser");
+      // Verify forward works via behavior
+      expect(router.forwardState("oldUser", { id: "1" }).name).toBe("newUser");
     });
 
     it("should allow forward when source has more params than target", () => {
@@ -83,7 +83,10 @@ describe("core/routes/routeTree/forward", () => {
       router.addRoute({ name: "category", path: "/categories/:category" });
 
       expect(() => router.forward("detail", "category")).not.toThrowError();
-      expect(getConfig(router).forwardMap.detail).toBe("category");
+      // Verify forward works via behavior
+      expect(
+        router.forwardState("detail", { category: "a", id: "1" }).name,
+      ).toBe("category");
     });
 
     it("should allow forward between static routes", () => {
@@ -91,7 +94,8 @@ describe("core/routes/routeTree/forward", () => {
       router.addRoute({ name: "newPage", path: "/new-page" });
 
       expect(() => router.forward("oldPage", "newPage")).not.toThrowError();
-      expect(getConfig(router).forwardMap.oldPage).toBe("newPage");
+      // Verify forward works via behavior
+      expect(router.forwardState("oldPage", {}).name).toBe("newPage");
     });
 
     it("should allow forward for nested routes with matching params", () => {
@@ -221,7 +225,10 @@ describe("core/routes/routeTree/forward", () => {
           }),
         ).not.toThrowError();
 
-        expect(getConfig(router).forwardMap["fwdto-old"]).toBe("fwdto-new");
+        // Verify forward works via behavior
+        expect(router.forwardState("fwdto-old", { id: "1" }).name).toBe(
+          "fwdto-new",
+        );
       });
 
       it("should allow forwardTo when source has more params than target", () => {
@@ -238,9 +245,10 @@ describe("core/routes/routeTree/forward", () => {
           }),
         ).not.toThrowError();
 
-        expect(getConfig(router).forwardMap["fwdto-detail"]).toBe(
-          "fwdto-category",
-        );
+        // Verify forward works via behavior
+        expect(
+          router.forwardState("fwdto-detail", { category: "a", id: "1" }).name,
+        ).toBe("fwdto-category");
       });
 
       it("should allow forwardTo between static routes", () => {
@@ -257,7 +265,8 @@ describe("core/routes/routeTree/forward", () => {
           }),
         ).not.toThrowError();
 
-        expect(getConfig(router).forwardMap["fwdto-old-static"]).toBe(
+        // Verify forward works via behavior
+        expect(router.forwardState("fwdto-old-static", {}).name).toBe(
           "fwdto-new-static",
         );
       });
@@ -315,7 +324,10 @@ describe("core/routes/routeTree/forward", () => {
           ]),
         ).not.toThrowError();
 
-        expect(getConfig(router).forwardMap["batch-old"]).toBe("batch-new");
+        // Verify forward works via behavior
+        expect(router.forwardState("batch-old", { id: "1" }).name).toBe(
+          "batch-new",
+        );
       });
 
       it("should throw for nested batch routes with param mismatch", () => {
@@ -359,9 +371,10 @@ describe("core/routes/routeTree/forward", () => {
           ]),
         ).not.toThrowError();
 
-        expect(getConfig(router).forwardMap["batch-b.source"]).toBe(
-          "batch-a.target",
-        );
+        // Verify forward works via behavior
+        expect(
+          router.forwardState("batch-b.source", { sharedId: "1" }).name,
+        ).toBe("batch-a.target");
       });
     });
 

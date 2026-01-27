@@ -109,6 +109,11 @@ export class PluginsNamespace<
       );
     }
 
+    // Validate all factories upfront
+    for (const factory of factories) {
+      PluginsNamespace.validateFactory<Dependencies>(factory);
+    }
+
     // Check limits
     this.#validateCount(factories.length);
 
@@ -227,7 +232,11 @@ export class PluginsNamespace<
     // Router is guaranteed to be set at this point
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const router = this.#router!;
-    const appliedPlugin = pluginFactory(router, router.getDependency);
+    // Bind getDependency to preserve 'this' context when called from factory
+    const appliedPlugin = pluginFactory(
+      router,
+      router.getDependency.bind(router),
+    );
 
     PluginsNamespace.validatePlugin(appliedPlugin);
 

@@ -103,6 +103,11 @@ export class MiddlewareNamespace<
       );
     }
 
+    // Validate all factories upfront
+    for (const [i, factory] of factories.entries()) {
+      MiddlewareNamespace.validateFactory<Dependencies>(factory, i);
+    }
+
     // Check limits
     this.#validateCount(factories.length);
 
@@ -126,7 +131,11 @@ export class MiddlewareNamespace<
     // Initialize phase with rollback capability
     try {
       for (const factory of factories) {
-        const middleware = factory(this.#router, this.#router.getDependency);
+        // Bind getDependency to preserve 'this' context when called from factory
+        const middleware = factory(
+          this.#router,
+          this.#router.getDependency.bind(this.#router),
+        );
 
         MiddlewareNamespace.validateMiddleware<Dependencies>(
           middleware,

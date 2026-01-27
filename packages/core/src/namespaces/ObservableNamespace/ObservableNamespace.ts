@@ -24,6 +24,64 @@ import type {
   Unsubscribe,
 } from "@real-router/types";
 
+// ============================================================================
+// Symbol.observable support (TC39 proposal)
+// ============================================================================
+
+/**
+ * Observable symbol - TC39 proposal with fallback
+ */
+const $$observable: typeof Symbol.observable =
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check for environments without Symbol.observable
+  (typeof Symbol === "function" && Symbol.observable) ||
+  ("@@observable" as unknown as typeof Symbol.observable);
+
+/**
+ * Observable state passed to subscribers
+ */
+interface SubscribeState {
+  route: State;
+  previousRoute: State | undefined;
+}
+
+/**
+ * Observer interface per Observable spec
+ */
+interface Observer {
+  next?: (value: SubscribeState) => void;
+  error?: (err: unknown) => void;
+  complete?: () => void;
+}
+
+/**
+ * Subscription interface per Observable spec
+ */
+interface Subscription {
+  unsubscribe: () => void;
+  readonly closed: boolean;
+}
+
+/**
+ * Observable options for enhanced control
+ */
+interface ObservableOptions {
+  /** AbortSignal for automatic unsubscription */
+  signal?: AbortSignal;
+  /** Replay current state to new subscribers (default: true) */
+  replay?: boolean;
+}
+
+/**
+ * Observable interface for TC39 compliance
+ */
+export interface RouterObservable {
+  [key: symbol]: () => RouterObservable;
+  subscribe: (
+    observer: Observer | ((value: SubscribeState) => void),
+    options?: ObservableOptions,
+  ) => Subscription;
+}
+
 /**
  * Independent namespace for managing router observability (events).
  *
@@ -44,6 +102,20 @@ export class ObservableNamespace {
    * Created lazily to reduce memory footprint when events are not dispatched.
    */
   #eventDepthMap: Record<EventName, number> | null = null;
+
+  /**
+   * Track active observers for deduplication
+   * Using WeakMap to allow garbage collection of observers
+   */
+  readonly #observerSubscriptions = new WeakMap<
+    Observer,
+    { unsubscribe: Unsubscribe; active: boolean }
+  >();
+
+  /**
+   * Functional reference to get current state (set via setGetState)
+   */
+  #getState: (() => State | undefined) | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -218,6 +290,18 @@ export class ObservableNamespace {
   }
 
   // =========================================================================
+  // Dependency injection for state access
+  // =========================================================================
+
+  /**
+   * Sets the function to get current router state.
+   * Required for replay feature in observable().
+   */
+  setGetState(getState: () => State | undefined): void {
+    this.#getState = getState;
+  }
+
+  // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
 
@@ -389,6 +473,177 @@ export class ObservableNamespace {
         });
       },
     );
+  }
+
+  /**
+   * Returns a TC39-compliant Observable for router state changes.
+   * Supports deduplication, error isolation, replay, and AbortSignal.
+   */
+  observable(): RouterObservable {
+    const observableObj: RouterObservable = {
+      /**
+       * TC39 Observable spec: [Symbol.observable]() returns self
+       */
+      [$$observable]() {
+        return observableObj;
+      },
+
+      /**
+       * Subscribe to router state changes - uses arrow function to bind `this`
+       */
+      subscribe: this.#subscribeImpl.bind(this),
+    };
+
+    // Add @@observable string key for RxJS compatibility
+    (observableObj as unknown as Record<string, unknown>)["@@observable"] =
+      () => observableObj;
+
+    return observableObj;
+  }
+
+  /**
+   * Internal implementation of observable subscribe
+   */
+  #subscribeImpl(
+    observer: Observer | ((value: SubscribeState) => void),
+    options: ObservableOptions = {},
+  ): Subscription {
+    // Normalize observer
+    const normalizedObserver: Observer =
+      typeof observer === "function" ? { next: observer } : observer;
+
+    // Check for duplicate subscription
+    const existing = this.#observerSubscriptions.get(normalizedObserver);
+
+    if (existing?.active) {
+      logger.warn(
+        "router.observable",
+        "Duplicate subscription prevented. Same observer already subscribed.",
+      );
+
+      return {
+        unsubscribe: existing.unsubscribe,
+        get closed() {
+          return !existing.active;
+        },
+      };
+    }
+
+    const { signal, replay = true } = options;
+
+    // Check if already aborted
+    if (signal?.aborted) {
+      return {
+        unsubscribe: () => {},
+        closed: true,
+      };
+    }
+
+    let closed = false;
+
+    // Create safe invoker with error isolation
+    const safeNext = (value: SubscribeState) => {
+      if (closed) {
+        return;
+      }
+
+      if (normalizedObserver.next) {
+        try {
+          normalizedObserver.next(value);
+        } catch (error) {
+          logger.error("router.observable", "Error in observer.next:", error);
+
+          // Call error handler if provided
+          if (normalizedObserver.error) {
+            try {
+              normalizedObserver.error(error);
+            } catch (errorHandlerError) {
+              logger.error(
+                "router.observable",
+                "Error in observer.error:",
+                errorHandlerError,
+              );
+            }
+          }
+        }
+      }
+    };
+
+    // Subscribe to TRANSITION_SUCCESS events
+    const unsubscribeFromEvents = this.addEventListener(
+      events.TRANSITION_SUCCESS,
+      (toState: State, fromState?: State) => {
+        safeNext({
+          route: toState,
+          previousRoute: fromState,
+        });
+      },
+    );
+
+    // Create unsubscribe function
+    const unsubscribe = () => {
+      if (closed) {
+        return;
+      }
+
+      closed = true;
+
+      // Update tracking
+      const sub = this.#observerSubscriptions.get(normalizedObserver);
+
+      if (sub) {
+        sub.active = false;
+      }
+
+      // Remove event listener
+      unsubscribeFromEvents();
+
+      // Call complete handler
+      if (normalizedObserver.complete) {
+        try {
+          normalizedObserver.complete();
+        } catch (error) {
+          logger.error(
+            "router.observable",
+            "Error in observer.complete:",
+            error,
+          );
+        }
+      }
+    };
+
+    // Track subscription
+    this.#observerSubscriptions.set(normalizedObserver, {
+      unsubscribe,
+      active: true,
+    });
+
+    // Handle AbortSignal
+    if (signal) {
+      signal.addEventListener("abort", unsubscribe, { once: true });
+    }
+
+    // Replay current state if requested
+    if (replay && this.#getState) {
+      const currentState = this.#getState();
+
+      if (currentState) {
+        // Use queueMicrotask to ensure subscription is set up before replay
+        queueMicrotask(() => {
+          safeNext({
+            route: currentState,
+            previousRoute: undefined,
+          });
+        });
+      }
+    }
+
+    return {
+      unsubscribe,
+      get closed() {
+        return closed;
+      },
+    };
   }
 
   // =========================================================================

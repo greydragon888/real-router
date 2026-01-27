@@ -14,7 +14,6 @@ import { createTestRouter } from "../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("navigateToDefault", () => {
   beforeEach(() => {
@@ -29,76 +28,78 @@ describe("navigateToDefault", () => {
   });
 
   describe("basic functionality", () => {
-    it("should call router.navigate with defaultRoute when defaultRoute is set", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should navigate to defaultRoute when defaultRoute is set", () => {
+      const callback = vi.fn();
 
       // Set up router with defaultRoute
       router.setOption("defaultRoute", "users");
       router.setOption("defaultParams", {});
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users", // defaultRoute
-        {}, // defaultParams (empty object)
-        {}, // options (empty)
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: {},
+        }),
       );
     });
 
     it("should use empty object as params when defaultParams is not set", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       // Set only defaultRoute, no defaultParams
       router.setOption("defaultRoute", "profile");
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "profile",
-        {}, // Should use empty object when defaultParams not set
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "profile",
+          params: {},
+        }),
       );
     });
 
-    it("should pass navigation options to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass navigation options through to state meta", () => {
+      const callback = vi.fn();
 
       router.setOption("defaultRoute", "orders");
       router.setOption("defaultParams", {});
 
       const options = { replace: true, source: "default" };
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "orders",
-        {},
-        options, // Navigation options should be passed through
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "orders",
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
-    it("should pass callback to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass callback through and invoke it on completion", () => {
       const callback = vi.fn();
 
       router.setOption("defaultRoute", "settings");
 
       router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "settings",
-        {},
-        {},
-        callback, // Callback should be passed through
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "settings" }),
       );
     });
 
-    it("should pass both options and callback to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass both options and callback correctly", () => {
       const callback = vi.fn();
       const options = { force: true };
 
@@ -106,76 +107,78 @@ describe("navigateToDefault", () => {
 
       router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith("home", {}, options, callback);
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "home",
+          meta: expect.objectContaining({
+            options: expect.objectContaining({ force: true }),
+          }),
+        }),
+      );
     });
 
-    it("should return cancel function from router.navigate when defaultRoute is set", () => {
-      const mockCancel = vi.fn();
-
-      vi.spyOn(router, "navigate").mockReturnValue(mockCancel);
-
+    it("should return cancel function when defaultRoute is set", () => {
       router.setOption("defaultRoute", "users");
 
       const result = router.navigateToDefault();
 
-      expect(result).toBe(mockCancel);
-
-      expectTypeOf(result).toBeFunction();
+      expect(typeof result).toBe("function");
     });
 
     it("should use defaultParams when they are set", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
-
+      const callback = vi.fn();
       const defaultParams = { id: 123, tab: "profile" };
 
       router.setOption("defaultRoute", "users.view");
       router.setOption("defaultParams", defaultParams);
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users.view",
-        defaultParams, // Should use provided defaultParams
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: defaultParams,
+        }),
       );
     });
 
     it("should work with nested defaultRoute", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       router.setOption("defaultRoute", "settings.account");
       router.setOption("defaultParams", { section: "privacy" });
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "settings.account",
-        { section: "privacy" },
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "settings.account",
+          params: { section: "privacy" },
+        }),
       );
     });
 
-    it("should delegate all navigation logic to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should delegate all navigation logic internally", () => {
       const callback = vi.fn();
 
       router.setOption("defaultRoute", "admin.dashboard");
 
       router.navigateToDefault({ reload: true }, callback);
 
-      // Should make exactly one call to router.navigate with correct arguments
-      expect(navigateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "admin.dashboard",
-        {},
-        { reload: true },
-        callback,
+      // Should complete successfully with navigation to admin.dashboard
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "admin.dashboard",
+          meta: expect.objectContaining({
+            options: expect.objectContaining({ reload: true }),
+          }),
+        }),
       );
-
-      // navigateToDefault should not implement any navigation logic itself
-      // All complex logic should be delegated to router.navigate
     });
   });
 
@@ -498,79 +501,87 @@ describe("navigateToDefault", () => {
 
   describe("with defaultParams", () => {
     it("should use defaultParams when no params provided in arguments", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = { id: 42, category: "tech" };
 
       router.setOption("defaultRoute", "users.view");
       router.setOption("defaultParams", defaultParams);
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users.view",
-        defaultParams, // Should use defaultParams
-        {},
-        expect.any(Function), // callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: defaultParams,
+        }),
       );
     });
 
     it("should use defaultParams with navigation options", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = { id: 123 };
       const options = { replace: true, source: "auto" };
 
       router.setOption("defaultRoute", "orders.view");
       router.setOption("defaultParams", defaultParams);
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "orders.view",
-        defaultParams, // Should use defaultParams
-        options,
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "orders.view",
+          params: defaultParams,
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
     it("should use defaultParams with callback", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
-      const defaultParams = { section: "section123", id: 456 };
       const callback = vi.fn();
+      const defaultParams = { section: "section123", id: 456 };
 
       router.setOption("defaultRoute", "section.view");
       router.setOption("defaultParams", defaultParams);
 
       router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "section.view",
-        defaultParams, // Should use defaultParams
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "section.view",
+          params: defaultParams,
+        }),
       );
     });
 
     it("should use defaultParams with both options and callback", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = { userId: "user123" };
       const options = { force: true };
-      const callback = vi.fn();
 
       router.setOption("defaultRoute", "profile.user");
       router.setOption("defaultParams", defaultParams);
 
       router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "profile.user",
-        defaultParams, // Should use defaultParams
-        options,
-        callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "profile.user",
+          params: defaultParams,
+          meta: expect.objectContaining({
+            options: expect.objectContaining({ force: true }),
+          }),
+        }),
       );
     });
 
     it("should handle complex defaultParams object", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = {
         id: 789,
         filters: {
@@ -585,29 +596,31 @@ describe("navigateToDefault", () => {
       router.setOption("defaultRoute", "users.view");
       router.setOption("defaultParams", defaultParams);
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users.view",
-        defaultParams, // Complex object should be passed as-is
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: defaultParams,
+        }),
       );
     });
 
     it("should handle defaultParams as empty object", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       router.setOption("defaultRoute", "profile");
       router.setOption("defaultParams", {});
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "profile",
-        {}, // Empty object should be used
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "profile",
+          params: {},
+        }),
       );
     });
 
@@ -625,7 +638,7 @@ describe("navigateToDefault", () => {
       });
     });
 
-    it("should pass defaultParams through router.navigate to final state", () => {
+    it("should pass defaultParams through to final state", () => {
       const defaultParams = { param: "custom_value" };
 
       router.setOption("defaultRoute", "withDefaultParam");
@@ -668,23 +681,12 @@ describe("navigateToDefault", () => {
     });
 
     it("should handle defaultParams when navigation fails", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
-      const defaultParams = { id: 999 };
-
-      router.setOption("defaultRoute", "non.existent.route");
-      router.setOption("defaultParams", defaultParams);
-
       const callback = vi.fn();
 
-      router.navigateToDefault(callback);
+      router.setOption("defaultRoute", "non.existent.route");
+      router.setOption("defaultParams", { id: 999 });
 
-      // defaultParams should still be passed to router.navigate
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "non.existent.route",
-        defaultParams,
-        {},
-        callback,
-      );
+      router.navigateToDefault(callback);
 
       // Navigation should fail with ROUTE_NOT_FOUND
       expect(callback).toHaveBeenCalledWith(
@@ -727,7 +729,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should preserve defaultParams type and structure", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       // Test different types of parameters
       const testCases = [
@@ -738,19 +740,20 @@ describe("navigateToDefault", () => {
       ];
 
       testCases.forEach((defaultParams) => {
-        navigateSpy.mockClear();
+        callback.mockClear();
 
         router.setOption("defaultRoute", "users");
         // @ts-expect-error for testing
         router.setOption("defaultParams", defaultParams);
 
-        router.navigateToDefault();
+        router.navigateToDefault(callback);
 
-        expect(navigateSpy).toHaveBeenCalledWith(
-          "users",
-          defaultParams, // Should preserve exact object reference and structure
-          {},
-          expect.any(Function), // callback
+        expect(callback).toHaveBeenCalledWith(
+          undefined,
+          expect.objectContaining({
+            name: "users",
+            params: defaultParams,
+          }),
         );
 
         router.stop();
@@ -758,7 +761,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should NOT be affected by mutation of defaultParams after setting", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = { id: 100, mutable: "original" };
 
       router.setOption("defaultRoute", "users.view");
@@ -769,19 +772,20 @@ describe("navigateToDefault", () => {
       defaultParams.mutable = "changed";
       defaultParams.id = 200;
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
       // Should use the ORIGINAL values (frozen copy was made at setOption time)
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users.view",
-        { id: 100, mutable: "original" }, // Original values preserved
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: { id: 100, mutable: "original" },
+        }),
       );
     });
 
     it("should handle defaultParams with special characters and values", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const defaultParams = {
         special: "hello/world?param=value#hash",
         unicode: "тест 测试 🚀",
@@ -794,47 +798,50 @@ describe("navigateToDefault", () => {
       router.setOption("defaultRoute", "users");
       router.setOption("defaultParams", defaultParams);
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        defaultParams, // All special values should be preserved
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: defaultParams,
+        }),
       );
     });
 
     it("should work with dynamic defaultParams changes", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       router.setOption("defaultRoute", "users.view");
 
       // First navigation with initial params
       router.setOption("defaultParams", { id: 1 });
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenLastCalledWith(
-        "users.view",
-        { id: 1 },
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenLastCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: { id: 1 },
+        }),
       );
 
-      navigateSpy.mockClear();
+      callback.mockClear();
 
       router.stop();
 
       // Change defaultParams and navigate again
       router.setOption("defaultParams", { id: 2, new: "param" });
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenLastCalledWith(
-        "users.view",
-        { id: 2, new: "param" },
-        {},
-        expect.any(Function), // callback
+      expect(callback).toHaveBeenLastCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: { id: 2, new: "param" },
+        }),
       );
     });
   });
@@ -846,74 +853,84 @@ describe("navigateToDefault", () => {
     });
 
     it("should handle no arguments", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      // Should not throw and return a cancel function
+      const result = router.navigateToDefault();
 
-      router.navigateToDefault();
-
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { tab: "main" },
-        {},
-        expect.any(Function), // noop function
-      );
+      expect(typeof result).toBe("function");
     });
 
     it("should parse single callback argument", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
       const callback = vi.fn();
 
       router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { tab: "main" },
-        {},
-        callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: { tab: "main" },
+        }),
       );
     });
 
     it("should parse single options object argument", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const onSuccess = vi.fn();
       const options = { replace: true, silent: false };
+
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
       router.navigateToDefault(options);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { tab: "main" },
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
+        expect.any(Object),
         options,
-        expect.any(Function), // noop function
       );
+
+      unsubSuccess();
     });
 
     it("should parse options and callback arguments", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
-      const options = { replace: true, silent: false };
       const callback = vi.fn();
+      const options = { replace: true, silent: false };
 
       router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { tab: "main" },
-        options,
-        callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: { tab: "main" },
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
     it("should parse callback and options arguments (reversed order)", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
       const callback = vi.fn();
       const options = { replace: true };
 
       // This tests the case where we have 2 args and first is treated as options
       router.navigateToDefault(options as any, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { tab: "main" },
-        options,
-        callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: { tab: "main" },
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
@@ -933,82 +950,111 @@ describe("navigateToDefault", () => {
       router.setOption("defaultParams", { id: 123 });
     });
 
-    it("should pass replace option to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass replace option through to state meta", () => {
+      const callback = vi.fn();
       const options = { replace: true };
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
-    it("should pass force option to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
-      const options = { force: true };
+    it("should pass force option and allow same-state navigation", () => {
+      const callback = vi.fn();
 
-      router.navigateToDefault(options);
+      // First navigate to users
+      router.navigate("users", { id: 123 }, {}, (err) => {
+        expect(err).toBeUndefined();
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
-      );
+        // Then try to navigate to default (same route) without force - should fail
+        router.navigateToDefault((err2) => {
+          expect(err2).toBeDefined();
+          expect(err2?.code).toBe(errorCodes.SAME_STATES);
+
+          // With force option, should succeed
+          router.navigateToDefault({ force: true }, callback);
+
+          expect(callback).toHaveBeenCalledWith(
+            undefined,
+            expect.objectContaining({
+              name: "users",
+              meta: expect.objectContaining({
+                options: expect.objectContaining({ force: true }),
+              }),
+            }),
+          );
+        });
+      });
     });
 
-    it("should pass reload option to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass reload option through to state meta", () => {
+      const callback = vi.fn();
       const options = { reload: true };
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
-    it("should pass custom options to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass custom options through to state meta", () => {
+      const callback = vi.fn();
       const options = {
         source: "default-navigation",
         metadata: { trigger: "auto" },
         customFlag: true,
       };
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
 
-    it("should pass skipTransition option to router.navigate", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+    it("should pass skipTransition option and skip events", () => {
+      const onSuccess = vi.fn();
+      const callback = vi.fn();
       const options = { skipTransition: true };
 
-      router.navigateToDefault(options);
-
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
       );
+
+      router.navigateToDefault(options, callback);
+
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "users" }),
+      );
+
+      // TRANSITION_SUCCESS should not be emitted with skipTransition
+      expect(onSuccess).not.toHaveBeenCalled();
+
+      unsubSuccess();
     });
 
     it("should combine provided options with internal navigation", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
       const options = {
         replace: true,
         force: false,
@@ -1017,13 +1063,15 @@ describe("navigateToDefault", () => {
         reload: false,
       };
 
-      router.navigateToDefault(options);
+      router.navigateToDefault(options, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        options,
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          meta: expect.objectContaining({
+            options: expect.objectContaining(options),
+          }),
+        }),
       );
     });
   });
@@ -1034,23 +1082,19 @@ describe("navigateToDefault", () => {
       router.setOption("defaultParams", { id: 123 });
     });
 
-    it("should handle router.navigate errors correctly", () => {
+    it("should handle navigation errors correctly", () => {
       const callback = vi.fn();
-      const mockError = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        message: "Test error",
-      });
 
-      vi.spyOn(router, "navigate").mockImplementation(
-        (_route, _params, _options, done) => {
-          done(mockError);
-
-          return noop;
-        },
-      );
+      // Set a non-existent route as default
+      router.setOption("defaultRoute", "non.existent.route");
 
       router.navigateToDefault(callback);
 
-      expect(callback).toHaveBeenCalledWith(mockError);
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: errorCodes.ROUTE_NOT_FOUND,
+        }),
+      );
     });
 
     it("should handle non-existent defaultRoute", () => {
@@ -1122,7 +1166,7 @@ describe("navigateToDefault", () => {
       vi.useRealTimers();
     });
 
-    it("should propagate router.navigate errors to callback", () => {
+    it("should propagate navigation errors to callback", () => {
       vi.useFakeTimers();
 
       const callback = vi.fn();
@@ -1130,16 +1174,12 @@ describe("navigateToDefault", () => {
         message: "Custom navigation error",
       });
 
-      vi.spyOn(router, "navigate").mockImplementation(
-        (_route, _params, _options, done) => {
-          // Simulate error in router.navigate
-          setTimeout(() => {
-            done(customError);
-          }, 10);
-
-          return noop;
-        },
-      );
+      // Add middleware that causes an error
+      router.useMiddleware(() => (_toState, _fromState, done) => {
+        setTimeout(() => {
+          done(customError);
+        }, 10);
+      });
 
       router.navigateToDefault(callback);
 
@@ -1148,6 +1188,7 @@ describe("navigateToDefault", () => {
 
       expect(callback).toHaveBeenCalledWith(customError);
 
+      router.clearMiddleware();
       vi.useRealTimers();
     });
   });
@@ -1286,25 +1327,24 @@ describe("navigateToDefault", () => {
     });
 
     it("should work when router is started", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
       const callback = vi.fn();
 
       // Ensure router is started
 
       router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        {},
-        callback,
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: { id: 123 },
+        }),
       );
 
       expect(router.isStarted()).toBe(true);
     });
 
     it("should handle call when router is not started", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
       const callback = vi.fn();
 
       // Stop router if it's running
@@ -1312,63 +1352,68 @@ describe("navigateToDefault", () => {
 
       router.navigateToDefault(callback);
 
-      // Should still attempt to navigate (router.navigate handles stopped state)
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        {},
-        callback,
+      // When router is not started, navigation should fail with ROUTER_NOT_STARTED
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: errorCodes.ROUTER_NOT_STARTED,
+        }),
       );
 
       expect(router.isStarted()).toBe(false);
     });
 
     it("should respect router options changes after creation", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       // Change options after router creation
       router.setOption("defaultRoute", "profile");
       router.setOption("defaultParams", { section: "settings" });
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "profile",
-        { section: "settings" },
-        {},
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "profile",
+          params: { section: "settings" },
+        }),
       );
     });
 
     it("should work with router.setOptions() dynamic changes", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       // Test multiple dynamic changes
       router.setOption("defaultRoute", "dashboard");
       router.setOption("defaultParams", { view: "summary" });
 
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "dashboard",
-        { view: "summary" },
-        {},
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "dashboard",
+          params: { view: "summary" },
+        }),
       );
 
-      navigateSpy.mockClear();
+      callback.mockClear();
 
       // Change again and test
       router.setOption("defaultRoute", "admin.panel");
       router.setOption("defaultParams", { tab: "users", filter: "active" });
 
-      router.navigateToDefault({ replace: true });
+      router.navigateToDefault({ replace: true }, callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "admin.panel",
-        { tab: "users", filter: "active" },
-        { replace: true },
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "admin.panel",
+          params: { tab: "users", filter: "active" },
+          meta: expect.objectContaining({
+            options: expect.objectContaining({ replace: true }),
+          }),
+        }),
       );
     });
   });
@@ -1380,14 +1425,11 @@ describe("navigateToDefault", () => {
     });
 
     it("should handle router.getOptions() returning partial options", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
       const getOptionsSpy = vi
         .spyOn(router, "getOptions")
         .mockReturnValue({} as any);
 
       const result = router.navigateToDefault();
-
-      expect(navigateSpy).not.toHaveBeenCalled();
 
       expectTypeOf(result).toBeFunction();
 
@@ -1434,7 +1476,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should work correctly after router restart", () => {
-      const navigateSpy = vi.spyOn(router, "navigate");
+      const callback = vi.fn();
 
       // Stop and restart router
       router.stop();
@@ -1446,13 +1488,14 @@ describe("navigateToDefault", () => {
       expect(router.isStarted()).toBe(true);
 
       // Should work normally after restart
-      router.navigateToDefault();
+      router.navigateToDefault(callback);
 
-      expect(navigateSpy).toHaveBeenCalledWith(
-        "users",
-        { id: 123 },
-        {},
-        expect.any(Function),
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users",
+          params: { id: 123 },
+        }),
       );
     });
 

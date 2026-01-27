@@ -1,6 +1,5 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router, ActivationFnFactory, Params } from "@real-router/core";
@@ -24,7 +23,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("ur-source", { forwardTo: "ur-target" });
 
-      expect(getConfig(router).forwardMap["ur-source"]).toBe("ur-target");
+      // Verify forward works via behavior
+      expect(router.forwardState("ur-source", {}).name).toBe("ur-target");
     });
 
     it("should update existing forwardTo", () => {
@@ -35,7 +35,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("ur-src", { forwardTo: "ur-target2" });
 
-      expect(getConfig(router).forwardMap["ur-src"]).toBe("ur-target2");
+      // Verify updated forward works
+      expect(router.forwardState("ur-src", {}).name).toBe("ur-target2");
     });
 
     it("should remove forwardTo when null", () => {
@@ -48,7 +49,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("ur-origin", { forwardTo: null });
 
-      expect(getConfig(router).forwardMap["ur-origin"]).toBeUndefined();
+      // Forward should no longer redirect
+      expect(router.forwardState("ur-origin", {}).name).toBe("ur-origin");
     });
 
     it("should throw if target does not exist", () => {
@@ -88,7 +90,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-old", { forwardTo: "ur-new" }),
       ).not.toThrowError();
 
-      expect(getConfig(router).forwardMap["ur-old"]).toBe("ur-new");
+      // Verify forward works via behavior
+      expect(router.forwardState("ur-old", { id: "1" }).name).toBe("ur-new");
     });
 
     it("should work with matchPath after update", () => {
@@ -116,10 +119,10 @@ describe("core/routes/routeTree/updateRoute", () => {
           router.updateRoute("ur-c", { forwardTo: "ur-a" }),
         ).toThrowError(/Circular forwardTo/);
 
-        // forwardMap should remain clean (without ur-c)
-        expect(getConfig(router).forwardMap["ur-a"]).toBe("ur-b");
-        expect(getConfig(router).forwardMap["ur-b"]).toBe("ur-c");
-        expect(getConfig(router).forwardMap["ur-c"]).toBeUndefined();
+        // forwardMap should remain clean (without ur-c) - verify via behavior
+        expect(router.forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
+        expect(router.forwardState("ur-b", {}).name).toBe("ur-c"); // ur-b → ur-c
+        expect(router.forwardState("ur-c", {}).name).toBe("ur-c"); // ur-c stays (no forward)
       });
 
       it("should not corrupt forwardMap on longer indirect cycle (A → B → C → D → A)", () => {
@@ -136,8 +139,8 @@ describe("core/routes/routeTree/updateRoute", () => {
           router.updateRoute("ur-w", { forwardTo: "ur-x" }),
         ).toThrowError(/Circular forwardTo/);
 
-        // forwardMap should remain without ur-w → ur-x
-        expect(getConfig(router).forwardMap["ur-w"]).toBeUndefined();
+        // forwardMap should remain without ur-w → ur-x - verify via behavior
+        expect(router.forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
       });
 
       it("should preserve resolvedForwardMap consistency after cycle rejection", () => {
@@ -194,7 +197,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         defaultParams: { page: 1, limit: 10 },
       });
 
-      expect(getConfig(router).defaultParams["ur-members"]).toStrictEqual({
+      // Verify via makeState
+      expect(router.makeState("ur-members").params).toStrictEqual({
         page: 1,
         limit: 10,
       });
@@ -211,7 +215,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         defaultParams: { page: 2, limit: 20 },
       });
 
-      expect(getConfig(router).defaultParams["ur-accounts"]).toStrictEqual({
+      // Verify via makeState
+      expect(router.makeState("ur-accounts").params).toStrictEqual({
         page: 2,
         limit: 20,
       });
@@ -226,29 +231,38 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("ur-teams", { defaultParams: null });
 
-      expect(getConfig(router).defaultParams["ur-teams"]).toBeUndefined();
+      // Verify via makeState - no defaults
+      expect(router.makeState("ur-teams").params).toStrictEqual({});
     });
   });
 
   describe("decodeParams", () => {
     it("should add decodeParams", () => {
-      const decoder = (params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
-      });
+      const decoder = vi.fn(
+        (params: Params): Params => ({
+          ...params,
+          id: Number(params.id),
+        }),
+      );
 
       router.addRoute({ name: "ur-items", path: "/ur-items/:id" });
       router.updateRoute("ur-items", { decodeParams: decoder });
 
-      expect(getConfig(router).decoders["ur-items"]).toBe(decoder);
+      // Verify via matchPath
+      const state = router.matchPath("/ur-items/123");
+
+      expect(decoder).toHaveBeenCalled();
+      expect(state?.params.id).toBe(123);
     });
 
     it("should update existing decodeParams", () => {
-      const decoder1 = (params: Params): Params => params;
-      const decoder2 = (params: Params): Params => ({
-        ...params,
-        id: Number(params.id),
-      });
+      const decoder1 = vi.fn((params: Params): Params => params);
+      const decoder2 = vi.fn(
+        (params: Params): Params => ({
+          ...params,
+          id: Number(params.id),
+        }),
+      );
 
       router.addRoute({
         name: "ur-products",
@@ -257,20 +271,41 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
       router.updateRoute("ur-products", { decodeParams: decoder2 });
 
-      expect(getConfig(router).decoders["ur-products"]).toBe(decoder2);
+      // Verify new decoder is used
+      const state = router.matchPath("/ur-products/456");
+
+      expect(decoder2).toHaveBeenCalled();
+      expect(state?.params.id).toBe(456);
     });
 
     it("should remove decodeParams when null", () => {
-      const decoder = (params: Params): Params => params;
+      const decoder = vi.fn(
+        (params: Params): Params => ({
+          ...params,
+          decoded: true,
+        }),
+      );
 
       router.addRoute({
         name: "ur-assets",
         path: "/ur-assets/:id",
         decodeParams: decoder,
       });
+
+      // Verify decoder works before removal
+      router.matchPath("/ur-assets/1");
+
+      expect(decoder).toHaveBeenCalled();
+
+      decoder.mockClear();
+
       router.updateRoute("ur-assets", { decodeParams: null });
 
-      expect(getConfig(router).decoders["ur-assets"]).toBeUndefined();
+      // Verify decoder is no longer called
+      const state = router.matchPath("/ur-assets/2");
+
+      expect(decoder).not.toHaveBeenCalled();
+      expect(state?.params.id).toBe("2"); // String, not decoded
     });
 
     it("should use updated decoder in matchPath", () => {
@@ -288,23 +323,30 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("encodeParams", () => {
     it("should add encodeParams", () => {
-      const encoder = (params: Params): Params => ({
-        ...params,
-        id: params.id as string,
-      });
+      const encoder = vi.fn(
+        (params: Params): Params => ({
+          ...params,
+          id: String(params.id as string | number),
+        }),
+      );
 
       router.addRoute({ name: "ur-goods", path: "/ur-goods/:id" });
       router.updateRoute("ur-goods", { encodeParams: encoder });
 
-      expect(getConfig(router).encoders["ur-goods"]).toBe(encoder);
+      // Verify via buildPath
+      router.buildPath("ur-goods", { id: 123 });
+
+      expect(encoder).toHaveBeenCalledWith({ id: 123 });
     });
 
     it("should update existing encodeParams", () => {
-      const encoder1 = (params: Params): Params => params;
-      const encoder2 = (params: Params): Params => ({
-        ...params,
-        id: params.id as string,
-      });
+      const encoder1 = vi.fn((params: Params): Params => params);
+      const encoder2 = vi.fn(
+        (params: Params): Params => ({
+          ...params,
+          id: String(params.id as string | number),
+        }),
+      );
 
       router.addRoute({
         name: "ur-things",
@@ -313,20 +355,34 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
       router.updateRoute("ur-things", { encodeParams: encoder2 });
 
-      expect(getConfig(router).encoders["ur-things"]).toBe(encoder2);
+      // Verify new encoder is used
+      router.buildPath("ur-things", { id: 456 });
+
+      expect(encoder2).toHaveBeenCalled();
     });
 
     it("should remove encodeParams when null", () => {
-      const encoder = (params: Params): Params => params;
+      const encoder = vi.fn((params: Params): Params => params);
 
       router.addRoute({
         name: "ur-stuff",
         path: "/ur-stuff/:id",
         encodeParams: encoder,
       });
+
+      // Verify encoder works before removal
+      router.buildPath("ur-stuff", { id: 1 });
+
+      expect(encoder).toHaveBeenCalled();
+
+      encoder.mockClear();
+
       router.updateRoute("ur-stuff", { encodeParams: null });
 
-      expect(getConfig(router).encoders["ur-stuff"]).toBeUndefined();
+      // Verify encoder is no longer called
+      router.buildPath("ur-stuff", { id: 2 });
+
+      expect(encoder).not.toHaveBeenCalled();
     });
 
     it("should use updated encoder in buildPath", () => {
@@ -695,10 +751,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         canActivate: guardFactory,
       });
 
-      expect(getConfig(router).defaultParams["ur-multi"]).toStrictEqual({
-        page: 1,
-      });
-      expect(getConfig(router).decoders["ur-multi"]).toBe(decoder);
+      // Verify via behavior
+      expect(router.makeState("ur-multi").params).toStrictEqual({ page: 1 });
 
       const [, canActivateFactories] = router.getLifecycleFactories();
 
@@ -712,7 +766,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         .updateRoute("ur-chain", { defaultParams: { page: 1 } })
         .updateRoute("ur-chain", { defaultParams: { page: 2, limit: 10 } });
 
-      expect(getConfig(router).defaultParams["ur-chain"]).toStrictEqual({
+      // Verify via behavior
+      expect(router.makeState("ur-chain").params).toStrictEqual({
         page: 2,
         limit: 10,
       });
@@ -729,7 +784,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("ur-parent.child", { defaultParams: { tab: "info" } });
 
-      expect(getConfig(router).defaultParams["ur-parent.child"]).toStrictEqual({
+      // Verify via behavior
+      expect(router.makeState("ur-parent.child").params).toStrictEqual({
         tab: "info",
       });
     });
@@ -783,7 +839,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       );
 
       // Config should be updated (we only log error, don't block)
-      expect(getConfig(router).defaultParams["ur-async"]).toStrictEqual({
+      expect(router.makeState("ur-async").params).toStrictEqual({
         page: 1,
       });
 
@@ -847,8 +903,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Should not throw
         expect(() => router.updateRoute("ur-empty", {})).not.toThrowError();
 
-        // Config should remain unchanged
-        expect(getConfig(router).defaultParams["ur-empty"]).toBeUndefined();
+        // No defaults should be applied
+        expect(router.makeState("ur-empty").params).toStrictEqual({});
       });
 
       it("should treat missing properties as no-op", () => {
@@ -862,7 +918,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-undef", {});
 
         // Existing config should be preserved
-        expect(getConfig(router).defaultParams["ur-undef"]).toStrictEqual({
+        expect(router.makeState("ur-undef").params).toStrictEqual({
           existing: 1,
         });
       });
@@ -879,7 +935,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(() =>
           router.updateRoute("ur-frozen", frozenUpdates),
         ).not.toThrowError();
-        expect(getConfig(router).defaultParams["ur-frozen"]).toStrictEqual({
+        expect(router.makeState("ur-frozen").params).toStrictEqual({
           page: 1,
         });
       });
@@ -893,11 +949,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         router.updateRoute("ur-nullproto", { defaultParams: nullProtoParams });
 
-        // Use toEqual (not toStrictEqual) since stored object preserves null prototype
-        // eslint-disable-next-line vitest/prefer-strict-equal -- intentional: null prototype vs Object prototype
-        expect(getConfig(router).defaultParams["ur-nullproto"]).toEqual({
-          page: 1,
-        });
+        // Verify behavior - params should work
+        const state = router.makeState("ur-nullproto");
+
+        expect(state.params).toMatchObject({ page: 1 });
       });
 
       it("should accept class instance as defaultParams", () => {
@@ -913,9 +968,10 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: new PageParams() as unknown as Params,
         });
 
-        const params = getConfig(router).defaultParams["ur-class"];
+        // Verify behavior
+        const state = router.makeState("ur-class");
 
-        expect(params).toMatchObject({ page: 1, limit: 10 });
+        expect(state.params).toMatchObject({ page: 1, limit: 10 });
       });
 
       it("should accept defaultParams with circular reference", () => {
@@ -930,10 +986,10 @@ describe("core/routes/routeTree/updateRoute", () => {
           router.updateRoute("ur-circular", { defaultParams: circular }),
         ).not.toThrowError();
 
-        const stored = getConfig(router).defaultParams["ur-circular"];
+        // Verify behavior - page should be accessible
+        const state = router.makeState("ur-circular");
 
-        expect(stored).toBe(circular);
-        expect((stored as Record<string, unknown>).self).toBe(circular);
+        expect(state.params.page).toBe(1);
       });
 
       it("should preserve Symbol keys in defaultParams (but may lose on copy)", () => {
@@ -944,11 +1000,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         router.updateRoute("ur-symbol", { defaultParams: params });
 
-        const stored = getConfig(router).defaultParams["ur-symbol"];
+        // Verify behavior - page should be accessible
+        const state = router.makeState("ur-symbol");
 
-        expect(stored).toHaveProperty("page", 1);
-        // Symbol key is preserved because we store reference
-        expect((stored as typeof params)[sym]).toBe("secret");
+        expect(state.params.page).toBe(1);
       });
     });
 
@@ -1033,7 +1088,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).toThrowError(/defaultParams must be an object/);
 
         // forwardTo should NOT be applied due to validation-first approach
-        expect(getConfig(router).forwardMap["ur-atom-src"]).toBeUndefined();
+        // Verify by checking forwardState returns same route (no forward)
+        expect(router.forwardState("ur-atom-src", {}).name).toBe("ur-atom-src");
       });
 
       it("should rollback forwardTo if forwardTo validation fails after mutation", () => {
@@ -1049,8 +1105,10 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).toThrowError(/forwardTo target.*does not exist/);
 
         // Both should NOT be applied
-        expect(getConfig(router).forwardMap["ur-atom-fwd"]).toBeUndefined();
-        expect(getConfig(router).defaultParams["ur-atom-fwd"]).toBeUndefined();
+        // No forward configured - forwardState returns same route
+        expect(router.forwardState("ur-atom-fwd", {}).name).toBe("ur-atom-fwd");
+        // No defaultParams - makeState returns empty params
+        expect(router.makeState("ur-atom-fwd").params).toStrictEqual({});
       });
     });
 
@@ -1061,12 +1119,12 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-seq", { defaultParams: { a: 1, b: 2 } });
         router.updateRoute("ur-seq", { defaultParams: { c: 3 } });
 
-        const params = getConfig(router).defaultParams["ur-seq"];
+        const state = router.makeState("ur-seq");
 
         // Should be replaced, not merged
-        expect(params).toStrictEqual({ c: 3 });
-        expect(params).not.toHaveProperty("a");
-        expect(params).not.toHaveProperty("b");
+        expect(state.params).toStrictEqual({ c: 3 });
+        expect(state.params).not.toHaveProperty("a");
+        expect(state.params).not.toHaveProperty("b");
       });
 
       it("should allow updating different properties independently", () => {
@@ -1077,11 +1135,15 @@ describe("core/routes/routeTree/updateRoute", () => {
           decodeParams: (p) => ({ ...p, decoded: true }),
         });
 
-        // Both should be set
-        expect(getConfig(router).defaultParams["ur-indep"]).toStrictEqual({
+        // defaultParams should still be set
+        expect(router.makeState("ur-indep").params).toStrictEqual({
           page: 1,
         });
-        expect(getConfig(router).decoders["ur-indep"]).toBeDefined();
+
+        // Decoder should be active - verify via matchPath
+        const state = router.matchPath("/ur-indep");
+
+        expect(state?.params).toHaveProperty("decoded", true);
       });
     });
 
@@ -1102,9 +1164,9 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Getter is called exactly once during destructuring
         // This protects against mutating getters returning different values
-        const stored = getConfig(router).defaultParams["ur-getter"];
+        const state = router.makeState("ur-getter");
 
-        expect(stored).toStrictEqual({ page: 1 });
+        expect(state.params).toStrictEqual({ page: 1 });
         expect(callCount).toBe(1); // Called only once during caching
       });
 
@@ -1128,7 +1190,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Config remains unchanged - exception happens during destructuring,
         // before any mutations
-        expect(getConfig(router).defaultParams["ur-throwing"]).toStrictEqual({
+        expect(router.makeState("ur-throwing").params).toStrictEqual({
           original: true,
         });
       });
@@ -1150,7 +1212,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(() =>
           router.updateRoute("ur-proxy", updates),
         ).not.toThrowError();
-        expect(getConfig(router).defaultParams["ur-proxy"]).toStrictEqual({
+        expect(router.makeState("ur-proxy").params).toStrictEqual({
           page: 1,
         });
       });

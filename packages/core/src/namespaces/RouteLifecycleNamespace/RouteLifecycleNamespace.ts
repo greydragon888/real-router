@@ -260,7 +260,11 @@ export class RouteLifecycleNamespace<
     this.#registering.add(name);
 
     try {
-      const fn = factory(this.#router, this.#router.getDependency);
+      // Bind getDependency to preserve 'this' context when called from factory
+      const fn = factory(
+        this.#router,
+        this.#router.getDependency.bind(this.#router),
+      );
 
       if (typeof fn !== "function") {
         throw new TypeError(
