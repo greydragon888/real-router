@@ -26,3 +26,26 @@ export {
 } from "./OptionsNamespace";
 
 export { StateNamespace } from "./StateNamespace";
+
+export { MiddlewareNamespace, MIDDLEWARE_LIMITS } from "./MiddlewareNamespace";
+
+export {
+  PluginsNamespace,
+  PLUGIN_LIMITS,
+  EVENTS_MAP,
+  EVENT_METHOD_NAMES,
+} from "./PluginsNamespace";
+
+export {
+  RouteLifecycleNamespace,
+  LIFECYCLE_LIMITS,
+} from "./RouteLifecycleNamespace";
+
+export {
+  RoutesNamespace,
+  DEFAULT_ROUTE_NAME,
+  validatedRouteNames,
+  createEmptyConfig,
+} from "./RoutesNamespace";
+
+export type { RouteConfig } from "./RoutesNamespace";
