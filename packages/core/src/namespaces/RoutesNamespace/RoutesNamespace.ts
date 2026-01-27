@@ -33,6 +33,7 @@ import type {
   Options,
   Params,
   Route,
+  RouteConfigUpdate,
   Router,
   State,
 } from "@real-router/types";
@@ -87,6 +88,80 @@ function paramsMatchExcluding(
   }
 
   return true;
+}
+
+/**
+ * Pattern for complete route validation (all segments at once).
+ * Matches: single segment or multiple segments separated by dots.
+ * Each segment must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
+ * Rejects: leading/trailing/consecutive dots, segments starting with numbers/hyphens.
+ */
+const FULL_ROUTE_PATTERN = /^[A-Z_a-z][\w-]*(?:\.[A-Z_a-z][\w-]*)*$/;
+
+/**
+ * Extracts parameter names from a single path string.
+ * Matches :param and *splat patterns.
+ */
+function extractParamsFromPath(path: string): Set<string> {
+  const params = new Set<string>();
+  const paramRegex = /[*:]([A-Z_a-z]\w*)/g;
+  let match;
+
+  while ((match = paramRegex.exec(path)) !== null) {
+    params.add(match[1]);
+  }
+
+  return params;
+}
+
+/**
+ * Extracts all parameters from multiple path segments.
+ */
+function extractParamsFromPaths(paths: readonly string[]): Set<string> {
+  const params = new Set<string>();
+
+  for (const path of paths) {
+    for (const param of extractParamsFromPath(path)) {
+      params.add(param);
+    }
+  }
+
+  return params;
+}
+
+/**
+ * Collects all path segments for a route from batch definitions.
+ * Traverses parent routes to include inherited path segments.
+ */
+function collectPathsToRoute<Dependencies extends DefaultDependencies>(
+  routes: readonly Route<Dependencies>[],
+  routeName: string,
+  parentName = "",
+  paths: string[] = [],
+): string[] | undefined {
+  for (const route of routes) {
+    const fullName = parentName ? `${parentName}.${route.name}` : route.name;
+    const currentPaths = [...paths, route.path];
+
+    if (fullName === routeName) {
+      return currentPaths;
+    }
+
+    if (route.children && routeName.startsWith(`${fullName}.`)) {
+      const result = collectPathsToRoute(
+        route.children,
+        routeName,
+        fullName,
+        currentPaths,
+      );
+
+      if (result) {
+        return result;
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -257,6 +332,13 @@ export class RoutesNamespace<
   }
 
   /**
+   * Validates removeRoute arguments.
+   */
+  static validateRemoveRouteArgs(name: unknown): asserts name is string {
+    validateRouteName(name, "removeRoute");
+  }
+
+  /**
    * Validates params structure.
    */
   static validateParams(
@@ -267,6 +349,205 @@ export class RoutesNamespace<
       throw new TypeError(
         `[router.${methodName}] Invalid params structure: ${getTypeDescription(params)}`,
       );
+    }
+  }
+
+  /**
+   * Validates optional params (undefined is allowed).
+   */
+  static validateOptionalParams(
+    params: unknown,
+    methodName: string,
+  ): asserts params is Params | undefined {
+    if (params !== undefined && !isParams(params)) {
+      throw new TypeError(
+        `[router.${methodName}] Invalid params structure: ${getTypeDescription(params)}`,
+      );
+    }
+  }
+
+  /**
+   * Validates isActiveRoute arguments.
+   */
+  static validateIsActiveRouteArgs(
+    name: unknown,
+    params: unknown,
+    strictEquality: unknown,
+    ignoreQueryParams: unknown,
+  ): void {
+    // Validate name - non-string throws
+    if (!isString(name)) {
+      throw new TypeError(`Route name must be a string`);
+    }
+
+    // Validate params if provided
+    if (params !== undefined && !isParams(params)) {
+      throw new TypeError(`[router.isActiveRoute] Invalid params structure`);
+    }
+
+    // Validate strictEquality if provided
+    if (strictEquality !== undefined && typeof strictEquality !== "boolean") {
+      throw new TypeError(
+        `[router.isActiveRoute] strictEquality must be a boolean, got ${typeof strictEquality}`,
+      );
+    }
+
+    // Validate ignoreQueryParams if provided
+    if (
+      ignoreQueryParams !== undefined &&
+      typeof ignoreQueryParams !== "boolean"
+    ) {
+      throw new TypeError(
+        `[router.isActiveRoute] ignoreQueryParams must be a boolean, got ${typeof ignoreQueryParams}`,
+      );
+    }
+  }
+
+  /**
+   * Validates forward() arguments.
+   */
+  static validateForwardArgs(
+    fromRoute: unknown,
+    toRoute: unknown,
+  ): asserts fromRoute is string {
+    if (!isString(fromRoute) || fromRoute === "") {
+      throw new TypeError(
+        `[router.forward] Invalid fromRoute: ${getTypeDescription(fromRoute)}. Expected non-empty string.`,
+      );
+    }
+
+    if (!isString(toRoute) || toRoute === "") {
+      throw new TypeError(
+        `[router.forward] Invalid toRoute: ${getTypeDescription(toRoute)}. Expected non-empty string.`,
+      );
+    }
+  }
+
+  /**
+   * Validates forwardState/buildState arguments.
+   */
+  static validateStateBuilderArgs(
+    routeName: unknown,
+    routeParams: unknown,
+    methodName: string,
+  ): void {
+    if (!isString(routeName)) {
+      throw new TypeError(
+        `[router.${methodName}] Invalid routeName: ${getTypeDescription(routeName)}. Expected string.`,
+      );
+    }
+
+    if (!isParams(routeParams)) {
+      throw new TypeError(
+        `[router.${methodName}] Invalid routeParams: ${getTypeDescription(routeParams)}. Expected plain object.`,
+      );
+    }
+  }
+
+  /**
+   * Validates updateRoute basic arguments (name and updates object structure).
+   * Does NOT read property values to allow caller to cache them first.
+   */
+  static validateUpdateRouteBasicArgs<Dependencies extends DefaultDependencies>(
+    name: unknown,
+    updates: unknown,
+  ): asserts updates is RouteConfigUpdate<Dependencies> {
+    // Validate name
+    validateRouteName(name, "updateRoute");
+
+    if (name === "") {
+      throw new ReferenceError(
+        `[router.updateRoute] Invalid name: empty string. Cannot update root node.`,
+      );
+    }
+
+    // Validate updates is not null
+
+    if (updates === null) {
+      throw new TypeError(
+        `[real-router] updateRoute: updates must be an object, got null`,
+      );
+    }
+
+    // Validate updates is an object (not array)
+    if (typeof updates !== "object" || Array.isArray(updates)) {
+      throw new TypeError(
+        `[real-router] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
+      );
+    }
+  }
+
+  /**
+   * Validates updateRoute property types using pre-cached values.
+   * Called AFTER properties are cached to ensure getters are called only once.
+   */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- validation logic is naturally verbose
+  static validateUpdateRoutePropertyTypes(
+    forwardTo: unknown,
+    defaultParams: unknown,
+    decodeParams: unknown,
+    encodeParams: unknown,
+  ): void {
+    // Validate forwardTo type (existence check is done by instance method)
+    if (forwardTo !== undefined && forwardTo !== null && !isString(forwardTo)) {
+      throw new TypeError(
+        `[real-router] updateRoute: forwardTo must be a string or null, got ${getTypeDescription(forwardTo)}`,
+      );
+    }
+
+    // Validate defaultParams
+    if (
+      defaultParams !== undefined &&
+      defaultParams !== null &&
+      (typeof defaultParams !== "object" || Array.isArray(defaultParams))
+    ) {
+      throw new TypeError(
+        `[real-router] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
+      );
+    }
+
+    // Validate decodeParams
+    if (decodeParams !== undefined && decodeParams !== null) {
+      if (typeof decodeParams !== "function") {
+        throw new TypeError(
+          `[real-router] updateRoute: decodeParams must be a function or null, got ${typeof decodeParams}`,
+        );
+      }
+
+      // Check for async function
+      if (
+        (decodeParams as { constructor: { name: string } }).constructor.name ===
+          "AsyncFunction" ||
+        (decodeParams as { toString: () => string })
+          .toString()
+          .includes("__awaiter")
+      ) {
+        throw new TypeError(
+          `[real-router] updateRoute: decodeParams cannot be an async function`,
+        );
+      }
+    }
+
+    // Validate encodeParams
+    if (encodeParams !== undefined && encodeParams !== null) {
+      if (typeof encodeParams !== "function") {
+        throw new TypeError(
+          `[real-router] updateRoute: encodeParams must be a function or null, got ${typeof encodeParams}`,
+        );
+      }
+
+      // Check for async function
+      if (
+        (encodeParams as { constructor: { name: string } }).constructor.name ===
+          "AsyncFunction" ||
+        (encodeParams as { toString: () => string })
+          .toString()
+          .includes("__awaiter")
+      ) {
+        throw new TypeError(
+          `[real-router] updateRoute: encodeParams cannot be an async function`,
+        );
+      }
     }
   }
 
@@ -351,10 +632,14 @@ export class RoutesNamespace<
 
   /**
    * Adds one or more routes to the router.
+   * Validates all routes before adding them.
    *
-   * @param routes - Already validated routes
+   * @param routes - Routes to add
    */
   addRoutes(routes: Route<Dependencies>[]): void {
+    // Validate all routes before any mutation
+    this.#validateRoutes(routes, "");
+
     // Add to definitions
     for (const route of routes) {
       this.#definitions.push(sanitizeRoute(route));
@@ -832,6 +1117,196 @@ export class RoutesNamespace<
   }
 
   // =========================================================================
+  // Public validation methods (used by Router facade)
+  // =========================================================================
+
+  /**
+   * Validates that forwardTo target doesn't require params that source doesn't have.
+   * Used by updateRoute and forward for forwardTo validation.
+   */
+  validateForwardToParamCompatibility(
+    sourceName: string,
+    targetName: string,
+    methodName: "forward" | "updateRoute" = "updateRoute",
+  ): void {
+    const sourceSegments = getSegmentsByName(this.#tree, sourceName);
+    const targetSegments = getSegmentsByName(this.#tree, targetName);
+
+    if (!sourceSegments || !targetSegments) {
+      return;
+    }
+
+    // Get source and target URL params using helper
+    const sourceParams = this.#collectUrlParams(sourceSegments);
+    const targetParams = this.#collectUrlParamsArray(targetSegments);
+
+    // Check if target requires params that source doesn't have
+    const missingParams = targetParams.filter(
+      (param) => !sourceParams.has(param),
+    );
+
+    if (missingParams.length > 0) {
+      const targetDesc =
+        methodName === "forward" ? "target route" : "forwardTo target";
+
+      throw new Error(
+        `[real-router] ${methodName}: ${targetDesc} "${targetName}" requires params ` +
+          `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
+      );
+    }
+  }
+
+  /**
+   * Validates that adding forwardTo doesn't create a cycle.
+   * Creates a test map with the new entry and uses resolveForwardChain
+   * to detect cycles before any mutation happens.
+   * Used by updateRoute for forwardTo validation.
+   */
+  validateForwardToCycle(sourceName: string, targetName: string): void {
+    // Create a test map with the new entry to validate BEFORE mutation
+    const testMap = {
+      ...this.#config.forwardMap,
+      [sourceName]: targetName,
+    };
+
+    // resolveForwardChain will throw if cycle is detected or max depth exceeded
+    resolveForwardChain(sourceName, testMap);
+  }
+
+  /**
+   * Validates removeRoute constraints.
+   * Returns false if removal should be blocked (route is active).
+   * Logs warnings for edge cases.
+   *
+   * @param name - Route name to remove
+   * @param currentStateName - Current active route name (or undefined)
+   * @param isNavigating - Whether navigation is in progress
+   * @returns true if removal can proceed, false if blocked
+   */
+  validateRemoveRoute(
+    name: string,
+    currentStateName: string | undefined,
+    isNavigating: boolean,
+  ): boolean {
+    // Check if trying to remove currently active route (or its parent)
+    if (currentStateName) {
+      const isExactMatch = currentStateName === name;
+      const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
+
+      if (isExactMatch || isParentOfCurrent) {
+        const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
+
+        logger.warn(
+          "router.removeRoute",
+          `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
+        );
+
+        return false;
+      }
+    }
+
+    // Warn if navigation is in progress (but allow removal)
+    if (isNavigating) {
+      logger.warn(
+        "router.removeRoute",
+        `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * Validates clearRoutes operation.
+   * Returns false if operation should be blocked (navigation in progress).
+   *
+   * @param isNavigating - Whether navigation is in progress
+   * @returns true if clearRoutes can proceed, false if blocked
+   */
+  validateClearRoutes(isNavigating: boolean): boolean {
+    if (isNavigating) {
+      logger.error(
+        "router.clearRoutes",
+        "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
+      );
+
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Validates updateRoute instance-level constraints (route existence, forwardTo).
+   * Called after static validation passes.
+   *
+   * @param name - Route name (already validated by static method)
+   * @param forwardTo - Cached forwardTo value (to avoid calling getter twice)
+   */
+  validateUpdateRoute(
+    name: string,
+    forwardTo: string | null | undefined,
+  ): void {
+    // Validate route exists
+    if (!this.hasRoute(name)) {
+      throw new ReferenceError(
+        `[real-router] updateRoute: route "${name}" does not exist`,
+      );
+    }
+
+    // Validate forwardTo target exists and is valid
+    if (forwardTo !== undefined && forwardTo !== null) {
+      if (!this.hasRoute(forwardTo)) {
+        throw new Error(
+          `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
+        );
+      }
+
+      // Check forwardTo param compatibility
+      this.validateForwardToParamCompatibility(name, forwardTo);
+
+      // Check for cycle detection
+      this.validateForwardToCycle(name, forwardTo);
+    }
+  }
+
+  /**
+   * Registers a forward mapping from one route to another.
+   * Validates route existence, param compatibility, and cycles before mutation.
+   */
+  forward(fromRoute: string, toRoute: string): void {
+    // Validate source route exists
+    if (!this.hasRoute(fromRoute)) {
+      throw new Error(
+        `[real-router] forward: source route "${fromRoute}" does not exist`,
+      );
+    }
+
+    // Validate target route exists
+    if (!this.hasRoute(toRoute)) {
+      throw new Error(
+        `[real-router] forward: target route "${toRoute}" does not exist`,
+      );
+    }
+
+    // Validate param compatibility
+    this.validateForwardToParamCompatibility(fromRoute, toRoute, "forward");
+
+    // Validate no cycles would be created
+    this.validateForwardToCycle(fromRoute, toRoute);
+
+    // Add forward mapping
+    this.#config.forwardMap[fromRoute] = toRoute;
+
+    // Rebuild resolved forward map entry
+    // resolveForwardChain handles the chain resolution
+    this.#resolvedForwardMap[fromRoute] = resolveForwardChain(
+      fromRoute,
+      this.#config.forwardMap,
+    );
+  }
+
+  // =========================================================================
   // Private methods
   // =========================================================================
 
@@ -842,6 +1317,48 @@ export class RoutesNamespace<
       this.#definitions,
       { skipValidation },
     );
+  }
+
+  /**
+   * Collects URL params from segments into a Set.
+   */
+  #collectUrlParams(
+    segments: ReturnType<typeof getSegmentsByName>,
+  ): Set<string> {
+    const params = new Set<string>();
+
+    if (segments) {
+      for (const segment of segments) {
+        if (segment.parser) {
+          for (const param of segment.parser.urlParams) {
+            params.add(param);
+          }
+        }
+      }
+    }
+
+    return params;
+  }
+
+  /**
+   * Collects URL params from segments into an array.
+   */
+  #collectUrlParamsArray(
+    segments: ReturnType<typeof getSegmentsByName>,
+  ): string[] {
+    const params: string[] = [];
+
+    if (segments) {
+      for (const segment of segments) {
+        if (segment.parser) {
+          for (const param of segment.parser.urlParams) {
+            params.push(param);
+          }
+        }
+      }
+    }
+
+    return params;
   }
 
   #getDefaultOptions(): Options {
@@ -1022,5 +1539,444 @@ export class RoutesNamespace<
     }
 
     return route;
+  }
+
+  // =========================================================================
+  // Route Validation Methods
+  // =========================================================================
+
+  /**
+   * Collects all route names from a batch recursively (for cross-reference validation).
+   */
+  #collectRouteNames(
+    routes: Route<Dependencies>[],
+    parentPrefix: string,
+    names: Set<string>,
+  ): void {
+    for (const route of routes) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
+      if (route && typeof route === "object" && isString(route.name)) {
+        const fullName = parentPrefix
+          ? `${parentPrefix}.${route.name}`
+          : route.name;
+
+        names.add(fullName);
+
+        if (route.children && Array.isArray(route.children)) {
+          this.#collectRouteNames(route.children, fullName, names);
+        }
+      }
+    }
+  }
+
+  /**
+   * Validates routes before adding them to the router.
+   * Performs recursive validation of nested routes.
+   */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- validation logic is naturally verbose
+  #validateRoutes(
+    routes: Route<Dependencies>[],
+    parentPrefix: string,
+    batchNames?: Set<string>,
+    processedNames?: Set<string>,
+    seenPathsByParent?: Map<string, Set<string>>,
+    topLevelBatch?: Route<Dependencies>[],
+  ): void {
+    // On first call (top-level), pre-collect all route names for cross-reference validation
+    // and store the top-level batch for forwardTo param validation
+    if (batchNames === undefined) {
+      batchNames = new Set<string>();
+      this.#collectRouteNames(routes, parentPrefix, batchNames);
+      topLevelBatch = routes;
+    }
+
+    // Track processed names for duplicate detection within batch
+    processedNames ??= new Set<string>();
+
+    // Track paths per parent for duplicate path detection
+    seenPathsByParent ??= new Map<string, Set<string>>();
+
+    for (const route of routes) {
+      // Check route is an object (runtime defense against `as any` casts)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime validation
+      if (route === null || typeof route !== "object" || Array.isArray(route)) {
+        throw new TypeError(
+          `[router.addRoute] Route must be an object, got ${getTypeDescription(route)}`,
+        );
+      }
+
+      // Check route is a plain object (no getters, setters, or class instances)
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Object.getPrototypeOf returns unknown
+      const proto: object | null = Object.getPrototypeOf(route);
+
+      if (proto !== null && proto !== Object.prototype) {
+        throw new TypeError(
+          `[router.addRoute] Route must be a plain object. Class instances are not allowed.`,
+        );
+      }
+
+      // Check for getters/setters on route object
+      const descriptors = Object.getOwnPropertyDescriptors(route);
+
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (descriptor.get || descriptor.set) {
+          throw new TypeError(
+            `[router.addRoute] Route must not have getters or setters. Found "${key}" with ${descriptor.get ? "getter" : "setter"}.`,
+          );
+        }
+      }
+
+      // Check required properties
+      if (!isString(route.name)) {
+        throw new TypeError(
+          `[router.addRoute] Route name must be a string, got ${getTypeDescription(route.name)}`,
+        );
+      }
+
+      if (route.name === "") {
+        throw new TypeError(`[router.addRoute] Route name cannot be empty`);
+      }
+
+      // System routes bypass pattern validation (e.g., @@router/UNKNOWN_ROUTE)
+      if (
+        !route.name.startsWith("@@") &&
+        !FULL_ROUTE_PATTERN.test(route.name)
+      ) {
+        throw new TypeError(
+          `[router.addRoute] Invalid route name "${route.name}". ` +
+            `Each segment must start with a letter or underscore, ` +
+            `followed by letters, numbers, underscores, or hyphens. ` +
+            `Segments are separated by dots (e.g., "users.profile").`,
+        );
+      }
+
+      if (!isString(route.path)) {
+        throw new TypeError(
+          `[router.addRoute] Route path must be a string for route "${route.name}", got ${getTypeDescription(route.path)}`,
+        );
+      }
+
+      // Check for whitespace in path
+      if (/\s/.test(route.path)) {
+        throw new Error(
+          `[router.addRoute] Route path "${route.path}" contains whitespace; whitespace not allowed in paths.`,
+        );
+      }
+
+      const fullName = parentPrefix
+        ? `${parentPrefix}.${route.name}`
+        : route.name;
+
+      // Check for duplicates in existing routes (name check first)
+      if (this.hasRoute(fullName)) {
+        throw new Error(
+          `[router.addRoute] Route "${fullName}" already exists. Use updateRoute() to modify.`,
+        );
+      }
+
+      // Check for duplicates within the batch (using processedNames, not batchNames)
+      if (processedNames.has(fullName)) {
+        throw new Error(
+          `[router.addRoute] Duplicate route "${fullName}" in batch`,
+        );
+      }
+
+      processedNames.add(fullName);
+
+      // Check for duplicate paths in existing tree at same parent level
+      let parentNode: RouteTree | undefined = this.#tree;
+
+      if (parentPrefix !== "") {
+        const segments = parentPrefix.split(".");
+
+        for (const segment of segments) {
+          parentNode = parentNode.childrenByName.get(segment);
+
+          if (!parentNode) {
+            break; // Parent doesn't exist in tree yet
+          }
+        }
+      }
+
+      if (parentNode) {
+        for (const child of parentNode.children) {
+          if (child.path === route.path) {
+            throw new Error(
+              `[router.addRoute] Path "${route.path}" is already defined`,
+            );
+          }
+        }
+      }
+
+      // Check for duplicate paths within current batch at same parent level
+      const pathsAtLevel = seenPathsByParent.get(parentPrefix) ?? new Set();
+
+      if (pathsAtLevel.has(route.path)) {
+        throw new Error(
+          `[router.addRoute] Path "${route.path}" is already defined`,
+        );
+      }
+
+      pathsAtLevel.add(route.path);
+      seenPathsByParent.set(parentPrefix, pathsAtLevel);
+
+      // Validate dot-notation parent exists (for top-level routes with dots)
+      if (parentPrefix === "" && fullName.includes(".")) {
+        const parentName = fullName.slice(
+          0,
+          Math.max(0, fullName.lastIndexOf(".")),
+        );
+
+        // Parent must exist either in router or already processed in this batch
+        // Using processedNames (not batchNames) to detect parent-after-child order errors
+        if (!this.hasRoute(parentName) && !processedNames.has(parentName)) {
+          throw new Error(
+            `[router.addRoute] Parent route "${parentName}" does not exist. Add the parent route first.`,
+          );
+        }
+      }
+
+      // Validate children is an array
+      if (route.children !== undefined && !Array.isArray(route.children)) {
+        throw new TypeError(
+          `[router.addRoute] Route "${fullName}" children must be an array, got ${getTypeDescription(route.children)}`,
+        );
+      }
+
+      // Validate canActivate is a function
+      if (
+        route.canActivate !== undefined &&
+        typeof route.canActivate !== "function"
+      ) {
+        throw new TypeError(
+          `[router.addRoute] canActivate must be a function for route "${fullName}", got ${getTypeDescription(route.canActivate)}`,
+        );
+      }
+
+      // Validate canDeactivate is a function
+      if (
+        route.canDeactivate !== undefined &&
+        typeof route.canDeactivate !== "function"
+      ) {
+        throw new TypeError(
+          `[router.addRoute] canDeactivate must be a function for route "${fullName}", got ${getTypeDescription(route.canDeactivate)}`,
+        );
+      }
+
+      // Validate defaultParams is an object (null not allowed in addRoute)
+      if (
+        route.defaultParams !== undefined &&
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime validation for JS callers
+        (route.defaultParams === null ||
+          typeof route.defaultParams !== "object" ||
+          Array.isArray(route.defaultParams))
+      ) {
+        throw new TypeError(
+          `[router.addRoute] defaultParams must be an object for route "${fullName}", got ${getTypeDescription(route.defaultParams)}`,
+        );
+      }
+
+      // Validate decodeParams is a function (and not async)
+      if (route.decodeParams !== undefined) {
+        if (typeof route.decodeParams !== "function") {
+          throw new TypeError(
+            `[router.addRoute] decodeParams must be a function for route "${fullName}", got ${getTypeDescription(route.decodeParams)}`,
+          );
+        }
+
+        if (route.decodeParams.constructor.name === "AsyncFunction") {
+          throw new TypeError(
+            `[router.addRoute] decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
+          );
+        }
+      }
+
+      // Validate encodeParams is a function (and not async)
+      if (route.encodeParams !== undefined) {
+        if (typeof route.encodeParams !== "function") {
+          throw new TypeError(
+            `[router.addRoute] encodeParams must be a function for route "${fullName}", got ${getTypeDescription(route.encodeParams)}`,
+          );
+        }
+
+        if (route.encodeParams.constructor.name === "AsyncFunction") {
+          throw new TypeError(
+            `[router.addRoute] encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
+          );
+        }
+      }
+
+      // Validate forwardTo target exists and param compatibility
+      if (route.forwardTo !== undefined) {
+        const targetExists =
+          this.hasRoute(route.forwardTo) || batchNames.has(route.forwardTo);
+
+        if (!targetExists) {
+          throw new Error(
+            `[router.addRoute] forwardTo target "${route.forwardTo}" does not exist for route "${fullName}"`,
+          );
+        }
+
+        // Validate param compatibility - target can't require params source doesn't have
+        const targetSegments = getSegmentsByName(this.#tree, route.forwardTo);
+
+        // Get target's required params - either from tree or from batch
+        let targetParams: Set<string>;
+
+        if (targetSegments) {
+          // Target exists in tree
+          targetParams = new Set<string>();
+
+          for (const segment of targetSegments) {
+            if (segment.parser) {
+              for (const param of segment.parser.urlParams) {
+                targetParams.add(param);
+              }
+            }
+          }
+        } else if (topLevelBatch) {
+          // Target is in batch - extract params from batch route definitions
+          const targetPaths = collectPathsToRoute(
+            topLevelBatch,
+            route.forwardTo,
+          );
+
+          targetParams = targetPaths
+            ? extractParamsFromPaths(targetPaths)
+            : new Set<string>();
+        } else {
+          targetParams = new Set<string>();
+        }
+
+        // Get source's params - from current route and all ancestors
+        let sourceParams: Set<string>;
+
+        if (topLevelBatch) {
+          // Get all paths from root to source in batch
+          const sourcePaths = collectPathsToRoute(topLevelBatch, fullName);
+
+          sourceParams = sourcePaths
+            ? extractParamsFromPaths(sourcePaths)
+            : new Set<string>();
+        } else {
+          // Fallback: extract from current path and tree ancestors
+          sourceParams = extractParamsFromPath(route.path);
+
+          if (parentPrefix !== "") {
+            const parentSegments = getSegmentsByName(this.#tree, parentPrefix);
+
+            if (parentSegments) {
+              for (const segment of parentSegments) {
+                if (segment.parser) {
+                  for (const param of segment.parser.urlParams) {
+                    sourceParams.add(param);
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // Check for missing params
+        const missingParams = [...targetParams].filter(
+          (param) => !sourceParams.has(param),
+        );
+
+        if (missingParams.length > 0) {
+          throw new Error(
+            `[router.addRoute] forwardTo target "${route.forwardTo}" requires params [${missingParams.join(", ")}] that are not available in source route "${fullName}"`,
+          );
+        }
+      }
+
+      // Recursively validate children
+      if (route.children) {
+        this.#validateRoutes(
+          route.children,
+          fullName,
+          batchNames,
+          processedNames,
+          seenPathsByParent,
+          topLevelBatch,
+        );
+      }
+    }
+
+    // On top-level call, validate forwardTo cycles for the entire batch
+    if (parentPrefix === "") {
+      this.#validateBatchForwardToCycles(routes, "");
+    }
+  }
+
+  /**
+   * Validates that adding a batch of routes doesn't create forwardTo cycles.
+   * Builds a test map combining existing forwardMap + batch forwardTo and checks for cycles.
+   */
+  #validateBatchForwardToCycles(
+    routes: Route<Dependencies>[],
+    parentPrefix: string,
+  ): void {
+    const testMap: Record<string, string> = { ...this.#config.forwardMap };
+
+    // Collect all forwardTo from the batch
+    this.#collectBatchForwardTo(routes, parentPrefix, testMap);
+
+    // Verify no cycles with combined map
+    const maxDepth = 100;
+
+    for (const fromRoute of Object.keys(testMap)) {
+      const visited = new Set<string>();
+      const chain: string[] = [fromRoute];
+      let current = fromRoute;
+
+      while (testMap[current]) {
+        const next = testMap[current];
+
+        if (visited.has(next)) {
+          const cycleStart = chain.indexOf(next);
+          const cycle = [...chain.slice(cycleStart), next];
+
+          throw new Error(`Circular forwardTo: ${cycle.join(" → ")}`);
+        }
+
+        visited.add(current);
+        chain.push(next);
+        current = next;
+
+        if (chain.length > maxDepth) {
+          throw new Error(
+            `forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Recursively collects all forwardTo mappings from a batch of routes.
+   */
+  #collectBatchForwardTo(
+    routes: Route<Dependencies>[],
+    parentPrefix: string,
+    targetMap: Record<string, string>,
+  ): void {
+    for (const route of routes) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
+      if (!route || typeof route !== "object") {
+        continue;
+      }
+
+      const fullName = parentPrefix
+        ? `${parentPrefix}.${route.name}`
+        : route.name;
+
+      if (route.forwardTo) {
+        targetMap[fullName] = route.forwardTo;
+      }
+
+      if (route.children && Array.isArray(route.children)) {
+        this.#collectBatchForwardTo(route.children, fullName, targetMap);
+      }
+    }
   }
 }

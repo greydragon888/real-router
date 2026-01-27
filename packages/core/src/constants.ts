@@ -8,63 +8,6 @@ import type {
   ErrorCodeValues,
 } from "@real-router/types";
 
-/**
- * Internal Symbol for storing the route tree.
- * Using Symbol to simulate a "private" property that won't appear in Object.keys().
- *
- * @internal
- */
-export const ROOT_TREE_SYMBOL = Symbol("real-router.routeTree");
-
-/**
- * Internal Symbol for storing route definitions.
- * Used for dynamic route addition support.
- *
- * @internal
- */
-export const ROUTE_DEFINITIONS_SYMBOL = Symbol("real-router.routeDefinitions");
-
-/**
- * Internal Symbol for storing resolved forwardTo chains cache.
- * Maps route names to their final destination after following the entire chain.
- *
- * @internal
- * @todo RFC-8: This is a stopgap solution until CacheManager is implemented.
- *       Once CacheManager is available, migrate to:
- *       CacheManager.getInstance().setResolvedForwardMap(router, resolvedMap)
- *
- * **Current approach (temporary)**:
- * ```typescript
- * router[RESOLVED_FORWARD_MAP_SYMBOL] = { "A": "C", "B": "C" };
- * ```
- *
- * **Future approach (RFC-8)**:
- * ```typescript
- * CacheManager.getInstance().setResolvedForwardMap(router, resolvedMap);
- * ```
- *
- * See: .claude/issues/1-dx-improve-rfc-list/rfc-7-route-guard-check.md
- * See: .claude/issues/2-fsm-migration-rfc-list/rfc-8-cache-manager.md
- */
-export const RESOLVED_FORWARD_MAP_SYMBOL = Symbol(
-  "real-router.resolvedForwardMap",
-);
-
-/**
- * Internal Symbol for storing root path.
- *
- * @internal
- */
-export const ROOT_PATH_SYMBOL = Symbol("real-router.rootPath");
-
-/**
- * Internal Symbol for storing router configuration.
- * Hides config from public API to prevent bypassing validation in updateRoute().
- *
- * @internal
- */
-export const CONFIG_SYMBOL = Symbol("real-router.config");
-
 export type ConstantsKeys = "UNKNOWN_ROUTE";
 
 export type Constants = Record<ConstantsKeys, string>;

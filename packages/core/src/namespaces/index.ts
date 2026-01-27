@@ -53,3 +53,7 @@ export type { RouteConfig } from "./RoutesNamespace";
 export { NavigationNamespace } from "./NavigationNamespace";
 
 export { RouterLifecycleNamespace } from "./RouterLifecycleNamespace";
+
+export { CloneNamespace } from "./CloneNamespace";
+
+export type { ApplyConfigFn, CloneData, RouterFactory } from "./CloneNamespace";

@@ -1,26 +1,9 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter } from "@real-router/core";
-
-import {
-  RESOLVED_FORWARD_MAP_SYMBOL,
-  ROUTE_DEFINITIONS_SYMBOL,
-} from "../../../../src/constants";
 import { createTestRouter } from "../../../helpers";
 
 import type { Route, Router } from "@real-router/core";
-
-// Helper to access internal resolvedForwardMap
-const getResolvedForwardMap = (r: Router): Record<string, string> =>
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  (r as Record<symbol, Record<string, string>>)[RESOLVED_FORWARD_MAP_SYMBOL] ||
-  {};
-
-// Helper to access internal routeDefinitions
-const getRouteDefinitions = (r: Router): Route[] =>
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-  (r as Record<symbol, Route[]>)[ROUTE_DEFINITIONS_SYMBOL] || [];
 
 let router: Router;
 
@@ -735,12 +718,6 @@ describe("core/routes/addRoute", () => {
       const state = router.forwardState("A", {});
 
       expect(state.name).toBe("C");
-
-      // Cached resolved map should have A → C
-      const resolvedMap = getResolvedForwardMap(router);
-
-      expect(resolvedMap.A).toBe("C");
-      expect(resolvedMap.B).toBe("C");
     });
 
     it("should handle route without forwardTo", () => {
@@ -749,7 +726,6 @@ describe("core/routes/addRoute", () => {
       const state = router.forwardState("no-forward", {});
 
       expect(state.name).toBe("no-forward");
-      expect(getResolvedForwardMap(router)["no-forward"]).toBeUndefined();
     });
 
     it("should detect circular forwardTo (A → B → A)", () => {
@@ -802,22 +778,23 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("existing");
     });
 
-    it("should update resolvedForwardMap after removeRoute", () => {
+    it("should handle forwardTo after removeRoute target", () => {
       router.addRoute([
         { name: "A", path: "/a", forwardTo: "B" },
         { name: "B", path: "/b" },
       ]);
 
-      expect(getResolvedForwardMap(router).A).toBe("B");
+      // A forwards to B
+      expect(router.forwardState("A", {}).name).toBe("B");
 
-      // Remove B (this should clear the cache and cause error on next add with A → B)
+      // Remove B - now A has dangling forwardTo
       router.removeRoute("B");
 
-      // resolvedForwardMap should not have A anymore since B is gone
-      expect(getResolvedForwardMap(router).A).toBeUndefined();
+      // forwardState should return A itself since B no longer exists
+      expect(router.forwardState("A", {}).name).toBe("A");
     });
 
-    it("should cache forwardTo chains for O(1) lookup", () => {
+    it("should resolve forwardTo chains correctly", () => {
       router.addRoute([
         { name: "level1", path: "/1", forwardTo: "level2" },
         { name: "level2", path: "/2", forwardTo: "level3" },
@@ -826,20 +803,11 @@ describe("core/routes/addRoute", () => {
         { name: "final", path: "/final" },
       ]);
 
-      // All levels should resolve to "final" in the cache
-      const resolvedMap = getResolvedForwardMap(router);
-
-      expect(resolvedMap.level1).toBe("final");
-      expect(resolvedMap.level2).toBe("final");
-      expect(resolvedMap.level3).toBe("final");
-      expect(resolvedMap.level4).toBe("final");
-
-      // forwardState should use the cache (O(1) lookup)
-      const state1 = router.forwardState("level1", {});
-      const state2 = router.forwardState("level2", {});
-
-      expect(state1.name).toBe("final");
-      expect(state2.name).toBe("final");
+      // All levels should resolve to "final"
+      expect(router.forwardState("level1", {}).name).toBe("final");
+      expect(router.forwardState("level2", {}).name).toBe("final");
+      expect(router.forwardState("level3", {}).name).toBe("final");
+      expect(router.forwardState("level4", {}).name).toBe("final");
     });
 
     it("should handle very long chains without stack overflow", () => {
@@ -863,8 +831,6 @@ describe("core/routes/addRoute", () => {
       router.addRoute(routes);
 
       // First route should resolve to last route
-      expect(getResolvedForwardMap(router).route1).toBe("route50");
-
       const state = router.forwardState("route1", {});
 
       expect(state.name).toBe("route50");
@@ -979,250 +945,12 @@ describe("core/routes/addRoute", () => {
     });
   });
 
-  describe("Route sanitization", () => {
-    it("should not store custom properties in routeDefinitions on initialization", () => {
-      const routerWithCustomProps = createRouter([
-        {
-          name: "test",
-          path: "/test",
-          meta: { role: "admin" },
-          customField: "anything",
-          secretKey: "PASSWORD123",
-        } as Route,
-      ]);
-
-      const definitions = getRouteDefinitions(routerWithCustomProps);
-
-      expect(definitions).toHaveLength(1);
-      expect(definitions[0]).toStrictEqual({
-        name: "test",
-        path: "/test",
-      });
-
-      // Verify custom properties are NOT stored
-      expect(definitions[0]).not.toHaveProperty("meta");
-      expect(definitions[0]).not.toHaveProperty("customField");
-      expect(definitions[0]).not.toHaveProperty("secretKey");
-    });
-
-    it("should not store custom properties when adding routes via router.addRoute()", () => {
-      router.addRoute({
-        name: "sanitization-test",
-        path: "/sanitization-test",
-        meta: { permissions: ["all"] },
-        apiKey: "sk_live_abc123",
-        customData: { foo: "bar" },
-      } as Route);
-
-      const definitions = getRouteDefinitions(router);
-      const testRoute = definitions.find((r) => r.name === "sanitization-test");
-
-      expect(testRoute).toBeDefined();
-      expect(testRoute).toStrictEqual({
-        name: "sanitization-test",
-        path: "/sanitization-test",
-      });
-
-      // Verify custom properties are NOT stored
-      expect(testRoute).not.toHaveProperty("meta");
-      expect(testRoute).not.toHaveProperty("apiKey");
-      expect(testRoute).not.toHaveProperty("customData");
-    });
-
-    it("should sanitize children routes recursively", () => {
-      router.addRoute({
-        name: "api",
-        path: "/api",
-        meta: { public: true },
-        children: [
-          {
-            name: "v1",
-            path: "/v1",
-            apiVersion: "1.0.0",
-            children: [
-              {
-                name: "users",
-                path: "/users",
-                secret: "NESTED_SECRET",
-              } as Route,
-            ],
-          } as Route,
-        ],
-      } as Route);
-
-      const definitions = getRouteDefinitions(router);
-      const apiRoute = definitions.find((r) => r.name === "api");
-
-      expect(apiRoute).toBeDefined();
-
-      // Parent should be sanitized
-      expect(apiRoute).toStrictEqual({
-        name: "api",
-        path: "/api",
-        children: [
-          {
-            name: "v1",
-            path: "/v1",
-            children: [
-              {
-                name: "users",
-                path: "/users",
-              },
-            ],
-          },
-        ],
-      });
-
-      // Verify custom properties are NOT stored at any level
-      expect(apiRoute).not.toHaveProperty("meta");
-      expect(apiRoute?.children?.[0]).not.toHaveProperty("apiVersion");
-      expect(apiRoute?.children?.[0].children?.[0]).not.toHaveProperty(
-        "secret",
-      );
-    });
-
-    it("should preserve essential properties (name, path, children)", () => {
-      router.addRoute([
-        {
-          name: "parent",
-          path: "/parent",
-          customProp: "ignored",
-          children: [
-            {
-              name: "child",
-              path: "/child",
-              anotherCustom: "also ignored",
-            } as Route,
-          ],
-        } as Route,
-      ]);
-
-      const definitions = getRouteDefinitions(router);
-      const parentRoute = definitions.find((r) => r.name === "parent");
-
-      // Essential properties are preserved
-      expect(parentRoute?.name).toBe("parent");
-      expect(parentRoute?.path).toBe("/parent");
-      expect(parentRoute?.children).toBeDefined();
-      expect(parentRoute?.children).toHaveLength(1);
-      expect(parentRoute?.children?.[0].name).toBe("child");
-      expect(parentRoute?.children?.[0].path).toBe("/child");
-
-      // Custom properties are removed
-      expect(parentRoute).not.toHaveProperty("customProp");
-      expect(parentRoute?.children?.[0]).not.toHaveProperty("anotherCustom");
-    });
-
-    it("should sanitize batch add operations", () => {
-      router.addRoute([
-        {
-          name: "route1",
-          path: "/route1",
-          meta: { version: 1 },
-        } as Route,
-        {
-          name: "route2",
-          path: "/route2",
-          config: { enabled: true },
-        } as Route,
-        {
-          name: "route3",
-          path: "/route3",
-          permissions: ["read", "write"],
-        } as Route,
-      ]);
-
-      const definitions = getRouteDefinitions(router);
-
-      // All routes should be sanitized
-      const route1 = definitions.find((r) => r.name === "route1");
-      const route2 = definitions.find((r) => r.name === "route2");
-      const route3 = definitions.find((r) => r.name === "route3");
-
-      expect(route1).toStrictEqual({ name: "route1", path: "/route1" });
-      expect(route2).toStrictEqual({ name: "route2", path: "/route2" });
-      expect(route3).toStrictEqual({ name: "route3", path: "/route3" });
-
-      // No custom properties stored
-      expect(route1).not.toHaveProperty("meta");
-      expect(route2).not.toHaveProperty("config");
-      expect(route3).not.toHaveProperty("permissions");
-    });
-
-    it("should not leak custom properties through mutation", () => {
-      const routeWithCustomProps = {
-        name: "mutable",
-        path: "/mutable",
-        secret: "ORIGINAL_VALUE",
-      } as Route;
-
-      router.addRoute(routeWithCustomProps);
-
-      // Mutate the original object
-      (routeWithCustomProps as unknown as { secret: string }).secret =
-        "MUTATED_VALUE";
-
-      const definitions = getRouteDefinitions(router);
-      const storedRoute = definitions.find((r) => r.name === "mutable");
-
-      // Custom property should not be in stored route (sanitized)
-      expect(storedRoute).not.toHaveProperty("secret");
-
-      // Even if we somehow access the property, it shouldn't have the mutated value
-      expect((storedRoute as unknown as { secret?: string }).secret).toBe(
-        undefined,
-      );
-    });
-
-    it("should handle routes with only name and path", () => {
-      router.addRoute({
-        name: "minimal",
-        path: "/minimal",
-      });
-
-      const definitions = getRouteDefinitions(router);
-      const minimalRoute = definitions.find((r) => r.name === "minimal");
-
-      expect(minimalRoute).toStrictEqual({
-        name: "minimal",
-        path: "/minimal",
-      });
-    });
-
-    it("should handle routes with empty children array", () => {
-      router.addRoute({
-        name: "parent",
-        path: "/parent",
-        children: [],
-        customProp: "ignored",
-      } as Route);
-
-      const definitions = getRouteDefinitions(router);
-      const parentRoute = definitions.find((r) => r.name === "parent");
-
-      expect(parentRoute).toStrictEqual({
-        name: "parent",
-        path: "/parent",
-        children: [],
-      });
-
-      expect(parentRoute).not.toHaveProperty("customProp");
-    });
-  });
-
   describe("Edge cases", () => {
     it("should handle empty batch addRoute([])", () => {
-      const definitionsBefore = getRouteDefinitions(router).length;
-
-      // Should not throw
+      // Should not throw when adding empty array
       expect(() => {
         router.addRoute([]);
       }).not.toThrowError();
-
-      // No routes should be added
-      const definitionsAfter = getRouteDefinitions(router).length;
-
-      expect(definitionsAfter).toBe(definitionsBefore);
     });
 
     it("should allow addRoute on stopped router", () => {
@@ -1410,14 +1138,9 @@ describe("core/routes/addRoute", () => {
       router.addRoute({ name: "middle", path: "/middle", forwardTo: "final" });
       router.addRoute({ name: "start", path: "/start", forwardTo: "middle" });
 
-      const state = router.forwardState("start", {});
-
-      expect(state.name).toBe("final");
-
-      const resolvedMap = getResolvedForwardMap(router);
-
-      expect(resolvedMap.start).toBe("final");
-      expect(resolvedMap.middle).toBe("final");
+      // Chain resolves correctly: start → middle → final
+      expect(router.forwardState("start", {}).name).toBe("final");
+      expect(router.forwardState("middle", {}).name).toBe("final");
     });
   });
 
@@ -1543,8 +1266,6 @@ describe("core/routes/addRoute", () => {
 
     describe("Problem 4: atomicity on Phase 4 errors", () => {
       it("should not add routes to definitions if forwardTo cycle is detected", () => {
-        const definitionsBefore = getRouteDefinitions(router).length;
-
         expect(() => {
           router.addRoute([
             { name: "cycle-a", path: "/cycle-a", forwardTo: "cycle-b" },
@@ -1552,10 +1273,9 @@ describe("core/routes/addRoute", () => {
           ]);
         }).toThrowError(/Circular forwardTo/);
 
-        // Routes should NOT be in definitions (atomicity)
-        const definitionsAfter = getRouteDefinitions(router).length;
-
-        expect(definitionsAfter).toBe(definitionsBefore);
+        // Routes should NOT be registered (atomicity)
+        expect(router.hasRoute("cycle-a")).toBe(false);
+        expect(router.hasRoute("cycle-b")).toBe(false);
       });
 
       it("should not register handlers if forwardTo cycle is detected", () => {

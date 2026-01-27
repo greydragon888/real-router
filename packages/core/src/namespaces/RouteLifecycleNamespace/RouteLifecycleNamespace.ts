@@ -175,6 +175,17 @@ export class RouteLifecycleNamespace<
   }
 
   /**
+   * Clears all lifecycle handlers (canActivate and canDeactivate).
+   * Used by clearRoutes to reset all lifecycle state.
+   */
+  clearAll(): void {
+    this.#canActivateFactories.clear();
+    this.#canActivateFunctions.clear();
+    this.#canDeactivateFactories.clear();
+    this.#canDeactivateFunctions.clear();
+  }
+
+  /**
    * Returns lifecycle factories as records for cloning.
    *
    * @returns Tuple of [canDeactivateFactories, canActivateFactories]

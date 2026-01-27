@@ -5,8 +5,6 @@ import { isState } from "type-guards";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
 
-import { initBuildOptionsCache } from "../../core/routes/routePath";
-
 import type {
   CancelFn,
   DefaultDependencies,
@@ -369,24 +367,6 @@ export class RouterLifecycleNamespace<
       typeof resolvedStartPathOrState === "string"
         ? resolvedStartPathOrState
         : "";
-
-    // Check if we can attempt to start the router
-    // See: https://github.com/greydragon888/real-router/issues/50
-    // Two-phase start: We only initialize the cache here, but don't mark as started yet.
-    // The router will be marked as started only after successful transition in handleTransitionComplete.
-    //
-    // Note: !startPathOrState checks ORIGINAL argument to distinguish:
-    //   - start() without path → can use defaultRoute
-    //   - start('/invalid') with explicit path → no silent fallback (Issue #44)
-    const canAttemptStart =
-      startState !== undefined ||
-      options.allowNotFound ||
-      (options.defaultRoute && !startPathOrState);
-
-    if (canAttemptStart) {
-      // Setup buildOptions cache for buildPath (needed for transition)
-      initBuildOptionsCache(router, options);
-    }
 
     // Perform transition based on conditions
     // All start() transitions should use replace: true
