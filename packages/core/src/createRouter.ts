@@ -1,41 +1,29 @@
-// packages/real-router/modules/createRouter.ts
+// packages/core/src/createRouter.ts
 
-import { logger } from "@real-router/logger";
-
-import { CONFIG_SYMBOL } from "./constants";
-import { withDependencies } from "./core/dependencies";
-import { withMiddleware } from "./core/middleware";
-import { withNavigation } from "./core/navigation";
-import { withObservability } from "./core/observable";
-import { withOptions } from "./core/options";
-import { withPlugins } from "./core/plugins";
-import { withRouteLifecycle } from "./core/routeLifecycle";
-import { withRouterLifecycle } from "./core/routerLifecycle";
-import { withRoutes } from "./core/routes";
-import { withState } from "./core/state";
-import { isLoggerConfig } from "./typeGuards";
+import { Router } from "./Router";
 
 import type {
-  Config,
   DefaultDependencies,
   Options,
   Route,
-  Router,
+  Router as RouterInterface,
 } from "@real-router/types";
-
-type Enhancer<Dependencies extends DefaultDependencies = DefaultDependencies> =
-  (router: Router<Dependencies>) => Router<Dependencies>;
-
-const pipe =
-  <Dependencies extends DefaultDependencies = DefaultDependencies>(
-    ...fns: Enhancer<Dependencies>[]
-  ) =>
-  (arg: Router<Dependencies>): Router<Dependencies> =>
-    // eslint-disable-next-line unicorn/no-array-reduce
-    fns.reduce((prev: Router<Dependencies>, fn) => fn(prev), arg);
 
 /**
  * Creates a new router instance.
+ *
+ * @param routes - Array of route definitions
+ * @param options - Router configuration options
+ * @param dependencies - Dependencies to inject into the router
+ * @returns A new Router instance
+ *
+ * @example
+ * const router = createRouter([
+ *   { name: 'home', path: '/' },
+ *   { name: 'users', path: '/users' },
+ * ]);
+ *
+ * router.start('/');
  */
 export const createRouter = <
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -43,34 +31,6 @@ export const createRouter = <
   routes: Route<Dependencies>[] = [],
   options: Partial<Options> = {},
   dependencies: Dependencies = {} as Dependencies,
-): Router<Dependencies> => {
-  if (options.logger && isLoggerConfig(options.logger)) {
-    logger.configure(options.logger);
-
-    delete options.logger;
-  }
-
-  const config: Config = {
-    decoders: {},
-    encoders: {},
-    defaultParams: {},
-    forwardMap: {},
-  };
-
-  const uninitializedRouter = {
-    [CONFIG_SYMBOL]: config,
-  };
-
-  return pipe<Dependencies>(
-    withOptions(options),
-    withDependencies(dependencies),
-    withObservability,
-    withState,
-    withRouterLifecycle,
-    withRouteLifecycle,
-    withNavigation,
-    withPlugins,
-    withMiddleware,
-    withRoutes(routes),
-  )(uninitializedRouter as unknown as Router<Dependencies>);
+): RouterInterface<Dependencies> => {
+  return new Router<Dependencies>(routes, options, dependencies);
 };

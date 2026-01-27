@@ -39,6 +39,7 @@ export type {
   SubscribeFn,
   Listener,
   Subscription,
+  RouteConfigUpdate,
 } from "./router";
 
 export type {

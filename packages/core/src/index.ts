@@ -35,3 +35,6 @@ export { events, constants, errorCodes } from "./constants";
 export { RouterError } from "./RouterError";
 
 export { createRouter } from "./createRouter";
+
+// Internal symbols (exposed for advanced use cases)
+export { LEGACY_ROUTER_SYMBOL } from "./Router";
