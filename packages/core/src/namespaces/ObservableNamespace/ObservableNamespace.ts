@@ -591,9 +591,10 @@ export class ObservableNamespace {
 
       closed = true;
 
-      // Update tracking
+      // Update tracking (sub always exists - added synchronously in subscribe before unsubscribe returned)
       const sub = this.#observerSubscriptions.get(normalizedObserver);
 
+      /* v8 ignore next 3 -- @preserve unreachable: sub added synchronously before unsubscribe is returned */
       if (sub) {
         sub.active = false;
       }

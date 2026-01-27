@@ -319,6 +319,22 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(state?.params.id).toBe(123);
       expect(typeof state?.params.id).toBe("number");
     });
+
+    it("should fallback to original params when decoder returns undefined", () => {
+      router.addRoute({
+        name: "ur-decode-undef",
+        path: "/ur-decode-undef/:id",
+      });
+      router.updateRoute("ur-decode-undef", {
+        // Decoder that returns undefined (bad user code)
+        decodeParams: () => undefined as unknown as Params,
+      });
+
+      // Should fallback to original params
+      const state = router.matchPath("/ur-decode-undef/123");
+
+      expect(state?.params.id).toBe("123");
+    });
   });
 
   describe("encodeParams", () => {
@@ -398,6 +414,22 @@ describe("core/routes/routeTree/updateRoute", () => {
       const path = router.buildPath("ur-encode-test", { id: "123" });
 
       expect(path).toBe("/ur-encode-test/user-123");
+    });
+
+    it("should fallback to original params when encoder returns undefined", () => {
+      router.addRoute({
+        name: "ur-encode-undef",
+        path: "/ur-encode-undef/:id",
+      });
+      router.updateRoute("ur-encode-undef", {
+        // Encoder that returns undefined (bad user code)
+        encodeParams: () => undefined as unknown as Params,
+      });
+
+      // Should fallback to original params
+      const path = router.buildPath("ur-encode-undef", { id: "123" });
+
+      expect(path).toBe("/ur-encode-undef/123");
     });
   });
 

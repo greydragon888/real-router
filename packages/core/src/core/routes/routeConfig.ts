@@ -61,6 +61,17 @@ export function validateRouteProperties<
     );
   }
 
+  // Validate canDeactivate is a function
+  if (
+    route.canDeactivate !== undefined &&
+    typeof route.canDeactivate !== "function"
+  ) {
+    throw new TypeError(
+      `[router.addRoute] canDeactivate must be a function for route "${fullName}", ` +
+        `got ${getTypeDescription(route.canDeactivate)}`,
+    );
+  }
+
   // Validate defaultParams is a plain object
   // Runtime check for invalid types passed via `as any`
   if (route.defaultParams !== undefined) {
@@ -76,6 +87,26 @@ export function validateRouteProperties<
           `got ${getTypeDescription(route.defaultParams)}`,
       );
     }
+  }
+
+  // Validate decodeParams is not async (sync required for matchPath/buildPath)
+  if (
+    route.decodeParams !== undefined &&
+    route.decodeParams.constructor.name === "AsyncFunction"
+  ) {
+    throw new TypeError(
+      `[router.addRoute] decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
+    );
+  }
+
+  // Validate encodeParams is not async (sync required for matchPath/buildPath)
+  if (
+    route.encodeParams !== undefined &&
+    route.encodeParams.constructor.name === "AsyncFunction"
+  ) {
+    throw new TypeError(
+      `[router.addRoute] encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
+    );
   }
 
   // Recursively validate children

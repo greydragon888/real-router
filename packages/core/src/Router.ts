@@ -315,6 +315,8 @@ export class Router<
   }
 
   buildPath(route: string, params?: Params): string {
+    RoutesNamespace.validateBuildPathArgs(route);
+
     return this.#routes.buildPath(route, params, this.#options.get());
   }
 
@@ -325,13 +327,15 @@ export class Router<
   ): string {
     // Note: segments parameter is kept for API compatibility but not used
     // because RoutesNamespace.buildPath handles segment lookup internally
-    return this.#routes.buildPath(route, params, this.#options.get());
+    return this.buildPath(route, params);
   }
 
   matchPath<P extends Params = Params, MP extends Params = Params>(
     path: string,
     source?: string,
   ): State<P, MP> | undefined {
+    RoutesNamespace.validateMatchPathArgs(path);
+
     return this.#routes.matchPath<P, MP>(path, source, this.#options.get());
   }
 
@@ -452,6 +456,8 @@ export class Router<
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
+    RoutesNamespace.validateShouldUpdateNodeArgs(nodeName);
+
     return this.#routes.shouldUpdateNode(nodeName);
   }
 
@@ -881,9 +887,9 @@ export class Router<
           return [];
         }
 
-        return segments.flatMap((segment) =>
-          segment.parser ? segment.parser.urlParams : [],
-        );
+        // Named routes always have parsers (null only for root without path)
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
+        return segments.flatMap((segment) => segment.parser!.urlParams);
       },
     });
 
