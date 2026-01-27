@@ -55,11 +55,6 @@ type StartRouterArguments =
 const getStartRouterArguments = (
   args: StartRouterArguments,
 ): [startPathOrState: string | State | undefined, done: DoneFn] => {
-  // Simple validation
-  if (args.length > 2) {
-    throw new Error("Invalid number of arguments");
-  }
-
   const [first, second] = args;
 
   if (!first) {
@@ -142,6 +137,21 @@ export class RouterLifecycleNamespace<
 
   // Router reference for lifecycle operations (set after construction)
   #router: Router<Dependencies> | undefined;
+
+  // =========================================================================
+  // Static validation methods (called by facade before instance methods)
+  // =========================================================================
+
+  /**
+   * Validates start() arguments.
+   */
+  static validateStartArgs(args: unknown[]): void {
+    if (args.length > 2) {
+      throw new Error(
+        "[router.start] Invalid number of arguments. Expected 0-2 arguments.",
+      );
+    }
+  }
 
   // =========================================================================
   // Dependency injection

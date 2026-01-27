@@ -381,14 +381,10 @@ describe("core/state", () => {
     });
 
     describe("argument validation", () => {
-      // Validation removed from areStatesEqual for performance optimization.
-      // States are validated at creation time (makeState, buildState).
-      // See: packages/real-router/.claude/OPTIMIZATION-RECOMMENDATIONS.md
-
       it("does not throw for null/undefined states", () => {
         const validState = router.makeState("home", {}, "/home");
 
-        // null/undefined are valid inputs (handled before validation)
+        // null/undefined are valid inputs (represent "no state")
         // Using 'as never' to test runtime behavior with null values
         expect(() =>
           router.areStatesEqual(null as never, null as never),
@@ -402,6 +398,40 @@ describe("core/state", () => {
         expect(() =>
           router.areStatesEqual(null as never, validState),
         ).not.toThrowError();
+      });
+
+      it("throws TypeError for invalid state1", () => {
+        const validState = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual("invalid" as never, validState),
+        ).toThrowError(TypeError);
+        expect(() =>
+          router.areStatesEqual({ name: "x" } as never, validState),
+        ).toThrowError(/Invalid state/);
+      });
+
+      it("throws TypeError for invalid state2", () => {
+        const validState = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual(validState, "invalid" as never),
+        ).toThrowError(TypeError);
+        expect(() =>
+          router.areStatesEqual(validState, 123 as never),
+        ).toThrowError(/Invalid state/);
+      });
+
+      it("throws TypeError for invalid ignoreQueryParams", () => {
+        const s1 = router.makeState("home", {}, "/home");
+        const s2 = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual(s1, s2, "true" as never),
+        ).toThrowError(TypeError);
+        expect(() => router.areStatesEqual(s1, s2, 1 as never)).toThrowError(
+          /Invalid ignoreQueryParams/,
+        );
       });
     });
 

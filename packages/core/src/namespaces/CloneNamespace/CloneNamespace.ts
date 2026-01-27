@@ -1,5 +1,7 @@
 // packages/core/src/namespaces/CloneNamespace/CloneNamespace.ts
 
+import { getTypeDescription } from "type-guards";
+
 import type { RouteConfig } from "../RoutesNamespace";
 import type {
   ActivationFnFactory,
@@ -54,6 +56,10 @@ export type ApplyConfigFn = (
 export class CloneNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  // =========================================================================
+  // Instance fields
+  // =========================================================================
+
   /**
    * Function to get cloning data from the source router.
    */
@@ -63,6 +69,43 @@ export class CloneNamespace<
    * Function to apply config to a new router.
    */
   #applyConfig: ApplyConfigFn | undefined;
+
+  // =========================================================================
+  // Static validation methods (called by facade before instance methods)
+  // =========================================================================
+
+  /**
+   * Validates clone arguments.
+   * Dependencies can be undefined or a plain object without getters.
+   */
+  static validateCloneArgs(dependencies: unknown): void {
+    // undefined is valid (no new dependencies)
+    if (dependencies === undefined) {
+      return;
+    }
+
+    // Must be a plain object
+    if (
+      !(
+        dependencies &&
+        typeof dependencies === "object" &&
+        dependencies.constructor === Object
+      )
+    ) {
+      throw new TypeError(
+        `[router.clone] Invalid dependencies: expected plain object or undefined, received ${getTypeDescription(dependencies)}`,
+      );
+    }
+
+    // Getters can throw, return different values, or have side effects
+    for (const key in dependencies) {
+      if (Object.getOwnPropertyDescriptor(dependencies, key)?.get) {
+        throw new TypeError(
+          `[router.clone] Getters not allowed in dependencies: "${key}"`,
+        );
+      }
+    }
+  }
 
   /**
    * Sets the cloning functions.

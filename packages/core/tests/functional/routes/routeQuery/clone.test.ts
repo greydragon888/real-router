@@ -211,6 +211,58 @@ describe("router.clone()", () => {
   });
 
   // ============================================
+  // Argument validation
+  // ============================================
+
+  describe("argument validation", () => {
+    it("should throw TypeError for invalid dependencies (array)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone([] as never)).toThrowError(TypeError);
+      expect(() => router.clone([] as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for invalid dependencies (null)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone(null as never)).toThrowError(TypeError);
+      expect(() => router.clone(null as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for invalid dependencies (primitive)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone("string" as never)).toThrowError(TypeError);
+      expect(() => router.clone(123 as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for dependencies with getters", () => {
+      const router = createTestRouter();
+      const depsWithGetter = {};
+
+      Object.defineProperty(depsWithGetter, "foo", {
+        get() {
+          return "bar";
+        },
+        enumerable: true,
+      });
+
+      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+        TypeError,
+      );
+      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+        /Getters not allowed/,
+      );
+    });
+  });
+
+  // ============================================
   // Error handling and edge cases
   // ============================================
 

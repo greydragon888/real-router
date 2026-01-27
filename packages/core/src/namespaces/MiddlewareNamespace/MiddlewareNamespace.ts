@@ -44,17 +44,18 @@ export class MiddlewareNamespace<
   // =========================================================================
 
   /**
-   * Validates that a value is a valid middleware factory function.
+   * Validates useMiddleware arguments.
    */
-  static validateFactory<D extends DefaultDependencies>(
-    middlewareFactory: unknown,
-    index: number,
-  ): asserts middlewareFactory is MiddlewareFactory<D> {
-    if (typeof middlewareFactory !== "function") {
-      throw new TypeError(
-        `[router.useMiddleware] Expected middleware factory function at index ${index}, ` +
-          `got ${getTypeDescription(middlewareFactory)}`,
-      );
+  static validateUseMiddlewareArgs<D extends DefaultDependencies>(
+    middlewares: unknown[],
+  ): asserts middlewares is MiddlewareFactory<D>[] {
+    for (const [i, middleware] of middlewares.entries()) {
+      if (typeof middleware !== "function") {
+        throw new TypeError(
+          `[router.useMiddleware] Expected middleware factory function at index ${i}, ` +
+            `got ${getTypeDescription(middleware)}`,
+        );
+      }
     }
   }
 
@@ -97,11 +98,6 @@ export class MiddlewareNamespace<
    * @param factories - Already validated by facade
    */
   use(...factories: MiddlewareFactory<Dependencies>[]): Unsubscribe {
-    // Validate all factories upfront
-    for (const [i, factory] of factories.entries()) {
-      MiddlewareNamespace.validateFactory<Dependencies>(factory, i);
-    }
-
     // Check limits
     this.#validateCount(factories.length);
 

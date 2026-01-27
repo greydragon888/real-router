@@ -260,6 +260,41 @@ export class RoutesNamespace<
   }
 
   /**
+   * Validates setRootPath arguments.
+   */
+  static validateSetRootPathArgs(
+    rootPath: unknown,
+  ): asserts rootPath is string {
+    if (typeof rootPath !== "string") {
+      throw new TypeError(
+        `[router.setRootPath] rootPath must be a string, got ${getTypeDescription(rootPath)}`,
+      );
+    }
+  }
+
+  /**
+   * Validates addRoute arguments (route structure and properties).
+   * State-dependent validation (duplicates, tree) happens in instance method.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
+  static validateAddRouteArgs(routes: readonly Route<any>[]): void {
+    for (const route of routes) {
+      // First check if route is an object (before accessing route.name)
+      // Runtime check for invalid types passed via `as any`
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
+      if (route === null || typeof route !== "object" || Array.isArray(route)) {
+        throw new TypeError(
+          `[router.addRoute] Route must be an object, got ${getTypeDescription(route)}`,
+        );
+      }
+
+      // Validate route properties (canActivate, canDeactivate, defaultParams, async checks)
+      // Note: validateRouteProperties handles children recursively
+      validateRouteProperties(route, route.name);
+    }
+  }
+
+  /**
    * Validates isActiveRoute arguments.
    */
   static validateIsActiveRouteArgs(
@@ -1396,6 +1431,9 @@ export class RoutesNamespace<
    * @param routes - Routes to validate
    */
   #validateRoutes(routes: Route<Dependencies>[]): void {
+    // State-dependent validation (requires access to #tree and #config)
+    // Property validation is done in static validateAddRouteArgs (called by facade)
+
     // Tracking sets for duplicate detection
     const seenNames = new Set<string>();
     const seenPathsByParent = new Map<string, Set<string>>();
@@ -1412,11 +1450,6 @@ export class RoutesNamespace<
         seenNames,
         seenPathsByParent,
       );
-
-      // Use validateRouteProperties for property validation
-      // (canActivate, canDeactivate, defaultParams, async function checks)
-      // Note: validateRouteProperties handles children recursively
-      validateRouteProperties(route, route.name);
     }
 
     // Validate forwardTo targets and cycles

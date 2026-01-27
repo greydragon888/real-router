@@ -35,15 +35,17 @@ export class PluginsNamespace<
   // =========================================================================
 
   /**
-   * Validates that a value is a valid plugin factory function.
+   * Validates usePlugin arguments.
    */
-  static validateFactory<D extends DefaultDependencies>(
-    plugin: unknown,
-  ): asserts plugin is PluginFactory<D> {
-    if (typeof plugin !== "function") {
-      throw new TypeError(
-        `[router.usePlugin] Expected plugin factory function, got ${typeof plugin}`,
-      );
+  static validateUsePluginArgs<D extends DefaultDependencies>(
+    plugins: unknown[],
+  ): asserts plugins is PluginFactory<D>[] {
+    for (const plugin of plugins) {
+      if (typeof plugin !== "function") {
+        throw new TypeError(
+          `[router.usePlugin] Expected plugin factory function, got ${typeof plugin}`,
+        );
+      }
     }
   }
 
@@ -103,11 +105,6 @@ export class PluginsNamespace<
    * @param factories - Already validated by facade
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
-    // Validate all factories upfront
-    for (const factory of factories) {
-      PluginsNamespace.validateFactory<Dependencies>(factory);
-    }
-
     // Check limits
     this.#validateCount(factories.length);
 

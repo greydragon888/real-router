@@ -113,6 +113,105 @@ export class NavigationNamespace<
   #router: Router<Dependencies> | undefined;
 
   // =========================================================================
+  // Static validation methods (called by facade before instance methods)
+  // =========================================================================
+
+  /**
+   * Validates navigate arguments.
+   * Note: Only validates `name` - other args are polymorphic and validated after parsing.
+   */
+  static validateNavigateArgs(name: unknown): asserts name is string {
+    if (typeof name !== "string") {
+      throw new TypeError(
+        `[router.navigate] Invalid route name: expected string, got ${getTypeDescription(name)}`,
+      );
+    }
+  }
+
+  /**
+   * Validates navigateToState arguments.
+   */
+  static validateNavigateToStateArgs(
+    toState: unknown,
+    fromState: unknown,
+    opts: unknown,
+    callback: unknown,
+    emitSuccess: unknown,
+  ): void {
+    // toState must be a valid state object
+    if (
+      !toState ||
+      typeof toState !== "object" ||
+      typeof (toState as State).name !== "string" ||
+      typeof (toState as State).path !== "string"
+    ) {
+      throw new TypeError(
+        `[router.navigateToState] Invalid toState: expected State object with name and path`,
+      );
+    }
+
+    // fromState can be undefined or a valid state
+    if (
+      fromState !== undefined &&
+      (!fromState ||
+        typeof fromState !== "object" ||
+        typeof (fromState as State).name !== "string")
+    ) {
+      throw new TypeError(
+        `[router.navigateToState] Invalid fromState: expected State object or undefined`,
+      );
+    }
+
+    // opts must be an object
+    if (typeof opts !== "object" || opts === null) {
+      throw new TypeError(
+        `[router.navigateToState] Invalid opts: expected NavigationOptions object, got ${getTypeDescription(opts)}`,
+      );
+    }
+
+    // callback must be a function
+    if (typeof callback !== "function") {
+      throw new TypeError(
+        `[router.navigateToState] Invalid callback: expected function, got ${getTypeDescription(callback)}`,
+      );
+    }
+
+    // emitSuccess must be a boolean
+    if (typeof emitSuccess !== "boolean") {
+      throw new TypeError(
+        `[router.navigateToState] Invalid emitSuccess: expected boolean, got ${getTypeDescription(emitSuccess)}`,
+      );
+    }
+  }
+
+  /**
+   * Validates navigateToDefault arguments.
+   * Note: Arguments are polymorphic - validates what can be checked upfront.
+   */
+  static validateNavigateToDefaultArgs(
+    optsOrDone: unknown,
+    done: unknown,
+  ): void {
+    // If first arg is provided and not a function, it must be an object (options)
+    if (
+      optsOrDone !== undefined &&
+      typeof optsOrDone !== "function" &&
+      (typeof optsOrDone !== "object" || optsOrDone === null)
+    ) {
+      throw new TypeError(
+        `[router.navigateToDefault] Invalid options: ${getTypeDescription(optsOrDone)}. Expected NavigationOptions object or callback function.`,
+      );
+    }
+
+    // If second arg is provided, it must be a function
+    if (done !== undefined && typeof done !== "function") {
+      throw new TypeError(
+        `[router.navigateToDefault] Invalid callback: expected function, got ${getTypeDescription(done)}`,
+      );
+    }
+  }
+
+  // =========================================================================
   // Dependency injection
   // =========================================================================
 

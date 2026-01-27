@@ -72,6 +72,25 @@ describe("core/routes/routePath/buildPath", () => {
 
       expect(path).toBe("/base/home");
     });
+
+    it("should throw TypeError for non-string rootPath", () => {
+      expect(() => {
+        router.setRootPath(123 as unknown as string);
+      }).toThrowError(TypeError);
+      expect(() => {
+        router.setRootPath(123 as unknown as string);
+      }).toThrowError(
+        "[router.setRootPath] rootPath must be a string, got number",
+      );
+    });
+
+    it("should throw TypeError for null rootPath", () => {
+      expect(() => {
+        router.setRootPath(null as unknown as string);
+      }).toThrowError(
+        "[router.setRootPath] rootPath must be a string, got null",
+      );
+    });
   });
 
   describe("getRootPath", () => {

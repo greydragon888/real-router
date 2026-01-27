@@ -157,7 +157,10 @@ export class Router<
   addRoute(routes: Route<Dependencies>[] | Route<Dependencies>): this {
     const routeArray = Array.isArray(routes) ? routes : [routes];
 
-    // Validation is now handled inside addRoutes
+    // Static validation (route structure and properties)
+    RoutesNamespace.validateAddRouteArgs(routeArray);
+
+    // Instance method handles state-dependent validation (duplicates, tree)
     this.#routes.addRoutes(routeArray);
 
     return this;
@@ -320,11 +323,7 @@ export class Router<
     return this.#routes.buildPath(route, params, this.#options.get());
   }
 
-  buildPathWithSegments(
-    route: string,
-    params: Params,
-    _segments: readonly unknown[],
-  ): string {
+  buildPathWithSegments(route: string, params: Params): string {
     // Note: segments parameter is kept for API compatibility but not used
     // because RoutesNamespace.buildPath handles segment lookup internally
     return this.buildPath(route, params);
@@ -340,6 +339,7 @@ export class Router<
   }
 
   setRootPath(rootPath: string): void {
+    RoutesNamespace.validateSetRootPathArgs(rootPath);
     this.#routes.setRootPath(rootPath);
   }
 
@@ -358,10 +358,14 @@ export class Router<
     meta?: StateMetaInput<MP>,
     forceId?: number,
   ): State<P, MP> {
+    StateNamespace.validateMakeStateArgs(name, params, path, forceId);
+
     return this.#state.makeState<P, MP>(name, params, path, meta, forceId);
   }
 
   makeNotFoundState(path: string, options?: NavigationOptions): State {
+    StateNamespace.validateMakeNotFoundStateArgs(path, options);
+
     return this.#state.makeNotFoundState(path, options);
   }
 
@@ -390,10 +394,18 @@ export class Router<
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
+    StateNamespace.validateAreStatesEqualArgs(
+      state1,
+      state2,
+      ignoreQueryParams,
+    );
+
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
 
   areStatesDescendants(parentState: State, childState: State): boolean {
+    StateNamespace.validateAreStatesDescendantsArgs(parentState, childState);
+
     // eslint-disable-next-line @typescript-eslint/no-deprecated, sonarjs/deprecation -- facade for deprecated method
     return this.#state.areStatesDescendants(parentState, childState);
   }
@@ -506,13 +518,16 @@ export class Router<
       | [startPathOrState: string | State]
       | [startPathOrState: string | State, done: DoneFn]
   ): this {
+    // Static validation
+    RouterLifecycleNamespace.validateStartArgs(args);
+
     // Lock options when router starts
     this.#options.lock();
 
     // Initialize build options cache
     this.#routes.initBuildOptionsCache(this.#options.get());
 
-    // Forward all arguments to lifecycle for validation (including arg count check)
+    // Forward to lifecycle namespace
     this.#lifecycle.start(...args);
 
     return this;
@@ -561,6 +576,7 @@ export class Router<
   ): this {
     validateRouteName(name, "canActivate");
     RouteLifecycleNamespace.validateHandler(canActivateHandler, "canActivate");
+
     this.#routeLifecycle.registerCanActivate(name, canActivateHandler);
 
     return this;
@@ -592,6 +608,8 @@ export class Router<
   // ============================================================================
 
   usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
+    PluginsNamespace.validateUsePluginArgs<Dependencies>(plugins);
+
     return this.#plugins.use(...plugins);
   }
 
@@ -606,6 +624,8 @@ export class Router<
   useMiddleware(
     ...middlewares: MiddlewareFactory<Dependencies>[]
   ): Unsubscribe {
+    MiddlewareNamespace.validateUseMiddlewareArgs<Dependencies>(middlewares);
+
     return this.#middleware.use(...middlewares);
   }
 
@@ -631,7 +651,7 @@ export class Router<
     dependencyName: K,
     dependency: Dependencies[K],
   ): this {
-    DependenciesNamespace.validateName(dependencyName, "setDependency");
+    DependenciesNamespace.validateSetDependencyArgs(dependencyName, dependency);
     this.#dependencies.set(dependencyName, dependency);
 
     return this;
@@ -733,6 +753,8 @@ export class Router<
     optionsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
+    NavigationNamespace.validateNavigateArgs(routeName);
+
     return this.#navigation.navigate(
       routeName,
       routeParamsOrDone,
@@ -745,6 +767,8 @@ export class Router<
     optsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
+    NavigationNamespace.validateNavigateToDefaultArgs(optsOrDone, done);
+
     return this.#navigation.navigateToDefault(optsOrDone, done);
   }
 
@@ -755,6 +779,14 @@ export class Router<
     callback: DoneFn,
     emitSuccess: boolean,
   ): CancelFn {
+    NavigationNamespace.validateNavigateToStateArgs(
+      toState,
+      fromState,
+      opts,
+      callback,
+      emitSuccess,
+    );
+
     return this.#navigation.navigateToState(
       toState,
       fromState,
@@ -793,6 +825,8 @@ export class Router<
   // ============================================================================
 
   clone(dependencies?: Dependencies): RouterInterface<Dependencies> {
+    CloneNamespace.validateCloneArgs(dependencies);
+
     return this.#clone.clone(
       dependencies,
       (routes, options, deps) =>

@@ -46,6 +46,24 @@ export class DependenciesNamespace<
   }
 
   /**
+   * Validates setDependency arguments.
+   * Note: Any value is valid (null, functions, objects, etc.).
+   * undefined is allowed and treated as "don't set" (no-op).
+   */
+  static validateSetDependencyArgs(
+    name: unknown,
+    _value: unknown,
+  ): asserts name is string {
+    if (typeof name !== "string") {
+      throw new TypeError(
+        `[router.setDependency]: dependency name must be a string, got ${typeof name}`,
+      );
+    }
+    // Value is intentionally not validated - any value is valid
+    // undefined means "don't set" (handled in instance method)
+  }
+
+  /**
    * Validates that dependencies object is a plain object without getters.
    * Called by facade before setMultiple/constructor.
    */

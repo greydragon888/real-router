@@ -106,6 +106,103 @@ export class StateNamespace {
   readonly #urlParamsCache = new Map<string, string[]>();
 
   // =========================================================================
+  // Static validation methods (called by facade before instance methods)
+  // =========================================================================
+
+  /**
+   * Validates makeState arguments.
+   */
+  static validateMakeStateArgs(
+    name: unknown,
+    params: unknown,
+    path: unknown,
+    forceId: unknown,
+  ): void {
+    // Validate name is a string
+    if (!isString(name)) {
+      throw new TypeError(
+        `[router.makeState] Invalid name: ${getTypeDescription(name)}. Expected string.`,
+      );
+    }
+
+    // Validate params if provided
+    if (params !== undefined && !isParams(params)) {
+      throw new TypeError(
+        `[router.makeState] Invalid params: ${getTypeDescription(params)}. Expected plain object.`,
+      );
+    }
+
+    // Validate path if provided
+    if (path !== undefined && !isString(path)) {
+      throw new TypeError(
+        `[router.makeState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
+      );
+    }
+
+    // Validate forceId if provided
+    if (forceId !== undefined && typeof forceId !== "number") {
+      throw new TypeError(
+        `[router.makeState] Invalid forceId: ${getTypeDescription(forceId)}. Expected number.`,
+      );
+    }
+  }
+
+  /**
+   * Validates areStatesEqual arguments.
+   */
+  static validateAreStatesEqualArgs(
+    state1: unknown,
+    state2: unknown,
+    ignoreQueryParams: unknown,
+  ): void {
+    // null/undefined are valid (represent "no state")
+    if (state1 != null) {
+      validateState(state1, "areStatesEqual");
+    }
+
+    if (state2 != null) {
+      validateState(state2, "areStatesEqual");
+    }
+
+    if (
+      ignoreQueryParams !== undefined &&
+      typeof ignoreQueryParams !== "boolean"
+    ) {
+      throw new TypeError(
+        `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQueryParams)}. Expected boolean.`,
+      );
+    }
+  }
+
+  /**
+   * Validates areStatesDescendants arguments.
+   */
+  static validateAreStatesDescendantsArgs(
+    parentState: unknown,
+    childState: unknown,
+  ): void {
+    validateState(parentState, "areStatesDescendants");
+    validateState(childState, "areStatesDescendants");
+  }
+
+  /**
+   * Validates makeNotFoundState arguments.
+   */
+  static validateMakeNotFoundStateArgs(path: unknown, options: unknown): void {
+    if (!isString(path)) {
+      throw new TypeError(
+        `[router.makeNotFoundState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
+      );
+    }
+
+    if (options !== undefined && !isNavigationOptions(options)) {
+      throw new TypeError(
+        `[router.makeNotFoundState] Invalid options: ${getTypeDescription(options)}. Expected NavigationOptions object.`,
+      );
+    }
+  }
+
+  // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
 
@@ -181,34 +278,6 @@ export class StateNamespace {
     meta?: StateMetaInput<MP>,
     forceId?: number,
   ): State<P, MP> {
-    // Validate name is a string
-    if (!isString(name)) {
-      throw new TypeError(
-        `[router.makeState] Invalid name: ${getTypeDescription(name)}. Expected string.`,
-      );
-    }
-
-    // Validate params if provided
-    if (params !== undefined && !isParams(params)) {
-      throw new TypeError(
-        `[router.makeState] Invalid params: ${getTypeDescription(params)}. Expected plain object.`,
-      );
-    }
-
-    // Validate path if provided
-    if (path !== undefined && !isString(path)) {
-      throw new TypeError(
-        `[router.makeState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
-      );
-    }
-
-    // Validate forceId if provided
-    if (forceId !== undefined && typeof forceId !== "number") {
-      throw new TypeError(
-        `[router.makeState] Invalid forceId: ${getTypeDescription(forceId)}. Expected number.`,
-      );
-    }
-
     const madeMeta = meta
       ? {
           ...meta,
@@ -259,18 +328,6 @@ export class StateNamespace {
    * Creates a frozen state object for the "not found" route.
    */
   makeNotFoundState(path: string, options?: NavigationOptions): State {
-    if (!isString(path)) {
-      throw new TypeError(
-        `[router.makeNotFoundState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
-      );
-    }
-
-    if (options !== undefined && !isNavigationOptions(options)) {
-      throw new TypeError(
-        `[router.makeNotFoundState] Invalid options: ${getTypeDescription(options)}. Expected NavigationOptions object.`,
-      );
-    }
-
     return this.makeState<{ path: string }>(
       constants.UNKNOWN_ROUTE,
       { path },
@@ -340,9 +397,6 @@ export class StateNamespace {
    * @deprecated Use router.isActiveRoute() instead.
    */
   areStatesDescendants(parentState: State, childState: State): boolean {
-    validateState(parentState, "areStatesDescendants");
-    validateState(childState, "areStatesDescendants");
-
     logger.warn(
       "real-router",
       "areStatesDescendants is deprecated and will be removed in the next major version. " +

@@ -1613,5 +1613,16 @@ describe("navigateToDefault", () => {
       expect(action).toThrowError(TypeError);
       expect(action).toThrowError(/\[router\.navigateToDefault\]/);
     });
+
+    it("should throw TypeError for invalid callback type", () => {
+      expect(() => {
+        // @ts-expect-error -- testing runtime validation
+        router.navigateToDefault({}, "not-a-function");
+      }).toThrowError(TypeError);
+      expect(() => {
+        // @ts-expect-error -- testing runtime validation
+        router.navigateToDefault({}, 123);
+      }).toThrowError(/Invalid callback/);
+    });
   });
 });
