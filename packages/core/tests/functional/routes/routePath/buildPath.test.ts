@@ -1,7 +1,5 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { constants } from "@real-router/core";
-
 import { createTestRouter } from "../../../helpers";
 
 import type { Route, Router } from "@real-router/core";
@@ -926,69 +924,6 @@ describe("core/routes/routePath/buildPath", () => {
           expect(toStringCalled).toBe(false);
           expect(valueOfCalled).toBe(false);
         });
-      });
-    });
-  });
-
-  describe("buildPathWithSegments (internal)", () => {
-    describe("route validation (line 186)", () => {
-      it("should throw TypeError for empty string route", () => {
-        expect(() => router.buildPathWithSegments("", {}, [])).toThrowError(
-          TypeError,
-        );
-        expect(() => router.buildPathWithSegments("", {}, [])).toThrowError(
-          'route must be a non-empty string, got ""',
-        );
-      });
-
-      it("should throw TypeError for non-string route", () => {
-        expect(() =>
-          router.buildPathWithSegments(123 as unknown as string, {}, []),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.buildPathWithSegments(123 as unknown as string, {}, []),
-        ).toThrowError("route must be a non-empty string, got number");
-      });
-
-      it("should throw TypeError for undefined route", () => {
-        expect(() =>
-          router.buildPathWithSegments(undefined as unknown as string, {}, []),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.buildPathWithSegments(undefined as unknown as string, {}, []),
-        ).toThrowError("route must be a non-empty string, got undefined");
-      });
-    });
-
-    describe("UNKNOWN_ROUTE handling (line 192)", () => {
-      it("should return params.path for UNKNOWN_ROUTE when path is string", () => {
-        const path = router.buildPathWithSegments(
-          constants.UNKNOWN_ROUTE,
-          { path: "/custom-not-found" },
-          [],
-        );
-
-        expect(path).toBe("/custom-not-found");
-      });
-
-      it("should return empty string for UNKNOWN_ROUTE when path is not a string", () => {
-        const path = router.buildPathWithSegments(
-          constants.UNKNOWN_ROUTE,
-          { path: 404 },
-          [],
-        );
-
-        expect(path).toBe("");
-      });
-
-      it("should return empty string for UNKNOWN_ROUTE when path is undefined", () => {
-        const path = router.buildPathWithSegments(
-          constants.UNKNOWN_ROUTE,
-          {},
-          [],
-        );
-
-        expect(path).toBe("");
       });
     });
   });

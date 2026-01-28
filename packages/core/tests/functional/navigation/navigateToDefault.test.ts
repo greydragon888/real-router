@@ -11,7 +11,7 @@ import { errorCodes, events, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { DoneFn, Router } from "@real-router/core";
 
 let router: Router;
 
@@ -1240,9 +1240,9 @@ describe("navigateToDefault", () => {
         setTimeout(done, 100);
       });
 
-      const cancel1 = router.navigateToDefault(vi.fn());
-      const cancel2 = router.navigateToDefault(vi.fn());
-      const cancel3 = router.navigateToDefault(vi.fn());
+      const cancel1 = router.navigateToDefault(vi.fn() as DoneFn);
+      const cancel2 = router.navigateToDefault(vi.fn() as DoneFn);
+      const cancel3 = router.navigateToDefault(vi.fn() as DoneFn);
 
       // Each should be a function
       expectTypeOf(cancel1).toBeFunction();

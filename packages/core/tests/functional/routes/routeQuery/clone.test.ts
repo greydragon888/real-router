@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core";
 
 describe("router.clone()", () => {
   it("should share the route tree with original router", () => {

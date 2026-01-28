@@ -3,7 +3,8 @@
 import { logger } from "@real-router/logger";
 import { isState } from "type-guards";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import { errorCodes, events } from "../constants";
+import { RouterError } from "../RouterError";
 
 import { initBuildOptionsCache } from "./routes/routePath";
 

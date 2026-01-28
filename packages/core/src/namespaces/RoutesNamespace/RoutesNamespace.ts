@@ -18,182 +18,39 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import { constants } from "@real-router/core";
-
 import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
 import {
+  clearConfigEntries,
   createEmptyConfig,
-  validateRouteProperties,
+  createMatchOptions,
+  paramsMatch,
+  paramsMatchExcluding,
+  removeFromDefinitions,
+  resolveForwardChain,
+  sanitizeRoute,
   validateForwardToTargets,
+  validateRouteProperties,
 } from "./helpers";
+import { constants } from "../../constants";
 import { createRouteState } from "../../core/stateBuilder";
 import { createBuildOptions } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RouteConfig } from "./types";
-import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
+import type { Router } from "../../Router";
 import type {
   ActivationFnFactory,
+  Route,
+  RouteConfigUpdate,
+} from "../../types";
+import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
+import type {
   DefaultDependencies,
   Options,
   Params,
-  Route,
-  RouteConfigUpdate,
-  Router,
   State,
 } from "@real-router/types";
-import type {
-  BuildOptions,
-  MatchOptions,
-  RouteDefinition,
-  RouteTree,
-} from "route-tree";
-
-/**
- * Creates RouteNode match options from real-router options.
- */
-function createMatchOptions(options: Options): MatchOptions {
-  return {
-    ...createBuildOptions(options),
-    caseSensitive: options.caseSensitive,
-    strictTrailingSlash: options.trailingSlash === "strict",
-    strongMatching: false,
-  };
-}
-
-/**
- * Checks if all params from source exist with same values in target.
- * Small function body allows V8 inlining.
- */
-function paramsMatch(source: Params, target: Params): boolean {
-  for (const key in source) {
-    if (source[key] !== target[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Checks params match, skipping keys present in skipKeys.
- */
-function paramsMatchExcluding(
-  source: Params,
-  target: Params,
-  skipKeys: Params,
-): boolean {
-  for (const key in source) {
-    if (key in skipKeys) {
-      continue;
-    }
-    if (source[key] !== target[key]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-/**
- * Sanitizes a route by keeping only essential properties.
- */
-function sanitizeRoute<Dependencies extends DefaultDependencies>(
-  route: Route<Dependencies>,
-): RouteDefinition {
-  const sanitized: RouteDefinition = {
-    name: route.name,
-    path: route.path,
-  };
-
-  if (route.children) {
-    sanitized.children = route.children.map((child) => sanitizeRoute(child));
-  }
-
-  return sanitized;
-}
-
-/**
- * Recursively removes a route from definitions array.
- */
-function removeFromDefinitions(
-  definitions: RouteDefinition[],
-  routeName: string,
-  parentPrefix = "",
-): boolean {
-  for (let i = 0; i < definitions.length; i++) {
-    const route = definitions[i];
-    const fullName = parentPrefix
-      ? `${parentPrefix}.${route.name}`
-      : route.name;
-
-    if (fullName === routeName) {
-      definitions.splice(i, 1);
-
-      return true;
-    }
-
-    if (
-      route.children &&
-      routeName.startsWith(`${fullName}.`) &&
-      removeFromDefinitions(route.children, routeName, fullName)
-    ) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Clears configuration entries that match the predicate.
- */
-function clearConfigEntries<T>(
-  config: Record<string, T>,
-  matcher: (key: string) => boolean,
-): void {
-  for (const key of Object.keys(config)) {
-    if (matcher(key)) {
-      delete config[key];
-    }
-  }
-}
-
-/**
- * Resolves a forwardTo chain to its final destination.
- */
-function resolveForwardChain(
-  startRoute: string,
-  forwardMap: Record<string, string>,
-  maxDepth = 100,
-): string {
-  const visited = new Set<string>();
-  const chain: string[] = [startRoute];
-  let current = startRoute;
-
-  while (forwardMap[current]) {
-    const next = forwardMap[current];
-
-    if (visited.has(next)) {
-      const cycleStart = chain.indexOf(next);
-      const cycle = [...chain.slice(cycleStart), next];
-
-      throw new Error(`Circular forwardTo: ${cycle.join(" → ")}`);
-    }
-
-    visited.add(current);
-    chain.push(next);
-    current = next;
-
-    if (chain.length > maxDepth) {
-      throw new Error(
-        `forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
-      );
-    }
-  }
-
-  return current;
-}
+import type { BuildOptions, RouteDefinition, RouteTree } from "route-tree";
 
 /**
  * Independent namespace for managing routes.

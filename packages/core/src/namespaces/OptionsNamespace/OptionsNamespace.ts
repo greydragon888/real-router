@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/OptionsNamespace/OptionsNamespace.ts
 
-import { isObjKey } from "type-guards";
+import { isObjKey, getTypeDescription } from "type-guards";
 
 import {
   defaultOptions,
@@ -9,7 +9,6 @@ import {
   VALID_QUERY_PARAMS,
 } from "./constants";
 import { deepFreeze, optionNotFoundError } from "./helpers";
-import { getTypeDescription } from "../../helpers";
 
 import type { Options } from "@real-router/types";
 

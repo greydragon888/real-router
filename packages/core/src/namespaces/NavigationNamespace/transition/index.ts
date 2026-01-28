@@ -1,17 +1,17 @@
 // packages/real-router/modules/transition/index.ts
 
-import { RouterError, constants, errorCodes } from "@real-router/core";
-
 import { executeLifecycleHooks } from "./executeLifecycleHooks";
 import { executeMiddleware } from "./executeMiddleware";
-import { getTransitionPath, nameToIDs } from "../transitionPath";
+import { constants, errorCodes } from "../../../constants";
+import { RouterError } from "../../../RouterError";
+import { getTransitionPath, nameToIDs } from "../../../transitionPath";
 
+import type { Router } from "../../../Router";
 import type {
   NavigationOptions,
   CancelFn,
   State,
   DefaultDependencies,
-  Router,
   RouterError as RouterErrorType,
 } from "@real-router/types";
 

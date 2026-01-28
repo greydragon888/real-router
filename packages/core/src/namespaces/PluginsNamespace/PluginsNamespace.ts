@@ -1,16 +1,15 @@
 // packages/core/src/namespaces/PluginsNamespace/PluginsNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isObjKey } from "type-guards";
+import { isObjKey, getTypeDescription } from "type-guards";
 
 import { PLUGIN_LIMITS, EVENTS_MAP, EVENT_METHOD_NAMES } from "./constants";
-import { getTypeDescription } from "../../helpers";
 
+import type { Router } from "../../Router";
+import type { PluginFactory } from "../../types";
 import type {
   DefaultDependencies,
   Plugin,
-  PluginFactory,
-  Router,
   Unsubscribe,
 } from "@real-router/types";
 

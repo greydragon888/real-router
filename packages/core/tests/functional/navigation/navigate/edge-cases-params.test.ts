@@ -147,7 +147,6 @@ describe("router.navigate() - edge cases params", () => {
 
         // When paramsOrDone is undefined, it should be treated as empty params
         // and the callback in position 3 should be called
-        // @ts-expect-error - testing runtime behavior with undefined params
         router.navigate("users", undefined, callback);
 
         // Callback SHOULD be called with success
@@ -162,7 +161,6 @@ describe("router.navigate() - edge cases params", () => {
 
         // 4-argument form: navigate(name, params, opts, callback)
         // Even with undefined params, callback should be called
-        // @ts-expect-error - testing runtime behavior with undefined params
         router.navigate("users", undefined, {}, callback);
 
         // Callback SHOULD be called

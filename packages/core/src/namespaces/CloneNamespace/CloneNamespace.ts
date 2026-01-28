@@ -2,49 +2,9 @@
 
 import { getTypeDescription } from "type-guards";
 
-import type { RouteConfig } from "../RoutesNamespace";
-import type {
-  ActivationFnFactory,
-  DefaultDependencies,
-  MiddlewareFactory,
-  Options,
-  PluginFactory,
-  Route,
-  Router as RouterInterface,
-} from "@real-router/types";
-
-/**
- * Data collected from source router for cloning.
- */
-export interface CloneData<Dependencies extends DefaultDependencies> {
-  routes: Route<Dependencies>[];
-  options: Options;
-  dependencies: Partial<Dependencies>;
-  canDeactivateFactories: Record<string, ActivationFnFactory<Dependencies>>;
-  canActivateFactories: Record<string, ActivationFnFactory<Dependencies>>;
-  middlewareFactories: MiddlewareFactory<Dependencies>[];
-  pluginFactories: PluginFactory<Dependencies>[];
-  routeConfig: RouteConfig;
-  resolvedForwardMap: Record<string, string>;
-}
-
-/**
- * Factory function to create a new router instance.
- */
-export type RouterFactory<Dependencies extends DefaultDependencies> = (
-  routes: Route<Dependencies>[],
-  options: Partial<Options>,
-  dependencies: Dependencies,
-) => RouterInterface<Dependencies>;
-
-/**
- * Function to apply route config to a new router.
- */
-export type ApplyConfigFn = (
-  router: RouterInterface,
-  config: RouteConfig,
-  resolvedForwardMap: Record<string, string>,
-) => void;
+import type { ApplyConfigFn, CloneData, RouterFactory } from "./types";
+import type { Router } from "../../Router";
+import type { DefaultDependencies } from "@real-router/types";
 
 /**
  * Independent namespace for router cloning operations.
@@ -127,7 +87,7 @@ export class CloneNamespace<
   clone(
     dependencies: Dependencies | undefined,
     factory: RouterFactory<Dependencies>,
-  ): RouterInterface<Dependencies> {
+  ): Router<Dependencies> {
     // Collect all data from source router
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
     const data = this.#getCloneData!();
@@ -163,7 +123,7 @@ export class CloneNamespace<
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
     this.#applyConfig!(
-      newRouter as unknown as RouterInterface,
+      newRouter as unknown as Router,
       data.routeConfig,
       data.resolvedForwardMap,
     );

@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/ObservableNamespace/constants.ts
 
-import { events } from "@real-router/core";
+import { events } from "../../constants";
 
 import type { EventName } from "@real-router/types";
 

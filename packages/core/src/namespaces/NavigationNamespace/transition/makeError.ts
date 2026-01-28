@@ -1,6 +1,6 @@
 // packages/real-router/modules/transition/makeError.ts
 
-import type { RouterError } from "@real-router/core";
+import type { RouterError } from "../../../RouterError";
 
 // Helper: Creating an error with code
 export const makeError = (

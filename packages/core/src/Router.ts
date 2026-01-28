@@ -27,11 +27,18 @@ import {
 } from "./namespaces";
 import { isLoggerConfig } from "./typeGuards";
 
-import type { RouterObservable } from "./namespaces/ObservableNamespace/ObservableNamespace";
+import type { EventMethodMap } from "./namespaces";
+import type { RouterObservable } from "./namespaces/ObservableNamespace";
 import type {
-  ActivationFn,
   ActivationFnFactory,
   BuildStateResultWithSegments,
+  MiddlewareFactory,
+  PluginFactory,
+  Route,
+  RouteConfigUpdate,
+} from "./types";
+import type {
+  ActivationFn,
   CancelFn,
   DefaultDependencies,
   DoneFn,
@@ -39,15 +46,10 @@ import type {
   EventsKeys,
   EventToNameMap,
   Middleware,
-  MiddlewareFactory,
   NavigationOptions,
   Options,
   Params,
   Plugin,
-  PluginFactory,
-  Route,
-  RouteConfigUpdate,
-  Router as RouterInterface,
   RouterError as RouterErrorType,
   RouteTreeState,
   SimpleState,
@@ -76,9 +78,8 @@ import type {
  */
 export class Router<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> implements RouterInterface<Dependencies> {
+> {
   // Index signatures to satisfy interface
-  [key: symbol]: unknown;
   [key: string]: unknown;
 
   // ============================================================================
@@ -148,6 +149,104 @@ export class Router<
     // =========================================================================
 
     this.#setupDependencies();
+
+    // =========================================================================
+    // Bind Public Methods
+    // =========================================================================
+    // All public methods that access private fields must be bound to preserve
+    // `this` context when methods are extracted as references.
+    // See: https://github.com/nicolo-ribaudo/tc39-proposal-bind-operator
+    // =========================================================================
+
+    // Route Management
+    this.addRoute = this.addRoute.bind(this);
+    this.removeRoute = this.removeRoute.bind(this);
+    this.clearRoutes = this.clearRoutes.bind(this);
+    this.getRoute = this.getRoute.bind(this);
+    this.hasRoute = this.hasRoute.bind(this);
+    this.updateRoute = this.updateRoute.bind(this);
+
+    // Path & State Building
+    this.isActiveRoute = this.isActiveRoute.bind(this);
+    this.buildPath = this.buildPath.bind(this);
+    this.matchPath = this.matchPath.bind(this);
+    this.setRootPath = this.setRootPath.bind(this);
+    this.getRootPath = this.getRootPath.bind(this);
+
+    // State Management
+    this.makeState = this.makeState.bind(this);
+    this.makeNotFoundState = this.makeNotFoundState.bind(this);
+    this.getState = this.getState.bind(this);
+    this.setState = this.setState.bind(this);
+    this.getPreviousState = this.getPreviousState.bind(this);
+    this.areStatesEqual = this.areStatesEqual.bind(this);
+    this.areStatesDescendants = this.areStatesDescendants.bind(this);
+    this.forwardState = this.forwardState.bind(this);
+    this.buildState = this.buildState.bind(this);
+    this.buildStateWithSegments = this.buildStateWithSegments.bind(this);
+    this.shouldUpdateNode = this.shouldUpdateNode.bind(this);
+
+    // Options
+    this.getOptions = this.getOptions.bind(this);
+    this.getOption = this.getOption.bind(this);
+    this.setOption = this.setOption.bind(this);
+
+    // Router Lifecycle
+    this.isStarted = this.isStarted.bind(this);
+    this.isActive = this.isActive.bind(this);
+    this.isNavigating = this.isNavigating.bind(this);
+    this.start = this.start.bind(this);
+    this.stop = this.stop.bind(this);
+
+    // Route Lifecycle (Guards)
+    this.canDeactivate = this.canDeactivate.bind(this);
+    this.clearCanDeactivate = this.clearCanDeactivate.bind(this);
+    this.canActivate = this.canActivate.bind(this);
+    this.clearCanActivate = this.clearCanActivate.bind(this);
+    this.getLifecycleFactories = this.getLifecycleFactories.bind(this);
+    this.getLifecycleFunctions = this.getLifecycleFunctions.bind(this);
+
+    // Plugins
+    this.usePlugin = this.usePlugin.bind(this);
+    this.getPlugins = this.getPlugins.bind(this);
+
+    // Middleware
+    this.useMiddleware = this.useMiddleware.bind(this);
+    this.clearMiddleware = this.clearMiddleware.bind(this);
+    this.getMiddlewareFactories = this.getMiddlewareFactories.bind(this);
+    this.getMiddlewareFunctions = this.getMiddlewareFunctions.bind(this);
+
+    // Dependencies
+    this.setDependency = this.setDependency.bind(this);
+    this.setDependencies = this.setDependencies.bind(this);
+    this.getDependency = this.getDependency.bind(this);
+    this.getDependencies = this.getDependencies.bind(this);
+    this.removeDependency = this.removeDependency.bind(this);
+    this.hasDependency = this.hasDependency.bind(this);
+    this.resetDependencies = this.resetDependencies.bind(this);
+
+    // Events
+    this.invokeEventListeners = this.invokeEventListeners.bind(this);
+    this.hasListeners = this.hasListeners.bind(this);
+    this.removeEventListener = this.removeEventListener.bind(this);
+    this.addEventListener = this.addEventListener.bind(this);
+
+    // Navigation
+    this.forward = this.forward.bind(this);
+    this.navigate = this.navigate.bind(this);
+    this.navigateToDefault = this.navigateToDefault.bind(this);
+    this.navigateToState = this.navigateToState.bind(this);
+
+    // Subscription
+    this.subscribe = this.subscribe.bind(this);
+
+    // Cloning
+    this.clone = this.clone.bind(this);
+
+    // Browser Plugin Stubs
+    this.buildUrl = this.buildUrl.bind(this);
+    this.matchUrl = this.matchUrl.bind(this);
+    this.replaceHistoryState = this.replaceHistoryState.bind(this);
   }
 
   // ============================================================================
@@ -321,12 +420,6 @@ export class Router<
     RoutesNamespace.validateBuildPathArgs(route);
 
     return this.#routes.buildPath(route, params, this.#options.get());
-  }
-
-  buildPathWithSegments(route: string, params: Params): string {
-    // Note: segments parameter is kept for API compatibility but not used
-    // because RoutesNamespace.buildPath handles segment lookup internally
-    return this.buildPath(route, params);
   }
 
   matchPath<P extends Params = Params, MP extends Params = Params>(
@@ -651,7 +744,7 @@ export class Router<
     dependencyName: K,
     dependency: Dependencies[K],
   ): this {
-    DependenciesNamespace.validateSetDependencyArgs(dependencyName, dependency);
+    DependenciesNamespace.validateSetDependencyArgs(dependencyName);
     this.#dependencies.set(dependencyName, dependency);
 
     return this;
@@ -712,25 +805,21 @@ export class Router<
     return this.#observable.hasListeners(eventName);
   }
 
-  removeEventListener(
-    eventName: EventToNameMap[EventsKeys],
-    cb: Plugin[keyof Plugin],
+  removeEventListener<E extends EventName>(
+    eventName: E,
+    cb: Plugin[EventMethodMap[E]],
   ): void {
-    ObservableNamespace.validateListenerArgs(eventName as EventName, cb);
-    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
-    this.#observable.removeEventListener(eventName as EventName, cb as any);
-    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+    ObservableNamespace.validateListenerArgs(eventName, cb);
+    this.#observable.removeEventListener(eventName, cb);
   }
 
-  addEventListener(
-    eventName: EventToNameMap[EventsKeys],
-    cb: Plugin[keyof Plugin],
+  addEventListener<E extends EventName>(
+    eventName: E,
+    cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
-    ObservableNamespace.validateListenerArgs(eventName as EventName, cb);
+    ObservableNamespace.validateListenerArgs(eventName, cb);
 
-    /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
-    return this.#observable.addEventListener(eventName as EventName, cb as any);
-    /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument */
+    return this.#observable.addEventListener(eventName, cb);
   }
 
   // ============================================================================
@@ -824,7 +913,7 @@ export class Router<
   // Cloning
   // ============================================================================
 
-  clone(dependencies?: Dependencies): RouterInterface<Dependencies> {
+  clone(dependencies?: Dependencies): Router<Dependencies> {
     CloneNamespace.validateCloneArgs(dependencies);
 
     return this.#clone.clone(
@@ -889,22 +978,18 @@ export class Router<
    * Called once in constructor after all namespaces are created.
    */
   #setupDependencies(): void {
-    // Inject router reference into namespaces that need it
-    // Using 'this' cast because Router implements RouterInterface
-    const routerRef = this as unknown as RouterInterface<Dependencies>;
-
     // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setRouter()
     // will register pending canActivate handlers which need RouteLifecycleNamespace
-    this.#routeLifecycle.setRouter(routerRef);
+    this.#routeLifecycle.setRouter(this);
 
     // Now set up RoutesNamespace (which will register pending canActivate handlers)
-    this.#routes.setRouter(routerRef);
+    this.#routes.setRouter(this);
     this.#routes.setLifecycleNamespace(this.#routeLifecycle);
 
-    this.#middleware.setRouter(routerRef);
-    this.#plugins.setRouter(routerRef);
-    this.#navigation.setRouter(routerRef);
-    this.#lifecycle.setRouter(routerRef);
+    this.#middleware.setRouter(this);
+    this.#plugins.setRouter(this);
+    this.#navigation.setRouter(this);
+    this.#lifecycle.setRouter(this);
 
     // Observable needs access to state for replay feature
     this.#observable.setGetState(() => this.getState());

@@ -10,7 +10,7 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import { constants } from "@real-router/core";
+import { constants } from "../constants";
 
 import { freezeStateInPlace } from "../helpers";
 import { getConfig, getResolvedForwardMap, getRouteTree } from "../internals";

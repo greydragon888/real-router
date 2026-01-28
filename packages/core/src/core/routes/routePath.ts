@@ -7,7 +7,7 @@ import {
 } from "route-tree";
 import { isString } from "type-guards";
 
-import { constants } from "@real-router/core";
+import { constants } from "../../constants";
 
 import { ROUTE_DEFINITIONS_SYMBOL, ROOT_PATH_SYMBOL } from "../../constants";
 import { createBuildOptions } from "../../helpers";
@@ -167,58 +167,6 @@ export function withRoutePath<Dependencies extends DefaultDependencies>(
       route,
       encodedParams,
       buildOptions,
-    );
-  };
-
-  /**
-   * Internal path builder that accepts pre-computed segments.
-   * Avoids duplicate getSegmentsByName call when segments are already available.
-   *
-   * @internal
-   */
-  router.buildPathWithSegments = (
-    route: string,
-    params: Params,
-    segments: readonly unknown[],
-  ): string => {
-    // Early validation for better DX (fail-fast with clear message)
-    if (!isString(route) || route === "") {
-      throw new TypeError(
-        `[real-router] buildPathWithSegments: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
-      );
-    }
-
-    if (route === constants.UNKNOWN_ROUTE) {
-      return isString(params.path) ? params.path : "";
-    }
-
-    const config = getConfig(router);
-
-    // R2 optimization: avoid spread when no defaultParams
-    const paramsWithDefault = Object.hasOwn(config.defaultParams, route)
-      ? { ...config.defaultParams[route], ...params }
-      : params;
-
-    // Apply custom encoder if defined (copy protects original params)
-    const encodedParams =
-      typeof config.encoders[route] === "function"
-        ? config.encoders[route]({ ...paramsWithDefault })
-        : paramsWithDefault;
-
-    // R5 optimization: read cached buildOptions
-    /* v8 ignore next 2 -- @preserve defensive: always called after router.start() */
-    const buildOptions =
-      (router as RouterWithCache)[BUILD_OPTIONS_CACHE_SYMBOL] ??
-      createBuildOptions(router.getOptions());
-
-    // Pass segments to avoid duplicate getSegmentsByName call in route-tree
-    // Cast to RouteTree[] - segments come from getSegmentsByName which returns RouteTree[]
-    return routeNodeBuildPath(
-      getRouteTree(router),
-      route,
-      encodedParams,
-      buildOptions,
-      segments as readonly RouteTree[],
     );
   };
 

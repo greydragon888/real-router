@@ -10,4 +10,11 @@ export {
 
 export { invokeFor } from "./helpers";
 
-export type { EventMethodMap } from "./types";
+export type {
+  EventMethodMap,
+  Observer,
+  ObservableOptions,
+  RouterObservable,
+  SubscribeState,
+  Subscription,
+} from "./types";

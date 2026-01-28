@@ -3,16 +3,23 @@
 import { logger } from "@real-router/logger";
 import { isNavigationOptions, isState } from "type-guards";
 
-import { events, RouterError } from "@real-router/core";
-
 import {
   MAX_EVENT_DEPTH,
   MAX_LISTENERS_HARD_LIMIT,
   validEventNames,
 } from "./constants";
 import { invokeFor } from "./helpers";
+import { events } from "../../constants";
+import { RouterError } from "../../RouterError";
 
-import type { EventMethodMap } from "./types";
+import type {
+  EventMethodMap,
+  Observer,
+  ObservableOptions,
+  RouterObservable,
+  SubscribeState,
+  Subscription,
+} from "./types";
 import type {
   EventName,
   EventsKeys,
@@ -29,58 +36,23 @@ import type {
 // ============================================================================
 
 /**
+ * Symbol.observable polyfill declaration for TC39 proposal
+ *
+ * @see https://github.com/tc39/proposal-observable
+ */
+declare global {
+  interface SymbolConstructor {
+    readonly observable: unique symbol;
+  }
+}
+
+/**
  * Observable symbol - TC39 proposal with fallback
  */
 const $$observable: typeof Symbol.observable =
   // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check for environments without Symbol.observable
   (typeof Symbol === "function" && Symbol.observable) ||
   ("@@observable" as unknown as typeof Symbol.observable);
-
-/**
- * Observable state passed to subscribers
- */
-interface SubscribeState {
-  route: State;
-  previousRoute: State | undefined;
-}
-
-/**
- * Observer interface per Observable spec
- */
-interface Observer {
-  next?: (value: SubscribeState) => void;
-  error?: (err: unknown) => void;
-  complete?: () => void;
-}
-
-/**
- * Subscription interface per Observable spec
- */
-interface Subscription {
-  unsubscribe: () => void;
-  readonly closed: boolean;
-}
-
-/**
- * Observable options for enhanced control
- */
-interface ObservableOptions {
-  /** AbortSignal for automatic unsubscription */
-  signal?: AbortSignal;
-  /** Replay current state to new subscribers (default: true) */
-  replay?: boolean;
-}
-
-/**
- * Observable interface for TC39 compliance
- */
-export interface RouterObservable {
-  [key: symbol]: () => RouterObservable;
-  subscribe: (
-    observer: Observer | ((value: SubscribeState) => void),
-    options?: ObservableOptions,
-  ) => Subscription;
-}
 
 /**
  * Independent namespace for managing router observability (events).

@@ -3,17 +3,17 @@
 import { logger } from "@real-router/logger";
 import { getTypeDescription, isNavigationOptions } from "type-guards";
 
-import { events, errorCodes, constants, RouterError } from "@real-router/core";
+import { transition } from "./transition";
+import { events, errorCodes, constants } from "../../constants";
+import { RouterError } from "../../RouterError";
 
-import { transition } from "../../transition";
-
+import type { Router } from "../../Router";
 import type {
   CancelFn,
   DefaultDependencies,
   DoneFn,
   NavigationOptions,
   Params,
-  Router,
   State,
 } from "@real-router/types";
 
@@ -410,14 +410,13 @@ export class NavigationNamespace<
       return noop;
     }
 
-    const { state: route, segments } = result;
+    const { state: route } = result;
 
     // create a target state
-    // Use buildPathWithSegments to avoid duplicate getSegmentsByName in buildPath
     const toState = router.makeState(
       route.name,
       route.params,
-      router.buildPathWithSegments(route.name, route.params, segments),
+      router.buildPath(route.name, route.params),
       {
         params: route.meta,
         options: opts,

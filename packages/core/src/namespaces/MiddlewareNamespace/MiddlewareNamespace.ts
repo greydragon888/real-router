@@ -1,15 +1,15 @@
 // packages/core/src/namespaces/MiddlewareNamespace/MiddlewareNamespace.ts
 
 import { logger } from "@real-router/logger";
+import { getTypeDescription } from "type-guards";
 
 import { MIDDLEWARE_LIMITS } from "./constants";
-import { getTypeDescription } from "../../helpers";
 
+import type { Router } from "../../Router";
+import type { MiddlewareFactory } from "../../types";
 import type {
   DefaultDependencies,
   Middleware,
-  MiddlewareFactory,
-  Router,
   Unsubscribe,
 } from "@real-router/types";
 

@@ -1,9 +1,9 @@
 // packages/core/src/namespaces/DependenciesNamespace/DependenciesNamespace.ts
 
 import { logger } from "@real-router/logger";
+import { getTypeDescription } from "type-guards";
 
 import { DEPENDENCY_LIMITS } from "./constants";
-import { getTypeDescription } from "../../helpers";
 
 import type { DefaultDependencies } from "@real-router/types";
 
@@ -46,21 +46,15 @@ export class DependenciesNamespace<
   }
 
   /**
-   * Validates setDependency arguments.
-   * Note: Any value is valid (null, functions, objects, etc.).
-   * undefined is allowed and treated as "don't set" (no-op).
+   * Validates setDependency name argument.
+   * Value is not validated - any value is valid.
    */
-  static validateSetDependencyArgs(
-    name: unknown,
-    _value: unknown,
-  ): asserts name is string {
+  static validateSetDependencyArgs(name: unknown): asserts name is string {
     if (typeof name !== "string") {
       throw new TypeError(
         `[router.setDependency]: dependency name must be a string, got ${typeof name}`,
       );
     }
-    // Value is intentionally not validated - any value is valid
-    // undefined means "don't set" (handled in instance method)
   }
 
   /**

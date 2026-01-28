@@ -4,7 +4,7 @@ import { logger } from "@real-router/logger";
 import { routeTreeToDefinitions } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 
-import { createRouter } from "@real-router/core";
+import { createRouter } from "../../createRouter";
 
 import { validateParams } from "./routeConfig";
 import {

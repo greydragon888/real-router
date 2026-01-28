@@ -3,7 +3,8 @@
 /* eslint-disable promise/always-return, promise/no-callback-in-promise */
 import { isPromise, isState } from "type-guards";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { errorCodes } from "../../../constants";
+import { RouterError } from "../../../RouterError";
 
 import type { DoneFn, State, ActivationFn } from "@real-router/types";
 

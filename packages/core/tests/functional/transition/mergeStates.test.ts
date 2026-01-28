@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { mergeStates } from "../../../src/transition/mergeStates";
+import { mergeStates } from "../../../src/namespaces/NavigationNamespace/transition/mergeStates";
 
 import type { State, StateMeta, Params } from "@real-router/types";
 

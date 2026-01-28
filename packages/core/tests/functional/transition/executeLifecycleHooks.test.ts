@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
-import { executeLifecycleHooks } from "../../../src/transition/executeLifecycleHooks";
+import { executeLifecycleHooks } from "../../../src/namespaces/NavigationNamespace/transition/executeLifecycleHooks";
 
 import type {
   State,

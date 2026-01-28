@@ -1,102 +1,26 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isState } from "type-guards";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import {
+  CACHED_ALREADY_STARTED_ERROR,
+  CACHED_NO_START_PATH_ERROR,
+} from "./constants";
+import { getStartRouterArguments, resolveStartState } from "./helpers";
+import { errorCodes, events } from "../../constants";
+import { RouterError } from "../../RouterError";
 
+import type { StartRouterArguments } from "./types";
+import type { Router } from "../../Router";
 import type {
   CancelFn,
   DefaultDependencies,
   DoneFn,
   NavigationOptions,
   Params,
-  Router,
   RouterError as RouterErrorType,
   State,
 } from "@real-router/types";
-
-const noop = (): void => {};
-
-// =============================================================================
-// Cached Errors (Performance Optimization)
-// =============================================================================
-// Pre-create error instances to avoid object allocation on hot paths.
-// Error creation involves: new object, stack trace capture (~500ns-2μs).
-// Cached errors skip this overhead entirely.
-//
-// Trade-off: All error instances share the same stack trace (points here).
-// This is acceptable because:
-// 1. These errors indicate user misconfiguration, not internal bugs
-// 2. Error code and message are sufficient for debugging
-// 3. Performance gain (~80% for error paths) outweighs stack trace loss
-// =============================================================================
-
-/**
- * Cached error for start() called without path/state and no defaultRoute.
- */
-const CACHED_NO_START_PATH_ERROR = new RouterError(
-  errorCodes.NO_START_PATH_OR_STATE,
-);
-
-/**
- * Cached error for start() called when router is already started/starting.
- */
-const CACHED_ALREADY_STARTED_ERROR = new RouterError(
-  errorCodes.ROUTER_ALREADY_STARTED,
-);
-
-type StartRouterArguments =
-  | []
-  | [done: DoneFn]
-  | [startPathOrState: string | State]
-  | [startPathOrState: string | State, done: DoneFn];
-
-const getStartRouterArguments = (
-  args: StartRouterArguments,
-): [startPathOrState: string | State | undefined, done: DoneFn] => {
-  const [first, second] = args;
-
-  if (!first) {
-    return [undefined, noop];
-  }
-  if (typeof first === "function") {
-    return [undefined, first];
-  }
-
-  return [first, second ?? noop];
-};
-
-/**
- * State resolution logic.
- */
-const resolveStartState = <Dependencies extends DefaultDependencies>(
-  pathOrState: string | State,
-  router: Router<Dependencies>,
-): State | undefined => {
-  if (typeof pathOrState === "string") {
-    return router.matchPath(pathOrState);
-  }
-
-  // Validate state object structure using isState type guard
-  // This validates: name (non-empty string), path (string), params (plain object)
-  // Rejects: missing fields, wrong types, functions, symbols, class instances
-  if (!isState(pathOrState)) {
-    return undefined;
-  }
-
-  // Validate that the route exists
-  // buildPath throws RouteNotFoundError for invalid routes, so we wrap in try-catch
-  // to gracefully return undefined instead of propagating the error
-  // See: https://github.com/greydragon888/real-router/issues/42
-  try {
-    router.buildPath(pathOrState.name, pathOrState.params);
-  } catch {
-    return undefined;
-  }
-
-  return pathOrState;
-};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CYCLIC DEPENDENCIES
@@ -417,7 +341,7 @@ export class RouterLifecycleNamespace<
     if (this.#started) {
       this.#started = false;
 
-      router.setState(undefined);
+      router.setState();
 
       router.invokeEventListeners(events.ROUTER_STOP);
     }

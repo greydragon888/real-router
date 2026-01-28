@@ -1,17 +1,13 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isBoolean } from "type-guards";
+import { isBoolean, getTypeDescription } from "type-guards";
 
 import { LIFECYCLE_LIMITS } from "./constants";
-import { getTypeDescription } from "../../helpers";
 
-import type {
-  ActivationFn,
-  ActivationFnFactory,
-  DefaultDependencies,
-  Router,
-} from "@real-router/types";
+import type { Router } from "../../Router";
+import type { ActivationFnFactory } from "../../types";
+import type { ActivationFn, DefaultDependencies } from "@real-router/types";
 
 /**
  * Converts a boolean value to an activation function factory.

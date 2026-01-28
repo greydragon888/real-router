@@ -21,25 +21,20 @@ export type {
   RouterError,
 } from "./base";
 
-// Router types
+// Router types (base types without Router dependency)
+// Note: Route, RouteConfigUpdate, ActivationFnFactory, MiddlewareFactory,
+// PluginFactory, BuildStateResultWithSegments are in @real-router/core
 export type {
-  BuildStateResultWithSegments,
-  Route,
   Options,
   ActivationFn,
-  ActivationFnFactory,
   DefaultDependencies,
   Config,
-  Router,
   Plugin,
   Middleware,
-  MiddlewareFactory,
-  PluginFactory,
   SubscribeState,
   SubscribeFn,
   Listener,
   Subscription,
-  RouteConfigUpdate,
 } from "./router";
 
 export type {

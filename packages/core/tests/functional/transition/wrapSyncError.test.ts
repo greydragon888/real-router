@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { wrapSyncError } from "../../../src/transition/wrapSyncError";
+import { wrapSyncError } from "../../../src/namespaces/NavigationNamespace/transition/wrapSyncError";
 
 describe("transition/wrapSyncError", () => {
   describe("Error instances", () => {

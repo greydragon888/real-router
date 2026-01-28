@@ -1,14 +1,14 @@
 // packages/real-router/modules/transition/executeMiddleware.ts
 
-import { logger } from "@real-router/logger";
+import { logger } from "logger";
 import { isState } from "type-guards";
-
-import { errorCodes, RouterError } from "@real-router/core";
 
 import { makeError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
 import { wrapSyncError } from "./wrapSyncError";
+import { errorCodes } from "../../../constants";
+import { RouterError } from "../../../RouterError";
 
 import type {
   DoneFn,

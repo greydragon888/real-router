@@ -3,7 +3,8 @@
 import { logger } from "@real-router/logger";
 import { isNavigationOptions, isState } from "type-guards";
 
-import { events, RouterError } from "@real-router/core";
+import { events } from "../constants";
+import { RouterError } from "../RouterError";
 
 import type { plugins } from "../constants";
 import type {
