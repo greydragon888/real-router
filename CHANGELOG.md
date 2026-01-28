@@ -5,6 +5,469 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-01-28]
+
+### @real-router/browser-plugin@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd), [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/core@0.3.0
+
+### @real-router/browser-plugin@0.1.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+
+### @real-router/browser-plugin@0.1.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+
+### @real-router/browser-plugin@0.1.3
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/core@0.2.2
+  - @real-router/logger@0.2.0
+
+### @real-router/browser-plugin@0.1.2
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+- Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
+  - @real-router/core@0.2.1
+
+### @real-router/core@0.3.0
+
+### Minor Changes
+
+- [`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor internal architecture to namespace-based design (#34)
+
+  Internal refactoring from functional decorator composition to class-based namespace architecture:
+  - 11 namespace classes with true encapsulation via private fields (`#`)
+  - Clean separation of concerns (Options, Dependencies, State, Routes, Navigation, etc.)
+  - Improved maintainability and testability
+
+  **No breaking changes** — public API remains 100% backward compatible.
+
+- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
+
+  Types moved to `@real-router/core`:
+  - `Router` (class replaces interface)
+  - `Route`
+  - `RouteConfigUpdate`
+  - `ActivationFnFactory`
+  - `MiddlewareFactory`
+  - `PluginFactory`
+  - `BuildStateResultWithSegments`
+
+  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
+
+  ```diff
+  - import type { Router, Route, PluginFactory } from "@real-router/types";
+  + import type { Router, Route, PluginFactory } from "@real-router/core";
+  ```
+
+  This change eliminates circular type dependencies between packages.
+
+### Patch Changes
+
+- Updated dependencies [[`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/types@0.2.0
+
+### @real-router/core@0.2.4
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+### @real-router/core@0.2.3
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+### @real-router/core@0.2.2
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/logger@0.2.0
+
+### @real-router/core@0.2.1
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+### @real-router/helpers@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd), [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/core@0.3.0
+
+### @real-router/helpers@0.1.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+
+### @real-router/helpers@0.1.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+
+### @real-router/helpers@0.1.3
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/core@0.2.2
+
+### @real-router/helpers@0.1.2
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+- Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
+  - @real-router/core@0.2.1
+
+### @real-router/logger@0.2.0
+
+### Minor Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+### @real-router/logger@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### @real-router/logger-plugin@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd), [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/core@0.3.0
+
+### @real-router/logger-plugin@0.2.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+
+### @real-router/logger-plugin@0.2.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+
+### @real-router/logger-plugin@0.2.3
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/core@0.2.2
+  - @real-router/logger@0.2.0
+
+### @real-router/logger-plugin@0.2.2
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+- Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
+  - @real-router/core@0.2.1
+
+### @real-router/persistent-params-plugin@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd), [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/core@0.3.0
+
+### @real-router/persistent-params-plugin@0.1.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+
+### @real-router/persistent-params-plugin@0.1.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+
+### @real-router/persistent-params-plugin@0.1.3
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/core@0.2.2
+
+### @real-router/persistent-params-plugin@0.1.2
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+- Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
+  - @real-router/core@0.2.1
+
+### @real-router/react@1.0.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @real-router/browser-plugin@0.1.0
+  - @real-router/helpers@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/react@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [[`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd), [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/core@0.3.0
+  - @real-router/browser-plugin@0.1.6
+  - @real-router/helpers@0.1.6
+
+### @real-router/react@0.1.5
+
+### Patch Changes
+
+- [#28](https://github.com/greydragon888/real-router/pull/28) [`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: use @real-router/types for shared type definitions
+
+  All packages now import types from @real-router/types instead of bundling
+  their own copies. This fixes TypeScript type compatibility issues when
+  using multiple @real-router packages together.
+
+- Updated dependencies [[`bfd2e5a`](https://github.com/greydragon888/real-router/commit/bfd2e5a560fa7ab701d9f59b4ea09c3779830c83)]:
+  - @real-router/core@0.2.4
+  - @real-router/browser-plugin@0.1.5
+  - @real-router/helpers@0.1.5
+
+### @real-router/react@0.1.4
+
+### Patch Changes
+
+- [`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies to actual versions
+
+  Previous release published packages with unresolved workspace:^ protocol
+  in dependencies, causing npm install to fail. This release fixes the
+  issue by using pnpm publish which correctly converts workspace references.
+
+- Updated dependencies [[`1319fb1`](https://github.com/greydragon888/real-router/commit/1319fb11de379534f213da091b6c190a7b6be46b)]:
+  - @real-router/core@0.2.3
+  - @real-router/browser-plugin@0.1.4
+  - @real-router/helpers@0.1.4
+
+### @real-router/react@0.1.3
+
+### Patch Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+- Updated dependencies []:
+  - @real-router/core@0.2.2
+  - @real-router/browser-plugin@0.1.3
+  - @real-router/helpers@0.1.3
+
+### @real-router/react@0.1.2
+
+### Patch Changes
+
+- [`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c) Thanks [@greydragon888](https://github.com/greydragon888)! - fix: resolve workspace:^ dependencies correctly in published packages
+
+  Previously, workspace:^ dependencies were published to npm as-is, causing
+  installation failures. Now workspace protocols are replaced with actual
+  version numbers before publishing.
+
+- Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
+  - @real-router/core@0.2.1
+  - @real-router/browser-plugin@0.1.2
+  - @real-router/helpers@0.1.2
+
+### @real-router/types@0.2.0
+
+### Minor Changes
+
+- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
+
+  Types moved to `@real-router/core`:
+  - `Router` (class replaces interface)
+  - `Route`
+  - `RouteConfigUpdate`
+  - `ActivationFnFactory`
+  - `MiddlewareFactory`
+  - `PluginFactory`
+  - `BuildStateResultWithSegments`
+
+  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
+
+  ```diff
+  - import type { Router, Route, PluginFactory } from "@real-router/types";
+  + import type { Router, Route, PluginFactory } from "@real-router/core";
+  ```
+
+  This change eliminates circular type dependencies between packages.
+
+### @real-router/types@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
 ## [2026-01-24]
 
 ### @real-router/logger-plugin@0.2.1
