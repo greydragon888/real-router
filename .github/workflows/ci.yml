@@ -76,7 +76,7 @@ jobs:
       checks: write
     steps:
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-reports
           path: packages
@@ -110,7 +110,7 @@ jobs:
           fetch-depth: 0
 
       - name: Download coverage artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: coverage-reports
           path: packages
