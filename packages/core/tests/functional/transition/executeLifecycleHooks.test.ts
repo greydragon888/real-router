@@ -47,7 +47,7 @@ describe("transition/executeLifecycleHooks", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "core:lifecycle",
-        "Error in lifecycle callback:",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -86,7 +86,7 @@ describe("transition/executeLifecycleHooks", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "core:lifecycle",
-        "Error in lifecycle callback:",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -138,7 +138,7 @@ describe("transition/executeLifecycleHooks", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "core:lifecycle",
-        "Error in lifecycle callback:",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -177,7 +177,7 @@ describe("transition/executeLifecycleHooks", () => {
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "core:lifecycle",
-        "Error in lifecycle callback:",
+        "Error in callback:",
         expect.any(Error),
       );
 

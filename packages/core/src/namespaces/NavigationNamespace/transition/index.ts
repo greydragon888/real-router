@@ -123,48 +123,58 @@ export function transition<Dependencies extends DefaultDependencies>(
       }
     };
 
-    // perform a chain
-    runDeactivation((err, state) => {
+    // Callback handlers extracted to reduce nesting depth
+    const handleMiddlewareComplete: StrictDoneFn = (
+      runMiddlewareErr,
+      runMiddlewareState,
+    ) => {
+      if (runMiddlewareErr) {
+        complete(runMiddlewareErr, runMiddlewareState);
+
+        return;
+      }
+
+      // Automatic cleaning of inactive segments
+      if (fromState) {
+        const activeSegments = nameToIDs(toState.name);
+        const previousActiveSegments = nameToIDs(fromState.name);
+        const activeSet = new Set(activeSegments);
+
+        for (const name of previousActiveSegments) {
+          if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
+            router.clearCanDeactivate(name);
+          }
+        }
+      }
+
+      complete(undefined, runMiddlewareState);
+    };
+
+    const handleActivationComplete: StrictDoneFn = (
+      runActivationErr,
+      runActivationState,
+    ) => {
+      if (runActivationErr) {
+        complete(runActivationErr, runActivationState);
+
+        return;
+      }
+
+      runMiddleware(runActivationState, handleMiddlewareComplete);
+    };
+
+    const handleDeactivationComplete: StrictDoneFn = (err, state) => {
       if (err) {
         complete(err, state);
 
         return;
       }
 
-      runActivation(state, (runActivationErr, runActivationState) => {
-        if (runActivationErr) {
-          complete(runActivationErr, runActivationState);
+      runActivation(state, handleActivationComplete);
+    };
 
-          return;
-        }
-
-        runMiddleware(
-          runActivationState,
-          (runMiddlewareErr, runMiddlewareState) => {
-            if (runMiddlewareErr) {
-              complete(runMiddlewareErr, runMiddlewareState);
-
-              return;
-            }
-
-            // Automatic cleaning of inactive segments
-            if (fromState) {
-              const activeSegments = nameToIDs(toState.name);
-              const previousActiveSegments = nameToIDs(fromState.name);
-              const activeSet = new Set(activeSegments);
-
-              for (const name of previousActiveSegments) {
-                if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
-                  router.clearCanDeactivate(name);
-                }
-              }
-            }
-
-            complete(undefined, runMiddlewareState);
-          },
-        );
-      });
-    });
+    // perform a chain
+    runDeactivation(handleDeactivationComplete);
   };
 
   // Launch transition

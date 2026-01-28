@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/ObservableNamespace/ObservableNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isNavigationOptions, isState } from "type-guards";
+import { isNavigationOptions } from "type-guards";
 
 import {
   MAX_EVENT_DEPTH,
@@ -9,6 +9,11 @@ import {
   validEventNames,
 } from "./constants";
 import { invokeFor } from "./helpers";
+import {
+  validateOptionalFromState,
+  validateOptionalToState,
+  validateRequiredToState,
+} from "./validators";
 import { events } from "../../constants";
 import { RouterError } from "../../RouterError";
 
@@ -147,7 +152,7 @@ export class ObservableNamespace {
    * Validates invoke arguments based on event type.
    * Called by facade before invoke.
    */
-  // eslint-disable-next-line sonarjs/cognitive-complexity
+
   static validateInvokeArgs(
     eventName: (typeof events)[EventsKeys],
     toState?: State,
@@ -159,42 +164,14 @@ export class ObservableNamespace {
     switch (eventName) {
       case events.TRANSITION_START:
       case events.TRANSITION_CANCEL: {
-        if (!toState) {
-          throw new TypeError(
-            `[router.invokeEventListeners] toState is required for event "${eventName}"`,
-          );
-        }
-
-        if (!isState(toState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] toState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
-
-        if (fromState && !isState(fromState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] fromState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
+        validateRequiredToState(toState, eventName);
+        validateOptionalFromState(fromState, eventName);
 
         break;
       }
       case events.TRANSITION_ERROR: {
-        if (toState && !isState(toState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] toState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
-
-        if (fromState && !isState(fromState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] fromState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
+        validateOptionalToState(toState, eventName);
+        validateOptionalFromState(fromState, eventName);
 
         if (!arg) {
           throw new TypeError(
@@ -212,25 +189,8 @@ export class ObservableNamespace {
         break;
       }
       case events.TRANSITION_SUCCESS: {
-        if (!toState) {
-          throw new TypeError(
-            `[router.invokeEventListeners] toState is required for event "${eventName}"`,
-          );
-        }
-
-        if (!isState(toState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] toState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
-
-        if (fromState && !isState(fromState)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] fromState is invalid for event "${eventName}". ` +
-              `Expected State object with name, path, and params.`,
-          );
-        }
+        validateRequiredToState(toState, eventName);
+        validateOptionalFromState(fromState, eventName);
 
         if (!arg) {
           throw new TypeError(

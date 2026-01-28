@@ -41,8 +41,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -78,8 +78,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -127,8 +127,8 @@ describe("transition/executeMiddleware", () => {
       });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -164,8 +164,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 

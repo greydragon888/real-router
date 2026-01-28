@@ -6,6 +6,7 @@ import { isState } from "type-guards";
 import { makeError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
+import { safeCallback, type StrictDoneFn } from "./shared";
 import { wrapSyncError } from "./wrapSyncError";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
@@ -17,33 +18,7 @@ import type {
   RouterError as RouterErrorType,
 } from "@real-router/types";
 
-/**
- * Strict callback type where state is always provided.
- *
- * @internal
- */
-type StrictDoneFn = (error: RouterErrorType | undefined, state: State) => void;
-
-/**
- * Safely invokes a callback, catching and logging any errors.
- *
- * @internal
- */
-function safeCallback(
-  callback: StrictDoneFn,
-  error: RouterErrorType | undefined,
-  state: State,
-): void {
-  try {
-    callback(error, state);
-  } catch (error_) {
-    logger.error(
-      "real-router:middleware",
-      "Error in middleware callback:",
-      error_,
-    );
-  }
-}
+const LOG_TAG = "core:middleware";
 
 // Helper: processing middleware
 export const executeMiddleware = (
@@ -72,6 +47,7 @@ export const executeMiddleware = (
         callback,
         new RouterError(errorCodes.TRANSITION_CANCELLED),
         currentState,
+        LOG_TAG,
       );
 
       return;
@@ -82,6 +58,7 @@ export const executeMiddleware = (
         callback,
         makeError(errorCodes.TRANSITION_ERR, err),
         currentState,
+        LOG_TAG,
       );
 
       return;
@@ -100,7 +77,7 @@ export const executeMiddleware = (
 
       if (hasChanged) {
         logger.error(
-          "real-router:middleware",
+          LOG_TAG,
           "Warning: State mutated during middleware execution",
           { from: currentState, to: newState },
         );
@@ -110,7 +87,7 @@ export const executeMiddleware = (
     }
 
     if (index >= middlewareFunctions.length) {
-      safeCallback(callback, undefined, currentState);
+      safeCallback(callback, undefined, currentState, LOG_TAG);
 
       return;
     }
@@ -118,7 +95,7 @@ export const executeMiddleware = (
     const middlewareFn = middlewareFunctions[index++];
 
     try {
-      const result = middlewareFn.call(null, currentState, fromState, done);
+      const result = middlewareFn(currentState, fromState, done);
 
       processLifecycleResult(result, done);
     } catch (syncError: unknown) {

@@ -3,12 +3,13 @@
 import { logger } from "logger";
 import { isState } from "type-guards";
 
+import { RouterError, errorCodes } from "@real-router/core";
+
 import { makeError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
+import { safeCallback, type StrictDoneFn } from "./shared";
 import { wrapSyncError } from "./wrapSyncError";
-import { errorCodes } from "../../../constants";
-import { RouterError } from "../../../RouterError";
 
 import type {
   DoneFn,
@@ -17,29 +18,7 @@ import type {
   RouterError as RouterErrorType,
 } from "@real-router/types";
 
-/**
- * Strict callback type where state is always provided.
- *
- * @internal
- */
-type StrictDoneFn = (error: RouterErrorType | undefined, state: State) => void;
-
-/**
- * Safely invokes a callback, catching and logging any errors.
- *
- * @internal
- */
-function safeCallback(
-  callback: StrictDoneFn,
-  error: RouterErrorType | undefined,
-  state: State,
-): void {
-  try {
-    callback(error, state);
-  } catch (error_) {
-    logger.error("core:lifecycle", "Error in lifecycle callback:", error_);
-  }
-}
+const LOG_TAG = "core:lifecycle";
 
 // Helper: execution of the Lifecycle Hooks group
 export const executeLifecycleHooks = (
@@ -55,7 +34,7 @@ export const executeLifecycleHooks = (
   const segmentsToProcess = segments.filter((name) => hooks.has(name));
 
   if (segmentsToProcess.length === 0) {
-    safeCallback(callback, undefined, currentState);
+    safeCallback(callback, undefined, currentState, LOG_TAG);
 
     return;
   }
@@ -88,13 +67,14 @@ export const executeLifecycleHooks = (
         callback,
         new RouterError(errorCodes.TRANSITION_CANCELLED),
         currentState,
+        LOG_TAG,
       );
 
       return;
     }
 
     if (err) {
-      safeCallback(callback, makeError(errorCode, err), currentState);
+      safeCallback(callback, makeError(errorCode, err), currentState, LOG_TAG);
 
       return;
     }
@@ -116,7 +96,7 @@ export const executeLifecycleHooks = (
           },
         });
 
-        safeCallback(callback, redirectNotAllowedErr, currentState);
+        safeCallback(callback, redirectNotAllowedErr, currentState, LOG_TAG);
 
         return;
       }
@@ -138,7 +118,7 @@ export const executeLifecycleHooks = (
     }
 
     if (index >= segmentsToProcess.length) {
-      safeCallback(callback, undefined, currentState);
+      safeCallback(callback, undefined, currentState, LOG_TAG);
 
       return;
     }
@@ -149,7 +129,7 @@ export const executeLifecycleHooks = (
     const hookFn = hooks.get(segment)!;
 
     try {
-      const result = hookFn.call(null, currentState, fromState, done);
+      const result = hookFn(currentState, fromState, done);
 
       processLifecycleResult(result, done, segment);
     } catch (syncError: unknown) {
