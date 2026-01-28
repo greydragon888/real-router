@@ -146,61 +146,6 @@ describe("createRouter", () => {
     });
   });
 
-  describe("browser plugin stubs", () => {
-    // These methods are stubs that throw unless browser-plugin is installed
-    // Using type assertions since these methods may not be in the public type definitions
-    interface RouterWithStubs {
-      buildUrl: (name: string, params?: Record<string, string>) => string;
-      matchUrl: (url: string) => unknown;
-      replaceHistoryState: (
-        name: string,
-        params?: Record<string, string>,
-        title?: string,
-      ) => void;
-    }
-
-    it("should throw error when buildUrl is called without browser plugin", () => {
-      const router = createRouter([
-        { name: "home", path: "/home" },
-      ]) as unknown as RouterWithStubs;
-
-      expect(() => router.buildUrl("home")).toThrowError(
-        "[router.buildUrl] Browser plugin is not installed",
-      );
-      expect(() => router.buildUrl("home")).toThrowError(
-        'Called with route: "home"',
-      );
-    });
-
-    it("should throw error when matchUrl is called without browser plugin", () => {
-      const router = createRouter([
-        { name: "home", path: "/home" },
-      ]) as unknown as RouterWithStubs;
-
-      expect(() => router.matchUrl("/home")).toThrowError(
-        "[router.matchUrl] Browser plugin is not installed",
-      );
-      expect(() => router.matchUrl("/home")).toThrowError(
-        'Called with URL: "/home"',
-      );
-    });
-
-    it("should throw error when replaceHistoryState is called without browser plugin", () => {
-      const router = createRouter([
-        { name: "home", path: "/home" },
-      ]) as unknown as RouterWithStubs;
-
-      expect(() => {
-        router.replaceHistoryState("home");
-      }).toThrowError(
-        "[router.replaceHistoryState] Browser plugin is not installed",
-      );
-      expect(() => {
-        router.replaceHistoryState("home");
-      }).toThrowError('Called with route: "home"');
-    });
-  });
-
   describe("TC39 Observable spec", () => {
     /**
      * Symbol.observable polyfill - TC39 proposal with fallback

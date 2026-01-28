@@ -46,13 +46,13 @@ export const BaseLink: FC<BaseLinkProps> = memo(
 
     // Build URL with memoization
     const href = useMemo(() => {
-      // Try buildUrl first (available when browser plugin is installed)
-      // Fall back to buildPath if buildUrl throws (e.g., in SSR or without browser plugin)
-      try {
+      // Use buildUrl if available (browser plugin installed)
+      // Otherwise fall back to buildPath (e.g., in SSR or without browser plugin)
+      if (typeof router.buildUrl === "function") {
         return router.buildUrl(routeName, stableParams);
-      } catch {
-        return router.buildPath(routeName, stableParams);
       }
+
+      return router.buildPath(routeName, stableParams);
     }, [router, routeName, stableParams]);
 
     // Optimized click handler

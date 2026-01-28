@@ -242,11 +242,6 @@ export class Router<
 
     // Cloning
     this.clone = this.clone.bind(this);
-
-    // Browser Plugin Stubs
-    this.buildUrl = this.buildUrl.bind(this);
-    this.matchUrl = this.matchUrl.bind(this);
-    this.replaceHistoryState = this.replaceHistoryState.bind(this);
   }
 
   // ============================================================================
@@ -920,52 +915,6 @@ export class Router<
       dependencies,
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
-    );
-  }
-
-  // ============================================================================
-  // Browser Plugin Stubs (overwritten by browser-plugin at runtime)
-  // ============================================================================
-
-  /**
-   * Builds full URL for a route with base path and hash prefix.
-   * This is a stub - actual implementation is provided by browser-plugin.
-   *
-   * @throws Error if called without browser-plugin
-   */
-  buildUrl(name: string, _params?: Params): string {
-    throw new Error(
-      `[router.buildUrl] Browser plugin is not installed. ` +
-        `Install @real-router/browser-plugin and call router.usePlugin(browserPlugin()) to use buildUrl. ` +
-        `Called with route: "${name}"`,
-    );
-  }
-
-  /**
-   * Matches URL and returns corresponding state.
-   * This is a stub - actual implementation is provided by browser-plugin.
-   *
-   * @throws Error if called without browser-plugin
-   */
-  matchUrl(url: string): State | undefined {
-    throw new Error(
-      `[router.matchUrl] Browser plugin is not installed. ` +
-        `Install @real-router/browser-plugin and call router.usePlugin(browserPlugin()) to use matchUrl. ` +
-        `Called with URL: "${url}"`,
-    );
-  }
-
-  /**
-   * Replaces current history state without triggering navigation.
-   * This is a stub - actual implementation is provided by browser-plugin.
-   *
-   * @throws Error if called without browser-plugin
-   */
-  replaceHistoryState(name: string, _params?: Params, _title?: string): void {
-    throw new Error(
-      `[router.replaceHistoryState] Browser plugin is not installed. ` +
-        `Install @real-router/browser-plugin and call router.usePlugin(browserPlugin()) to use replaceHistoryState. ` +
-        `Called with route: "${name}"`,
     );
   }
 
