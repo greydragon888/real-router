@@ -11,14 +11,6 @@ set -e
 
 echo "🚀 Running pre-push checks..."
 
-# Run type checking, linting, and tests via turbo pipeline
-echo "🧪 Running tests (includes type-check and lint via turbo)..."
-pnpm test
-
-# Check for unused code
-echo "🧹 Checking for unused code..."
-pnpm lint:unused
-
 # Check for code duplication
 echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
@@ -29,14 +21,10 @@ pnpm lint:dedupe
 
 # Build the project to ensure it compiles
 echo "📦 Building project..."
-pnpm build
+pnpm validate:pre-push
 
-# Validate TypeScript types in dist
-echo "🔷 Validating TypeScript types in dist..."
-pnpm lint:types
-
-# Validate package.json exports
-echo "📄 Validating package configuration..."
-pnpm lint:package
+# Check for unused code
+echo "🧹 Checking for unused code..."
+pnpm lint:unused
 
 echo "✅ All pre-push checks passed! Pushing to remote..."

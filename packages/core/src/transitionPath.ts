@@ -1,7 +1,6 @@
 // packages/real-router/modules/transitionPath.ts
 
 import { logger } from "@real-router/logger";
-import { validateState } from "type-guards";
 
 import type { Params, State } from "@real-router/types";
 
@@ -358,9 +357,6 @@ export function getTransitionPath(
   toState: State,
   fromState?: State,
 ): TransitionPath {
-  // Validate required toState
-  validateState(toState, "getTransitionPath");
-
   // ===== FAST PATH 1: Initial navigation (no fromState) =====
   // This is the best performing case in benchmarks (5M ops/sec)
   if (!fromState) {
@@ -370,9 +366,6 @@ export function getTransitionPath(
       toDeactivate: [],
     };
   }
-
-  // Validate optional fromState
-  validateState(fromState, "getTransitionPath");
 
   const toStateOptions = toState.meta?.options ?? {};
 

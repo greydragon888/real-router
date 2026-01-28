@@ -1,6 +1,5 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -230,38 +229,55 @@ describe("core/routes/removeRoute", () => {
       // The silent parameter should suppress warnings
       expect(() => router.removeRoute("nohandlers")).not.toThrowError();
 
-      // Route config should still be cleaned up
-      expect(getConfig(router).decoders.nohandlers).toBeUndefined();
+      // Route should be removed
+      expect(router.hasRoute("nohandlers")).toBe(false);
     });
   });
 
   describe("config cleanup", () => {
     it("should clear decoders on removeRoute", () => {
+      const decodeParams = vi.fn((params) => ({
+        ...params,
+        id: Number(params.id),
+      }));
+
       router.addRoute({
         name: "encoded",
         path: "/encoded/:id",
-        decodeParams: (params) => ({ ...params, id: Number(params.id) }),
+        decodeParams,
       });
 
-      expect(getConfig(router).decoders.encoded).toBeDefined();
+      // Verify decoder works before removal
+      expect(router.matchPath("/encoded/123")?.params.id).toBe(123);
 
       router.removeRoute("encoded");
 
-      expect(getConfig(router).decoders.encoded).toBeUndefined();
+      // Route no longer exists
+      expect(router.hasRoute("encoded")).toBe(false);
+      expect(router.matchPath("/encoded/123")).toBeUndefined();
     });
 
     it("should clear encoders on removeRoute", () => {
+      const encodeParams = vi.fn((params) => ({
+        ...params,
+        id: `${params.id as number}`,
+      }));
+
       router.addRoute({
         name: "decoded",
         path: "/decoded/:id",
-        encodeParams: (params) => ({ ...params, id: `${params.id as number}` }),
+        encodeParams,
       });
 
-      expect(getConfig(router).encoders.decoded).toBeDefined();
+      // Verify encoder works before removal
+      router.buildPath("decoded", { id: 123 });
+
+      expect(encodeParams).toHaveBeenCalled();
 
       router.removeRoute("decoded");
 
-      expect(getConfig(router).encoders.decoded).toBeUndefined();
+      // Route no longer exists
+      expect(router.hasRoute("decoded")).toBe(false);
     });
 
     it("should clear defaultParams on removeRoute", () => {
@@ -271,11 +287,15 @@ describe("core/routes/removeRoute", () => {
         defaultParams: { page: 1 },
       });
 
-      expect(getConfig(router).defaultParams.withdefaults).toBeDefined();
+      // Verify defaults work before removal
+      expect(router.makeState("withdefaults").params).toStrictEqual({
+        page: 1,
+      });
 
       router.removeRoute("withdefaults");
 
-      expect(getConfig(router).defaultParams.withdefaults).toBeUndefined();
+      // Route no longer exists
+      expect(router.hasRoute("withdefaults")).toBe(false);
     });
 
     it("should clear forwardMap on removeRoute", () => {
@@ -286,11 +306,13 @@ describe("core/routes/removeRoute", () => {
         forwardTo: "target",
       });
 
-      expect(getConfig(router).forwardMap.redirect).toBe("target");
+      // Verify forward works before removal
+      expect(router.forwardState("redirect", {}).name).toBe("target");
 
       router.removeRoute("redirect");
 
-      expect(getConfig(router).forwardMap.redirect).toBeUndefined();
+      // Route no longer exists
+      expect(router.hasRoute("redirect")).toBe(false);
     });
 
     it("should only clear forwardMap for removed route", () => {
@@ -298,13 +320,15 @@ describe("core/routes/removeRoute", () => {
       router.addRoute({ name: "fwd1", path: "/fwd1", forwardTo: "dest" });
       router.addRoute({ name: "fwd2", path: "/fwd2", forwardTo: "dest" });
 
-      expect(getConfig(router).forwardMap.fwd1).toBe("dest");
-      expect(getConfig(router).forwardMap.fwd2).toBe("dest");
+      // Both forward rules work
+      expect(router.forwardState("fwd1", {}).name).toBe("dest");
+      expect(router.forwardState("fwd2", {}).name).toBe("dest");
 
       router.removeRoute("fwd1");
 
-      expect(getConfig(router).forwardMap.fwd1).toBeUndefined();
-      expect(getConfig(router).forwardMap.fwd2).toBe("dest");
+      // fwd1 is removed, fwd2 still works
+      expect(router.hasRoute("fwd1")).toBe(false);
+      expect(router.forwardState("fwd2", {}).name).toBe("dest");
     });
 
     it("should clear child route forwardMap when parent removed", () => {
@@ -312,16 +336,17 @@ describe("core/routes/removeRoute", () => {
       router.addRoute({
         name: "container",
         path: "/container",
-        children: [{ name: "fwd", path: "/fwd" }],
+        children: [{ name: "fwd", path: "/fwd", forwardTo: "dest" }],
       });
-      // Register forward manually (forwardTo in children isn't auto-registered)
-      getConfig(router).forwardMap["container.fwd"] = "dest";
 
-      expect(getConfig(router).forwardMap["container.fwd"]).toBe("dest");
+      // Verify child forward works
+      expect(router.forwardState("container.fwd", {}).name).toBe("dest");
 
       router.removeRoute("container");
 
-      expect(getConfig(router).forwardMap["container.fwd"]).toBeUndefined();
+      // Parent and child routes no longer exist
+      expect(router.hasRoute("container")).toBe(false);
+      expect(router.hasRoute("container.fwd")).toBe(false);
     });
 
     it("should clear child route handlers when parent removed", () => {
@@ -398,29 +423,26 @@ describe("core/routes/removeRoute", () => {
       });
       router.canDeactivate("existing", () => () => true);
 
-      // Capture references before (these should be the same object instances)
+      // Capture lifecycle factories before
       const [canDeactivateBefore, canActivateBefore] =
         router.getLifecycleFactories();
-      const decoderBefore = getConfig(router).decoders.existing;
-      const encoderBefore = getConfig(router).encoders.existing;
-      const defaultsBefore = getConfig(router).defaultParams.existing;
 
       // Attempt to remove non-existent route
       router.removeRoute("nonexistent");
 
-      // Verify route still works
+      // Verify route still works (behavioral test)
       expect(router.matchPath("/existing/42")?.name).toBe("existing");
       expect(router.buildPath("existing", { id: 99 })).toBe("/existing/99");
+      expect(router.makeState("existing").params).toStrictEqual({
+        id: "1",
+      });
 
-      // Verify config objects are the SAME references (not rebuilt)
+      // Verify lifecycle handlers still registered
       const [canDeactivateAfter, canActivateAfter] =
         router.getLifecycleFactories();
 
       expect(canActivateAfter.existing).toBe(canActivateBefore.existing);
       expect(canDeactivateAfter.existing).toBe(canDeactivateBefore.existing);
-      expect(getConfig(router).decoders.existing).toBe(decoderBefore);
-      expect(getConfig(router).encoders.existing).toBe(encoderBefore);
-      expect(getConfig(router).defaultParams.existing).toBe(defaultsBefore);
     });
 
     it("should return router for chaining even when route not found", () => {
@@ -583,14 +605,18 @@ describe("core/routes/removeRoute", () => {
           forwardTo: "newDashboard",
         });
 
-        // Verify forwardMap is set
-        expect(getConfig(router).forwardMap.oldDashboard).toBe("newDashboard");
+        // Verify forward works
+        expect(router.forwardState("oldDashboard", {}).name).toBe(
+          "newDashboard",
+        );
 
         // Remove the target route
         router.removeRoute("newDashboard");
 
-        // forwardMap entry should be cleared (points TO deleted route)
-        expect(getConfig(router).forwardMap.oldDashboard).toBeUndefined();
+        // Forward should no longer redirect (target removed)
+        expect(router.forwardState("oldDashboard", {}).name).toBe(
+          "oldDashboard",
+        );
       });
 
       it("should keep source route functional after target removal", () => {
@@ -641,17 +667,17 @@ describe("core/routes/removeRoute", () => {
           forwardTo: "middle",
         });
 
-        // Verify chain exists
-        expect(getConfig(router).forwardMap.start).toBe("middle");
-        expect(getConfig(router).forwardMap.middle).toBe("final");
+        // Verify chain works: start -> middle -> final
+        expect(router.forwardState("start", {}).name).toBe("final");
+        expect(router.forwardState("middle", {}).name).toBe("final");
 
         // Remove middle route
         router.removeRoute("middle");
 
-        // start's forward to middle should be cleared
-        expect(getConfig(router).forwardMap.start).toBeUndefined();
-        // middle's forward to final should be gone (route itself removed)
-        expect(getConfig(router).forwardMap.middle).toBeUndefined();
+        // start's forward to middle should be cleared (middle no longer exists)
+        expect(router.forwardState("start", {}).name).toBe("start");
+        // middle route no longer exists
+        expect(router.hasRoute("middle")).toBe(false);
         // final route should still exist
         expect(router.matchPath("/final")?.name).toBe("final");
       });
@@ -664,13 +690,14 @@ describe("core/routes/removeRoute", () => {
           forwardTo: "keepTarget",
         });
 
-        expect(getConfig(router).forwardMap.removeSource).toBe("keepTarget");
+        // Verify forward works
+        expect(router.forwardState("removeSource", {}).name).toBe("keepTarget");
 
         // Remove the source route
         router.removeRoute("removeSource");
 
-        // forwardMap entry should be cleared (source route removed)
-        expect(getConfig(router).forwardMap.removeSource).toBeUndefined();
+        // Source route no longer exists
+        expect(router.hasRoute("removeSource")).toBe(false);
         // Target should still exist
         expect(router.matchPath("/keep-target")?.name).toBe("keepTarget");
       });

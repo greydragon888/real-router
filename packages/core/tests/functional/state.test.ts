@@ -7,8 +7,7 @@ import { constants } from "@real-router/core";
 import {
   buildNameFromSegments,
   createRouteState,
-} from "../../src/core/stateBuilder";
-import { getConfig } from "../../src/internals";
+} from "../../src/namespaces/RoutesNamespace/stateBuilder";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -50,11 +49,11 @@ describe("core/state", () => {
       expect(router.getState()).toStrictEqual(state);
     });
 
-    it("clears state when undefined is passed", () => {
+    it("clears state when called without argument", () => {
       const state = router.makeState("home", {}, "/home");
 
       router.setState(state);
-      router.setState(undefined);
+      router.setState();
 
       expect(router.getState()).toBe(undefined);
     });
@@ -157,16 +156,23 @@ describe("core/state", () => {
     });
 
     it("merges with defaultParams", () => {
-      getConfig(router).defaultParams.admin = { lang: "en" };
-      const state = router.makeState("admin", { id: 123 }, "/admin");
+      // Add a route with defaultParams
+      router.addRoute({
+        name: "withDefaults",
+        path: "/with-defaults",
+        defaultParams: { lang: "en" },
+      });
+      const state = router.makeState(
+        "withDefaults",
+        { id: 123 },
+        "/with-defaults",
+      );
 
       expect(state.params).toStrictEqual({ lang: "en", id: 123 });
     });
 
     it("uses empty params when no params and no defaultParams (line 328)", () => {
-      // Delete any defaultParams for home route
-      delete getConfig(router).defaultParams.home;
-
+      // home route has no defaultParams defined
       // Call makeState with undefined params (no params, no defaults)
       const state = router.makeState("home", undefined as never, "/home");
 
@@ -375,14 +381,10 @@ describe("core/state", () => {
     });
 
     describe("argument validation", () => {
-      // Validation removed from areStatesEqual for performance optimization.
-      // States are validated at creation time (makeState, buildState).
-      // See: packages/real-router/.claude/OPTIMIZATION-RECOMMENDATIONS.md
-
       it("does not throw for null/undefined states", () => {
         const validState = router.makeState("home", {}, "/home");
 
-        // null/undefined are valid inputs (handled before validation)
+        // null/undefined are valid inputs (represent "no state")
         // Using 'as never' to test runtime behavior with null values
         expect(() =>
           router.areStatesEqual(null as never, null as never),
@@ -396,6 +398,40 @@ describe("core/state", () => {
         expect(() =>
           router.areStatesEqual(null as never, validState),
         ).not.toThrowError();
+      });
+
+      it("throws TypeError for invalid state1", () => {
+        const validState = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual("invalid" as never, validState),
+        ).toThrowError(TypeError);
+        expect(() =>
+          router.areStatesEqual({ name: "x" } as never, validState),
+        ).toThrowError(/Invalid state/);
+      });
+
+      it("throws TypeError for invalid state2", () => {
+        const validState = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual(validState, "invalid" as never),
+        ).toThrowError(TypeError);
+        expect(() =>
+          router.areStatesEqual(validState, 123 as never),
+        ).toThrowError(/Invalid state/);
+      });
+
+      it("throws TypeError for invalid ignoreQueryParams", () => {
+        const s1 = router.makeState("home", {}, "/home");
+        const s2 = router.makeState("home", {}, "/home");
+
+        expect(() =>
+          router.areStatesEqual(s1, s2, "true" as never),
+        ).toThrowError(TypeError);
+        expect(() => router.areStatesEqual(s1, s2, 1 as never)).toThrowError(
+          /Invalid ignoreQueryParams/,
+        );
       });
     });
 
@@ -638,35 +674,52 @@ describe("core/state", () => {
     });
 
     it("forwards to another route with merged params", () => {
-      router.forward("home", "admin");
-      getConfig(router).defaultParams.home = { a: 1 };
-      getConfig(router).defaultParams.admin = { b: 2 };
+      // Add routes with defaultParams
+      router.addRoute([
+        { name: "srcRoute", path: "/src", defaultParams: { a: 1 } },
+        { name: "dstRoute", path: "/dst", defaultParams: { b: 2 } },
+      ]);
+      router.forward("srcRoute", "dstRoute");
 
-      const state = router.forwardState("home", { c: 3 });
+      const state = router.forwardState("srcRoute", { c: 3 });
 
-      expect(state.name).toBe("admin");
+      expect(state.name).toBe("dstRoute");
       expect(state.params).toStrictEqual({ a: 1, b: 2, c: 3 });
     });
 
     it("forwards with only source route defaults (line 595)", () => {
-      router.forward("home", "admin");
-      getConfig(router).defaultParams.home = { a: 1 };
-      // No defaults for admin
+      // Add routes: source has defaults, target doesn't
+      router.addRoute([
+        {
+          name: "srcWithDefaults",
+          path: "/src-with-defaults",
+          defaultParams: { a: 1 },
+        },
+        { name: "dstNoDefaults", path: "/dst-no-defaults" },
+      ]);
+      router.forward("srcWithDefaults", "dstNoDefaults");
 
-      const state = router.forwardState("home", { c: 3 });
+      const state = router.forwardState("srcWithDefaults", { c: 3 });
 
-      expect(state.name).toBe("admin");
+      expect(state.name).toBe("dstNoDefaults");
       expect(state.params).toStrictEqual({ a: 1, c: 3 });
     });
 
     it("forwards with only target route defaults (line 598)", () => {
-      router.forward("sign-in", "admin");
-      // No defaults for sign-in
-      getConfig(router).defaultParams.admin = { b: 2 };
+      // Add routes: source has no defaults, target has defaults
+      router.addRoute([
+        { name: "srcNoDefaults", path: "/src-no-defaults" },
+        {
+          name: "dstWithDefaults",
+          path: "/dst-with-defaults",
+          defaultParams: { b: 2 },
+        },
+      ]);
+      router.forward("srcNoDefaults", "dstWithDefaults");
 
-      const state = router.forwardState("sign-in", { c: 3 });
+      const state = router.forwardState("srcNoDefaults", { c: 3 });
 
-      expect(state.name).toBe("admin");
+      expect(state.name).toBe("dstWithDefaults");
       expect(state.params).toStrictEqual({ b: 2, c: 3 });
     });
 

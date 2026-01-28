@@ -3,7 +3,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { events } from "@real-router/core";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -90,33 +89,48 @@ describe("core/routes/clearRoutes", () => {
 
   describe("config cleanup", () => {
     it("should clear decoders", () => {
+      const decodeParams = vi.fn((params) => ({
+        ...params,
+        id: Number(params.id),
+      }));
+
       router.addRoute({
         name: "encoded",
         path: "/encoded/:id",
-        decodeParams: (params) => ({ ...params, id: Number(params.id) }),
+        decodeParams,
       });
 
-      expect(getConfig(router).decoders.encoded).toBeDefined();
+      // Verify decoder works before clear
+      expect(router.matchPath("/encoded/123")?.params.id).toBe(123);
 
       router.clearRoutes();
 
-      expect(getConfig(router).decoders.encoded).toBeUndefined();
-      expect(Object.keys(getConfig(router).decoders)).toHaveLength(0);
+      // Route no longer exists after clear
+      expect(router.hasRoute("encoded")).toBe(false);
+      expect(router.matchPath("/encoded/123")).toBeUndefined();
     });
 
     it("should clear encoders", () => {
+      const encodeParams = vi.fn((params) => ({
+        ...params,
+        id: `${params.id as number}`,
+      }));
+
       router.addRoute({
         name: "decoded",
         path: "/decoded/:id",
-        encodeParams: (params) => ({ ...params, id: `${params.id as number}` }),
+        encodeParams,
       });
 
-      expect(getConfig(router).encoders.decoded).toBeDefined();
+      // Verify encoder works before clear
+      router.buildPath("decoded", { id: 123 });
+
+      expect(encodeParams).toHaveBeenCalled();
 
       router.clearRoutes();
 
-      expect(getConfig(router).encoders.decoded).toBeUndefined();
-      expect(Object.keys(getConfig(router).encoders)).toHaveLength(0);
+      // Route no longer exists after clear
+      expect(router.hasRoute("decoded")).toBe(false);
     });
 
     it("should clear defaultParams", () => {
@@ -126,12 +140,16 @@ describe("core/routes/clearRoutes", () => {
         defaultParams: { page: 1, limit: 10 },
       });
 
-      expect(getConfig(router).defaultParams.withDefaults).toBeDefined();
+      // Verify defaults work before clear
+      expect(router.makeState("withDefaults").params).toStrictEqual({
+        page: 1,
+        limit: 10,
+      });
 
       router.clearRoutes();
 
-      expect(getConfig(router).defaultParams.withDefaults).toBeUndefined();
-      expect(Object.keys(getConfig(router).defaultParams)).toHaveLength(0);
+      // Route no longer exists after clear
+      expect(router.hasRoute("withDefaults")).toBe(false);
     });
 
     it("should clear forwardMap", () => {
@@ -142,12 +160,14 @@ describe("core/routes/clearRoutes", () => {
         forwardTo: "target",
       });
 
-      expect(getConfig(router).forwardMap.redirect).toBe("target");
+      // Verify forward works before clear
+      expect(router.forwardState("redirect", {}).name).toBe("target");
 
       router.clearRoutes();
 
-      expect(getConfig(router).forwardMap.redirect).toBeUndefined();
-      expect(Object.keys(getConfig(router).forwardMap)).toHaveLength(0);
+      // Routes no longer exist after clear
+      expect(router.hasRoute("redirect")).toBe(false);
+      expect(router.hasRoute("target")).toBe(false);
     });
   });
 

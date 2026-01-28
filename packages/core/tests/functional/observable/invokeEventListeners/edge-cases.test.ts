@@ -333,7 +333,7 @@ describe("invokeEventListeners - Edge cases", () => {
 
       const listener = vi.fn(
         (
-          _toState: State,
+          _toState: State | undefined,
           _fromState: State | undefined,
           receivedError?: RouterError,
         ) => {
@@ -777,11 +777,7 @@ describe("invokeEventListeners - Edge cases", () => {
 
     it("should accept undefined fromState (optional parameter)", () => {
       expect(() => {
-        router.invokeEventListeners(
-          events.TRANSITION_START,
-          validToState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_START, validToState);
       }).not.toThrowError();
     });
   });
@@ -796,11 +792,7 @@ describe("invokeEventListeners - Edge cases", () => {
       nullProtoState.params = {};
 
       expect(() => {
-        router.invokeEventListeners(
-          events.TRANSITION_START,
-          nullProtoState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_START, nullProtoState);
       }).not.toThrowError();
     });
 
@@ -814,11 +806,7 @@ describe("invokeEventListeners - Edge cases", () => {
       const listener = vi.fn();
 
       router.addEventListener(events.TRANSITION_START, listener);
-      router.invokeEventListeners(
-        events.TRANSITION_START,
-        nullProtoState,
-        undefined,
-      );
+      router.invokeEventListeners(events.TRANSITION_START, nullProtoState);
 
       expect(listener).toHaveBeenCalledTimes(1);
       // Verify the state was passed (may be cloned)
@@ -868,11 +856,7 @@ describe("invokeEventListeners - Edge cases", () => {
       });
 
       router.addEventListener(events.TRANSITION_START, listener);
-      router.invokeEventListeners(
-        events.TRANSITION_START,
-        nullProtoState,
-        undefined,
-      );
+      router.invokeEventListeners(events.TRANSITION_START, nullProtoState);
 
       expect(receivedState).toBeDefined();
       // State is passed through as-is (not frozen by invokeEventListeners)
@@ -891,11 +875,7 @@ describe("invokeEventListeners - Edge cases", () => {
       });
 
       expect(() => {
-        router.invokeEventListeners(
-          events.TRANSITION_START,
-          frozenState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_START, frozenState);
       }).not.toThrowError();
     });
 
@@ -931,11 +911,7 @@ describe("invokeEventListeners - Edge cases", () => {
       });
 
       router.addEventListener(events.TRANSITION_START, listener);
-      router.invokeEventListeners(
-        events.TRANSITION_START,
-        frozenState,
-        undefined,
-      );
+      router.invokeEventListeners(events.TRANSITION_START, frozenState);
 
       expect(receivedState).toBeDefined();
       // Should be the same object (no cloning)
@@ -962,11 +938,7 @@ describe("invokeEventListeners - Edge cases", () => {
       router.addEventListener(events.TRANSITION_START, listener);
 
       expect(() => {
-        router.invokeEventListeners(
-          events.TRANSITION_START,
-          deeplyFrozen,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_START, deeplyFrozen);
       }).not.toThrowError();
 
       expect(listener).toHaveBeenCalledTimes(1);
@@ -1139,11 +1111,7 @@ describe("invokeEventListeners - Edge cases", () => {
 
       // Proxy states now work - no structuredClone is called
       expect(() => {
-        router.invokeEventListeners(
-          events.TRANSITION_START,
-          proxyState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_START, proxyState);
       }).not.toThrowError();
 
       expect(listener).toHaveBeenCalledTimes(1);
@@ -1190,11 +1158,7 @@ describe("invokeEventListeners - Edge cases", () => {
       const listener = vi.fn();
 
       router.addEventListener(events.TRANSITION_START, listener);
-      router.invokeEventListeners(
-        events.TRANSITION_START,
-        proxyState,
-        undefined,
-      );
+      router.invokeEventListeners(events.TRANSITION_START, proxyState);
 
       // Listener should be called with the Proxy state
       expect(listener).toHaveBeenCalledTimes(1);

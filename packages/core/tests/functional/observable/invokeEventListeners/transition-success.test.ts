@@ -510,7 +510,6 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
             events.TRANSITION_SUCCESS,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 
@@ -550,7 +549,6 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
             events.TRANSITION_SUCCESS,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 
@@ -592,7 +590,6 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
             events.TRANSITION_SUCCESS,
             validToState,
             validFromState,
-            undefined,
           );
         }).toThrowError(TypeError);
       });
@@ -611,7 +608,6 @@ describe("invokeEventListeners - TRANSITION_SUCCESS event", () => {
             events.TRANSITION_SUCCESS,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 

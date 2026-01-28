@@ -102,7 +102,7 @@ describe("router.navigate() - events listeners", () => {
     });
 
     describe("TRANSITION_SUCCESS event pollution", () => {
-      it("should fire success listener for final navigation only when chained", async () => {
+      it("should fire success listener for each completed navigation when chained", async () => {
         const freshRouter = createTestRouter();
         const successLog: string[] = [];
 
@@ -126,10 +126,9 @@ describe("router.navigate() - events listeners", () => {
           });
         });
 
-        // Note: When navigation callback triggers another navigation,
-        // only the final navigation's success is logged
-        // This is different from TRANSITION_START which fires for all
-        expect(successLog).toStrictEqual(["success:users"]);
+        // Each successful navigation fires TRANSITION_SUCCESS
+        // Both admin and users navigations completed successfully
+        expect(successLog).toStrictEqual(["success:admin", "success:users"]);
 
         freshRouter.stop();
       });

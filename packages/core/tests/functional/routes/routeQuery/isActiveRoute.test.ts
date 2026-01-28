@@ -3,7 +3,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter } from "@real-router/core";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
 import type { Params, Router } from "@real-router/core";
@@ -210,8 +209,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("defaultParams in exact match", () => {
       it("should work without defaultParams (false branch coverage)", () => {
-        // home has no defaultParams configured
-        expect(getConfig(router).defaultParams.home).toBeUndefined();
+        // home route has no defaultParams - test isActiveRoute still works
         expect(router.isActiveRoute("home")).toBe(true);
       });
 
@@ -229,40 +227,52 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     });
 
     describe("defaultParams in hierarchical check", () => {
-      it("should use defaultParams when checking parent route", () => {
-        // Set defaultParams for parent route
-        getConfig(router).defaultParams.users = { filter: "active" };
+      beforeEach(() => {
+        // Add a parent route with defaultParams and a child route
+        router.addRoute({
+          name: "usersWithDefaults",
+          path: "/users-with-defaults",
+          defaultParams: { filter: "active" },
+          children: [{ name: "view", path: "/view/:id" }],
+        });
+      });
 
+      it("should use defaultParams when checking parent route", () => {
         // Navigate to child route with matching params
-        router.navigate("users.view", { id: "123", filter: "active" });
+        router.navigate("usersWithDefaults.view", {
+          id: "123",
+          filter: "active",
+        });
 
         // Parent with matching defaultParams should be active
-        expect(router.isActiveRoute("users")).toBe(true);
+        expect(router.isActiveRoute("usersWithDefaults")).toBe(true);
       });
 
       it("should return false when defaultParams do not match active state", () => {
-        // Set defaultParams for parent route
-        getConfig(router).defaultParams.users = { filter: "active" };
-
         // Navigate to child route with different params
-        router.navigate("users.view", { id: "123", filter: "inactive" });
+        router.navigate("usersWithDefaults.view", {
+          id: "123",
+          filter: "inactive",
+        });
 
         // Parent with non-matching defaultParams should not be active
-        expect(router.isActiveRoute("users")).toBe(false);
+        expect(router.isActiveRoute("usersWithDefaults")).toBe(false);
       });
 
       it("should prefer provided params over defaultParams", () => {
-        // Set defaultParams for parent route
-        getConfig(router).defaultParams.users = { filter: "active" };
-
         // Navigate to child route with different filter
-        router.navigate("users.view", { id: "123", filter: "inactive" });
+        router.navigate("usersWithDefaults.view", {
+          id: "123",
+          filter: "inactive",
+        });
 
         // Providing explicit params should override defaultParams
-        expect(router.isActiveRoute("users", { filter: "inactive" })).toBe(
-          true,
-        );
-        expect(router.isActiveRoute("users", { filter: "active" })).toBe(false);
+        expect(
+          router.isActiveRoute("usersWithDefaults", { filter: "inactive" }),
+        ).toBe(true);
+        expect(
+          router.isActiveRoute("usersWithDefaults", { filter: "active" }),
+        ).toBe(false);
       });
     });
 
@@ -484,44 +494,54 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     });
 
     describe("defaultParams interaction with undefined", () => {
-      it("should allow undefined to override defaultParams", () => {
-        // Set defaultParams for users route
-        getConfig(router).defaultParams.users = { filter: "active" };
+      beforeEach(() => {
+        // Add a parent route with defaultParams and a child route
+        router.addRoute({
+          name: "usersFiltered",
+          path: "/users-filtered",
+          defaultParams: { filter: "active" },
+          children: [{ name: "view", path: "/view/:id" }],
+        });
+      });
 
+      it("should allow undefined to override defaultParams", () => {
         // Navigate with the default filter
-        router.navigate("users.view", { id: "123", filter: "active" });
+        router.navigate("usersFiltered.view", { id: "123", filter: "active" });
 
         // Passing undefined for filter overrides the default
         // effectiveParams = { ...{filter: "active"}, ...{filter: undefined} }
         // = { filter: undefined }
         // Then undefined !== "active" → false
         expect(
-          router.isActiveRoute("users", { filter: undefined } as unknown as {
+          router.isActiveRoute("usersFiltered", {
+            filter: undefined,
+          } as unknown as {
             filter: string;
           }),
         ).toBe(false);
       });
 
       it("should use defaultParams when param is not provided", () => {
-        getConfig(router).defaultParams.users = { filter: "active" };
-
-        router.navigate("users.view", { id: "123", filter: "active" });
+        router.navigate("usersFiltered.view", { id: "123", filter: "active" });
 
         // Empty params → effectiveParams = { filter: "active" }
         // Matches activeState.params.filter = "active"
-        expect(router.isActiveRoute("users", {})).toBe(true);
+        expect(router.isActiveRoute("usersFiltered", {})).toBe(true);
       });
 
       it("should use provided params over defaultParams", () => {
-        getConfig(router).defaultParams.users = { filter: "active" };
-
-        router.navigate("users.view", { id: "123", filter: "inactive" });
+        router.navigate("usersFiltered.view", {
+          id: "123",
+          filter: "inactive",
+        });
 
         // Explicit filter overrides default
-        expect(router.isActiveRoute("users", { filter: "inactive" })).toBe(
-          true,
-        );
-        expect(router.isActiveRoute("users", { filter: "active" })).toBe(false);
+        expect(
+          router.isActiveRoute("usersFiltered", { filter: "inactive" }),
+        ).toBe(true);
+        expect(
+          router.isActiveRoute("usersFiltered", { filter: "active" }),
+        ).toBe(false);
       });
     });
   });

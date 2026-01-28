@@ -4,7 +4,7 @@ import { constants, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { DoneFn, Router } from "@real-router/core";
 
 let router: Router;
 
@@ -131,7 +131,7 @@ describe("router.start() - edge cases", () => {
       // This will throw DataCloneError due to function properties
       // but we're testing that valueOf/toString aren't called during isState validation
       try {
-        router.start(stateWithOverrides, vi.fn());
+        router.start(stateWithOverrides, vi.fn() as DoneFn);
       } catch {
         // Expected: DataCloneError from structuredClone
       }
@@ -340,7 +340,6 @@ describe("router.start() - edge cases", () => {
   });
 
   describe("Async callback returning Promise", () => {
-    /* eslint-disable @typescript-eslint/no-misused-promises -- testing edge case of Promise-returning callback */
     it("should work with async callback (rejected promise not caught)", () => {
       const asyncCallback = vi.fn(() => {
         return Promise.reject(new Error("Async error"));
@@ -354,7 +353,6 @@ describe("router.start() - edge cases", () => {
       expect(asyncCallback).toHaveBeenCalled();
       expect(router.isStarted()).toBe(true);
     });
-    /* eslint-enable @typescript-eslint/no-misused-promises */
   });
 
   describe("Empty string as path", () => {

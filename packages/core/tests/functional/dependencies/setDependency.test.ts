@@ -49,23 +49,22 @@ describe("core/dependencies/setDependency", () => {
     expect(router.hasDependency("newKey" as "foo")).toBe(false);
   });
 
-  it("should not throw for invalid key when value is undefined", () => {
-    // undefined check happens BEFORE key validation - this is a design decision
-    // to support: setDependency(key, condition ? value : undefined)
+  it("should throw TypeError for invalid key even when value is undefined", () => {
+    // Key validation happens BEFORE undefined check - consistent validation
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       router.setDependency(null, undefined);
-    }).not.toThrowError();
+    }).toThrowError(TypeError);
 
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       router.setDependency(123, undefined);
-    }).not.toThrowError();
+    }).toThrowError(TypeError);
 
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       router.setDependency({}, undefined);
-    }).not.toThrowError();
+    }).toThrowError(TypeError);
   });
 
   it("should allow conditional setup with undefined", () => {

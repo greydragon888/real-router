@@ -224,7 +224,6 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
             events.TRANSITION_ERROR,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
       });
@@ -245,7 +244,6 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
             events.TRANSITION_ERROR,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 
@@ -269,7 +267,6 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
             events.TRANSITION_ERROR,
             toState,
             fromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 
@@ -353,7 +350,6 @@ describe("invokeEventListeners - TRANSITION_ERROR event", () => {
             events.TRANSITION_ERROR,
             validToState,
             validFromState,
-            undefined,
           );
         }).toThrowError(TypeError);
 

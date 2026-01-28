@@ -6,19 +6,22 @@ import type { BuildOptions, TrailingSlashMode } from "route-tree";
 export { getTypeDescription } from "type-guards";
 
 // =============================================================================
-// State Helpers (migrated from router-error)
+// State Helpers
 // =============================================================================
 
 /**
- * Simple type guard for State object structure.
- * Checks for required fields: name, params, path.
+ * Structural type guard for State object.
+ * Only checks required fields exist with correct types.
+ * Does NOT validate params serializability (allows circular refs).
+ *
+ * Use `isState` from type-guards for full validation (serializable params).
+ * Use this for internal operations like deepFreezeState that handle any object structure.
  *
  * @param value - Value to check
  * @returns true if value has State structure
  * @internal
  */
-function isState(value: unknown): value is State {
-  // Check null first to avoid type narrowing issues (typeof null === "object" in JS)
+function isStateStructural(value: unknown): value is State {
   if (value === null || typeof value !== "object") {
     return false;
   }
@@ -55,8 +58,8 @@ export function deepFreezeState<T extends State>(state: T): T {
     return state;
   }
 
-  // Validate State structure
-  if (!isState(state)) {
+  // Validate State structure (structural check, allows circular refs)
+  if (!isStateStructural(state)) {
     throw new TypeError(
       `[deepFreezeState] Expected valid State object, got: ${typeof state}`,
     );

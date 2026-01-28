@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
-import { makeError } from "../../../src/transition/makeError";
+import { makeError } from "../../../src/namespaces/NavigationNamespace/transition/makeError";
 
 describe("transition/makeError", () => {
   describe("makeError", () => {

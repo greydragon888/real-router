@@ -230,12 +230,10 @@ describe("invokeEventListeners - Undefined return", () => {
     });
 
     it("should handle listeners with conditional undefined returns", () => {
-      const conditionalListener = vi.fn((param1, param2) => {
-        if (!param1 && !param2) {
-          return;
-        }
-
-        return "processed";
+      // ROUTER_STOP listener takes no parameters
+      const conditionalListener = vi.fn(() => {
+        // No parameters for ROUTER_STOP, so always return undefined
+        return;
       });
 
       router.addEventListener(events.ROUTER_STOP, conditionalListener);

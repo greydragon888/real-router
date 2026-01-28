@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { getConfig } from "../../../../src/internals";
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, Params } from "@real-router/types";
+import type { Router } from "@real-router/core";
 
 describe("router.clone()", () => {
   it("should share the route tree with original router", () => {
@@ -77,10 +76,21 @@ describe("router.clone()", () => {
 
   it("should clone config by value", () => {
     const router = createTestRouter();
+
+    // Add some config to verify
+    router.addRoute({
+      name: "cloneTest",
+      path: "/clone-test/:id",
+      defaultParams: { id: "default" },
+    });
+
     const clonedRouter = router.clone();
 
-    expect(getConfig(clonedRouter)).toStrictEqual(getConfig(router));
-    expect(getConfig(clonedRouter)).not.toBe(getConfig(router));
+    // Clone has same routes and behavior as original
+    expect(clonedRouter.hasRoute("cloneTest")).toBe(true);
+    expect(clonedRouter.makeState("cloneTest").params).toStrictEqual({
+      id: "default",
+    });
   });
 
   it("should make independent router clone: plugins", () => {
@@ -140,42 +150,116 @@ describe("router.clone()", () => {
   it("should clone config independently (deep copy)", () => {
     const router = createTestRouter();
 
-    getConfig(router).forwardMap.test = "value";
+    router.addRoute({ name: "original", path: "/original" });
+    router.addRoute({ name: "redirectTarget", path: "/redirect-target" });
+    router.forward("original", "redirectTarget");
 
     const clonedRouter = router.clone();
 
-    getConfig(clonedRouter).forwardMap.test = "modified";
+    // Clone inherits forward rules from original
+    expect(clonedRouter.forwardState("original", {}).name).toBe(
+      "redirectTarget",
+    );
 
-    expect(getConfig(router).forwardMap.test).toBe("value");
-    expect(getConfig(clonedRouter).forwardMap.test).toBe("modified");
+    // Modify cloned router's forward rules
+    clonedRouter.addRoute({ name: "newTarget", path: "/new-target" });
+    clonedRouter.forward("original", "newTarget");
+
+    // Original should NOT be affected
+    expect(router.forwardState("original", {}).name).toBe("redirectTarget");
+    // Clone uses new forward rule
+    expect(clonedRouter.forwardState("original", {}).name).toBe("newTarget");
   });
 
   it("should deep clone defaultParams (nested objects are independent)", () => {
     const router = createTestRouter();
 
-    // Set nested object in defaultParams
-    getConfig(router).defaultParams.users = { page: 1, sort: "name" };
+    // Add route with defaultParams
+    router.addRoute({
+      name: "paginated",
+      path: "/paginated",
+      defaultParams: { page: 1, sort: "name" },
+    });
 
     const clonedRouter = router.clone();
 
-    // Verify nested object is a different reference
-    expect(getConfig(clonedRouter).defaultParams.users).not.toBe(
-      getConfig(router).defaultParams.users,
-    );
+    // Both have same defaults initially
+    expect(router.makeState("paginated").params).toStrictEqual({
+      page: 1,
+      sort: "name",
+    });
+    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+      page: 1,
+      sort: "name",
+    });
 
-    // Mutate nested object in clone
-    (
-      getConfig(clonedRouter).defaultParams.users as Record<string, unknown>
-    ).page = 2;
+    // Update clone's route with different defaults
+    clonedRouter.updateRoute("paginated", {
+      defaultParams: { page: 2, sort: "name" },
+    });
 
     // Original should NOT be affected
-    expect(
-      (getConfig(router).defaultParams.users as Record<string, unknown>).page,
-    ).toBe(1);
-    expect(
-      (getConfig(clonedRouter).defaultParams.users as Record<string, unknown>)
-        .page,
-    ).toBe(2);
+    expect(router.makeState("paginated").params).toStrictEqual({
+      page: 1,
+      sort: "name",
+    });
+    // Clone has updated defaults
+    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+      page: 2,
+      sort: "name",
+    });
+  });
+
+  // ============================================
+  // Argument validation
+  // ============================================
+
+  describe("argument validation", () => {
+    it("should throw TypeError for invalid dependencies (array)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone([] as never)).toThrowError(TypeError);
+      expect(() => router.clone([] as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for invalid dependencies (null)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone(null as never)).toThrowError(TypeError);
+      expect(() => router.clone(null as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for invalid dependencies (primitive)", () => {
+      const router = createTestRouter();
+
+      expect(() => router.clone("string" as never)).toThrowError(TypeError);
+      expect(() => router.clone(123 as never)).toThrowError(
+        /Invalid dependencies/,
+      );
+    });
+
+    it("should throw TypeError for dependencies with getters", () => {
+      const router = createTestRouter();
+      const depsWithGetter = {};
+
+      Object.defineProperty(depsWithGetter, "foo", {
+        get() {
+          return "bar";
+        },
+        enumerable: true,
+      });
+
+      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+        TypeError,
+      );
+      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+        /Getters not allowed/,
+      );
+    });
   });
 
   // ============================================
@@ -235,61 +319,64 @@ describe("router.clone()", () => {
       // createTestRouter has withEncoder route with encodeParams/decodeParams
       const clonedRouter = router.clone();
 
-      // Config objects should be cloned (not same reference)
-      expect(getConfig(clonedRouter).decoders).not.toBe(
-        getConfig(router).decoders,
-      );
-      expect(getConfig(clonedRouter).encoders).not.toBe(
-        getConfig(router).encoders,
-      );
-      expect(getConfig(clonedRouter).defaultParams).not.toBe(
-        getConfig(router).defaultParams,
-      );
-      expect(getConfig(clonedRouter).forwardMap).not.toBe(
-        getConfig(router).forwardMap,
-      );
+      // Both routers should have same routes
+      expect(router.hasRoute("withEncoder")).toBe(true);
+      expect(clonedRouter.hasRoute("withEncoder")).toBe(true);
 
-      // But should have same content
-      expect(Object.keys(getConfig(clonedRouter).decoders)).toStrictEqual(
-        Object.keys(getConfig(router).decoders),
-      );
-      expect(Object.keys(getConfig(clonedRouter).encoders)).toStrictEqual(
-        Object.keys(getConfig(router).encoders),
-      );
+      // Both should apply same encoding/decoding behavior
+      const encodedPath = router.buildPath("withEncoder", {
+        one: "a",
+        two: "b",
+      });
+      const clonedEncodedPath = clonedRouter.buildPath("withEncoder", {
+        one: "a",
+        two: "b",
+      });
+
+      expect(encodedPath).toBe(clonedEncodedPath);
     });
 
     it("should clone router with complex config", () => {
       const router = createTestRouter();
-      const decoder = (params: Params): Params => params;
-      const encoder = (params: Params): Params => params;
 
-      getConfig(router).decoders.userId = decoder;
-      getConfig(router).encoders.userId = encoder;
-      getConfig(router).defaultParams.users = { page: 1 };
-      getConfig(router).forwardMap.oldRoute = "newRoute";
+      // Add routes with encoders, decoders, defaultParams, and forwards via API
+      router.addRoute({
+        name: "complexRoute",
+        path: "/complex/:id",
+        decodeParams: (params) => ({ ...params, decoded: true }),
+        encodeParams: (params) => ({ ...params, encoded: true }),
+        defaultParams: { id: "default", page: 1 },
+      });
+      router.addRoute({ name: "targetRoute", path: "/target" });
+      router.forward("complexRoute", "targetRoute");
 
       const clonedRouter = router.clone();
 
-      // Functions are copied by reference
-      expect(getConfig(clonedRouter).decoders.userId).toBe(decoder);
-      expect(getConfig(clonedRouter).encoders.userId).toBe(encoder);
+      // Clone should have same behavior
+      expect(clonedRouter.hasRoute("complexRoute")).toBe(true);
+      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+        id: "default",
+        page: 1,
+      });
+      expect(
+        clonedRouter.forwardState("complexRoute", { id: "1", page: 1 }).name,
+      ).toBe("targetRoute");
 
-      // Objects are copied - top level is new object
-      expect(getConfig(clonedRouter).defaultParams).not.toBe(
-        getConfig(router).defaultParams,
-      );
-      expect(getConfig(clonedRouter).forwardMap).not.toBe(
-        getConfig(router).forwardMap,
-      );
+      // Modify clone
+      clonedRouter.updateRoute("complexRoute", {
+        defaultParams: { id: "default", page: 2 },
+      });
 
-      // Nested objects in defaultParams are deep cloned (independent)
-      expect(getConfig(clonedRouter).defaultParams.users).not.toBe(
-        getConfig(router).defaultParams.users,
-      );
-      // But have the same values
-      expect(getConfig(clonedRouter).defaultParams.users).toStrictEqual(
-        getConfig(router).defaultParams.users,
-      );
+      // Original should NOT be affected
+      expect(router.makeState("complexRoute").params).toStrictEqual({
+        id: "default",
+        page: 1,
+      });
+      // Clone has updated defaults
+      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+        id: "default",
+        page: 2,
+      });
     });
 
     it("should clone multiple middleware in correct order", () => {

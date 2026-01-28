@@ -29,6 +29,9 @@ describe("core/route-lifecycle/canActivate", () => {
   });
 
   it("should block navigation if route cannot be activated", () => {
+    // Set up canActivate guard to block admin route
+    router.canActivate("admin", false);
+
     router.navigate("home");
 
     router.navigate("admin", (err) => {
@@ -311,6 +314,10 @@ describe("core/route-lifecycle/canActivate", () => {
       let receivedRouter: unknown;
       let receivedGetDependency: unknown;
 
+      // Set up a test dependency
+      // @ts-expect-error: testing with custom dependency
+      router.setDependency("testValue", "hello");
+
       router.canActivate("testRoute", (r, getDep) => {
         receivedRouter = r;
         receivedGetDependency = getDep;
@@ -319,7 +326,10 @@ describe("core/route-lifecycle/canActivate", () => {
       });
 
       expect(receivedRouter).toBe(router);
-      expect(receivedGetDependency).toBe(router.getDependency);
+      // Check behavior: getDependency should work correctly
+      expect(typeof receivedGetDependency).toBe("function");
+      // @ts-expect-error: testing function call
+      expect(receivedGetDependency("testValue")).toBe("hello");
     });
 
     it("should allow factory to access dependencies via getDependency", () => {

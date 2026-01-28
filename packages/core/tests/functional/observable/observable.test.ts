@@ -75,7 +75,6 @@ describe("core/observable", () => {
             events.TRANSITION_ERROR,
             { name: "a" } as any,
             { name: "b" } as any,
-            undefined,
           );
         }).toThrowError(TypeError);
         expect(() => {
@@ -83,7 +82,6 @@ describe("core/observable", () => {
             events.TRANSITION_SUCCESS,
             { name: "a" } as any,
             { name: "b" } as any,
-            undefined,
           );
         }).toThrowError(TypeError);
       });
