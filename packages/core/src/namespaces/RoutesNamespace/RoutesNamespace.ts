@@ -31,8 +31,8 @@ import {
   validateForwardToTargets,
   validateRouteProperties,
 } from "./helpers";
+import { createRouteState } from "./stateBuilder";
 import { constants } from "../../constants";
-import { createRouteState } from "../../core/stateBuilder";
 import { createBuildOptions } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -40,6 +40,7 @@ import type { RouteConfig } from "./types";
 import type { Router } from "../../Router";
 import type {
   ActivationFnFactory,
+  BuildStateResultWithSegments,
   Route,
   RouteConfigUpdate,
 } from "../../types";
@@ -50,7 +51,12 @@ import type {
   Params,
   State,
 } from "@real-router/types";
-import type { BuildOptions, RouteDefinition, RouteTree } from "route-tree";
+import type {
+  BuildOptions,
+  RouteDefinition,
+  RouteTree,
+  RouteTreeState,
+} from "route-tree";
 
 /**
  * Independent namespace for managing routes.
@@ -406,7 +412,10 @@ export class RoutesNamespace<
 
   /**
    * Returns the route tree.
+   *
+   * @internal Used for advanced introspection. Prefer specific methods.
    */
+  /* v8 ignore next -- @preserve @internal method, tested implicitly via buildState/matchPath */
   getTree(): RouteTree {
     return this.#tree;
   }
@@ -715,6 +724,47 @@ export class RoutesNamespace<
   }
 
   /**
+   * Builds a RouteTreeState from already-resolved route name and params.
+   * Called by Router.buildState after forwardState is applied at facade level.
+   * This allows plugins to intercept forwardState.
+   */
+  buildStateResolved(
+    resolvedName: string,
+    resolvedParams: Params,
+  ): RouteTreeState | undefined {
+    const segments = getSegmentsByName(this.#tree, resolvedName);
+
+    if (!segments) {
+      return undefined;
+    }
+
+    return createRouteState({ segments, params: resolvedParams }, resolvedName);
+  }
+
+  /**
+   * Builds a RouteTreeState with segments from already-resolved route name and params.
+   * Called by Router.buildStateWithSegments after forwardState is applied at facade level.
+   * This allows plugins to intercept forwardState.
+   */
+  buildStateWithSegmentsResolved<P extends Params = Params>(
+    resolvedName: string,
+    resolvedParams: P,
+  ): BuildStateResultWithSegments<P> | undefined {
+    const segments = getSegmentsByName(this.#tree, resolvedName);
+
+    if (!segments) {
+      return undefined;
+    }
+
+    const state = createRouteState<P>(
+      { segments, params: resolvedParams },
+      resolvedName,
+    );
+
+    return { state, segments };
+  }
+
+  /**
    * Initializes buildOptions cache.
    * Called from routerLifecycle at router.start().
    */
@@ -853,6 +903,20 @@ export class RoutesNamespace<
    */
   getConfig(): RouteConfig {
     return this.#config;
+  }
+
+  /**
+   * Returns URL params for a route.
+   * Used by StateNamespace.
+   */
+  getUrlParams(name: string): string[] {
+    const segments = getSegmentsByName(this.#tree, name);
+
+    if (!segments) {
+      return [];
+    }
+
+    return this.#collectUrlParamsArray(segments);
   }
 
   /**

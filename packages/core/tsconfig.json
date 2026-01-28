@@ -1,18 +1,6 @@
 {
   "extends": "../../tsconfig.json",
   "include": ["src", "tests"],
-  "exclude": [
-    "src/core/routes",
-    "src/core/state.ts",
-    "src/core/dependencies.ts",
-    "src/core/middleware.ts",
-    "src/core/navigation.ts",
-    "src/core/observable.ts",
-    "src/core/options.ts",
-    "src/core/plugins.ts",
-    "src/core/routeLifecycle.ts",
-    "src/core/routerLifecycle.ts"
-  ],
   "references": [
     { "path": "./tsconfig.node.json" }
   ]

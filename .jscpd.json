@@ -14,8 +14,7 @@
     "**/*.test.ts",
     "**/*.test.tsx",
     "**/*.bench.ts",
-    "**/*.spec.ts",
-    "**/packages/core/src/core/**"
+    "**/*.spec.ts"
   ],
   "format": ["typescript", "tsx"],
   "absolute": false,

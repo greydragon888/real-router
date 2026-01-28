@@ -239,6 +239,7 @@ Set up route forwarding (redirect).\
 `toRoute: string` — target route name\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/forward)
+
 ---
 
 ### State Utilities
@@ -266,11 +267,29 @@ Build state from route name.\
 `params?: Params` — route parameters\
 Returns: `State | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/buildState)
+#### `router.buildStateWithSegments(name: string, params?: Params): { state: State; segments: RouteSegment[] } | undefined`
+Build state with route segments for advanced use cases.\
+`name: string` — route name\
+`params?: Params` — route parameters\
+Returns: `{ state, segments } | undefined`\
+[Wiki](https://github.com/greydragon888/real-router/wiki/buildStateWithSegments)
+#### `router.forwardState(name: string, params: Params): { name: string; params: Params }`
+Resolve route forwarding and merge default params.\
+`name: string` — route name\
+`params: Params` — route parameters\
+Returns: `{ name, params }` — resolved route name and merged params\
+[Wiki](https://github.com/greydragon888/real-router/wiki/forwardState)
+#### `router.shouldUpdateNode(nodeName: string): (toState, fromState?) => boolean`
+Create a predicate to check if a route node should update during transition.\
+`nodeName: string` — route node name\
+Returns: predicate function\
+[Wiki](https://github.com/greydragon888/real-router/wiki/shouldUpdateNode)
 #### `router.areStatesEqual(state1: State, state2: State, ignoreQueryParams?: boolean): boolean`
 Compare two states for equality.\
 `state1: State` — first state\
 `state2: State` — second state\
-`ignoreQueryParams?: boolean` — ignore query params (default: true)Returns: `boolean`\
+`ignoreQueryParams?: boolean` — ignore query params (default: true)\
+Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/areStatesEqual)
 #### `router.areStatesDescendants(parentState: State, childState: State): boolean`
 Check if child state is descendant of parent.\
@@ -278,6 +297,7 @@ Check if child state is descendant of parent.\
 `childState: State` — child state\
 Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/areStatesDescendants)
+
 ---
 
 ### Path Operations
@@ -297,7 +317,9 @@ Returns: `State | undefined`\
 Check if route is currently active.\
 `name: string` — route name\
 `params?: Params` — route parameters\
-`strictEquality?: boolean` — exact match (default: false)`ignoreQueryParams?: boolean` — ignore query params (default: true)Returns: `boolean`\
+`strictEquality?: boolean` — exact match (default: false)\
+`ignoreQueryParams?: boolean` — ignore query params (default: true)\
+Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/isActiveRoute)
 #### `router.setRootPath(rootPath: string): void`
 Set root path prefix for all routes.\
@@ -308,6 +330,7 @@ Returns: `void`\
 Get root path prefix.\
 Returns: `string`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getRootPath)
+
 ---
 
 ### Dependencies
@@ -346,20 +369,27 @@ Returns: `void`\
 Remove all dependencies.\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/resetDependencies)
+
 ---
 
 ### Options
 
 #### `router.getOptions(): Options`
-Get router options.\
+Get all router options.\
 Returns: `Options`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getOptions)
+#### `router.getOption(name: keyof Options): unknown`
+Get a single router option by name.\
+`name: keyof Options` — option name\
+Returns: option value\
+[Wiki](https://github.com/greydragon888/real-router/wiki/getOption)
 #### `router.setOption(name: string, value: unknown): void`
 Set a router option. Must be called before `start()`.\
 `name: string` — option name\
 `value: unknown` — option value\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/setOption)
+
 ---
 
 ### Other
@@ -373,12 +403,8 @@ Returns: `Router`\
 Check if navigation is in progress.\
 Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/isNavigating)
-#### `router.isActive(name: string, params?: Params, strictEquality?: boolean, ignoreQueryParams?: boolean): boolean`
-Alias for `isActiveRoute`.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`strictEquality?: boolean` — exact match\
-`ignoreQueryParams?: boolean` — ignore query params\
+#### `router.isActive(): boolean`
+Check if router is active (started and has current state).\
 Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/isActive)
 #### `router.clearCanActivate(name: string): void`
@@ -401,6 +427,7 @@ Remove event listener.\
 `listener: Function` — listener to remove\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/removeEventListener)
+
 ---
 
 ## Configuration

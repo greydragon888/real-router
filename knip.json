@@ -25,7 +25,7 @@
     }
   },
   "ignoreWorkspaces": [],
-  "ignore": ["dist/**", "coverage/**", "**/*.d.ts", "packages/core/src/core/**"],
+  "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
   "ignoreDependencies": [
     "@real-router/logger",
     "@real-router/types",

@@ -3,15 +3,12 @@
 /**
  * Router class - facade with integrated namespaces.
  *
- * This is Phase 5 of RFC-1 "Fort Knox" architecture.
  * All functionality is now provided by namespace classes.
  */
 
 import { logger } from "@real-router/logger";
-import { getSegmentsByName } from "route-tree";
 import { validateRouteName, validateState } from "type-guards";
 
-import { createRouteState } from "./core/stateBuilder";
 import {
   CloneNamespace,
   DependenciesNamespace,
@@ -521,14 +518,10 @@ export class Router<
       "buildState",
     );
 
+    // Call forwardState at facade level to allow plugin interception
     const { name, params } = this.forwardState(routeName, routeParams);
-    const segments = getSegmentsByName(this.#routes.getTree(), name);
 
-    if (!segments) {
-      return undefined;
-    }
-
-    return createRouteState({ segments, params }, name);
+    return this.#routes.buildStateResolved(name, params);
   }
 
   buildStateWithSegments<P extends Params = Params>(
@@ -541,16 +534,10 @@ export class Router<
       "buildStateWithSegments",
     );
 
-    const { name, params } = this.forwardState(routeName, routeParams);
-    const segments = getSegmentsByName(this.#routes.getTree(), name);
+    // Call forwardState at facade level to allow plugin interception
+    const { name, params } = this.forwardState<P>(routeName, routeParams);
 
-    if (!segments) {
-      return undefined;
-    }
-
-    const state = createRouteState<P>({ segments, params }, name);
-
-    return { state, segments };
+    return this.#routes.buildStateWithSegmentsResolved(name, params);
   }
 
   shouldUpdateNode(
@@ -948,17 +935,7 @@ export class Router<
       getDefaultParams: () => this.#routes.getConfig().defaultParams,
       buildPath: (name, params) =>
         this.#routes.buildPath(name, params, this.#options.get()),
-      getUrlParams: (name) => {
-        const segments = getSegmentsByName(this.#routes.getTree(), name);
-
-        if (!segments) {
-          return [];
-        }
-
-        // Named routes always have parsers (null only for root without path)
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
-        return segments.flatMap((segment) => segment.parser!.urlParams);
-      },
+      getUrlParams: (name) => this.#routes.getUrlParams(name),
     });
 
     // =========================================================================

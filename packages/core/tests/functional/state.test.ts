@@ -7,7 +7,7 @@ import { constants } from "@real-router/core";
 import {
   buildNameFromSegments,
   createRouteState,
-} from "../../src/core/stateBuilder";
+} from "../../src/namespaces/RoutesNamespace/stateBuilder";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -49,11 +49,11 @@ describe("core/state", () => {
       expect(router.getState()).toStrictEqual(state);
     });
 
-    it("clears state when undefined is passed", () => {
+    it("clears state when called without argument", () => {
       const state = router.makeState("home", {}, "/home");
 
       router.setState(state);
-      router.setState(undefined);
+      router.setState();
 
       expect(router.getState()).toBe(undefined);
     });
