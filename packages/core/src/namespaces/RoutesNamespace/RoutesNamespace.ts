@@ -11,12 +11,7 @@ import {
   routeTreeToDefinitions,
   validateRoute,
 } from "route-tree";
-import {
-  isString,
-  validateRouteName,
-  isParams,
-  getTypeDescription,
-} from "type-guards";
+import { isString, validateRouteName } from "type-guards";
 
 import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
 import {
@@ -29,9 +24,21 @@ import {
   resolveForwardChain,
   sanitizeRoute,
   validateForwardToTargets,
-  validateRouteProperties,
 } from "./helpers";
 import { createRouteState } from "./stateBuilder";
+import {
+  validateRemoveRouteArgs,
+  validateSetRootPathArgs,
+  validateAddRouteArgs,
+  validateIsActiveRouteArgs,
+  validateForwardArgs,
+  validateStateBuilderArgs,
+  validateUpdateRouteBasicArgs,
+  validateUpdateRoutePropertyTypes,
+  validateBuildPathArgs,
+  validateMatchPathArgs,
+  validateShouldUpdateNodeArgs,
+} from "./validators";
 import { constants } from "../../constants";
 import { createBuildOptions } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
@@ -67,6 +74,10 @@ import type {
 export class RoutesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
+  // =========================================================================
+  // Private instance fields
+  // =========================================================================
+
   readonly #definitions: RouteDefinition[] = [];
   readonly #config: RouteConfig = createEmptyConfig();
   readonly #resolvedForwardMap: Record<string, string> = Object.create(
@@ -90,6 +101,10 @@ export class RoutesNamespace<
   // Lifecycle handlers reference (set after construction)
   #lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
 
+  // =========================================================================
+  // Constructor
+  // =========================================================================
+
   constructor(routes: Route<Dependencies>[] = []) {
     // Sanitize routes to store only essential properties
     for (const route of routes) {
@@ -112,269 +127,82 @@ export class RoutesNamespace<
   }
 
   // =========================================================================
-  // Static validation methods (called by facade before instance methods)
+  // Static validation methods (delegated to validators.ts)
+  // TypeScript requires explicit method declarations for assertion functions
   // =========================================================================
 
-  /**
-   * Validates removeRoute arguments.
-   */
   static validateRemoveRouteArgs(name: unknown): asserts name is string {
-    validateRouteName(name, "removeRoute");
+    validateRemoveRouteArgs(name);
   }
 
-  /**
-   * Validates setRootPath arguments.
-   */
   static validateSetRootPathArgs(
     rootPath: unknown,
   ): asserts rootPath is string {
-    if (typeof rootPath !== "string") {
-      throw new TypeError(
-        `[router.setRootPath] rootPath must be a string, got ${getTypeDescription(rootPath)}`,
-      );
-    }
+    validateSetRootPathArgs(rootPath);
   }
 
-  /**
-   * Validates addRoute arguments (route structure and properties).
-   * State-dependent validation (duplicates, tree) happens in instance method.
-   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
   static validateAddRouteArgs(routes: readonly Route<any>[]): void {
-    for (const route of routes) {
-      // First check if route is an object (before accessing route.name)
-      // Runtime check for invalid types passed via `as any`
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check
-      if (route === null || typeof route !== "object" || Array.isArray(route)) {
-        throw new TypeError(
-          `[router.addRoute] Route must be an object, got ${getTypeDescription(route)}`,
-        );
-      }
-
-      // Validate route properties (canActivate, canDeactivate, defaultParams, async checks)
-      // Note: validateRouteProperties handles children recursively
-      validateRouteProperties(route, route.name);
-    }
+    validateAddRouteArgs(routes);
   }
 
-  /**
-   * Validates isActiveRoute arguments.
-   */
   static validateIsActiveRouteArgs(
     name: unknown,
     params: unknown,
     strictEquality: unknown,
     ignoreQueryParams: unknown,
   ): void {
-    // Validate name - non-string throws
-    if (!isString(name)) {
-      throw new TypeError(`Route name must be a string`);
-    }
-
-    // Validate params if provided
-    if (params !== undefined && !isParams(params)) {
-      throw new TypeError(`[router.isActiveRoute] Invalid params structure`);
-    }
-
-    // Validate strictEquality if provided
-    if (strictEquality !== undefined && typeof strictEquality !== "boolean") {
-      throw new TypeError(
-        `[router.isActiveRoute] strictEquality must be a boolean, got ${typeof strictEquality}`,
-      );
-    }
-
-    // Validate ignoreQueryParams if provided
-    if (
-      ignoreQueryParams !== undefined &&
-      typeof ignoreQueryParams !== "boolean"
-    ) {
-      throw new TypeError(
-        `[router.isActiveRoute] ignoreQueryParams must be a boolean, got ${typeof ignoreQueryParams}`,
-      );
-    }
+    validateIsActiveRouteArgs(name, params, strictEquality, ignoreQueryParams);
   }
 
-  /**
-   * Validates forward() arguments.
-   */
   static validateForwardArgs(
     fromRoute: unknown,
     toRoute: unknown,
   ): asserts fromRoute is string {
-    if (!isString(fromRoute) || fromRoute === "") {
-      throw new TypeError(
-        `[router.forward] Invalid fromRoute: ${getTypeDescription(fromRoute)}. Expected non-empty string.`,
-      );
-    }
-
-    if (!isString(toRoute) || toRoute === "") {
-      throw new TypeError(
-        `[router.forward] Invalid toRoute: ${getTypeDescription(toRoute)}. Expected non-empty string.`,
-      );
-    }
+    validateForwardArgs(fromRoute, toRoute);
   }
 
-  /**
-   * Validates forwardState/buildState arguments.
-   */
   static validateStateBuilderArgs(
     routeName: unknown,
     routeParams: unknown,
     methodName: string,
   ): void {
-    if (!isString(routeName)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid routeName: ${getTypeDescription(routeName)}. Expected string.`,
-      );
-    }
-
-    if (!isParams(routeParams)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid routeParams: ${getTypeDescription(routeParams)}. Expected plain object.`,
-      );
-    }
+    validateStateBuilderArgs(routeName, routeParams, methodName);
   }
 
-  /**
-   * Validates updateRoute basic arguments (name and updates object structure).
-   * Does NOT read property values to allow caller to cache them first.
-   */
-  static validateUpdateRouteBasicArgs<Dependencies extends DefaultDependencies>(
+  static validateUpdateRouteBasicArgs<Deps extends DefaultDependencies>(
     name: unknown,
     updates: unknown,
-  ): asserts updates is RouteConfigUpdate<Dependencies> {
-    // Validate name
-    validateRouteName(name, "updateRoute");
-
-    if (name === "") {
-      throw new ReferenceError(
-        `[router.updateRoute] Invalid name: empty string. Cannot update root node.`,
-      );
-    }
-
-    // Validate updates is not null
-
-    if (updates === null) {
-      throw new TypeError(
-        `[real-router] updateRoute: updates must be an object, got null`,
-      );
-    }
-
-    // Validate updates is an object (not array)
-    if (typeof updates !== "object" || Array.isArray(updates)) {
-      throw new TypeError(
-        `[real-router] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
-      );
-    }
+  ): asserts updates is RouteConfigUpdate<Deps> {
+    validateUpdateRouteBasicArgs<Deps>(name, updates);
   }
 
-  /**
-   * Validates updateRoute property types using pre-cached values.
-   * Called AFTER properties are cached to ensure getters are called only once.
-   */
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- validation logic is naturally verbose
   static validateUpdateRoutePropertyTypes(
     forwardTo: unknown,
     defaultParams: unknown,
     decodeParams: unknown,
     encodeParams: unknown,
   ): void {
-    // Validate forwardTo type (existence check is done by instance method)
-    if (forwardTo !== undefined && forwardTo !== null && !isString(forwardTo)) {
-      throw new TypeError(
-        `[real-router] updateRoute: forwardTo must be a string or null, got ${getTypeDescription(forwardTo)}`,
-      );
-    }
-
-    // Validate defaultParams
-    if (
-      defaultParams !== undefined &&
-      defaultParams !== null &&
-      (typeof defaultParams !== "object" || Array.isArray(defaultParams))
-    ) {
-      throw new TypeError(
-        `[real-router] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
-      );
-    }
-
-    // Validate decodeParams
-    if (decodeParams !== undefined && decodeParams !== null) {
-      if (typeof decodeParams !== "function") {
-        throw new TypeError(
-          `[real-router] updateRoute: decodeParams must be a function or null, got ${typeof decodeParams}`,
-        );
-      }
-
-      // Check for async function
-      if (
-        (decodeParams as { constructor: { name: string } }).constructor.name ===
-          "AsyncFunction" ||
-        (decodeParams as { toString: () => string })
-          .toString()
-          .includes("__awaiter")
-      ) {
-        throw new TypeError(
-          `[real-router] updateRoute: decodeParams cannot be an async function`,
-        );
-      }
-    }
-
-    // Validate encodeParams
-    if (encodeParams !== undefined && encodeParams !== null) {
-      if (typeof encodeParams !== "function") {
-        throw new TypeError(
-          `[real-router] updateRoute: encodeParams must be a function or null, got ${typeof encodeParams}`,
-        );
-      }
-
-      // Check for async function
-      if (
-        (encodeParams as { constructor: { name: string } }).constructor.name ===
-          "AsyncFunction" ||
-        (encodeParams as { toString: () => string })
-          .toString()
-          .includes("__awaiter")
-      ) {
-        throw new TypeError(
-          `[real-router] updateRoute: encodeParams cannot be an async function`,
-        );
-      }
-    }
+    validateUpdateRoutePropertyTypes(
+      forwardTo,
+      defaultParams,
+      decodeParams,
+      encodeParams,
+    );
   }
 
-  /**
-   * Validates buildPath arguments.
-   */
   static validateBuildPathArgs(route: unknown): asserts route is string {
-    if (!isString(route) || route === "") {
-      throw new TypeError(
-        `[real-router] buildPath: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
-      );
-    }
+    validateBuildPathArgs(route);
   }
 
-  /**
-   * Validates matchPath arguments.
-   */
   static validateMatchPathArgs(path: unknown): asserts path is string {
-    if (!isString(path)) {
-      throw new TypeError(
-        `[real-router] matchPath: path must be a string, got ${typeof path}`,
-      );
-    }
+    validateMatchPathArgs(path);
   }
 
-  /**
-   * Validates shouldUpdateNode arguments.
-   */
   static validateShouldUpdateNodeArgs(
     nodeName: unknown,
   ): asserts nodeName is string {
-    if (!isString(nodeName)) {
-      throw new TypeError(
-        `[router.shouldUpdateNode] nodeName must be a string, got ${typeof nodeName}`,
-      );
-    }
+    validateShouldUpdateNodeArgs(nodeName);
   }
 
   // =========================================================================
@@ -409,16 +237,6 @@ export class RoutesNamespace<
   // =========================================================================
   // Route tree operations
   // =========================================================================
-
-  /**
-   * Returns the route tree.
-   *
-   * @internal Used for advanced introspection. Prefer specific methods.
-   */
-  /* v8 ignore next -- @preserve @internal method, tested implicitly via buildState/matchPath */
-  getTree(): RouteTree {
-    return this.#tree;
-  }
 
   /**
    * Returns the root path.

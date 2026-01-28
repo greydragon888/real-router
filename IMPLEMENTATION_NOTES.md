@@ -627,3 +627,210 @@ Tried full strict mode but it broke React tests. When manually specifying react/
 2. **Hidden dependency on auto-install-peers** — Tests relied on pnpm selecting compatible React versions automatically
 
 **Result:** Peer dep conflicts now fail `pnpm install` instead of being silent warnings.
+
+## Core Architecture
+
+### Namespace-Based Design
+
+**Problem:** Original `@real-router/core` had a monolithic structure with decorators in `src/core/`:
+
+```
+src/core/
+├── dependencies.ts    (700+ lines)
+├── middleware.ts      (300+ lines)
+├── navigation.ts      (400+ lines)
+├── observable.ts      (700+ lines)
+├── options.ts         (300+ lines)
+├── plugins.ts         (300+ lines)
+├── routeLifecycle.ts  (400+ lines)
+├── routerLifecycle.ts (400+ lines)
+├── state.ts           (700+ lines)
+└── routes/
+    ├── routeConfig.ts (900+ lines)
+    ├── routePath.ts   (300+ lines)
+    ├── routeQuery.ts  (400+ lines)
+    └── routeTree.ts   (700+ lines)
+```
+
+Issues:
+- Circular dependencies between decorators
+- Hard to test individual concerns
+- Unclear boundaries of responsibility
+- Router.ts was a god class (2500+ lines)
+
+**Solution:** Migrated to **facade + namespaces** pattern:
+
+```
+src/
+├── Router.ts (facade, ~900 lines)
+└── namespaces/
+    ├── RoutesNamespace/
+    │   ├── RoutesNamespace.ts
+    │   ├── constants.ts
+    │   ├── helpers.ts
+    │   ├── types.ts
+    │   └── stateBuilder.ts
+    ├── StateNamespace/
+    ├── NavigationNamespace/
+    └── ... (11 namespaces total)
+```
+
+**Benefits:**
+- Clear separation of concerns
+- Each namespace is independently testable
+- No circular dependencies
+- Router.ts is thin facade (validation + delegation)
+- Namespace internals are encapsulated
+
+**Migration:** Completed January 2026. Legacy `src/core/` folder deleted after full test coverage verification.
+
+### Validation Pattern
+
+**Decision:** All input validation happens in Router.ts facade via **static methods** on namespace classes.
+
+```typescript
+// Router.ts (facade)
+buildPath(route: string, params?: Params): string {
+  // 1. Validate via static method (throws on invalid input)
+  RoutesNamespace.validateBuildPathArgs(route);
+
+  // 2. Delegate to namespace instance (input guaranteed valid)
+  return this.#routes.buildPath(route, params, this.#options.get());
+}
+
+// RoutesNamespace.ts
+class RoutesNamespace {
+  // Static: validation only, no instance access
+  static validateBuildPathArgs(route: unknown): asserts route is string {
+    if (!isString(route) || route === "") {
+      throw new TypeError(`buildPath: route must be non-empty string`);
+    }
+  }
+
+  // Instance: business logic, assumes valid input
+  buildPath(route: string, params?: Params, options?: Options): string {
+    // No validation here - route is guaranteed valid
+    return this.#tree.buildPath(route, params, options);
+  }
+}
+```
+
+**Why static methods?**
+1. **No instance needed** — validation doesn't require state
+2. **Clear contract** — `static` signals "pure validation, no side effects"
+3. **Testable independently** — can test validation without Router instance
+4. **Type narrowing** — `asserts` keyword narrows types for TypeScript
+
+**Why validate in facade, not namespace?**
+1. **Single entry point** — all public API goes through facade
+2. **Consistent error messages** — facade knows method names for errors
+3. **Namespace trusts facade** — cleaner internal code without defensive checks
+
+### Plugin Interception Pattern
+
+**Problem discovered:** After moving `buildState` logic into `RoutesNamespace`, tests for `@real-router/persistent-params-plugin` failed.
+
+**Root cause:** Plugin intercepts `router.forwardState()` to merge persistent params:
+
+```typescript
+// persistent-params-plugin
+const originalForwardState = router.forwardState;
+router.forwardState = (name, params) => {
+  const result = originalForwardState(name, params);
+  return { ...result, params: withPersistentParams(result.params) };
+};
+```
+
+Original code in Router.ts:
+```typescript
+buildState(routeName, routeParams) {
+  const { name, params } = this.forwardState(routeName, routeParams); // ✅ Interceptable
+  return createRouteState(segments, params);
+}
+```
+
+After moving to namespace:
+```typescript
+// RoutesNamespace.ts
+buildState(routeName, routeParams) {
+  const { name, params } = this.forwardState(routeName, routeParams); // ❌ NOT interceptable!
+  return createRouteState(segments, params);
+}
+```
+
+The namespace calls its own `forwardState`, bypassing plugin interception on `router.forwardState`.
+
+**Solution:** Keep interception points at facade level:
+
+```typescript
+// Router.ts (facade)
+buildState(routeName, routeParams) {
+  // Call forwardState at FACADE level (interceptable by plugins)
+  const { name, params } = this.forwardState(routeName, routeParams);
+
+  // Delegate to namespace with already-resolved values
+  return this.#routes.buildStateResolved(name, params);
+}
+
+// RoutesNamespace.ts
+buildStateResolved(resolvedName, resolvedParams) {
+  // No forwardState call - values already resolved
+  const segments = getSegmentsByName(this.#tree, resolvedName);
+  return createRouteState({ segments, params: resolvedParams }, resolvedName);
+}
+```
+
+**Rule:** Methods that plugins may intercept must be called at facade level, not inside namespaces.
+
+**Affected methods:**
+- `forwardState` — intercepted by persistent-params-plugin
+- `navigate` — could be intercepted for analytics
+- `buildPath` — could be intercepted for URL rewriting
+
+### Type Guard Hierarchy
+
+**Problem:** `isState` function existed in two places with different semantics:
+
+1. `type-guards` package — strict validation, rejects circular refs in params (not JSON-serializable)
+2. `helpers.ts` (local) — structural check only, allows any object structure
+
+**Issue discovered:** After removing local `isState` and using `type-guards` version, `deepFreezeState` tests failed for circular reference cases.
+
+**Root cause:** `type-guards/isState` calls `isParams` which validates serializability:
+
+```typescript
+// type-guards/isParams
+function isSerializable(value, visited = new WeakSet()) {
+  if (visited.has(value)) {
+    return false; // Circular reference - not serializable!
+  }
+  // ...
+}
+```
+
+**Solution:** Two-tier validation:
+
+```typescript
+// type-guards (public API)
+export function isState(value): value is State {
+  // Full validation: structure + params serializability
+  return isRequiredFields(obj); // Uses isParams internally
+}
+
+// helpers.ts (internal)
+function isStateStructural(value): value is State {
+  // Structural only: just checks name/path/params exist
+  return (
+    typeof obj.name === "string" &&
+    typeof obj.path === "string" &&
+    typeof obj.params === "object" &&
+    obj.params !== null
+  );
+}
+```
+
+**Usage:**
+- `isState` from `type-guards` — for public API validation (params must be serializable)
+- `isStateStructural` in `helpers.ts` — for internal operations like `deepFreezeState` that handle any structure
+
+**Lesson:** Validation strictness depends on context. Public API should be strict; internal utilities may need flexibility.
