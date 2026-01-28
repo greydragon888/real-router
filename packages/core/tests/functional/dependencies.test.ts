@@ -3,8 +3,6 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
 
-import { withDependencies } from "../../src/core/dependencies";
-
 import type { Router } from "@real-router/core";
 
 // Import all individual test modules
@@ -20,11 +18,8 @@ let router: Router<{ foo?: number; bar?: string }>;
 
 describe("core/dependencies (integration)", () => {
   beforeEach(() => {
-    const baseRouter = createRouter();
-
-    router = withDependencies<{ foo?: number; bar?: string }>({ foo: 1 })(
-      baseRouter,
-    );
+    // Router now has built-in dependency management via DependenciesNamespace
+    router = createRouter<{ foo?: number; bar?: string }>([], {}, { foo: 1 });
     router.start();
   });
 
@@ -143,17 +138,14 @@ describe("core/dependencies (integration)", () => {
     it("should warn when reaching 20 dependencies (line 30)", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Add 20 dependencies to trigger warning
       for (let i = 0; i < 20; i++) {
-        routerWithDeps.setDependency(`dep${i}`, i);
+        testRouter.setDependency(`dep${i}`, i);
       }
 
       // Verify all dependencies were set (no throw occurred)
-      expect(Object.keys(routerWithDeps.getDependencies())).toHaveLength(20);
+      expect(Object.keys(testRouter.getDependencies())).toHaveLength(20);
 
       warnSpy.mockRestore();
     });
@@ -161,14 +153,11 @@ describe("core/dependencies (integration)", () => {
     it("should error when reaching 50 dependencies (line 36)", () => {
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Add 51 dependencies - checkDependencyCount is called BEFORE adding,
       // so the 51st call triggers the error log when count is exactly 50
       for (let i = 0; i < 51; i++) {
-        routerWithDeps.setDependency(`dep${i}`, i);
+        testRouter.setDependency(`dep${i}`, i);
       }
 
       expect(errorSpy).toHaveBeenCalled();
@@ -181,42 +170,36 @@ describe("core/dependencies (integration)", () => {
 
     it("should throw when exceeding hard limit of 100 dependencies (line 43)", () => {
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Add 100 dependencies first
       for (let i = 0; i < 100; i++) {
-        routerWithDeps.setDependency(`dep${i}`, i);
+        testRouter.setDependency(`dep${i}`, i);
       }
 
       // The 101st should throw (checkDependencyCount sees 100)
       expect(() => {
-        routerWithDeps.setDependency("dep100", 100);
+        testRouter.setDependency("dep100", 100);
       }).toThrowError(/Dependency limit exceeded.*100/);
     });
 
     it("should allow overwriting existing dependency at hard limit", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Add exactly 100 dependencies
       for (let i = 0; i < 100; i++) {
-        routerWithDeps.setDependency(`dep${i}`, i);
+        testRouter.setDependency(`dep${i}`, i);
       }
 
       warnSpy.mockClear();
 
       // Overwriting should NOT throw (count stays at 100)
       expect(() => {
-        routerWithDeps.setDependency("dep0", 999);
+        testRouter.setDependency("dep0", 999);
       }).not.toThrowError();
 
       // Value should be updated
-      expect(routerWithDeps.getDependency("dep0")).toBe(999);
+      expect(testRouter.getDependency("dep0")).toBe(999);
 
       // Warning about overwrite should have been logged
       expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -229,32 +212,26 @@ describe("core/dependencies (integration)", () => {
 
     it("should handle many dependencies without error", () => {
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Add many dependencies
       for (let i = 0; i < 50; i++) {
-        routerWithDeps.setDependency(`dep${i}`, i);
+        testRouter.setDependency(`dep${i}`, i);
       }
 
       // Should have 50 dependencies
-      const deps = routerWithDeps.getDependencies();
+      const deps = testRouter.getDependencies();
 
       expect(Object.keys(deps)).toHaveLength(50);
     });
 
     it("should throw for non-string dependency name", () => {
       const testRouter = createRouter<Record<string, number>>();
-      const routerWithDeps = withDependencies<Record<string, number>>({})(
-        testRouter,
-      );
 
       // Create an object - should throw for invalid type
       const badKey = { test: true };
 
       expect(() =>
-        routerWithDeps.getDependency(badKey as unknown as string),
+        testRouter.getDependency(badKey as unknown as string),
       ).toThrowError("dependency name must be a string");
     });
   });

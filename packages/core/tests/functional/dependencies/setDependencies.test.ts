@@ -313,4 +313,17 @@ describe("core/dependencies/setDependencies", () => {
     // @ts-expect-error: accessing nested properties
     expect(retrieved.ref.ref).toBe(retrieved); // Circular preserved
   });
+
+  // HARD_LIMIT test for setMultiple (line 131 in DependenciesNamespace)
+  it("should throw when setting more than 100 dependencies at once", () => {
+    const manyDeps: Record<string, number> = {};
+
+    for (let i = 0; i < 101; i++) {
+      manyDeps[`dep${i}`] = i;
+    }
+
+    expect(() => {
+      router.setDependencies(manyDeps);
+    }).toThrowError(/Dependency limit exceeded.*100/);
+  });
 });

@@ -503,7 +503,16 @@ describe("invokeEventListeners - Sequential event calls", () => {
         metadata: { original: true },
       };
 
-      const modifyingListener = vi.fn((toState, fromState, options) => {
+      const modifyingStartListener = vi.fn((toState, fromState) => {
+        if (toState) {
+          toState.modified = true;
+        }
+        if (fromState) {
+          fromState.modified = true;
+        }
+      });
+
+      const modifyingSuccessListener = vi.fn((toState, fromState, options) => {
         if (toState) {
           toState.modified = true;
         }
@@ -515,7 +524,18 @@ describe("invokeEventListeners - Sequential event calls", () => {
         }
       });
 
-      const checkingListener = vi.fn((toState, fromState, options) => {
+      const checkingStartListener = vi.fn((toState, fromState) => {
+        /* eslint-disable vitest/no-conditional-expect */
+        if (toState) {
+          expect(toState.modified).toBe(true);
+        }
+        if (fromState) {
+          expect(fromState.modified).toBe(true);
+        }
+        /* eslint-enable vitest/no-conditional-expect */
+      });
+
+      const checkingSuccessListener = vi.fn((toState, fromState, options) => {
         /* eslint-disable vitest/no-conditional-expect */
         if (toState) {
           expect(toState.modified).toBe(true);
@@ -529,10 +549,16 @@ describe("invokeEventListeners - Sequential event calls", () => {
         /* eslint-enable vitest/no-conditional-expect */
       });
 
-      router.addEventListener(events.TRANSITION_START, modifyingListener);
-      router.addEventListener(events.TRANSITION_START, checkingListener);
-      router.addEventListener(events.TRANSITION_SUCCESS, modifyingListener);
-      router.addEventListener(events.TRANSITION_SUCCESS, checkingListener);
+      router.addEventListener(events.TRANSITION_START, modifyingStartListener);
+      router.addEventListener(events.TRANSITION_START, checkingStartListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        modifyingSuccessListener,
+      );
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        checkingSuccessListener,
+      );
 
       // First call - objects get modified
       router.invokeEventListeners(
@@ -549,8 +575,10 @@ describe("invokeEventListeners - Sequential event calls", () => {
         originalOptions,
       );
 
-      expect(modifyingListener).toHaveBeenCalledTimes(2);
-      expect(checkingListener).toHaveBeenCalledTimes(2);
+      expect(modifyingStartListener).toHaveBeenCalledTimes(1);
+      expect(modifyingSuccessListener).toHaveBeenCalledTimes(1);
+      expect(checkingStartListener).toHaveBeenCalledTimes(1);
+      expect(checkingSuccessListener).toHaveBeenCalledTimes(1);
     });
   });
 });

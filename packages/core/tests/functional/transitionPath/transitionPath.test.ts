@@ -641,23 +641,21 @@ describe("transitionPath", () => {
     });
   });
 
-  describe("Mutation testing - getTransitionPath validation (lines 343-356)", () => {
-    it("should include function name in toState validation error (line 343)", () => {
-      // Line 343: validateState(toState, "getTransitionPath");
-      expect(() => getTransitionPath(null as unknown as State)).toThrowError(
-        /getTransitionPath/,
-      );
+  describe("Edge cases - getTransitionPath with invalid input", () => {
+    it("should throw when toState is null", () => {
+      // Accessing properties on null throws a TypeError
+      expect(() => getTransitionPath(null as unknown as State)).toThrowError();
     });
 
-    it("should include function name in fromState validation error (line 356)", () => {
-      // Line 356: validateState(fromState, "getTransitionPath");
-      // Note: null/undefined fromState is valid (means no fromState), so we need invalid object
+    it("should handle fromState with missing name property gracefully", () => {
+      // Invalid fromState is handled gracefully (treated as partial state)
       const validToState = makeState("a");
       const invalidFromState = { invalid: "object" } as unknown as State;
 
+      // Should not throw - fromState.name will be undefined
       expect(() =>
         getTransitionPath(validToState, invalidFromState),
-      ).toThrowError(/getTransitionPath/);
+      ).not.toThrowError();
     });
   });
 

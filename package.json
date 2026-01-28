@@ -1,6 +1,6 @@
 {
   "name": "real-router",
-  "version": "0.1.0",
+  "version": "0.2.4",
   "type": "module",
   "description": "A real router. Just routing, nothing else.",
   "scripts": {
@@ -16,6 +16,7 @@
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix-mismatches && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check",
+    "validate:pre-push": "turbo run build lint:package lint:types",
     "type-check": "turbo run type-check",
     "sonar": "dotenv -- sonar-scanner -Dsonar.login=$SONAR_TOKEN",
     "sonar:local": "pnpm type-check && pnpm test:coverage && pnpm sonar",

@@ -101,7 +101,7 @@ export function persistentParamsPluginFactory(
     }
 
     // Mark router as initialized
-    (router as Record<symbol, boolean>)[PLUGIN_MARKER] = true;
+    (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER] = true;
 
     // Initialize frozen persistent parameters
     let persistentParams: Readonly<Params>;
@@ -140,7 +140,7 @@ export function persistentParamsPluginFactory(
       router.setRootPath(`${basePath}?${newQueryString}`);
     } catch (error) {
       // Rollback initialization marker on error
-      delete (router as Record<symbol, boolean>)[PLUGIN_MARKER];
+      delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
 
       throw new Error(
         `[@real-router/persistent-params-plugin] Failed to update root path: ${error instanceof Error ? error.message : String(error)}`,
@@ -293,7 +293,7 @@ export function persistentParamsPluginFactory(
           router.setRootPath(originalRootPath);
 
           // Remove initialization marker
-          delete (router as Record<symbol, boolean>)[PLUGIN_MARKER];
+          delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
         } catch (error) {
           console.error(
             "persistent-params-plugin",

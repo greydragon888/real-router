@@ -8,7 +8,16 @@ const routes: Route[] = [
   { name: "index", path: "/" },
   { name: "home", path: "/home" },
   { name: "items", path: "/items/:id" },
-  { name: "admin", path: "/admin", canActivate: () => () => false },
+  {
+    name: "admin",
+    path: "/admin",
+    children: [{ name: "dashboard", path: "/dashboard" }],
+  },
+  {
+    name: "admin-protected",
+    path: "/admin-protected",
+    canActivate: () => () => false,
+  },
   { name: "sign-in", path: "/sign-in" },
   {
     name: "auth-protected",

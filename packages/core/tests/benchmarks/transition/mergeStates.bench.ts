@@ -11,7 +11,7 @@
 
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
-import { mergeStates } from "../../../src/transition/mergeStates";
+import { mergeStates } from "../../../src/namespaces/NavigationNamespace/transition/mergeStates";
 
 import type { State, StateMeta, Params } from "@real-router/types";
 

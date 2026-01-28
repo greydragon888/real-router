@@ -93,7 +93,7 @@ jobs:
         if: steps.check.outputs.changesets_count != '0'
         uses: changesets/action@v1
         with:
-          version: pnpm changeset version
+          version: pnpm version
           title: "release: version packages${{ steps.refs.outputs.refs }}"
           commit: "release: version packages${{ steps.refs.outputs.refs }}"
           setupGitUser: false

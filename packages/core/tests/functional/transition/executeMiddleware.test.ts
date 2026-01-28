@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi } from "vitest";
 
-import { executeMiddleware } from "../../../src/transition/executeMiddleware";
+import { executeMiddleware } from "../../../src/namespaces/NavigationNamespace/transition/executeMiddleware";
 
 import type {
   State,
@@ -41,8 +41,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -78,8 +78,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -127,8 +127,8 @@ describe("transition/executeMiddleware", () => {
       });
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 
@@ -164,8 +164,8 @@ describe("transition/executeMiddleware", () => {
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "real-router:middleware",
-        "Error in middleware callback:",
+        "core:middleware",
+        "Error in callback:",
         expect.any(Error),
       );
 

@@ -283,6 +283,7 @@ describe("BaseLink component", () => {
       fireEvent.click(screen.getByTestId("link"), { button: 1 });
 
       expect(onClickMock).toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
 
@@ -294,6 +295,7 @@ describe("BaseLink component", () => {
       await user.keyboard("{/Meta}");
 
       expect(onClickMock).toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });
@@ -320,6 +322,7 @@ describe("BaseLink component", () => {
       await user.click(screen.getByTestId("link"));
 
       expect(onClickMock).toHaveBeenCalled();
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });
@@ -342,6 +345,7 @@ describe("BaseLink component", () => {
 
       fireEvent.click(screen.getByTestId("link"));
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).not.toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(currentRouteName);
     });
@@ -367,6 +371,7 @@ describe("BaseLink component", () => {
 
       await user.click(screen.getByTestId("link"));
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).toHaveBeenCalled();
       expect(router.getState()?.name).toStrictEqual(newRouteName);
       expect(successCallbackMock).toHaveBeenCalled();
@@ -376,7 +381,7 @@ describe("BaseLink component", () => {
       const error = new RouterError("Test error");
 
       vi.spyOn(router, "navigate").mockImplementation((_, __, ___, cb): any => {
-        cb(error);
+        cb?.(error);
       });
 
       const errorCallbackMock = vi.fn();
@@ -397,6 +402,7 @@ describe("BaseLink component", () => {
       await user.click(screen.getByTestId("link"));
 
       expect(router.getState()?.name).toStrictEqual(defRouteName);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).toHaveBeenCalled();
       expect(errorCallbackMock).toHaveBeenCalledWith(error);
     });
@@ -407,7 +413,7 @@ describe("BaseLink component", () => {
       const errorCallbackMock = vi.fn();
 
       vi.spyOn(router, "navigate").mockImplementation((_, __, ___, cb): any => {
-        cb(error);
+        cb?.(error);
       });
 
       render(
@@ -426,6 +432,7 @@ describe("BaseLink component", () => {
       await user.click(screen.getByTestId("link"));
 
       expect(errorCallbackMock).toHaveBeenCalledWith(error);
+      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
       expect(router.navigate).toHaveBeenCalled();
       expect(successCallbackMock).not.toHaveBeenCalled();
     });

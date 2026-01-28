@@ -145,4 +145,53 @@ describe("createRouter", () => {
       expect(router.getOptions().defaultRoute).toBe("home");
     });
   });
+
+  describe("TC39 Observable spec", () => {
+    /**
+     * Symbol.observable polyfill - TC39 proposal with fallback
+     */
+    const $$observable: typeof Symbol.observable =
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check for environments without Symbol.observable
+      (typeof Symbol === "function" && Symbol.observable) ||
+      ("@@observable" as unknown as typeof Symbol.observable);
+
+    it("should expose observable via Symbol.observable on router instance", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+      const observableMethod = (router as unknown as Record<symbol, unknown>)[
+        $$observable
+      ];
+
+      expect(typeof observableMethod).toBe("function");
+    });
+
+    it("should return observable object from Symbol.observable method", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+      const observable = (router as unknown as Record<symbol, () => unknown>)[
+        $$observable
+      ]();
+
+      expect(observable).toBeDefined();
+      expect(typeof (observable as { subscribe: unknown }).subscribe).toBe(
+        "function",
+      );
+    });
+
+    it("should expose observable via Symbol.observable key (line 775)", () => {
+      const router = createRouter([{ name: "home", path: "/home" }]);
+
+      // In Node.js, Symbol.observable is undefined (TC39 proposal not yet standard)
+      // The class defines [Symbol.observable]() which evaluates to [undefined]()
+      // So the method is keyed by undefined (or by Symbol.observable if it exists)
+      const key = Symbol.observable; // undefined in Node.js
+
+      const observableMethod = (router as any)[key] as () => unknown;
+
+      expect(typeof observableMethod).toBe("function");
+
+      // Call the method with proper this binding to ensure full coverage
+      const observable = observableMethod.call(router);
+
+      expect(observable).toBeDefined();
+    });
+  });
 });

@@ -494,7 +494,6 @@ describe("router.navigate() - edge cases callback", () => {
       freshRouter.start();
 
       // This form: navigate(name, params, undefined, callback)
-      // @ts-expect-error - testing undefined opts handling
       freshRouter.navigate("users", { id: "1" }, undefined, callback);
 
       expect(callback).toHaveBeenCalledTimes(1);
@@ -524,7 +523,6 @@ describe("router.navigate() - edge cases callback", () => {
       freshRouter.start();
 
       // Navigate to non-existent route
-      // @ts-expect-error - testing undefined opts handling
       freshRouter.navigate("nonexistent", {}, undefined, callback);
 
       expect(callback).toHaveBeenCalledTimes(1);
@@ -576,7 +574,6 @@ describe("router.navigate() - edge cases callback", () => {
       // Form 7: navigate(name, params, undefined, callback) - the bug case
       const cb7 = vi.fn();
 
-      // @ts-expect-error - testing undefined opts handling
       freshRouter.navigate("users.view", { id: "3" }, undefined, cb7);
 
       expect(cb7).toHaveBeenCalled();

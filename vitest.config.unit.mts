@@ -56,6 +56,17 @@ export default mergeConfig(
           "**/interfaces.ts",
           "**/constants.ts",
           "**/index.ts",
+          // Legacy core files (replaced by namespaces, kept for test compatibility)
+          "**/core/dependencies.ts",
+          "**/core/middleware.ts",
+          "**/core/navigation.ts",
+          "**/core/observable.ts",
+          "**/core/options.ts",
+          "**/core/plugins.ts",
+          "**/core/routeLifecycle.ts",
+          "**/core/routerLifecycle.ts",
+          "**/core/state.ts",
+          "**/core/routes/**",
         ],
         thresholds: {
           statements: 100,

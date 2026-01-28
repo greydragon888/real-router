@@ -1,23 +1,31 @@
 // packages/real-router/modules/index.ts
 
-// Types (re-exported from core-types)
+// Router-dependent types (defined in core)
+export type {
+  ActivationFnFactory,
+  BuildStateResultWithSegments,
+  MiddlewareFactory,
+  PluginFactory,
+  Route,
+  RouteConfigUpdate,
+} from "./types";
+
+// Router class (replaces Router interface from core-types)
+export { Router } from "./Router";
+
+// Types (re-exported from core-types - no Router dependency)
 export type {
   ActivationFn,
-  ActivationFnFactory,
   CancelFn,
   Config,
   DefaultDependencies,
   DoneFn,
   Listener,
   Middleware,
-  MiddlewareFactory,
   NavigationOptions,
   Options,
   Params,
   Plugin,
-  PluginFactory,
-  Route,
-  Router,
   SimpleState,
   State,
   StateMeta,
