@@ -181,7 +181,6 @@ boxplot(() => {
       sharedRouter.invokeEventListeners(
         events.TRANSITION_START,
         TEST_DATA.states.shallow,
-        undefined,
       );
     });
 
@@ -265,7 +264,6 @@ boxplot(() => {
       sharedRouter.invokeEventListeners(
         events.TRANSITION_START,
         TEST_DATA.states.shallow,
-        undefined,
       );
     });
 
@@ -273,7 +271,6 @@ boxplot(() => {
       sharedRouter.invokeEventListeners(
         events.TRANSITION_START,
         TEST_DATA.states.typical,
-        undefined,
       );
     });
 
@@ -281,7 +278,6 @@ boxplot(() => {
       sharedRouter.invokeEventListeners(
         events.TRANSITION_START,
         TEST_DATA.states.deepNested,
-        undefined,
       );
     });
 
@@ -289,7 +285,6 @@ boxplot(() => {
       sharedRouter.invokeEventListeners(
         events.TRANSITION_START,
         TEST_DATA.states.withArrayParams,
-        undefined,
       );
     });
 

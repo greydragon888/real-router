@@ -1,3 +1,14 @@
-deny-licenses:
-  - GPL-3.0
-  - AGPL-3.0
+# Allow-list of acceptable licenses (deny-licenses is deprecated)
+# Excludes copyleft licenses (GPL, AGPL) that would require open-sourcing derivative works
+allow-licenses:
+  - MIT
+  - Apache-2.0
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - ISC
+  - 0BSD
+  - Unlicense
+  - CC0-1.0
+  - CC-BY-4.0
+  - BlueOak-1.0.0
+  - Python-2.0

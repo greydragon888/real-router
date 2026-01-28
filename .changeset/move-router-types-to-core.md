@@ -3,7 +3,7 @@
 "@real-router/core": minor
 ---
 
-**BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core`
+**BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
 
 Types moved to `@real-router/core`:
 - `Router` (class replaces interface)

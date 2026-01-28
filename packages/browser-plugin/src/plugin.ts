@@ -120,6 +120,7 @@ export function browserPluginFactory(
 
   return function browserPlugin(router: Router) {
     // Store original methods for restoration on teardown
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- method is pre-bound in Router constructor
     const routerStart = router.start;
 
     // Transition state management

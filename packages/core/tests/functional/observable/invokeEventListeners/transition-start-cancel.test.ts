@@ -141,11 +141,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         };
 
         expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_CANCEL,
-            toState,
-            undefined,
-          );
+          router.invokeEventListeners(events.TRANSITION_CANCEL, toState);
         }).not.toThrowError();
       });
 
@@ -163,11 +159,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         router.addEventListener(events.TRANSITION_CANCEL, listener2);
         router.addEventListener(events.TRANSITION_CANCEL, listener3);
 
-        router.invokeEventListeners(
-          events.TRANSITION_CANCEL,
-          toState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_CANCEL, toState);
 
         expect(listener1).toHaveBeenCalledWith(toState, undefined);
         expect(listener2).toHaveBeenCalledWith(toState, undefined);
@@ -184,11 +176,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
 
         router.addEventListener(events.TRANSITION_CANCEL, listener);
 
-        router.invokeEventListeners(
-          events.TRANSITION_CANCEL,
-          toState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_CANCEL, toState);
 
         expect(listener).toHaveBeenCalledTimes(1);
         expect(listener).toHaveBeenCalledWith(toState, undefined);
@@ -218,11 +206,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         router.addEventListener(events.TRANSITION_CANCEL, listener2);
         router.addEventListener(events.TRANSITION_CANCEL, listener3);
 
-        router.invokeEventListeners(
-          events.TRANSITION_CANCEL,
-          toState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_CANCEL, toState);
 
         // All originally registered listeners should execute
         expect(listener1).toHaveBeenCalledWith(toState, undefined);
@@ -263,11 +247,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         );
         router.addEventListener(events.TRANSITION_CANCEL, listener3);
 
-        router.invokeEventListeners(
-          events.TRANSITION_CANCEL,
-          toState,
-          undefined,
-        );
+        router.invokeEventListeners(events.TRANSITION_CANCEL, toState);
 
         // All originally registered listeners should still execute
         expect(listener1).toHaveBeenCalledWith(toState, undefined);
@@ -594,11 +574,7 @@ describe("invokeEventListeners - TRANSITION_START and TRANSITION_CANCEL", () => 
         const toState = { name: "help", params: {}, path: "/help" };
 
         expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_START,
-            toState,
-            undefined,
-          );
+          router.invokeEventListeners(events.TRANSITION_START, toState);
         }).not.toThrowError();
       });
 
