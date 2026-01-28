@@ -11,10 +11,6 @@ set -e
 
 echo "🚀 Running pre-push checks..."
 
-# Check for unused code
-echo "🧹 Checking for unused code..."
-pnpm lint:unused
-
 # Check for code duplication
 echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
@@ -26,5 +22,9 @@ pnpm lint:dedupe
 # Build the project to ensure it compiles
 echo "📦 Building project..."
 pnpm validate:pre-push
+
+# Check for unused code
+echo "🧹 Checking for unused code..."
+pnpm lint:unused
 
 echo "✅ All pre-push checks passed! Pushing to remote..."
