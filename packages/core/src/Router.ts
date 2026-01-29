@@ -1006,8 +1006,19 @@ export class Router<
       setState: (state) => {
         this.#state.set(state);
       },
-      buildStateWithSegments: (routeName, routeParams) =>
-        this.#routes.buildStateWithSegmentsResolved(routeName, routeParams),
+      buildStateWithSegments: (routeName, routeParams) => {
+        // Validation must happen here since we bypass the facade method
+        RoutesNamespace.validateStateBuilderArgs(
+          routeName,
+          routeParams,
+          "buildStateWithSegments",
+        );
+
+        return this.#routes.buildStateWithSegmentsResolved(
+          routeName,
+          routeParams,
+        );
+      },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
       buildPath: (route, params) => this.#routes.buildPath(route, params),

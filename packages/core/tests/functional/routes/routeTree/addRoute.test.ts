@@ -59,7 +59,6 @@ describe("core/routes/addRoute", () => {
 
   it("should register canActivate function if defined on route", () => {
     const canActivateFactory = () => () => true;
-    const spyCanActivate = vi.spyOn(router, "canActivate");
 
     router.addRoute([
       {
@@ -69,7 +68,10 @@ describe("core/routes/addRoute", () => {
       },
     ]);
 
-    expect(spyCanActivate).toHaveBeenCalledWith("secure", canActivateFactory);
+    // Verify via getLifecycleFactories instead of spy
+    const [, canActivateFactories] = router.getLifecycleFactories();
+
+    expect(canActivateFactories.secure).toBe(canActivateFactory);
   });
 
   it("should register forwardTo and redirect during navigation", () => {
