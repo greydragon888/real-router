@@ -1013,6 +1013,31 @@ describe("core/plugins", () => {
           router.start();
         }).not.toThrowError();
       });
+
+      it("should provide getDependency function to plugin factory", () => {
+        // Set up a dependency (use any to bypass strict typing)
+        (router as any).setDependency("apiKey", "my-api-key-456");
+
+        let capturedApiKey: string | undefined;
+        const factoryUsingDeps = (
+          _r: typeof router,
+          getDep: (key: string) => unknown,
+        ) => {
+          // Call getDependency to verify it works
+          capturedApiKey = getDep("apiKey") as string;
+
+          return {
+            onStart: vi.fn(),
+          };
+        };
+
+        router.usePlugin(factoryUsingDeps as any);
+
+        // Verify getDependency was called and returned correct value
+        expect(capturedApiKey).toBe("my-api-key-456");
+
+        (router as any).removeDependency("apiKey");
+      });
     });
 
     // 🟢 DESIRABLE: Return value

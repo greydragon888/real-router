@@ -16,7 +16,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$start", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$start", listener);
+      unsub();
     }
   }).gc("inner");
 }
@@ -33,7 +33,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$stop", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$stop", listener);
+      unsub();
     }
   }).gc("inner");
 }
@@ -50,7 +50,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$$start", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$$start", listener);
+      unsub();
     }
   }).gc("inner");
 }
@@ -67,7 +67,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$$success", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$$success", listener);
+      unsub();
     }
   }).gc("inner");
 }
@@ -84,7 +84,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$$error", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$$error", listener);
+      unsub();
     }
   }).gc("inner");
 }
@@ -101,7 +101,7 @@ import { createSimpleRouter } from "../helpers";
       const unsub = router.addEventListener("$$cancel", listener);
 
       do_not_optimize(unsub);
-      router.removeEventListener("$$cancel", listener);
+      unsub();
     }
   }).gc("inner");
 }

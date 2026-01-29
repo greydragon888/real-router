@@ -146,11 +146,6 @@ export function validateOptionValue(
   value: unknown,
   methodName: string,
 ): void {
-  // Skip unknown options - validateOptionExists handles that
-  if (!Object.hasOwn(defaultOptions, optionName)) {
-    return;
-  }
-
   const expectedValue = defaultOptions[optionName];
 
   // For object options - ensure plain objects only (not null, arrays, Date, etc)

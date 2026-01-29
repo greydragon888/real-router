@@ -690,4 +690,21 @@ describe("core/stateBuilder", () => {
       });
     });
   });
+
+  describe("not found state via start with allowNotFound", () => {
+    it("creates not found state when starting at unknown path", () => {
+      const freshRouter = createTestRouter({ allowNotFound: true });
+
+      // Start at an unknown path - this triggers makeNotFoundState internally
+      freshRouter.start("/completely/unknown/path");
+
+      const state = freshRouter.getState();
+
+      expect(state?.name).toBe("@@router/UNKNOWN_ROUTE");
+      expect(state?.path).toBe("/completely/unknown/path");
+      expect(state?.params).toStrictEqual({ path: "/completely/unknown/path" });
+
+      freshRouter.stop();
+    });
+  });
 });

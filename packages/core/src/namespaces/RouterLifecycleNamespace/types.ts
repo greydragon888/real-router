@@ -58,7 +58,7 @@ export interface RouterLifecycleDependencies {
   buildPath: (route: string, params?: Params) => string;
 
   /** Make not found state */
-  makeNotFoundState: (path: string, options?: NavigationOptions) => State;
+  makeNotFoundState: (path: string, options: NavigationOptions) => State;
 
   /** Set router state (undefined to clear) */
   setState: (state?: State) => void;

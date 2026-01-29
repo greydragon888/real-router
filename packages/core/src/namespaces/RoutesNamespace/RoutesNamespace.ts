@@ -775,12 +775,11 @@ export class RoutesNamespace<
 
   /**
    * Validates that forwardTo target doesn't require params that source doesn't have.
-   * Used by updateRoute and forward for forwardTo validation.
+   * Used by updateRoute for forwardTo validation.
    */
   validateForwardToParamCompatibility(
     sourceName: string,
     targetName: string,
-    methodName: "forward" | "updateRoute" = "updateRoute",
   ): void {
     // Note: hasRoute() is always called before this method, so segments are guaranteed to exist
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasRoute() validates existence
@@ -798,11 +797,8 @@ export class RoutesNamespace<
     );
 
     if (missingParams.length > 0) {
-      const targetDesc =
-        methodName === "forward" ? "target route" : "forwardTo target";
-
       throw new Error(
-        `[real-router] ${methodName}: ${targetDesc} "${targetName}" requires params ` +
+        `[real-router] forwardTo target "${targetName}" requires params ` +
           `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
       );
     }
@@ -920,42 +916,6 @@ export class RoutesNamespace<
       // Check for cycle detection
       this.validateForwardToCycle(name, forwardTo);
     }
-  }
-
-  /**
-   * Registers a forward mapping from one route to another.
-   * Validates route existence, param compatibility, and cycles before mutation.
-   */
-  forward(fromRoute: string, toRoute: string): void {
-    // Validate source route exists
-    if (!this.hasRoute(fromRoute)) {
-      throw new Error(
-        `[real-router] forward: source route "${fromRoute}" does not exist`,
-      );
-    }
-
-    // Validate target route exists
-    if (!this.hasRoute(toRoute)) {
-      throw new Error(
-        `[real-router] forward: target route "${toRoute}" does not exist`,
-      );
-    }
-
-    // Validate param compatibility
-    this.validateForwardToParamCompatibility(fromRoute, toRoute, "forward");
-
-    // Validate no cycles would be created
-    this.validateForwardToCycle(fromRoute, toRoute);
-
-    // Add forward mapping
-    this.#config.forwardMap[fromRoute] = toRoute;
-
-    // Rebuild resolved forward map entry
-    // resolveForwardChain handles the chain resolution
-    this.#resolvedForwardMap[fromRoute] = resolveForwardChain(
-      fromRoute,
-      this.#config.forwardMap,
-    );
   }
 
   // =========================================================================

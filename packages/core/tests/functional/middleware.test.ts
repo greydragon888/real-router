@@ -1380,5 +1380,40 @@ describe("core/middleware", () => {
         unsub();
       });
     });
+
+    // 🟡 IMPORTANT: getDependency injection
+    describe("getDependency injection", () => {
+      it("should provide getDependency function to middleware factory", () => {
+        router.clearMiddleware();
+
+        // Set up a dependency (use any to bypass strict typing)
+        (router as any).setDependency("authToken", "secret-token-123");
+
+        let capturedToken: string | undefined;
+        const factoryUsingDeps = (
+          _r: typeof router,
+          getDep: (key: string) => unknown,
+        ) => {
+          // Call getDependency to verify it works
+          capturedToken = getDep("authToken") as string;
+
+          return (toState: State, _fromState: unknown, done: Function) => {
+            done(undefined, toState);
+          };
+        };
+
+        router.useMiddleware(factoryUsingDeps as any);
+
+        // Navigate to trigger the middleware
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+        });
+
+        // Verify getDependency was called and returned correct value
+        expect(capturedToken).toBe("secret-token-123");
+
+        (router as any).removeDependency("authToken");
+      });
+    });
   });
 });

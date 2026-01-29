@@ -166,6 +166,7 @@ export class RouterLifecycleNamespace {
     this.#active = true;
 
     const protectedDone = (err?: RouterError, state?: State) => {
+      /* v8 ignore next 5 -- @preserve defensive: protects against user callback bugs */
       if (callbackInvoked) {
         logger.warn("real-router", "Callback already invoked");
 

@@ -231,10 +231,6 @@ export class ObservableNamespace {
    * Checks if there are any listeners registered for a given event.
    */
   hasListeners(eventName: (typeof events)[EventsKeys]): boolean {
-    if (!validEventNames.has(eventName)) {
-      return false;
-    }
-
     const set = this.#callbacks[eventName];
 
     return set !== undefined && set.size > 0;
@@ -435,6 +431,13 @@ export class ObservableNamespace {
       },
     );
 
+    // Subscription object referenced by unsubscribe closure below
+    // (assigned synchronously before subscribe returns)
+    const subscription: { unsubscribe: Unsubscribe; active: boolean } = {
+      unsubscribe: undefined as unknown as Unsubscribe,
+      active: true,
+    };
+
     // Create unsubscribe function
     const unsubscribe = () => {
       if (closed) {
@@ -443,13 +446,8 @@ export class ObservableNamespace {
 
       closed = true;
 
-      // Update tracking (sub always exists - added synchronously in subscribe before unsubscribe returned)
-      const sub = this.#observerSubscriptions.get(normalizedObserver);
-
-      /* v8 ignore next 3 -- @preserve unreachable: sub added synchronously before unsubscribe is returned */
-      if (sub) {
-        sub.active = false;
-      }
+      // Update tracking (subscription assigned synchronously before subscribe returns)
+      subscription.active = false;
 
       // Remove event listener
       unsubscribeFromEvents();
@@ -468,11 +466,9 @@ export class ObservableNamespace {
       }
     };
 
-    // Track subscription
-    this.#observerSubscriptions.set(normalizedObserver, {
-      unsubscribe,
-      active: true,
-    });
+    // Complete subscription object and track it
+    subscription.unsubscribe = unsubscribe;
+    this.#observerSubscriptions.set(normalizedObserver, subscription);
 
     // Handle AbortSignal
     if (signal) {
@@ -550,6 +546,7 @@ export class ObservableNamespace {
     const depthMap = this.#getEventDepthMap();
     const depth = depthMap[eventName];
 
+    /* v8 ignore next 5 -- @preserve defensive: protects against recursive plugins */
     if (depth >= MAX_EVENT_DEPTH) {
       throw new Error(
         `[Router] Maximum recursion depth (${MAX_EVENT_DEPTH}) exceeded for event: ${eventName}`,

@@ -920,6 +920,37 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ id: "123" });
     });
 
+    it("should preserve splat params when forwarding", () => {
+      // First add target route with splat param to tree
+      router.addRoute({ name: "newfiles", path: "/newfiles/*filepath" });
+
+      // Then add source route with forwardTo - this triggers getRequiredParams on existing tree
+      router.addRoute({
+        name: "files",
+        path: "/files/*filepath",
+        forwardTo: "newfiles",
+      });
+
+      const state = router.forwardState("files", {
+        filepath: "docs/readme.md",
+      });
+
+      expect(state.name).toBe("newfiles");
+      expect(state.params).toStrictEqual({ filepath: "docs/readme.md" });
+    });
+
+    it("should throw if forwardTo target is missing required params", () => {
+      // Target route requires :id param, but source has no params
+      expect(() => {
+        router.addRoute([
+          { name: "noparams", path: "/noparams", forwardTo: "withparams" },
+          { name: "withparams", path: "/withparams/:id" },
+        ]);
+      }).toThrowError(
+        /forwardTo target.*requires params.*not available in source/,
+      );
+    });
+
     it("should allow adding forwards dynamically via updateRoute()", () => {
       router.addRoute([
         { name: "oldRoute", path: "/old" },

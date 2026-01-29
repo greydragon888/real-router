@@ -201,18 +201,11 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param silent - If true, suppresses warning when no handler exists
+   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanActivate(name: string, silent = false): void {
-    const factoryDeleted = this.#canActivateFactories.delete(name);
-    const functionDeleted = this.#canActivateFunctions.delete(name);
-
-    if (!silent && !factoryDeleted && !functionDeleted) {
-      logger.warn(
-        "router.clearCanActivate",
-        `No canActivate handler found for route "${name}"`,
-      );
-    }
+  clearCanActivate(name: string, _silent = false): void {
+    this.#canActivateFactories.delete(name);
+    this.#canActivateFunctions.delete(name);
   }
 
   /**
@@ -220,18 +213,11 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param silent - If true, suppresses warning when no handler exists
+   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanDeactivate(name: string, silent = false): void {
-    const factoryDeleted = this.#canDeactivateFactories.delete(name);
-    const functionDeleted = this.#canDeactivateFunctions.delete(name);
-
-    if (!silent && !factoryDeleted && !functionDeleted) {
-      logger.warn(
-        "router.clearCanDeactivate",
-        `No canDeactivate handler found for route "${name}"`,
-      );
-    }
+  clearCanDeactivate(name: string, _silent = false): void {
+    this.#canDeactivateFactories.delete(name);
+    this.#canDeactivateFunctions.delete(name);
   }
 
   /**

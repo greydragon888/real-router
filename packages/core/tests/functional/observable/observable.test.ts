@@ -213,6 +213,32 @@ describe("core/observable", () => {
         }).not.toThrowError();
       });
 
+      it("should warn when unsubscribing a listener that was already removed", () => {
+        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
+
+        const cb1 = vi.fn();
+        const cb2 = vi.fn();
+
+        // Add two listeners to ensure set is not empty after first removal
+        router.addEventListener(events.ROUTER_STOP, cb1);
+        const unsubscribe2 = router.addEventListener(events.ROUTER_STOP, cb2);
+
+        // First unsubscribe - should succeed without warning
+        unsubscribe2();
+
+        expect(warnSpy).not.toHaveBeenCalled();
+
+        // Second unsubscribe - should warn (set still has cb1, but cb2 is gone)
+        unsubscribe2();
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          "Router",
+          expect.stringContaining("non-existent listener"),
+        );
+
+        warnSpy.mockRestore();
+      });
+
       it("should only unsubscribe the specific listener", () => {
         const cb1 = vi.fn();
         const cb2 = vi.fn();

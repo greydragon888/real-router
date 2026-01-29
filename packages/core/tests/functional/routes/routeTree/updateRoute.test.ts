@@ -80,7 +80,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(() =>
         router.updateRoute("ur-static", { forwardTo: "ur-param" }),
       ).toThrowError(
-        '[real-router] updateRoute: forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
+        '[real-router] forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
       );
     });
 

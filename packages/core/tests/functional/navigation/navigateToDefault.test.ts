@@ -27,6 +27,31 @@ describe("navigateToDefault", () => {
     vi.clearAllMocks();
   });
 
+  describe("when defaultRoute is not set", () => {
+    it("should return noop cancel function when defaultRoute is not configured", () => {
+      // Create router WITHOUT defaultRoute (override the default)
+      const freshRouter = createTestRouter({ defaultRoute: "" });
+
+      // Start at a specific route since there's no defaultRoute
+      freshRouter.start("/users");
+
+      // navigateToDefault should return a function even when no defaultRoute
+      const cancel = freshRouter.navigateToDefault();
+
+      expect(typeof cancel).toBe("function");
+
+      // Calling cancel should be safe (noop)
+      expect(() => {
+        cancel();
+      }).not.toThrowError();
+
+      // Router state should remain at the route we started at
+      expect(freshRouter.getState()?.name).toBe("users");
+
+      freshRouter.stop();
+    });
+  });
+
   describe("basic functionality", () => {
     it("should navigate to defaultRoute when defaultRoute is set", () => {
       const callback = vi.fn();

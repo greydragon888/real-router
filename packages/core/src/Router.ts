@@ -972,14 +972,14 @@ export class Router<
           "buildStateWithSegments",
         );
 
-        return this.#routes.buildStateWithSegmentsResolved(
-          routeName,
-          routeParams,
-        );
+        // Call forwardState to allow plugin interception
+        const { name, params } = this.forwardState(routeName, routeParams);
+
+        return this.#routes.buildStateWithSegmentsResolved(name, params);
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) => this.#routes.buildPath(route, params),
+      buildPath: (route, params) => this.buildPath(route, params),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
@@ -1009,10 +1009,10 @@ export class Router<
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
       buildState: (routeName, routeParams) =>
-        this.#routes.buildStateResolved(routeName, routeParams),
+        this.buildState(routeName, routeParams),
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) => this.#routes.buildPath(route, params),
+      buildPath: (route, params) => this.buildPath(route, params),
       makeNotFoundState: (path, options) =>
         this.#state.makeNotFoundState(path, options),
       setState: (state) => {
