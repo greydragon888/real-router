@@ -5,6 +5,7 @@ import { getTypeDescription } from "type-guards";
 
 import { MIDDLEWARE_LIMITS } from "./constants";
 
+import type { MiddlewareDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { MiddlewareFactory } from "../../types";
 import type {
@@ -36,8 +37,11 @@ export class MiddlewareNamespace<
     Middleware
   >();
 
-  // Router reference for middleware initialization (set after construction)
+  // Router reference for middleware initialization (passed to middleware factories)
   #router: Router<Dependencies> | undefined;
+
+  // Dependencies injected via setDependencies (for internal operations)
+  #deps: MiddlewareDependencies<Dependencies> | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -81,10 +85,18 @@ export class MiddlewareNamespace<
 
   /**
    * Sets the router reference for middleware initialization.
-   * Must be called before registering any middleware.
+   * Middleware factories receive the router object directly as part of their API.
    */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
+  }
+
+  /**
+   * Sets dependencies for internal operations.
+   * These replace direct method calls on router.
+   */
+  setDependencies(deps: MiddlewareDependencies<Dependencies>): void {
+    this.#deps = deps;
   }
 
   // =========================================================================
@@ -121,14 +133,14 @@ export class MiddlewareNamespace<
     // Initialize phase with rollback capability
     try {
       for (const factory of factories) {
-        // Bind getDependency to preserve 'this' context when called from factory
+        // Router and deps are guaranteed to be set at this point
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const router = this.#router!;
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        const deps = this.#deps!;
 
-        const middleware = factory(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-          this.#router!,
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-          this.#router!.getDependency.bind(this.#router),
-        );
+        // Middleware factories receive full router as part of their public API
+        const middleware = factory(router, deps.getDependency);
 
         MiddlewareNamespace.validateMiddleware<Dependencies>(
           middleware,

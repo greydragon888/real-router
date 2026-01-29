@@ -25,7 +25,16 @@ import {
 import { isLoggerConfig } from "./typeGuards";
 
 import type { EventMethodMap } from "./namespaces";
+import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
+import type {
+  NavigationDependencies,
+  TransitionDependencies,
+} from "./namespaces/NavigationNamespace";
 import type { RouterObservable } from "./namespaces/ObservableNamespace";
+import type { PluginsDependencies } from "./namespaces/PluginsNamespace";
+import type { RouteLifecycleDependencies } from "./namespaces/RouteLifecycleNamespace";
+import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNamespace";
+import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
   BuildStateResultWithSegments,
@@ -91,8 +100,8 @@ export class Router<
   readonly #routeLifecycle: RouteLifecycleNamespace<Dependencies>;
   readonly #middleware: MiddlewareNamespace<Dependencies>;
   readonly #plugins: PluginsNamespace<Dependencies>;
-  readonly #navigation: NavigationNamespace<Dependencies>;
-  readonly #lifecycle: RouterLifecycleNamespace<Dependencies>;
+  readonly #navigation: NavigationNamespace;
+  readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
 
   // ============================================================================
@@ -137,8 +146,8 @@ export class Router<
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#middleware = new MiddlewareNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
-    this.#navigation = new NavigationNamespace<Dependencies>();
-    this.#lifecycle = new RouterLifecycleNamespace<Dependencies>();
+    this.#navigation = new NavigationNamespace();
+    this.#lifecycle = new RouterLifecycleNamespace();
     this.#clone = new CloneNamespace<Dependencies>();
 
     // =========================================================================
@@ -414,6 +423,7 @@ export class Router<
     return this.#routes.buildPath(route, params, this.#options.get());
   }
 
+  // @internal-plugin
   matchPath<P extends Params = Params, MP extends Params = Params>(
     path: string,
     source?: string,
@@ -423,11 +433,13 @@ export class Router<
     return this.#routes.matchPath<P, MP>(path, source, this.#options.get());
   }
 
+  // @internal-plugin
   setRootPath(rootPath: string): void {
     RoutesNamespace.validateSetRootPathArgs(rootPath);
     this.#routes.setRootPath(rootPath);
   }
 
+  // @internal-plugin
   getRootPath(): string {
     return this.#routes.getRootPath();
   }
@@ -436,6 +448,7 @@ export class Router<
   // State Management (delegated to StateNamespace)
   // ============================================================================
 
+  // @internal-plugin
   makeState<P extends Params = Params, MP extends Params = Params>(
     name: string,
     params?: P,
@@ -448,6 +461,7 @@ export class Router<
     return this.#state.makeState<P, MP>(name, params, path, meta, forceId);
   }
 
+  // @internal
   makeNotFoundState(path: string, options?: NavigationOptions): State {
     StateNamespace.validateMakeNotFoundStateArgs(path, options);
 
@@ -460,6 +474,7 @@ export class Router<
     return this.#state.get<P, MP>();
   }
 
+  // @internal
   setState<P extends Params = Params, MP extends Params = Params>(
     state?: State<P, MP>,
   ): void {
@@ -488,6 +503,7 @@ export class Router<
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
 
+  // @internal
   areStatesDescendants(parentState: State, childState: State): boolean {
     StateNamespace.validateAreStatesDescendantsArgs(parentState, childState);
 
@@ -495,6 +511,7 @@ export class Router<
     return this.#state.areStatesDescendants(parentState, childState);
   }
 
+  // @internal-plugin
   forwardState<P extends Params = Params>(
     routeName: string,
     routeParams: P,
@@ -508,6 +525,7 @@ export class Router<
     return this.#routes.forwardState<P>(routeName, routeParams);
   }
 
+  // @internal-plugin
   buildState(
     routeName: string,
     routeParams: Params,
@@ -524,6 +542,7 @@ export class Router<
     return this.#routes.buildStateResolved(name, params);
   }
 
+  // @internal
   buildStateWithSegments<P extends Params = Params>(
     routeName: string,
     routeParams: P,
@@ -574,6 +593,7 @@ export class Router<
   // Router Lifecycle
   // ============================================================================
 
+  // @internal
   isStarted(): boolean {
     return this.#lifecycle.isStarted();
   }
@@ -582,6 +602,7 @@ export class Router<
     return this.#lifecycle.isActive();
   }
 
+  // @internal
   isNavigating(): boolean {
     return this.#navigation.isNavigating();
   }
@@ -638,6 +659,7 @@ export class Router<
     return this;
   }
 
+  // @internal
   clearCanDeactivate(name: string, silent?: boolean): this {
     validateRouteName(name, "clearCanDeactivate");
     this.#routeLifecycle.clearCanDeactivate(name, silent);
@@ -657,6 +679,7 @@ export class Router<
     return this;
   }
 
+  // @internal
   clearCanActivate(name: string, silent?: boolean): this {
     validateRouteName(name, "clearCanActivate");
     this.#routeLifecycle.clearCanActivate(name, silent);
@@ -664,6 +687,7 @@ export class Router<
     return this;
   }
 
+  // @internal
   getLifecycleFactories(): [
     Record<string, ActivationFnFactory<Dependencies>>,
     Record<string, ActivationFnFactory<Dependencies>>,
@@ -671,6 +695,7 @@ export class Router<
     return this.#routeLifecycle.getFactories();
   }
 
+  // @internal
   getLifecycleFunctions(): [
     Map<string, ActivationFn>,
     Map<string, ActivationFn>,
@@ -688,6 +713,7 @@ export class Router<
     return this.#plugins.use(...plugins);
   }
 
+  // @internal
   getPlugins(): PluginFactory<Dependencies>[] {
     return this.#plugins.getAll();
   }
@@ -704,16 +730,19 @@ export class Router<
     return this.#middleware.use(...middlewares);
   }
 
+  // @internal
   clearMiddleware(): this {
     this.#middleware.clear();
 
     return this;
   }
 
+  // @internal
   getMiddlewareFactories(): MiddlewareFactory<Dependencies>[] {
     return this.#middleware.getFactories();
   }
 
+  // @internal
   getMiddlewareFunctions(): Middleware[] {
     return this.#middleware.getFunctions();
   }
@@ -772,6 +801,7 @@ export class Router<
   // Events (backed by ObservableNamespace)
   // ============================================================================
 
+  // @internal
   invokeEventListeners(
     eventName: EventToNameMap[EventsKeys],
     toState?: State,
@@ -782,11 +812,13 @@ export class Router<
     this.#observable.invoke(eventName as EventName, toState, fromState, arg);
   }
 
+  // @internal
   hasListeners(eventName: EventToNameMap[EventsKeys]): boolean {
     // No validation - return false for invalid event names (matches original behavior)
     return this.#observable.hasListeners(eventName);
   }
 
+  // @internal
   removeEventListener<E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
@@ -808,6 +840,7 @@ export class Router<
   // Navigation
   // ============================================================================
 
+  // @internal
   forward(fromRoute: string, toRoute: string): this {
     // Static validation (argument types)
     RoutesNamespace.validateForwardArgs(fromRoute, toRoute);
@@ -843,6 +876,7 @@ export class Router<
     return this.#navigation.navigateToDefault(optsOrDone, done);
   }
 
+  // @internal-plugin
   navigateToState(
     toState: State,
     fromState: State | undefined,
@@ -914,21 +948,116 @@ export class Router<
    * Called once in constructor after all namespaces are created.
    */
   #setupDependencies(): void {
-    // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setRouter()
+    // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setDependencies()
     // will register pending canActivate handlers which need RouteLifecycleNamespace
     this.#routeLifecycle.setRouter(this);
 
-    // Now set up RoutesNamespace (which will register pending canActivate handlers)
-    this.#routes.setRouter(this);
+    // RouteLifecycleNamespace uses function injection for getDependency
+    const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
+      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
+        this.#dependencies.get(dependencyName),
+    };
+
+    this.#routeLifecycle.setDependencies(routeLifecycleDeps);
+
+    // RoutesNamespace uses function injection (will register pending canActivate handlers)
+    const routesDeps: RoutesDependencies<Dependencies> = {
+      canActivate: (name, handler) => {
+        this.#routeLifecycle.registerCanActivate(name, handler);
+      },
+      makeState: (name, params, path, meta) =>
+        this.#state.makeState(name, params, path, meta),
+      getState: () => this.#state.get(),
+      areStatesEqual: (state1, state2, ignoreQueryParams) =>
+        this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
+    };
+
+    this.#routes.setDependencies(routesDeps);
     this.#routes.setLifecycleNamespace(this.#routeLifecycle);
 
     this.#middleware.setRouter(this);
+
+    // MiddlewareNamespace uses function injection for getDependency
+    const middlewareDeps: MiddlewareDependencies<Dependencies> = {
+      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
+        this.#dependencies.get(dependencyName),
+    };
+
+    this.#middleware.setDependencies(middlewareDeps);
+
     this.#plugins.setRouter(this);
-    this.#navigation.setRouter(this);
-    this.#lifecycle.setRouter(this);
+
+    // PluginsNamespace uses function injection for internal @internal method calls
+    const pluginsDeps: PluginsDependencies<Dependencies> = {
+      addEventListener: (eventName, cb) =>
+        this.#observable.addEventListener(eventName, cb),
+      isStarted: () => this.#lifecycle.isStarted(),
+      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
+        this.#dependencies.get(dependencyName),
+    };
+
+    this.#plugins.setDependencies(pluginsDeps);
+
+    // NavigationNamespace uses function injection
+    const navigationDeps: NavigationDependencies = {
+      getOptions: () => this.#options.get(),
+      hasRoute: (name) => this.#routes.hasRoute(name),
+      getState: () => this.#state.get(),
+      setState: (state) => {
+        this.#state.set(state);
+      },
+      buildStateWithSegments: (routeName, routeParams) =>
+        this.#routes.buildStateWithSegmentsResolved(routeName, routeParams),
+      makeState: (name, params, path, meta) =>
+        this.#state.makeState(name, params, path, meta),
+      buildPath: (route, params) => this.#routes.buildPath(route, params),
+      areStatesEqual: (state1, state2, ignoreQueryParams) =>
+        this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
+      invokeEventListeners: (eventName, toState, fromState, arg) => {
+        this.#observable.invoke(eventName, toState, fromState, arg);
+      },
+    };
+
+    this.#navigation.setDependencies(navigationDeps);
+
+    const transitionDeps: TransitionDependencies = {
+      getLifecycleFunctions: () => this.#routeLifecycle.getFunctions(),
+      getMiddlewareFunctions: () => this.#middleware.getFunctions(),
+      isActive: () => this.#lifecycle.isActive(),
+      clearCanDeactivate: (name) => {
+        this.#routeLifecycle.clearCanDeactivate(name);
+      },
+    };
+
+    this.#navigation.setTransitionDependencies(transitionDeps);
+
+    // RouterLifecycleNamespace uses function injection
+    // Use facade methods to ensure spies work and plugin interception is possible
+    const lifecycleDeps: RouterLifecycleDependencies = {
+      getOptions: () => this.#options.get(),
+      hasListeners: (eventName) => this.#observable.hasListeners(eventName),
+      invokeEventListeners: (eventName, toState, fromState, arg) => {
+        this.#observable.invoke(eventName, toState, fromState, arg);
+      },
+      buildState: (routeName, routeParams) =>
+        this.#routes.buildStateResolved(routeName, routeParams),
+      makeState: (name, params, path, meta) =>
+        this.#state.makeState(name, params, path, meta),
+      buildPath: (route, params) => this.#routes.buildPath(route, params),
+      makeNotFoundState: (path, options) =>
+        this.#state.makeNotFoundState(path, options),
+      setState: (state) => {
+        this.#state.set(state);
+      },
+      // RouterLifecycleNamespace only uses matchPath without source parameter
+      matchPath: (path, source?: string) =>
+        this.#routes.matchPath(path, source, this.#options.get()),
+    };
+
+    this.#lifecycle.setDependencies(lifecycleDeps);
 
     // Observable needs access to state for replay feature
-    this.#observable.setGetState(() => this.getState());
+    this.#observable.setGetState(() => this.#state.get());
 
     // StateNamespace needs access to route config and path building
     this.#state.setDependencies({
@@ -954,7 +1083,14 @@ export class Router<
       opts: NavigationOptions,
       callback: DoneFn,
       emitSuccess: boolean,
-    ) => this.navigateToState(toState, fromState, opts, callback, emitSuccess);
+    ) =>
+      this.#navigation.navigateToState(
+        toState,
+        fromState,
+        opts,
+        callback,
+        emitSuccess,
+      );
 
     // CloneNamespace needs access to collect cloning data and apply config
     this.#clone.setCallbacks(

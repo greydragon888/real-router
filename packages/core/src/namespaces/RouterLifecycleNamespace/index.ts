@@ -2,4 +2,7 @@
 
 export { RouterLifecycleNamespace } from "./RouterLifecycleNamespace";
 
-export type { StartRouterArguments } from "./types";
+export type {
+  RouterLifecycleDependencies,
+  StartRouterArguments,
+} from "./types";

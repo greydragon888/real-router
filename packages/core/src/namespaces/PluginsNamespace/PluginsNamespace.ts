@@ -5,6 +5,7 @@ import { isObjKey, getTypeDescription } from "type-guards";
 
 import { PLUGIN_LIMITS, EVENTS_MAP, EVENT_METHOD_NAMES } from "./constants";
 
+import type { PluginsDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { PluginFactory } from "../../types";
 import type {
@@ -26,8 +27,11 @@ export class PluginsNamespace<
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
 
-  // Router reference for plugin initialization (set after construction)
+  // Router reference for plugin initialization (passed to plugin factories)
   #router: Router<Dependencies> | undefined;
+
+  // Dependencies injected via setDependencies (for internal @internal method calls)
+  #deps: PluginsDependencies<Dependencies> | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -87,10 +91,18 @@ export class PluginsNamespace<
 
   /**
    * Sets the router reference for plugin initialization.
-   * Must be called before registering any plugins.
+   * Plugins receive the router object directly as part of their API.
    */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
+  }
+
+  /**
+   * Sets dependencies for internal operations.
+   * These replace direct @internal method calls on router.
+   */
+  setDependencies(deps: PluginsDependencies<Dependencies>): void {
+    this.#deps = deps;
   }
 
   // =========================================================================
@@ -219,14 +231,15 @@ export class PluginsNamespace<
   }
 
   #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
-    // Router is guaranteed to be set at this point
+    // Router and deps are guaranteed to be set at this point
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const router = this.#router!;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const deps = this.#deps!;
+
     // Bind getDependency to preserve 'this' context when called from factory
-    const appliedPlugin = pluginFactory(
-      router,
-      router.getDependency.bind(router),
-    );
+    // Plugin factories receive full router as part of their public API
+    const appliedPlugin = pluginFactory(router, deps.getDependency);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
 
@@ -240,13 +253,13 @@ export class PluginsNamespace<
       if (methodName in appliedPlugin) {
         if (typeof appliedPlugin[methodName] === "function") {
           removeEventListeners.push(
-            router.addEventListener(
+            deps.addEventListener(
               EVENTS_MAP[methodName],
               appliedPlugin[methodName],
             ),
           );
 
-          if (methodName === "onStart" && router.isStarted()) {
+          if (methodName === "onStart" && deps.isStarted()) {
             logger.warn(
               LOGGER_CONTEXT,
               "Router already started, onStart will not be called",

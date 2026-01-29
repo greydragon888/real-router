@@ -10,11 +10,12 @@ import { getStartRouterArguments, resolveStartState } from "./helpers";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { StartRouterArguments } from "./types";
-import type { Router } from "../../Router";
+import type {
+  RouterLifecycleDependencies,
+  StartRouterArguments,
+} from "./types";
 import type {
   CancelFn,
-  DefaultDependencies,
   DoneFn,
   NavigationOptions,
   Params,
@@ -36,9 +37,7 @@ import type {
  *
  * Handles start(), stop(), isStarted(), and isActive().
  */
-export class RouterLifecycleNamespace<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> {
+export class RouterLifecycleNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
   // Functional references for cyclic dependencies
   // ═══════════════════════════════════════════════════════════════════════════
@@ -59,8 +58,8 @@ export class RouterLifecycleNamespace<
   #started = false;
   #active = false;
 
-  // Router reference for lifecycle operations (set after construction)
-  #router: Router<Dependencies> | undefined;
+  // Dependencies injected via setDependencies (replaces full router reference)
+  #deps: RouterLifecycleDependencies | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -82,11 +81,11 @@ export class RouterLifecycleNamespace<
   // =========================================================================
 
   /**
-   * Sets the router reference for lifecycle operations.
+   * Sets dependencies for lifecycle operations.
    * Must be called before using lifecycle methods.
    */
-  setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
+  setDependencies(deps: RouterLifecycleDependencies): void {
+    this.#deps = deps;
   }
 
   // =========================================================================
@@ -113,8 +112,8 @@ export class RouterLifecycleNamespace<
    */
   start(...args: StartRouterArguments): void {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const router = this.#router!;
-    const options = router.getOptions();
+    const deps = this.#deps!;
+    const options = deps.getOptions();
     const [startPathOrState, done] = getStartRouterArguments(args);
 
     let callbackInvoked = false;
@@ -148,8 +147,8 @@ export class RouterLifecycleNamespace<
 
       // Lazy emit: only invoke if listeners exist
       // hasListeners check (~5ns) vs invokeEventListeners validation (~100ns+)
-      if (router.hasListeners(events.TRANSITION_ERROR)) {
-        router.invokeEventListeners(
+      if (deps.hasListeners(events.TRANSITION_ERROR)) {
+        deps.invokeEventListeners(
           events.TRANSITION_ERROR,
           undefined,
           undefined,
@@ -203,10 +202,10 @@ export class RouterLifecycleNamespace<
         // Issue #50: Unset active flag on failure (router is no longer starting)
         this.#active = false;
 
-        if (emitErrorEvent && router.hasListeners(events.TRANSITION_ERROR)) {
+        if (emitErrorEvent && deps.hasListeners(events.TRANSITION_ERROR)) {
           // Emit TRANSITION_ERROR for errors not going through navigateToState
           // Performance: Skip emission if no listeners
-          router.invokeEventListeners(
+          deps.invokeEventListeners(
             events.TRANSITION_ERROR,
             undefined,
             undefined,
@@ -217,14 +216,11 @@ export class RouterLifecycleNamespace<
         // Two-phase start: Only set started and emit ROUTER_START on success
         // See: https://github.com/greydragon888/real-router/issues/50
         this.#started = true;
-        router.invokeEventListeners(events.ROUTER_START);
+        deps.invokeEventListeners(events.ROUTER_START);
 
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          state,
-          undefined,
-          { replace: true },
-        );
+        deps.invokeEventListeners(events.TRANSITION_SUCCESS, state, undefined, {
+          replace: true,
+        });
       }
       // For performTransition errors, TRANSITION_ERROR is already emitted by navigateToState
 
@@ -257,7 +253,7 @@ export class RouterLifecycleNamespace<
       defaultParams: Params,
       navOptions: NavigationOptions,
     ) => {
-      const defaultRoute = router.buildState(defaultRouteName, defaultParams);
+      const defaultRoute = deps.buildState(defaultRouteName, defaultParams);
 
       if (!defaultRoute) {
         handleTransitionComplete(
@@ -271,10 +267,10 @@ export class RouterLifecycleNamespace<
         return;
       }
 
-      const toState = router.makeState(
+      const toState = deps.makeState(
         defaultRoute.name,
         defaultRoute.params,
-        router.buildPath(defaultRoute.name, defaultRoute.params),
+        deps.buildPath(defaultRoute.name, defaultRoute.params),
         {
           params: defaultRoute.meta,
           options: navOptions,
@@ -290,7 +286,7 @@ export class RouterLifecycleNamespace<
     const resolvedStartPathOrState = startPathOrState ?? options.defaultRoute;
 
     // Parse the start path or state
-    const startState = resolveStartState(resolvedStartPathOrState, router);
+    const startState = resolveStartState(resolvedStartPathOrState, deps);
 
     // Determine the target state and path
     const targetPath =
@@ -315,7 +311,7 @@ export class RouterLifecycleNamespace<
       navigateToDefault(options.defaultRoute, params, startOptions);
     } else if (options.allowNotFound) {
       performTransition(
-        router.makeNotFoundState(targetPath, startOptions),
+        deps.makeNotFoundState(targetPath, startOptions),
         startOptions,
       );
     } else {
@@ -332,7 +328,7 @@ export class RouterLifecycleNamespace<
    */
   stop(): void {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const router = this.#router!;
+    const deps = this.#deps!;
 
     // Issue #50: Always unset active flag when stopping
     // This cancels any in-flight transitions via isCancelled() check
@@ -341,9 +337,9 @@ export class RouterLifecycleNamespace<
     if (this.#started) {
       this.#started = false;
 
-      router.setState();
+      deps.setState();
 
-      router.invokeEventListeners(events.ROUTER_STOP);
+      deps.invokeEventListeners(events.ROUTER_STOP);
     }
   }
 }

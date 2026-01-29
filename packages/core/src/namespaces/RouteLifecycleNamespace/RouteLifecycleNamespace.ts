@@ -5,6 +5,7 @@ import { isBoolean, getTypeDescription } from "type-guards";
 
 import { LIFECYCLE_LIMITS } from "./constants";
 
+import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { ActivationFnFactory } from "../../types";
 import type { ActivationFn, DefaultDependencies } from "@real-router/types";
@@ -44,8 +45,11 @@ export class RouteLifecycleNamespace<
   // Track routes currently being registered to prevent self-modification
   readonly #registering = new Set<string>();
 
-  // Router reference for dependency injection (set after construction)
+  // Router reference for factory compilation (passed to lifecycle factories)
   #router: Router<Dependencies> | undefined;
+
+  // Dependencies injected via setDependencies (for internal operations)
+  #deps: RouteLifecycleDependencies<Dependencies> | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -72,10 +76,18 @@ export class RouteLifecycleNamespace<
 
   /**
    * Sets the router reference for factory compilation.
-   * Must be called before registering any handlers.
+   * Lifecycle factories receive the router object directly as part of their API.
    */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
+  }
+
+  /**
+   * Sets dependencies for internal operations.
+   * These replace direct method calls on router.
+   */
+  setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
+    this.#deps = deps;
   }
 
   // =========================================================================
@@ -261,14 +273,14 @@ export class RouteLifecycleNamespace<
     this.#registering.add(name);
 
     try {
-      // Bind getDependency to preserve 'this' context when called from factory
+      // Router and deps are guaranteed to be set at this point
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const router = this.#router!;
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const deps = this.#deps!;
 
-      const fn = factory(
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-        this.#router!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-        this.#router!.getDependency.bind(this.#router),
-      );
+      // Lifecycle factories receive full router as part of their public API
+      const fn = factory(router, deps.getDependency);
 
       if (typeof fn !== "function") {
         throw new TypeError(

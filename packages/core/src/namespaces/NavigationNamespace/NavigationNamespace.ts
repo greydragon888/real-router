@@ -7,10 +7,9 @@ import { transition } from "./transition";
 import { events, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { Router } from "../../Router";
+import type { NavigationDependencies, TransitionDependencies } from "./types";
 import type {
   CancelFn,
-  DefaultDependencies,
   DoneFn,
   NavigationOptions,
   Params,
@@ -92,9 +91,7 @@ function parseNavigateArgs(
  *
  * Handles navigate(), navigateToDefault(), navigateToState(), and transition state.
  */
-export class NavigationNamespace<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> {
+export class NavigationNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
   // Functional reference for cyclic dependency
   // ═══════════════════════════════════════════════════════════════════════════
@@ -109,8 +106,9 @@ export class NavigationNamespace<
   #navigating = false;
   #cancelCurrentTransition: CancelFn | null = null;
 
-  // Router reference for navigation operations (set after construction)
-  #router: Router<Dependencies> | undefined;
+  // Dependencies injected via setDependencies (replaces full router reference)
+  #deps: NavigationDependencies | undefined;
+  #transitionDeps: TransitionDependencies | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -216,11 +214,19 @@ export class NavigationNamespace<
   // =========================================================================
 
   /**
-   * Sets the router reference for navigation operations.
+   * Sets dependencies for navigation operations.
    * Must be called before using navigation methods.
    */
-  setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
+  setDependencies(deps: NavigationDependencies): void {
+    this.#deps = deps;
+  }
+
+  /**
+   * Sets dependencies for transition operations.
+   * Must be called before using navigation methods.
+   */
+  setTransitionDependencies(deps: TransitionDependencies): void {
+    this.#transitionDeps = deps;
   }
 
   // =========================================================================
@@ -258,7 +264,9 @@ export class NavigationNamespace<
     emitSuccess: boolean,
   ): CancelFn {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const router = this.#router!;
+    const deps = this.#deps!;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
+    const transitionDeps = this.#transitionDeps!;
 
     // Warn about concurrent navigation (potential SSR race condition)
     if (this.#navigating) {
@@ -277,7 +285,7 @@ export class NavigationNamespace<
     this.#navigating = true;
 
     // Emit TRANSITION_START (after navigating flag is set)
-    router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
+    deps.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
     // Create callback for transition
     const transitionCallback = (err: RouterError | undefined, state: State) => {
@@ -292,13 +300,13 @@ export class NavigationNamespace<
         // UNKNOWN_ROUTE is always valid (used for 404 handling).
         if (
           state.name === constants.UNKNOWN_ROUTE ||
-          router.hasRoute(state.name)
+          deps.hasRoute(state.name)
         ) {
-          router.setState(state);
+          deps.setState(state);
 
           // Emit TRANSITION_SUCCESS only if requested
           if (emitSuccess) {
-            router.invokeEventListeners(
+            deps.invokeEventListeners(
               events.TRANSITION_SUCCESS,
               state,
               fromState,
@@ -315,10 +323,10 @@ export class NavigationNamespace<
           });
 
           safeCallback(callback, notFoundErr);
-          router.invokeEventListeners(
+          deps.invokeEventListeners(
             events.TRANSITION_ERROR,
             undefined,
-            router.getState(),
+            deps.getState(),
             notFoundErr,
           );
         }
@@ -328,13 +336,9 @@ export class NavigationNamespace<
 
       // Error handling
       if (err.code === errorCodes.TRANSITION_CANCELLED) {
-        router.invokeEventListeners(
-          events.TRANSITION_CANCEL,
-          toState,
-          fromState,
-        );
+        deps.invokeEventListeners(events.TRANSITION_CANCEL, toState, fromState);
       } else {
-        router.invokeEventListeners(
+        deps.invokeEventListeners(
           events.TRANSITION_ERROR,
           toState,
           fromState,
@@ -347,7 +351,7 @@ export class NavigationNamespace<
 
     // Launch transition
     this.#cancelCurrentTransition = transition(
-      router,
+      transitionDeps,
       toState,
       fromState,
       opts,
@@ -367,7 +371,7 @@ export class NavigationNamespace<
     done?: DoneFn,
   ): CancelFn {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const router = this.#router!;
+    const deps = this.#deps!;
 
     // Parse polymorphic arguments first (needed for callback in error case)
     const { params, opts, callback } = parseNavigateArgs(
@@ -394,16 +398,16 @@ export class NavigationNamespace<
     }
 
     // build route state with segments (avoids duplicate getSegmentsByName call)
-    const result = router.buildStateWithSegments(name, params);
+    const result = deps.buildStateWithSegments(name, params);
 
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
       safeCallback(callback, err);
-      router.invokeEventListeners(
+      deps.invokeEventListeners(
         events.TRANSITION_ERROR,
         undefined,
-        router.getState(),
+        deps.getState(),
         err,
       );
 
@@ -413,10 +417,10 @@ export class NavigationNamespace<
     const { state: route } = result;
 
     // create a target state
-    const toState = router.makeState(
+    const toState = deps.makeState(
       route.name,
       route.params,
-      router.buildPath(route.name, route.params),
+      deps.buildPath(route.name, route.params),
       {
         params: route.meta,
         options: opts,
@@ -433,18 +437,18 @@ export class NavigationNamespace<
       return noop;
     }
 
-    const fromState = router.getState();
+    const fromState = deps.getState();
 
     // Fast verification for the same states
     if (
       !opts.reload &&
       !opts.force &&
-      router.areStatesEqual(fromState, toState, false)
+      deps.areStatesEqual(fromState, toState, false)
     ) {
       const err = new RouterError(errorCodes.SAME_STATES);
 
       safeCallback(callback, err);
-      router.invokeEventListeners(
+      deps.invokeEventListeners(
         events.TRANSITION_ERROR,
         toState,
         fromState,
@@ -467,8 +471,8 @@ export class NavigationNamespace<
     done?: DoneFn,
   ): CancelFn {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const router = this.#router!;
-    const options = router.getOptions();
+    const deps = this.#deps!;
+    const options = deps.getOptions();
 
     if (!options.defaultRoute) {
       return noop;

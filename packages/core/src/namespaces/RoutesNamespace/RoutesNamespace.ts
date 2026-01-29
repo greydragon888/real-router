@@ -43,8 +43,7 @@ import { constants } from "../../constants";
 import { createBuildOptions } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
-import type { RouteConfig } from "./types";
-import type { Router } from "../../Router";
+import type { RouteConfig, RoutesDependencies } from "./types";
 import type {
   ActivationFnFactory,
   BuildStateResultWithSegments,
@@ -95,8 +94,8 @@ export class RoutesNamespace<
   #tree: RouteTree;
   #buildOptionsCache: BuildOptions | undefined;
 
-  // Router reference for route handlers (set after construction)
-  #router: Router<Dependencies> | undefined;
+  // Dependencies injected via setDependencies (for facade method calls)
+  #deps: RoutesDependencies<Dependencies> | undefined;
 
   // Lifecycle handlers reference (set after construction)
   #lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
@@ -210,15 +209,15 @@ export class RoutesNamespace<
   // =========================================================================
 
   /**
-   * Sets the router reference and registers pending canActivate handlers.
-   * canActivate handlers from initial routes are deferred until router is set.
+   * Sets dependencies and registers pending canActivate handlers.
+   * canActivate handlers from initial routes are deferred until deps are set.
    */
-  setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
+  setDependencies(deps: RoutesDependencies<Dependencies>): void {
+    this.#deps = deps;
 
     // Register pending canActivate handlers that were deferred during construction
     for (const [routeName, handler] of this.#pendingCanActivate) {
-      router.canActivate(routeName, handler);
+      deps.canActivate(routeName, handler);
     }
 
     // Clear pending handlers after registration
@@ -492,9 +491,9 @@ export class RoutesNamespace<
         ? this.buildPath(routeName, routeParams, opts)
         : path;
 
-      // Create state using router's makeState
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- router is always set by Router.ts
-      return this.#router!.makeState<P, MP>(routeName, routeParams, builtPath, {
+      // Create state using deps.makeState
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- deps is always set by Router.ts
+      return this.#deps!.makeState<P, MP>(routeName, routeParams, builtPath, {
         params: meta as MP,
         options: {},
         source,
@@ -618,8 +617,8 @@ export class RoutesNamespace<
     }
 
     // Note: empty string check is handled by Router.ts facade
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- router is always set by Router.ts
-    const activeState = this.#router!.getState();
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- deps is always set by Router.ts
+    const activeState = this.#deps!.getState();
 
     if (!activeState) {
       return false;
@@ -653,8 +652,8 @@ export class RoutesNamespace<
       };
 
       return (
-        /* v8 ignore next -- @preserve unreachable: #router always set by Router constructor */
-        this.#router?.areStatesEqual(
+        /* v8 ignore next -- @preserve unreachable: #deps always set by Router constructor */
+        this.#deps?.areStatesEqual(
           targetState,
           activeState,
           ignoreQueryParams,
@@ -1066,13 +1065,13 @@ export class RoutesNamespace<
     route: Route<Dependencies>,
     fullName: string,
   ): void {
-    // Register canActivate via router API (allows tests to spy on router.canActivate)
+    // Register canActivate via deps.canActivate (allows tests to spy on router.canActivate)
     if (route.canActivate) {
-      if (this.#router) {
-        // Router is available, register immediately
-        this.#router.canActivate(fullName, route.canActivate);
+      if (this.#deps) {
+        // Deps available, register immediately
+        this.#deps.canActivate(fullName, route.canActivate);
       } else {
-        // Router not set yet, store for later registration
+        // Deps not set yet, store for later registration
         this.#pendingCanActivate.set(fullName, route.canActivate);
       }
     }
