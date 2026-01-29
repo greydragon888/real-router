@@ -408,7 +408,6 @@ export class Router<
     return this.#routes.buildPath(route, params, this.#options.get());
   }
 
-  // @internal-plugin
   matchPath<P extends Params = Params, MP extends Params = Params>(
     path: string,
     source?: string,
@@ -418,13 +417,11 @@ export class Router<
     return this.#routes.matchPath<P, MP>(path, source, this.#options.get());
   }
 
-  // @internal-plugin
   setRootPath(rootPath: string): void {
     RoutesNamespace.validateSetRootPathArgs(rootPath);
     this.#routes.setRootPath(rootPath);
   }
 
-  // @internal-plugin
   getRootPath(): string {
     return this.#routes.getRootPath();
   }
@@ -433,7 +430,6 @@ export class Router<
   // State Management (delegated to StateNamespace)
   // ============================================================================
 
-  // @internal-plugin
   makeState<P extends Params = Params, MP extends Params = Params>(
     name: string,
     params?: P,
@@ -470,7 +466,6 @@ export class Router<
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
 
-  // @internal-plugin
   forwardState<P extends Params = Params>(
     routeName: string,
     routeParams: P,
@@ -484,7 +479,6 @@ export class Router<
     return this.#routes.forwardState<P>(routeName, routeParams);
   }
 
-  // @internal-plugin
   buildState(
     routeName: string,
     routeParams: Params,
@@ -833,7 +827,6 @@ export class Router<
     return this.#navigation.navigateToDefault(opts, callback);
   }
 
-  // @internal-plugin
   navigateToState(
     toState: State,
     fromState: State | undefined,
