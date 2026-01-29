@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { errorCodes } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Router, ActivationFnFactory, Params } from "@real-router/core";
@@ -435,45 +437,62 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("canActivate", () => {
     it("should add canActivate", () => {
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guard = vi.fn().mockReturnValue(true);
+      const guardFactory: ActivationFnFactory = () => guard;
 
       router.addRoute({ name: "ur-secure", path: "/ur-secure" });
       router.updateRoute("ur-secure", { canActivate: guardFactory });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories["ur-secure"]).toBe(guardFactory);
+      // Verify canActivate works by navigating
+      router.navigate("ur-secure", (err) => {
+        expect(err).toBeUndefined();
+        expect(guard).toHaveBeenCalled();
+      });
     });
 
     it("should update existing canActivate", () => {
-      const guard1: ActivationFnFactory = () => () => true;
-      const guard2: ActivationFnFactory = () => () => false;
+      const guard1 = vi.fn().mockReturnValue(true);
+      const guard2 = vi.fn().mockReturnValue(false);
 
       router.addRoute({
         name: "ur-guarded",
         path: "/ur-guarded",
-        canActivate: guard1,
+        canActivate: () => guard1,
       });
-      router.updateRoute("ur-guarded", { canActivate: guard2 });
+      router.updateRoute("ur-guarded", { canActivate: () => guard2 });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories["ur-guarded"]).toBe(guard2);
+      // Verify new guard is used - navigation should be blocked
+      router.navigate("ur-guarded", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(guard2).toHaveBeenCalled();
+        expect(guard1).not.toHaveBeenCalled();
+      });
     });
 
     it("should remove canActivate when null", () => {
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
         name: "ur-locked",
         path: "/ur-locked",
-        canActivate: guardFactory,
+        canActivate: () => guard,
       });
+
+      // Verify guard is active - navigation blocked
+      router.navigate("ur-locked", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      });
+
+      guard.mockClear();
+
+      // Remove canActivate
       router.updateRoute("ur-locked", { canActivate: null });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories["ur-locked"]).toBeUndefined();
+      // Now navigation should succeed
+      router.navigate("ur-locked", (err) => {
+        expect(err).toBeUndefined();
+        expect(guard).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -774,7 +793,8 @@ describe("core/routes/routeTree/updateRoute", () => {
   describe("multiple updates", () => {
     it("should update multiple properties at once", () => {
       const decoder = (params: Params): Params => params;
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guard = vi.fn().mockReturnValue(true);
+      const guardFactory: ActivationFnFactory = () => guard;
 
       router.addRoute({ name: "ur-multi", path: "/ur-multi" });
       router.updateRoute("ur-multi", {
@@ -783,12 +803,14 @@ describe("core/routes/routeTree/updateRoute", () => {
         canActivate: guardFactory,
       });
 
-      // Verify via behavior
+      // Verify defaultParams via behavior
       expect(router.makeState("ur-multi").params).toStrictEqual({ page: 1 });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories["ur-multi"]).toBe(guardFactory);
+      // Verify canActivate via navigation
+      router.navigate("ur-multi", (err) => {
+        expect(err).toBeUndefined();
+        expect(guard).toHaveBeenCalled();
+      });
     });
 
     it("should chain multiple updateRoute calls", () => {
@@ -859,9 +881,6 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Verify navigation is in progress
-      expect(router.isNavigating()).toBe(true);
-
       // Try to update during navigation - should log error but proceed
       router.updateRoute("ur-async", { defaultParams: { page: 1 } });
 
@@ -888,10 +907,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.addRoute({ name: "ur-no-warn", path: "/ur-no-warn" });
 
-      // No navigation in progress
-      expect(router.isNavigating()).toBe(false);
-
-      // Update should not log error
+      // Update should not log error (no navigation in progress)
       router.updateRoute("ur-no-warn", { defaultParams: { page: 1 } });
 
       expect(errorSpy).not.toHaveBeenCalledWith(
@@ -1075,17 +1091,21 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept arrow function as canActivate factory", () => {
+        const guard = vi.fn((_toState, _fromState, done) => {
+          done();
+        });
+
         router.addRoute({ name: "ur-arrow-guard", path: "/ur-arrow-guard" });
 
         router.updateRoute("ur-arrow-guard", {
-          canActivate: () => (_toState, _fromState, done) => {
-            done();
-          },
+          canActivate: () => guard,
         });
 
-        const [, factories] = router.getLifecycleFactories();
-
-        expect(factories["ur-arrow-guard"]).toBeDefined();
+        // Verify canActivate works via navigation
+        router.navigate("ur-arrow-guard", (err) => {
+          expect(err).toBeUndefined();
+          expect(guard).toHaveBeenCalled();
+        });
       });
     });
 

@@ -77,7 +77,7 @@ describe("router.start() - error handling", () => {
 
         const result = router.start(callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(result).toBe(router);
@@ -102,7 +102,7 @@ describe("router.start() - error handling", () => {
 
         const result = router.start(callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -137,7 +137,7 @@ describe("router.start() - error handling", () => {
         const result = router.start(callback);
 
         // Issue #50: Router is NOT started when default route fails
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -176,7 +176,7 @@ describe("router.start() - error handling", () => {
         }).not.toThrowError();
 
         // Router should be started successfully
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()).toBeDefined();
 
         // Error should be logged (format: logger.error("Router", "Error in listener for <event>:", Error))
@@ -203,7 +203,7 @@ describe("router.start() - error handling", () => {
         }).not.toThrowError();
 
         // Router should be started successfully
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
@@ -231,7 +231,7 @@ describe("router.start() - error handling", () => {
         }).not.toThrowError();
 
         // Router should NOT be started (route not found)
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalledWith(
@@ -259,7 +259,7 @@ describe("router.start() - error handling", () => {
         }).not.toThrowError();
 
         // Router should be started (callback error doesn't break router)
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         // Error should be logged
         expect(errorSpy).toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe("router.start() - error handling", () => {
           router.start("/home", { callback: true });
         }).not.toThrowError();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(errorSpy).toHaveBeenCalled();
 
         errorSpy.mockRestore();
@@ -289,7 +289,7 @@ describe("router.start() - error handling", () => {
           router.start("/home", 123);
         }).not.toThrowError();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(errorSpy).toHaveBeenCalled();
 
         errorSpy.mockRestore();
@@ -302,7 +302,7 @@ describe("router.start() - error handling", () => {
           router.start("/home", undefined);
         }).not.toThrowError();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
       });
 
       it("should work correctly when second argument is null", () => {
@@ -312,7 +312,7 @@ describe("router.start() - error handling", () => {
           router.start("/home", null);
         }).not.toThrowError();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
       });
     });
 
@@ -362,7 +362,7 @@ describe("router.start() - error handling", () => {
         expect(startListeners).toHaveLength(1);
 
         // Router should be started only once
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
       });
 
@@ -373,19 +373,19 @@ describe("router.start() - error handling", () => {
         // First start
         router.start("/home", callback1);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
 
         // Stop
         router.stop();
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(router.getState()).toBeUndefined();
 
         // Second start should work
         router.start("/users", callback2);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users");
 
         expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
@@ -402,12 +402,12 @@ describe("router.start() - error handling", () => {
 
           router.start(`/${routes[i]}`, callback);
 
-          expect(router.isStarted()).toBe(true);
+          expect(router.isActive()).toBe(true);
           expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
 
           router.stop();
 
-          expect(router.isStarted()).toBe(false);
+          expect(router.isActive()).toBe(false);
           expect(router.getState()).toBeUndefined();
         }
       });
@@ -431,7 +431,6 @@ describe("router.start() - error handling", () => {
 
         // At this point: isActive()=true, isStarted()=false
         expect(router.isActive()).toBe(true);
-        expect(router.isStarted()).toBe(false);
         expect(callback1).not.toHaveBeenCalled();
 
         // Try second start() - should fail immediately with ROUTER_ALREADY_STARTED
@@ -452,7 +451,7 @@ describe("router.start() - error handling", () => {
         // Now first transition completes
         expect(callback1).toHaveBeenCalledTimes(1);
         expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
       });
 
@@ -477,7 +476,7 @@ describe("router.start() - error handling", () => {
           expect.objectContaining({ code: "TRANSITION_ERR" }),
           undefined,
         );
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(router.isActive()).toBe(false);
 
         // Clear middleware for second attempt
@@ -489,7 +488,7 @@ describe("router.start() - error handling", () => {
         router.start("/users", callback2);
 
         expect(callback2).toHaveBeenCalledWith(undefined, expect.any(Object));
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users");
       });
     });
@@ -598,7 +597,7 @@ describe("router.start() - error handling", () => {
 
         // Issue #50: Router is NOT started if transition fails
         // Two-phase start ensures isStarted() only returns true after successful transition
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
       });
 

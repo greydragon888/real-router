@@ -84,13 +84,6 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state).toBe(undefined);
     });
 
-    it("should decode and redirect if forward is defined", () => {
-      router.forward("home", "sign-in");
-      const state = router.matchPath("/home");
-
-      expect(state?.name).toBe("sign-in");
-    });
-
     it("should return matched path as-is when rewritePathOnMatch is false", () => {
       const customRouter = createTestRouter({ rewritePathOnMatch: false });
 
@@ -631,30 +624,6 @@ describe("core/routes/routePath/matchPath", () => {
       expect(() => customRouter.matchPath("/user/123")).toThrowError(
         "Decoder intentionally failed",
       );
-    });
-
-    it("should apply decoder before forwarding", () => {
-      const customRouter = createTestRouter();
-
-      customRouter.addRoute({
-        name: "legacy",
-        path: "/old/:id",
-        decodeParams: (params) => ({
-          id: `decoded-${params.id as string}`,
-        }),
-      });
-      customRouter.addRoute({
-        name: "newRoute",
-        path: "/new/:id",
-      });
-      customRouter.forward("legacy", "newRoute");
-
-      const state = customRouter.matchPath("/old/123");
-
-      // Decoder is applied, then forwarding happens with decoded params
-      expect(state?.name).toBe("newRoute");
-      expect(state?.params.id).toBe("decoded-123");
-      expect(state?.path).toBe("/new/decoded-123");
     });
   });
 });

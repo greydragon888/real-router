@@ -731,7 +731,7 @@ describe("core/options", () => {
           .setOption("trailingSlash", "always")
           .start();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getOptions().caseSensitive).toBe(true);
         expect(router.getOptions().trailingSlash).toBe("always");
       });

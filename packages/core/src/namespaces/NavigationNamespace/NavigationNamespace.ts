@@ -1,13 +1,26 @@
 // packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { getTypeDescription, isNavigationOptions } from "type-guards";
 
+import { noop, safeCallback } from "./helpers";
 import { transition } from "./transition";
+import {
+  parseNavigateArgs,
+  parseNavigateToDefaultArgs,
+  validateNavigateArgs,
+  validateNavigateToDefaultArgs,
+  validateNavigateToStateArgs,
+  validateNavigationOptions,
+} from "./validators";
 import { events, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-import type { NavigationDependencies, TransitionDependencies } from "./types";
+import type {
+  NavigationDependencies,
+  ParsedNavigateArgs,
+  ParsedNavigateDefaultArgs,
+  TransitionDependencies,
+} from "./types";
 import type {
   CancelFn,
   DoneFn,
@@ -15,76 +28,6 @@ import type {
   Params,
   State,
 } from "@real-router/types";
-
-const noop = (): void => {};
-
-/**
- * Safely invokes a callback, catching and logging any errors.
- * Prevents user callback errors from crashing the router.
- */
-function safeCallback(
-  callback: DoneFn,
-  ...args: [error?: RouterError, state?: State]
-): void {
-  try {
-    callback(...args);
-  } catch (error) {
-    logger.error("router.navigate", "Error in navigation callback:", error);
-  }
-}
-
-/**
- * Result of parsing polymorphic navigate() arguments.
- */
-interface ParsedNavigateArgs {
-  params: Params;
-  opts: NavigationOptions;
-  callback: DoneFn;
-}
-
-/**
- * Parses the polymorphic arguments of navigate().
- *
- * Handles all valid call signatures:
- * - navigate(name, callback)
- * - navigate(name, params)
- * - navigate(name, params, callback)
- * - navigate(name, params, opts)
- * - navigate(name, params, opts, callback)
- */
-function parseNavigateArgs(
-  paramsOrDone?: Params | DoneFn,
-  optsOrDone?: NavigationOptions | DoneFn,
-  done?: DoneFn,
-): ParsedNavigateArgs {
-  if (typeof paramsOrDone === "function") {
-    // Form: navigate(name, callback)
-    return { params: {}, opts: {}, callback: paramsOrDone };
-  }
-
-  // Forms: navigate(name), navigate(name, params), navigate(name, params, callback),
-  //        navigate(name, params, opts), navigate(name, params, opts, callback)
-  // Also handles: navigate(name, null/undefined, callback) - runtime defense
-  const params = paramsOrDone ?? {};
-
-  if (typeof optsOrDone === "function") {
-    return { params, opts: {}, callback: optsOrDone };
-  }
-
-  return {
-    params,
-    opts: optsOrDone ?? {},
-    callback: done ?? noop,
-  };
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CYCLIC DEPENDENCIES
-// ═══════════════════════════════════════════════════════════════════════════════
-// Navigation → RouterLifecycle.isStarted() (check before navigation)
-//
-// Solution: functional reference `isRouterStarted`, configured in Router.#setupDependencies()
-// ═══════════════════════════════════════════════════════════════════════════════
 
 /**
  * Independent namespace for managing navigation.
@@ -112,23 +55,13 @@ export class NavigationNamespace {
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
+  // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
 
-  /**
-   * Validates navigate arguments.
-   * Note: Only validates `name` - other args are polymorphic and validated after parsing.
-   */
   static validateNavigateArgs(name: unknown): asserts name is string {
-    if (typeof name !== "string") {
-      throw new TypeError(
-        `[router.navigate] Invalid route name: expected string, got ${getTypeDescription(name)}`,
-      );
-    }
+    validateNavigateArgs(name);
   }
 
-  /**
-   * Validates navigateToState arguments.
-   */
   static validateNavigateToStateArgs(
     toState: unknown,
     fromState: unknown,
@@ -136,77 +69,42 @@ export class NavigationNamespace {
     callback: unknown,
     emitSuccess: unknown,
   ): void {
-    // toState must be a valid state object
-    if (
-      !toState ||
-      typeof toState !== "object" ||
-      typeof (toState as State).name !== "string" ||
-      typeof (toState as State).path !== "string"
-    ) {
-      throw new TypeError(
-        `[router.navigateToState] Invalid toState: expected State object with name and path`,
-      );
-    }
-
-    // fromState can be undefined or a valid state
-    if (
-      fromState !== undefined &&
-      (!fromState ||
-        typeof fromState !== "object" ||
-        typeof (fromState as State).name !== "string")
-    ) {
-      throw new TypeError(
-        `[router.navigateToState] Invalid fromState: expected State object or undefined`,
-      );
-    }
-
-    // opts must be an object
-    if (typeof opts !== "object" || opts === null) {
-      throw new TypeError(
-        `[router.navigateToState] Invalid opts: expected NavigationOptions object, got ${getTypeDescription(opts)}`,
-      );
-    }
-
-    // callback must be a function
-    if (typeof callback !== "function") {
-      throw new TypeError(
-        `[router.navigateToState] Invalid callback: expected function, got ${getTypeDescription(callback)}`,
-      );
-    }
-
-    // emitSuccess must be a boolean
-    if (typeof emitSuccess !== "boolean") {
-      throw new TypeError(
-        `[router.navigateToState] Invalid emitSuccess: expected boolean, got ${getTypeDescription(emitSuccess)}`,
-      );
-    }
+    validateNavigateToStateArgs(
+      toState,
+      fromState,
+      opts,
+      callback,
+      emitSuccess,
+    );
   }
 
-  /**
-   * Validates navigateToDefault arguments.
-   * Note: Arguments are polymorphic - validates what can be checked upfront.
-   */
   static validateNavigateToDefaultArgs(
     optsOrDone: unknown,
     done: unknown,
   ): void {
-    // If first arg is provided and not a function, it must be an object (options)
-    if (
-      optsOrDone !== undefined &&
-      typeof optsOrDone !== "function" &&
-      (typeof optsOrDone !== "object" || optsOrDone === null)
-    ) {
-      throw new TypeError(
-        `[router.navigateToDefault] Invalid options: ${getTypeDescription(optsOrDone)}. Expected NavigationOptions object or callback function.`,
-      );
-    }
+    validateNavigateToDefaultArgs(optsOrDone, done);
+  }
 
-    // If second arg is provided, it must be a function
-    if (done !== undefined && typeof done !== "function") {
-      throw new TypeError(
-        `[router.navigateToDefault] Invalid callback: expected function, got ${getTypeDescription(done)}`,
-      );
-    }
+  static validateNavigationOptions(
+    opts: unknown,
+    methodName: string,
+  ): asserts opts is NavigationOptions {
+    validateNavigationOptions(opts, methodName);
+  }
+
+  static parseNavigateArgs(
+    paramsOrDone?: Params | DoneFn,
+    optsOrDone?: NavigationOptions | DoneFn,
+    done?: DoneFn,
+  ): ParsedNavigateArgs {
+    return parseNavigateArgs(paramsOrDone, optsOrDone, done);
+  }
+
+  static parseNavigateToDefaultArgs(
+    optsOrDone?: NavigationOptions | DoneFn,
+    done?: DoneFn,
+  ): ParsedNavigateDefaultArgs {
+    return parseNavigateToDefaultArgs(optsOrDone, done);
   }
 
   // =========================================================================
@@ -363,22 +261,16 @@ export class NavigationNamespace {
 
   /**
    * Navigates to a route by name.
+   * Arguments should be pre-parsed and validated by facade.
    */
   navigate(
     name: string,
-    paramsOrDone?: Params | DoneFn,
-    optsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
+    params: Params,
+    opts: NavigationOptions,
+    callback: DoneFn,
   ): CancelFn {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
     const deps = this.#deps!;
-
-    // Parse polymorphic arguments first (needed for callback in error case)
-    const { params, opts, callback } = parseNavigateArgs(
-      paramsOrDone,
-      optsOrDone,
-      done,
-    );
 
     // Quick check of the state of the router
     if (!this.isRouterStarted()) {
@@ -387,14 +279,6 @@ export class NavigationNamespace {
       safeCallback(callback, err);
 
       return noop;
-    }
-
-    // Validate opts after polymorphic argument resolution
-    // Note: Empty object {} is valid, but invalid types/fields are rejected
-    if (!isNavigationOptions(opts)) {
-      throw new TypeError(
-        `[router.navigate] Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`,
-      );
     }
 
     // build route state with segments (avoids duplicate getSegmentsByName call)
@@ -465,34 +349,15 @@ export class NavigationNamespace {
 
   /**
    * Navigates to the default route if configured.
+   * Arguments should be pre-parsed and validated by facade.
    */
-  navigateToDefault(
-    optsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ): CancelFn {
+  navigateToDefault(opts: NavigationOptions, callback: DoneFn): CancelFn {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
     const deps = this.#deps!;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {
       return noop;
-    }
-
-    let opts: NavigationOptions = {};
-    let callback: DoneFn = noop;
-
-    if (typeof optsOrDone === "function") {
-      callback = optsOrDone;
-    } else if (optsOrDone) {
-      opts = optsOrDone;
-      callback = done ?? noop;
-    }
-
-    // Validate opts for better error messages (specific to navigateToDefault)
-    if (!isNavigationOptions(opts)) {
-      throw new TypeError(
-        `[router.navigateToDefault] Invalid options: ${getTypeDescription(opts)}. Expected NavigationOptions object.`,
-      );
     }
 
     return this.navigate(

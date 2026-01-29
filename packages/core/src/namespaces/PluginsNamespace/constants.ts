@@ -40,3 +40,5 @@ export const EVENT_METHOD_NAMES = Object.keys(EVENTS_MAP).filter(
   (eventName): eventName is keyof typeof EVENTS_MAP =>
     isObjKey<typeof EVENTS_MAP>(eventName, EVENTS_MAP),
 );
+
+export const LOGGER_CONTEXT = "router.usePlugin";

@@ -7,7 +7,7 @@
  */
 
 import { logger } from "@real-router/logger";
-import { validateRouteName, validateState } from "type-guards";
+import { validateRouteName } from "type-guards";
 
 import {
   CloneNamespace,
@@ -37,26 +37,20 @@ import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNa
 import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
-  BuildStateResultWithSegments,
   MiddlewareFactory,
   PluginFactory,
   Route,
   RouteConfigUpdate,
 } from "./types";
 import type {
-  ActivationFn,
   CancelFn,
   DefaultDependencies,
   DoneFn,
   EventName,
-  EventsKeys,
-  EventToNameMap,
-  Middleware,
   NavigationOptions,
   Options,
   Params,
   Plugin,
-  RouterError as RouterErrorType,
   RouteTreeState,
   SimpleState,
   State,
@@ -181,15 +175,11 @@ export class Router<
 
     // State Management
     this.makeState = this.makeState.bind(this);
-    this.makeNotFoundState = this.makeNotFoundState.bind(this);
     this.getState = this.getState.bind(this);
-    this.setState = this.setState.bind(this);
     this.getPreviousState = this.getPreviousState.bind(this);
     this.areStatesEqual = this.areStatesEqual.bind(this);
-    this.areStatesDescendants = this.areStatesDescendants.bind(this);
     this.forwardState = this.forwardState.bind(this);
     this.buildState = this.buildState.bind(this);
-    this.buildStateWithSegments = this.buildStateWithSegments.bind(this);
     this.shouldUpdateNode = this.shouldUpdateNode.bind(this);
 
     // Options
@@ -198,29 +188,20 @@ export class Router<
     this.setOption = this.setOption.bind(this);
 
     // Router Lifecycle
-    this.isStarted = this.isStarted.bind(this);
     this.isActive = this.isActive.bind(this);
-    this.isNavigating = this.isNavigating.bind(this);
     this.start = this.start.bind(this);
     this.stop = this.stop.bind(this);
 
     // Route Lifecycle (Guards)
     this.canDeactivate = this.canDeactivate.bind(this);
-    this.clearCanDeactivate = this.clearCanDeactivate.bind(this);
     this.canActivate = this.canActivate.bind(this);
-    this.clearCanActivate = this.clearCanActivate.bind(this);
-    this.getLifecycleFactories = this.getLifecycleFactories.bind(this);
-    this.getLifecycleFunctions = this.getLifecycleFunctions.bind(this);
 
     // Plugins
     this.usePlugin = this.usePlugin.bind(this);
-    this.getPlugins = this.getPlugins.bind(this);
 
     // Middleware
     this.useMiddleware = this.useMiddleware.bind(this);
     this.clearMiddleware = this.clearMiddleware.bind(this);
-    this.getMiddlewareFactories = this.getMiddlewareFactories.bind(this);
-    this.getMiddlewareFunctions = this.getMiddlewareFunctions.bind(this);
 
     // Dependencies
     this.setDependency = this.setDependency.bind(this);
@@ -232,13 +213,9 @@ export class Router<
     this.resetDependencies = this.resetDependencies.bind(this);
 
     // Events
-    this.invokeEventListeners = this.invokeEventListeners.bind(this);
-    this.hasListeners = this.hasListeners.bind(this);
-    this.removeEventListener = this.removeEventListener.bind(this);
     this.addEventListener = this.addEventListener.bind(this);
 
     // Navigation
-    this.forward = this.forward.bind(this);
     this.navigate = this.navigate.bind(this);
     this.navigateToDefault = this.navigateToDefault.bind(this);
     this.navigateToState = this.navigateToState.bind(this);
@@ -257,10 +234,17 @@ export class Router<
   addRoute(routes: Route<Dependencies>[] | Route<Dependencies>): this {
     const routeArray = Array.isArray(routes) ? routes : [routes];
 
-    // Static validation (route structure and properties)
+    // 1. Static validation (route structure and properties)
     RoutesNamespace.validateAddRouteArgs(routeArray);
 
-    // Instance method handles state-dependent validation (duplicates, tree)
+    // 2. State-dependent validation (duplicates, parent exists, forwardTo)
+    RoutesNamespace.validateRoutes(
+      routeArray,
+      this.#routes.getTree(),
+      this.#routes.getForwardRecord(),
+    );
+
+    // 3. Execute (add definitions, register handlers, rebuild tree)
     this.#routes.addRoutes(routeArray);
 
     return this;
@@ -371,11 +355,12 @@ export class Router<
     });
 
     // Handle canActivate separately (uses RouteLifecycleNamespace)
+    // Use facade method for proper validation
     if (canActivate !== undefined) {
       if (canActivate === null) {
         this.#routeLifecycle.clearCanActivate(name, true);
       } else {
-        this.#routeLifecycle.registerCanActivate(name, canActivate);
+        this.canActivate(name, canActivate);
       }
     }
 
@@ -461,28 +446,10 @@ export class Router<
     return this.#state.makeState<P, MP>(name, params, path, meta, forceId);
   }
 
-  // @internal
-  makeNotFoundState(path: string, options?: NavigationOptions): State {
-    StateNamespace.validateMakeNotFoundStateArgs(path, options);
-
-    return this.#state.makeNotFoundState(path, options);
-  }
-
   getState<P extends Params = Params, MP extends Params = Params>():
     | State<P, MP>
     | undefined {
     return this.#state.get<P, MP>();
-  }
-
-  // @internal
-  setState<P extends Params = Params, MP extends Params = Params>(
-    state?: State<P, MP>,
-  ): void {
-    if (state !== undefined) {
-      validateState(state, "router.setState");
-    }
-
-    this.#state.set(state);
   }
 
   getPreviousState(): State | undefined {
@@ -501,14 +468,6 @@ export class Router<
     );
 
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
-  }
-
-  // @internal
-  areStatesDescendants(parentState: State, childState: State): boolean {
-    StateNamespace.validateAreStatesDescendantsArgs(parentState, childState);
-
-    // eslint-disable-next-line @typescript-eslint/no-deprecated, sonarjs/deprecation -- facade for deprecated method
-    return this.#state.areStatesDescendants(parentState, childState);
   }
 
   // @internal-plugin
@@ -542,23 +501,6 @@ export class Router<
     return this.#routes.buildStateResolved(name, params);
   }
 
-  // @internal
-  buildStateWithSegments<P extends Params = Params>(
-    routeName: string,
-    routeParams: P,
-  ): BuildStateResultWithSegments<P> | undefined {
-    RoutesNamespace.validateStateBuilderArgs(
-      routeName,
-      routeParams,
-      "buildStateWithSegments",
-    );
-
-    // Call forwardState at facade level to allow plugin interception
-    const { name, params } = this.forwardState<P>(routeName, routeParams);
-
-    return this.#routes.buildStateWithSegmentsResolved(name, params);
-  }
-
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
@@ -577,12 +519,15 @@ export class Router<
 
   getOption<K extends keyof Options>(option: K): Options[K] {
     OptionsNamespace.validateOptionName(option, "getOption");
+    OptionsNamespace.validateOptionExists(option, "getOption");
 
     return this.#options.getOption(option);
   }
 
   setOption(option: keyof Options, value: Options[keyof Options]): this {
     OptionsNamespace.validateOptionName(option, "setOption");
+    OptionsNamespace.validateOptionExists(option, "setOption");
+    OptionsNamespace.validateNotLocked(this.#options.isLocked(), option);
     OptionsNamespace.validateOptionValue(option, value, "setOption");
     this.#options.set(option, value);
 
@@ -593,18 +538,8 @@ export class Router<
   // Router Lifecycle
   // ============================================================================
 
-  // @internal
-  isStarted(): boolean {
-    return this.#lifecycle.isStarted();
-  }
-
   isActive(): boolean {
     return this.#lifecycle.isActive();
-  }
-
-  // @internal
-  isNavigating(): boolean {
-    return this.#navigation.isNavigating();
   }
 
   start(
@@ -649,20 +584,36 @@ export class Router<
     name: string,
     canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
+    // 1. Validate input
     validateRouteName(name, "canDeactivate");
     RouteLifecycleNamespace.validateHandler(
       canDeactivateHandler,
       "canDeactivate",
     );
-    this.#routeLifecycle.registerCanDeactivate(name, canDeactivateHandler);
 
-    return this;
-  }
+    // 2. Validate not registering
+    RouteLifecycleNamespace.validateNotRegistering(
+      this.#routeLifecycle.isRegistering(name),
+      name,
+      "canDeactivate",
+    );
 
-  // @internal
-  clearCanDeactivate(name: string, silent?: boolean): this {
-    validateRouteName(name, "clearCanDeactivate");
-    this.#routeLifecycle.clearCanDeactivate(name, silent);
+    // 3. Check if overwrite and validate limit
+    const isOverwrite = this.#routeLifecycle.hasCanDeactivate(name);
+
+    if (!isOverwrite) {
+      RouteLifecycleNamespace.validateHandlerLimit(
+        this.#routeLifecycle.countCanDeactivate() + 1,
+        "canDeactivate",
+      );
+    }
+
+    // 4. Execute
+    this.#routeLifecycle.registerCanDeactivate(
+      name,
+      canDeactivateHandler,
+      isOverwrite,
+    );
 
     return this;
   }
@@ -671,36 +622,35 @@ export class Router<
     name: string,
     canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
+    // 1. Validate input
     validateRouteName(name, "canActivate");
     RouteLifecycleNamespace.validateHandler(canActivateHandler, "canActivate");
 
-    this.#routeLifecycle.registerCanActivate(name, canActivateHandler);
+    // 2. Validate not registering
+    RouteLifecycleNamespace.validateNotRegistering(
+      this.#routeLifecycle.isRegistering(name),
+      name,
+      "canActivate",
+    );
+
+    // 3. Check if overwrite and validate limit
+    const isOverwrite = this.#routeLifecycle.hasCanActivate(name);
+
+    if (!isOverwrite) {
+      RouteLifecycleNamespace.validateHandlerLimit(
+        this.#routeLifecycle.countCanActivate() + 1,
+        "canActivate",
+      );
+    }
+
+    // 4. Execute
+    this.#routeLifecycle.registerCanActivate(
+      name,
+      canActivateHandler,
+      isOverwrite,
+    );
 
     return this;
-  }
-
-  // @internal
-  clearCanActivate(name: string, silent?: boolean): this {
-    validateRouteName(name, "clearCanActivate");
-    this.#routeLifecycle.clearCanActivate(name, silent);
-
-    return this;
-  }
-
-  // @internal
-  getLifecycleFactories(): [
-    Record<string, ActivationFnFactory<Dependencies>>,
-    Record<string, ActivationFnFactory<Dependencies>>,
-  ] {
-    return this.#routeLifecycle.getFactories();
-  }
-
-  // @internal
-  getLifecycleFunctions(): [
-    Map<string, ActivationFn>,
-    Map<string, ActivationFn>,
-  ] {
-    return this.#routeLifecycle.getFunctions();
   }
 
   // ============================================================================
@@ -708,14 +658,20 @@ export class Router<
   // ============================================================================
 
   usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
+    // 1. Validate input arguments
     PluginsNamespace.validateUsePluginArgs<Dependencies>(plugins);
 
-    return this.#plugins.use(...plugins);
-  }
+    // 2. Validate limit
+    PluginsNamespace.validatePluginLimit(this.#plugins.count(), plugins.length);
 
-  // @internal
-  getPlugins(): PluginFactory<Dependencies>[] {
-    return this.#plugins.getAll();
+    // 3. Validate no duplicates with existing plugins
+    PluginsNamespace.validateNoDuplicatePlugins(
+      plugins,
+      this.#plugins.getAll(),
+    );
+
+    // 4. Execute (warnings, deduplication, initialization, commit)
+    return this.#plugins.use(...plugins);
   }
 
   // ============================================================================
@@ -725,26 +681,37 @@ export class Router<
   useMiddleware(
     ...middlewares: MiddlewareFactory<Dependencies>[]
   ): Unsubscribe {
+    // 1. Validate input arguments
     MiddlewareNamespace.validateUseMiddlewareArgs<Dependencies>(middlewares);
 
-    return this.#middleware.use(...middlewares);
+    // 2. Validate no duplicates
+    MiddlewareNamespace.validateNoDuplicates<Dependencies>(
+      middlewares,
+      this.#middleware.getFactories(),
+    );
+
+    // 3. Validate limit
+    MiddlewareNamespace.validateMiddlewareLimit(
+      this.#middleware.count(),
+      middlewares.length,
+    );
+
+    // 4. Initialize (without committing)
+    const initialized = this.#middleware.initialize(...middlewares);
+
+    // 5. Validate results
+    for (const { middleware, factory } of initialized) {
+      MiddlewareNamespace.validateMiddleware<Dependencies>(middleware, factory);
+    }
+
+    // 6. Commit
+    return this.#middleware.commit(initialized);
   }
 
-  // @internal
   clearMiddleware(): this {
     this.#middleware.clear();
 
     return this;
-  }
-
-  // @internal
-  getMiddlewareFactories(): MiddlewareFactory<Dependencies>[] {
-    return this.#middleware.getFactories();
-  }
-
-  // @internal
-  getMiddlewareFunctions(): Middleware[] {
-    return this.#middleware.getFunctions();
   }
 
   // ============================================================================
@@ -763,6 +730,11 @@ export class Router<
 
   setDependencies(deps: Dependencies): this {
     DependenciesNamespace.validateDependenciesObject(deps, "setDependencies");
+    DependenciesNamespace.validateDependencyLimit(
+      this.#dependencies.count(),
+      Object.keys(deps).length,
+      "setDependencies",
+    );
     this.#dependencies.setMultiple(deps);
 
     return this;
@@ -771,7 +743,11 @@ export class Router<
   getDependency<K extends keyof Dependencies>(key: K): Dependencies[K] {
     DependenciesNamespace.validateName(key, "getDependency");
 
-    return this.#dependencies.get(key);
+    const value = this.#dependencies.get(key);
+
+    DependenciesNamespace.validateDependencyExists(value, key);
+
+    return value;
   }
 
   getDependencies(): Partial<Dependencies> {
@@ -801,32 +777,6 @@ export class Router<
   // Events (backed by ObservableNamespace)
   // ============================================================================
 
-  // @internal
-  invokeEventListeners(
-    eventName: EventToNameMap[EventsKeys],
-    toState?: State,
-    fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
-  ): void {
-    ObservableNamespace.validateInvokeArgs(eventName, toState, fromState, arg);
-    this.#observable.invoke(eventName as EventName, toState, fromState, arg);
-  }
-
-  // @internal
-  hasListeners(eventName: EventToNameMap[EventsKeys]): boolean {
-    // No validation - return false for invalid event names (matches original behavior)
-    return this.#observable.hasListeners(eventName);
-  }
-
-  // @internal
-  removeEventListener<E extends EventName>(
-    eventName: E,
-    cb: Plugin[EventMethodMap[E]],
-  ): void {
-    ObservableNamespace.validateListenerArgs(eventName, cb);
-    this.#observable.removeEventListener(eventName, cb);
-  }
-
   addEventListener<E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
@@ -840,40 +790,47 @@ export class Router<
   // Navigation
   // ============================================================================
 
-  // @internal
-  forward(fromRoute: string, toRoute: string): this {
-    // Static validation (argument types)
-    RoutesNamespace.validateForwardArgs(fromRoute, toRoute);
-
-    // Instance validation and mutation (route existence, param compatibility, cycles)
-    this.#routes.forward(fromRoute, toRoute);
-
-    return this;
-  }
-
   navigate(
     routeName: string,
     routeParamsOrDone?: Params | DoneFn,
     optionsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
+    // 1. Validate route name
     NavigationNamespace.validateNavigateArgs(routeName);
 
-    return this.#navigation.navigate(
-      routeName,
+    // 2. Parse polymorphic arguments
+    const { params, opts, callback } = NavigationNamespace.parseNavigateArgs(
       routeParamsOrDone,
       optionsOrDone,
       done,
     );
+
+    // 3. Validate parsed options
+    NavigationNamespace.validateNavigationOptions(opts, "navigate");
+
+    // 4. Execute navigation with parsed arguments
+    return this.#navigation.navigate(routeName, params, opts, callback);
   }
 
   navigateToDefault(
     optsOrDone?: NavigationOptions | DoneFn,
     done?: DoneFn,
   ): CancelFn {
+    // 1. Validate arguments (before parsing)
     NavigationNamespace.validateNavigateToDefaultArgs(optsOrDone, done);
 
-    return this.#navigation.navigateToDefault(optsOrDone, done);
+    // 2. Parse polymorphic arguments
+    const { opts, callback } = NavigationNamespace.parseNavigateToDefaultArgs(
+      optsOrDone,
+      done,
+    );
+
+    // 3. Validate parsed options
+    NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
+
+    // 4. Execute navigation with parsed arguments
+    return this.#navigation.navigateToDefault(opts, callback);
   }
 
   // @internal-plugin
@@ -961,9 +918,10 @@ export class Router<
     this.#routeLifecycle.setDependencies(routeLifecycleDeps);
 
     // RoutesNamespace uses function injection (will register pending canActivate handlers)
+    // Use facade method for proper validation
     const routesDeps: RoutesDependencies<Dependencies> = {
       canActivate: (name, handler) => {
-        this.#routeLifecycle.registerCanActivate(name, handler);
+        this.canActivate(name, handler);
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),

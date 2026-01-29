@@ -9,7 +9,6 @@ import {
   matchSegments,
   buildPath as routeNodeBuildPath,
   routeTreeToDefinitions,
-  validateRoute,
 } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 
@@ -23,7 +22,6 @@ import {
   removeFromDefinitions,
   resolveForwardChain,
   sanitizeRoute,
-  validateForwardToTargets,
 } from "./helpers";
 import { createRouteState } from "./stateBuilder";
 import {
@@ -31,13 +29,13 @@ import {
   validateSetRootPathArgs,
   validateAddRouteArgs,
   validateIsActiveRouteArgs,
-  validateForwardArgs,
   validateStateBuilderArgs,
   validateUpdateRouteBasicArgs,
   validateUpdateRoutePropertyTypes,
   validateBuildPathArgs,
   validateMatchPathArgs,
   validateShouldUpdateNodeArgs,
+  validateRoutes,
 } from "./validators";
 import { constants } from "../../constants";
 import { createBuildOptions } from "../../helpers";
@@ -154,13 +152,6 @@ export class RoutesNamespace<
     validateIsActiveRouteArgs(name, params, strictEquality, ignoreQueryParams);
   }
 
-  static validateForwardArgs(
-    fromRoute: unknown,
-    toRoute: unknown,
-  ): asserts fromRoute is string {
-    validateForwardArgs(fromRoute, toRoute);
-  }
-
   static validateStateBuilderArgs(
     routeName: unknown,
     routeParams: unknown,
@@ -204,6 +195,14 @@ export class RoutesNamespace<
     validateShouldUpdateNodeArgs(nodeName);
   }
 
+  static validateRoutes<Deps extends DefaultDependencies>(
+    routes: Route<Deps>[],
+    tree: RouteTree,
+    forwardMap: Record<string, string>,
+  ): void {
+    validateRoutes(routes, tree, forwardMap);
+  }
+
   // =========================================================================
   // Dependency injection
   // =========================================================================
@@ -245,6 +244,22 @@ export class RoutesNamespace<
   }
 
   /**
+   * Returns the route tree.
+   * Used by facade for state-dependent validation.
+   */
+  getTree(): RouteTree {
+    return this.#tree;
+  }
+
+  /**
+   * Returns the forward record (route name -> forward target).
+   * Used by facade for state-dependent validation.
+   */
+  getForwardRecord(): Record<string, string> {
+    return this.#config.forwardMap;
+  }
+
+  /**
    * Sets the root path and rebuilds the tree.
    */
   setRootPath(newRootPath: string): void {
@@ -278,14 +293,11 @@ export class RoutesNamespace<
 
   /**
    * Adds one or more routes to the router.
-   * Validates all routes before adding them.
+   * Input already validated by facade (properties and state-dependent checks).
    *
    * @param routes - Routes to add
    */
   addRoutes(routes: Route<Dependencies>[]): void {
-    // Validate all routes before any mutation
-    this.#validateRoutes(routes);
-
     // Add to definitions
     for (const route of routes) {
       this.#definitions.push(sanitizeRoute(route));
@@ -1156,41 +1168,5 @@ export class RoutesNamespace<
     }
 
     return route;
-  }
-
-  // =========================================================================
-  // Route Validation Methods
-  // =========================================================================
-
-  /**
-   * Validates routes before adding them to the router.
-   * Uses centralized validation functions from route-tree and helpers.
-   *
-   * @param routes - Routes to validate
-   */
-  #validateRoutes(routes: Route<Dependencies>[]): void {
-    // State-dependent validation (requires access to #tree and #config)
-    // Property validation is done in static validateAddRouteArgs (called by facade)
-
-    // Tracking sets for duplicate detection
-    const seenNames = new Set<string>();
-    const seenPathsByParent = new Map<string, Set<string>>();
-
-    for (const route of routes) {
-      // Use route-tree's validateRoute for structural validation
-      // (type, name, path, duplicates, parent exists, children array)
-      // Note: validateRoute handles children recursively
-      validateRoute(
-        route,
-        "addRoute",
-        this.#tree,
-        "",
-        seenNames,
-        seenPathsByParent,
-      );
-    }
-
-    // Validate forwardTo targets and cycles
-    validateForwardToTargets(routes, this.#config.forwardMap, this.#tree);
   }
 }

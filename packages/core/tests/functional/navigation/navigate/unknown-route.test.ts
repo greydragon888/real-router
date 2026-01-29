@@ -98,31 +98,6 @@ describe("router.navigate() - unknown route", () => {
       });
     });
 
-    it("should use makeNotFoundState directly to create UNKNOWN_ROUTE", () => {
-      const canActivateGuard = vi.fn().mockReturnValue(true);
-
-      // Set up guard (should not be called)
-      router.canActivate(constants.UNKNOWN_ROUTE, () => canActivateGuard);
-
-      // Create UNKNOWN_ROUTE state directly
-      const unknownState = router.makeNotFoundState("/direct-unknown-path", {
-        replace: true,
-      });
-
-      expect(unknownState.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(unknownState.params.path).toBe("/direct-unknown-path");
-      expect(unknownState.path).toBe("/direct-unknown-path");
-
-      // Manually set state to test guard behavior
-      router.setState(unknownState);
-
-      // Navigate away to trigger lifecycle
-      router.navigate("profile", {}, {}, () => {
-        // canActivate should not have been called for UNKNOWN_ROUTE
-        expect(canActivateGuard).not.toHaveBeenCalled();
-      });
-    });
-
     it("should handle blocked transitions from existing route when allowNotFound disabled", () => {
       // Test without allowNotFound to see normal ROUTE_NOT_FOUND behavior
       const strictRouter = createRouter(

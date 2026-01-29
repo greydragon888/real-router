@@ -50,41 +50,6 @@ describe("router.navigate() - events transition success", () => {
       unsubSuccess();
     });
 
-    it("should call router.setState with newState before emitting TRANSITION_SUCCESS", () => {
-      const onSuccess = vi.fn();
-      const setStateSpy = vi.spyOn(router, "setState");
-
-      router.navigate("profile", {}, {}, (err) => {
-        expect(err).toBeUndefined();
-      });
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      setStateSpy.mockClear();
-      onSuccess.mockClear();
-
-      router.navigate("orders", {}, (err, state) => {
-        expect(err).toBeUndefined();
-
-        // Verify setState was called
-        expect(setStateSpy).toHaveBeenCalledTimes(1);
-        expect(setStateSpy).toHaveBeenCalledWith(state);
-
-        // Verify TRANSITION_SUCCESS was emitted after setState
-        expect(onSuccess).toHaveBeenCalledTimes(1);
-
-        // Verify call order: setState should be called before TRANSITION_SUCCESS
-        const setStateCallTime = setStateSpy.mock.invocationCallOrder[0];
-        const successCallTime = onSuccess.mock.invocationCallOrder[0];
-
-        expect(setStateCallTime).toBeLessThan(successCallTime);
-      });
-
-      unsubSuccess();
-    });
-
     it("should call navigation callback with done(undefined, newState)", () => {
       vi.useFakeTimers();
 

@@ -105,14 +105,6 @@ describe("router.navigate() - router not started", () => {
       unsubError();
     });
 
-    it("should not call router.setState when router is not started", () => {
-      const setStateSpy = vi.spyOn(router, "setState");
-
-      router.navigate("users", noop);
-
-      expect(setStateSpy).not.toHaveBeenCalled();
-    });
-
     it("should handle navigation with parameters when router not started", () => {
       const callback = vi.fn();
 
@@ -230,7 +222,7 @@ describe("router.navigate() - router not started", () => {
       const callback = vi.fn();
 
       // Verify router is stopped
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       router.navigate("users", callback);
 
@@ -247,7 +239,7 @@ describe("router.navigate() - router not started", () => {
       // Start router and try again
       router.start();
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       router.navigate("users", callback);
 

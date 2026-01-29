@@ -37,7 +37,7 @@ describe("router.start() - state object scenarios", () => {
 
       const result = router.start("/users/list", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -151,105 +151,6 @@ describe("router.start() - state object scenarios", () => {
       });
     });
 
-    describe("valid state object with direct setState", () => {
-      it("should successfully initialize router with valid state object", () => {
-        const startState = {
-          name: "users.view",
-          params: { id: "123" },
-          path: "/users/view/123",
-        };
-        const callback = vi.fn();
-
-        const result = router.start(startState, callback);
-
-        // Router should initialize and return itself
-        expect(result).toBe(router);
-        expect(router.isStarted()).toBe(true);
-      });
-
-      it("should call callback without error with provided state", () => {
-        const startState = {
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-        };
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Callback should be called exactly once without error
-        expect(callback).toHaveBeenCalledExactlyOnceWith(undefined, startState);
-      });
-
-      it("should set router state to provided state object", () => {
-        const startState = {
-          name: "orders.view",
-          params: { id: "456" },
-          path: "/orders/view/456",
-        };
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Router state should match the provided object
-        expect(router.getState()).toStrictEqual(startState);
-      });
-
-      it("should process state through transition pipeline including middleware", () => {
-        const startState = {
-          name: "settings.account",
-          params: {},
-          path: "/settings/account",
-        };
-
-        // add middleware to check that pipeline works
-        const middlewareSpy = vi.fn();
-
-        router.useMiddleware(() => (toState, _fromState, done) => {
-          middlewareSpy(toState.name);
-          done(); // allow the transition
-        });
-
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Middleware should be called
-        expect(middlewareSpy).toHaveBeenCalledExactlyOnceWith(
-          "settings.account",
-        );
-
-        // And the state should be established
-        expect(callback).toHaveBeenCalledWith(undefined, startState);
-      });
-
-      it("should emit proper transition events for state objects", () => {
-        const startState = {
-          name: "profile.me",
-          params: {},
-          path: "/profile/",
-        };
-
-        const routerStartSpy = vi.fn();
-        const transitionStartSpy = vi.fn();
-        const transitionSuccessSpy = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, routerStartSpy);
-        router.addEventListener(events.TRANSITION_START, transitionStartSpy);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessSpy,
-        );
-
-        router.start(startState);
-
-        // All events should be emitted
-        expect(routerStartSpy).toHaveBeenCalledTimes(1);
-        expect(transitionStartSpy).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
     describe("invalid state object initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for non-existent route name", () => {
@@ -265,7 +166,7 @@ describe("router.start() - state object scenarios", () => {
         router.start(invalidState, callback);
 
         // Router should not be started
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
 
         // Callback should be called with ROUTE_NOT_FOUND error
         expect(callback).toHaveBeenCalledTimes(1);
@@ -294,7 +195,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalledTimes(1);
 
         const [error, state] = callback.mock.calls[0];
@@ -318,7 +219,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalled();
 
         const [error] = callback.mock.calls[0];
@@ -342,7 +243,7 @@ describe("router.start() - state object scenarios", () => {
         // @ts-expect-error: Intentionally testing invalid structure
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalled();
 
         const [error] = callback.mock.calls[0];
@@ -367,7 +268,7 @@ describe("router.start() - state object scenarios", () => {
         // @ts-expect-error: Intentionally testing invalid types
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalledTimes(1);
 
         const [error, state] = callback.mock.calls[0];
@@ -393,7 +294,7 @@ describe("router.start() - state object scenarios", () => {
         }).not.toThrowError();
 
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         const [error, state] = callback.mock.calls[0];
 
@@ -421,7 +322,7 @@ describe("router.start() - state object scenarios", () => {
         expect(error).toBeUndefined();
         expect(state?.name).toBe("users.view");
         expect(state?.params).toStrictEqual({ id: "123" });
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users.view");
       });
 
@@ -448,7 +349,7 @@ describe("router.start() - state object scenarios", () => {
           filter: "pending",
         });
         expect(router.getState()?.name).toBe("orders.view");
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
       });
     });
 
@@ -869,7 +770,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
       });
 
@@ -983,7 +884,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
       });
     });
@@ -1020,7 +921,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(validState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
       });
     });
@@ -1060,8 +961,8 @@ describe("router.start() - state object scenarios", () => {
         expect(stateError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
         // Both routers should not be started
-        expect(router1.isStarted()).toBe(false);
-        expect(router2.isStarted()).toBe(false);
+        expect(router1.isActive()).toBe(false);
+        expect(router2.isActive()).toBe(false);
 
         router1.stop();
         router2.stop();

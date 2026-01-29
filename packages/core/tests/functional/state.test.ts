@@ -1,8 +1,5 @@
-import { logger } from "@real-router/logger";
 import { createRouteTree, matchSegments } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
-
-import { constants } from "@real-router/core";
 
 import {
   buildNameFromSegments,
@@ -31,73 +28,13 @@ describe("core/state", () => {
       expect(router.getState()).toBe(undefined);
     });
 
-    it("returns the previously set state", () => {
-      const state = router.makeState("home", { id: 1 }, "/home");
+    it("returns state after navigation", () => {
+      router.navigate("users.view", { id: "123" });
 
-      router.setState(state);
+      const state = router.getState();
 
-      expect(router.getState()).toStrictEqual(state);
-    });
-  });
-
-  describe("setState", () => {
-    it("sets internal router state", () => {
-      const state = router.makeState("home", {}, "/home");
-
-      router.setState(state);
-
-      expect(router.getState()).toStrictEqual(state);
-    });
-
-    it("clears state when called without argument", () => {
-      const state = router.makeState("home", {}, "/home");
-
-      router.setState(state);
-      router.setState();
-
-      expect(router.getState()).toBe(undefined);
-    });
-
-    describe("argument validation", () => {
-      it("throws TypeError for null", () => {
-        expect(() => {
-          router.setState(null as any);
-        }).toThrowError(TypeError);
-        expect(() => {
-          router.setState(null as any);
-        }).toThrowError("Invalid state");
-      });
-
-      it("throws TypeError for invalid object (missing fields)", () => {
-        expect(() => {
-          router.setState({ name: "home" } as any);
-        }).toThrowError(TypeError);
-        expect(() => {
-          router.setState({ name: "home", params: {} } as any);
-        }).toThrowError("Invalid state");
-      });
-
-      it("throws TypeError for primitive values", () => {
-        expect(() => {
-          router.setState("home" as any);
-        }).toThrowError(TypeError);
-        expect(() => {
-          router.setState(123 as any);
-        }).toThrowError(TypeError);
-      });
-
-      it("preserves state after failed validation", () => {
-        const validState = router.makeState("home", {}, "/home");
-
-        router.setState(validState);
-
-        expect(() => {
-          router.setState(null as any);
-        }).toThrowError();
-
-        // State should remain unchanged
-        expect(router.getState()).toStrictEqual(validState);
-      });
+      expect(state?.name).toBe("users.view");
+      expect(state?.params).toStrictEqual({ id: "123" });
     });
   });
 
@@ -238,43 +175,6 @@ describe("core/state", () => {
             {} as unknown as number,
           ),
         ).toThrowError(/Invalid forceId/);
-      });
-    });
-  });
-
-  describe("makeNotFoundState", () => {
-    it("returns a state for unknown route", () => {
-      const state = router.makeNotFoundState("/unknown");
-
-      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(state.params).toStrictEqual({ path: "/unknown" });
-      expect(state.path).toBe("/unknown");
-    });
-
-    it("includes meta when options passed", () => {
-      const state = router.makeNotFoundState("/x", { reload: true });
-
-      expect(state.meta?.options).toStrictEqual({ reload: true });
-      expect(state.meta?.redirected).toBe(false);
-    });
-
-    describe("argument validation", () => {
-      it("throws TypeError for non-string path", () => {
-        expect(() =>
-          router.makeNotFoundState(123 as unknown as string),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.makeNotFoundState(null as unknown as string),
-        ).toThrowError(/Invalid path/);
-      });
-
-      it("throws TypeError for invalid options", () => {
-        expect(() =>
-          router.makeNotFoundState("/x", "invalid" as never),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.makeNotFoundState("/x", { reload: "yes" } as never),
-        ).toThrowError(/Invalid options/);
       });
     });
   });
@@ -570,101 +470,6 @@ describe("core/state", () => {
     });
   });
 
-  describe("areStatesDescendants (deprecated)", () => {
-    // Suppress deprecation warnings during tests
-    const originalWarn = console.warn;
-
-    beforeEach(() => {
-      vi.spyOn(logger, "warn").mockImplementation(() => {});
-    });
-
-    afterEach(() => {
-      logger.warn = originalWarn;
-    });
-
-    it("returns true if child extends parent and params match", () => {
-      const parent = router.makeState("index", { x: 1 }, "/");
-      const child = router.makeState("index.home", { x: 1, y: 2 }, "/home");
-
-      expect(router.areStatesDescendants(parent, child)).toBe(true);
-    });
-
-    it("returns false if child name doesn't extend parent", () => {
-      const parent = router.makeState("home", {}, "/home");
-      const child = router.makeState("admin.sign-in", {}, "/sign-in");
-
-      expect(router.areStatesDescendants(parent, child)).toBe(false);
-    });
-
-    it("returns false if parent params don't match", () => {
-      const parent = router.makeState("home", { x: 1 }, "/home");
-      const child = router.makeState("home.nested", { x: 2 }, "/home/nested");
-
-      expect(router.areStatesDescendants(parent, child)).toBe(false);
-    });
-
-    it("logs deprecation warning when called", () => {
-      const parent = router.makeState("index", {}, "/");
-      const child = router.makeState("index.home", {}, "/home");
-
-      router.areStatesDescendants(parent, child);
-
-      // Checking logger.warn, not console.warn (logger is spied in beforeEach)
-      expect(logger.warn).toHaveBeenCalledWith(
-        "real-router",
-        expect.stringContaining("deprecated"),
-      );
-    });
-
-    describe("argument validation", () => {
-      it("throws TypeError for invalid parentState", () => {
-        const child = router.makeState("home", {}, "/home");
-
-        expect(() =>
-          router.areStatesDescendants(null as never, child),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.areStatesDescendants("invalid" as never, child),
-        ).toThrowError(/Invalid state/);
-      });
-
-      it("throws TypeError for invalid childState", () => {
-        const parent = router.makeState("home", {}, "/home");
-
-        expect(() =>
-          router.areStatesDescendants(parent, null as never),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.areStatesDescendants(parent, { name: "x" } as never),
-        ).toThrowError(/Invalid state/);
-      });
-    });
-
-    describe("array params comparison", () => {
-      it("returns true when array params match (deep equality)", () => {
-        const parent = router.makeState("index", { tags: ["a", "b"] }, "/");
-        const child = router.makeState(
-          "index.home",
-          { tags: ["a", "b"], extra: 1 },
-          "/home",
-        );
-
-        expect(router.areStatesDescendants(parent, child)).toBe(true);
-      });
-
-      it("returns false when array params differ", () => {
-        const parent = router.makeState("index", { tags: ["a", "b"] }, "/");
-        const child = router.makeState(
-          "index.home",
-          { tags: ["a", "c"], extra: 1 },
-          "/home",
-        );
-
-        expect(router.areStatesDescendants(parent, child)).toBe(false);
-      });
-    });
-  });
-
   describe("forwardState", () => {
     it("returns same state if no forward defined", () => {
       const state = router.forwardState("home", { id: 1 });
@@ -679,7 +484,7 @@ describe("core/state", () => {
         { name: "srcRoute", path: "/src", defaultParams: { a: 1 } },
         { name: "dstRoute", path: "/dst", defaultParams: { b: 2 } },
       ]);
-      router.forward("srcRoute", "dstRoute");
+      router.updateRoute("srcRoute", { forwardTo: "dstRoute" });
 
       const state = router.forwardState("srcRoute", { c: 3 });
 
@@ -697,7 +502,7 @@ describe("core/state", () => {
         },
         { name: "dstNoDefaults", path: "/dst-no-defaults" },
       ]);
-      router.forward("srcWithDefaults", "dstNoDefaults");
+      router.updateRoute("srcWithDefaults", { forwardTo: "dstNoDefaults" });
 
       const state = router.forwardState("srcWithDefaults", { c: 3 });
 
@@ -715,7 +520,7 @@ describe("core/state", () => {
           defaultParams: { b: 2 },
         },
       ]);
-      router.forward("srcNoDefaults", "dstWithDefaults");
+      router.updateRoute("srcNoDefaults", { forwardTo: "dstWithDefaults" });
 
       const state = router.forwardState("srcNoDefaults", { c: 3 });
 

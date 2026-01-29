@@ -1,8 +1,65 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { createTestRouter } from "../../../helpers";
+import { errorCodes } from "@real-router/core";
 
-import type { Router } from "@real-router/core";
+import { createTestRouter } from "../helpers";
+
+import type { Router, State } from "@real-router/core";
+
+/**
+ * Creates a trackable plugin that records when its hooks are called.
+ */
+function createTrackingPlugin(id: string, orderTracker?: string[]) {
+  const calls = {
+    onStart: 0,
+    onStop: 0,
+    onTransitionSuccess: 0,
+  };
+
+  return {
+    factory: () => ({
+      onStart: () => {
+        calls.onStart++;
+        orderTracker?.push(`${id}-start`);
+      },
+      onStop: () => {
+        calls.onStop++;
+        orderTracker?.push(`${id}-stop`);
+      },
+      onTransitionSuccess: () => {
+        calls.onTransitionSuccess++;
+        orderTracker?.push(`${id}-transition`);
+      },
+    }),
+    getCalls: () => ({ ...calls }),
+    reset: () => {
+      calls.onStart = 0;
+      calls.onStop = 0;
+      calls.onTransitionSuccess = 0;
+    },
+  };
+}
+
+/**
+ * Creates a trackable middleware that records when it's called.
+ */
+function createTrackingMiddleware(id: string, orderTracker?: string[]) {
+  let callCount = 0;
+
+  return {
+    factory:
+      () =>
+      (_toState: State, _fromState: State | undefined, done: Function) => {
+        callCount++;
+        orderTracker?.push(id);
+        done();
+      },
+    getCallCount: () => callCount,
+    reset: () => {
+      callCount = 0;
+    },
+  };
+}
 
 describe("router.clone()", () => {
   it("should share the route tree with original router", () => {
@@ -18,52 +75,80 @@ describe("router.clone()", () => {
 
   it("should clone plugins", () => {
     const router = createTestRouter();
-    const myPlugin = () => ({
-      onTransitionSuccess: () => true,
-    });
+    const tracker = createTrackingPlugin("plugin");
 
-    router.usePlugin(myPlugin);
+    router.usePlugin(tracker.factory);
 
     const clonedRouter = router.clone();
 
-    expect(clonedRouter.getPlugins()).toContain(myPlugin);
+    // Verify plugin is cloned by checking it responds to events on cloned router
+    clonedRouter.start();
+
+    expect(tracker.getCalls().onStart).toBe(1);
+
+    clonedRouter.stop();
   });
 
   it("should clone middleware functions", () => {
     const router = createTestRouter();
-    const myMiddleware = () => () => true;
+    const tracker = createTrackingMiddleware("mw");
 
-    router.useMiddleware(myMiddleware);
+    router.useMiddleware(tracker.factory);
 
     const clonedRouter = router.clone();
 
-    expect(clonedRouter.getMiddlewareFactories()).toContain(myMiddleware);
+    // Verify middleware is cloned by checking it executes on cloned router
+    clonedRouter.start("/");
+
+    clonedRouter.navigate("users", (err) => {
+      expect(err).toBeUndefined();
+      expect(tracker.getCallCount()).toBeGreaterThan(0);
+    });
+
+    clonedRouter.stop();
   });
 
   it("should clone canActivate handlers", () => {
     const router = createTestRouter();
-    const canActivateAdmin = () => () => false;
+    const canActivateGuard = vi.fn().mockReturnValue(false);
 
-    router.canActivate("admin", canActivateAdmin);
+    router.canActivate("admin", () => canActivateGuard);
 
     const clonedRouter = router.clone();
 
-    expect(clonedRouter.getLifecycleFactories()[1].admin).toStrictEqual(
-      canActivateAdmin,
-    );
+    clonedRouter.start("/");
+
+    // Verify canActivate is cloned - navigation to admin should be blocked
+    clonedRouter.navigate("admin", (err) => {
+      expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      expect(canActivateGuard).toHaveBeenCalled();
+    });
+
+    clonedRouter.stop();
   });
 
   it("should clone canDeactivate handlers", () => {
     const router = createTestRouter();
-    const canDeactivateUser = () => () => true;
+    const canDeactivateGuard = vi.fn().mockReturnValue(false);
 
-    router.canDeactivate("user", canDeactivateUser);
+    router.canDeactivate("users", () => canDeactivateGuard);
 
     const clonedRouter = router.clone();
 
-    expect(clonedRouter.getLifecycleFactories()[0].user).toStrictEqual(
-      canDeactivateUser,
-    );
+    clonedRouter.start("/");
+
+    // Navigate to users first
+    clonedRouter.navigate("users", (err) => {
+      expect(err).toBeUndefined();
+
+      // Verify canDeactivate is cloned - leaving users should be blocked
+      clonedRouter.navigate("home", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(canDeactivateGuard).toHaveBeenCalled();
+      });
+    });
+
+    clonedRouter.stop();
   });
 
   it("should clone router options", () => {
@@ -95,24 +180,52 @@ describe("router.clone()", () => {
 
   it("should make independent router clone: plugins", () => {
     const router = createTestRouter();
-    const plugin = () => ({});
+    const tracker = createTrackingPlugin("plugin");
     const clonedRouter = router.clone();
 
-    clonedRouter.usePlugin(plugin);
+    // Add plugin only to cloned router
+    clonedRouter.usePlugin(tracker.factory);
 
-    expect(router.getPlugins()).not.toContain(plugin);
-    expect(clonedRouter.getPlugins()).toContain(plugin);
+    // Start both routers
+    router.start();
+    clonedRouter.start();
+
+    // Plugin should only respond on cloned router (2 starts: router + clonedRouter)
+    // But we added plugin only to clonedRouter, so only 1 start
+    expect(tracker.getCalls().onStart).toBe(1);
+
+    router.stop();
+    clonedRouter.stop();
   });
 
   it("should make independent router clone: middleware", () => {
     const router = createTestRouter();
-    const middleware = () => () => true;
+    const tracker = createTrackingMiddleware("mw");
     const clonedRouter = router.clone();
 
-    clonedRouter.useMiddleware(middleware);
+    // Add middleware only to cloned router
+    clonedRouter.useMiddleware(tracker.factory);
 
-    expect(router.getMiddlewareFactories()).not.toContain(middleware);
-    expect(clonedRouter.getMiddlewareFactories()).toContain(middleware);
+    // Navigate on original router
+    router.start("/");
+
+    router.navigate("users", (err) => {
+      expect(err).toBeUndefined();
+      // Middleware should NOT execute on original router
+      expect(tracker.getCallCount()).toBe(0);
+    });
+
+    // Navigate on cloned router
+    clonedRouter.start("/");
+
+    clonedRouter.navigate("users", (err) => {
+      expect(err).toBeUndefined();
+      // Middleware should execute on cloned router
+      expect(tracker.getCallCount()).toBeGreaterThan(0);
+    });
+
+    router.stop();
+    clonedRouter.stop();
   });
 
   it("should accept new dependencies", () => {
@@ -128,8 +241,8 @@ describe("router.clone()", () => {
     router.start("/");
     const clonedRouter = router.clone();
 
-    expect(router.isStarted()).toBe(true);
-    expect(clonedRouter.isStarted()).toBe(false);
+    expect(router.isActive()).toBe(true);
+    expect(clonedRouter.isActive()).toBe(false);
     expect(clonedRouter.getState()).toBeUndefined();
   });
 
@@ -152,7 +265,7 @@ describe("router.clone()", () => {
 
     router.addRoute({ name: "original", path: "/original" });
     router.addRoute({ name: "redirectTarget", path: "/redirect-target" });
-    router.forward("original", "redirectTarget");
+    router.updateRoute("original", { forwardTo: "redirectTarget" });
 
     const clonedRouter = router.clone();
 
@@ -163,7 +276,7 @@ describe("router.clone()", () => {
 
     // Modify cloned router's forward rules
     clonedRouter.addRoute({ name: "newTarget", path: "/new-target" });
-    clonedRouter.forward("original", "newTarget");
+    clonedRouter.updateRoute("original", { forwardTo: "newTarget" });
 
     // Original should NOT be affected
     expect(router.forwardState("original", {}).name).toBe("redirectTarget");
@@ -288,7 +401,16 @@ describe("router.clone()", () => {
       // Don't add any middleware
       const clonedRouter = router.clone();
 
-      expect(clonedRouter.getMiddlewareFactories()).toHaveLength(0);
+      // Clone should work without errors
+      expect(clonedRouter).toBeDefined();
+
+      clonedRouter.start("/");
+
+      clonedRouter.navigate("users", (err) => {
+        expect(err).toBeUndefined();
+      });
+
+      clonedRouter.stop();
     });
 
     it("should work when router has no plugins", () => {
@@ -296,22 +418,28 @@ describe("router.clone()", () => {
       // Don't add any plugins
       const clonedRouter = router.clone();
 
-      expect(clonedRouter.getPlugins()).toHaveLength(0);
+      // Clone should work without errors
+      expect(clonedRouter).toBeDefined();
+
+      clonedRouter.start("/");
+      clonedRouter.stop();
     });
 
     it("should clone lifecycle handlers from route definitions", () => {
       const router = createTestRouter();
-      // createTestRouter has routes with canActivate defined (admin, auth-protected)
+      // createTestRouter has routes with canActivate defined
       const clonedRouter = router.clone();
 
-      const [canDeactivate, canActivate] = clonedRouter.getLifecycleFactories();
-      const [origDeactivate, origActivate] = router.getLifecycleFactories();
+      clonedRouter.start("/");
 
-      // Should have same lifecycle handlers as original
-      expect(Object.keys(canActivate)).toStrictEqual(Object.keys(origActivate));
-      expect(Object.keys(canDeactivate)).toStrictEqual(
-        Object.keys(origDeactivate),
-      );
+      // Verify lifecycle handlers are cloned by testing navigation behavior
+      // The "admin" route has canActivate that blocks navigation
+      clonedRouter.navigate("admin", (err) => {
+        // If lifecycle handlers are cloned, admin should be blocked
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      });
+
+      clonedRouter.stop();
     });
 
     it("should clone config including route-defined encoders/decoders", () => {
@@ -348,7 +476,7 @@ describe("router.clone()", () => {
         defaultParams: { id: "default", page: 1 },
       });
       router.addRoute({ name: "targetRoute", path: "/target" });
-      router.forward("complexRoute", "targetRoute");
+      router.updateRoute("complexRoute", { forwardTo: "targetRoute" });
 
       const clonedRouter = router.clone();
 
@@ -381,134 +509,197 @@ describe("router.clone()", () => {
 
     it("should clone multiple middleware in correct order", () => {
       const router = createTestRouter();
-      const middleware1 = () => () => true;
-      const middleware2 = () => () => false;
-      const middleware3 = () => () => true;
+      const orderTracker: string[] = [];
+      const mw1 = createTrackingMiddleware("mw1", orderTracker);
+      const mw2 = createTrackingMiddleware("mw2", orderTracker);
+      const mw3 = createTrackingMiddleware("mw3", orderTracker);
 
-      router.useMiddleware(middleware1, middleware2, middleware3);
+      router.useMiddleware(mw1.factory, mw2.factory, mw3.factory);
 
       const clonedRouter = router.clone();
-      const factories = clonedRouter.getMiddlewareFactories();
 
-      expect(factories).toHaveLength(3);
-      expect(factories[0]).toBe(middleware1);
-      expect(factories[1]).toBe(middleware2);
-      expect(factories[2]).toBe(middleware3);
+      clonedRouter.start("/");
+
+      clonedRouter.navigate("users", (err) => {
+        expect(err).toBeUndefined();
+        // Verify order is preserved
+        expect(orderTracker).toStrictEqual(["mw1", "mw2", "mw3"]);
+      });
+
+      clonedRouter.stop();
     });
 
     it("should clone multiple plugins in correct order", () => {
       const router = createTestRouter();
-      const plugin1 = () => ({ onStart: () => {} });
-      const plugin2 = () => ({ onStop: () => {} });
+      const orderTracker: string[] = [];
+      const plugin1 = createTrackingPlugin("p1", orderTracker);
+      const plugin2 = createTrackingPlugin("p2", orderTracker);
 
-      router.usePlugin(plugin1, plugin2);
+      router.usePlugin(plugin1.factory, plugin2.factory);
 
       const clonedRouter = router.clone();
-      const plugins = clonedRouter.getPlugins();
 
-      expect(plugins).toHaveLength(2);
-      expect(plugins[0]).toBe(plugin1);
-      expect(plugins[1]).toBe(plugin2);
+      clonedRouter.start("/");
+
+      // Verify order is preserved (both onStart should be called in order)
+      expect(orderTracker).toContain("p1-start");
+      expect(orderTracker).toContain("p2-start");
+      expect(orderTracker.indexOf("p1-start")).toBeLessThan(
+        orderTracker.indexOf("p2-start"),
+      );
+
+      clonedRouter.stop();
     });
 
     it("should clone multiple lifecycle handlers", () => {
       const router = createTestRouter();
-      const canActivateA = () => () => true;
-      const canActivateB = () => () => false;
-      const canDeactivateA = () => () => true;
+      const canActivateHome = vi.fn().mockReturnValue(true);
+      const canActivateUsers = vi.fn().mockReturnValue(true);
+      const canDeactivateAdmin = vi.fn().mockReturnValue(true);
 
-      router.canActivate("home", canActivateA);
-      router.canActivate("users", canActivateB);
-      router.canDeactivate("admin", canDeactivateA);
+      router.canActivate("home", () => canActivateHome);
+      router.canActivate("users", () => canActivateUsers);
+      router.canDeactivate("admin", () => canDeactivateAdmin);
 
       const clonedRouter = router.clone();
-      const [canDeactivate, canActivate] = clonedRouter.getLifecycleFactories();
 
-      expect(canActivate.home).toBe(canActivateA);
-      expect(canActivate.users).toBe(canActivateB);
-      expect(canDeactivate.admin).toBe(canDeactivateA);
+      clonedRouter.start("/");
+
+      // Verify canActivate handlers are cloned
+      clonedRouter.navigate("home", (err) => {
+        expect(err).toBeUndefined();
+        expect(canActivateHome).toHaveBeenCalled();
+      });
+
+      clonedRouter.navigate("users", (err) => {
+        expect(err).toBeUndefined();
+        expect(canActivateUsers).toHaveBeenCalled();
+      });
+
+      // Verify canDeactivate handler is cloned - navigate to admin then leave
+      clonedRouter.navigate("admin", () => {
+        clonedRouter.navigate("home", () => {
+          expect(canDeactivateAdmin).toHaveBeenCalled();
+        });
+      });
+
+      clonedRouter.stop();
     });
 
     it("should support chain cloning (clone of clone) with proper isolation", () => {
       const router = createTestRouter();
-      const middleware1 = () => () => true;
-      const plugin1 = () => ({});
+      const mw1Tracker = createTrackingMiddleware("mw1");
+      const plugin1Tracker = createTrackingPlugin("p1");
 
-      router.useMiddleware(middleware1);
+      router.useMiddleware(mw1Tracker.factory);
 
       // First level clone
       const clone1 = router.clone();
-      const middleware2 = () => () => false;
-      const plugin2 = () => ({});
+      const mw2Tracker = createTrackingMiddleware("mw2");
+      const plugin2Tracker = createTrackingPlugin("p2");
 
-      clone1.useMiddleware(middleware2);
-      clone1.usePlugin(plugin1);
+      clone1.useMiddleware(mw2Tracker.factory);
+      clone1.usePlugin(plugin1Tracker.factory);
 
       // Second level clone (clone of clone)
       const clone2 = clone1.clone();
-      const middleware3 = () => () => true;
+      const mw3Tracker = createTrackingMiddleware("mw3");
 
-      clone2.useMiddleware(middleware3);
-      clone2.usePlugin(plugin2);
+      clone2.useMiddleware(mw3Tracker.factory);
+      clone2.usePlugin(plugin2Tracker.factory);
 
-      // Verify middleware isolation at each level
-      expect(router.getMiddlewareFactories()).toHaveLength(1);
-      expect(router.getMiddlewareFactories()).toContain(middleware1);
-      expect(router.getMiddlewareFactories()).not.toContain(middleware2);
+      // Test middleware isolation - navigate on each router
+      router.start("/");
 
-      expect(clone1.getMiddlewareFactories()).toHaveLength(2);
-      expect(clone1.getMiddlewareFactories()).toContain(middleware1);
-      expect(clone1.getMiddlewareFactories()).toContain(middleware2);
-      expect(clone1.getMiddlewareFactories()).not.toContain(middleware3);
+      router.navigate("users", () => {
+        // Only mw1 should execute on original router
+        expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
+        expect(mw2Tracker.getCallCount()).toBe(0);
+        expect(mw3Tracker.getCallCount()).toBe(0);
+      });
 
-      expect(clone2.getMiddlewareFactories()).toHaveLength(3);
-      expect(clone2.getMiddlewareFactories()).toContain(middleware1);
-      expect(clone2.getMiddlewareFactories()).toContain(middleware2);
-      expect(clone2.getMiddlewareFactories()).toContain(middleware3);
+      mw1Tracker.reset();
+      clone1.start("/");
 
-      // Verify plugin isolation
-      expect(router.getPlugins()).toHaveLength(0);
-      expect(clone1.getPlugins()).toHaveLength(1);
-      expect(clone1.getPlugins()).toContain(plugin1);
-      expect(clone2.getPlugins()).toHaveLength(2);
-      expect(clone2.getPlugins()).toContain(plugin1);
-      expect(clone2.getPlugins()).toContain(plugin2);
+      clone1.navigate("users", () => {
+        // mw1 and mw2 should execute on clone1
+        expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
+        expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
+        expect(mw3Tracker.getCallCount()).toBe(0);
+      });
+
+      mw1Tracker.reset();
+      mw2Tracker.reset();
+      clone2.start("/");
+
+      clone2.navigate("users", () => {
+        // All three should execute on clone2
+        expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
+        expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
+        expect(mw3Tracker.getCallCount()).toBeGreaterThan(0);
+      });
+
+      // Test plugin isolation
+      // plugin1 is on clone1 and clone2
+      expect(plugin1Tracker.getCalls().onStart).toBe(2); // clone1.start + clone2.start
+      // plugin2 is only on clone2
+      expect(plugin2Tracker.getCalls().onStart).toBe(1); // clone2.start
 
       // Verify routes are still shared across all levels
       expect(router.buildPath("home")).toBe(clone1.buildPath("home"));
       expect(clone1.buildPath("home")).toBe(clone2.buildPath("home"));
+
+      router.stop();
+      clone1.stop();
+      clone2.stop();
     });
 
     it("should clone both canActivate and canDeactivate for same route", () => {
       const router = createTestRouter();
-      const canActivateHome = () => () => true;
-      const canDeactivateHome = () => () => false;
+      const canActivateHome = vi.fn().mockReturnValue(true);
+      const canDeactivateHome = vi.fn().mockReturnValue(true);
 
       // Same route has both lifecycle handlers
-      router.canActivate("home", canActivateHome);
-      router.canDeactivate("home", canDeactivateHome);
+      router.canActivate("home", () => canActivateHome);
+      router.canDeactivate("home", () => canDeactivateHome);
 
       const clonedRouter = router.clone();
 
-      const [origDeactivate, origActivate] = router.getLifecycleFactories();
-      const [cloneDeactivate, cloneActivate] =
-        clonedRouter.getLifecycleFactories();
+      clonedRouter.start("/");
 
-      // Both handlers should be cloned for the same route
-      expect(cloneActivate.home).toBe(canActivateHome);
-      expect(cloneDeactivate.home).toBe(canDeactivateHome);
+      // Navigate to home to trigger canActivate
+      clonedRouter.navigate("home", (err) => {
+        expect(err).toBeUndefined();
+        expect(canActivateHome).toHaveBeenCalled();
 
-      // Should match original
-      expect(cloneActivate.home).toBe(origActivate.home);
-      expect(cloneDeactivate.home).toBe(origDeactivate.home);
+        // Navigate away to trigger canDeactivate
+        clonedRouter.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(canDeactivateHome).toHaveBeenCalled();
+        });
+      });
 
-      // Handlers should be independent (adding to clone doesn't affect original)
-      const newHandler = () => () => true;
+      // Verify handlers are independent - adding to clone doesn't affect original
+      const newHandler = vi.fn().mockReturnValue(true);
 
-      clonedRouter.canActivate("users", newHandler);
+      clonedRouter.canActivate("orders", () => newHandler);
 
-      expect(clonedRouter.getLifecycleFactories()[1].users).toBe(newHandler);
-      expect(router.getLifecycleFactories()[1].users).toBeUndefined();
+      // Navigate on cloned router
+      clonedRouter.navigate("orders", () => {
+        expect(newHandler).toHaveBeenCalled();
+      });
+
+      // Original router should not have the new handler
+      newHandler.mockClear();
+      router.start("/");
+
+      router.navigate("orders", () => {
+        // Handler was NOT added to original, so it should NOT be called
+        expect(newHandler).not.toHaveBeenCalled();
+      });
+
+      router.stop();
+      clonedRouter.stop();
     });
   });
 });

@@ -32,7 +32,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/users/list", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -61,7 +61,7 @@ describe("router.start() - path string scenarios", () => {
 
       router.start("/users/list?page=2&sort=name", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
 
@@ -105,7 +105,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(result).toBe(router);
@@ -128,7 +128,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/nonexistent/route", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -156,7 +156,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -180,7 +180,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
       expect(result).toBe(router);
 
@@ -206,7 +206,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/some/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -297,7 +297,7 @@ describe("router.start() - path string scenarios", () => {
     it("should handle empty string as path (fallback to defaultRoute)", () => {
       router.start("");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       // Empty string triggers fallback to defaultRoute
       expect(router.getState()?.name).toBe("home");
     });

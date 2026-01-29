@@ -58,20 +58,18 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should register canActivate function if defined on route", () => {
-    const canActivateFactory = () => () => true;
-
     router.addRoute([
       {
         name: "secure",
         path: "/secure",
-        canActivate: canActivateFactory,
+        canActivate: () => () => false, // blocking guard
       },
     ]);
 
-    // Verify via getLifecycleFactories instead of spy
-    const [, canActivateFactories] = router.getLifecycleFactories();
-
-    expect(canActivateFactories.secure).toBe(canActivateFactory);
+    // Verify guard is registered by testing navigation behavior
+    router.navigate("secure", (err) => {
+      expect(err?.code).toBe("CANNOT_ACTIVATE");
+    });
   });
 
   it("should register forwardTo and redirect during navigation", () => {
@@ -268,9 +266,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('[router.addRoute] Route "first-dup" already exists');
 
     // new-before-dup should NOT be registered (atomicity preserved)
-    const [, canActivate] = router.getLifecycleFactories();
-
-    expect(canActivate).not.toHaveProperty("new-before-dup");
+    expect(router.hasRoute("new-before-dup")).toBe(false);
   });
 
   it("should throw on duplicate nested child route", () => {
@@ -303,12 +299,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('Path "/path-conflict" is already defined');
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
-    // Test behavior: route doesn't exist
     expect(router.hasRoute("pre-validation-test")).toBe(false);
-
-    const [, canActivate] = router.getLifecycleFactories();
-
-    expect(canActivate).not.toHaveProperty("pre-validation-test");
   });
 
   it("should throw on duplicate path within same batch", () => {
@@ -322,8 +313,6 @@ describe("core/routes/addRoute", () => {
 
   describe("children handlers registration", () => {
     it("should register canActivate for children routes", () => {
-      const childCanActivate = vi.fn(() => () => true);
-
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -331,20 +320,18 @@ describe("core/routes/addRoute", () => {
           {
             name: "child",
             path: "/child",
-            canActivate: childCanActivate,
+            canActivate: () => () => false, // blocking guard
           },
         ],
       });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories["parent.child"]).toBeDefined();
+      // Verify guard is registered by testing navigation behavior
+      router.navigate("parent.child", (err) => {
+        expect(err?.code).toBe("CANNOT_ACTIVATE");
+      });
     });
 
     it("should register canActivate for deeply nested children", () => {
-      const level2CanActivate = vi.fn(() => () => true);
-      const level3CanActivate = vi.fn(() => () => true);
-
       router.addRoute({
         name: "level1",
         path: "/level1",
@@ -352,22 +339,27 @@ describe("core/routes/addRoute", () => {
           {
             name: "level2",
             path: "/level2",
-            canActivate: level2CanActivate,
+            canActivate: () => () => false, // blocking guard
             children: [
               {
                 name: "level3",
                 path: "/level3",
-                canActivate: level3CanActivate,
+                canActivate: () => () => true, // allowing guard
               },
             ],
           },
         ],
       });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
+      // level2 guard blocks navigation to level2
+      router.navigate("level1.level2", (err) => {
+        expect(err?.code).toBe("CANNOT_ACTIVATE");
+      });
 
-      expect(canActivateFactories["level1.level2"]).toBeDefined();
-      expect(canActivateFactories["level1.level2.level3"]).toBeDefined();
+      // level2 guard also blocks navigation to level3 (parent guard runs first)
+      router.navigate("level1.level2.level3", (err) => {
+        expect(err?.code).toBe("CANNOT_ACTIVATE");
+      });
     });
 
     it("should register forwardTo for children routes", () => {
@@ -458,28 +450,37 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should register all handlers for parent and children in same call", () => {
-      const parentCanActivate = vi.fn(() => () => true);
-      const childCanActivate = vi.fn(() => () => true);
+      let parentGuardCalled = false;
+      let childGuardCalled = false;
 
       router.addRoute({
         name: "wrapper",
         path: "/wrapper",
-        canActivate: parentCanActivate,
+        canActivate: () => () => {
+          parentGuardCalled = true;
+
+          return true;
+        },
         defaultParams: { parentParam: "value" },
         children: [
           {
             name: "inner",
             path: "/inner",
-            canActivate: childCanActivate,
+            canActivate: () => () => {
+              childGuardCalled = true;
+
+              return true;
+            },
             defaultParams: { childParam: "value" },
           },
         ],
       });
 
-      const [, canActivateFactories] = router.getLifecycleFactories();
+      // Navigate to inner to trigger both guards
+      router.navigate("wrapper.inner");
 
-      expect(canActivateFactories.wrapper).toBeDefined();
-      expect(canActivateFactories["wrapper.inner"]).toBeDefined();
+      expect(parentGuardCalled).toBe(true);
+      expect(childGuardCalled).toBe(true);
 
       // Default params should be applied when creating state without params
       const wrapperState = router.makeState("wrapper");
@@ -919,14 +920,14 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ id: "123" });
     });
 
-    it("should allow adding forwards dynamically via forward()", () => {
+    it("should allow adding forwards dynamically via updateRoute()", () => {
       router.addRoute([
         { name: "oldRoute", path: "/old" },
         { name: "newRoute", path: "/new" },
       ]);
 
-      // Use forward() API to dynamically add a redirect
-      router.forward("oldRoute", "newRoute");
+      // Use updateRoute() API to dynamically add a redirect
+      router.updateRoute("oldRoute", { forwardTo: "newRoute" });
 
       // Verify behavior: forwardState should follow the new rule
       const state = router.forwardState("oldRoute", {});
@@ -1035,6 +1036,7 @@ describe("core/routes/addRoute", () => {
 
     it("should handle route with all options combined", () => {
       const canActivate = vi.fn(() => () => true);
+      const nestedCanActivate = vi.fn(() => () => true);
       const decodeParams = vi.fn((p) => ({ ...p, decoded: true }));
       const encodeParams = vi.fn((p) => ({ ...p, encoded: true }));
 
@@ -1052,16 +1054,15 @@ describe("core/routes/addRoute", () => {
           {
             name: "nested",
             path: "/nested",
-            canActivate: () => () => true,
+            canActivate: nestedCanActivate,
           },
         ],
       });
 
-      // Verify canActivate registration
-      const [, canActivateFactories] = router.getLifecycleFactories();
-
-      expect(canActivateFactories.complete).toBeDefined();
-      expect(canActivateFactories["complete.nested"]).toBeDefined();
+      // Verify canActivate registration by checking factory was called
+      // (factory is invoked during registration to compile the guard)
+      expect(canActivate).toHaveBeenCalled();
+      expect(nestedCanActivate).toHaveBeenCalled();
 
       // Verify decodeParams works
       const matchedState = router.matchPath("/complete/123");
@@ -1344,9 +1345,6 @@ describe("core/routes/addRoute", () => {
       });
 
       it("should not register handlers if forwardTo cycle is detected", () => {
-        const [, canActivateBefore] = router.getLifecycleFactories();
-        const keysBefore = Object.keys(canActivateBefore).length;
-
         expect(() => {
           router.addRoute([
             {
@@ -1363,11 +1361,9 @@ describe("core/routes/addRoute", () => {
           ]);
         }).toThrowError(/Circular forwardTo/);
 
-        // Handlers should NOT be registered (atomicity)
-        const [, canActivateAfter] = router.getLifecycleFactories();
-        const keysAfter = Object.keys(canActivateAfter).length;
-
-        expect(keysAfter).toBe(keysBefore);
+        // Routes should NOT be registered (atomicity)
+        expect(router.hasRoute("cycle-with-guard-a")).toBe(false);
+        expect(router.hasRoute("cycle-with-guard-b")).toBe(false);
       });
     });
   });

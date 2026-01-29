@@ -21,11 +21,11 @@ describe("stop", () => {
     it("should stop started router", () => {
       router.start();
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       const result = router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(result).toBe(router); // Method chaining
     });
 
@@ -55,13 +55,13 @@ describe("stop", () => {
 
   describe("stop when router is not started", () => {
     it("should handle stop on non-started router gracefully", () => {
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       expect(() => {
         router.stop();
       }).not.toThrowError();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -76,7 +76,7 @@ describe("stop", () => {
     });
 
     it("should return router instance even when not started", () => {
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       const result = router.stop();
 
@@ -88,23 +88,23 @@ describe("stop", () => {
     it("should handle multiple stop calls gracefully", () => {
       router.start("/home");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       // Second stop should not throw
       expect(() => {
         router.stop();
       }).not.toThrowError();
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       // Third stop should not throw
       expect(() => {
         router.stop();
       }).not.toThrowError();
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should emit ROUTER_STOP event only once per start/stop cycle", () => {
@@ -168,7 +168,7 @@ describe("stop", () => {
       stopListener.mockImplementation(() => {
         // When event fires, state should already be cleared
         expect(router.getState()).toBeUndefined();
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
       });
 
       router.stop();
@@ -207,18 +207,18 @@ describe("stop", () => {
     it("should allow restart after stop", () => {
       router.start("/home");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("home");
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
 
       // Should be able to start again
       router.start("/users/list");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("users.list");
     });
 
@@ -270,7 +270,7 @@ describe("stop", () => {
 
       expect(startListener).toHaveBeenCalledTimes(5);
       expect(stopListener).toHaveBeenCalledTimes(5);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -406,7 +406,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -423,7 +423,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -434,7 +434,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -447,7 +447,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
@@ -461,7 +461,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
   });
@@ -477,30 +477,8 @@ describe("stop", () => {
       // Stop immediately
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
-    });
-
-    it("should reject invalid state in setState", () => {
-      router.start("/home");
-      const originalState = router.getState();
-
-      // setState validates state structure and rejects invalid values
-      expect(() => {
-        router.setState(null as any);
-      }).toThrowError(TypeError);
-      expect(() => {
-        router.setState(null as any);
-      }).toThrowError("Invalid state");
-
-      // State should remain unchanged after failed setState
-      expect(router.getState()).toStrictEqual(originalState);
-
-      // stop() should still work
-      expect(() => {
-        router.stop();
-      }).not.toThrowError();
-      expect(router.isStarted()).toBe(false);
     });
 
     it("should maintain proper state after stop with complex navigation history", () => {
@@ -514,7 +492,7 @@ describe("stop", () => {
 
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
   });

@@ -26,7 +26,7 @@ describe("router.start() - lifecycle events", () => {
 
         router.start();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
       });
 

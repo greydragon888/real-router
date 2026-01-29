@@ -1338,7 +1338,7 @@ describe("navigateToDefault", () => {
         }),
       );
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should handle call when router is not started", () => {
@@ -1356,7 +1356,7 @@ describe("navigateToDefault", () => {
         }),
       );
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should respect router options changes after creation", () => {
@@ -1478,11 +1478,11 @@ describe("navigateToDefault", () => {
       // Stop and restart router
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       router.start();
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       // Should work normally after restart (with reload to avoid SAME_STATES)
       router.navigateToDefault({ reload: true }, callback);

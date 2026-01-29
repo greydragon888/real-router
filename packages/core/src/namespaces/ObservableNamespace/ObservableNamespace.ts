@@ -1,7 +1,6 @@
 // packages/core/src/namespaces/ObservableNamespace/ObservableNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isNavigationOptions } from "type-guards";
 
 import {
   MAX_EVENT_DEPTH,
@@ -9,13 +8,7 @@ import {
   validEventNames,
 } from "./constants";
 import { invokeFor } from "./helpers";
-import {
-  validateOptionalFromState,
-  validateOptionalToState,
-  validateRequiredToState,
-} from "./validators";
 import { events } from "../../constants";
-import { RouterError } from "../../RouterError";
 
 import type {
   EventMethodMap,
@@ -145,79 +138,6 @@ export class ObservableNamespace {
         "[router.subscribe] Expected a function. " +
           "For Observable pattern use router[Symbol.observable]().subscribe(observer)",
       );
-    }
-  }
-
-  /**
-   * Validates invoke arguments based on event type.
-   * Called by facade before invoke.
-   */
-
-  static validateInvokeArgs(
-    eventName: (typeof events)[EventsKeys],
-    toState?: State,
-    fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
-  ): void {
-    ObservableNamespace.validateEventName(eventName);
-
-    switch (eventName) {
-      case events.TRANSITION_START:
-      case events.TRANSITION_CANCEL: {
-        validateRequiredToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        break;
-      }
-      case events.TRANSITION_ERROR: {
-        validateOptionalToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        if (!arg) {
-          throw new TypeError(
-            `[router.invokeEventListeners] error is required for event "${eventName}"`,
-          );
-        }
-
-        if (!(arg instanceof RouterError)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] error must be a RouterError instance for event "${eventName}". ` +
-              `Got: ${typeof arg === "object" ? arg.constructor.name : typeof arg}`,
-          );
-        }
-
-        break;
-      }
-      case events.TRANSITION_SUCCESS: {
-        validateRequiredToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        if (!arg) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options is required for event "${eventName}"`,
-          );
-        }
-
-        if (arg instanceof RouterError) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options cannot be a RouterError for event "${eventName}". ` +
-              `Use TRANSITION_ERROR event for errors.`,
-          );
-        }
-
-        if (!isNavigationOptions(arg)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options is invalid for event "${eventName}". ` +
-              `Expected NavigationOptions object.`,
-          );
-        }
-
-        break;
-      }
-      // ROUTER_START and ROUTER_STOP have no required args
-      default: {
-        break;
-      }
     }
   }
 

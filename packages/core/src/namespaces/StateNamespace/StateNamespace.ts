@@ -1,6 +1,5 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { logger } from "@real-router/logger";
 import {
   getTypeDescription,
   isNavigationOptions,
@@ -337,29 +336,6 @@ export class StateNamespace {
       (param) =>
         param in state2.params &&
         areParamValuesEqual(state1.params[param], state2.params[param]),
-    );
-  }
-
-  /**
-   * Checks if childState is a descendant of parentState.
-   *
-   * @deprecated Use router.isActiveRoute() instead.
-   */
-  areStatesDescendants(parentState: State, childState: State): boolean {
-    logger.warn(
-      "real-router",
-      "areStatesDescendants is deprecated and will be removed in the next major version. " +
-        "Use router.isActiveRoute() instead.",
-    );
-
-    const parentPrefix = `${parentState.name}.`;
-
-    if (!childState.name.startsWith(parentPrefix)) {
-      return false;
-    }
-
-    return Object.keys(parentState.params).every((p) =>
-      areParamValuesEqual(parentState.params[p], childState.params[p]),
     );
   }
 

@@ -40,7 +40,7 @@ describe("router.start() - edge cases", () => {
 
       expect(callback).toHaveBeenCalledTimes(1);
       // Router handles gracefully - either starts or errors
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
   });
 
@@ -99,7 +99,7 @@ describe("router.start() - edge cases", () => {
       // isParams() rejects circular references via isSerializable()
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
   });
 
@@ -269,7 +269,7 @@ describe("router.start() - edge cases", () => {
       // isState() rejects because typeof undefined !== "string"
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should reject state with missing params field", () => {
@@ -290,7 +290,7 @@ describe("router.start() - edge cases", () => {
 
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should reject state with function in params", () => {
@@ -311,7 +311,7 @@ describe("router.start() - edge cases", () => {
 
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should reject state with class instance in params", () => {
@@ -335,7 +335,7 @@ describe("router.start() - edge cases", () => {
 
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
   });
 
@@ -351,7 +351,7 @@ describe("router.start() - edge cases", () => {
       }).not.toThrowError();
 
       expect(asyncCallback).toHaveBeenCalled();
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
   });
 
@@ -362,7 +362,7 @@ describe("router.start() - edge cases", () => {
       // This is arguably a bug but current behavior - use explicit path instead
       router.start("");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       // Empty string triggers fallback to defaultRoute
       expect(router.getState()?.name).toBe("home");
     });
@@ -383,7 +383,7 @@ describe("router.start() - edge cases", () => {
       }).not.toThrowError();
 
       expect(callback).toHaveBeenCalledTimes(1);
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       const [error, state] = callback.mock.calls[0];
 

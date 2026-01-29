@@ -4,6 +4,11 @@ import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
 
 import { LIFECYCLE_LIMITS } from "./constants";
+import {
+  validateHandler,
+  validateHandlerLimit,
+  validateNotRegistering,
+} from "./validators";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
@@ -53,21 +58,26 @@ export class RouteLifecycleNamespace<
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
+  // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
 
-  /**
-   * Validates that a handler is either a boolean or a factory function.
-   */
   static validateHandler<D extends DefaultDependencies>(
     handler: unknown,
     methodName: string,
   ): asserts handler is ActivationFnFactory<D> | boolean {
-    if (!isBoolean(handler) && typeof handler !== "function") {
-      throw new TypeError(
-        `[router.${methodName}] Handler must be a boolean or factory function, ` +
-          `got ${getTypeDescription(handler)}`,
-      );
-    }
+    validateHandler<D>(handler, methodName);
+  }
+
+  static validateNotRegistering(
+    isRegistering: boolean,
+    name: string,
+    methodName: string,
+  ): void {
+    validateNotRegistering(isRegistering, name, methodName);
+  }
+
+  static validateHandlerLimit(currentCount: number, methodName: string): void {
+    validateHandlerLimit(currentCount, methodName);
   }
 
   // =========================================================================
@@ -91,18 +101,65 @@ export class RouteLifecycleNamespace<
   }
 
   // =========================================================================
+  // State accessors (for facade validation)
+  // =========================================================================
+
+  /**
+   * Returns true if route is currently being registered.
+   * Used by facade for self-modification validation.
+   */
+  isRegistering(name: string): boolean {
+    return this.#registering.has(name);
+  }
+
+  /**
+   * Returns the number of canActivate handlers.
+   * Used by facade for limit validation.
+   */
+  countCanActivate(): number {
+    return this.#canActivateFactories.size;
+  }
+
+  /**
+   * Returns the number of canDeactivate handlers.
+   * Used by facade for limit validation.
+   */
+  countCanDeactivate(): number {
+    return this.#canDeactivateFactories.size;
+  }
+
+  /**
+   * Returns true if canActivate handler exists for route.
+   * Used by facade to determine if this is an overwrite.
+   */
+  hasCanActivate(name: string): boolean {
+    return this.#canActivateFactories.has(name);
+  }
+
+  /**
+   * Returns true if canDeactivate handler exists for route.
+   * Used by facade to determine if this is an overwrite.
+   */
+  hasCanDeactivate(name: string): boolean {
+    return this.#canDeactivateFactories.has(name);
+  }
+
+  // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
 
   /**
    * Registers a canActivate guard for a route.
+   * Input already validated by facade (not registering, limit).
    *
    * @param name - Route name (already validated by facade)
    * @param handler - Guard function or boolean (already validated)
+   * @param isOverwrite - True if overwriting existing handler (computed by facade)
    */
   registerCanActivate(
     name: string,
     handler: ActivationFnFactory<Dependencies> | boolean,
+    isOverwrite: boolean,
   ): void {
     this.#registerHandler(
       "activate",
@@ -111,18 +168,22 @@ export class RouteLifecycleNamespace<
       this.#canActivateFactories,
       this.#canActivateFunctions,
       "canActivate",
+      isOverwrite,
     );
   }
 
   /**
    * Registers a canDeactivate guard for a route.
+   * Input already validated by facade (not registering, limit).
    *
    * @param name - Route name (already validated by facade)
    * @param handler - Guard function or boolean (already validated)
+   * @param isOverwrite - True if overwriting existing handler (computed by facade)
    */
   registerCanDeactivate(
     name: string,
     handler: ActivationFnFactory<Dependencies> | boolean,
+    isOverwrite: boolean,
   ): void {
     this.#registerHandler(
       "deactivate",
@@ -131,22 +192,18 @@ export class RouteLifecycleNamespace<
       this.#canDeactivateFactories,
       this.#canDeactivateFunctions,
       "canDeactivate",
+      isOverwrite,
     );
   }
 
   /**
    * Removes a canActivate guard for a route.
+   * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
    * @param silent - If true, suppresses warning when no handler exists
    */
   clearCanActivate(name: string, silent = false): void {
-    if (this.#registering.has(name)) {
-      throw new Error(
-        `[router.clearCanActivate] Cannot modify route "${name}" during its own registration`,
-      );
-    }
-
     const factoryDeleted = this.#canActivateFactories.delete(name);
     const functionDeleted = this.#canActivateFunctions.delete(name);
 
@@ -160,17 +217,12 @@ export class RouteLifecycleNamespace<
 
   /**
    * Removes a canDeactivate guard for a route.
+   * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
    * @param silent - If true, suppresses warning when no handler exists
    */
   clearCanDeactivate(name: string, silent = false): void {
-    if (this.#registering.has(name)) {
-      throw new Error(
-        `[router.clearCanDeactivate] Cannot modify route "${name}" during its own registration`,
-      );
-    }
-
     const factoryDeleted = this.#canDeactivateFactories.delete(name);
     const functionDeleted = this.#canDeactivateFunctions.delete(name);
 
@@ -235,6 +287,10 @@ export class RouteLifecycleNamespace<
   // Private methods (business logic)
   // =========================================================================
 
+  /**
+   * Registers a handler. Input already validated by facade.
+   * Handles overwrite warning, count threshold warnings, and factory compilation.
+   */
   #registerHandler(
     type: "activate" | "deactivate",
     name: string,
@@ -242,23 +298,16 @@ export class RouteLifecycleNamespace<
     factories: Map<string, ActivationFnFactory<Dependencies>>,
     functions: Map<string, ActivationFn>,
     methodName: string,
+    isOverwrite: boolean,
   ): void {
-    // Prevent self-modification during factory compilation
-    if (this.#registering.has(name)) {
-      throw new Error(
-        `[router.${methodName}] Cannot modify route "${name}" during its own registration`,
-      );
-    }
-
-    const isOverwrite = factories.has(name);
-
+    // Emit warnings (validation done by facade)
     if (isOverwrite) {
       logger.warn(
         `router.${methodName}`,
         `Overwriting existing ${type} handler for route "${name}"`,
       );
     } else {
-      this.#checkHandlerCount(factories.size + 1, methodName);
+      this.#checkCountThresholds(factories.size + 1, methodName);
     }
 
     // Convert boolean to factory if needed
@@ -299,15 +348,11 @@ export class RouteLifecycleNamespace<
     }
   }
 
-  #checkHandlerCount(currentSize: number, methodName: string): void {
-    if (currentSize >= LIFECYCLE_LIMITS.HARD_LIMIT) {
-      throw new Error(
-        `[router.${methodName}] Lifecycle handler limit exceeded (${LIFECYCLE_LIMITS.HARD_LIMIT}). ` +
-          `This indicates too many routes with individual handlers. ` +
-          `Consider using middleware for cross-cutting concerns.`,
-      );
-    }
-
+  /**
+   * Emits warnings for count thresholds.
+   * Validation (HARD_LIMIT) is done by facade.
+   */
+  #checkCountThresholds(currentSize: number, methodName: string): void {
     if (currentSize >= LIFECYCLE_LIMITS.ERROR) {
       logger.error(
         `router.${methodName}`,

@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { errorCodes } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -147,57 +149,76 @@ describe("core/routes/removeRoute", () => {
 
   describe("lifecycle cleanup", () => {
     it("should clear canActivate handler on removeRoute", () => {
-      // canActivate in route config is a factory: () => ActivationFn
+      const guard = vi.fn().mockReturnValue(false);
+
       router.addRoute({
         name: "protected",
         path: "/protected",
-        canActivate: () => () => true,
+        canActivate: () => guard,
       });
 
-      const [, canActivateFactoriesBefore] = router.getLifecycleFactories();
-
-      expect(canActivateFactoriesBefore.protected).toBeDefined();
+      // Verify guard works before removal - navigation should be blocked
+      router.navigate("protected", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(guard).toHaveBeenCalled();
+      });
 
       router.removeRoute("protected");
 
-      const [, canActivateFactoriesAfter] = router.getLifecycleFactories();
-
-      expect(canActivateFactoriesAfter.protected).toBeUndefined();
+      // After removal, route no longer exists
+      expect(router.hasRoute("protected")).toBe(false);
+      expect(router.matchPath("/protected")).toBeUndefined();
     });
 
     it("should clear canDeactivate handler on removeRoute", () => {
+      const guard = vi.fn().mockReturnValue(false);
+
       router.addRoute({ name: "editor", path: "/editor" });
-      // canDeactivate via method accepts factory or boolean
-      router.canDeactivate("editor", () => () => true);
+      router.canDeactivate("editor", () => guard);
 
-      const [canDeactivateFactoriesBefore] = router.getLifecycleFactories();
+      // Navigate to editor first
+      router.navigate("editor", (err) => {
+        expect(err).toBeUndefined();
 
-      expect(canDeactivateFactoriesBefore.editor).toBeDefined();
+        // Verify guard works - leaving should be blocked
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(guard).toHaveBeenCalled();
+        });
+      });
+
+      // Navigate back to home for clean state
+      guard.mockReturnValue(true);
+      router.navigate("home", () => {});
+      guard.mockClear();
 
       router.removeRoute("editor");
 
-      const [canDeactivateFactoriesAfter] = router.getLifecycleFactories();
-
-      expect(canDeactivateFactoriesAfter.editor).toBeUndefined();
+      // After removal, route no longer exists
+      expect(router.hasRoute("editor")).toBe(false);
     });
 
     it("should only clear canDeactivate for removed route", () => {
+      const guard1 = vi.fn().mockReturnValue(false);
+      const guard2 = vi.fn().mockReturnValue(false);
+
       router.addRoute({ name: "form1", path: "/form1" });
       router.addRoute({ name: "form2", path: "/form2" });
-      router.canDeactivate("form1", () => () => true);
-      router.canDeactivate("form2", () => () => true);
-
-      const [beforeFactories] = router.getLifecycleFactories();
-
-      expect(beforeFactories.form1).toBeDefined();
-      expect(beforeFactories.form2).toBeDefined();
+      router.canDeactivate("form1", () => guard1);
+      router.canDeactivate("form2", () => guard2);
 
       router.removeRoute("form1");
 
-      const [afterFactories] = router.getLifecycleFactories();
+      // form1 no longer exists
+      expect(router.hasRoute("form1")).toBe(false);
 
-      expect(afterFactories.form1).toBeUndefined();
-      expect(afterFactories.form2).toBeDefined();
+      // form2 guard should still work - verify by navigation
+      router.navigate("form2", () => {
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(guard2).toHaveBeenCalled();
+        });
+      });
     });
 
     it("should clear both canActivate and canDeactivate handlers", () => {
@@ -210,11 +231,9 @@ describe("core/routes/removeRoute", () => {
 
       router.removeRoute("dashboard");
 
-      const [canDeactivateFactories, canActivateFactories] =
-        router.getLifecycleFactories();
-
-      expect(canActivateFactories.dashboard).toBeUndefined();
-      expect(canDeactivateFactories.dashboard).toBeUndefined();
+      // After removal, route no longer exists
+      expect(router.hasRoute("dashboard")).toBe(false);
+      expect(router.matchPath("/dashboard")).toBeUndefined();
     });
 
     it("should not throw when route has no lifecycle handlers", () => {
@@ -350,22 +369,32 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should clear child route handlers when parent removed", () => {
+      const guard = vi.fn().mockReturnValue(false);
+
       router.addRoute({
         name: "area",
         path: "/area",
         children: [{ name: "page", path: "/page" }],
       });
-      router.canDeactivate("area.page", () => () => true);
+      router.canDeactivate("area.page", () => guard);
 
-      const [canDeactivateBefore] = router.getLifecycleFactories();
+      // Verify guard works before removal
+      router.navigate("area.page", () => {
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(guard).toHaveBeenCalled();
+        });
+      });
 
-      expect(canDeactivateBefore["area.page"]).toBeDefined();
+      // Navigate back to home
+      guard.mockReturnValue(true);
+      router.navigate("home", () => {});
 
       router.removeRoute("area");
 
-      const [canDeactivateAfter] = router.getLifecycleFactories();
-
-      expect(canDeactivateAfter["area.page"]).toBeUndefined();
+      // Parent and child no longer exist
+      expect(router.hasRoute("area")).toBe(false);
+      expect(router.hasRoute("area.page")).toBe(false);
     });
   });
 
@@ -412,6 +441,9 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should NOT modify existing routes when removing non-existent route", () => {
+      const activateGuard = vi.fn().mockReturnValue(false);
+      const deactivateGuard = vi.fn().mockReturnValue(false);
+
       // Setup: add routes with various configurations
       router.addRoute({
         name: "existing",
@@ -419,13 +451,9 @@ describe("core/routes/removeRoute", () => {
         defaultParams: { id: "1" },
         decodeParams: (p) => ({ ...p, id: Number(p.id) }),
         encodeParams: (p) => ({ ...p, id: `${p.id as number}` }),
-        canActivate: () => () => true,
+        canActivate: () => activateGuard,
       });
-      router.canDeactivate("existing", () => () => true);
-
-      // Capture lifecycle factories before
-      const [canDeactivateBefore, canActivateBefore] =
-        router.getLifecycleFactories();
+      router.canDeactivate("existing", () => deactivateGuard);
 
       // Attempt to remove non-existent route
       router.removeRoute("nonexistent");
@@ -437,12 +465,22 @@ describe("core/routes/removeRoute", () => {
         id: "1",
       });
 
-      // Verify lifecycle handlers still registered
-      const [canDeactivateAfter, canActivateAfter] =
-        router.getLifecycleFactories();
+      // Verify canActivate guard still works
+      router.navigate("existing", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(activateGuard).toHaveBeenCalled();
+      });
 
-      expect(canActivateAfter.existing).toBe(canActivateBefore.existing);
-      expect(canDeactivateAfter.existing).toBe(canDeactivateBefore.existing);
+      activateGuard.mockClear();
+      activateGuard.mockReturnValue(true);
+
+      // Verify canDeactivate guard still works
+      router.navigate("existing", () => {
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(deactivateGuard).toHaveBeenCalled();
+        });
+      });
     });
 
     it("should return router for chaining even when route not found", () => {
@@ -733,9 +771,6 @@ describe("core/routes/removeRoute", () => {
 
         // Give time for navigation to start
         await new Promise((resolve) => setTimeout(resolve, 10));
-
-        // Verify navigation is in progress
-        expect(router.isNavigating()).toBe(true);
 
         // Try to remove during navigation - should warn but proceed
         router.removeRoute("asyncRoute");

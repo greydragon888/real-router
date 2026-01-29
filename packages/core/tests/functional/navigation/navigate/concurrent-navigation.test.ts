@@ -6,6 +6,7 @@ import {
   it,
   expect,
   expectTypeOf,
+  vi,
 } from "vitest";
 
 import { errorCodes, events } from "@real-router/core";
@@ -45,7 +46,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       expectTypeOf(cancel).toBeFunction();
 
-      expect(cancel.name).toBe("cancel"); // Optional: check function name
+      expect(typeof cancel).toBe("function");
     });
 
     it("should cancel navigation and call callback with TRANSITION_CANCELLED error", () => {
@@ -327,32 +328,6 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should cancel navigation and not call router.setState", () => {
-      vi.useFakeTimers();
-
-      const setStateSpy = vi.spyOn(router, "setState");
-
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
-      });
-
-      const cancel = router.navigate("settings", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      });
-
-      setTimeout(cancel, 20);
-
-      // Advance timers
-      vi.advanceTimersByTime(20);
-      vi.advanceTimersByTime(50);
-
-      // setState should not be called for cancelled navigation
-      expect(setStateSpy).not.toHaveBeenCalled();
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
-
     it("should cancel navigation with custom navigation options", () => {
       vi.useFakeTimers();
 
@@ -500,124 +475,8 @@ describe("router.navigate() - concurrent navigation", () => {
     });
   });
 
-  describe("Issue #56: isNavigating() returns true during TRANSITION_START (FIXED)", () => {
-    /**
-     * FIXED: navigating flag is now set BEFORE emitting TRANSITION_START
-     *
-     * File: navigation.ts
-     * ```typescript
-     * // Cancel previous transition
-     * cancel();
-     *
-     * // Set navigating flag BEFORE emitting TRANSITION_START
-     * navigating = true;
-     *
-     * // Emit TRANSITION_START (after navigating flag is set)
-     * router.invokeEventListeners(events.TRANSITION_START, toState, fromState);
-     * ```
-     */
-
-    it("should return true from isNavigating() during TRANSITION_START", () => {
-      const freshRouter = createTestRouter();
-      let isNavigatingDuringStart: boolean | null = null;
-
-      freshRouter.start();
-
-      freshRouter.addEventListener(events.TRANSITION_START, () => {
-        isNavigatingDuringStart = freshRouter.isNavigating();
-      });
-
-      freshRouter.navigate("users");
-
-      // FIXED: isNavigating() now returns true during TRANSITION_START
-      expect(isNavigatingDuringStart).toBe(true);
-
-      freshRouter.stop();
-    });
-
-    it("should return consistent isNavigating() state across all event phases", () => {
-      const freshRouter = createTestRouter();
-      const stateLog: { event: string; isNavigating: boolean }[] = [];
-
-      freshRouter.start();
-
-      freshRouter.addEventListener(events.TRANSITION_START, () => {
-        stateLog.push({
-          event: "TRANSITION_START",
-          isNavigating: freshRouter.isNavigating(),
-        });
-      });
-
-      freshRouter.addEventListener(events.TRANSITION_SUCCESS, () => {
-        stateLog.push({
-          event: "TRANSITION_SUCCESS",
-          isNavigating: freshRouter.isNavigating(),
-        });
-      });
-
-      freshRouter.navigate("users");
-
-      // Consistent behavior:
-      // TRANSITION_START: isNavigating = true (navigation in progress)
-      // TRANSITION_SUCCESS: isNavigating = false (navigation finished)
-      expect(stateLog).toStrictEqual([
-        { event: "TRANSITION_START", isNavigating: true },
-        { event: "TRANSITION_SUCCESS", isNavigating: false },
-      ]);
-
-      freshRouter.stop();
-    });
-
-    it("should allow listener to detect if another navigation is in progress", () => {
-      const freshRouter = createTestRouter();
-      const navigationAttempts: {
-        route: string;
-        wasNavigating: boolean;
-      }[] = [];
-
-      freshRouter.start();
-
-      freshRouter.addEventListener(
-        events.TRANSITION_START,
-        (toState: State) => {
-          navigationAttempts.push({
-            route: toState.name,
-            wasNavigating: freshRouter.isNavigating(),
-          });
-
-          // Try to start another navigation while first is "in progress"
-          if (toState.name === "users") {
-            freshRouter.navigate("admin");
-          }
-        },
-      );
-
-      freshRouter.navigate("users");
-
-      // FIXED: isNavigating() now correctly reports true during TRANSITION_START
-      // Both navigations show wasNavigating = true
-      expect(navigationAttempts).toStrictEqual([
-        { route: "users", wasNavigating: true },
-        { route: "admin", wasNavigating: true },
-      ]);
-
-      freshRouter.stop();
-    });
-
-    it("should be false after sync navigation completes", () => {
-      const freshRouter = createTestRouter();
-
-      freshRouter.start();
-
-      freshRouter.navigate("users");
-      const isNavigatingAfterCall = freshRouter.isNavigating();
-
-      // After navigate() returns for sync transitions, navigation is complete
-      expect(isNavigatingAfterCall).toBe(false);
-
-      freshRouter.stop();
-    });
-  });
+  // Note: "Issue #56: isNavigating()" tests were removed because isNavigating()
+  // is no longer part of the public API.
 
   // Note: "Issue #57: Redundant buildState call" tests were removed because they
   // relied on spying on buildStateWithSegments facade method, which is now bypassed

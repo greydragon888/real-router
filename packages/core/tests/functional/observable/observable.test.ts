@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, RouterError } from "@real-router/core";
+import { errorCodes, events } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -64,270 +64,220 @@ describe("core/observable", () => {
     router.stop();
   });
 
-  describe("invokeEventListeners", () => {
-    describe("old tests", () => {
-      it("should throw TypeError if required arguments are missing for event", () => {
-        expect(() => {
-          router.invokeEventListeners(events.TRANSITION_START);
-        }).toThrowError(TypeError);
-        expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            { name: "a" } as any,
-            { name: "b" } as any,
-          );
-        }).toThrowError(TypeError);
-        expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_SUCCESS,
-            { name: "a" } as any,
-            { name: "b" } as any,
-          );
-        }).toThrowError(TypeError);
-      });
-
-      it("should throw TypeError if toState is missing for TRANSITION_CANCEL", () => {
-        expect(() => {
-          router.invokeEventListeners(events.TRANSITION_CANCEL);
-        }).toThrowError(TypeError);
-      });
-
-      it("should not break other listeners if one throws", () => {
-        const goodCb = vi.fn();
-        const badCb = vi.fn(() => {
-          vi.spyOn(logger, "error").mockImplementation(noop);
-
-          throw new Error("listener failed");
-        });
-
-        router.addEventListener(events.ROUTER_START, badCb);
-        router.addEventListener(events.ROUTER_START, goodCb);
-
-        expect(() => {
-          router.invokeEventListeners(events.ROUTER_START);
-        }).not.toThrowError();
-
-        expect(goodCb).toHaveBeenCalled();
-      });
-
-      it("should not throw or call anything if listeners array is empty", () => {
-        expect(() => {
-          router.invokeEventListeners(events.ROUTER_START);
-        }).not.toThrowError();
-      });
-    });
-  });
-
-  describe("removeEventListener", () => {
-    describe("old tests", () => {
-      it("should allow removing same listener multiple times without effect", () => {
+  describe("addEventListener", () => {
+    describe("event triggering via real operations", () => {
+      it("should trigger ROUTER_START listener when router starts", () => {
+        const freshRouter = createTestRouter();
         const cb = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, cb);
-        router.removeEventListener(events.ROUTER_START, cb);
-        router.invokeEventListeners(events.ROUTER_START);
+        freshRouter.addEventListener(events.ROUTER_START, cb);
+        freshRouter.start();
 
-        expect(cb).not.toHaveBeenCalled();
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith();
+
+        freshRouter.stop();
       });
 
-      it("should remove event listener via removeEventListener", () => {
+      it("should trigger ROUTER_STOP listener when router stops", () => {
         const cb = vi.fn();
 
         router.addEventListener(events.ROUTER_STOP, cb);
-        router.removeEventListener(events.ROUTER_STOP, cb);
-        router.invokeEventListeners(events.ROUTER_STOP);
+        router.stop();
+
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith();
+      });
+
+      it("should trigger TRANSITION_START listener during navigation", () => {
+        const cb = vi.fn();
+
+        router.addEventListener(events.TRANSITION_START, cb);
+        router.navigate("users");
+
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "users" }),
+          expect.objectContaining({ name: "home" }),
+        );
+      });
+
+      it("should trigger TRANSITION_SUCCESS listener after successful navigation", () => {
+        const cb = vi.fn();
+
+        router.addEventListener(events.TRANSITION_SUCCESS, cb);
+        router.navigate("users", {}, {}, (err) => {
+          expect(err).toBeUndefined();
+        });
+
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "users" }),
+          expect.objectContaining({ name: "home" }),
+          expect.any(Object),
+        );
+      });
+
+      it("should trigger TRANSITION_ERROR listener when navigation fails", () => {
+        const cb = vi.fn();
+
+        router.canActivate("admin-protected", () => () => false);
+        router.addEventListener(events.TRANSITION_ERROR, cb);
+        router.navigate("admin-protected", {}, {}, (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        });
+
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "admin-protected" }),
+          expect.objectContaining({ name: "home" }),
+          expect.objectContaining({ code: errorCodes.CANNOT_ACTIVATE }),
+        );
+      });
+
+      it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", () => {
+        const cb = vi.fn();
+        let middlewareResolve: Function | undefined;
+
+        // Use middleware to delay first navigation
+        router.useMiddleware(() => (_toState, _fromState, done) => {
+          middlewareResolve = done;
+        });
+
+        router.addEventListener(events.TRANSITION_CANCEL, cb);
+
+        // First navigation - will be delayed
+        router.navigate("users");
+
+        // Second navigation - cancels the first
+        router.navigate("orders");
+
+        expect(cb).toHaveBeenCalledTimes(1);
+        expect(cb).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "users" }),
+          expect.objectContaining({ name: "home" }),
+        );
+
+        // Clean up - let pending navigation complete
+        middlewareResolve?.();
+      });
+
+      it("should not break other listeners if one throws", () => {
+        vi.spyOn(logger, "error").mockImplementation(noop);
+
+        const freshRouter = createTestRouter();
+        const goodCb = vi.fn();
+        const badCb = vi.fn(() => {
+          throw new Error("listener failed");
+        });
+
+        freshRouter.addEventListener(events.ROUTER_START, badCb);
+        freshRouter.addEventListener(events.ROUTER_START, goodCb);
+
+        expect(() => {
+          freshRouter.start();
+        }).not.toThrowError();
+
+        expect(goodCb).toHaveBeenCalled();
+
+        freshRouter.stop();
+      });
+    });
+
+    describe("unsubscribe functionality", () => {
+      it("should return an unsubscribe function", () => {
+        const cb = vi.fn();
+        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+
+        expect(typeof unsubscribe).toBe("function");
+      });
+
+      it("should not call listener after unsubscribe", () => {
+        const cb = vi.fn();
+        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+
+        unsubscribe();
+        router.stop();
 
         expect(cb).not.toHaveBeenCalled();
       });
 
-      it("should not throw if removing unregistered event listener", () => {
+      it("should allow unsubscribing multiple times without error", () => {
         const cb = vi.fn();
+        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+
+        unsubscribe();
 
         expect(() => {
-          router.removeEventListener(events.ROUTER_STOP, cb);
+          unsubscribe();
         }).not.toThrowError();
       });
 
-      it("should not call removed event listener", () => {
+      it("should only unsubscribe the specific listener", () => {
+        const cb1 = vi.fn();
+        const cb2 = vi.fn();
+
+        const unsubscribe1 = router.addEventListener(events.ROUTER_STOP, cb1);
+
+        router.addEventListener(events.ROUTER_STOP, cb2);
+
+        unsubscribe1();
+        router.stop();
+
+        expect(cb1).not.toHaveBeenCalled();
+        expect(cb2).toHaveBeenCalled();
+      });
+    });
+
+    describe("validation", () => {
+      it("should throw TypeError for invalid event name", () => {
+        expect(() => {
+          router.addEventListener("invalid-event" as any, () => {});
+        }).toThrowError("Invalid event name");
+      });
+
+      it("should throw TypeError for non-function callback", () => {
+        expect(() => {
+          router.addEventListener(events.ROUTER_START, "not-a-function" as any);
+        }).toThrowError(TypeError);
+        expect(() => {
+          router.addEventListener(events.ROUTER_START, "not-a-function" as any);
+        }).toThrowError("Expected callback to be a function");
+      });
+
+      it("should throw when adding duplicate listener", () => {
         const cb = vi.fn();
 
         router.addEventListener(events.ROUTER_START, cb);
-        router.removeEventListener(events.ROUTER_START, cb);
-        router.invokeEventListeners(events.ROUTER_START);
-
-        expect(cb).not.toHaveBeenCalled();
-      });
-
-      it("should not throw error when removing non-existing event listener", () => {
-        const cb = vi.fn();
 
         expect(() => {
-          router.removeEventListener(events.ROUTER_START, cb);
-        }).not.toThrowError();
-      });
-    });
-  });
-
-  describe("addEventListener", () => {
-    describe("old tests", () => {
-      it("should add and trigger event listener", () => {
-        const cb = vi.fn();
-        const evtName = events.ROUTER_START;
-
-        router.addEventListener(evtName, cb);
-        router.invokeEventListeners(evtName);
-
-        expect(cb).toHaveBeenCalledTimes(1);
-      });
-
-      it("should pass (toState, fromState) to TRANSITION_START listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.TRANSITION_START;
-
-        router.addEventListener(evtName, cb);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
-
-        router.invokeEventListeners(evtName, toState, fromState);
-
-        expect(cb).toHaveBeenCalledWith(toState, fromState);
-      });
-
-      it("should pass (toState, fromState) to TRANSITION_CANCEL listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.TRANSITION_CANCEL;
-
-        router.addEventListener(evtName, cb);
-
-        const to = { name: "foo", path: "/foo", params: {} } as any;
-        const from = { name: "bar", path: "/bar", params: {} } as any;
-
-        router.invokeEventListeners(evtName, to, from);
-
-        expect(cb).toHaveBeenCalledWith(to, from);
-      });
-
-      it("should pass (toState, fromState, options) to TRANSITION_SUCCESS listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.TRANSITION_SUCCESS;
-
-        router.addEventListener(evtName, cb);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
-        const opts = { reload: true };
-
-        router.invokeEventListeners(evtName, toState, fromState, opts);
-
-        expect(cb).toHaveBeenCalledWith(toState, fromState, opts);
-      });
-
-      it("should pass (toState, fromState, error) to TRANSITION_ERROR listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.TRANSITION_ERROR;
-
-        router.addEventListener(evtName, cb);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
-        const error = new RouterError("ERR");
-
-        router.invokeEventListeners(evtName, toState, fromState, error);
-
-        expect(cb).toHaveBeenCalledWith(toState, fromState, error);
-      });
-
-      it("should pass no args to ROUTER_START listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.ROUTER_START;
-
-        router.addEventListener(evtName, cb);
-
-        router.invokeEventListeners(evtName);
-
-        expect(cb).toHaveBeenCalledWith();
-      });
-
-      it("should pass no args to ROUTER_STOP listeners", () => {
-        const cb = vi.fn();
-        const evtName = events.ROUTER_STOP;
-
-        router.addEventListener(evtName, cb);
-
-        router.invokeEventListeners(evtName);
-
-        expect(cb).toHaveBeenCalledWith();
+          router.addEventListener(events.ROUTER_START, cb);
+        }).toThrowError("Listener already exists");
       });
     });
   });
 
   describe("subscribe", () => {
-    describe("old tests", () => {
+    describe("basic functionality", () => {
       it("should accept a listener function", () => {
         const unsubscribe = router.subscribe(() => undefined);
 
         expect(typeof unsubscribe).toStrictEqual("function");
       });
 
-      it("should call on TRANSITION_SUCCESS", () => {
+      it("should call listener on TRANSITION_SUCCESS", () => {
         const listener = vi.fn();
+        const previousState = router.getState();
 
         router.subscribe(listener);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
-        const opts = {};
-
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          fromState,
-          opts,
-        );
+        router.navigate("users", {}, {}, (err) => {
+          expect(err).toBeUndefined();
+        });
 
         expect(listener).toHaveBeenCalledWith({
-          route: toState,
-          previousRoute: fromState,
+          route: expect.objectContaining({ name: "users" }),
+          previousRoute: previousState,
         });
-      });
-
-      it("should call with undefined previousRoute when fromState is undefined (line 343)", () => {
-        const listener = vi.fn();
-
-        router.subscribe(listener);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const opts = {};
-
-        // First navigation - no fromState
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          undefined,
-          opts,
-        );
-
-        expect(listener).toHaveBeenCalledWith({
-          route: toState,
-          previousRoute: undefined,
-        });
-      });
-
-      it("should call subscriber function when event is triggered", () => {
-        const spy = vi.fn();
-        const unsubscribe = router.subscribe(spy);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
-
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          fromState,
-          {},
-        );
-
-        expect(spy).toHaveBeenCalledWith({
-          route: toState,
-          previousRoute: fromState,
-        });
-
-        unsubscribe();
       });
 
       it("should not call subscriber after unsubscribe", () => {
@@ -335,12 +285,7 @@ describe("core/observable", () => {
         const unsubscribe = router.subscribe(spy);
 
         unsubscribe();
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          { name: "a", path: "/a", params: {} } as any,
-          { name: "b", path: "/a", params: {} } as any,
-          {},
-        );
+        router.navigate("users");
 
         expect(spy).not.toHaveBeenCalled();
       });
@@ -350,24 +295,11 @@ describe("core/observable", () => {
         const spy2 = vi.fn();
         const unsub1 = router.subscribe(spy1);
         const unsub2 = router.subscribe(spy2);
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = { name: "b", path: "/a", params: {} } as any;
 
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          fromState,
-          {},
-        );
+        router.navigate("users");
 
-        expect(spy1).toHaveBeenCalledWith({
-          route: toState,
-          previousRoute: fromState,
-        });
-        expect(spy2).toHaveBeenCalledWith({
-          route: toState,
-          previousRoute: fromState,
-        });
+        expect(spy1).toHaveBeenCalled();
+        expect(spy2).toHaveBeenCalled();
 
         unsub1();
         unsub2();
@@ -383,8 +315,10 @@ describe("core/observable", () => {
           unsubscribe();
         }).not.toThrowError();
       });
+    });
 
-      it("should throw TypeError for non-function listener (line 334)", () => {
+    describe("validation", () => {
+      it("should throw TypeError for non-function listener", () => {
         expect(() => {
           router.subscribe("not-a-function" as any);
         }).toThrowError(TypeError);
@@ -405,88 +339,6 @@ describe("core/observable", () => {
         }).toThrowError(TypeError);
       });
     });
-  });
-
-  describe("edge cases (observable.ts uncovered lines)", () => {
-    it("should throw for invalid event name in invokeEventListeners (line 126)", () => {
-      expect(() => {
-        router.invokeEventListeners("invalid-event" as any);
-      }).toThrowError("Invalid event name: invalid-event");
-    });
-
-    it("should throw for invalid event name in addEventListener", () => {
-      expect(() => {
-        router.addEventListener("invalid-event" as any, () => {});
-      }).toThrowError("Invalid event name");
-    });
-
-    it("should throw for invalid event name in removeEventListener", () => {
-      const noop = (): void => {};
-
-      expect(() => {
-        router.removeEventListener("invalid-event" as any, noop);
-      }).toThrowError("Invalid event name");
-    });
-
-    it("should return false for hasListeners with invalid event name (line 380)", () => {
-      // hasListeners returns false for event names not in validEventNames set
-      const result = router.hasListeners("invalid-event" as any);
-
-      expect(result).toBe(false);
-    });
-
-    it("should throw TypeError for non-function callback in addEventListener", () => {
-      expect(() => {
-        router.addEventListener(events.ROUTER_START, "not-a-function" as any);
-      }).toThrowError(TypeError);
-      expect(() => {
-        router.addEventListener(events.ROUTER_START, "not-a-function" as any);
-      }).toThrowError("Expected callback to be a function");
-    });
-
-    it("should throw TypeError for non-function callback in removeEventListener", () => {
-      expect(() => {
-        router.removeEventListener(
-          events.ROUTER_START,
-          "not-a-function" as any,
-        );
-      }).toThrowError(TypeError);
-    });
-
-    it("should warn when removing non-existent listener (line 281)", () => {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-
-      // First add a listener to make the set non-empty
-      const cb1 = vi.fn();
-
-      router.addEventListener(events.ROUTER_START, cb1);
-
-      // Try to remove a different listener that was never added
-      const cb2 = vi.fn();
-
-      // Should not throw when removing non-existent listener
-      expect(() => {
-        router.removeEventListener(events.ROUTER_START, cb2);
-      }).not.toThrowError();
-
-      warnSpy.mockRestore();
-    });
-
-    it("should throw when adding duplicate listener", () => {
-      const cb = vi.fn();
-
-      router.addEventListener(events.ROUTER_START, cb);
-
-      expect(() => {
-        router.addEventListener(events.ROUTER_START, cb);
-      }).toThrowError("Listener already exists");
-    });
-
-    // Note: Line 64 (`continue` for non-function listener in invokeFor) is defensive code
-    // that cannot be triggered through the public API because:
-    // - addEventListener validates callbacks with `typeof cb !== "function"` check
-    // - Only validated functions can be added to the listeners Set
-    // This provides runtime protection for direct module usage or future changes.
   });
 
   describe("observable (Symbol.observable)", () => {
@@ -553,23 +405,16 @@ describe("core/observable", () => {
 
       it("should receive state changes via next()", () => {
         const nextSpy = vi.fn();
+        const fromState = router.getState();
 
         getObservableRouter()
           [$$observable]()
           .subscribe({ next: nextSpy }, { replay: false });
 
-        const toState = { name: "a", path: "/a", params: {} } as any;
-        const fromState = router.getState();
-
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          fromState,
-          {},
-        );
+        router.navigate("users");
 
         expect(nextSpy).toHaveBeenCalledWith({
-          route: toState,
+          route: expect.objectContaining({ name: "users" }),
           previousRoute: fromState,
         });
       });
@@ -594,31 +439,20 @@ describe("core/observable", () => {
 
         subscription.unsubscribe();
 
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          { name: "a", path: "/a", params: {} } as any,
-          undefined,
-          {},
-        );
+        router.navigate("users");
 
         expect(nextSpy).not.toHaveBeenCalled();
       });
 
       it("should handle observer without next handler", () => {
-        // Observer with only complete handler, no next
         const completeSpy = vi.fn();
         const subscription = getObservableRouter()
           [$$observable]()
           .subscribe({ complete: completeSpy }, { replay: false });
 
-        // Should not throw when event is triggered
+        // Should not throw when navigation occurs
         expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_SUCCESS,
-            { name: "a", path: "/a", params: {} } as any,
-            undefined,
-            {},
-          );
+          router.navigate("users");
         }).not.toThrowError();
 
         subscription.unsubscribe();
@@ -759,14 +593,7 @@ describe("core/observable", () => {
           replay: false,
         });
 
-        const toState = { name: "a", path: "/a", params: {} } as any;
-
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          toState,
-          undefined,
-          {},
-        );
+        router.navigate("users");
 
         // Good observer should still receive the event
         expect(goodObserver.next).toHaveBeenCalled();
@@ -789,12 +616,7 @@ describe("core/observable", () => {
           replay: false,
         });
 
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          { name: "a", path: "/a", params: {} } as any,
-          undefined,
-          {},
-        );
+        router.navigate("users");
 
         expect(errorSpy).toHaveBeenCalledWith(expect.any(Error));
       });
@@ -815,12 +637,7 @@ describe("core/observable", () => {
         });
 
         expect(() => {
-          router.invokeEventListeners(
-            events.TRANSITION_SUCCESS,
-            { name: "a", path: "/a", params: {} } as any,
-            undefined,
-            {},
-          );
+          router.navigate("users");
         }).not.toThrowError();
 
         expect(errorSpy).toHaveBeenCalledTimes(2);
@@ -941,12 +758,7 @@ describe("core/observable", () => {
 
         controller.abort();
 
-        router.invokeEventListeners(
-          events.TRANSITION_SUCCESS,
-          { name: "a", path: "/a", params: {} } as any,
-          undefined,
-          {},
-        );
+        router.navigate("users");
 
         expect(nextSpy).not.toHaveBeenCalled();
       });
