@@ -105,12 +105,9 @@ if (IS_ROUTER5) {
 
     const cloned = router.clone();
 
-    // Save reference for cleanup
-    const listener = () => {
+    const unsub = cloned.addEventListener("$$success", () => {
       clonedCalled = true;
-    };
-
-    cloned.addEventListener("$$success", listener);
+    });
 
     router.navigate(routes[index++ % 2]);
 
@@ -119,8 +116,8 @@ if (IS_ROUTER5) {
 
     do_not_optimize(clonedCalled);
 
-    // Fallback: remove listener and stop
-    cloned.removeEventListener("$$success", listener);
+    // Cleanup: remove listener and stop
+    unsub();
     cloned.stop();
   }).gc("inner");
 }

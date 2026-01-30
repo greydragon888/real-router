@@ -101,7 +101,7 @@ describe("router.navigate() - edge cases input validation", () => {
       }).toThrowError(TypeError);
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should throw TypeError for null as route name", () => {
@@ -111,7 +111,7 @@ describe("router.navigate() - edge cases input validation", () => {
       }).toThrowError(TypeError);
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should throw TypeError for undefined as route name", () => {
@@ -121,7 +121,7 @@ describe("router.navigate() - edge cases input validation", () => {
       }).toThrowError(TypeError);
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should handle empty string as route name", () => {
@@ -130,7 +130,7 @@ describe("router.navigate() - edge cases input validation", () => {
       });
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
   });
 

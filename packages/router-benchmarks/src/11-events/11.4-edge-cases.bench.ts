@@ -7,13 +7,14 @@ import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 // 11.4.1 Adding listener during dispatch
 {
   const router = createSimpleRouter();
-  let addedListener: (() => void) | null = null;
+  let addedListenerUnsub: (() => void) | null = null;
 
   router.addEventListener("$$success", () => {
-    addedListener = () => {
+    const listener = () => {
       // Added during dispatch
     };
-    router.addEventListener("$$success", addedListener);
+
+    addedListenerUnsub = router.addEventListener("$$success", listener);
   });
 
   router.start();
@@ -23,9 +24,9 @@ import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
   bench("11.4.1 Adding listener during dispatch", () => {
     router.navigate(routes[index++ % 2]);
     // Cleanup to prevent accumulation
-    if (addedListener) {
-      router.removeEventListener("$$success", addedListener);
-      addedListener = null;
+    if (addedListenerUnsub) {
+      addedListenerUnsub();
+      addedListenerUnsub = null;
     }
   }).gc("inner");
 }
@@ -33,17 +34,19 @@ import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 // 11.4.2 Removing listener during dispatch
 {
   const router = createSimpleRouter();
-  let handler = () => {};
+  let handlerUnsub: (() => void) | null = null;
 
   const removerHandler = () => {
-    router.removeEventListener("$$success", handler);
+    if (handlerUnsub) {
+      handlerUnsub();
+    }
+
     // Re-add for next iteration
-    handler = () => {};
-    router.addEventListener("$$success", handler);
+    handlerUnsub = router.addEventListener("$$success", () => {});
   };
 
   router.addEventListener("$$success", removerHandler);
-  router.addEventListener("$$success", handler);
+  handlerUnsub = router.addEventListener("$$success", () => {});
 
   router.start();
   const routes = ["about", "home"];

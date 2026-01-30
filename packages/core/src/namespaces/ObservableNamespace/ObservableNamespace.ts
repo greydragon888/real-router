@@ -1,7 +1,6 @@
 // packages/core/src/namespaces/ObservableNamespace/ObservableNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isNavigationOptions } from "type-guards";
 
 import {
   MAX_EVENT_DEPTH,
@@ -9,13 +8,7 @@ import {
   validEventNames,
 } from "./constants";
 import { invokeFor } from "./helpers";
-import {
-  validateOptionalFromState,
-  validateOptionalToState,
-  validateRequiredToState,
-} from "./validators";
 import { events } from "../../constants";
-import { RouterError } from "../../RouterError";
 
 import type {
   EventMethodMap,
@@ -148,79 +141,6 @@ export class ObservableNamespace {
     }
   }
 
-  /**
-   * Validates invoke arguments based on event type.
-   * Called by facade before invoke.
-   */
-
-  static validateInvokeArgs(
-    eventName: (typeof events)[EventsKeys],
-    toState?: State,
-    fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
-  ): void {
-    ObservableNamespace.validateEventName(eventName);
-
-    switch (eventName) {
-      case events.TRANSITION_START:
-      case events.TRANSITION_CANCEL: {
-        validateRequiredToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        break;
-      }
-      case events.TRANSITION_ERROR: {
-        validateOptionalToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        if (!arg) {
-          throw new TypeError(
-            `[router.invokeEventListeners] error is required for event "${eventName}"`,
-          );
-        }
-
-        if (!(arg instanceof RouterError)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] error must be a RouterError instance for event "${eventName}". ` +
-              `Got: ${typeof arg === "object" ? arg.constructor.name : typeof arg}`,
-          );
-        }
-
-        break;
-      }
-      case events.TRANSITION_SUCCESS: {
-        validateRequiredToState(toState, eventName);
-        validateOptionalFromState(fromState, eventName);
-
-        if (!arg) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options is required for event "${eventName}"`,
-          );
-        }
-
-        if (arg instanceof RouterError) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options cannot be a RouterError for event "${eventName}". ` +
-              `Use TRANSITION_ERROR event for errors.`,
-          );
-        }
-
-        if (!isNavigationOptions(arg)) {
-          throw new TypeError(
-            `[router.invokeEventListeners] options is invalid for event "${eventName}". ` +
-              `Expected NavigationOptions object.`,
-          );
-        }
-
-        break;
-      }
-      // ROUTER_START and ROUTER_STOP have no required args
-      default: {
-        break;
-      }
-    }
-  }
-
   // =========================================================================
   // Dependency injection for state access
   // =========================================================================
@@ -311,10 +231,6 @@ export class ObservableNamespace {
    * Checks if there are any listeners registered for a given event.
    */
   hasListeners(eventName: (typeof events)[EventsKeys]): boolean {
-    if (!validEventNames.has(eventName)) {
-      return false;
-    }
-
     const set = this.#callbacks[eventName];
 
     return set !== undefined && set.size > 0;
@@ -515,6 +431,13 @@ export class ObservableNamespace {
       },
     );
 
+    // Subscription object referenced by unsubscribe closure below
+    // (assigned synchronously before subscribe returns)
+    const subscription: { unsubscribe: Unsubscribe; active: boolean } = {
+      unsubscribe: undefined as unknown as Unsubscribe,
+      active: true,
+    };
+
     // Create unsubscribe function
     const unsubscribe = () => {
       if (closed) {
@@ -523,13 +446,8 @@ export class ObservableNamespace {
 
       closed = true;
 
-      // Update tracking (sub always exists - added synchronously in subscribe before unsubscribe returned)
-      const sub = this.#observerSubscriptions.get(normalizedObserver);
-
-      /* v8 ignore next 3 -- @preserve unreachable: sub added synchronously before unsubscribe is returned */
-      if (sub) {
-        sub.active = false;
-      }
+      // Update tracking (subscription assigned synchronously before subscribe returns)
+      subscription.active = false;
 
       // Remove event listener
       unsubscribeFromEvents();
@@ -548,11 +466,9 @@ export class ObservableNamespace {
       }
     };
 
-    // Track subscription
-    this.#observerSubscriptions.set(normalizedObserver, {
-      unsubscribe,
-      active: true,
-    });
+    // Complete subscription object and track it
+    subscription.unsubscribe = unsubscribe;
+    this.#observerSubscriptions.set(normalizedObserver, subscription);
 
     // Handle AbortSignal
     if (signal) {
@@ -630,6 +546,7 @@ export class ObservableNamespace {
     const depthMap = this.#getEventDepthMap();
     const depth = depthMap[eventName];
 
+    /* v8 ignore next 5 -- @preserve defensive: protects against recursive plugins */
     if (depth >= MAX_EVENT_DEPTH) {
       throw new Error(
         `[Router] Maximum recursion depth (${MAX_EVENT_DEPTH}) exceeded for event: ${eventName}`,

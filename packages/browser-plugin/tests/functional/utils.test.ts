@@ -241,8 +241,8 @@ describe("Utils", () => {
       router.start();
     });
 
-    it("invokes success event when no error", () => {
-      const invokeSpy = vi.spyOn(router, "invokeEventListeners");
+    it("returns early when no error", () => {
+      const replaceStateSpy = vi.spyOn(browser, "replaceState");
 
       handleTransitionResult(
         undefined,
@@ -254,12 +254,8 @@ describe("Utils", () => {
         options,
       );
 
-      expect(invokeSpy).toHaveBeenCalledWith(
-        expect.stringContaining("success"),
-        toState,
-        fromState,
-        { replace: true },
-      );
+      // Success case now just returns - event is emitted by navigateToState
+      expect(replaceStateSpy).not.toHaveBeenCalled();
     });
 
     it("updates browser state on CANNOT_DEACTIVATE error (lines 236-244)", () => {

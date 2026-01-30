@@ -1,10 +1,21 @@
 // packages/core/src/namespaces/PluginsNamespace/PluginsNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isObjKey, getTypeDescription } from "type-guards";
 
-import { PLUGIN_LIMITS, EVENTS_MAP, EVENT_METHOD_NAMES } from "./constants";
+import {
+  PLUGIN_LIMITS,
+  EVENTS_MAP,
+  EVENT_METHOD_NAMES,
+  LOGGER_CONTEXT,
+} from "./constants";
+import {
+  validateNoDuplicatePlugins,
+  validatePlugin,
+  validatePluginLimit,
+  validateUsePluginArgs,
+} from "./validators";
 
+import type { PluginsDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { PluginFactory } from "../../types";
 import type {
@@ -12,8 +23,6 @@ import type {
   Plugin,
   Unsubscribe,
 } from "@real-router/types";
-
-const LOGGER_CONTEXT = "router.usePlugin";
 
 /**
  * Independent namespace for managing plugins.
@@ -26,59 +35,36 @@ export class PluginsNamespace<
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
 
-  // Router reference for plugin initialization (set after construction)
+  // Router reference for plugin initialization (passed to plugin factories)
   #router: Router<Dependencies> | undefined;
+
+  // Dependencies injected via setDependencies (for internal @internal method calls)
+  #deps: PluginsDependencies<Dependencies> | undefined;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
+  // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
 
-  /**
-   * Validates usePlugin arguments.
-   */
   static validateUsePluginArgs<D extends DefaultDependencies>(
     plugins: unknown[],
   ): asserts plugins is PluginFactory<D>[] {
-    for (const plugin of plugins) {
-      if (typeof plugin !== "function") {
-        throw new TypeError(
-          `[router.usePlugin] Expected plugin factory function, got ${typeof plugin}`,
-        );
-      }
-    }
+    validateUsePluginArgs<D>(plugins);
   }
 
-  /**
-   * Validates that a plugin factory returned a valid plugin object.
-   */
   static validatePlugin(plugin: Plugin): void {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (!(plugin && typeof plugin === "object") || Array.isArray(plugin)) {
-      throw new TypeError(
-        `[router.usePlugin] Plugin factory must return an object, got ${getTypeDescription(
-          plugin,
-        )}`,
-      );
-    }
+    validatePlugin(plugin);
+  }
 
-    // Detect async factory (returns Promise)
-    if (typeof (plugin as unknown as { then?: unknown }).then === "function") {
-      throw new TypeError(
-        `[router.usePlugin] Async plugin factories are not supported. ` +
-          `Factory returned a Promise instead of a plugin object.`,
-      );
-    }
+  static validatePluginLimit(currentCount: number, newCount: number): void {
+    validatePluginLimit(currentCount, newCount);
+  }
 
-    for (const key in plugin) {
-      if (
-        !(key === "teardown" || isObjKey<typeof EVENTS_MAP>(key, EVENTS_MAP))
-      ) {
-        throw new TypeError(
-          `[router.usePlugin] Unknown property '${key}'. ` +
-            `Plugin must only contain event handlers and optional teardown.`,
-        );
-      }
-    }
+  static validateNoDuplicatePlugins<D extends DefaultDependencies>(
+    newFactories: PluginFactory<D>[],
+    existingFactories: PluginFactory<D>[],
+  ): void {
+    validateNoDuplicatePlugins(newFactories, existingFactories);
   }
 
   // =========================================================================
@@ -87,10 +73,18 @@ export class PluginsNamespace<
 
   /**
    * Sets the router reference for plugin initialization.
-   * Must be called before registering any plugins.
+   * Plugins receive the router object directly as part of their API.
    */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
+  }
+
+  /**
+   * Sets dependencies for internal operations.
+   * These replace direct @internal method calls on router.
+   */
+  setDependencies(deps: PluginsDependencies<Dependencies>): void {
+    this.#deps = deps;
   }
 
   // =========================================================================
@@ -98,17 +92,26 @@ export class PluginsNamespace<
   // =========================================================================
 
   /**
+   * Returns the number of registered plugins.
+   * Used by facade for limit validation.
+   */
+  count(): number {
+    return this.#plugins.size;
+  }
+
+  /**
    * Registers one or more plugin factories.
    * Returns unsubscribe function to remove all added plugins.
+   * Input already validated by facade (limit, duplicates).
    *
    * @param factories - Already validated by facade
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
-    // Check limits
-    this.#validateCount(factories.length);
+    // Emit warnings for count thresholds (not validation, just warnings)
+    this.#checkCountThresholds(factories.length);
 
-    // Validate batch and get deduplicated set
-    const seenInBatch = this.#validateBatch(factories);
+    // Deduplicate batch with warning (validation already done by facade)
+    const seenInBatch = this.#deduplicateBatch(factories);
 
     // Track successfully initialized plugins for cleanup
     const initializedPlugins: {
@@ -176,35 +179,30 @@ export class PluginsNamespace<
   // Private methods
   // =========================================================================
 
-  #validateCount(newCount: number): void {
-    const newSize = newCount + this.#plugins.size;
+  /**
+   * Emits warnings for count thresholds.
+   * Validation (HARD_LIMIT) is done by facade.
+   */
+  #checkCountThresholds(newCount: number): void {
+    const totalCount = newCount + this.#plugins.size;
 
-    if (newSize > PLUGIN_LIMITS.HARD_LIMIT) {
-      throw new Error(
-        `[router.usePlugin] Plugin limit exceeded (${PLUGIN_LIMITS.HARD_LIMIT})`,
-      );
-    }
-
-    if (newSize >= PLUGIN_LIMITS.ERROR) {
-      logger.error(LOGGER_CONTEXT, `${newSize} plugins registered!`);
-    } else if (newSize >= PLUGIN_LIMITS.WARN) {
-      logger.warn(LOGGER_CONTEXT, `${newSize} plugins registered`);
+    if (totalCount >= PLUGIN_LIMITS.ERROR) {
+      logger.error(LOGGER_CONTEXT, `${totalCount} plugins registered!`);
+    } else if (totalCount >= PLUGIN_LIMITS.WARN) {
+      logger.warn(LOGGER_CONTEXT, `${totalCount} plugins registered`);
     }
   }
 
-  #validateBatch(
+  /**
+   * Deduplicates batch with warning for duplicates within batch.
+   * Validation (existing duplicates) is done by facade.
+   */
+  #deduplicateBatch(
     plugins: PluginFactory<Dependencies>[],
   ): Set<PluginFactory<Dependencies>> {
     const seenInBatch = new Set<PluginFactory<Dependencies>>();
 
     for (const plugin of plugins) {
-      if (this.#plugins.has(plugin)) {
-        throw new Error(
-          `[router.usePlugin] Plugin factory already registered. ` +
-            `To re-register, first unsubscribe the existing plugin.`,
-        );
-      }
-
       if (seenInBatch.has(plugin)) {
         logger.warn(
           LOGGER_CONTEXT,
@@ -219,14 +217,15 @@ export class PluginsNamespace<
   }
 
   #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
-    // Router is guaranteed to be set at this point
+    // Router and deps are guaranteed to be set at this point
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const router = this.#router!;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const deps = this.#deps!;
+
     // Bind getDependency to preserve 'this' context when called from factory
-    const appliedPlugin = pluginFactory(
-      router,
-      router.getDependency.bind(router),
-    );
+    // Plugin factories receive full router as part of their public API
+    const appliedPlugin = pluginFactory(router, deps.getDependency);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
 
@@ -240,13 +239,13 @@ export class PluginsNamespace<
       if (methodName in appliedPlugin) {
         if (typeof appliedPlugin[methodName] === "function") {
           removeEventListeners.push(
-            router.addEventListener(
+            deps.addEventListener(
               EVENTS_MAP[methodName],
               appliedPlugin[methodName],
             ),
           );
 
-          if (methodName === "onStart" && router.isStarted()) {
+          if (methodName === "onStart" && deps.isStarted()) {
             logger.warn(
               LOGGER_CONTEXT,
               "Router already started, onStart will not be called",

@@ -203,14 +203,6 @@ describe("router.navigate() - route not found", () => {
       unsubError();
     });
 
-    it("should not call router.setState for invalid route", () => {
-      const setStateSpy = vi.spyOn(router, "setState");
-
-      router.navigate("invalid.route", noop);
-
-      expect(setStateSpy).not.toHaveBeenCalled();
-    });
-
     it("should not trigger guards or middleware for invalid route", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();

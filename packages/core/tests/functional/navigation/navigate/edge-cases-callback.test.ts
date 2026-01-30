@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events } from "@real-router/core";
 
@@ -28,7 +28,7 @@ describe("router.navigate() - edge cases callback", () => {
       });
 
       // Router should continue working
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("users");
     });
 
@@ -38,7 +38,7 @@ describe("router.navigate() - edge cases callback", () => {
       });
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should not crash when callback throws on same states error", () => {
@@ -52,7 +52,7 @@ describe("router.navigate() - edge cases callback", () => {
       });
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should not crash when callback throws with skipTransition", () => {
@@ -61,7 +61,7 @@ describe("router.navigate() - edge cases callback", () => {
       });
 
       // Router should still be operational
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should not crash when router not started and callback throws", () => {
@@ -72,7 +72,7 @@ describe("router.navigate() - edge cases callback", () => {
       });
 
       // Router should not have crashed
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
   });
 
@@ -99,7 +99,7 @@ describe("router.navigate() - edge cases callback", () => {
 
         // Should complete without stack overflow
         expect(depth).toBeGreaterThan(0);
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
       });
 
       it("should allow navigation from success callback", () => {
@@ -355,7 +355,10 @@ describe("router.navigate() - edge cases callback", () => {
       it("should apply opts when provided after params", async () => {
         const successListener = vi.fn();
 
-        router.addEventListener(events.TRANSITION_SUCCESS, successListener);
+        const unsubscribe = router.addEventListener(
+          events.TRANSITION_SUCCESS,
+          successListener,
+        );
 
         await new Promise<void>((resolve) => {
           router.navigate("users", {}, { replace: true }, () => {
@@ -370,13 +373,16 @@ describe("router.navigate() - edge cases callback", () => {
 
         expect(opts?.replace).toBe(true);
 
-        router.removeEventListener(events.TRANSITION_SUCCESS, successListener);
+        unsubscribe();
       });
 
       it("should use default empty opts when undefined is passed", async () => {
         const successListener = vi.fn();
 
-        router.addEventListener(events.TRANSITION_SUCCESS, successListener);
+        const unsubscribe = router.addEventListener(
+          events.TRANSITION_SUCCESS,
+          successListener,
+        );
 
         await new Promise<void>((resolve) => {
           router.navigate("users", {}, undefined as any, () => {
@@ -395,7 +401,7 @@ describe("router.navigate() - edge cases callback", () => {
         // eslint-disable-next-line vitest/prefer-strict-boolean-matchers
         expect(opts?.reload).toBeFalsy();
 
-        router.removeEventListener(events.TRANSITION_SUCCESS, successListener);
+        unsubscribe();
       });
     });
 
@@ -460,7 +466,10 @@ describe("router.navigate() - edge cases callback", () => {
       it("should work: navigate(name, params, opts)", async () => {
         const successListener = vi.fn();
 
-        router.addEventListener(events.TRANSITION_SUCCESS, successListener);
+        const unsubscribe = router.addEventListener(
+          events.TRANSITION_SUCCESS,
+          successListener,
+        );
 
         router.navigate("users", {}, { replace: true });
 
@@ -473,7 +482,7 @@ describe("router.navigate() - edge cases callback", () => {
 
         expect(opts?.replace).toBe(true);
 
-        router.removeEventListener(events.TRANSITION_SUCCESS, successListener);
+        unsubscribe();
       });
     });
   });

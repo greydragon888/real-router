@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 
@@ -66,7 +66,7 @@ describe("router.navigate() - error state recovery", () => {
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should reset isNavigating() to false after guard error", () => {
+    it("should allow new navigation after guard error", async () => {
       router.canActivate(
         "users",
         () => () =>
@@ -77,16 +77,21 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      expect(router.isNavigating()).toBe(false);
+      // First navigation fails
+      await new Promise<void>((resolve) => {
+        router.navigate("users", (err) => {
+          expect(err).toBeDefined();
 
-      router.navigate("users", (err) => {
-        expect(err).toBeDefined();
-        // isNavigating should be false after error
-        expect(router.isNavigating()).toBe(false);
+          resolve();
+        });
       });
 
-      // isNavigating should be true during transition
-      expect(router.isNavigating()).toBe(true);
+      // Can start new navigation after error (router is not stuck)
+      router.navigate("home", (err) => {
+        expect(err).toBeUndefined();
+      });
+
+      expect(router.getState()?.name).toBe("home");
     });
 
     it("should do nothing when cancel() called after navigation complete", () => {

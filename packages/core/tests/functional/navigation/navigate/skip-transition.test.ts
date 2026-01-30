@@ -74,14 +74,6 @@ describe("router.navigate() - skip transition", () => {
       }).not.toThrowError();
     });
 
-    it("should not call router.setState when skipTransition is true", () => {
-      const setStateSpy = vi.spyOn(router, "setState");
-
-      router.navigate("orders", {}, { skipTransition: true }, noop);
-
-      expect(setStateSpy).not.toHaveBeenCalled();
-    });
-
     it("should not emit any transition events when skipTransition is true", () => {
       const onStart = vi.fn();
       const onSuccess = vi.fn();

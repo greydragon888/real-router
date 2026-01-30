@@ -128,54 +128,6 @@ boxplot(() => {
 });
 
 // ============================================================================
-// CORE OPERATIONS: removeEventListener
-// ============================================================================
-
-boxplot(() => {
-  summary(() => {
-    bench("removeEventListener: single listener", () => {
-      const router = createBenchRouter();
-      const listener = createListener();
-
-      router.addEventListener(events.TRANSITION_START, listener);
-      router.removeEventListener(events.TRANSITION_START, listener);
-    });
-
-    bench("removeEventListener: from Set with 10 listeners", () => {
-      const router = createBenchRouter();
-      const listeners = generateListeners(10);
-      const targetListener = listeners[5]; // middle listener
-
-      for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
-      }
-
-      router.removeEventListener(events.TRANSITION_START, targetListener);
-    });
-
-    bench("removeEventListener: from Set with 100 listeners", () => {
-      const router = createBenchRouter();
-      const listeners = generateListeners(100);
-      const targetListener = listeners[50]; // middle listener
-
-      for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
-      }
-
-      router.removeEventListener(events.TRANSITION_START, targetListener);
-    });
-
-    bench("removeEventListener: from empty Set (early return)", () => {
-      const router = createBenchRouter();
-      const listener = createListener();
-
-      // Never added, set is empty
-      router.removeEventListener(events.TRANSITION_START, listener);
-    });
-  });
-});
-
-// ============================================================================
 // CORE OPERATIONS: unsubscribe function
 // ============================================================================
 
@@ -633,21 +585,6 @@ boxplot(() => {
 
       for (const l of listeners) {
         router.addEventListener(events.TRANSITION_START, l);
-      }
-    });
-
-    bench("removeEventListener only (100 listeners pre-added)", () => {
-      const router = createBenchRouter();
-      const listeners = generateListeners(100);
-
-      // Pre-add all listeners
-      for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
-      }
-
-      // Only measure removal
-      for (const l of listeners) {
-        router.removeEventListener(events.TRANSITION_START, l);
       }
     });
 

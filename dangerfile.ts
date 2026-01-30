@@ -211,19 +211,51 @@ function checkPRDescription() {
 /**
  * Check 6: Package.json and lockfile sync
  *
- * Warn if package.json changed but pnpm-lock.yaml didn't.
+ * Warn if package.json dependencies changed but pnpm-lock.yaml didn't.
+ * Only checks actual dependency changes, not scripts/metadata.
  */
-function checkLockfileSync() {
-  const packageJsonChanged = allChangedFiles.some((f) =>
+async function checkLockfileSync() {
+  const changedPackageJsons = modifiedFiles.filter((f) =>
     f.endsWith("package.json")
   );
   const lockfileChanged = allChangedFiles.includes("pnpm-lock.yaml");
 
-  if (packageJsonChanged && !lockfileChanged) {
-    warn(
-      `🔒 \`package.json\` was changed but \`pnpm-lock.yaml\` was not.\n\n` +
-        `Did you forget to run \`pnpm install\`?`
+  if (changedPackageJsons.length === 0 || lockfileChanged) {
+    return;
+  }
+
+  // Check if any package.json has dependency changes
+  const dependencyFields = [
+    '"dependencies"',
+    '"devDependencies"',
+    '"peerDependencies"',
+    '"optionalDependencies"',
+  ];
+
+  for (const file of changedPackageJsons) {
+    const diff = await danger.git.diffForFile(file);
+    if (!diff) continue;
+
+    const hasDependencyChanges = dependencyFields.some(
+      (field) => diff.added.includes(field) || diff.removed.includes(field)
     );
+
+    // Also check for version changes in existing dependencies
+    const hasVersionChanges =
+      diff.added.includes('"^') ||
+      diff.added.includes('"~') ||
+      diff.added.includes('"workspace:') ||
+      diff.removed.includes('"^') ||
+      diff.removed.includes('"~') ||
+      diff.removed.includes('"workspace:');
+
+    if (hasDependencyChanges || hasVersionChanges) {
+      warn(
+        `🔒 Dependencies in \`${file}\` were changed but \`pnpm-lock.yaml\` was not.\n\n` +
+          `Run \`pnpm install\` to update the lockfile.`
+      );
+      return; // One warning is enough
+    }
   }
 }
 
@@ -316,7 +348,7 @@ void (async () => {
   checkChangeset();
   checkPRSize();
   checkPRDescription();
-  checkLockfileSync();
+  await checkLockfileSync();
   checkTestCoverage();
   await checkConsoleStatements();
   showSummary();
