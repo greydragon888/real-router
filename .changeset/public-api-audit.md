@@ -1,5 +1,5 @@
 ---
-"@real-router/core": major
+"@real-router/core": minor
 "@real-router/browser-plugin": patch
 "@real-router/persistent-params-plugin": patch
 ---
@@ -42,7 +42,6 @@ The following methods are now documented for plugin authors:
 - Moved validation logic from namespaces to Router facade
 - Removed ~12,000 lines of dead code and redundant tests
 - Namespace methods now trust validated input from facade
-- Added `/* v8 ignore next */` markers for defensive checks
 
 ### Patch Updates
 
