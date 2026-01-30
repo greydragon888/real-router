@@ -11,7 +11,6 @@
 import { buildTree } from "./buildTree";
 import { computeCaches } from "./computeCaches";
 import { sortTree } from "./sortTree";
-import { validateRoutes } from "./validateRoutes";
 
 import type {
   RouteDefinition,
@@ -59,20 +58,15 @@ export function createRouteTreeBuilder(
     },
 
     build(options?: TreeBuildOptions): RouteTree {
-      // Step 1: Validate all routes (unless skipped)
-      if (!options?.skipValidation) {
-        validateRoutes(routes);
-      }
-
-      // Step 2: Build mutable tree structure
+      // Step 1: Build mutable tree structure
       const mutableTree = buildTree(name, path, routes);
 
-      // Step 3: Sort all children (unless skipped)
+      // Step 2: Sort all children (unless skipped)
       if (!options?.skipSort) {
         sortTree(mutableTree);
       }
 
-      // Step 4: Compute all caches and optionally freeze
+      // Step 3: Compute all caches and optionally freeze
       const freeze = !options?.skipFreeze;
 
       return computeCaches(mutableTree, freeze);
@@ -92,7 +86,7 @@ export function createRouteTreeBuilder(
  * @param name - Root node name (typically empty string)
  * @param path - Root node path (typically empty string)
  * @param routes - Route definitions to add
- * @param options - Build options (e.g., skipValidation)
+ * @param options - Build options (e.g., skipSort, skipFreeze)
  * @returns Immutable RouteTree
  *
  * @example
@@ -101,9 +95,6 @@ export function createRouteTreeBuilder(
  *   { name: "users", path: "/users" },
  *   { name: "users.profile", path: "/:id" },
  * ]);
- *
- * // Skip validation (when routes are pre-validated)
- * const tree = createRouteTree("", "", routes, { skipValidation: true });
  * ```
  */
 export function createRouteTree(

@@ -142,6 +142,13 @@ export class Router<
       );
     }
 
+    // Conditional validation for initial routes - structure and batch duplicates
+    // Validation happens BEFORE tree is built, so tree is not passed
+    if (!noValidate && routes.length > 0) {
+      RoutesNamespace.validateAddRouteArgs(routes);
+      RoutesNamespace.validateRoutes(routes);
+    }
+
     // =========================================================================
     // Create Namespaces
     // =========================================================================
@@ -150,7 +157,7 @@ export class Router<
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
     this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
-    this.#routes = new RoutesNamespace<Dependencies>(routes);
+    this.#routes = new RoutesNamespace<Dependencies>(routes, noValidate);
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#middleware = new MiddlewareNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();

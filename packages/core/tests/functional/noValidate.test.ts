@@ -329,6 +329,96 @@ describe("core/noValidate option", () => {
     });
   });
 
+  describe("forwardMap caching with noValidate", () => {
+    it("should cache forwardTo chains without validation", () => {
+      // Create router with forwardTo chain (a → b → c)
+      const router = createRouter(
+        [
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b", forwardTo: "c" },
+          { name: "c", path: "/c" },
+        ],
+        { noValidate: true },
+      );
+
+      // forwardState should resolve through chain a → b → c
+      const result = router.forwardState("a", {});
+
+      expect(result.name).toBe("c");
+
+      router.stop();
+    });
+
+    it("should refresh forward cache when routes are added (noValidate: true)", () => {
+      // Start with a simple forwardTo
+      const router = createRouter(
+        [
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b" },
+        ],
+        { noValidate: true },
+      );
+
+      // Verify initial forwardTo works
+      expect(router.forwardState("a", {}).name).toBe("b");
+
+      // Add another route with forwardTo - this triggers cache refresh
+      router.addRoute({ name: "d", path: "/d", forwardTo: "a" });
+
+      // d → a → b
+      expect(router.forwardState("d", {}).name).toBe("b");
+
+      router.stop();
+    });
+
+    it("should refresh forward cache when routes are removed (noValidate: true)", () => {
+      // Create router with multiple forwardTo routes
+      const router = createRouter(
+        [
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b", forwardTo: "c" },
+          { name: "c", path: "/c" },
+          { name: "d", path: "/d", forwardTo: "c" },
+        ],
+        { noValidate: true },
+      );
+
+      // Verify initial chains work
+      expect(router.forwardState("a", {}).name).toBe("c");
+      expect(router.forwardState("d", {}).name).toBe("c");
+
+      // Remove route 'd' - triggers cache refresh
+      router.removeRoute("d");
+
+      // Remaining chain should still work
+      expect(router.forwardState("a", {}).name).toBe("c");
+
+      router.stop();
+    });
+
+    it("should refresh forward cache when forwardTo is updated (noValidate: true)", () => {
+      const router = createRouter(
+        [
+          { name: "a", path: "/a", forwardTo: "b" },
+          { name: "b", path: "/b" },
+          { name: "c", path: "/c" },
+        ],
+        { noValidate: true },
+      );
+
+      // Initial: a → b
+      expect(router.forwardState("a", {}).name).toBe("b");
+
+      // Update forwardTo: a → c (triggers cache refresh)
+      router.updateRoute("a", { forwardTo: "c" });
+
+      // Now: a → c
+      expect(router.forwardState("a", {}).name).toBe("c");
+
+      router.stop();
+    });
+  });
+
   describe("validation comparison", () => {
     it("should throw validation error with noValidate: false for empty route name", () => {
       const testRouter = createTestRouter({ noValidate: false });
