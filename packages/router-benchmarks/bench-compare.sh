@@ -6,11 +6,70 @@ set -e
 # Optimized for macOS with Apple Silicon (M3 Pro)
 # =============================================================================
 
+# Require bash (not sh, dash, zsh, etc.)
+# Using POSIX-compatible syntax here so the error message works even when run with sh
+if [ -z "$BASH_VERSION" ]; then
+    echo "Error: This script requires bash. Please run with:"
+    echo "  sudo bash $0"
+    echo "  or"
+    echo "  sudo ./$0"
+    exit 1
+fi
+
+# Show help (before sudo check so users can see help without sudo)
+for arg in "$@"; do
+    if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then
+        echo "Usage: sudo ./bench-compare.sh [SECTIONS...]"
+        echo ""
+        echo "Run benchmark comparison between router5, router6, and real-router."
+        echo ""
+        echo "Arguments:"
+        echo "  SECTIONS    Section numbers to run (space-separated). If omitted, runs all."
+        echo ""
+        echo "Available sections:"
+        echo "   1  Navigation Basic"
+        echo "   2  Navigation Plugins"
+        echo "   3  Dependencies"
+        echo "   4  Plugins Management"
+        echo "   5  Router Options"
+        echo "   7  Path Operations"
+        echo "   8  Current State"
+        echo "   9  Redirects"
+        echo "  10  Start/Stop"
+        echo "  11  Events"
+        echo "  12  Stress Testing"
+        echo "  13  Cloning"
+        echo ""
+        echo "Examples:"
+        echo "  sudo ./bench-compare.sh           # Run all sections"
+        echo "  sudo ./bench-compare.sh 1         # Run only Navigation Basic"
+        echo "  sudo ./bench-compare.sh 1 2 3     # Run sections 1, 2, and 3"
+        echo ""
+        echo "Environment variables:"
+        echo "  COOLDOWN           Fallback cooldown in seconds (default: 60)"
+        echo "  MAX_COOLDOWN_WAIT  Max thermal cooldown wait in seconds (default: 300)"
+        exit 0
+    fi
+done
+
 # Require sudo upfront
 if [[ "$EUID" -ne 0 ]]; then
     echo "This script requires sudo privileges. Please run with sudo."
     exit 1
 fi
+
+# Parse section arguments
+BENCH_SECTIONS=""
+for arg in "$@"; do
+    # Collect section numbers (skip flags)
+    if [[ "$arg" =~ ^[0-9]+$ ]]; then
+        if [[ -n "$BENCH_SECTIONS" ]]; then
+            BENCH_SECTIONS="${BENCH_SECTIONS},${arg}"
+        else
+            BENCH_SECTIONS="$arg"
+        fi
+    fi
+done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RESULTS_DIR="${SCRIPT_DIR}/.bench-results"
@@ -23,6 +82,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Smart cooldown - waits for CPU temperature to drop
@@ -207,6 +267,7 @@ echo "  Chip: $CHIP"
 echo "  Power: ${POWER_SOURCE:-unknown}${BATTERY_PERCENT:+ (${BATTERY_PERCENT}%)}"
 echo "  Thermal pressure: ${THERMAL_PRESSURE:-unknown}"
 echo "  Cooldown: wait for Nominal (max ${MAX_COOLDOWN_WAIT}s, fallback ${COOLDOWN}s)"
+echo "  Sections: ${BENCH_SECTIONS:-all}"
 
 # -----------------------------------------------------------------------------
 # Step 3: Disable system distractions
@@ -219,16 +280,16 @@ caffeinate -dim &
 CAFFEINATE_PID=$!
 echo -e "${GREEN}Screensaver/sleep disabled (PID: $CAFFEINATE_PID)${NC}"
 
-# Disable Spotlight indexing
-sudo mdutil -i off / >/dev/null 2>&1
+# Disable Spotlight indexing (non-fatal if fails)
+sudo mdutil -i off / >/dev/null 2>&1 || true
 echo -e "${GREEN}Spotlight indexing disabled${NC}"
 
-# Disable Time Machine backups
-sudo tmutil disable >/dev/null 2>&1
+# Disable Time Machine backups (non-fatal if not configured)
+sudo tmutil disable >/dev/null 2>&1 || true
 echo -e "${GREEN}Time Machine disabled${NC}"
 
-# Flush file system caches
-sync && sudo purge
+# Flush file system caches (purge may fail on some systems)
+sync && sudo purge || true || true
 echo -e "${GREEN}File system caches purged${NC}"
 
 # -----------------------------------------------------------------------------
@@ -261,12 +322,19 @@ if warn_if_throttling; then
     fi
 fi
 
+# Show which sections will run
+if [[ -n "$BENCH_SECTIONS" ]]; then
+    echo -e "${CYAN}Running sections: ${BENCH_SECTIONS}${NC}"
+else
+    echo -e "${CYAN}Running all sections${NC}"
+fi
+
 # --- router5 (baseline) ---
 echo ""
 echo -e "${BLUE}--- Testing router5 (baseline) ---${NC}"
 RESULT_FILE_ROUTER5="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
-sync && sudo purge
-BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+sync && sudo purge || true
+BENCH_ROUTER=router5 BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
     nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER5"
 
 # --- Cooldown ---
@@ -277,8 +345,8 @@ wait_for_cooldown "$MAX_COOLDOWN_WAIT"
 echo ""
 echo -e "${BLUE}--- Testing router6 ---${NC}"
 RESULT_FILE_ROUTER6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
-sync && sudo purge
-BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+sync && sudo purge || true
+BENCH_ROUTER=router6 BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
     nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER6"
 
 # --- Cooldown ---
@@ -289,9 +357,21 @@ wait_for_cooldown "$MAX_COOLDOWN_WAIT"
 echo ""
 echo -e "${BLUE}--- Testing real-router (current) ---${NC}"
 RESULT_FILE_REAL_ROUTER="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
-sync && sudo purge
-BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+sync && sudo purge || true
+BENCH_ROUTER=real-router BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
     nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER"
+
+# --- Cooldown ---
+echo ""
+wait_for_cooldown "$MAX_COOLDOWN_WAIT"
+
+# --- real-router (noValidate) ---
+echo ""
+echo -e "${BLUE}--- Testing real-router (noValidate: true) ---${NC}"
+RESULT_FILE_REAL_ROUTER_NOVALIDATE="${RESULTS_DIR}/${TIMESTAMP}_real-router-novalidate.txt"
+sync && sudo purge || true
+BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 
 # -----------------------------------------------------------------------------
 # Step 6: Fix file ownership (since script runs as root)
@@ -312,6 +392,7 @@ echo "Files:"
 echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
 echo "  router6: $RESULT_FILE_ROUTER6"
 echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
+echo "  real-router (noValidate): $RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 
 echo ""
 echo -e "${BLUE}To compare results:${NC}"

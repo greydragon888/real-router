@@ -1,6 +1,6 @@
 // packages/router-benchmarks/src/helpers/router-adapter.ts
 
-import { ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
+import { BENCH_NO_VALIDATE, ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
 
 import type {
   Router,
@@ -58,4 +58,6 @@ export const cloneRouter = routerModule.cloneRouter;
 
 export type { Route, Router } from "@real-router/core";
 
-console.error(`Using router: ${ROUTER_NAME}`);
+console.error(
+  `Using router: ${ROUTER_NAME}${BENCH_NO_VALIDATE ? " (noValidate: true)" : ""}`,
+);

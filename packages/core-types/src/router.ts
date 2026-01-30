@@ -119,6 +119,14 @@ export interface Options {
    * @default undefined
    */
   logger?: Partial<LoggerConfig>;
+
+  /**
+   * Disables argument validation in public router methods.
+   * Use in production for performance. Keep false in development for early error detection.
+   *
+   * @default false
+   */
+  noValidate?: boolean;
 }
 
 export type ActivationFn = (
