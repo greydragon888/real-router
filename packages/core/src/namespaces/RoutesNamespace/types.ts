@@ -1,6 +1,46 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
-import type { Params } from "@real-router/types";
+import type { ActivationFnFactory } from "../../types";
+import type {
+  DefaultDependencies,
+  Params,
+  State,
+  StateMetaInput,
+} from "@real-router/types";
+
+/**
+ * Dependencies injected into RoutesNamespace.
+ *
+ * These are function references from the Router facade,
+ * avoiding the need to pass the entire Router object.
+ */
+export interface RoutesDependencies<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  /** Register canActivate handler for a route */
+  canActivate: (
+    name: string,
+    handler: ActivationFnFactory<Dependencies>,
+  ) => void;
+
+  /** Create state object */
+  makeState: <P extends Params = Params, MP extends Params = Params>(
+    name: string,
+    params?: P,
+    path?: string,
+    meta?: StateMetaInput<MP>,
+  ) => State<P, MP>;
+
+  /** Get current router state */
+  getState: () => State | undefined;
+
+  /** Compare two states for equality */
+  areStatesEqual: (
+    state1: State | undefined,
+    state2: State | undefined,
+    ignoreQueryParams?: boolean,
+  ) => boolean;
+}
 
 /**
  * Configuration storage for routes.

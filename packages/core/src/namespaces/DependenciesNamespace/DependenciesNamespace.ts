@@ -4,6 +4,13 @@ import { logger } from "@real-router/logger";
 import { getTypeDescription } from "type-guards";
 
 import { DEPENDENCY_LIMITS } from "./constants";
+import {
+  validateDependencyExists,
+  validateDependencyLimit,
+  validateDependencyName,
+  validateDependenciesObject,
+  validateSetDependencyArgs,
+} from "./validators";
 
 import type { DefaultDependencies } from "@real-router/types";
 
@@ -28,58 +35,40 @@ export class DependenciesNamespace<
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
+  // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
 
-  /**
-   * Validates that dependency name is a string.
-   * Called by facade before set/get operations.
-   */
   static validateName(
     name: unknown,
     methodName: string,
   ): asserts name is string {
-    if (typeof name !== "string") {
-      throw new TypeError(
-        `[router.${methodName}]: dependency name must be a string, got ${typeof name}`,
-      );
-    }
+    validateDependencyName(name, methodName);
   }
 
-  /**
-   * Validates setDependency name argument.
-   * Value is not validated - any value is valid.
-   */
   static validateSetDependencyArgs(name: unknown): asserts name is string {
-    if (typeof name !== "string") {
-      throw new TypeError(
-        `[router.setDependency]: dependency name must be a string, got ${typeof name}`,
-      );
-    }
+    validateSetDependencyArgs(name);
   }
 
-  /**
-   * Validates that dependencies object is a plain object without getters.
-   * Called by facade before setMultiple/constructor.
-   */
   static validateDependenciesObject(
     deps: unknown,
     methodName: string,
   ): asserts deps is Record<string, unknown> {
-    // Reject non-plain objects (classes, Date, Map, Array)
-    if (!(deps && typeof deps === "object" && deps.constructor === Object)) {
-      throw new TypeError(
-        `[router.${methodName}] Invalid argument: expected plain object, received ${getTypeDescription(deps)}`,
-      );
-    }
+    validateDependenciesObject(deps, methodName);
+  }
 
-    // Getters can throw, return different values, or have side effects
-    for (const key in deps) {
-      if (Object.getOwnPropertyDescriptor(deps, key)?.get) {
-        throw new TypeError(
-          `[router.${methodName}] Getters not allowed: "${key}"`,
-        );
-      }
-    }
+  static validateDependencyExists(
+    value: unknown,
+    dependencyName: string,
+  ): asserts value is NonNullable<unknown> {
+    validateDependencyExists(value, dependencyName);
+  }
+
+  static validateDependencyLimit(
+    currentCount: number,
+    newCount: number,
+    methodName: string,
+  ): void {
+    validateDependencyLimit(currentCount, newCount, methodName);
   }
 
   // =========================================================================
@@ -130,22 +119,11 @@ export class DependenciesNamespace<
 
   /**
    * Sets multiple dependencies at once.
-   * Performs atomic limit check - either all set or none.
+   * Limit check should be done by facade before calling this method.
    *
    * @param deps - Already validated by facade
    */
   setMultiple(deps: Partial<Dependencies>): void {
-    // Atomic limit check - either all set or none
-    const totalCount =
-      Object.keys(this.#dependencies).length + Object.keys(deps).length;
-
-    if (totalCount >= DEPENDENCY_LIMITS.HARD_LIMIT) {
-      throw new Error(
-        `[router.setDependencies] Dependency limit exceeded (${DEPENDENCY_LIMITS.HARD_LIMIT}). ` +
-          `Current: ${totalCount}. This is likely a bug in your code.`,
-      );
-    }
-
     const overwrittenKeys: string[] = [];
 
     for (const key in deps) {
@@ -174,15 +152,7 @@ export class DependenciesNamespace<
    * @param dependencyName - Already validated by facade
    */
   get<K extends keyof Dependencies>(dependencyName: K): Dependencies[K] {
-    const dependency = this.#dependencies[dependencyName];
-
-    if (dependency === undefined) {
-      throw new ReferenceError(
-        `[router.getDependency]: dependency "${String(dependencyName)}" not found`,
-      );
-    }
-
-    return dependency;
+    return this.#dependencies[dependencyName] as Dependencies[K];
   }
 
   /**
@@ -190,6 +160,13 @@ export class DependenciesNamespace<
    */
   getAll(): Partial<Dependencies> {
     return { ...this.#dependencies };
+  }
+
+  /**
+   * Gets the current number of dependencies.
+   */
+  count(): number {
+    return Object.keys(this.#dependencies).length;
   }
 
   /**

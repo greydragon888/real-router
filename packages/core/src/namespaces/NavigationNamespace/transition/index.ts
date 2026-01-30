@@ -6,12 +6,11 @@ import { constants, errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../../transitionPath";
 
-import type { Router } from "../../../Router";
+import type { TransitionDependencies } from "../types";
 import type {
   NavigationOptions,
   CancelFn,
   State,
-  DefaultDependencies,
   RouterError as RouterErrorType,
 } from "@real-router/types";
 
@@ -21,8 +20,8 @@ import type {
  */
 type StrictDoneFn = (error: RouterErrorType | undefined, state: State) => void;
 
-export function transition<Dependencies extends DefaultDependencies>(
-  router: Router<Dependencies>,
+export function transition(
+  deps: TransitionDependencies,
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
@@ -34,15 +33,15 @@ export function transition<Dependencies extends DefaultDependencies>(
 
   // We're caching the necessary data
   const [canDeactivateFunctions, canActivateFunctions] =
-    router.getLifecycleFunctions();
-  const middlewareFunctions = router.getMiddlewareFunctions();
+    deps.getLifecycleFunctions();
+  const middlewareFunctions = deps.getMiddlewareFunctions();
   const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
 
   // State management functions
   // Issue #36: Check both explicit cancellation AND router shutdown
   // Issue #50: Use isActive() instead of isStarted() for two-phase start support
   // isActive() is true during initial start transition, isStarted() is false
-  const isCancelled = () => cancelled || !router.isActive();
+  const isCancelled = () => cancelled || !deps.isActive();
 
   const cancel = () => {
     if (!cancelled && !completed) {
@@ -142,7 +141,7 @@ export function transition<Dependencies extends DefaultDependencies>(
 
         for (const name of previousActiveSegments) {
           if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
-            router.clearCanDeactivate(name);
+            deps.clearCanDeactivate(name);
           }
         }
       }

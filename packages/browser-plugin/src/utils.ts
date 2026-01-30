@@ -1,6 +1,6 @@
 // packages/browser-plugin/modules/utils.ts
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 import { isStateStrict as isState } from "type-guards";
 
 import { type DefaultBrowserPluginOptions, LOGGER_CONTEXT } from "./constants";
@@ -210,7 +210,10 @@ export function updateBrowserState(
 }
 
 /**
- * Handles transition result (success, redirect, or error)
+ * Handles transition result (success or error)
+ *
+ * Success case is handled by navigateToState with emitSuccess=true.
+ * This function only handles error cases that need URL restoration.
  *
  * @param err - Router error or undefined if successful
  * @param toState - Target state
@@ -229,16 +232,12 @@ export function handleTransitionResult(
   browser: Browser,
   options: BrowserPluginOptions,
 ): void {
-  // Successful transition
+  // Success case handled by navigateToState with emitSuccess=true
   if (!err) {
-    router.invokeEventListeners(events.TRANSITION_SUCCESS, toState, fromState, {
-      replace: true,
-    });
-
     return;
   }
 
-  // Handle CANNOT_DEACTIVATE
+  // Handle CANNOT_DEACTIVATE - restore previous URL
   if (
     err.code === errorCodes.CANNOT_DEACTIVATE &&
     toState &&

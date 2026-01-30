@@ -55,14 +55,3 @@ import { createSimpleRouter } from "../helpers";
     }
   }).gc("inner");
 }
-
-// 8.3.5 Batch creating 1000 not found states
-{
-  const router = createSimpleRouter();
-
-  bench("8.3.5 Batch creating 1000 not found states", () => {
-    for (let i = 0; i < 1000; i++) {
-      do_not_optimize(router.makeNotFoundState("/nonexistent"));
-    }
-  }).gc("inner");
-}

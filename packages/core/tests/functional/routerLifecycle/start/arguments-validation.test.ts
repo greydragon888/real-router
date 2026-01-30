@@ -33,7 +33,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -50,7 +50,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         const currentState = router.getState();
 
@@ -68,7 +68,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start();
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         const currentState = router.getState();
 
@@ -88,7 +88,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
 
         const [error] = callback.mock.calls[0];
 
@@ -113,7 +113,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -143,7 +143,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/users/list");
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -169,7 +169,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/invalid/path", callbackSpy);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -195,7 +195,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/invalid/path");
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalled();
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -225,7 +225,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(startState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -247,7 +247,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(startState, callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -273,7 +273,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(startState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
 
         const currentState = router.getState();
@@ -297,7 +297,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/users/list", callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -329,7 +329,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/invalid/path", callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -358,7 +358,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start("/invalid/path", callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalled();
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -395,7 +395,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(startState, callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -428,7 +428,7 @@ describe("router.start() - arguments validation", () => {
 
         router.start(startState, callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -467,7 +467,7 @@ describe("router.start() - arguments validation", () => {
         router.start(startState, callback);
 
         // Router should NOT start when validation fails with allowNotFound = false
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledTimes(1);
@@ -511,7 +511,7 @@ describe("router.start() - arguments validation", () => {
 
         const result = router.start(callback);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).not.toHaveBeenCalled();
         expect(callback).toHaveBeenCalledTimes(1);
         expect(result).toBe(router);

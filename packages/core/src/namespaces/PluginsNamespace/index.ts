@@ -3,3 +3,5 @@
 export { PluginsNamespace } from "./PluginsNamespace";
 
 export { PLUGIN_LIMITS, EVENTS_MAP, EVENT_METHOD_NAMES } from "./constants";
+
+export type { PluginsDependencies } from "./types";

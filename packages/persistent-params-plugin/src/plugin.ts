@@ -270,6 +270,7 @@ export function persistentParamsPluginFactory(
           }
         } catch (error) {
           // Log error but don't break navigation
+          /* v8 ignore next 5 -- @preserve defensive: validation happens before navigate() */
           console.error(
             "persistent-params-plugin",
             "Error updating persistent params:",
