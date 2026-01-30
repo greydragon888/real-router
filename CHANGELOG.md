@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-01-30]
+
+### @real-router/browser-plugin@0.1.7
+
+### Patch Changes
+
+- [`402c61c`](https://github.com/greydragon888/real-router/commit/402c61c68e62e50cf69af15bd7ff0e4ed5563777) Thanks [@greydragon888](https://github.com/greydragon888)! - Updated to use Plugin Development API
+
+- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/core@0.4.0
+
+### @real-router/core@0.4.0
+
+### Minor Changes
+
+- [#46](https://github.com/greydragon888/real-router/pull/46) [`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572) Thanks [@greydragon888](https://github.com/greydragon888)! - ## Public API Audit — Remove Legacy Internal Methods
+
+  ### Breaking Changes
+
+  **Removed methods:**
+  - `isStarted()` — use `isActive()` instead
+  - `isNavigating()` — track via middleware/events if needed
+  - `forward()` — use `forwardTo` option in route config
+  - `setState()` — internal only, use `navigate()` or `navigateToState()`
+  - `areStatesDescendants()` — use `state2.name.startsWith(state1.name + ".")`
+  - `clearCanActivate()` — override with `canActivate(name, true)`
+  - `clearCanDeactivate()` — override with `canDeactivate(name, true)`
+  - `removeEventListener()` — use unsubscribe function from `addEventListener()`
+  - `makeNotFoundState()` — use `navigateToDefault()` or handle in middleware
+  - `getPlugins()` — track plugins in application code if needed
+  - `invokeEventListeners()` — internal only
+  - `hasListeners()` — internal only
+  - `getLifecycleFactories()` — internal only
+  - `getLifecycleFunctions()` — internal only
+  - `getMiddlewareFactories()` — internal only
+  - `getMiddlewareFunctions()` — internal only
+
+  **Plugin Development API:**
+
+  The following methods are now documented for plugin authors:
+  - `matchPath()` — match URL path to route state
+  - `makeState()` — create State with custom `meta.id`
+  - `buildState()` — validate route and build state
+  - `forwardState()` — resolve forwarding and merge default params
+  - `navigateToState()` — navigate with pre-built State
+  - `setRootPath()` — dynamically modify router base path
+  - `getRootPath()` — read current base path
+
+  ### Internal Changes
+  - Moved validation logic from namespaces to Router facade
+  - Namespace methods now trust validated input from facade
+
+  Closes #36
+
+### @real-router/helpers@0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/core@0.4.0
+
+### @real-router/logger-plugin@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/core@0.4.0
+
+### @real-router/persistent-params-plugin@0.1.7
+
+### Patch Changes
+
+- [`402c61c`](https://github.com/greydragon888/real-router/commit/402c61c68e62e50cf69af15bd7ff0e4ed5563777) Thanks [@greydragon888](https://github.com/greydragon888)! - Updated to use Plugin Development API
+
+- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/core@0.4.0
+
+### @real-router/react@0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`402c61c`](https://github.com/greydragon888/real-router/commit/402c61c68e62e50cf69af15bd7ff0e4ed5563777), [`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/browser-plugin@0.1.7
+  - @real-router/core@0.4.0
+  - @real-router/helpers@0.1.7
+
 ## [2026-01-28]
 
 ### @real-router/browser-plugin@0.1.6
