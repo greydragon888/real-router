@@ -483,6 +483,72 @@ test → depends on lint + type-check
 
 Build only runs after tests pass.
 
+### Input Patterns Performance
+
+**Problem:** Turbo `--dry-run` took 92 seconds with valid cache due to glob patterns scanning `node_modules`.
+
+**Root cause:** Patterns like `**/*.{ts,tsx}` in `inputs` were scanning 536MB of `node_modules` (50k+ files) for hash calculation.
+
+**Solution:** Add explicit exclusion to all tasks with recursive globs:
+
+```json
+{
+  "lint": {
+    "inputs": [
+      "**/*.{ts,tsx,js,jsx}",
+      "!dist/**",
+      "!coverage/**",
+      "!**/node_modules/**"
+    ]
+  },
+  "type-check": {
+    "inputs": [
+      "**/*.{ts,tsx}",
+      "!dist/**",
+      "!**/node_modules/**"
+    ]
+  },
+  "test": {
+    "inputs": [
+      "src/**/*.{ts,tsx}",
+      "tests/**/*.{ts,tsx}",
+      "!**/node_modules/**"
+    ]
+  }
+}
+```
+
+**Result:** 92s → 1.4s (65x improvement).
+
+**Rule:** Always add `!**/node_modules/**` when using `**/*.{ext}` patterns in turbo.json inputs.
+
+## macOS Development Setup
+
+### Spotlight Exclusion
+
+**Problem:** macOS Spotlight continuously indexes `node_modules`, causing high I/O during file operations.
+
+**Symptoms:**
+- `pnpm install` slow even with warm cache
+- High `system` time in `time` output (2:1 ratio system:user = I/O bottleneck)
+- `mds_stores` process using CPU
+
+**Solution:** Exclude `node_modules` from Spotlight indexing:
+
+```
+System Settings → Siri & Spotlight → Spotlight Privacy → "+" → select node_modules folder
+```
+
+**Verification:**
+```bash
+# Should return 0 results if excluded
+mdfind -onlyin ./node_modules "kMDItemFSName == '*.ts'" | wc -l
+```
+
+**Additional recommendations:**
+- Exclude `node_modules` from Time Machine backups
+- Exclude from antivirus real-time scanning (if applicable)
+
 ## Logger Package
 
 ### Why?

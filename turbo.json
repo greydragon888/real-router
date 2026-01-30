@@ -32,7 +32,8 @@
         "tests/**/*.{ts,tsx}",
         "vitest.config.*",
         "**/*.test.{ts,tsx}",
-        "**/*.spec.{ts,tsx}"
+        "**/*.spec.{ts,tsx}",
+        "!**/node_modules/**"
       ],
       "env": ["NODE_ENV"],
       "passThroughEnv": ["CI"],
@@ -45,6 +46,7 @@
         "**/*.{ts,tsx,js,jsx}",
         "!dist/**",
         "!coverage/**",
+        "!**/node_modules/**",
         "eslint.config.*"
       ],
       "cache": true
@@ -55,6 +57,7 @@
       "inputs": [
         "**/*.{ts,tsx}",
         "!dist/**",
+        "!**/node_modules/**",
         "tsconfig.json",
         "**/tsconfig.json"
       ],
