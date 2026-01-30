@@ -4,9 +4,19 @@ import { isState } from "type-guards";
 
 import { noop } from "./constants";
 
-import type { StartRouterArguments } from "./types";
-import type { Router } from "../../Router";
-import type { DefaultDependencies, DoneFn, State } from "@real-router/types";
+import type {
+  RouterLifecycleDependencies,
+  StartRouterArguments,
+} from "./types";
+import type { DoneFn, State } from "@real-router/types";
+
+/**
+ * Dependencies required for resolveStartState helper.
+ */
+type ResolveStartStateDeps = Pick<
+  RouterLifecycleDependencies,
+  "matchPath" | "buildPath"
+>;
 
 /**
  * Parses start() arguments into a normalized tuple.
@@ -29,12 +39,12 @@ export const getStartRouterArguments = (
 /**
  * Resolves a path or state to a valid State object.
  */
-export const resolveStartState = <Dependencies extends DefaultDependencies>(
+export const resolveStartState = (
   pathOrState: string | State,
-  router: Router<Dependencies>,
+  deps: ResolveStartStateDeps,
 ): State | undefined => {
   if (typeof pathOrState === "string") {
-    return router.matchPath(pathOrState);
+    return deps.matchPath(pathOrState);
   }
 
   // Validate state object structure using isState type guard
@@ -49,7 +59,7 @@ export const resolveStartState = <Dependencies extends DefaultDependencies>(
   // to gracefully return undefined instead of propagating the error
   // See: https://github.com/greydragon888/real-router/issues/42
   try {
-    router.buildPath(pathOrState.name, pathOrState.params);
+    deps.buildPath(pathOrState.name, pathOrState.params);
   } catch {
     return undefined;
   }

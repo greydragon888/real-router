@@ -7,6 +7,7 @@
  * Extracted from RoutesNamespace class for better separation of concerns.
  */
 
+import { validateRoute } from "route-tree";
 import {
   isString,
   validateRouteName,
@@ -14,10 +15,11 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import { validateRouteProperties } from "./helpers";
+import { validateRouteProperties, validateForwardToTargets } from "./helpers";
 
 import type { Route, RouteConfigUpdate } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
+import type { RouteTree } from "route-tree";
 
 /**
  * Validates removeRoute arguments.
@@ -94,26 +96,6 @@ export function validateIsActiveRouteArgs(
   ) {
     throw new TypeError(
       `[router.isActiveRoute] ignoreQueryParams must be a boolean, got ${typeof ignoreQueryParams}`,
-    );
-  }
-}
-
-/**
- * Validates forward() arguments.
- */
-export function validateForwardArgs(
-  fromRoute: unknown,
-  toRoute: unknown,
-): asserts fromRoute is string {
-  if (!isString(fromRoute) || fromRoute === "") {
-    throw new TypeError(
-      `[router.forward] Invalid fromRoute: ${getTypeDescription(fromRoute)}. Expected non-empty string.`,
-    );
-  }
-
-  if (!isString(toRoute) || toRoute === "") {
-    throw new TypeError(
-      `[router.forward] Invalid toRoute: ${getTypeDescription(toRoute)}. Expected non-empty string.`,
     );
   }
 }
@@ -281,4 +263,32 @@ export function validateShouldUpdateNodeArgs(
       `[router.shouldUpdateNode] nodeName must be a string, got ${typeof nodeName}`,
     );
   }
+}
+
+/**
+ * Validates routes against existing route tree state.
+ * Checks for duplicates, parent existence, and forwardTo targets/cycles.
+ *
+ * @param routes - Routes to validate
+ * @param tree - Current route tree
+ * @param forwardMap - Current forward map for cycle detection
+ */
+export function validateRoutes<Dependencies extends DefaultDependencies>(
+  routes: Route<Dependencies>[],
+  tree: RouteTree,
+  forwardMap: Record<string, string>,
+): void {
+  // Tracking sets for duplicate detection
+  const seenNames = new Set<string>();
+  const seenPathsByParent = new Map<string, Set<string>>();
+
+  for (const route of routes) {
+    // Use route-tree's validateRoute for structural validation
+    // (type, name, path, duplicates, parent exists, children array)
+    // Note: validateRoute handles children recursively
+    validateRoute(route, "addRoute", tree, "", seenNames, seenPathsByParent);
+  }
+
+  // Validate forwardTo targets and cycles
+  validateForwardToTargets(routes, forwardMap, tree);
 }

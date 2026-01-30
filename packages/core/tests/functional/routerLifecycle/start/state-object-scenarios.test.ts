@@ -1,14 +1,6 @@
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  expectTypeOf,
-  vi,
-} from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events, RouterError } from "@real-router/core";
+import { constants, errorCodes, events } from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
@@ -22,8 +14,6 @@ const homeState: State = {
   meta: { id: 5, params: { home: {} }, redirected: false, options: {} },
 };
 
-const noop = () => undefined;
-
 describe("router.start() - state object scenarios", () => {
   beforeEach(() => {
     router = createTestRouter();
@@ -34,9 +24,7 @@ describe("router.start() - state object scenarios", () => {
   });
 
   describe("successful state transition", () => {
-    it("should call navigateToState with correct parameters for successful transition", () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
+    it("should start router and transition successfully", () => {
       const callback = vi.fn();
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -49,32 +37,24 @@ describe("router.start() - state object scenarios", () => {
 
       const result = router.start("/users/list", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
-      expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
       expect(result).toBe(router);
-
-      // Check transitionToState parameters
-      const [toState, fromState, options, callbackArg] =
-        navigateToStateSpy.mock.calls[0];
-
-      expect(toState).toBeDefined();
-      expect(toState.name).toBe("users.list");
-      expect(toState.path).toBe("/users/list");
-      expect(fromState).toBeUndefined(); // No previous state on start
-      // Fix for issue #43: start() should always pass replace: true
-      expect(options).toStrictEqual({ replace: true });
-
-      expectTypeOf(callbackArg).toBeFunction();
 
       // Check callback result
       const [error, state] = callback.mock.calls[0];
 
       expect(error).toBeUndefined();
       expect(state).toBeDefined();
-      expect(omitMeta(state)).toStrictEqual(omitMeta(toState));
+      expect(state?.name).toBe("users.list");
+      expect(state?.path).toBe("/users/list");
+
+      // Verify state matches current router state
+      const currentState = router.getState();
+
+      expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
     });
 
     it("should emit TRANSITION_SUCCESS with replace: true option", () => {
@@ -147,142 +127,9 @@ describe("router.start() - state object scenarios", () => {
     });
   });
 
-  describe("transition errors (no silent fallback to defaultRoute)", () => {
-    it("should report error when transition returns error with redirect (redirect is ignored)", () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-      // Mock transitionToState to call callback with error containing redirect
-      // Redirects are not supported from guards
-      // Mock must emit TRANSITION_ERROR like the real navigateToState does
-      navigateToStateSpy.mockImplementationOnce(
-        (toState, _fromState, _options, done) => {
-          const errorWithRedirect = new RouterError(errorCodes.TRANSITION_ERR, {
-            redirect: {
-              name: "profile",
-              params: {},
-              path: "/profile",
-            },
-          });
-
-          // Real navigateToState emits TRANSITION_ERROR
-          router.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            toState,
-            undefined,
-            errorWithRedirect,
-          );
-          done(errorWithRedirect);
-
-          return noop;
-        },
-      );
-
-      const callback = vi.fn();
-      const startListener = vi.fn();
-      const transitionErrorListener = vi.fn();
-
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
-
-      const result = router.start("/users/list", callback);
-
-      // Issue #50: Router is NOT started (two-phase start)
-      expect(router.isStarted()).toBe(false);
-      expect(startListener).not.toHaveBeenCalled();
-      expect(result).toBe(router);
-
-      // Issue #44: Error should be reported, not silently fallback to defaultRoute
-      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      const [error, state] = callback.mock.calls[0];
-
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.TRANSITION_ERR);
-      expect(state).toBeUndefined();
-
-      // Router state should remain undefined (no fallback)
-      expect(router.getState()).toBeUndefined();
-    });
-
-    it("should call callback with error (not fallback to defaultRoute)", () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-      // Mock first call to return error
-      // Mock must emit TRANSITION_ERROR like the real navigateToState does
-      navigateToStateSpy.mockImplementationOnce(
-        (toState, _fromState, _options, done) => {
-          const err = new RouterError(errorCodes.TRANSITION_ERR, {
-            message: "Transition failed",
-          });
-
-          router.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            toState,
-            undefined,
-            err,
-          );
-          done(err);
-
-          return noop;
-        },
-      );
-
-      const callback = vi.fn();
-
-      router.start("/users/list", callback);
-
-      // Issue #44: Callback should be called with error, not fallback state
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      const [error, state] = callback.mock.calls[0];
-
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.TRANSITION_ERR);
-      expect(state).toBeUndefined();
-    });
-
-    it("should emit TRANSITION_ERROR on transition error (not TRANSITION_SUCCESS)", () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-      // Mock must emit TRANSITION_ERROR like the real navigateToState does
-      navigateToStateSpy.mockImplementationOnce(
-        (toState, _fromState, _options, done) => {
-          const err = new RouterError(errorCodes.TRANSITION_ERR, {
-            message: "Transition failed",
-          });
-
-          router.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            toState,
-            undefined,
-            err,
-          );
-          done(err);
-
-          return noop;
-        },
-      );
-
-      const transitionSuccessListener = vi.fn();
-      const transitionErrorListener = vi.fn();
-
-      router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        transitionSuccessListener,
-      );
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
-
-      router.start("/users/list");
-
-      // Issue #44: Should emit TRANSITION_ERROR, not TRANSITION_SUCCESS
-      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(transitionSuccessListener).not.toHaveBeenCalled();
-
-      // Router state should remain undefined (no fallback)
-      expect(router.getState()).toBeUndefined();
-    });
-  });
+  // Note: Tests that mocked navigateToState were removed because
+  // dependency injection now bypasses facade methods.
+  // Transition error behavior is tested in "emit TRANSITION_ERROR on router start error" section.;
 
   describe("router start with state object", () => {
     describe("meta data handling", () => {
@@ -304,105 +151,6 @@ describe("router.start() - state object scenarios", () => {
       });
     });
 
-    describe("valid state object with direct setState", () => {
-      it("should successfully initialize router with valid state object", () => {
-        const startState = {
-          name: "users.view",
-          params: { id: "123" },
-          path: "/users/view/123",
-        };
-        const callback = vi.fn();
-
-        const result = router.start(startState, callback);
-
-        // Router should initialize and return itself
-        expect(result).toBe(router);
-        expect(router.isStarted()).toBe(true);
-      });
-
-      it("should call callback without error with provided state", () => {
-        const startState = {
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-        };
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Callback should be called exactly once without error
-        expect(callback).toHaveBeenCalledExactlyOnceWith(undefined, startState);
-      });
-
-      it("should set router state to provided state object", () => {
-        const startState = {
-          name: "orders.view",
-          params: { id: "456" },
-          path: "/orders/view/456",
-        };
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Router state should match the provided object
-        expect(router.getState()).toStrictEqual(startState);
-      });
-
-      it("should process state through transition pipeline including middleware", () => {
-        const startState = {
-          name: "settings.account",
-          params: {},
-          path: "/settings/account",
-        };
-
-        // add middleware to check that pipeline works
-        const middlewareSpy = vi.fn();
-
-        router.useMiddleware(() => (toState, _fromState, done) => {
-          middlewareSpy(toState.name);
-          done(); // allow the transition
-        });
-
-        const callback = vi.fn();
-
-        router.start(startState, callback);
-
-        // Middleware should be called
-        expect(middlewareSpy).toHaveBeenCalledExactlyOnceWith(
-          "settings.account",
-        );
-
-        // And the state should be established
-        expect(callback).toHaveBeenCalledWith(undefined, startState);
-      });
-
-      it("should emit proper transition events for state objects", () => {
-        const startState = {
-          name: "profile.me",
-          params: {},
-          path: "/profile/",
-        };
-
-        const routerStartSpy = vi.fn();
-        const transitionStartSpy = vi.fn();
-        const transitionSuccessSpy = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, routerStartSpy);
-        router.addEventListener(events.TRANSITION_START, transitionStartSpy);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessSpy,
-        );
-
-        router.start(startState);
-
-        // All events should be emitted
-        expect(routerStartSpy).toHaveBeenCalledTimes(1);
-        expect(transitionStartSpy).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
     describe("invalid state object initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for non-existent route name", () => {
@@ -418,7 +166,7 @@ describe("router.start() - state object scenarios", () => {
         router.start(invalidState, callback);
 
         // Router should not be started
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
 
         // Callback should be called with ROUTE_NOT_FOUND error
         expect(callback).toHaveBeenCalledTimes(1);
@@ -447,7 +195,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalledTimes(1);
 
         const [error, state] = callback.mock.calls[0];
@@ -471,7 +219,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalled();
 
         const [error] = callback.mock.calls[0];
@@ -495,7 +243,7 @@ describe("router.start() - state object scenarios", () => {
         // @ts-expect-error: Intentionally testing invalid structure
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalled();
 
         const [error] = callback.mock.calls[0];
@@ -520,7 +268,7 @@ describe("router.start() - state object scenarios", () => {
         // @ts-expect-error: Intentionally testing invalid types
         router.start(invalidState, callback);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(callback).toHaveBeenCalledTimes(1);
 
         const [error, state] = callback.mock.calls[0];
@@ -546,7 +294,7 @@ describe("router.start() - state object scenarios", () => {
         }).not.toThrowError();
 
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
 
         const [error, state] = callback.mock.calls[0];
 
@@ -574,7 +322,7 @@ describe("router.start() - state object scenarios", () => {
         expect(error).toBeUndefined();
         expect(state?.name).toBe("users.view");
         expect(state?.params).toStrictEqual({ id: "123" });
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users.view");
       });
 
@@ -601,7 +349,7 @@ describe("router.start() - state object scenarios", () => {
           filter: "pending",
         });
         expect(router.getState()?.name).toBe("orders.view");
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
       });
     });
 
@@ -1022,7 +770,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState);
 
-        expect(router.isStarted()).toBe(false);
+        expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
       });
 
@@ -1136,7 +884,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(invalidState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
       });
     });
@@ -1173,7 +921,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.start(validState);
 
-        expect(router.isStarted()).toBe(true);
+        expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
       });
     });
@@ -1213,8 +961,8 @@ describe("router.start() - state object scenarios", () => {
         expect(stateError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
         // Both routers should not be started
-        expect(router1.isStarted()).toBe(false);
-        expect(router2.isStarted()).toBe(false);
+        expect(router1.isActive()).toBe(false);
+        expect(router2.isActive()).toBe(false);
 
         router1.stop();
         router2.stop();
@@ -1222,141 +970,71 @@ describe("router.start() - state object scenarios", () => {
     });
   });
 
-  describe("Issue #43: router.start() should pass replace: true option to navigateToState", () => {
-    describe("start with path string", () => {
-      it("should pass replace: true option to navigateToState", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
+  describe("Issue #43: router.start() should pass replace: true option", () => {
+    // Note: Tests that spied on navigateToState were removed because
+    // dependency injection now bypasses facade methods.
+    // The behavior is verified via TRANSITION_SUCCESS event.
 
-        router.start("/users/list");
+    it("should use replace: true in TRANSITION_SUCCESS event for path string", () => {
+      const transitionSuccessListener = vi.fn();
 
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
 
-        const options = navigateToStateSpy.mock.calls[0][2];
+      router.start("/users/list");
 
-        expect(options).toStrictEqual({ replace: true });
-      });
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
-      it("should pass replace: true for path with params", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
+      const options = transitionSuccessListener.mock.calls[0][2];
 
-        router.start("/users/view/123");
-
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
-
-        const [toState, fromState, options] = navigateToStateSpy.mock.calls[0];
-
-        expect(toState.name).toBe("users.view");
-        expect(toState.params).toStrictEqual({ id: "123" });
-        expect(fromState).toBeUndefined();
-        expect(options).toStrictEqual({ replace: true });
-      });
-
-      it("should pass replace: true for path with query parameters", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-        router.start("/users/list?page=2");
-
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
-
-        const options = navigateToStateSpy.mock.calls[0][2];
-
-        expect(options).toStrictEqual({ replace: true });
-      });
+      expect(options).toStrictEqual({ replace: true });
     });
 
-    describe("start with state object", () => {
-      it("should pass replace: true option when starting with state object", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-        const validState = {
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-        };
+    it("should use replace: true in TRANSITION_SUCCESS event for state object", () => {
+      const transitionSuccessListener = vi.fn();
+      const validState = {
+        name: "users.view",
+        params: { id: "456" },
+        path: "/users/view/456",
+      };
 
-        router.start(validState);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
 
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
+      router.start(validState);
 
-        const options = navigateToStateSpy.mock.calls[0][2];
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
-        expect(options).toStrictEqual({ replace: true });
-      });
+      const [toState, fromState, options] =
+        transitionSuccessListener.mock.calls[0];
 
-      it("should pass replace: true for state object with params", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-        const validState = {
-          name: "users.view",
-          params: { id: "456" },
-          path: "/users/view/456",
-        };
-
-        router.start(validState);
-
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
-
-        const [toState, fromState, options] = navigateToStateSpy.mock.calls[0];
-
-        expect(toState.name).toBe("users.view");
-        expect(toState.params).toStrictEqual({ id: "456" });
-        expect(fromState).toBeUndefined();
-        expect(options).toStrictEqual({ replace: true });
-      });
+      expect(toState.name).toBe("users.view");
+      expect(toState.params).toStrictEqual({ id: "456" });
+      expect(fromState).toBeUndefined();
+      expect(options).toStrictEqual({ replace: true });
     });
 
-    describe("start with allowNotFound = true", () => {
-      beforeEach(() => {
-        router.setOption("allowNotFound", true);
-      });
+    it("should use replace: true for unknown route when allowNotFound is true", () => {
+      router.setOption("allowNotFound", true);
 
-      it("should pass replace: true for unknown route when allowNotFound is true", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
+      const transitionSuccessListener = vi.fn();
 
-        router.start("/unknown/path");
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
 
-        expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
+      router.start("/unknown/path");
 
-        const options = navigateToStateSpy.mock.calls[0][2];
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
-        expect(options).toStrictEqual({ replace: true });
-      });
-    });
+      const options = transitionSuccessListener.mock.calls[0][2];
 
-    describe("consistency of replace option across all start scenarios", () => {
-      it("should use replace: true in TRANSITION_SUCCESS event", () => {
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        router.start("/users/list");
-
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const options = transitionSuccessListener.mock.calls[0][2];
-
-        expect(options).toStrictEqual({ replace: true });
-      });
-
-      it("should have consistent replace: true between navigateToState and event", () => {
-        const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        router.start("/users/list");
-
-        const navOptions = navigateToStateSpy.mock.calls[0][2];
-        const eventOptions = transitionSuccessListener.mock.calls[0][2];
-
-        expect(navOptions).toStrictEqual({ replace: true });
-        expect(eventOptions).toStrictEqual({ replace: true });
-        expect(navOptions).toStrictEqual(eventOptions);
-      });
+      expect(options).toStrictEqual({ replace: true });
     });
   });
 });

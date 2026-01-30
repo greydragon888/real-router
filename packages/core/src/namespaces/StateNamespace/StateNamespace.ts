@@ -1,9 +1,7 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { logger } from "@real-router/logger";
 import {
   getTypeDescription,
-  isNavigationOptions,
   isParams,
   isString,
   validateState,
@@ -119,34 +117,6 @@ export class StateNamespace {
     ) {
       throw new TypeError(
         `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQueryParams)}. Expected boolean.`,
-      );
-    }
-  }
-
-  /**
-   * Validates areStatesDescendants arguments.
-   */
-  static validateAreStatesDescendantsArgs(
-    parentState: unknown,
-    childState: unknown,
-  ): void {
-    validateState(parentState, "areStatesDescendants");
-    validateState(childState, "areStatesDescendants");
-  }
-
-  /**
-   * Validates makeNotFoundState arguments.
-   */
-  static validateMakeNotFoundStateArgs(path: unknown, options: unknown): void {
-    if (!isString(path)) {
-      throw new TypeError(
-        `[router.makeNotFoundState] Invalid path: ${getTypeDescription(path)}. Expected string.`,
-      );
-    }
-
-    if (options !== undefined && !isNavigationOptions(options)) {
-      throw new TypeError(
-        `[router.makeNotFoundState] Invalid options: ${getTypeDescription(options)}. Expected NavigationOptions object.`,
       );
     }
   }
@@ -276,18 +246,16 @@ export class StateNamespace {
   /**
    * Creates a frozen state object for the "not found" route.
    */
-  makeNotFoundState(path: string, options?: NavigationOptions): State {
+  makeNotFoundState(path: string, options: NavigationOptions): State {
     return this.makeState<{ path: string }>(
       constants.UNKNOWN_ROUTE,
       { path },
       path,
-      options
-        ? {
-            options,
-            params: {},
-            redirected: false,
-          }
-        : undefined,
+      {
+        options,
+        params: {},
+        redirected: false,
+      },
     );
   }
 
@@ -337,29 +305,6 @@ export class StateNamespace {
       (param) =>
         param in state2.params &&
         areParamValuesEqual(state1.params[param], state2.params[param]),
-    );
-  }
-
-  /**
-   * Checks if childState is a descendant of parentState.
-   *
-   * @deprecated Use router.isActiveRoute() instead.
-   */
-  areStatesDescendants(parentState: State, childState: State): boolean {
-    logger.warn(
-      "real-router",
-      "areStatesDescendants is deprecated and will be removed in the next major version. " +
-        "Use router.isActiveRoute() instead.",
-    );
-
-    const parentPrefix = `${parentState.name}.`;
-
-    if (!childState.name.startsWith(parentPrefix)) {
-      return false;
-    }
-
-    return Object.keys(parentState.params).every((p) =>
-      areParamValuesEqual(parentState.params[p], childState.params[p]),
     );
   }
 

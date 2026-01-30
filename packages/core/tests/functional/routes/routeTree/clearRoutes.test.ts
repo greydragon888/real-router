@@ -176,55 +176,85 @@ describe("core/routes/clearRoutes", () => {
       router.addRoute({
         name: "protected",
         path: "/protected",
-        canActivate: () => () => true,
+        canActivate: () => () => false, // blocking guard
       });
 
-      const [, canActivateBefore] = router.getLifecycleFactories();
-
-      expect(canActivateBefore.protected).toBeDefined();
+      // Verify guard is active before clear
+      router.navigate("protected", (err) => {
+        expect(err?.code).toBe("CANNOT_ACTIVATE");
+      });
 
       router.clearRoutes();
 
-      const [, canActivateAfter] = router.getLifecycleFactories();
+      // Re-add route without guard
+      router.addRoute({ name: "protected", path: "/protected" });
 
-      expect(canActivateAfter.protected).toBeUndefined();
+      // Navigation should succeed (no guard after clear)
+      router.navigate("protected", (err) => {
+        expect(err).toBeUndefined();
+      });
+
+      expect(router.getState()?.name).toBe("protected");
     });
 
     it("should clear canDeactivate handlers", () => {
       router.addRoute({ name: "editor", path: "/editor" });
-      router.canDeactivate("editor", () => () => true);
+      router.canDeactivate("editor", () => () => false); // blocking guard
 
-      const [canDeactivateBefore] = router.getLifecycleFactories();
+      router.navigate("editor");
 
-      expect(canDeactivateBefore.editor).toBeDefined();
+      // Try to leave - should be blocked
+      router.navigate("home", (err) => {
+        expect(err?.code).toBe("CANNOT_DEACTIVATE");
+      });
+
+      expect(router.getState()?.name).toBe("editor");
 
       router.clearRoutes();
 
-      const [canDeactivateAfter] = router.getLifecycleFactories();
+      // Re-add routes without guards
+      router.addRoute({ name: "editor", path: "/editor" });
+      router.addRoute({ name: "home", path: "/home" });
+      router.navigate("editor");
 
-      expect(canDeactivateAfter.editor).toBeUndefined();
+      // Now leaving should work (guard was cleared)
+      router.navigate("home", (err) => {
+        expect(err).toBeUndefined();
+      });
+
+      expect(router.getState()?.name).toBe("home");
     });
 
     it("should clear all lifecycle handlers for all routes", () => {
       router.addRoute({
         name: "route1",
         path: "/route1",
-        canActivate: () => () => true,
+        canActivate: () => () => false,
       });
       router.addRoute({
         name: "route2",
         path: "/route2",
-        canActivate: () => () => true,
+        canActivate: () => () => false,
       });
-      router.canDeactivate("route1", () => () => true);
-      router.canDeactivate("route2", () => () => true);
+      router.canDeactivate("home", () => () => false);
 
       router.clearRoutes();
 
-      const [canDeactivate, canActivate] = router.getLifecycleFactories();
+      // Re-add routes without guards
+      router.addRoute({ name: "home", path: "/home" });
+      router.addRoute({ name: "route1", path: "/route1" });
+      router.addRoute({ name: "route2", path: "/route2" });
 
-      expect(Object.keys(canActivate)).toHaveLength(0);
-      expect(Object.keys(canDeactivate)).toHaveLength(0);
+      // All navigations should work (all guards were cleared)
+      router.navigate("home");
+      router.navigate("route1", (err) => {
+        expect(err).toBeUndefined();
+      });
+      router.navigate("route2", (err) => {
+        expect(err).toBeUndefined();
+      });
+
+      expect(router.getState()?.name).toBe("route2");
     });
   });
 
@@ -241,8 +271,12 @@ describe("core/routes/clearRoutes", () => {
 
       router.clearRoutes();
 
-      // Plugin should still be registered
-      expect(router.getPlugins()).toContain(plugin);
+      // Add route and navigate to verify plugin is still active
+      router.addRoute({ name: "test", path: "/test" });
+      router.navigate("test");
+
+      // Plugin should have been called (proving it's still registered)
+      expect(pluginCalls).toContain("start");
     });
 
     it("should preserve middleware", () => {
@@ -257,8 +291,12 @@ describe("core/routes/clearRoutes", () => {
 
       router.clearRoutes();
 
-      // Middleware should still be registered
-      expect(router.getMiddlewareFactories()).toContain(middleware);
+      // Add route and navigate to verify middleware is still active
+      router.addRoute({ name: "test", path: "/test" });
+      router.navigate("test");
+
+      // Middleware should have been called (proving it's still registered)
+      expect(middlewareCalls).toContain("mw");
     });
 
     it("should preserve dependencies", () => {
@@ -432,9 +470,6 @@ describe("core/routes/clearRoutes", () => {
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // Verify navigation is in progress
-      expect(router.isNavigating()).toBe(true);
-
       // Try to clear during navigation - should be blocked
       router.clearRoutes();
 
@@ -522,9 +557,7 @@ describe("core/routes/clearRoutes", () => {
       // Reset spy to check next call
       errorSpy.mockClear();
 
-      // Now navigation is complete - clearRoutes should work
-      expect(router.isNavigating()).toBe(false);
-
+      // Now navigation is complete (callback was called) - clearRoutes should work
       router.clearRoutes();
 
       // Should NOT log error this time
@@ -558,9 +591,6 @@ describe("core/routes/clearRoutes", () => {
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
-
-      expect(router.isNavigating()).toBe(true);
-      expect(router2.isNavigating()).toBe(false);
 
       // clearRoutes on router2 should work (it's not navigating)
       router2.clearRoutes();

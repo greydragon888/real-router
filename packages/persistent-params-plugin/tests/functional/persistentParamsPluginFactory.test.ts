@@ -1,11 +1,11 @@
-import { createRouter, events } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { createRouter } from "@real-router/core";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
 
 import { parseQueryString } from "../../src/utils";
 
-import type { Router, State } from "@real-router/core";
+import type { Router } from "@real-router/core";
 
 let router: Router;
 
@@ -1057,84 +1057,6 @@ describe("Persistent params plugin", () => {
         router.navigate("route1", maliciousParams);
       }).toThrowError(/String error thrown/);
     });
-
-    it("should log error when onTransitionSuccess encounters invalid state (line 356)", () => {
-      const consoleError = vi
-        .spyOn(console, "error")
-        .mockImplementation(() => {});
-
-      router.usePlugin(persistentParamsPlugin(["mode"]));
-      router.start();
-
-      // First navigate to set a valid param
-      router.navigate("route1", { id: "1", mode: "dev" });
-
-      // Create a new state with invalid param value (object instead of primitive)
-      // This will trigger validateParamValue to throw inside onTransitionSuccess
-      const invalidState: State = {
-        name: "route2",
-        path: "/route2/2",
-        params: { id: "2", mode: { invalid: "object" } as unknown as string },
-        meta: { id: 1, params: {}, options: {}, redirected: false },
-      };
-
-      const fromState = router.getState();
-
-      // Manually emit transition success to trigger onTransitionSuccess
-      router.invokeEventListeners(
-        events.TRANSITION_SUCCESS,
-        invalidState,
-        fromState,
-        {},
-      );
-
-      expect(consoleError).toHaveBeenCalledWith(
-        "persistent-params-plugin",
-        "Error updating persistent params:",
-        expect.any(Error),
-      );
-
-      consoleError.mockRestore();
-    });
-  });
-
-  describe("onTransitionSuccess Removal Logic", () => {
-    it("should remove param from persistence when missing from state (lines 301-302, 349)", () => {
-      // Configure with default value
-      router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
-      router.start();
-
-      // Navigate to confirm param is persisted
-      router.navigate("route1", { id: "1" });
-
-      const fromState = router.getState();
-
-      expect(fromState?.params.mode).toBe("dev");
-
-      // Now simulate a transition where mode is missing from state
-      // by manually invoking onTransitionSuccess with a state without mode
-      // This triggers the removal logic in onTransitionSuccess (lines 301-302, 349)
-      const stateWithoutMode: State = {
-        name: "route2",
-        path: "/route2/2",
-        params: { id: "2" }, // mode is NOT here - triggers removal
-        meta: { id: 1, params: {}, options: {}, redirected: false },
-      };
-
-      router.invokeEventListeners(
-        events.TRANSITION_SUCCESS,
-        stateWithoutMode,
-        fromState,
-        {},
-      );
-
-      // After this, the plugin should have removed 'mode' from persistence
-      // We can verify by checking that buildPath no longer includes mode
-      const path = router.buildPath("route3", { id: "3" });
-
-      // The path should no longer have mode since it was removed in onTransitionSuccess
-      expect(path).toBe("/route3/3");
-    });
   });
 
   describe("Plugin Composition", () => {
@@ -1205,6 +1127,35 @@ describe("Persistent params plugin", () => {
 
       expect(state?.params).toStrictEqual({ id: "2", b: "2", d: "4" });
       expect(router.buildPath("route", { id: "3" })).toBe("/route/3?b=2&d=4");
+    });
+  });
+
+  describe("onTransitionSuccess Removal", () => {
+    it("should remove default param in onTransitionSuccess when URL doesn't contain it", () => {
+      const routes = [{ name: "route", path: "/route/:id" }];
+
+      const router = createRouter(routes, {
+        queryParamsMode: "default",
+      });
+
+      // Configure with default value
+      router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
+
+      // Start with path that doesn't include mode - this triggers removal in onTransitionSuccess
+      router.start("/route/1");
+
+      // The start path doesn't go through forwardState, so mode is not in the state
+      // onTransitionSuccess sees mode is missing and removes it from persistentParams
+      const state = router.getState();
+
+      expect(state?.path).toBe("/route/1");
+      expect(state?.params).toStrictEqual({ id: "1" });
+
+      // After removal, subsequent navigations won't include mode
+      router.navigate("route", { id: "2" });
+      const state2 = router.getState();
+
+      expect(state2?.path).toBe("/route/2");
     });
   });
 });

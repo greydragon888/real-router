@@ -52,18 +52,3 @@ import { createSimpleRouter } from "../helpers";
     }
   }).gc("inner");
 }
-
-// 8.2.3 Batch comparing 1000 parent-child states
-{
-  const router = createSimpleRouter();
-
-  // Prepare parent and child states using makeState
-  const parentState = router.makeState("users", {}, "/users");
-  const childState = router.makeState("user", { id: "123" }, "/users/123");
-
-  bench("8.2.3 Batch comparing 1000 parent-child states", () => {
-    for (let i = 0; i < 1000; i++) {
-      do_not_optimize(router.areStatesDescendants(parentState, childState));
-    }
-  }).gc("inner");
-}

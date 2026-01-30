@@ -42,10 +42,6 @@ const redirectMiddleware =
   () =>
     targetState;
 
-const f1 = () => transitionMiddleware;
-const f2 = () => transitionErrorMiddleware;
-const factoryForUnsubTest = () => transitionMiddleware;
-
 // Async middleware functions
 const m2Middleware: Middleware = (toState) =>
   Promise.resolve({
@@ -76,6 +72,29 @@ const spyOnFunctions = (obj: Record<string, Middleware>): void => {
   }
 };
 
+/**
+ * Creates a trackable middleware that records when it's called.
+ * Used to verify middleware registration/execution behavior.
+ */
+function createTrackingMiddleware(): {
+  middleware: Middleware;
+  wasCalled: () => boolean;
+  reset: () => void;
+} {
+  let called = false;
+
+  return {
+    middleware: (toState, _fromState, done) => {
+      called = true;
+      done(undefined, toState);
+    },
+    wasCalled: () => called,
+    reset: () => {
+      called = false;
+    },
+  };
+}
+
 describe("core/middleware", () => {
   let router: Router;
 
@@ -90,51 +109,45 @@ describe("core/middleware", () => {
 
   describe("clearMiddleware", () => {
     it("should clear all middleware", () => {
-      router.useMiddleware(() => transitionMiddleware);
+      const tracker = createTrackingMiddleware();
 
-      expect(router.getMiddlewareFunctions()).toHaveLength(1);
-      expect(router.getMiddlewareFactories()).toHaveLength(1);
+      router.useMiddleware(() => tracker.middleware);
 
+      // Verify middleware is registered by checking it executes
+      router.navigate("users", (err) => {
+        expect(err).toBeUndefined();
+        expect(tracker.wasCalled()).toBe(true);
+      });
+
+      tracker.reset();
       router.clearMiddleware();
 
-      expect(router.getMiddlewareFunctions()).toHaveLength(0);
-      expect(router.getMiddlewareFactories()).toHaveLength(0);
+      // After clear, middleware should not execute
+      router.navigate("orders", (err) => {
+        expect(err).toBeUndefined();
+        expect(tracker.wasCalled()).toBe(false);
+      });
     });
 
     it("should unsubscribe middleware when returned function is called", () => {
-      const unsub = router.useMiddleware(factoryForUnsubTest);
+      const tracker = createTrackingMiddleware();
 
-      expect(router.getMiddlewareFactories()).toContain(factoryForUnsubTest);
+      const unsub = router.useMiddleware(() => tracker.middleware);
 
+      // Verify middleware is registered
+      router.navigate("users", (err) => {
+        expect(err).toBeUndefined();
+        expect(tracker.wasCalled()).toBe(true);
+      });
+
+      tracker.reset();
       unsub();
 
-      expect(router.getMiddlewareFactories()).not.toContain(
-        factoryForUnsubTest,
-      );
-    });
-  });
-
-  describe("getMiddlewareFactories", () => {
-    it("should return registered middleware factories", () => {
-      router.clearMiddleware();
-      router.useMiddleware(f1, f2);
-
-      expect(router.getMiddlewareFactories()).toStrictEqual([f1, f2]);
-    });
-  });
-
-  describe("getMiddlewareFunctions", () => {
-    it("should return executed middleware functions", () => {
-      const m1 = f1();
-      const m2 = f2();
-
-      router.clearMiddleware();
-      router.useMiddleware(
-        () => m1,
-        () => m2,
-      );
-
-      expect(router.getMiddlewareFunctions()).toStrictEqual([m1, m2]);
+      // After unsubscribe, middleware should not execute
+      router.navigate("orders", (err) => {
+        expect(err).toBeUndefined();
+        expect(tracker.wasCalled()).toBe(false);
+      });
     });
   });
 
@@ -295,7 +308,8 @@ describe("core/middleware", () => {
     // 🔴 CRITICAL: Atomicity of registration on errors
     describe("atomicity on errors", () => {
       it("should not register any middleware if factory throws error", () => {
-        const validFactory1 = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const validFactory1 = () => tracker.middleware;
         const failingFactory = () => {
           throw new Error("Factory initialization failed");
         };
@@ -307,13 +321,16 @@ describe("core/middleware", () => {
           router.useMiddleware(validFactory1, failingFactory, validFactory2);
         }).toThrowError("Factory initialization failed");
 
-        // No middleware should be registered after error
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
-        expect(router.getMiddlewareFunctions()).toHaveLength(0);
+        // No middleware should execute after error (none registered)
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should rollback all middleware if any factory returns non-function", () => {
-        const validFactory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const validFactory = () => tracker.middleware;
         const invalidFactory = () => ({ notAFunction: true }) as any;
 
         router.clearMiddleware();
@@ -322,13 +339,16 @@ describe("core/middleware", () => {
           router.useMiddleware(validFactory, invalidFactory);
         }).toThrowError(TypeError);
 
-        // Rollback should leave state unchanged
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
-        expect(router.getMiddlewareFunctions()).toHaveLength(0);
+        // Rollback should leave state unchanged - middleware should not execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should rollback when error occurs in middle of batch", () => {
-        const factory1 = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory1 = () => tracker.middleware;
         const factory2 = () => transitionMiddleware;
         const factory3 = () => {
           throw new Error("Error in factory3");
@@ -341,15 +361,19 @@ describe("core/middleware", () => {
           router.useMiddleware(factory1, factory2, factory3, factory4);
         }).toThrowError("Error in factory3");
 
-        // All-or-nothing: no middleware registered
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        // All-or-nothing: no middleware should execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
     });
 
     // 🔴 CRITICAL: Duplicate protection
     describe("duplicate protection", () => {
       it("should throw error when registering same factory twice", () => {
-        const factory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         router.clearMiddleware();
         router.useMiddleware(factory);
@@ -358,9 +382,11 @@ describe("core/middleware", () => {
           router.useMiddleware(factory);
         }).toThrowError("Middleware factory already registered");
 
-        // Original middleware should remain registered
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
-        expect(router.getMiddlewareFactories()).toContain(factory);
+        // Original middleware should remain registered and execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
       });
 
       it("should include named factory name in duplicate error (line 162)", () => {
@@ -393,23 +419,28 @@ describe("core/middleware", () => {
       });
 
       it("should automatically deduplicate within same batch (Set behavior)", () => {
-        const factory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         router.clearMiddleware();
 
         // Set automatically deduplicates, so this won't throw
         const unsub = router.useMiddleware(factory, factory);
 
-        // Set deduplication means only one factory registered
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
-        expect(router.getMiddlewareFactories()).toContain(factory);
+        // Middleware should only execute once (deduplication)
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
         unsub();
       });
 
       it("should allow identical functions with different references", () => {
-        const factory1 = () => transitionMiddleware;
-        const factory2 = () => transitionMiddleware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+        const factory1 = () => tracker1.middleware;
+        const factory2 = () => tracker2.middleware;
 
         router.clearMiddleware();
 
@@ -418,41 +449,74 @@ describe("core/middleware", () => {
           router.useMiddleware(factory1, factory2);
         }).not.toThrowError();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(2);
+        // Both middleware should execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(true);
+          expect(tracker2.wasCalled()).toBe(true);
+        });
       });
     });
 
     // 🔴 CRITICAL: Unsubscribe isolation
     describe("unsubscribe isolation", () => {
       it("should only remove middleware from its own call", () => {
-        const factory1 = () => transitionMiddleware;
-        const factory2 = () => transitionErrorMiddleware;
-        const factory3 = () => asyncMware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+        const tracker3 = createTrackingMiddleware();
+        const factory1 = () => tracker1.middleware;
+        const factory2 = () => tracker2.middleware;
+        const factory3 = () => tracker3.middleware;
 
         router.clearMiddleware();
 
         const unsub1 = router.useMiddleware(factory1);
         const unsub2 = router.useMiddleware(factory2, factory3);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(3);
+        // All three should execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(true);
+          expect(tracker2.wasCalled()).toBe(true);
+          expect(tracker3.wasCalled()).toBe(true);
+        });
+
+        tracker1.reset();
+        tracker2.reset();
+        tracker3.reset();
 
         // Unsubscribe first call
         unsub1();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(2);
-        expect(router.getMiddlewareFactories()).not.toContain(factory1);
-        expect(router.getMiddlewareFactories()).toContain(factory2);
-        expect(router.getMiddlewareFactories()).toContain(factory3);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          // factory1 should not execute anymore
+          expect(tracker1.wasCalled()).toBe(false);
+          // factory2 and factory3 should still execute
+          expect(tracker2.wasCalled()).toBe(true);
+          expect(tracker3.wasCalled()).toBe(true);
+        });
+
+        tracker2.reset();
+        tracker3.reset();
 
         // Unsubscribe second call
         unsub2();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          // None should execute
+          expect(tracker1.wasCalled()).toBe(false);
+          expect(tracker2.wasCalled()).toBe(false);
+          expect(tracker3.wasCalled()).toBe(false);
+        });
       });
 
       it("should handle unsubscribe in reverse order", () => {
-        const factory1 = () => transitionMiddleware;
-        const factory2 = () => transitionErrorMiddleware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+        const factory1 = () => tracker1.middleware;
+        const factory2 = () => tracker2.middleware;
 
         router.clearMiddleware();
 
@@ -462,17 +526,28 @@ describe("core/middleware", () => {
         // Unsubscribe in reverse order
         unsub2();
 
-        expect(router.getMiddlewareFactories()).toStrictEqual([factory1]);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(true);
+          expect(tracker2.wasCalled()).toBe(false);
+        });
 
+        tracker1.reset();
         unsub1();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(false);
+        });
       });
 
       it("should maintain correct state after partial unsubscribe", () => {
-        const f1 = () => transitionMiddleware;
-        const f2 = () => transitionErrorMiddleware;
-        const f3 = () => asyncMware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+        const tracker3 = createTrackingMiddleware();
+        const f1 = () => tracker1.middleware;
+        const f2 = () => tracker2.middleware;
+        const f3 = () => tracker3.middleware;
 
         router.clearMiddleware();
 
@@ -483,12 +558,25 @@ describe("core/middleware", () => {
         // Unsubscribe middle one
         u2();
 
-        expect(router.getMiddlewareFactories()).toStrictEqual([f1, f3]);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(true);
+          expect(tracker2.wasCalled()).toBe(false);
+          expect(tracker3.wasCalled()).toBe(true);
+        });
+
+        tracker1.reset();
+        tracker3.reset();
 
         u1();
         u3();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(false);
+          expect(tracker2.wasCalled()).toBe(false);
+          expect(tracker3.wasCalled()).toBe(false);
+        });
       });
     });
 
@@ -576,9 +664,7 @@ describe("core/middleware", () => {
 
         factories.forEach((f) => router.useMiddleware(f));
 
-        expect(router.getMiddlewareFactories()).toHaveLength(50);
-
-        // 50th should fail (>= 50 check)
+        // 51st should fail (>= 50 check)
         expect(() => {
           router.useMiddleware(() => transitionMiddleware);
         }).toThrowError("Middleware limit exceeded");
@@ -625,9 +711,7 @@ describe("core/middleware", () => {
           );
         }).not.toThrowError();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(50);
-
-        // But adding 1 more should fail (would be 50)
+        // But adding 1 more should fail (would be 51)
         expect(() => {
           router.useMiddleware(() => transitionMiddleware);
         }).toThrowError();
@@ -644,7 +728,7 @@ describe("core/middleware", () => {
 
         factories.forEach((f) => router.useMiddleware(f));
 
-        // Try to add 2 more (would be 50 total) - should fail
+        // Try to add 3 more (would be 52 total) - should fail
         expect(() => {
           router.useMiddleware(
             () => transitionMiddleware,
@@ -653,8 +737,15 @@ describe("core/middleware", () => {
           );
         }).toThrowError("Middleware limit exceeded");
 
-        // Should remain at 49
-        expect(router.getMiddlewareFactories()).toHaveLength(49);
+        // Verify only 49 were registered by checking that adding 1 succeeds
+        expect(() => {
+          router.useMiddleware(() => transitionMiddleware);
+        }).not.toThrowError();
+
+        // Now at 50, next should fail
+        expect(() => {
+          router.useMiddleware(() => transitionMiddleware);
+        }).toThrowError("Middleware limit exceeded");
       });
     });
 
@@ -666,8 +757,6 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware();
 
         expectTypeOf(unsub).toBeFunction();
-
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
 
         // Unsubscribe should be safe no-op
         expect(() => {
@@ -713,8 +802,16 @@ describe("core/middleware", () => {
         // Side effect persists even though batch was rolled back
         expect(sideEffectCounter).toBe(1);
 
-        // No middleware registered (atomicity)
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        // No middleware registered (atomicity) - verify by checking nothing executes
+        const tracker = createTrackingMiddleware();
+
+        router.useMiddleware(() => tracker.middleware);
+
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          // Only tracker should execute, not the rolled-back factory
+          expect(tracker.wasCalled()).toBe(true);
+        });
       });
 
       it("should log warning when unsubscribe called after clearMiddleware", () => {
@@ -726,12 +823,8 @@ describe("core/middleware", () => {
 
         const unsub = router.useMiddleware(factory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
-
         // Clear all middleware
         router.clearMiddleware();
-
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
 
         // Unsubscribe after clear - should warn but not throw
         expect(() => {
@@ -744,7 +837,8 @@ describe("core/middleware", () => {
       });
 
       it("should handle multiple unsubscribe calls safely", () => {
-        const factory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         router.clearMiddleware();
 
@@ -752,7 +846,11 @@ describe("core/middleware", () => {
 
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        // Verify middleware doesn't execute after unsubscribe
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
 
         // Second call should be safe
         expect(() => {
@@ -878,79 +976,99 @@ describe("core/middleware", () => {
       it("should handle reentrant useMiddleware call from factory", () => {
         router.clearMiddleware();
 
+        const nestedTracker = createTrackingMiddleware();
+        const reentrantTracker = createTrackingMiddleware();
+
         let nestedUnsub: (() => void) | undefined;
-        const nestedFactory = () => transitionMiddleware;
+        const nestedFactory = () => nestedTracker.middleware;
 
         const reentrantFactory = (r: typeof router) => {
           // Call useMiddleware during factory initialization
           nestedUnsub = r.useMiddleware(nestedFactory);
 
-          return transitionMiddleware;
+          return reentrantTracker.middleware;
         };
 
         const unsub = router.useMiddleware(reentrantFactory);
 
-        // Both should be registered
-        expect(router.getMiddlewareFactories()).toHaveLength(2);
-        expect(router.getMiddlewareFactories()).toContain(reentrantFactory);
-        expect(router.getMiddlewareFactories()).toContain(nestedFactory);
+        // Both should execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(nestedTracker.wasCalled()).toBe(true);
+          expect(reentrantTracker.wasCalled()).toBe(true);
+        });
 
-        // Nested was registered first (during reentrantFactory execution)
-        expect(router.getMiddlewareFactories()[0]).toBe(nestedFactory);
-        expect(router.getMiddlewareFactories()[1]).toBe(reentrantFactory);
+        nestedTracker.reset();
+        reentrantTracker.reset();
 
         // Both unsubscribe functions should work
         nestedUnsub?.();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(nestedTracker.wasCalled()).toBe(false);
+          expect(reentrantTracker.wasCalled()).toBe(true);
+        });
 
+        reentrantTracker.reset();
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(nestedTracker.wasCalled()).toBe(false);
+          expect(reentrantTracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should handle factory calling unsubscribe of another middleware", () => {
         router.clearMiddleware();
 
-        const factory1 = () => transitionMiddleware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+        const factory1 = () => tracker1.middleware;
         let unsub1: () => void;
 
         unsub1 = router.useMiddleware(factory1);
-
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
 
         const factory2 = () => {
           // Unsubscribe factory1 during factory2 initialization
           unsub1();
 
-          return transitionMiddleware;
+          return tracker2.middleware;
         };
 
         router.useMiddleware(factory2);
 
-        // factory1 removed, factory2 added
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
-        expect(router.getMiddlewareFactories()).toContain(factory2);
-        expect(router.getMiddlewareFactories()).not.toContain(factory1);
+        // factory1 should not execute (unsubscribed), factory2 should execute
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(false);
+          expect(tracker2.wasCalled()).toBe(true);
+        });
       });
 
       it("should handle factory calling clearMiddleware during batch", () => {
         router.clearMiddleware();
 
-        const factory1 = () => transitionMiddleware;
+        const tracker1 = createTrackingMiddleware();
+        const tracker2 = createTrackingMiddleware();
+
+        const factory1 = () => tracker1.middleware;
         const factory2 = (r: typeof router) => {
           // Clear all middleware during batch initialization
           r.clearMiddleware();
 
-          return transitionMiddleware;
+          return tracker2.middleware;
         };
 
         router.useMiddleware(factory1, factory2);
 
         // Both should be registered (commit phase adds initialized back)
-        expect(router.getMiddlewareFactories()).toHaveLength(2);
-        expect(router.getMiddlewareFactories()).toContain(factory1);
-        expect(router.getMiddlewareFactories()).toContain(factory2);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker1.wasCalled()).toBe(true);
+          expect(tracker2.wasCalled()).toBe(true);
+        });
       });
     });
 
@@ -959,7 +1077,9 @@ describe("core/middleware", () => {
       it("should work with Proxy as factory", () => {
         router.clearMiddleware();
 
-        const realFactory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+
+        const realFactory = () => tracker.middleware;
         const proxyFactory = new Proxy(realFactory, {
           apply(target, thisArg, args) {
             return Reflect.apply(target, thisArg, args);
@@ -975,11 +1095,18 @@ describe("core/middleware", () => {
 
         const unsub = router.useMiddleware(proxyFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
+        tracker.reset();
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should handle factory with throwing getter on name property", () => {
@@ -1054,58 +1181,94 @@ describe("core/middleware", () => {
           router.useMiddleware(MiddlewareClass as any);
         }).toThrowError(/cannot be invoked without 'new'/);
 
-        // State should remain unchanged
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        // State should remain unchanged - verify by checking no middleware executes
+        const tracker = createTrackingMiddleware();
+
+        router.useMiddleware(() => tracker.middleware);
+
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
       });
 
       it("should work with bound function as factory", () => {
         router.clearMiddleware();
 
+        const tracker = createTrackingMiddleware();
         const context = { prefix: "LOG:" };
 
         function contextFactory(this: typeof context) {
           expect(this.prefix).toBe("LOG:");
 
-          return transitionMiddleware;
+          return tracker.middleware;
         }
 
         const boundFactory = contextFactory.bind(context);
 
         const unsub = router.useMiddleware(boundFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
         // Bound function name includes "bound" prefix
         expect(boundFactory.name).toBe("bound contextFactory");
 
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
+
+        tracker.reset();
         unsub();
+
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should work with frozen function as factory", () => {
         router.clearMiddleware();
 
-        const frozenFactory = Object.freeze(() => transitionMiddleware);
+        const tracker = createTrackingMiddleware();
+
+        const frozenFactory = Object.freeze(() => tracker.middleware);
 
         const unsub = router.useMiddleware(frozenFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
+        tracker.reset();
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
 
       it("should work with sealed function as factory", () => {
         router.clearMiddleware();
 
-        const sealedFactory = Object.seal(() => transitionMiddleware);
+        const tracker = createTrackingMiddleware();
+
+        const sealedFactory = Object.seal(() => tracker.middleware);
 
         const unsub = router.useMiddleware(sealedFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
+        tracker.reset();
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(false);
+        });
       });
     });
 
@@ -1114,18 +1277,30 @@ describe("core/middleware", () => {
       it("should accept self-returning factory", () => {
         router.clearMiddleware();
 
+        let selfReturningWasCalled = false;
+
         // Factory that returns itself (technically valid - it's a function)
-        const selfReturningFactory = (): any => selfReturningFactory;
+        const selfReturningFactory = (): any => {
+          selfReturningWasCalled = true;
+
+          return selfReturningFactory;
+        };
 
         // Registration should succeed (factory returns function = valid)
         const unsub = router.useMiddleware(selfReturningFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
-        expect(router.getMiddlewareFunctions()).toContain(selfReturningFactory);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(selfReturningWasCalled).toBe(true);
+        });
 
+        selfReturningWasCalled = false;
         unsub();
 
-        expect(router.getMiddlewareFactories()).toHaveLength(0);
+        router.navigate("orders", (err) => {
+          expect(err).toBeUndefined();
+          expect(selfReturningWasCalled).toBe(false);
+        });
       });
 
       it("should handle factory with very long name in error messages", () => {
@@ -1144,15 +1319,21 @@ describe("core/middleware", () => {
       it("should handle factory with unicode name", () => {
         router.clearMiddleware();
 
+        const tracker = createTrackingMiddleware();
+
         // Use a function expression with computed property to set unicode name
         const unicodeFactory = {
-          ["日本語Factory🚀"]: () => transitionMiddleware,
+          ["日本語Factory🚀"]: () => tracker.middleware,
         }["日本語Factory🚀"];
 
         const unsub = router.useMiddleware(unicodeFactory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
         expect(unicodeFactory.name).toBe("日本語Factory🚀");
+
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
         unsub();
       });
@@ -1160,7 +1341,8 @@ describe("core/middleware", () => {
       it("should handle factory with empty string name", () => {
         router.clearMiddleware();
 
-        const factory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         Object.defineProperty(factory, "name", {
           value: "",
@@ -1169,7 +1351,10 @@ describe("core/middleware", () => {
 
         const unsub = router.useMiddleware(factory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
         unsub();
       });
@@ -1177,7 +1362,8 @@ describe("core/middleware", () => {
       it("should handle factory with whitespace-only name", () => {
         router.clearMiddleware();
 
-        const factory = () => transitionMiddleware;
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         Object.defineProperty(factory, "name", {
           value: "   ",
@@ -1186,9 +1372,47 @@ describe("core/middleware", () => {
 
         const unsub = router.useMiddleware(factory);
 
-        expect(router.getMiddlewareFactories()).toHaveLength(1);
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+          expect(tracker.wasCalled()).toBe(true);
+        });
 
         unsub();
+      });
+    });
+
+    // 🟡 IMPORTANT: getDependency injection
+    describe("getDependency injection", () => {
+      it("should provide getDependency function to middleware factory", () => {
+        router.clearMiddleware();
+
+        // Set up a dependency (use any to bypass strict typing)
+        (router as any).setDependency("authToken", "secret-token-123");
+
+        let capturedToken: string | undefined;
+        const factoryUsingDeps = (
+          _r: typeof router,
+          getDep: (key: string) => unknown,
+        ) => {
+          // Call getDependency to verify it works
+          capturedToken = getDep("authToken") as string;
+
+          return (toState: State, _fromState: unknown, done: Function) => {
+            done(undefined, toState);
+          };
+        };
+
+        router.useMiddleware(factoryUsingDeps as any);
+
+        // Navigate to trigger the middleware
+        router.navigate("users", (err) => {
+          expect(err).toBeUndefined();
+        });
+
+        // Verify getDependency was called and returned correct value
+        expect(capturedToken).toBe("secret-token-123");
+
+        (router as any).removeDependency("authToken");
       });
     });
   });

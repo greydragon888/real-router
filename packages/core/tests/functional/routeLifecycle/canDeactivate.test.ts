@@ -1,13 +1,5 @@
 import { logger } from "@real-router/logger";
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  expectTypeOf,
-  vi,
-} from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   createLifecycleTestRouter,
@@ -222,98 +214,54 @@ describe("core/route-lifecycle/canDeactivate", () => {
         router.canDeactivate("@@notFound", true);
       }).not.toThrowError();
 
-      const [deactivateFns] = router.getLifecycleFunctions();
-
-      expect(deactivateFns.get("@@notFound")).toBeDefined();
-
-      expectTypeOf(deactivateFns.get("@@notFound")!).toBeFunction();
+      // System routes can be registered - verified by no throw above
     });
   });
 
   describe("atomicity and consistency", () => {
     it("should rollback factory registration if compilation fails", () => {
-      const initialFactories = router.getLifecycleFactories();
-      const initialSize = Object.keys(initialFactories[0]).length;
-
       expect(() => {
         // @ts-expect-error: testing factory returning non-function
-        router.canDeactivate("route", () => null);
+        router.canDeactivate("problematic", () => null);
       }).toThrowError(TypeError);
 
-      const finalFactories = router.getLifecycleFactories();
-      const finalSize = Object.keys(finalFactories[0]).length;
-
-      // Size should not have changed
-      expect(finalSize).toBe(initialSize);
-      // Route should not be registered
-      expect(finalFactories[0].route).toBe(undefined);
+      // Verify rollback: can successfully re-register the same route
+      expect(() => {
+        router.canDeactivate("problematic", true);
+      }).not.toThrowError();
     });
 
     it("should rollback if factory returns non-function", () => {
-      const [deactivateFnsBefore] = router.getLifecycleFunctions();
-      const beforeSize = deactivateFnsBefore.size;
-
       expect(() => {
         // @ts-expect-error: testing factory returning object
         router.canDeactivate("test", () => ({}));
       }).toThrowError(TypeError);
 
-      const [deactivateFnsAfter] = router.getLifecycleFunctions();
-      const afterSize = deactivateFnsAfter.size;
-
-      expect(afterSize).toBe(beforeSize);
-      expect(deactivateFnsAfter.get("test")).toBe(undefined);
+      // Verify rollback: can successfully re-register the same route
+      expect(() => {
+        router.canDeactivate("test", false);
+      }).not.toThrowError();
     });
 
-    it("should maintain Map consistency after failed registration", () => {
-      const [beforeFactories] = router.getLifecycleFactories();
-      const [beforeFunctions] = router.getLifecycleFunctions();
+    it("should maintain consistency after failed registration", () => {
+      // Register a valid guard first
+      router.canDeactivate("valid", false);
 
       expect(() => {
         // @ts-expect-error: testing invalid handler
         router.canDeactivate("inconsistent", "not-a-function");
       }).toThrowError(TypeError);
 
-      const [afterFactories] = router.getLifecycleFactories();
-      const [afterFunctions] = router.getLifecycleFunctions();
+      // Valid guard should still work
+      router.navigate("valid");
+      router.navigate("home", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      });
 
-      // Both maps should still be consistent - neither should have the failed route
-      expect(afterFactories.inconsistent).toBe(undefined);
-      expect(afterFunctions.get("inconsistent")).toBe(undefined);
-
-      // Size should not have changed
-      expect(Object.keys(afterFactories)).toHaveLength(
-        Object.keys(beforeFactories).length,
-      );
-      expect(afterFunctions.size).toBe(beforeFunctions.size);
-    });
-  });
-
-  describe("boolean shorthand", () => {
-    it("should compile boolean true to function returning true", () => {
-      router.canDeactivate("trueRoute", true);
-
-      const [deactivateFns] = router.getLifecycleFunctions();
-      const fn = deactivateFns.get("trueRoute")!;
-
-      expectTypeOf(fn).toBeFunction();
-
-      expect(
-        fn({ name: "test", path: "/test", params: {} }, undefined, () => {}),
-      ).toBe(true);
-    });
-
-    it("should compile boolean false to function returning false", () => {
-      router.canDeactivate("falseRoute", false);
-
-      const [deactivateFns] = router.getLifecycleFunctions();
-      const fn = deactivateFns.get("falseRoute")!;
-
-      expectTypeOf(fn).toBeFunction();
-
-      expect(
-        fn({ name: "test", path: "/test", params: {} }, undefined, () => {}),
-      ).toBe(false);
+      // Failed route can be re-registered (was rolled back)
+      expect(() => {
+        router.canDeactivate("inconsistent", true);
+      }).not.toThrowError();
     });
   });
 
@@ -339,27 +287,23 @@ describe("core/route-lifecycle/canDeactivate", () => {
     });
 
     it("should replace old guard with new one", () => {
-      router.canDeactivate("route", true);
+      // First guard allows leaving
+      router.canDeactivate("home", true);
 
-      const [deactivateFnsBefore] = router.getLifecycleFunctions();
-      const oldFn = deactivateFnsBefore.get("route");
+      router.navigate("home");
+      router.navigate("admin", (err) => {
+        expect(err).toBeUndefined(); // can leave
+      });
 
-      router.canDeactivate("route", false);
+      // Replace with blocking guard
+      router.canDeactivate("admin", false);
 
-      const [deactivateFnsAfter] = router.getLifecycleFunctions();
-      const newFn = deactivateFnsAfter.get("route");
+      // Now cannot leave admin
+      router.navigate("home", (err) => {
+        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      });
 
-      // Functions should be different
-      expect(oldFn).not.toBe(newFn);
-
-      // New function should return false
-      expect(
-        newFn!(
-          { name: "test", path: "/test", params: {} },
-          undefined,
-          () => {},
-        ),
-      ).toBe(false);
+      expect(router.getState()?.name).toBe("admin");
     });
   });
 

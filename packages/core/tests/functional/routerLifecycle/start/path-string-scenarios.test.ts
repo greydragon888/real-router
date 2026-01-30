@@ -20,9 +20,6 @@ describe("router.start() - path string scenarios", () => {
 
   describe("successful path matching", () => {
     it("should match path and transition to found state", () => {
-      const matchPathSpy = vi.spyOn(router, "matchPath");
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
       const callback = vi.fn();
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -35,10 +32,8 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/users/list", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
-      expect(matchPathSpy).toHaveBeenCalledWith("/users/list");
-      expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
       expect(result).toBe(router);
@@ -55,23 +50,6 @@ describe("router.start() - path string scenarios", () => {
       expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
     });
 
-    it("should call navigateToState with matched state", () => {
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-      router.start("/users/view/123");
-
-      expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
-
-      const [toState, fromState, options] = navigateToStateSpy.mock.calls[0];
-
-      expect(toState).toBeDefined();
-      expect(toState.name).toBe("users.view");
-      expect(toState.params).toStrictEqual({ id: "123" });
-      expect(toState.path).toBe("/users/view/123");
-      expect(fromState).toBeUndefined();
-      expect(options).toStrictEqual({ replace: true });
-    });
-
     it("should handle path with query parameters", () => {
       const callback = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -83,7 +61,7 @@ describe("router.start() - path string scenarios", () => {
 
       router.start("/users/list?page=2&sort=name", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
 
@@ -118,9 +96,6 @@ describe("router.start() - path string scenarios", () => {
     it("should return error when path matching fails even with defaultRoute", () => {
       router.setOption("allowNotFound", false);
 
-      const matchPathSpy = vi.spyOn(router, "matchPath");
-      const navigateToDefaultSpy = vi.spyOn(router, "navigateToDefault");
-
       const callback = vi.fn();
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
@@ -130,10 +105,8 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
-      expect(matchPathSpy).toHaveBeenCalledWith("/invalid/path");
-      expect(navigateToDefaultSpy).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(result).toBe(router);
 
@@ -155,7 +128,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/nonexistent/route", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -183,7 +156,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -194,25 +167,11 @@ describe("router.start() - path string scenarios", () => {
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
-
-    it("should not call navigateToDefault for invalid path", () => {
-      const matchPathSpy = vi.spyOn(router, "matchPath");
-      const navigateToDefaultSpy = vi.spyOn(router, "navigateToDefault");
-
-      router.start("/some/invalid/path");
-
-      expect(matchPathSpy).toHaveBeenCalledWith("/some/invalid/path");
-      expect(navigateToDefaultSpy).not.toHaveBeenCalled();
-    });
   });
 
   describe("unsuccessful path matching with allowNotFound", () => {
     it("should create not found state when path matching fails and allowNotFound is true", () => {
       router.setOption("allowNotFound", true);
-
-      const matchPathSpy = vi.spyOn(router, "matchPath");
-      const makeNotFoundStateSpy = vi.spyOn(router, "makeNotFoundState");
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -221,14 +180,15 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
-      expect(matchPathSpy).toHaveBeenCalledWith("/invalid/path");
-      expect(makeNotFoundStateSpy).toHaveBeenCalledWith("/invalid/path", {
-        replace: true,
-      });
-      expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
       expect(result).toBe(router);
+
+      // Verify state is UNKNOWN_ROUTE
+      const currentState = router.getState();
+
+      expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(currentState?.params.path).toBe("/invalid/path");
     });
 
     it("should successfully transition to not found state", () => {
@@ -246,7 +206,7 @@ describe("router.start() - path string scenarios", () => {
 
       const result = router.start("/some/invalid/path", callback);
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(callback).toHaveBeenCalledTimes(1);
@@ -265,40 +225,13 @@ describe("router.start() - path string scenarios", () => {
       expect(currentState?.params.path).toBe("/some/invalid/path");
     });
 
-    it("should call methods in correct order for not found path", () => {
-      router.setOption("allowNotFound", true);
-
-      const matchPathSpy = vi.spyOn(router, "matchPath");
-      const makeNotFoundStateSpy = vi.spyOn(router, "makeNotFoundState");
-      const navigateToStateSpy = vi.spyOn(router, "navigateToState");
-
-      router.start("/invalid/path");
-
-      expect(matchPathSpy).toHaveBeenCalledBefore(makeNotFoundStateSpy as any);
-      expect(makeNotFoundStateSpy).toHaveBeenCalledBefore(
-        navigateToStateSpy as any,
-      );
-
-      expect(matchPathSpy).toHaveBeenCalledWith("/invalid/path");
-      expect(makeNotFoundStateSpy).toHaveBeenCalledWith("/invalid/path", {
-        replace: true,
-      });
-      expect(navigateToStateSpy).toHaveBeenCalledTimes(1);
-    });
-
     it("should prefer allowNotFound over defaultRoute when both are set", () => {
       router.setOption("allowNotFound", true);
       router.setOption("defaultRoute", "home");
 
-      const makeNotFoundStateSpy = vi.spyOn(router, "makeNotFoundState");
-      const navigateToDefaultSpy = vi.spyOn(router, "navigateToDefault");
-
       const callback = vi.fn();
 
       router.start("/invalid/path", callback);
-
-      expect(makeNotFoundStateSpy).toHaveBeenCalledTimes(1);
-      expect(navigateToDefaultSpy).not.toHaveBeenCalled();
 
       const [error, state] = callback.mock.calls[0];
 
@@ -364,7 +297,7 @@ describe("router.start() - path string scenarios", () => {
     it("should handle empty string as path (fallback to defaultRoute)", () => {
       router.start("");
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
       // Empty string triggers fallback to defaultRoute
       expect(router.getState()?.name).toBe("home");
     });

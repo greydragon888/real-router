@@ -111,10 +111,13 @@ export function browserPluginFactory(
   };
 
   // Create transition options with proper typing for exactOptionalPropertyTypes
+  // replace: true is needed because popstate means URL already changed (back/forward)
   const forceDeactivate = options.forceDeactivate;
-  /* v8 ignore next 2 -- @preserve both branches tested, coverage tool limitation */
+  /* v8 ignore next 4 -- @preserve both branches tested, coverage tool limitation */
   const transitionOptions =
-    forceDeactivate === undefined ? { source } : { forceDeactivate, source };
+    forceDeactivate === undefined
+      ? { source, replace: true }
+      : { forceDeactivate, source, replace: true };
 
   let removePopStateListener: (() => void) | undefined;
 
@@ -350,8 +353,8 @@ export function browserPluginFactory(
         // 2. shouldSkipTransition returns true when !state (utils.ts:136)
         isTransitioning = true;
 
-        // Use internal navigateToState without emitting TRANSITION_SUCCESS
-        // We'll emit it in handleTransitionResult if needed
+        // Use internal navigateToState with emitSuccess = true
+        // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
         router.navigateToState(
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by shouldSkipTransition
           state!,
@@ -372,7 +375,7 @@ export function browserPluginFactory(
             // Process any deferred popstate events after transition completes
             processDeferredEvent();
           },
-          false, // emitSuccess = false - handleTransitionResult will emit if needed
+          true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
         );
       } catch (error) {
         isTransitioning = false;

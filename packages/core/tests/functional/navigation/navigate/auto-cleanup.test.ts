@@ -1,36 +1,20 @@
 import { logger } from "@real-router/logger";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
 
-import { createTestRouter } from "../../../helpers";
-
 import type { Router } from "@real-router/core";
 
-let router: Router;
 const noop = () => undefined;
 
 describe("router.navigate() - auto cleanup", () => {
-  beforeEach(() => {
-    router = createTestRouter();
-
-    router.start();
-  });
-
-  afterEach(() => {
-    router.stop();
-
-    vi.clearAllMocks();
-  });
-
   describe("navigation with options.autoCleanUp === true", () => {
-    let routerWithAutoCleanUp: Router;
+    let router: Router;
 
     beforeEach(() => {
       vi.spyOn(logger, "error").mockImplementation(noop);
 
-      // Create router with autoCleanUp enabled
-      routerWithAutoCleanUp = createRouter(
+      router = createRouter(
         [
           { name: "home", path: "/" },
           { name: "users", path: "/users" },
@@ -49,56 +33,66 @@ describe("router.navigate() - auto cleanup", () => {
         },
       );
 
-      routerWithAutoCleanUp.start();
+      router.start();
     });
 
     afterEach(() => {
-      routerWithAutoCleanUp.stop();
+      router.stop();
     });
 
+    /**
+     * Helper to check if a canDeactivate guard exists for a route.
+     * Uses overwrite warning detection: if guard exists, registering new one triggers warning.
+     */
+    function hasCanDeactivate(routeName: string): boolean {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
+
+      // Try to register a guard - if one exists, it will trigger overwrite warning
+      router.canDeactivate(routeName, true);
+
+      const hadGuard = warnSpy.mock.calls.some(
+        (call) =>
+          call[0] === "router.canDeactivate" &&
+          typeof call[1] === "string" &&
+          call[1].includes("Overwriting"),
+      );
+
+      warnSpy.mockRestore();
+
+      return hadGuard;
+    }
+
     describe("basic autoCleanUp functionality", () => {
-      it("should call clearCanDeactivate for previously active segments that become inactive", () => {
+      it("should remove canDeactivate for previously active segments that become inactive", () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
         const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
 
         // Navigate to users first to establish a baseline
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          // Now set up guards only for routes we'll actually use
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => usersDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
-            "orders",
-            () => ordersDeactivateGuard,
-          );
+          // Set up guards for routes
+          router.canDeactivate("users", () => usersDeactivateGuard);
+          router.canDeactivate("orders", () => ordersDeactivateGuard);
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
+          expect(hasCanDeactivate("users")).toBe(true);
+          expect(hasCanDeactivate("orders")).toBe(true);
 
           // Navigate to orders - users becomes inactive and should be cleaned up
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err) => {
+          router.navigate("orders", {}, {}, (err) => {
             expect(err).toBeUndefined();
 
-            // Should clean up users (was previously active, now inactive)
-            expect(clearCanDeactivateSpy).toHaveBeenCalledWith("users");
-            // orders should not be cleared (it's now active)
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith("orders");
+            // users guard should be removed (was active, now inactive)
+            expect(hasCanDeactivate("users")).toBe(false);
+            // orders guard should remain (it's now active)
+            expect(hasCanDeactivate("orders")).toBe(true);
 
-            clearCanDeactivateSpy.mockClear();
-
-            // Navigate back to users - orders becomes inactive and should be cleaned up
-            routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+            // Navigate back to users - orders becomes inactive
+            router.navigate("users", {}, {}, (err) => {
               expect(err).toBeUndefined();
 
-              // Should clean up orders (now inactive)
-              expect(clearCanDeactivateSpy).toHaveBeenCalledTimes(1);
-              expect(clearCanDeactivateSpy).toHaveBeenCalledWith("orders");
-              expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith("users");
+              // orders guard should be removed
+              expect(hasCanDeactivate("orders")).toBe(false);
             });
           });
         });
@@ -106,278 +100,202 @@ describe("router.navigate() - auto cleanup", () => {
 
       it("should only clean up segments that are not in active path for nested routes", () => {
         // Navigate to users first to establish baseline
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          // Set up guards after navigation
+          // Set up guards
           const usersDeactivateGuard = vi.fn().mockReturnValue(true);
           const usersListDeactivateGuard = vi.fn().mockReturnValue(true);
           const usersViewDeactivateGuard = vi.fn().mockReturnValue(true);
 
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => usersDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
-            "users.list",
-            () => usersListDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
-            "users.view",
-            () => usersViewDeactivateGuard,
-          );
+          router.canDeactivate("users", () => usersDeactivateGuard);
+          router.canDeactivate("users.list", () => usersListDeactivateGuard);
+          router.canDeactivate("users.view", () => usersViewDeactivateGuard);
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
+          expect(hasCanDeactivate("users")).toBe(true);
+          expect(hasCanDeactivate("users.list")).toBe(true);
+          expect(hasCanDeactivate("users.view")).toBe(true);
 
           // Navigate to users.list
-          routerWithAutoCleanUp.navigate("users.list", {}, {}, (err) => {
+          router.navigate("users.list", {}, {}, (err) => {
             expect(err).toBeUndefined();
 
-            clearCanDeactivateSpy.mockClear();
-
             // Navigate to users.view (users remains active, but users.list becomes inactive)
-            routerWithAutoCleanUp.navigate(
-              "users.view",
-              { id: 123 },
-              {},
-              (err) => {
-                expect(err).toBeUndefined();
+            router.navigate("users.view", { id: 123 }, {}, (err) => {
+              expect(err).toBeUndefined();
 
-                // Should only clean up users.list (users is still active in the path)
-                expect(clearCanDeactivateSpy).toHaveBeenCalledTimes(1);
-                expect(clearCanDeactivateSpy).toHaveBeenCalledWith(
-                  "users.list",
-                );
+              // users.list should be removed (was active, now inactive)
+              expect(hasCanDeactivate("users.list")).toBe(false);
 
-                // users and users.view should not be cleared (they're active)
-                expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith("users");
-                expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith(
-                  "users.view",
-                );
-              },
-            );
+              // users should remain (still in active path)
+              expect(hasCanDeactivate("users")).toBe(true);
+
+              // users.view should remain (now active)
+              expect(hasCanDeactivate("users.view")).toBe(true);
+            });
           });
         });
       });
 
       it("should handle complex nested route transitions correctly", () => {
-        // Navigate to home first
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        // Navigate to users first
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          // Set up guards after navigation
+          // Set up guards
           const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
           const settingsGeneralDeactivateGuard = vi.fn().mockReturnValue(true);
           const settingsAccountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-          routerWithAutoCleanUp.canDeactivate(
-            "settings",
-            () => settingsDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
+          router.canDeactivate("settings", () => settingsDeactivateGuard);
+          router.canDeactivate(
             "settings.general",
             () => settingsGeneralDeactivateGuard,
           );
-          routerWithAutoCleanUp.canDeactivate(
+          router.canDeactivate(
             "settings.account",
             () => settingsAccountDeactivateGuard,
           );
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
-
           // Navigate through nested routes: settings.general -> settings.account -> users
-          routerWithAutoCleanUp.navigate("settings.general", {}, {}, (err) => {
+          router.navigate("settings.general", {}, {}, (err) => {
             expect(err).toBeUndefined();
 
-            clearCanDeactivateSpy.mockClear();
+            expect(hasCanDeactivate("settings")).toBe(true);
+            expect(hasCanDeactivate("settings.general")).toBe(true);
+            expect(hasCanDeactivate("settings.account")).toBe(true);
 
             // Navigate within settings hierarchy
-            routerWithAutoCleanUp.navigate(
-              "settings.account",
-              {},
-              {},
-              (err) => {
+            router.navigate("settings.account", {}, {}, (err) => {
+              expect(err).toBeUndefined();
+
+              // settings.general should be removed (settings remains active)
+              expect(hasCanDeactivate("settings.general")).toBe(false);
+              expect(hasCanDeactivate("settings")).toBe(true);
+              expect(hasCanDeactivate("settings.account")).toBe(true);
+
+              // Navigate out of settings hierarchy completely
+              router.navigate("users", {}, {}, (err) => {
                 expect(err).toBeUndefined();
 
-                // Should only clean up settings.general (settings remains active)
-                expect(clearCanDeactivateSpy).toHaveBeenCalledTimes(1);
-                expect(clearCanDeactivateSpy).toHaveBeenCalledWith(
-                  "settings.general",
-                );
-
-                clearCanDeactivateSpy.mockClear();
-
-                // Navigate out of settings hierarchy completely
-                routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
-                  expect(err).toBeUndefined();
-
-                  // Should clean up remaining settings segments
-                  expect(clearCanDeactivateSpy).toHaveBeenCalledTimes(2);
-                  expect(clearCanDeactivateSpy).toHaveBeenCalledWith(
-                    "settings",
-                  );
-                  expect(clearCanDeactivateSpy).toHaveBeenCalledWith(
-                    "settings.account",
-                  );
-                });
-              },
-            );
+                // All settings guards should be removed
+                expect(hasCanDeactivate("settings")).toBe(false);
+                expect(hasCanDeactivate("settings.account")).toBe(false);
+              });
+            });
           });
         });
       });
     });
 
     describe("autoCleanUp with transition errors", () => {
-      it("should not call clearCanDeactivate when middleware blocks transition", () => {
+      it("should not remove canDeactivate when middleware blocks transition", () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
-        const blockingMiddleware = vi.fn().mockReturnValue(false);
 
-        routerWithAutoCleanUp.canDeactivate(
-          "users",
-          () => usersDeactivateGuard,
-        );
-        routerWithAutoCleanUp.useMiddleware(() => blockingMiddleware);
+        // Navigate to users first (before adding blocking middleware)
+        router.navigate("users", {}, {}, (err) => {
+          expect(err).toBeUndefined();
 
-        const clearCanDeactivateSpy = vi.spyOn(
-          routerWithAutoCleanUp,
-          "clearCanDeactivate",
-        );
+          // Set up guard
+          router.canDeactivate("users", () => usersDeactivateGuard);
 
-        // This should work but currently fails
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
-          expect(err).toBeUndefined(); // FAILS: middleware blocks initial navigation
+          expect(hasCanDeactivate("users")).toBe(true);
 
-          clearCanDeactivateSpy.mockClear();
+          // Add blocking middleware
+          const blockingMiddleware = vi.fn().mockReturnValue(false);
 
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err) => {
+          router.useMiddleware(() => blockingMiddleware);
+
+          // Try to navigate away (should be blocked)
+          router.navigate("orders", {}, {}, (err) => {
             expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalled();
+
+            // Guard should NOT be removed (transition failed)
+            expect(hasCanDeactivate("users")).toBe(true);
           });
         });
       });
 
-      it("should not call clearCanDeactivate when canActivate blocks transition", () => {
-        // Current problem: guard blocks initial navigation, preventing test setup
+      it("should not remove canDeactivate when canActivate blocks transition", () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        routerWithAutoCleanUp.canDeactivate(
-          "users",
-          () => usersDeactivateGuard,
-        );
-        routerWithAutoCleanUp.canActivate(
-          "profile",
-          () => blockingActivateGuard,
-        );
+        router.canDeactivate("users", () => usersDeactivateGuard);
+        router.canActivate("profile", () => blockingActivateGuard);
 
-        const clearCanDeactivateSpy = vi.spyOn(
-          routerWithAutoCleanUp,
-          "clearCanDeactivate",
-        );
-
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          clearCanDeactivateSpy.mockClear();
+          expect(hasCanDeactivate("users")).toBe(true);
 
-          routerWithAutoCleanUp.navigate("profile", {}, {}, (err) => {
+          router.navigate("profile", {}, {}, (err) => {
             expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalled();
+
+            // Guard should NOT be removed (transition failed)
+            expect(hasCanDeactivate("users")).toBe(true);
           });
         });
       });
 
-      it("should not call clearCanDeactivate when canDeactivate blocks transition", () => {
+      it("should not remove canDeactivate when canDeactivate blocks transition", () => {
         const normalDeactivateGuard = vi.fn().mockReturnValue(true);
-        const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
 
         // Navigate to users first with normal guard
-        routerWithAutoCleanUp.canDeactivate(
-          "users",
-          () => normalDeactivateGuard,
-        );
+        router.canDeactivate("users", () => normalDeactivateGuard);
 
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
-
           // Replace with blocking guard
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => blockingDeactivateGuard,
-          );
+          const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
+
+          router.canDeactivate("users", () => blockingDeactivateGuard);
+
+          expect(hasCanDeactivate("users")).toBe(true);
 
           // Try to navigate away (should be blocked)
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err) => {
+          router.navigate("orders", {}, {}, (err) => {
             expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
 
-            // clearCanDeactivate should not be called due to failed transition
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalled();
+            // Guard should NOT be removed (transition failed)
+            expect(hasCanDeactivate("users")).toBe(true);
           });
         });
       });
     });
 
     describe("autoCleanUp edge cases", () => {
-      it("should handle empty canDeactivateFunctions object gracefully", () => {
-        // No canDeactivate guards set
-        const clearCanDeactivateSpy = vi.spyOn(
-          routerWithAutoCleanUp,
-          "clearCanDeactivate",
-        );
-
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+      it("should handle navigation when no canDeactivate guards are set", () => {
+        // No guards set - just verify navigation works
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          clearCanDeactivateSpy.mockClear();
-
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err) => {
+          router.navigate("orders", {}, {}, (err) => {
             expect(err).toBeUndefined();
 
-            // clearCanDeactivate should not be called when no guards are set
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalled();
+            // No guards to check - just verify no errors
+            expect(router.getState()?.name).toBe("orders");
           });
         });
       });
 
-      it("should handle navigation to same route with autoCleanUp", () => {
+      it("should not remove guard when navigating to same route", () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => usersDeactivateGuard,
-          );
+          router.canDeactivate("users", () => usersDeactivateGuard);
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
+          expect(hasCanDeactivate("users")).toBe(true);
 
           // Navigate to same route with force option
-          routerWithAutoCleanUp.navigate(
-            "users",
-            {},
-            { force: true },
-            (err) => {
-              expect(err).toBeUndefined();
+          router.navigate("users", {}, { force: true }, (err) => {
+            expect(err).toBeUndefined();
 
-              // No segments should be cleaned up (same route is still active)
-              expect(clearCanDeactivateSpy).not.toHaveBeenCalled();
-            },
-          );
+            // Guard should NOT be removed (same route is still active)
+            expect(hasCanDeactivate("users")).toBe(true);
+          });
         });
       });
 
@@ -386,38 +304,31 @@ describe("router.navigate() - auto cleanup", () => {
         const profileDeactivateGuard = vi.fn().mockReturnValue(true);
 
         // Navigate to users first
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
           // Set up guards and redirect after initial navigation
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => usersDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
-            "profile",
-            () => profileDeactivateGuard,
-          );
+          router.canDeactivate("users", () => usersDeactivateGuard);
+          router.canDeactivate("profile", () => profileDeactivateGuard);
 
           // Set up redirect from orders to profile
-          routerWithAutoCleanUp.canActivate("orders", () => () => {
+          router.canActivate("orders", () => () => {
             return { name: "profile", params: {}, path: "/profile" };
           });
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
+          expect(hasCanDeactivate("users")).toBe(true);
+          expect(hasCanDeactivate("profile")).toBe(true);
 
           // Navigate to orders (will redirect to profile)
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err, state) => {
+          router.navigate("orders", {}, {}, (err, state) => {
             expect(err).toBeUndefined();
             expect(state?.name).toBe("profile");
 
-            // Should clean up users (was active, now not active in final state)
-            expect(clearCanDeactivateSpy).toHaveBeenCalledWith("users");
-            // Should not clean up profile (it's the final active route)
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith("profile");
+            // users should be removed (was active, now not active in final state)
+            expect(hasCanDeactivate("users")).toBe(false);
+
+            // profile should remain (it's the final active route)
+            expect(hasCanDeactivate("profile")).toBe(true);
           });
         });
       });
@@ -427,34 +338,25 @@ describe("router.navigate() - auto cleanup", () => {
         const neverActiveGuard = vi.fn().mockReturnValue(true);
 
         // Navigate to users first
-        routerWithAutoCleanUp.navigate("users", {}, {}, (err) => {
+        router.navigate("users", {}, {}, (err) => {
           expect(err).toBeUndefined();
 
           // Set up guards: one for active route, one for route we'll never visit
-          routerWithAutoCleanUp.canDeactivate(
-            "users",
-            () => usersDeactivateGuard,
-          );
-          routerWithAutoCleanUp.canDeactivate(
-            "profile",
-            () => neverActiveGuard,
-          );
+          router.canDeactivate("users", () => usersDeactivateGuard);
+          router.canDeactivate("profile", () => neverActiveGuard);
 
-          const clearCanDeactivateSpy = vi.spyOn(
-            routerWithAutoCleanUp,
-            "clearCanDeactivate",
-          );
+          expect(hasCanDeactivate("users")).toBe(true);
+          expect(hasCanDeactivate("profile")).toBe(true);
 
           // Navigate to orders (profile was never active, so shouldn't be cleaned)
-          routerWithAutoCleanUp.navigate("orders", {}, {}, (err) => {
+          router.navigate("orders", {}, {}, (err) => {
             expect(err).toBeUndefined();
 
-            // Should only clean up users (was active)
-            expect(clearCanDeactivateSpy).toHaveBeenCalledTimes(1);
-            expect(clearCanDeactivateSpy).toHaveBeenCalledWith("users");
+            // users should be removed (was active)
+            expect(hasCanDeactivate("users")).toBe(false);
 
-            // Should NOT clean up profile (was never active)
-            expect(clearCanDeactivateSpy).not.toHaveBeenCalledWith("profile");
+            // profile should NOT be removed (was never active)
+            expect(hasCanDeactivate("profile")).toBe(true);
           });
         });
       });

@@ -27,6 +27,31 @@ describe("navigateToDefault", () => {
     vi.clearAllMocks();
   });
 
+  describe("when defaultRoute is not set", () => {
+    it("should return noop cancel function when defaultRoute is not configured", () => {
+      // Create router WITHOUT defaultRoute (override the default)
+      const freshRouter = createTestRouter({ defaultRoute: "" });
+
+      // Start at a specific route since there's no defaultRoute
+      freshRouter.start("/users");
+
+      // navigateToDefault should return a function even when no defaultRoute
+      const cancel = freshRouter.navigateToDefault();
+
+      expect(typeof cancel).toBe("function");
+
+      // Calling cancel should be safe (noop)
+      expect(() => {
+        cancel();
+      }).not.toThrowError();
+
+      // Router state should remain at the route we started at
+      expect(freshRouter.getState()?.name).toBe("users");
+
+      freshRouter.stop();
+    });
+  });
+
   describe("basic functionality", () => {
     it("should navigate to defaultRoute when defaultRoute is set", () => {
       const callback = vi.fn();
@@ -1338,7 +1363,7 @@ describe("navigateToDefault", () => {
         }),
       );
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should handle call when router is not started", () => {
@@ -1356,7 +1381,7 @@ describe("navigateToDefault", () => {
         }),
       );
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
     });
 
     it("should respect router options changes after creation", () => {
@@ -1478,11 +1503,11 @@ describe("navigateToDefault", () => {
       // Stop and restart router
       router.stop();
 
-      expect(router.isStarted()).toBe(false);
+      expect(router.isActive()).toBe(false);
 
       router.start();
 
-      expect(router.isStarted()).toBe(true);
+      expect(router.isActive()).toBe(true);
 
       // Should work normally after restart (with reload to avoid SAME_STATES)
       router.navigateToDefault({ reload: true }, callback);
