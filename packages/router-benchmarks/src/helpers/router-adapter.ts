@@ -19,7 +19,10 @@ const routerModule = (() => {
       return require("router6");
     }
     default: {
-      return require("@real-router/core");
+      // IMPORTANT: Explicitly load from dist to avoid tsx transpiling TypeScript source.
+      // tsx resolves workspace packages to src/*.ts, causing unfair benchmark comparison
+      // with external packages that load from compiled dist/*.js.
+      return require("@real-router/core/dist/cjs/index.js");
     }
   }
 })();

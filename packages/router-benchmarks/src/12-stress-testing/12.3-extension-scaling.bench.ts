@@ -27,6 +27,8 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 // 12.3.2 Navigation with 50 asynchronous middleware
 {
   const router = createSimpleRouter();
+  const alternatingRoutes = ["about", "home"];
+  let index = 0;
 
   // Add 50 middleware (max limit)
   for (let i = 0; i < 50; i++) {
@@ -44,7 +46,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   router.start();
 
   bench("12.3.2 Navigation with 50 asynchronous middleware", () => {
-    router.navigate("about");
+    router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -70,6 +72,8 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 // 12.3.4 Navigation with 50 plugins
 {
   const router = createSimpleRouter();
+  const alternatingRoutes = ["about", "home"];
+  let index = 0;
 
   for (let i = 0; i < 50; i++) {
     router.usePlugin(() => ({
@@ -81,7 +85,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   router.start();
 
   bench("12.3.4 Navigation with 50 plugins", () => {
-    router.navigate("about");
+    router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -108,6 +112,8 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 // 12.3.6 Navigation with 100 canActivate guards on different routes
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["route50", "route51"];
+  let index = 0;
 
   // Add 100 routes with guards
   for (let i = 0; i < 100; i++) {
@@ -123,11 +129,13 @@ if (IS_ROUTER5) {
   bench(
     "12.3.6 Navigation with 100 canActivate guards on different routes",
     () => {
-      router.navigate("route50");
+      router.navigate(routes[index++ % 2]);
     },
   ).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["route50", "route51"];
+  let index = 0;
 
   // Add 100 routes with guards
   for (let i = 0; i < 100; i++) {
@@ -142,7 +150,7 @@ if (IS_ROUTER5) {
   bench(
     "12.3.6 Navigation with 100 canActivate guards on different routes",
     () => {
-      router.navigate("route50");
+      router.navigate(routes[index++ % 2]);
     },
   ).gc("inner");
 }

@@ -456,8 +456,18 @@ export class RoutesNamespace<
   /**
    * Builds a URL path for a route.
    * Note: Argument validation is done by facade (Router.ts) via validateBuildPathArgs.
+   *
+   * @param route - Route name
+   * @param params - Route parameters
+   * @param options - Router options
+   * @param segments - Optional pre-computed segments to avoid duplicate lookup
    */
-  buildPath(route: string, params?: Params, options?: Options): string {
+  buildPath(
+    route: string,
+    params?: Params,
+    options?: Options,
+    segments?: readonly unknown[],
+  ): string {
     if (route === constants.UNKNOWN_ROUTE) {
       return isString(params?.path) ? params.path : "";
     }
@@ -478,7 +488,14 @@ export class RoutesNamespace<
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
       this.#buildOptionsCache ?? createBuildOptions(options!);
 
-    return routeNodeBuildPath(this.#tree, route, encodedParams, buildOptions);
+    return routeNodeBuildPath(
+      this.#tree,
+      route,
+      encodedParams,
+      buildOptions,
+      // Cast to RouteTree[] - segments come from getSegmentsByName which returns RouteTree[]
+      segments as readonly RouteTree[] | undefined,
+    );
   }
 
   /**

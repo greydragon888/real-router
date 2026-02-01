@@ -52,6 +52,8 @@ import { createSimpleRouter } from "../helpers";
 // 11.2.4 Getting data in subscribe handler
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.subscribe(() => {
     // Access route and previousRoute in handler
@@ -59,6 +61,6 @@ import { createSimpleRouter } from "../helpers";
   router.start();
 
   bench("11.2.4 Getting data in subscribe handler", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }

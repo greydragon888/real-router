@@ -38,6 +38,7 @@ export const BENCH_NO_VALIDATE = process.env.BENCH_NO_VALIDATE === "true";
 export const UNIFIED_OPTIONS: Partial<Options> = {
   queryParamsMode: "default",
   allowNotFound: false,
+  defaultRoute: "home",
   // Only apply noValidate for real-router (router5/router6 don't have this option)
   ...(IS_REAL_ROUTER && BENCH_NO_VALIDATE ? { noValidate: true } : {}),
 };

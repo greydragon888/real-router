@@ -135,6 +135,8 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   const router = createSimpleRouter();
   // Using array to create unpredictable reload pattern
   const reloadPattern = [true, false, true, false, false, true, false, true];
+  // Alternate routes to avoid SAME_STATES when reload=false
+  const routes = ["about", "home"];
 
   router.start();
 
@@ -142,7 +144,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
     for (let i = 0; i < 1000; i++) {
       const reload = reloadPattern[i % reloadPattern.length];
 
-      router.navigate("about", {}, { reload });
+      router.navigate(routes[i % 2], {}, { reload });
     }
   }).gc("inner");
 }

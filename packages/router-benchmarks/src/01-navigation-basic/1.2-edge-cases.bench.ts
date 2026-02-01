@@ -178,25 +178,31 @@ if (!IS_ROUTER5) {
 
   router.start("/");
 
+  // JIT warmup: exercise nested object navigation to stabilize V8 optimization
+  for (let i = 0; i < 300; i++) {
+    router.navigate("nested", { data: dataSets[i % 2] });
+    router.navigate("home");
+  }
+
   bench("1.2.8 Navigation with nested objects in parameters", () => {
     router.navigate("nested", { data: dataSets[index++ % 2] });
   }).gc("inner");
 }
 
 // 1.2.9 Fast sequential navigations
-// This test already alternates routes internally
+// Chain starts from about (not home) to avoid SAME_STATES on first navigate
 {
   const router = createSimpleRouter();
 
   router.start("/");
 
   bench("1.2.9 Fast sequential navigations", () => {
-    router.navigate("home");
     router.navigate("about");
     router.navigate("users");
     router.navigate("user", { id: "1" });
     router.navigate("home");
     router.navigate("about");
+    router.navigate("users");
   }).gc("inner");
 }
 

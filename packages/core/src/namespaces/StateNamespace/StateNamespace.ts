@@ -207,29 +207,20 @@ export class StateNamespace {
         }
       : undefined;
 
-    // Get default params from routes config, including ancestor routes
+    // Optimization: O(1) lookup instead of O(depth) ancestor iteration
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
     const defaultParamsConfig = this.#deps!.getDefaultParams();
+    const hasDefaultParams = Object.hasOwn(defaultParamsConfig, name);
 
-    // Collect defaultParams from all ancestors (parent.child -> parent, parent.child)
-    const segments = name.split(".");
-    let mergedParams: P = {} as P;
+    // Conditional allocation: avoid spreading when no defaultParams exist
+    let mergedParams: P;
 
-    // Build up ancestor names and merge their defaultParams
-    for (let i = 1; i <= segments.length; i++) {
-      const ancestorName = segments.slice(0, i).join(".");
-
-      if (Object.hasOwn(defaultParamsConfig, ancestorName)) {
-        mergedParams = {
-          ...mergedParams,
-          ...defaultParamsConfig[ancestorName],
-        } as P;
-      }
-    }
-
-    // Finally merge with provided params (highest priority)
-    if (params) {
-      mergedParams = { ...mergedParams, ...params };
+    if (hasDefaultParams) {
+      mergedParams = { ...defaultParamsConfig[name], ...params } as P;
+    } else if (params) {
+      mergedParams = { ...params };
+    } else {
+      mergedParams = {} as P;
     }
 
     const state: State<P, MP> = {

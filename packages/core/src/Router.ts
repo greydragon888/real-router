@@ -1077,7 +1077,8 @@ export class Router<
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) => this.buildPath(route, params),
+      buildPath: (route, params, segments) =>
+        this.#routes.buildPath(route, params, this.#options.get(), segments),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {

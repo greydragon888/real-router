@@ -77,16 +77,20 @@ import { createSimpleRouter } from "../helpers";
 // 4.2.6 Guard returning State
 {
   const router = createSimpleRouter();
+  // Alternate: "about" (redirects to "home") and "users"
+  // Start at "users" so redirect to "home" is always a real navigation
+  const routes = ["about", "users"];
+  let index = 0;
 
   router.canActivate("about", () => () => ({
     name: "home",
     params: {},
     path: "/",
   }));
-  router.start();
+  router.start("/users");
 
   bench("4.2.6 Guard returning State", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 

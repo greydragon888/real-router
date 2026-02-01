@@ -382,7 +382,15 @@ chown -R "$ORIGINAL_USER" "$RESULTS_DIR"
 echo -e "${GREEN}Ownership transferred to $ORIGINAL_USER${NC}"
 
 # -----------------------------------------------------------------------------
-# Step 7: Summary
+# Step 7: Run comparison
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${YELLOW}[Step 7] Running comparison...${NC}"
+# Run as original user to avoid permission issues with output file
+sudo -u "$ORIGINAL_USER" node compare.mjs
+
+# -----------------------------------------------------------------------------
+# Step 8: Summary
 # -----------------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}=== Benchmark Complete ===${NC}"
@@ -393,7 +401,4 @@ echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
 echo "  router6: $RESULT_FILE_ROUTER6"
 echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
 echo "  real-router (noValidate): $RESULT_FILE_REAL_ROUTER_NOVALIDATE"
-
-echo ""
-echo -e "${BLUE}To compare results:${NC}"
-echo "  node compare.mjs"
+echo "  comparison: ${RESULTS_DIR}/${TIMESTAMP}_comparison.txt"

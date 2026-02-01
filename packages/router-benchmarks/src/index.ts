@@ -16,6 +16,107 @@ import { run } from "mitata";
 // MUST be first import to suppress console before router warnings
 import "./helpers/suppress-console";
 
+import { createSimpleRouter } from "./helpers";
+
+// ============================================================================
+// JIT Warmup: Pre-warm V8 for stable benchmark measurements
+// ============================================================================
+
+/**
+ * Number of warmup iterations for JIT compilation.
+ * V8 needs 200-300 iterations to fully optimize hot code paths.
+ */
+const JIT_WARMUP_ITERATIONS = 300;
+
+// Warmup helper functions (defined outside to satisfy eslint consistent-function-scoping)
+function warmupMiddlewareHandler(
+  _to: unknown,
+  _from: unknown,
+  done: () => void,
+): void {
+  done();
+}
+const warmupMiddleware = () => warmupMiddlewareHandler;
+
+function warmupGuardHandler(): boolean {
+  return true;
+}
+const warmupGuard = () => warmupGuardHandler;
+
+// Warmup callback for start() variants
+function warmupStartCallback(): void {
+  // Empty callback for start(callback) warmup
+}
+
+/**
+ * Global JIT warmup that exercises all major router code paths.
+ * This ensures V8 has optimized the code before benchmarks run,
+ * preventing cold-start penalties from affecting measurements.
+ */
+function warmupJIT(): void {
+  console.error(`JIT warmup: ${JIT_WARMUP_ITERATIONS} iterations...`);
+
+  for (let i = 0; i < JIT_WARMUP_ITERATIONS; i++) {
+    // Create fresh router instances to warm up object creation paths
+    const router = createSimpleRouter();
+
+    // Warm up plugin/middleware registration
+    router.usePlugin(() => ({
+      onStart: () => {},
+      onStop: () => {},
+      onTransitionSuccess: () => {},
+    }));
+    router.useMiddleware(warmupMiddleware);
+    router.canActivate("home", warmupGuard);
+
+    // Pre-create states for start(state) warmup
+    const warmupState = router.makeState("about", {}, "/about");
+
+    // Warm up ALL start() variants (critical for sections 10-11)
+    // Variant 1: start() without args
+    router.start();
+    router.stop();
+
+    // Variant 2: start(path)
+    router.start("/about");
+    router.stop();
+
+    // Variant 3: start(state)
+    router.start(warmupState);
+    router.stop();
+
+    // Variant 4: start(callback)
+    router.start(warmupStartCallback);
+    router.stop();
+
+    // Variant 5: start(path, callback)
+    router.start("/", warmupStartCallback);
+    router.stop();
+
+    // Now do navigation warmup
+    router.start();
+
+    // Warm up navigation paths
+    router.navigate("about");
+    router.navigate("home");
+
+    // Warm up state operations
+    router.getState();
+
+    // Warm up event system
+    const unsub = router.subscribe(() => {});
+
+    router.addEventListener("$$success", () => {});
+    router.addEventListener("$$error", () => {});
+
+    unsub();
+
+    router.stop();
+  }
+
+  console.error("JIT warmup complete");
+}
+
 // Section imports mapping
 const SECTION_IMPORTS: Record<number, string[]> = {
   1: [
@@ -298,9 +399,13 @@ function processResults(results: MitataResults): void {
   }
 }
 
-// Main: import sections then run benchmarks
+// Main: import sections, warmup JIT, then run benchmarks
 void importSections()
-  .then(() => run())
+  .then(() => {
+    warmupJIT();
+
+    return run();
+  })
   .then((results: unknown) => {
     try {
       processResults(results as MitataResults);

@@ -89,10 +89,12 @@ if (IS_ROUTER5) {
 // 10.4.7 Stopping with state cleanup
 {
   const router = createSimpleRouter();
+  const routes = ["about", "users"];
+  let index = 0;
 
   bench("10.4.7 Stopping with state cleanup", () => {
     router.start();
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
     router.stop();
     do_not_optimize(router.getState()); // Should return undefined
   }).gc("inner");

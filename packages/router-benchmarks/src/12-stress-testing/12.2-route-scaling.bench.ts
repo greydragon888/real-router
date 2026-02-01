@@ -9,6 +9,8 @@ import type { Route } from "../helpers";
 // 12.2.1 Navigation in router with 100 routes
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["route50", "route51"];
+  let index = 0;
 
   for (let i = 0; i < 100; i++) {
     // @ts-expect-error - use method from router5
@@ -18,10 +20,12 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.1 Navigation in router with 100 routes", () => {
-    router.navigate("route50");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["route50", "route51"];
+  let index = 0;
 
   for (let i = 0; i < 100; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
@@ -30,13 +34,15 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.1 Navigation in router with 100 routes", () => {
-    router.navigate("route50");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 12.2.2 Navigation in router with 500 routes
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["route250", "route251"];
+  let index = 0;
 
   for (let i = 0; i < 500; i++) {
     // @ts-expect-error - use method from router5
@@ -46,10 +52,12 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.2 Navigation in router with 500 routes", () => {
-    router.navigate("route250");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["route250", "route251"];
+  let index = 0;
 
   for (let i = 0; i < 500; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
@@ -58,13 +66,15 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.2 Navigation in router with 500 routes", () => {
-    router.navigate("route250");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 12.2.3 Navigation in router with 1000 routes
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["route500", "route501"];
+  let index = 0;
 
   for (let i = 0; i < 1000; i++) {
     // @ts-expect-error - use method from router5
@@ -74,10 +84,12 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.3 Navigation in router with 1000 routes", () => {
-    router.navigate("route500");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["route500", "route501"];
+  let index = 0;
 
   for (let i = 0; i < 1000; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
@@ -86,7 +98,7 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.2.3 Navigation in router with 1000 routes", () => {
-    router.navigate("route500");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -187,10 +199,15 @@ if (IS_ROUTER5) {
   router.add(deepRoute);
   router.start();
 
+  // Alternate between two nested levels to avoid SAME_STATES
+  const routes = [
+    "level1.level2.level3.level4.level5.level6.level7.level8.level9.level10",
+    "level1.level2.level3.level4.level5.level6.level7.level8",
+  ];
+  let index = 0;
+
   bench("12.2.5 Navigation in router with deep 10-level hierarchy", () => {
-    router.navigate(
-      "level1.level2.level3.level4.level5.level6.level7.level8.level9.level10",
-    );
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createNestedRouter();
@@ -255,10 +272,15 @@ if (IS_ROUTER5) {
   router.addRoute(deepRoute);
   router.start();
 
+  // Alternate between two nested levels to avoid SAME_STATES
+  const routes = [
+    "level1.level2.level3.level4.level5.level6.level7.level8.level9.level10",
+    "level1.level2.level3.level4.level5.level6.level7.level8",
+  ];
+  let index = 0;
+
   bench("12.2.5 Navigation in router with deep 10-level hierarchy", () => {
-    router.navigate(
-      "level1.level2.level3.level4.level5.level6.level7.level8.level9.level10",
-    );
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
