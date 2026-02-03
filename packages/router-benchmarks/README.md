@@ -177,7 +177,6 @@ Performance Summary:
 | 07  | Path Operations    | buildPath, matchPath, setRootPath           |
 | 08  | Current State      | State creation, comparison, building        |
 | 09  | Redirects          | Middleware redirects, guards, forwardTo     |
-| 10  | Start/Stop         | Router lifecycle operations                 |
 | 11  | Events             | addEventListener, subscribe, event dispatch |
 | 12  | Stress Testing     | High load, scaling, auto-cleanup            |
 | 13  | Cloning            | SSR scenarios, testing, isolation           |
@@ -200,7 +199,6 @@ packages/router-benchmarks/
 │   ├── 07-path-operations/
 │   ├── 08-current-state/
 │   ├── 09-redirects/
-│   ├── 10-start-stop/
 │   ├── 11-events/
 │   ├── 12-stress-testing/
 │   └── 13-cloning/

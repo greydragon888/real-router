@@ -163,11 +163,6 @@ const SECTION_IMPORTS: Record<number, string[]> = {
     "./09-redirects/9.3-forwardTo.bench",
     "./09-redirects/9.5-edge-cases.bench",
   ],
-  10: [
-    "./10-start-stop/10.1-start-success.bench",
-    "./10-start-stop/10.2-stop-success.bench",
-    "./10-start-stop/10.4-lifecycle-edge-cases.bench",
-  ],
   11: [
     "./11-events/11.1-addEventListener.bench",
     "./11-events/11.2-subscribe.bench",
@@ -260,7 +255,6 @@ const SECTION_NAMES: Record<number, string> = {
   7: "07-path-operations",
   8: "08-current-state",
   9: "09-redirects",
-  10: "10-start-stop",
   11: "11-events",
   12: "12-stress-testing",
   13: "13-cloning",

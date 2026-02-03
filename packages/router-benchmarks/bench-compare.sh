@@ -35,7 +35,6 @@ for arg in "$@"; do
         echo "   7  Path Operations"
         echo "   8  Current State"
         echo "   9  Redirects"
-        echo "  10  Start/Stop"
         echo "  11  Events"
         echo "  12  Stress Testing"
         echo "  13  Cloning"
@@ -330,7 +329,7 @@ if warn_if_throttling; then
 fi
 
 # Define available sections (no section 6)
-AVAILABLE_SECTIONS=(1 2 3 4 5 7 8 9 10 11 12 13)
+AVAILABLE_SECTIONS=(1 2 3 4 5 7 8 9 11 12 13)
 
 # Parse requested sections or use all
 if [[ -n "$BENCH_SECTIONS" ]]; then
