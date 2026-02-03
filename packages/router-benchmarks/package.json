@@ -9,6 +9,7 @@
     "bench:router6": "BENCH_ROUTER=router6 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
     "bench:baseline": "BENCH_ROUTER=router5 NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
     "bench:current": "pnpm prebench && BENCH_ROUTER=real-router NODE_OPTIONS='--expose-gc --max-old-space-size=8192' npx tsx src/index.ts",
+    "check:rme": "scripts/check-rme.sh",
     "cpu": "ps -Ao %cpu,comm -r | awk '$1 > 10 && !/webstorm/ && !/claude/ && !/WindowServer/ {print $2 \" (\" $1 \"%)\"}' | head -10",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ --fix --max-warnings 0"

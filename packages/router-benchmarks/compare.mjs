@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, ".bench-results");
+const BENCH_DIR = join(__dirname, ".bench");
 
 // ANSI colors
 const RESET = "\x1b[0m";
@@ -243,6 +244,63 @@ function formatDiffCompact(diff) {
 }
 
 /**
+ * Load RME data from JSON files in .bench/{router}/ directory
+ * Returns a map of benchmark name -> RME value
+ */
+function loadRmeData(routerName) {
+  const rmeMap = new Map();
+  const routerBenchDir = join(BENCH_DIR, routerName);
+
+  if (!existsSync(routerBenchDir)) {
+    return rmeMap;
+  }
+
+  try {
+    const files = readdirSync(routerBenchDir).filter((f) =>
+      f.endsWith(".json"),
+    );
+
+    for (const file of files) {
+      const filepath = join(routerBenchDir, file);
+      try {
+        const content = readFileSync(filepath, "utf-8");
+        const benchmarks = JSON.parse(content);
+
+        if (Array.isArray(benchmarks)) {
+          for (const benchmark of benchmarks) {
+            if (
+              benchmark.name &&
+              benchmark.stats &&
+              benchmark.stats.rme !== undefined
+            ) {
+              rmeMap.set(benchmark.name, benchmark.stats.rme);
+            }
+          }
+        }
+      } catch (e) {
+        // Skip files that can't be parsed
+      }
+    }
+  } catch (e) {
+    // Directory doesn't exist or can't be read
+  }
+
+  return rmeMap;
+}
+
+/**
+ * Check if RME is high (> 10% = 0.1 as decimal)
+ * and return warning message if so
+ */
+function getRmeWarning(benchmarkName, rmeValue) {
+  if (rmeValue > 0.1) {
+    const rmePercent = (rmeValue * 100).toFixed(1);
+    return `${YELLOW}⚠️ High RME (${rmePercent}%) for "${benchmarkName}" - comparison unreliable${RESET}`;
+  }
+  return null;
+}
+
+/**
  * Category names mapping
  */
 const CATEGORY_NAMES = {
@@ -321,6 +379,10 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
   const baselineResults = parseBenchmarkFile(join(RESULTS_DIR, baselineFile));
   const currentResults = parseBenchmarkFile(join(RESULTS_DIR, currentFile));
 
+  // Load RME data from JSON files
+  const baselineRmeMap = loadRmeData("router5");
+  const currentRmeMap = loadRmeData("real-router");
+
   console.log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
   console.log("─".repeat(120));
   console.log(
@@ -385,6 +447,20 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
     console.log(
       `${nameDisplay.padEnd(70)} ${baselineTime} ${currentTime} ${diffDisplay}`,
     );
+
+    // Check for high RME warnings
+    const baselineRme = baselineRmeMap.get(name);
+    const currentRme = currentRmeMap.get(name);
+
+    if (baselineRme !== undefined) {
+      const warning = getRmeWarning(name, baselineRme);
+      if (warning) console.log(warning);
+    }
+
+    if (currentRme !== undefined) {
+      const warning = getRmeWarning(name, currentRme);
+      if (warning) console.log(warning);
+    }
   }
 
   console.log("─".repeat(120));
@@ -461,6 +537,20 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
     console.log(
       `${nameDisplay.padEnd(70)} ${baselineMem} ${currentMem} ${diffDisplay}`,
     );
+
+    // Check for high RME warnings
+    const baselineRme = baselineRmeMap.get(name);
+    const currentRme = currentRmeMap.get(name);
+
+    if (baselineRme !== undefined) {
+      const warning = getRmeWarning(name, baselineRme);
+      if (warning) console.log(warning);
+    }
+
+    if (currentRme !== undefined) {
+      const warning = getRmeWarning(name, currentRme);
+      if (warning) console.log(warning);
+    }
   }
 
   console.log("─".repeat(120));
@@ -490,7 +580,14 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
 
   const router5Results = parseBenchmarkFile(join(RESULTS_DIR, router5File));
   const router6Results = parseBenchmarkFile(join(RESULTS_DIR, router6File));
-  const realRouterResults = parseBenchmarkFile(join(RESULTS_DIR, realRouterFile));
+  const realRouterResults = parseBenchmarkFile(
+    join(RESULTS_DIR, realRouterFile),
+  );
+
+  // Load RME data from JSON files
+  const router5RmeMap = loadRmeData("router5");
+  const router6RmeMap = loadRmeData("router6");
+  const realRouterRmeMap = loadRmeData("real-router");
 
   // Performance comparison
   console.log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
@@ -510,7 +607,9 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
     const rr = realRouterResults.get(name);
 
     if (!r6 && !rr) {
-      console.log(`${YELLOW}⚠ ${name.padEnd(48)} ${RESET}${GRAY}missing in router6 and real-router${RESET}`);
+      console.log(
+        `${YELLOW}⚠ ${name.padEnd(48)} ${RESET}${GRAY}missing in router6 and real-router${RESET}`,
+      );
       continue;
     }
 
@@ -523,7 +622,8 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
     let r6VsR5Diff = GRAY + "N/A".padStart(10) + RESET;
     if (r6) {
       r6Time = formatTime(r6.avgMicroseconds).padStart(12);
-      const diff = ((r6.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
+      const diff =
+        ((r6.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
       r6VsR5Diff = formatDiffCompact(diff).padStart(10);
       if (diff < 0) r6VsR5Better++;
     }
@@ -533,27 +633,58 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
     let rrVsR6Diff = GRAY + "N/A".padStart(10) + RESET;
     if (rr) {
       rrTime = formatTime(rr.avgMicroseconds).padStart(12);
-      const diffVsR5 = ((rr.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
+      const diffVsR5 =
+        ((rr.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
       rrVsR5Diff = formatDiffCompact(diffVsR5).padStart(10);
       if (diffVsR5 < 0) rrVsR5Better++;
 
       if (r6) {
-        const diffVsR6 = ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) * 100;
+        const diffVsR6 =
+          ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) *
+          100;
         rrVsR6Diff = formatDiffCompact(diffVsR6).padStart(10);
         if (diffVsR6 < 0) rrVsR6Better++;
       }
     }
 
-    console.log(`${nameDisplay.padEnd(50)} ${r5Time} ${r6Time} ${r6VsR5Diff} ${rrTime} ${rrVsR5Diff} ${rrVsR6Diff}`);
+    console.log(
+      `${nameDisplay.padEnd(50)} ${r5Time} ${r6Time} ${r6VsR5Diff} ${rrTime} ${rrVsR5Diff} ${rrVsR6Diff}`,
+    );
+
+    // Check for high RME warnings
+    const r5Rme = router5RmeMap.get(name);
+    const r6Rme = router6RmeMap.get(name);
+    const rrRme = realRouterRmeMap.get(name);
+
+    if (r5Rme !== undefined) {
+      const warning = getRmeWarning(name, r5Rme);
+      if (warning) console.log(warning);
+    }
+
+    if (r6Rme !== undefined) {
+      const warning = getRmeWarning(name, r6Rme);
+      if (warning) console.log(warning);
+    }
+
+    if (rrRme !== undefined) {
+      const warning = getRmeWarning(name, rrRme);
+      if (warning) console.log(warning);
+    }
   }
 
   console.log("─".repeat(150));
 
   console.log(`\n${BOLD}Performance Summary:${RESET}`);
   console.log(`  Total benchmarks: ${count}`);
-  console.log(`  router6 faster than router5: ${r6VsR5Better > count/2 ? GREEN : RED}${r6VsR5Better}${RESET} (${((r6VsR5Better / count) * 100).toFixed(1)}%)`);
-  console.log(`  real-router faster than router5: ${rrVsR5Better > count/2 ? GREEN : RED}${rrVsR5Better}${RESET} (${((rrVsR5Better / count) * 100).toFixed(1)}%)`);
-  console.log(`  real-router faster than router6: ${rrVsR6Better > count/2 ? GREEN : RED}${rrVsR6Better}${RESET} (${((rrVsR6Better / count) * 100).toFixed(1)}%)`);
+  console.log(
+    `  router6 faster than router5: ${r6VsR5Better > count / 2 ? GREEN : RED}${r6VsR5Better}${RESET} (${((r6VsR5Better / count) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `  real-router faster than router5: ${rrVsR5Better > count / 2 ? GREEN : RED}${rrVsR5Better}${RESET} (${((rrVsR5Better / count) * 100).toFixed(1)}%)`,
+  );
+  console.log(
+    `  real-router faster than router6: ${rrVsR6Better > count / 2 ? GREEN : RED}${rrVsR6Better}${RESET} (${((rrVsR6Better / count) * 100).toFixed(1)}%)`,
+  );
 
   // Memory comparison
   console.log(`\n${BOLD}${CYAN}Memory Allocation Comparison${RESET}`);
@@ -606,7 +737,29 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
       }
     }
 
-    console.log(`${nameDisplay.padEnd(50)} ${r5Mem} ${r6Mem} ${r6MemDiff} ${rrMem} ${rrMemVsR5} ${rrMemVsR6}`);
+    console.log(
+      `${nameDisplay.padEnd(50)} ${r5Mem} ${r6Mem} ${r6MemDiff} ${rrMem} ${rrMemVsR5} ${rrMemVsR6}`,
+    );
+
+    // Check for high RME warnings
+    const r5Rme = router5RmeMap.get(name);
+    const r6Rme = router6RmeMap.get(name);
+    const rrRme = realRouterRmeMap.get(name);
+
+    if (r5Rme !== undefined) {
+      const warning = getRmeWarning(name, r5Rme);
+      if (warning) console.log(warning);
+    }
+
+    if (r6Rme !== undefined) {
+      const warning = getRmeWarning(name, r6Rme);
+      if (warning) console.log(warning);
+    }
+
+    if (rrRme !== undefined) {
+      const warning = getRmeWarning(name, rrRme);
+      if (warning) console.log(warning);
+    }
   }
 
   console.log("─".repeat(150));
@@ -614,9 +767,15 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
   if (memCount > 0) {
     console.log(`\n${BOLD}Memory Summary:${RESET}`);
     console.log(`  Total benchmarks: ${memCount}`);
-    console.log(`  router6 uses less than router5: ${r6MemBetter > memCount/2 ? GREEN : RED}${r6MemBetter}${RESET} (${((r6MemBetter / memCount) * 100).toFixed(1)}%)`);
-    console.log(`  real-router uses less than router5: ${rrMemVsR5Better > memCount/2 ? GREEN : RED}${rrMemVsR5Better}${RESET} (${((rrMemVsR5Better / memCount) * 100).toFixed(1)}%)`);
-    console.log(`  real-router uses less than router6: ${rrMemVsR6Better > memCount/2 ? GREEN : RED}${rrMemVsR6Better}${RESET} (${((rrMemVsR6Better / memCount) * 100).toFixed(1)}%)`);
+    console.log(
+      `  router6 uses less than router5: ${r6MemBetter > memCount / 2 ? GREEN : RED}${r6MemBetter}${RESET} (${((r6MemBetter / memCount) * 100).toFixed(1)}%)`,
+    );
+    console.log(
+      `  real-router uses less than router5: ${rrMemVsR5Better > memCount / 2 ? GREEN : RED}${rrMemVsR5Better}${RESET} (${((rrMemVsR5Better / memCount) * 100).toFixed(1)}%)`,
+    );
+    console.log(
+      `  real-router uses less than router6: ${rrMemVsR6Better > memCount / 2 ? GREEN : RED}${rrMemVsR6Better}${RESET} (${((rrMemVsR6Better / memCount) * 100).toFixed(1)}%)`,
+    );
   }
 }
 
@@ -633,7 +792,9 @@ function getLatestBenchmarkSet() {
     if (!file.endsWith(".txt")) continue;
 
     // Match naming: router5, router6, real-router
-    const match = file.match(/^(\d{8}_\d{6})_(router5|router6|real-router)\.txt$/);
+    const match = file.match(
+      /^(\d{8}_\d{6})_(router5|router6|real-router)\.txt$/,
+    );
     if (!match) continue;
 
     const [, timestamp, version] = match;
