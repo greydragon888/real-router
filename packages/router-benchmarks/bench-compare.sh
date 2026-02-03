@@ -46,8 +46,13 @@ for arg in "$@"; do
         echo "  sudo ./bench-compare.sh 1 2 3     # Run sections 1, 2, and 3"
         echo ""
         echo "Environment variables:"
-        echo "  COOLDOWN           Fallback cooldown in seconds (default: 60)"
-        echo "  MAX_COOLDOWN_WAIT  Max thermal cooldown wait in seconds (default: 300)"
+        echo "  SHORT_COOLDOWN     Cooldown between routers within a section (default: 20)"
+        echo "  COOLDOWN           Fallback cooldown when thermal pressure unavailable (default: 60)"
+        echo "  MAX_COOLDOWN_WAIT  Max thermal cooldown wait between sections (default: 300)"
+        echo ""
+        echo "Benchmark methodology:"
+        echo "  Runs each section for ALL routers before moving to next section."
+        echo "  This ensures fair comparisons within each section (similar thermal state)."
         exit 0
     fi
 done
@@ -267,7 +272,9 @@ echo "  Chip: $CHIP"
 echo "  Power: ${POWER_SOURCE:-unknown}${BATTERY_PERCENT:+ (${BATTERY_PERCENT}%)}"
 echo "  Thermal pressure: ${THERMAL_PRESSURE:-unknown}"
 echo "  Cooldown: wait for Nominal (max ${MAX_COOLDOWN_WAIT}s, fallback ${COOLDOWN}s)"
+echo "  Short cooldown: ${SHORT_COOLDOWN:-20}s between routers"
 echo "  Sections: ${BENCH_SECTIONS:-all}"
+echo "  Mode: per-section isolated runs (all routers per section)"
 
 # -----------------------------------------------------------------------------
 # Step 3: Disable system distractions
@@ -306,10 +313,10 @@ pnpm --filter @real-router/core build >/dev/null 2>&1
 echo -e "${GREEN}@real-router/core built successfully${NC}"
 
 # -----------------------------------------------------------------------------
-# Step 5: Run benchmarks
+# Step 5: Run benchmarks (per-section isolated runs)
 # -----------------------------------------------------------------------------
 echo ""
-echo -e "${YELLOW}[Step 5] Running benchmarks...${NC}"
+echo -e "${YELLOW}[Step 5] Running benchmarks (per-section isolated runs)...${NC}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Check for throttling before starting
@@ -322,56 +329,85 @@ if warn_if_throttling; then
     fi
 fi
 
-# Show which sections will run
+# Define available sections (no section 6)
+AVAILABLE_SECTIONS=(1 2 3 4 5 7 8 9 10 11 12 13)
+
+# Parse requested sections or use all
 if [[ -n "$BENCH_SECTIONS" ]]; then
-    echo -e "${CYAN}Running sections: ${BENCH_SECTIONS}${NC}"
+    IFS=',' read -ra RUN_SECTIONS <<< "$BENCH_SECTIONS"
 else
-    echo -e "${CYAN}Running all sections${NC}"
+    RUN_SECTIONS=("${AVAILABLE_SECTIONS[@]}")
 fi
 
-# --- router5 (baseline) ---
-echo ""
-echo -e "${BLUE}--- Testing router5 (baseline) ---${NC}"
+echo -e "${CYAN}Running sections: ${RUN_SECTIONS[*]}${NC}"
+echo -e "${CYAN}Mode: per-section isolated runs (all routers per section)${NC}"
+
+# Short cooldown between routers within a section (seconds)
+SHORT_COOLDOWN=${SHORT_COOLDOWN:-20}
+echo -e "${CYAN}Short cooldown between routers: ${SHORT_COOLDOWN}s${NC}"
+
+# Initialize result files (empty them)
 RESULT_FILE_ROUTER5="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
-sync && sudo purge || true
-BENCH_ROUTER=router5 BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER5"
-
-# --- Cooldown ---
-echo ""
-wait_for_cooldown "$MAX_COOLDOWN_WAIT"
-
-# --- router6 ---
-echo ""
-echo -e "${BLUE}--- Testing router6 ---${NC}"
 RESULT_FILE_ROUTER6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
-sync && sudo purge || true
-BENCH_ROUTER=router6 BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_ROUTER6"
-
-# --- Cooldown ---
-echo ""
-wait_for_cooldown "$MAX_COOLDOWN_WAIT"
-
-# --- real-router (current) ---
-echo ""
-echo -e "${BLUE}--- Testing real-router (current) ---${NC}"
 RESULT_FILE_REAL_ROUTER="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
-sync && sudo purge || true
-BENCH_ROUTER=real-router BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER"
-
-# --- Cooldown ---
-echo ""
-wait_for_cooldown "$MAX_COOLDOWN_WAIT"
-
-# --- real-router (noValidate) ---
-echo ""
-echo -e "${BLUE}--- Testing real-router (noValidate: true) ---${NC}"
 RESULT_FILE_REAL_ROUTER_NOVALIDATE="${RESULTS_DIR}/${TIMESTAMP}_real-router-novalidate.txt"
-sync && sudo purge || true
-BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$BENCH_SECTIONS" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-    nice -n -20 npx tsx src/index.ts 2>&1 | tee "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+
+: > "$RESULT_FILE_ROUTER5"
+: > "$RESULT_FILE_ROUTER6"
+: > "$RESULT_FILE_REAL_ROUTER"
+: > "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+
+# Run each section for all routers before moving to the next section
+# This ensures fair comparison within each section (similar thermal conditions)
+for section in "${RUN_SECTIONS[@]}"; do
+    echo ""
+    echo -e "${CYAN}╔════════════════════════════════════════╗${NC}"
+    echo -e "${CYAN}║  Section $section                             ║${NC}"
+    echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
+
+    # --- router5 ---
+    echo -e "${BLUE}  [1/4] router5 (section $section)...${NC}"
+    sync && sudo purge || true
+    BENCH_ROUTER=router5 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER5"
+    echo -e "${GREEN}  ✓ router5 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+    sleep "$SHORT_COOLDOWN"
+
+    # --- router6 ---
+    echo -e "${BLUE}  [2/4] router6 (section $section)...${NC}"
+    sync && sudo purge || true
+    BENCH_ROUTER=router6 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER6"
+    echo -e "${GREEN}  ✓ router6 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+    sleep "$SHORT_COOLDOWN"
+
+    # --- real-router ---
+    echo -e "${BLUE}  [3/4] real-router (section $section)...${NC}"
+    sync && sudo purge || true
+    BENCH_ROUTER=real-router BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER"
+    echo -e "${GREEN}  ✓ real-router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+    sleep "$SHORT_COOLDOWN"
+
+    # --- real-router (noValidate) ---
+    echo -e "${BLUE}  [4/4] real-router noValidate (section $section)...${NC}"
+    sync && sudo purge || true
+    BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+    echo -e "${GREEN}  ✓ real-router (noValidate) done${NC}"
+
+    # Thermal cooldown between sections (not after the last one)
+    # Note: ${RUN_SECTIONS[-1]} syntax requires bash 4.0+, but macOS ships with bash 3.2
+    LAST_SECTION="${RUN_SECTIONS[${#RUN_SECTIONS[@]}-1]}"
+    if [[ "$section" != "$LAST_SECTION" ]]; then
+        echo ""
+        echo -e "${YELLOW}Section $section complete. Waiting for thermal cooldown...${NC}"
+        wait_for_cooldown "$MAX_COOLDOWN_WAIT"
+    fi
+done
+
+echo ""
+echo -e "${GREEN}All sections complete!${NC}"
 
 # -----------------------------------------------------------------------------
 # Step 6: Fix file ownership (since script runs as root)

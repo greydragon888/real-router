@@ -6,6 +6,12 @@ import { createRouter } from "../helpers";
 
 import type { Route } from "../helpers";
 
+/**
+ * Batch size for stable measurements.
+ * matchPath is slower than buildPath, so smaller batch is sufficient.
+ */
+const BATCH = 50;
+
 const routes: Route[] = [
   { name: "home", path: "/" },
   { name: "about", path: "/about" },
@@ -28,8 +34,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.2.1 Matching simple path", () => {
-    do_not_optimize(router.matchPath("/about"));
+  bench(`7.2.1 Matching simple path (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/about"));
+    }
   }).gc("inner");
 }
 
@@ -37,8 +45,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.2.2 Matching path with parameters", () => {
-    do_not_optimize(router.matchPath("/users/123"));
+  bench(`7.2.2 Matching path with parameters (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/users/123"));
+    }
   }).gc("inner");
 }
 
@@ -46,8 +56,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.2.3 Matching path with query parameters", () => {
-    do_not_optimize(router.matchPath("/about?search=test&page=1"));
+  bench(`7.2.3 Matching path with query parameters (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/about?search=test&page=1"));
+    }
   }).gc("inner");
 }
 
@@ -55,8 +67,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.2.4 Matching nested path", () => {
-    do_not_optimize(router.matchPath("/users/123/profile"));
+  bench(`7.2.4 Matching nested path (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/users/123/profile"));
+    }
   }).gc("inner");
 }
 
@@ -66,8 +80,10 @@ const routes: Route[] = [
     urlParamsEncoding: "uriComponent",
   });
 
-  bench("7.2.5 Matching with parameter decoding", () => {
-    do_not_optimize(router.matchPath("/users/test%40example.com"));
+  bench(`7.2.5 Matching with parameter decoding (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/users/test%40example.com"));
+    }
   }).gc("inner");
 }
 
@@ -81,8 +97,10 @@ const routes: Route[] = [
     },
   ]);
 
-  bench("7.2.6 Matching with custom decoder", () => {
-    do_not_optimize(router.matchPath("/custom/123"));
+  bench(`7.2.6 Matching with custom decoder (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/custom/123"));
+    }
   }).gc("inner");
 }
 
@@ -92,8 +110,10 @@ const routes: Route[] = [
     allowNotFound: true,
   });
 
-  bench("7.2.7 Matching with allowNotFound mode", () => {
-    do_not_optimize(router.matchPath("/nonexistent"));
+  bench(`7.2.7 Matching with allowNotFound mode (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/nonexistent"));
+    }
   }).gc("inner");
 }
 
@@ -101,8 +121,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.2.8 Matching with source parameter", () => {
-    do_not_optimize(router.matchPath("/users", "users"));
+  bench(`7.2.8 Matching with source parameter (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/users", "users"));
+    }
   }).gc("inner");
 }
 
@@ -112,7 +134,9 @@ const routes: Route[] = [
     trailingSlash: "always",
   });
 
-  bench("7.2.9 Matching with trailing slash", () => {
-    do_not_optimize(router.matchPath("/about/"));
+  bench(`7.2.9 Matching with trailing slash (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/about/"));
+    }
   }).gc("inner");
 }

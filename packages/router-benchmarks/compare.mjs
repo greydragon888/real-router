@@ -1,11 +1,23 @@
 #!/usr/bin/env node
 
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RESULTS_DIR = join(__dirname, ".bench-results");
+const BENCH_JSON_DIR = join(__dirname, ".bench");
+
+// Anomaly thresholds
+const ANOMALY_THRESHOLDS = {
+  // rr slower than r6 by this % is anomalous (they should be similar)
+  rrVsR6Slowdown: 20,
+  // noValidate slower than rr by this % is anomalous (should be faster or equal)
+  nvVsRrSlowdown: 5,
+  // RME threshold for unstable measurements
+  rmeUnstable: 0.3,
+  rmeSuspicious: 0.5,
+};
 
 // Output capture for saving to file
 const outputLines = [];
@@ -19,6 +31,11 @@ const BLUE = "\x1b[34m";
 const CYAN = "\x1b[36m";
 const GRAY = "\x1b[90m";
 const BOLD = "\x1b[1m";
+const MAGENTA = "\x1b[35m";
+
+// Markers for anomalies and unstable measurements
+const MARKER_ANOMALY = `${RED}⚠${RESET}`;  // Red warning for anomaly
+const MARKER_UNSTABLE = `${YELLOW}~${RESET}`; // Yellow tilde for unstable RME
 
 /**
  * Remove ANSI escape codes from string
@@ -42,6 +59,91 @@ function saveResults(timestamp) {
   const outputFile = join(RESULTS_DIR, `${timestamp}_comparison.txt`);
   writeFileSync(outputFile, outputLines.join("\n"));
   console.log(`\n${GREEN}Results saved to: ${outputFile}${RESET}`);
+}
+
+/**
+ * Map section number to JSON filename
+ */
+const SECTION_TO_FILE = {
+  1: "01-navigation-basic.json",
+  2: "02-navigation-plugins.json",
+  3: "03-dependencies.json",
+  4: "04-plugins-management.json",
+  5: "05-router-options.json",
+  7: "07-path-operations.json",
+  8: "08-current-state.json",
+  9: "09-redirects.json",
+  10: "10-start-stop.json",
+  11: "11-events.json",
+  12: "12-stress-testing.json",
+  13: "13-cloning.json",
+};
+
+/**
+ * Load RME data from .bench/ JSON files
+ * @returns Map<routerName, Map<benchmarkName, rme>>
+ */
+function loadRmeData() {
+  const rmeData = new Map();
+  const routers = ["router5", "router6", "real-router", "real-router-novalidate"];
+
+  for (const router of routers) {
+    const routerDir = router === "real-router-novalidate"
+      ? join(BENCH_JSON_DIR, "real-router") // novalidate uses same dir as real-router
+      : join(BENCH_JSON_DIR, router);
+
+    if (!existsSync(routerDir)) continue;
+
+    const routerRme = new Map();
+
+    for (const [section, filename] of Object.entries(SECTION_TO_FILE)) {
+      const filepath = join(routerDir, filename);
+      if (!existsSync(filepath)) continue;
+
+      try {
+        const content = readFileSync(filepath, "utf-8");
+        const benchmarks = JSON.parse(content);
+
+        for (const bench of benchmarks) {
+          if (bench.name && bench.stats?.rme !== undefined) {
+            routerRme.set(bench.name, bench.stats.rme);
+          }
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+
+    rmeData.set(router, routerRme);
+  }
+
+  return rmeData;
+}
+
+/**
+ * Check if a measurement is anomalous or unstable
+ * @returns { anomaly: string | null, unstable: boolean, rme: number | null }
+ */
+function checkMeasurement(name, routerName, rmeData, diff, type = "rrVsR6") {
+  const result = { anomaly: null, unstable: false, rme: null };
+
+  // Get RME for this measurement
+  const routerRme = rmeData.get(routerName);
+  if (routerRme) {
+    result.rme = routerRme.get(name) ?? null;
+    if (result.rme !== null) {
+      result.unstable = result.rme > ANOMALY_THRESHOLDS.rmeUnstable;
+    }
+  }
+
+  // Check for anomalies based on type
+  if (type === "rrVsR6" && diff > ANOMALY_THRESHOLDS.rrVsR6Slowdown) {
+    result.anomaly = `rr +${diff.toFixed(0)}% vs r6`;
+  } else if (type === "nvVsRr" && diff > ANOMALY_THRESHOLDS.nvVsRrSlowdown) {
+    result.anomaly = `nv +${diff.toFixed(0)}% vs rr`;
+  }
+
+  return result;
 }
 
 /**
@@ -653,19 +755,26 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
   log(`${GRAY}r6     = router6: ${router6File}${RESET}`);
   log(`${GRAY}rr     = real-router: ${realRouterFile}${RESET}`);
   log(`${GRAY}rr(nv) = real-router (noValidate: true): ${realRouterNoValidateFile}${RESET}\n`);
+  log(`${GRAY}Legend: ${MARKER_ANOMALY} anomaly (unexpected slowdown)  ${MARKER_UNSTABLE} unstable (RME>${ANOMALY_THRESHOLDS.rmeUnstable})${RESET}\n`);
 
   const router5Results = parseBenchmarkFile(join(RESULTS_DIR, router5File));
   const router6Results = parseBenchmarkFile(join(RESULTS_DIR, router6File));
   const realRouterResults = parseBenchmarkFile(join(RESULTS_DIR, realRouterFile));
   const noValidateResults = parseBenchmarkFile(join(RESULTS_DIR, realRouterNoValidateFile));
 
+  // Load RME data for stability analysis
+  const rmeData = loadRmeData();
+
+  // Collect anomalies for summary
+  const anomalies = [];
+
   // Performance comparison
   log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
-  log("─".repeat(155));
+  log("─".repeat(160));
   log(
-    `${"Benchmark".padEnd(40)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
+    `${"".padEnd(3)}${"Benchmark".padEnd(37)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
   );
-  log("─".repeat(155));
+  log("─".repeat(160));
 
   let count = 0;
   let rrVsR5Better = 0;
@@ -678,13 +787,13 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
     const nv = noValidateResults.get(name);
 
     if (!r6 && !rr && !nv) {
-      log(`${YELLOW}⚠ ${name.padEnd(40)} ${RESET}${GRAY}missing in all variants${RESET}`);
+      log(`   ${YELLOW}⚠ ${name.padEnd(37)} ${RESET}${GRAY}missing in all variants${RESET}`);
       continue;
     }
 
     count++;
 
-    const nameDisplay = name.length > 40 ? name.substring(0, 37) + "..." : name;
+    const nameDisplay = name.length > 37 ? name.substring(0, 34) + "..." : name;
     const r5Time = formatTime(r5.avgMicroseconds).padStart(10);
 
     let r6Time = GRAY + "N/A".padStart(10) + RESET;
@@ -692,9 +801,17 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
       r6Time = formatTime(r6.avgMicroseconds).padStart(10);
     }
 
+    // Get RME data first for stability markers
+    const rrRme = rmeData.get("real-router")?.get(name);
+    const r6Rme = rmeData.get("router6")?.get(name);
+    const rrVsR6Unstable = (rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable) ||
+                           (r6Rme && r6Rme > ANOMALY_THRESHOLDS.rmeUnstable);
+    const nvVsRrUnstable = rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable;
+
     let rrTime = GRAY + "N/A".padStart(10) + RESET;
     let rrVsR5Diff = GRAY + "N/A".padStart(10) + RESET;
     let rrVsR6Diff = GRAY + "N/A".padStart(10) + RESET;
+    let diffVsR6Raw = null;
     if (rr) {
       rrTime = formatTime(rr.avgMicroseconds).padStart(10);
       const diffVsR5 = ((rr.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
@@ -702,27 +819,65 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
       if (diffVsR5 < 0) rrVsR5Better++;
 
       if (r6) {
-        const diffVsR6 = ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) * 100;
-        rrVsR6Diff = formatDiffCompact(diffVsR6, 10);
-        if (diffVsR6 < 0) rrVsR6Better++;
+        diffVsR6Raw = ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) * 100;
+        rrVsR6Diff = formatDiffCompact(diffVsR6Raw, 10);
+        if (diffVsR6Raw < 0) rrVsR6Better++;
+        // Add unstable marker to diff
+        if (rrVsR6Unstable) {
+          rrVsR6Diff = rrVsR6Diff.replace(RESET, YELLOW + "~" + RESET);
+        }
       }
     }
 
     let nvTime = GRAY + "N/A".padStart(10) + RESET;
     let nvVsRrDiff = GRAY + "N/A".padStart(10) + RESET;
+    let diffVsRrRaw = null;
     if (nv) {
       nvTime = formatTime(nv.avgMicroseconds).padStart(10);
       if (rr) {
-        const diffVsRr = ((nv.avgMicroseconds - rr.avgMicroseconds) / rr.avgMicroseconds) * 100;
-        nvVsRrDiff = formatDiffCompact(diffVsRr, 10);
-        if (diffVsRr < 0) nvVsRrBetter++;
+        diffVsRrRaw = ((nv.avgMicroseconds - rr.avgMicroseconds) / rr.avgMicroseconds) * 100;
+        nvVsRrDiff = formatDiffCompact(diffVsRrRaw, 10);
+        if (diffVsRrRaw < 0) nvVsRrBetter++;
+        // Add unstable marker to diff
+        if (nvVsRrUnstable) {
+          nvVsRrDiff = nvVsRrDiff.replace(RESET, YELLOW + "~" + RESET);
+        }
       }
     }
 
-    log(`${nameDisplay.padEnd(40)} │ ${r5Time} ${r6Time} ${rrTime} ${nvTime} │ ${rrVsR5Diff} ${rrVsR6Diff} ${nvVsRrDiff}`);
+    // Check for anomalies
+    let markers = "   ";
+    const rowAnomalies = [];
+
+    // Check rr vs r6 anomaly
+    if (diffVsR6Raw !== null && diffVsR6Raw > ANOMALY_THRESHOLDS.rrVsR6Slowdown) {
+      rowAnomalies.push({ type: "rrVsR6", diff: diffVsR6Raw, name });
+    }
+
+    // Check nv vs rr anomaly (noValidate should be faster or equal)
+    if (diffVsRrRaw !== null && diffVsRrRaw > ANOMALY_THRESHOLDS.nvVsRrSlowdown) {
+      rowAnomalies.push({ type: "nvVsRr", diff: diffVsRrRaw, name });
+    }
+
+    // Set row marker (anomaly takes precedence)
+    if (rowAnomalies.length > 0) {
+      markers = MARKER_ANOMALY + "  ";
+      for (const a of rowAnomalies) {
+        anomalies.push({
+          ...a,
+          rrRme,
+          r6Rme,
+          unstable: rrVsR6Unstable,
+        });
+      }
+    } else if (rrVsR6Unstable) {
+      markers = MARKER_UNSTABLE + "  ";
+    }
+
+    log(`${markers}${nameDisplay.padEnd(37)} │ ${r5Time} ${r6Time} ${rrTime} ${nvTime} │ ${rrVsR5Diff} ${rrVsR6Diff} ${nvVsRrDiff}`);
   }
 
-  log("─".repeat(155));
+  log("─".repeat(160));
 
   log(`\n${BOLD}Performance Summary:${RESET}`);
   log(`  Total benchmarks: ${count}`);
@@ -731,12 +886,14 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
   log(`  rr(nv) faster than rr: ${nvVsRrBetter > count/2 ? GREEN : RED}${nvVsRrBetter}${RESET} (${((nvVsRrBetter / count) * 100).toFixed(1)}%)`);
 
   // Memory comparison
+  const memAnomalies = [];
+
   log(`\n${BOLD}${CYAN}Memory Allocation Comparison${RESET}`);
-  log("─".repeat(155));
+  log("─".repeat(160));
   log(
-    `${"Benchmark".padEnd(40)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
+    `${"".padEnd(3)}${"Benchmark".padEnd(37)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
   );
-  log("─".repeat(155));
+  log("─".repeat(160));
 
   let memCount = 0;
   let rrMemVsR5Better = 0;
@@ -754,7 +911,7 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
 
     memCount++;
 
-    const nameDisplay = name.length > 40 ? name.substring(0, 37) + "..." : name;
+    const nameDisplay = name.length > 37 ? name.substring(0, 34) + "..." : name;
     const r5Mem = formatMemory(r5.memoryKb).padStart(10);
 
     let r6Mem = GRAY + "N/A".padStart(10) + RESET;
@@ -765,6 +922,7 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
     let rrMem = GRAY + "N/A".padStart(10) + RESET;
     let rrMemVsR5 = GRAY + "N/A".padStart(10) + RESET;
     let rrMemVsR6 = GRAY + "N/A".padStart(10) + RESET;
+    let memDiffVsR6Raw = null;
     if (rr && rr.memoryKb) {
       rrMem = formatMemory(rr.memoryKb).padStart(10);
       const diffVsR5 = ((rr.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
@@ -772,27 +930,62 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
       if (diffVsR5 < 0) rrMemVsR5Better++;
 
       if (r6 && r6.memoryKb) {
-        const diffVsR6 = ((rr.memoryKb - r6.memoryKb) / r6.memoryKb) * 100;
-        rrMemVsR6 = formatDiffCompact(diffVsR6, 10);
-        if (diffVsR6 < 0) rrMemVsR6Better++;
+        memDiffVsR6Raw = ((rr.memoryKb - r6.memoryKb) / r6.memoryKb) * 100;
+        rrMemVsR6 = formatDiffCompact(memDiffVsR6Raw, 10);
+        if (memDiffVsR6Raw < 0) rrMemVsR6Better++;
       }
     }
 
     let nvMem = GRAY + "N/A".padStart(10) + RESET;
     let nvMemVsRr = GRAY + "N/A".padStart(10) + RESET;
+    let memDiffVsRrRaw = null;
     if (nv && nv.memoryKb) {
       nvMem = formatMemory(nv.memoryKb).padStart(10);
       if (rr && rr.memoryKb) {
-        const diffVsRr = ((nv.memoryKb - rr.memoryKb) / rr.memoryKb) * 100;
-        nvMemVsRr = formatDiffCompact(diffVsRr, 10);
-        if (diffVsRr < 0) nvMemVsRrBetter++;
+        memDiffVsRrRaw = ((nv.memoryKb - rr.memoryKb) / rr.memoryKb) * 100;
+        nvMemVsRr = formatDiffCompact(memDiffVsRrRaw, 10);
+        if (memDiffVsRrRaw < 0) nvMemVsRrBetter++;
       }
     }
 
-    log(`${nameDisplay.padEnd(40)} │ ${r5Mem} ${r6Mem} ${rrMem} ${nvMem} │ ${rrMemVsR5} ${rrMemVsR6} ${nvMemVsRr}`);
+    // Check for memory anomalies
+    let markers = "   ";
+    const rowMemAnomalies = [];
+
+    // Check rr vs r6 memory anomaly (rr using much more memory)
+    if (memDiffVsR6Raw !== null && memDiffVsR6Raw > ANOMALY_THRESHOLDS.rrVsR6Slowdown) {
+      rowMemAnomalies.push({ type: "memRrVsR6", diff: memDiffVsR6Raw, name });
+    }
+
+    // Check nv vs rr memory anomaly
+    if (memDiffVsRrRaw !== null && memDiffVsRrRaw > ANOMALY_THRESHOLDS.nvVsRrSlowdown) {
+      rowMemAnomalies.push({ type: "memNvVsRr", diff: memDiffVsRrRaw, name });
+    }
+
+    // Check RME stability
+    const rrRme = rmeData.get("real-router")?.get(name);
+    const r6Rme = rmeData.get("router6")?.get(name);
+    const isUnstable = (rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable) ||
+                       (r6Rme && r6Rme > ANOMALY_THRESHOLDS.rmeUnstable);
+
+    if (rowMemAnomalies.length > 0) {
+      markers = MARKER_ANOMALY + "  ";
+      for (const a of rowMemAnomalies) {
+        memAnomalies.push({
+          ...a,
+          rrRme,
+          r6Rme,
+          unstable: isUnstable,
+        });
+      }
+    } else if (isUnstable) {
+      markers = MARKER_UNSTABLE + "  ";
+    }
+
+    log(`${markers}${nameDisplay.padEnd(37)} │ ${r5Mem} ${r6Mem} ${rrMem} ${nvMem} │ ${rrMemVsR5} ${rrMemVsR6} ${nvMemVsRr}`);
   }
 
-  log("─".repeat(155));
+  log("─".repeat(160));
 
   if (memCount > 0) {
     log(`\n${BOLD}Memory Summary:${RESET}`);
@@ -800,6 +993,47 @@ function compareFourBenchmarks(router5File, router6File, realRouterFile, realRou
     log(`  rr uses less than r5: ${rrMemVsR5Better > memCount/2 ? GREEN : RED}${rrMemVsR5Better}${RESET} (${((rrMemVsR5Better / memCount) * 100).toFixed(1)}%)`);
     log(`  rr uses less than r6: ${rrMemVsR6Better > memCount/2 ? GREEN : RED}${rrMemVsR6Better}${RESET} (${((rrMemVsR6Better / memCount) * 100).toFixed(1)}%)`);
     log(`  rr(nv) uses less than rr: ${nvMemVsRrBetter > memCount/2 ? GREEN : RED}${nvMemVsRrBetter}${RESET} (${((nvMemVsRrBetter / memCount) * 100).toFixed(1)}%)`);
+  }
+
+  // Print anomaly summary
+  const allAnomalies = [...anomalies, ...memAnomalies];
+  if (allAnomalies.length > 0) {
+    log(`\n${BOLD}${RED}=== Anomalies Detected (${allAnomalies.length}) ===${RESET}`);
+    log(`${GRAY}Anomaly = unexpected slowdown. Check RME for stability.${RESET}`);
+    log("─".repeat(100));
+
+    // Group by type
+    const rrVsR6Anomalies = allAnomalies.filter(a => a.type === "rrVsR6" || a.type === "memRrVsR6");
+    const nvVsRrAnomalies = allAnomalies.filter(a => a.type === "nvVsRr" || a.type === "memNvVsRr");
+
+    if (rrVsR6Anomalies.length > 0) {
+      log(`\n${YELLOW}rr slower than r6 (threshold: >${ANOMALY_THRESHOLDS.rrVsR6Slowdown}%):${RESET}`);
+      for (const a of rrVsR6Anomalies) {
+        const typeLabel = a.type.startsWith("mem") ? "(memory)" : "(time)";
+        const rmeInfo = a.rrRme !== undefined || a.r6Rme !== undefined
+          ? ` ${GRAY}[RME: rr=${a.rrRme?.toFixed(2) ?? "?"}, r6=${a.r6Rme?.toFixed(2) ?? "?"}]${RESET}`
+          : "";
+        const unstableTag = a.unstable ? ` ${YELLOW}~unstable${RESET}` : "";
+        log(`  ${MARKER_ANOMALY} ${a.name.substring(0, 60).padEnd(60)} ${RED}+${a.diff.toFixed(1)}%${RESET} ${typeLabel}${rmeInfo}${unstableTag}`);
+      }
+    }
+
+    if (nvVsRrAnomalies.length > 0) {
+      log(`\n${YELLOW}noValidate slower than rr (threshold: >${ANOMALY_THRESHOLDS.nvVsRrSlowdown}%):${RESET}`);
+      for (const a of nvVsRrAnomalies) {
+        const typeLabel = a.type.startsWith("mem") ? "(memory)" : "(time)";
+        const rmeInfo = a.rrRme !== undefined || a.r6Rme !== undefined
+          ? ` ${GRAY}[RME: rr=${a.rrRme?.toFixed(2) ?? "?"}, r6=${a.r6Rme?.toFixed(2) ?? "?"}]${RESET}`
+          : "";
+        const unstableTag = a.unstable ? ` ${YELLOW}~unstable${RESET}` : "";
+        log(`  ${MARKER_ANOMALY} ${a.name.substring(0, 60).padEnd(60)} ${RED}+${a.diff.toFixed(1)}%${RESET} ${typeLabel}${rmeInfo}${unstableTag}`);
+      }
+    }
+
+    log("─".repeat(100));
+    log(`${GRAY}Note: Anomalies with high RME (>0.5) are likely measurement artifacts, not real regressions.${RESET}`);
+  } else {
+    log(`\n${GREEN}✓ No anomalies detected.${RESET}`);
   }
 }
 

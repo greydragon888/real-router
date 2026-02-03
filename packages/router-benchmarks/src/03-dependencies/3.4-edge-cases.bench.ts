@@ -4,14 +4,24 @@ import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 100;
+
 // 3.4.1 Checking existence of non-existent dependency
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  bench("3.4.1 Checking existence of non-existent dependency", () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(router.hasDependency("nonExistent"));
-  }).gc("inner");
+  bench(
+    `3.4.1 Checking existence of non-existent dependency (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        // @ts-expect-error - test dependency
+        do_not_optimize(router.hasDependency("nonExistent"));
+      }
+    },
+  ).gc("inner");
 }
 
 // 3.4.2 Adding dependency with undefined value
@@ -23,9 +33,11 @@ if (!IS_ROUTER5) {
     service3: { id: 3 },
   };
 
-  bench("3.4.2 Adding dependency with undefined value", () => {
-    router.setDependencies(depsWithUndefined);
-    router.resetDependencies();
+  bench(`3.4.2 Adding dependency with undefined value (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies(depsWithUndefined);
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -38,10 +50,15 @@ if (!IS_ROUTER5) {
     deps[`service${i}`] = { id: i };
   }
 
-  bench("3.4.3 Working with dependencies at warning threshold", () => {
-    router.setDependencies(deps);
-    router.resetDependencies();
-  }).gc("inner");
+  bench(
+    `3.4.3 Working with dependencies at warning threshold (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        router.setDependencies(deps);
+        router.resetDependencies();
+      }
+    },
+  ).gc("inner");
 }
 
 // 3.4.4 Working with dependencies at error threshold
@@ -53,10 +70,15 @@ if (!IS_ROUTER5) {
     deps[`service${i}`] = { id: i };
   }
 
-  bench("3.4.4 Working with dependencies at error threshold", () => {
-    router.setDependencies(deps);
-    router.resetDependencies();
-  }).gc("inner");
+  bench(
+    `3.4.4 Working with dependencies at error threshold (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        router.setDependencies(deps);
+        router.resetDependencies();
+      }
+    },
+  ).gc("inner");
 }
 
 // 3.4.6 Getting cloned dependency container
@@ -81,12 +103,14 @@ if (!IS_ROUTER5) {
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  bench("3.4.7 Fast dependency rotation", () => {
-    for (let i = 0; i < 10; i++) {
-      // @ts-expect-error - test dependency
-      router.setDependency("temp", { id: i });
-      // @ts-expect-error - test dependency
-      router.removeDependency("temp");
+  bench(`3.4.7 Fast dependency rotation (×${BATCH})`, () => {
+    for (let b = 0; b < BATCH; b++) {
+      for (let i = 0; i < 10; i++) {
+        // @ts-expect-error - test dependency
+        router.setDependency("temp", { id: i });
+        // @ts-expect-error - test dependency
+        router.removeDependency("temp");
+      }
     }
   }).gc("inner");
 }
@@ -130,9 +154,11 @@ if (!IS_ROUTER5) {
   // @ts-expect-error - test dependency
   router.setDependency("large", largeObject);
 
-  bench("3.4.9 Dependency with very large object", () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(router.getDependency("large"));
+  bench(`3.4.9 Dependency with very large object (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      do_not_optimize(router.getDependency("large"));
+    }
   }).gc("inner");
 }
 
@@ -149,9 +175,11 @@ if (!IS_ROUTER5) {
     serviceC,
   });
 
-  bench("3.4.10 Dependency chain", () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(router.getDependency("serviceC"));
+  bench(`3.4.10 Dependency chain (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      do_not_optimize(router.getDependency("serviceC"));
+    }
   }).gc("inner");
 }
 
@@ -159,9 +187,11 @@ if (!IS_ROUTER5) {
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  bench("3.4.11 Removing non-existent dependency", () => {
-    // @ts-expect-error - test dependency
-    router.removeDependency("nonExistent");
+  bench(`3.4.11 Removing non-existent dependency (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      router.removeDependency("nonExistent");
+    }
   }).gc("inner");
 }
 
@@ -169,14 +199,16 @@ if (!IS_ROUTER5) {
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  bench("3.4.12 Multiple removal of single dependency", () => {
-    // @ts-expect-error - test dependency
-    router.setDependency("service", { value: 1 });
-    // @ts-expect-error - test dependency
-    router.removeDependency("service");
-    // @ts-expect-error - test dependency
-    router.removeDependency("service");
-    // @ts-expect-error - test dependency
-    router.removeDependency("service");
+  bench(`3.4.12 Multiple removal of single dependency (×${BATCH})`, () => {
+    for (let b = 0; b < BATCH; b++) {
+      // @ts-expect-error - test dependency
+      router.setDependency("service", { value: 1 });
+      // @ts-expect-error - test dependency
+      router.removeDependency("service");
+      // @ts-expect-error - test dependency
+      router.removeDependency("service");
+      // @ts-expect-error - test dependency
+      router.removeDependency("service");
+    }
   }).gc("inner");
 }

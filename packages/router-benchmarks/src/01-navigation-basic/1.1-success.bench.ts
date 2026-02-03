@@ -10,64 +10,6 @@ import {
 
 import type { Route } from "../helpers";
 
-// JIT Warmup: Pre-warm all navigation code paths to avoid cold-start bias
-// Without this, the first benchmarks would be significantly slower due to JIT compilation
-{
-  const warmupRoutes: Route[] = [
-    { name: "home", path: "/" },
-    { name: "about", path: "/about" },
-    { name: "user", path: "/user/:id" },
-    { name: "search", path: "/search?q&page" },
-    {
-      name: "complex",
-      path: "/complex/:id/:slug?page&sort",
-      decodeParams: (params) => params,
-      encodeParams: (params) => params,
-    },
-  ];
-
-  const warmupRouter = createRouter(warmupRoutes, {
-    defaultRoute: "home",
-    queryParamsMode: "loose",
-    urlParamsEncoding: "uriComponent",
-  });
-
-  const warmupNested = createNestedRouter(5);
-
-  warmupRouter.start();
-  warmupNested.start("/");
-
-  for (let i = 0; i < 100; i++) {
-    // Warmup: simple navigation
-    warmupRouter.navigate("about");
-    warmupRouter.navigate("home");
-
-    // Warmup: navigation with params
-    warmupRouter.navigate("user", { id: "123" });
-
-    // Warmup: navigation with query params
-    warmupRouter.navigate("search", { q: "test", page: "1" });
-
-    // Warmup: navigation with multiple params
-    warmupRouter.navigate("complex", {
-      id: "1",
-      slug: "test",
-      page: "1",
-      sort: "asc",
-    });
-
-    // Warmup: navigateToDefault
-    warmupRouter.navigateToDefault();
-
-    // Warmup: nested routes (full path required for nested routes)
-    warmupNested.navigate("root.level1.level2.level3.level4.level5");
-    warmupNested.navigate("root");
-  }
-
-  warmupRouter.stop();
-  warmupNested.stop();
-}
-
 // 1.1.1 Simple navigation between routes
 {
   const router = createSimpleRouter();

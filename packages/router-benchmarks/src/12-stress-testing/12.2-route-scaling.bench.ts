@@ -6,6 +6,11 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 50;
+
 // 12.2.1 Navigation in router with 100 routes
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
@@ -293,8 +298,10 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
-  bench("12.2.6 BuildPath in router with 500 routes", () => {
-    do_not_optimize(router.buildPath("route250"));
+  bench(`12.2.6 BuildPath in router with 500 routes (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("route250"));
+    }
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
@@ -303,8 +310,10 @@ if (IS_ROUTER5) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
   }
 
-  bench("12.2.6 BuildPath in router with 500 routes", () => {
-    do_not_optimize(router.buildPath("route250"));
+  bench(`12.2.6 BuildPath in router with 500 routes (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("route250"));
+    }
   }).gc("inner");
 }
 

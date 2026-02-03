@@ -105,11 +105,21 @@ if (IS_ROUTER5) {
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.6.4 Cloning basic router", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
+  }
 
   bench("13.6.4 Cloning basic router", () => {
     do_not_optimize(router.clone());
