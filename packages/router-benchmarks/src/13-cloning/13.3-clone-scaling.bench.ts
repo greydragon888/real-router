@@ -20,6 +20,11 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.3.1 Cloning router with 10 routes", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
@@ -28,6 +33,11 @@ if (IS_ROUTER5) {
 
   for (let i = 0; i < 10; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
   }
 
   bench("13.3.1 Cloning router with 10 routes", () => {
@@ -44,6 +54,11 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.3.2 Cloning router with 100 routes", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
@@ -52,6 +67,11 @@ if (IS_ROUTER5) {
 
   for (let i = 0; i < 100; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
   }
 
   bench("13.3.2 Cloning router with 100 routes", () => {
@@ -68,6 +88,11 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.3.3 Cloning router with 500 routes", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
@@ -76,6 +101,11 @@ if (IS_ROUTER5) {
 
   for (let i = 0; i < 500; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
   }
 
   bench("13.3.3 Cloning router with 500 routes", () => {
@@ -126,6 +156,11 @@ if (IS_ROUTER5) {
   // @ts-expect-error - use method from router5
   router.add(deepRoute);
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.3.4 Cloning with deep hierarchy (7 levels)", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
@@ -170,6 +205,11 @@ if (IS_ROUTER5) {
 
   router.addRoute(deepRoute);
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
+  }
+
   bench("13.3.4 Cloning with deep hierarchy (7 levels)", () => {
     do_not_optimize(router.clone());
   }).gc("inner");
@@ -191,6 +231,11 @@ if (IS_ROUTER5) {
     }));
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.3.5 Cloning with 20 middleware and 30 plugins", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
@@ -207,6 +252,11 @@ if (IS_ROUTER5) {
     router.usePlugin(() => ({
       onTransitionStart: () => {},
     }));
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
   }
 
   bench("13.3.5 Cloning with 20 middleware and 30 plugins", () => {

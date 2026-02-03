@@ -6,7 +6,7 @@
  * - Batch addition (parameterized)
  * - Nested routes (parameterized)
  * - Dot-notation
- * - Validation vs skip-validation
+ * - Build options (skipSort, skipFreeze)
  *
  * Note: .gc("inner") is used for tests with heavy allocations to stabilize results
  *
@@ -33,14 +33,6 @@ barplot(() => {
         createRouteTreeBuilder("", "")
           .add({ name: "users", path: "/users" })
           .build();
-      };
-    }).gc("inner");
-
-    bench("build: single route (skipValidation)", function* () {
-      yield () => {
-        createRouteTreeBuilder("", "")
-          .add({ name: "users", path: "/users" })
-          .build({ skipValidation: true });
       };
     }).gc("inner");
   });
@@ -78,22 +70,14 @@ lineplot(() => {
   });
 });
 
-// 3.4 Validation vs skip-validation - barplot for comparison
+// 3.4 Build options comparison - barplot
 barplot(() => {
   summary(() => {
     const routes = generateWideTree(50);
 
-    bench("build: 50 routes with validation", function* () {
+    bench("build: 50 routes (default)", function* () {
       yield () => {
         createRouteTreeBuilder("", "").addMany(routes).build();
-      };
-    }).gc("inner");
-
-    bench("build: 50 routes skipValidation", function* () {
-      yield () => {
-        createRouteTreeBuilder("", "")
-          .addMany(routes)
-          .build({ skipValidation: true });
       };
     }).gc("inner");
 
@@ -117,7 +101,7 @@ barplot(() => {
       yield () => {
         createRouteTreeBuilder("", "")
           .addMany(routes)
-          .build({ skipValidation: true, skipSort: true, skipFreeze: true });
+          .build({ skipSort: true, skipFreeze: true });
       };
     }).gc("inner");
   });

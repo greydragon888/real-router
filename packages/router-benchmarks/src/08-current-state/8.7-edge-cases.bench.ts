@@ -21,37 +21,40 @@ import { createSimpleRouter } from "../helpers";
 }
 
 // 8.7.2 State with deeply nested parameters
+// IMPORTANT: Create fresh params each iteration to avoid frozen object reuse bias
 {
   const router = createSimpleRouter();
-  const params = {
-    level1: {
-      level2: {
-        level3: {
-          level4: {
-            level5: "deep value",
-          },
-        },
-      },
-    },
-  };
 
   bench("8.7.2 State with deeply nested parameters", () => {
     for (let i = 0; i < 100; i++) {
+      // Fresh nested object each iteration for fair measurement
+      const params = {
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                level5: "deep value",
+              },
+            },
+          },
+        },
+      };
+
       do_not_optimize(router.makeState("home", params, "/"));
     }
   }).gc("inner");
 }
 
 // 8.7.3 State with large string parameters
+// Note: Strings are primitives, not frozen by freezeRecursive
 {
   const router = createSimpleRouter();
   const largeString = "a".repeat(10_000);
+  const path = `/users/${largeString}`;
 
   bench("8.7.3 State with large string parameters", () => {
     for (let i = 0; i < 100; i++) {
-      do_not_optimize(
-        router.makeState("user", { id: largeString }, `/users/${largeString}`),
-      );
+      do_not_optimize(router.makeState("user", { id: largeString }, path));
     }
   }).gc("inner");
 }

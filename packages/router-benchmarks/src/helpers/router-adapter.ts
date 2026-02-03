@@ -1,6 +1,6 @@
 // packages/router-benchmarks/src/helpers/router-adapter.ts
 
-import { ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
+import { BENCH_NO_VALIDATE, ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
 
 import type {
   Router,
@@ -19,7 +19,10 @@ const routerModule = (() => {
       return require("router6");
     }
     default: {
-      return require("@real-router/core");
+      // IMPORTANT: Explicitly load from dist to avoid tsx transpiling TypeScript source.
+      // tsx resolves workspace packages to src/*.ts, causing unfair benchmark comparison
+      // with external packages that load from compiled dist/*.js.
+      return require("@real-router/core/dist/cjs/index.js");
     }
   }
 })();
@@ -58,4 +61,6 @@ export const cloneRouter = routerModule.cloneRouter;
 
 export type { Route, Router } from "@real-router/core";
 
-console.error(`Using router: ${ROUTER_NAME}`);
+console.error(
+  `Using router: ${ROUTER_NAME}${BENCH_NO_VALIDATE ? " (noValidate: true)" : ""}`,
+);

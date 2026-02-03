@@ -4,16 +4,23 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 50;
+
 // 11.2.1 Subscribing via subscribe with unsubscribe
 {
   const router = createSimpleRouter();
 
-  bench("11.2.1 Subscribing via subscribe with unsubscribe", () => {
-    const unsubscribe = router.subscribe(() => {
-      // Subscribe handler
-    });
+  bench(`11.2.1 Subscribing via subscribe with unsubscribe (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      const unsubscribe = router.subscribe(() => {
+        // Subscribe handler
+      });
 
-    unsubscribe();
+      unsubscribe();
+    }
   }).gc("inner");
 }
 
@@ -21,37 +28,49 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  bench("11.2.2 Multiple subscriptions via subscribe with unsubscribe", () => {
-    const unsubscribers: (() => void)[] = [];
+  bench(
+    `11.2.2 Multiple subscriptions via subscribe with unsubscribe (×${BATCH})`,
+    () => {
+      for (let b = 0; b < BATCH; b++) {
+        const unsubscribers: (() => void)[] = [];
 
-    for (let i = 0; i < 10; i++) {
-      unsubscribers.push(
-        router.subscribe(() => {
-          // Subscribe handler
-        }),
-      );
-    }
+        for (let i = 0; i < 10; i++) {
+          unsubscribers.push(
+            router.subscribe(() => {
+              // Subscribe handler
+            }),
+          );
+        }
 
-    for (const unsub of unsubscribers) {
-      unsub();
-    }
-  }).gc("inner");
+        for (const unsub of unsubscribers) {
+          unsub();
+        }
+      }
+    },
+  ).gc("inner");
 }
 
 // 11.2.3 Unsubscribing via unsubscribe from subscribe
 {
   const router = createSimpleRouter();
 
-  bench("11.2.3 Unsubscribing via unsubscribe from subscribe", () => {
-    const unsubscribe = router.subscribe(() => {});
+  bench(
+    `11.2.3 Unsubscribing via unsubscribe from subscribe (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        const unsubscribe = router.subscribe(() => {});
 
-    unsubscribe();
-  }).gc("inner");
+        unsubscribe();
+      }
+    },
+  ).gc("inner");
 }
 
 // 11.2.4 Getting data in subscribe handler
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.subscribe(() => {
     // Access route and previousRoute in handler
@@ -59,6 +78,6 @@ import { createSimpleRouter } from "../helpers";
   router.start();
 
   bench("11.2.4 Getting data in subscribe handler", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }

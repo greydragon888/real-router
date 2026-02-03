@@ -19,6 +19,15 @@ if (IS_ROUTER5) {
     });
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+    cloned.navigate("route25");
+    cloned.stop();
+  }
+
   bench("13.4.1 Clone preserves defaultParams", () => {
     const cloned = cloneRouter(router);
 
@@ -37,6 +46,15 @@ if (IS_ROUTER5) {
       path: `/route${i}`,
       defaultParams: { id: String(i), tab: "default" },
     });
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = router.clone();
+
+    cloned.start();
+    cloned.navigate("route25");
+    cloned.stop();
   }
 
   bench("13.4.1 Clone preserves defaultParams", () => {
@@ -68,6 +86,15 @@ if (IS_ROUTER5) {
     }),
   });
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+    cloned.navigate("custom", { id: "123" });
+    cloned.stop();
+  }
+
   bench("13.4.2 Clone preserves decoders/encoders", () => {
     const cloned = cloneRouter(router);
 
@@ -93,6 +120,15 @@ if (IS_ROUTER5) {
     }),
   });
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = router.clone();
+
+    cloned.start();
+    cloned.navigate("custom", { id: "123" });
+    cloned.stop();
+  }
+
   bench("13.4.2 Clone preserves decoders/encoders", () => {
     const cloned = router.clone();
 
@@ -113,6 +149,15 @@ if (IS_ROUTER5) {
   // @ts-expect-error - use method from router5
   router.add({ name: "old2", path: "/old2", forwardTo: "old" });
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+    cloned.navigate("old2");
+    cloned.stop();
+  }
+
   bench("13.4.3 Clone preserves forwardTo chains", () => {
     const cloned = cloneRouter(router);
 
@@ -127,6 +172,15 @@ if (IS_ROUTER5) {
 
   router.addRoute({ name: "old", path: "/old", forwardTo: "about" });
   router.addRoute({ name: "old2", path: "/old2", forwardTo: "old" });
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = router.clone();
+
+    cloned.start();
+    cloned.navigate("old2");
+    cloned.stop();
+  }
 
   bench("13.4.3 Clone preserves forwardTo chains", () => {
     const cloned = router.clone();
@@ -146,6 +200,16 @@ if (IS_ROUTER5) {
   router.canActivate("about", () => () => true);
   router.canDeactivate("users", () => () => true);
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+    cloned.navigate("about");
+    cloned.navigate("users");
+    cloned.stop();
+  }
+
   bench("13.4.4 Clone preserves lifecycle handlers", () => {
     const cloned = cloneRouter(router);
 
@@ -161,6 +225,16 @@ if (IS_ROUTER5) {
 
   router.canActivate("about", () => () => true);
   router.canDeactivate("users", () => () => true);
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = router.clone();
+
+    cloned.start();
+    cloned.navigate("about");
+    cloned.navigate("users");
+    cloned.stop();
+  }
 
   bench("13.4.4 Clone preserves lifecycle handlers", () => {
     const cloned = router.clone();

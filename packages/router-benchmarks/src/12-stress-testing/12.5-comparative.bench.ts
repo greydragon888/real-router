@@ -9,22 +9,26 @@ import type { Route } from "../helpers";
 // 12.5.1 Comparison: parameter count impact (0/5/10 parameters)
 {
   const router = createSimpleRouter();
+  const alternatingRoutes = ["about", "home"];
+  let index = 0;
 
   router.start();
 
   bench("12.5.1 Comparison: route without parameters", () => {
-    router.navigate("about");
+    router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
 {
   const router = createSimpleRouter();
+  const ids = ["123", "456"];
+  let index = 0;
 
   router.start();
 
   bench("12.5.2 Comparison: route with 5 parameters", () => {
     router.navigate("user", {
-      id: "123",
+      id: ids[index++ % 2],
       tab: "profile",
       filter: "active",
       sort: "name",
@@ -35,12 +39,14 @@ import type { Route } from "../helpers";
 
 {
   const router = createSimpleRouter();
+  const ids = ["123", "456"];
+  let index = 0;
 
   router.start();
 
   bench("12.5.3 Comparison: route with 10 parameters", () => {
     router.navigate("user", {
-      id: "123",
+      id: ids[index++ % 2],
       tab: "profile",
       filter: "active",
       sort: "name",
@@ -57,16 +63,21 @@ import type { Route } from "../helpers";
 // 12.5.4 Comparison: nesting depth impact (flat vs 5 levels)
 {
   const router = createSimpleRouter();
+  const alternatingRoutes = ["about", "home"];
+  let index = 0;
 
   router.start();
 
   bench("12.5.4 Comparison: flat routes", () => {
-    router.navigate("about");
+    router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
 if (IS_ROUTER5) {
   const router = createNestedRouter();
+  // Alternate between two nested levels to avoid SAME_STATES
+  const routes = ["l1.l2.l3.l4.l5", "l1.l2.l3"];
+  let index = 0;
 
   const nestedRoute: Route = {
     name: "l1",
@@ -97,10 +108,13 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.5.5 Comparison: 5 levels of nesting", () => {
-    router.navigate("l1.l2.l3.l4.l5");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createNestedRouter();
+  // Alternate between two nested levels to avoid SAME_STATES
+  const routes = ["l1.l2.l3.l4.l5", "l1.l2.l3"];
+  let index = 0;
 
   const nestedRoute: Route = {
     name: "l1",
@@ -130,7 +144,7 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("12.5.5 Comparison: 5 levels of nesting", () => {
-    router.navigate("l1.l2.l3.l4.l5");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -159,7 +173,11 @@ if (IS_ROUTER5) {
 
   bench("12.5.7 Five thousand navigations with skipTransition flag", () => {
     for (let i = 0; i < 5000; i++) {
-      router.navigate("about", {}, { skipTransition: true });
+      router.navigate(
+        i % 2 === 0 ? "about" : "users",
+        {},
+        { skipTransition: true },
+      );
     }
   }).gc("inner");
 }
@@ -167,6 +185,8 @@ if (IS_ROUTER5) {
 // 12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["route500", "route501"];
+  let index = 0;
 
   for (let i = 0; i < 1000; i++) {
     // @ts-expect-error - use method from router5
@@ -191,11 +211,13 @@ if (IS_ROUTER5) {
   bench(
     "12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins",
     () => {
-      router.navigate("route500");
+      router.navigate(routes[index++ % 2]);
     },
   ).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["route500", "route501"];
+  let index = 0;
 
   for (let i = 0; i < 1000; i++) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
@@ -219,7 +241,7 @@ if (IS_ROUTER5) {
   bench(
     "12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins",
     () => {
-      router.navigate("route500");
+      router.navigate(routes[index++ % 2]);
     },
   ).gc("inner");
 }

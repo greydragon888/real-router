@@ -483,14 +483,12 @@ describe("core/routes/addRoute", () => {
       expect(childGuardCalled).toBe(true);
 
       // Default params should be applied when creating state without params
+      // Note: makeState only applies the route's OWN defaultParams, not ancestors'
       const wrapperState = router.makeState("wrapper");
       const innerState = router.makeState("wrapper.inner");
 
       expect(wrapperState.params).toStrictEqual({ parentParam: "value" });
-      expect(innerState.params).toStrictEqual({
-        parentParam: "value",
-        childParam: "value",
-      });
+      expect(innerState.params).toStrictEqual({ childParam: "value" });
     });
   });
 

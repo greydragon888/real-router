@@ -1,10 +1,15 @@
 // packages/router-benchmarks/modules/07-path-operations/7.3-setRootPath.bench.ts
 
-import { bench } from "mitata";
+import { bench, do_not_optimize } from "mitata";
 
 import { createRouter } from "../helpers";
 
 import type { Route } from "../helpers";
+
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 100;
 
 const routes: Route[] = [
   { name: "home", path: "/" },
@@ -52,8 +57,10 @@ const routes: Route[] = [
 
   router.setRootPath("/app");
 
-  bench("7.3.4 Building paths after setRootPath", () => {
-    router.buildPath("about");
+  bench(`7.3.4 Building paths after setRootPath (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("about"));
+    }
   }).gc("inner");
 }
 
@@ -63,7 +70,9 @@ const routes: Route[] = [
 
   router.setRootPath("/app");
 
-  bench("7.3.5 Matching paths after setRootPath", () => {
-    router.matchPath("/app/about");
+  bench(`7.3.5 Matching paths after setRootPath (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.matchPath("/app/about"));
+    }
   }).gc("inner");
 }

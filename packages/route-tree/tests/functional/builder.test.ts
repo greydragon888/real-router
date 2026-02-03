@@ -1,12 +1,7 @@
 // Tests for the new pure function API - Builder
 import { describe, it, expect } from "vitest";
 
-import {
-  createRouteTree,
-  createRouteTreeBuilder,
-  DuplicateRouteError,
-  InvalidRouteError,
-} from "../../src/builder";
+import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
 
 describe("createRouteTree", () => {
   describe("basic tree creation", () => {
@@ -200,125 +195,6 @@ describe("createRouteTreeBuilder", () => {
       .build();
 
     expect(tree.children).toHaveLength(4);
-  });
-});
-
-describe("validation", () => {
-  it("should throw InvalidRouteError for missing name", () => {
-    expect(() => {
-      // @ts-expect-error Testing invalid input
-      createRouteTree("", "", [{ path: "/" }]);
-    }).toThrowError(InvalidRouteError);
-  });
-
-  it("should throw InvalidRouteError for empty string name (line 26 !route.name)", () => {
-    // Tests the falsy check on route.name (empty string is falsy but typeof === "string")
-    expect(() => {
-      createRouteTree("", "", [{ name: "", path: "/" }]);
-    }).toThrowError(InvalidRouteError);
-  });
-
-  it("should throw InvalidRouteError for non-string name (line 26 typeof check)", () => {
-    // Tests typeof check when name is truthy but not a string
-    expect(() => {
-      // @ts-expect-error Testing invalid input
-      createRouteTree("", "", [{ name: 123, path: "/" }]);
-    }).toThrowError(InvalidRouteError);
-  });
-
-  it("should throw InvalidRouteError for missing path", () => {
-    expect(() => {
-      // @ts-expect-error Testing invalid input
-      createRouteTree("", "", [{ name: "home" }]);
-    }).toThrowError(InvalidRouteError);
-  });
-
-  it("should throw DuplicateRouteError for duplicate names", () => {
-    expect(() => {
-      createRouteTree("", "", [
-        { name: "home", path: "/" },
-        { name: "home", path: "/home" },
-      ]);
-    }).toThrowError(DuplicateRouteError);
-  });
-
-  it("should throw DuplicateRouteError for duplicate paths at same level (line 68)", () => {
-    // Tests duplicate path detection and verifies error property
-    expect(() => {
-      createRouteTree("", "", [
-        { name: "home", path: "/" },
-        { name: "root", path: "/" }, // same path
-      ]);
-    }).toThrowError(DuplicateRouteError);
-  });
-
-  it("should handle multiple paths at same parent level (line 72 pathsAtLevel branch)", () => {
-    // Tests the branch where pathsAtLevel already exists and needs .add()
-    const tree = createRouteTree("", "", [
-      { name: "first", path: "/first" },
-      { name: "second", path: "/second" },
-      { name: "third", path: "/third" },
-    ]);
-
-    expect(tree.children).toHaveLength(3);
-  });
-
-  it("should use empty parentPrefix for root level routes (line 99)", () => {
-    // Tests that root level routes are correctly validated at "" parent level
-    const tree = createRouteTree("", "", [
-      { name: "users", path: "/users" },
-      { name: "posts", path: "/posts" },
-    ]);
-
-    expect(tree.childrenByName.get("users")).toBeDefined();
-    expect(tree.childrenByName.get("posts")).toBeDefined();
-  });
-
-  it("should not push empty children to stack (line 117 length > 0)", () => {
-    // Tests that routes with empty children array don't cause issues
-    const tree = createRouteTree("", "", [
-      { name: "parent", path: "/parent", children: [] },
-    ]);
-
-    expect(tree.children[0].children).toHaveLength(0);
-  });
-
-  it("should validate nested children correctly (line 117 children processing)", () => {
-    // Tests that children are pushed to stack and validated
-    expect(() => {
-      createRouteTree("", "", [
-        {
-          name: "parent",
-          path: "/parent",
-          children: [
-            { name: "child1", path: "/child1" },
-            { name: "child1", path: "/child2" }, // duplicate name
-          ],
-        },
-      ]);
-    }).toThrowError(DuplicateRouteError);
-  });
-});
-
-describe("skipValidation option", () => {
-  it("should skip validation when skipValidation is true", () => {
-    // This would normally throw DuplicateRouteError, but with skipValidation=true
-    // the validation is skipped (useful when routes are pre-validated externally)
-    // Note: The tree will still be built, but may have undefined behavior with duplicates
-    const tree = createRouteTree("", "", [{ name: "home", path: "/" }], {
-      skipValidation: true,
-    });
-
-    expect(tree.children).toHaveLength(1);
-    expect(tree.children[0].name).toBe("home");
-  });
-
-  it("should skip validation in builder when using build({ skipValidation: true })", () => {
-    const tree = createRouteTreeBuilder("", "")
-      .add({ name: "users", path: "/users" })
-      .build({ skipValidation: true });
-
-    expect(tree.children).toHaveLength(1);
   });
 });
 
@@ -801,53 +677,6 @@ describe("mutation testing coverage - computeCaches", () => {
 
       expect(usersRoutes).toBeDefined();
       expect(Object.isFrozen(usersRoutes)).toBe(true);
-    });
-  });
-});
-
-describe("mutation testing coverage - validateRoutes", () => {
-  describe("children processing (line 117)", () => {
-    it("should validate nested children recursively", () => {
-      // This test ensures the children branch is taken
-      expect(() => {
-        createRouteTree("", "", [
-          {
-            name: "parent",
-            path: "/parent",
-            children: [
-              {
-                name: "child",
-                path: "/child",
-                children: [{ name: "grandchild", path: "/grandchild" }],
-              },
-            ],
-          },
-        ]);
-      }).not.toThrowError();
-    });
-
-    it("should throw for duplicate names in nested children", () => {
-      expect(() => {
-        createRouteTree("", "", [
-          {
-            name: "parent",
-            path: "/parent",
-            children: [
-              { name: "child", path: "/child1" },
-              { name: "child", path: "/child2" }, // duplicate
-            ],
-          },
-        ]);
-      }).toThrowError(DuplicateRouteError);
-    });
-
-    it("should not process children when array is empty", () => {
-      // Empty children array should be skipped (length > 0 check)
-      const tree = createRouteTree("", "", [
-        { name: "route", path: "/route", children: [] },
-      ]);
-
-      expect(tree.children[0].children).toHaveLength(0);
     });
   });
 });

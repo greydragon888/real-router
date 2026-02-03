@@ -4,13 +4,21 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
+/**
+ * Batch size for stable measurements.
+ * Testing showed batch=10 gives optimal variance (~1.6x) for start/stop operations.
+ */
+const BATCH = 10;
+
 // 10.2.1 Stopping router via stop
 {
   const router = createSimpleRouter();
 
-  bench("10.2.1 Stopping router via stop", () => {
-    router.start();
-    router.stop();
+  bench(`10.2.1 Stopping router via stop (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -24,9 +32,11 @@ import { createSimpleRouter } from "../helpers";
     },
   }));
 
-  bench("10.2.2 Stopping router with plugins", () => {
-    router.start();
-    router.stop();
+  bench(`10.2.2 Stopping router with plugins (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -40,9 +50,11 @@ import { createSimpleRouter } from "../helpers";
     },
   }));
 
-  bench("10.2.3 Stopping router with plugin teardown", () => {
-    router.start();
-    router.stop();
+  bench(`10.2.3 Stopping router with plugin teardown (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -52,10 +64,12 @@ import { createSimpleRouter } from "../helpers";
   const routes = ["about", "home"];
   let index = 0;
 
-  bench("10.2.4 Stopping router during navigation", () => {
-    router.start();
-    router.navigate(routes[index++ % 2]);
-    router.stop();
+  bench(`10.2.4 Stopping router during navigation (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.navigate(routes[index++ % 2]);
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -63,9 +77,11 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  bench("10.2.5 Stopping router repeatedly", () => {
-    router.start();
-    router.stop();
-    router.stop(); // Idempotent
+  bench(`10.2.5 Stopping router repeatedly (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+      router.stop(); // Idempotent
+    }
   }).gc("inner");
 }

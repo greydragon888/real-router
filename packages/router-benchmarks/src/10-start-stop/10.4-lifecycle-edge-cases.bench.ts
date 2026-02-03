@@ -6,14 +6,25 @@ import { createRouter, createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
 
+/**
+ * Batch size for stable measurements.
+ * Testing showed batch=10 gives optimal variance (~1.6x) for start/stop operations.
+ */
+const BATCH = 10;
+
 // 10.4.1 Starting immediately after router creation with stop
 {
   const router = createSimpleRouter();
 
-  bench("10.4.1 Starting immediately after router creation with stop", () => {
-    router.start();
-    router.stop();
-  }).gc("inner");
+  bench(
+    `10.4.1 Starting immediately after router creation with stop (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        router.start();
+        router.stop();
+      }
+    },
+  ).gc("inner");
 }
 
 // 10.4.2 Starting after adding routes with stop
@@ -24,9 +35,11 @@ if (IS_ROUTER5) {
   // @ts-expect-error - use method from router5
   router.add({ name: "about", path: "/about" });
 
-  bench("10.4.2 Starting after adding routes with stop", () => {
-    router.start();
-    router.stop();
+  bench(`10.4.2 Starting after adding routes with stop (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 } else {
   const routes: Route[] = [{ name: "home", path: "/" }];
@@ -34,9 +47,11 @@ if (IS_ROUTER5) {
 
   router.addRoute({ name: "about", path: "/about" });
 
-  bench("10.4.2 Starting after adding routes with stop", () => {
-    router.start();
-    router.stop();
+  bench(`10.4.2 Starting after adding routes with stop (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -46,21 +61,28 @@ if (IS_ROUTER5) {
 
   router.usePlugin(() => ({}));
 
-  bench("10.4.3 Starting after registering plugins with stop", () => {
-    router.start();
-    router.stop();
-  }).gc("inner");
+  bench(
+    `10.4.3 Starting after registering plugins with stop (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        router.start();
+        router.stop();
+      }
+    },
+  ).gc("inner");
 }
 
 // 10.4.4 Stop and restart
 {
   const router = createSimpleRouter();
 
-  bench("10.4.4 Stop and restart", () => {
-    router.start();
-    router.stop();
-    router.start();
-    router.stop();
+  bench(`10.4.4 Stop and restart (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -68,8 +90,8 @@ if (IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  bench("10.4.5 Multiple start-stop cycles", () => {
-    for (let i = 0; i < 10; i++) {
+  bench(`10.4.5 Multiple start-stop cycles (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
       router.start();
       router.stop();
     }
@@ -80,21 +102,30 @@ if (IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  bench("10.4.6 Starting with initial navigation to root with stop", () => {
-    router.start("/");
-    router.stop();
-  }).gc("inner");
+  bench(
+    `10.4.6 Starting with initial navigation to root with stop (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        router.start("/");
+        router.stop();
+      }
+    },
+  ).gc("inner");
 }
 
 // 10.4.7 Stopping with state cleanup
 {
   const router = createSimpleRouter();
+  const routes = ["about", "users"];
+  let index = 0;
 
-  bench("10.4.7 Stopping with state cleanup", () => {
-    router.start();
-    router.navigate("about");
-    router.stop();
-    do_not_optimize(router.getState()); // Should return undefined
+  bench(`10.4.7 Stopping with state cleanup (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.navigate(routes[index++ % 2]);
+      router.stop();
+      do_not_optimize(router.getState()); // Should return undefined
+    }
   }).gc("inner");
 }
 
@@ -110,9 +141,11 @@ if (IS_ROUTER5) {
     }));
   }
 
-  bench("10.4.9 Starting with many plugins and stop", () => {
-    router.start();
-    router.stop();
+  bench(`10.4.9 Starting with many plugins and stop (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
 
@@ -128,8 +161,10 @@ if (IS_ROUTER5) {
     }));
   }
 
-  bench("10.4.10 Stopping with many plugins", () => {
-    router.start();
-    router.stop();
+  bench(`10.4.10 Stopping with many plugins (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.start();
+      router.stop();
+    }
   }).gc("inner");
 }
