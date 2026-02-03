@@ -1,5 +1,6 @@
 # Allow-list of acceptable licenses (deny-licenses is deprecated)
-# Excludes copyleft licenses (GPL, AGPL) that would require open-sourcing derivative works
+# Excludes strong copyleft licenses (GPL, AGPL) that would require open-sourcing derivative works
+# LGPL is allowed for devDependencies (linters, build tools) as they don't link with production code
 allow-licenses:
   - MIT
   - Apache-2.0
@@ -12,3 +13,4 @@ allow-licenses:
   - CC-BY-4.0
   - BlueOak-1.0.0
   - Python-2.0
+  - LGPL-3.0-only
