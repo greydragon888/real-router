@@ -144,18 +144,17 @@ export class MiddlewareNamespace<
     }
 
     // Return unsubscribe function specific to THIS call's middleware
+    let unsubscribed = false;
+
     return (): void => {
+      if (unsubscribed) {
+        return;
+      }
+
+      unsubscribed = true;
+
       for (const { factory } of initialized) {
-        const wasDeleted = this.#factories.delete(factory);
-
-        if (!wasDeleted) {
-          logger.warn(
-            "router.useMiddleware",
-            `Attempted to remove non-existent middleware factory. ` +
-              `This might indicate a memory leak or incorrect cleanup logic.`,
-          );
-        }
-
+        this.#factories.delete(factory);
         this.#factoryToMiddleware.delete(factory);
       }
     };

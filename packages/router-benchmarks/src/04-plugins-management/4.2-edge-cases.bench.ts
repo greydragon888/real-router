@@ -198,21 +198,27 @@ const BATCH = 50;
   }).gc("inner");
 }
 
+// Increased BATCH for sub-microsecond operations to reduce RME
+const BATCH_MIDDLEWARE = 200;
+
 // 4.2.13 Multiple middleware removal (idempotent)
 {
   const router = createSimpleRouter();
 
-  bench(`4.2.13 Multiple middleware removal (idempotent) (×${BATCH})`, () => {
-    for (let b = 0; b < BATCH; b++) {
-      const unsubscribe = router.useMiddleware(
-        () => (_toState, _fromState, done) => {
-          done();
-        },
-      );
+  bench(
+    `4.2.13 Multiple middleware removal (idempotent) (×${BATCH_MIDDLEWARE})`,
+    () => {
+      for (let b = 0; b < BATCH_MIDDLEWARE; b++) {
+        const unsubscribe = router.useMiddleware(
+          () => (_toState, _fromState, done) => {
+            done();
+          },
+        );
 
-      unsubscribe();
-      unsubscribe();
-      unsubscribe();
-    }
-  }).gc("inner");
+        unsubscribe();
+        unsubscribe();
+        unsubscribe();
+      }
+    },
+  ).gc("inner");
 }

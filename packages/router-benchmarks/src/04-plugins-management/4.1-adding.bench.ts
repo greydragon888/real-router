@@ -91,14 +91,17 @@ const BATCH = 50;
   ).gc("inner");
 }
 
+// Increased BATCH for sub-microsecond operations to reduce RME
+const BATCH_GUARDS = 200;
+
 // 4.1.7 Adding canActivate guard for route with cleanup
 {
   const router = createSimpleRouter();
 
   bench(
-    `4.1.7 Adding canActivate guard for route with cleanup (×${BATCH})`,
+    `4.1.7 Adding canActivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
-      for (let i = 0; i < BATCH; i++) {
+      for (let i = 0; i < BATCH_GUARDS; i++) {
         router.canActivate("about", () => () => true);
         // Overwrite with true to effectively clear the guard
         router.canActivate("about", true);
@@ -112,9 +115,9 @@ const BATCH = 50;
   const router = createSimpleRouter();
 
   bench(
-    `4.1.8 Adding canDeactivate guard for route with cleanup (×${BATCH})`,
+    `4.1.8 Adding canDeactivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
-      for (let i = 0; i < BATCH; i++) {
+      for (let i = 0; i < BATCH_GUARDS; i++) {
         router.canDeactivate("about", () => () => true);
         // Overwrite with true to effectively clear the guard
         router.canDeactivate("about", true);
