@@ -47,10 +47,16 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // Using useSyncExternalStore to manage subscription and state updates
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
+  // Memoize RouteContext value to prevent unnecessary re-renders
+  const routeContextValue = useMemo(
+    () => ({ navigator, ...state }),
+    [navigator, state],
+  );
+
   return (
     <RouterContext.Provider value={router}>
       <NavigatorContext.Provider value={navigator}>
-        <RouteContext.Provider value={{ navigator, ...state }}>
+        <RouteContext.Provider value={routeContextValue}>
           {children}
         </RouteContext.Provider>
       </NavigatorContext.Provider>
