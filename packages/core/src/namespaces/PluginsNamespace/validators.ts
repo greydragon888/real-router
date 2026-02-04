@@ -73,22 +73,3 @@ export function validatePluginLimit(
     );
   }
 }
-
-/**
- * Validates that no plugin factory is already registered.
- */
-export function validateNoDuplicatePlugins<D extends DefaultDependencies>(
-  newFactories: PluginFactory<D>[],
-  existingFactories: PluginFactory<D>[],
-): void {
-  const existing = new Set(existingFactories);
-
-  for (const factory of newFactories) {
-    if (existing.has(factory)) {
-      throw new Error(
-        `[router.usePlugin] Plugin factory already registered. ` +
-          `To re-register, first unsubscribe the existing plugin.`,
-      );
-    }
-  }
-}

@@ -734,7 +734,7 @@ export class Router<
       // 3. Validate no duplicates with existing plugins
       PluginsNamespace.validateNoDuplicatePlugins(
         plugins,
-        this.#plugins.getAll(),
+        this.#plugins.has.bind(this.#plugins),
       );
     }
 

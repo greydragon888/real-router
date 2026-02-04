@@ -9,7 +9,6 @@ import {
   LOGGER_CONTEXT,
 } from "./constants";
 import {
-  validateNoDuplicatePlugins,
   validatePlugin,
   validatePluginLimit,
   validateUsePluginArgs,
@@ -62,9 +61,16 @@ export class PluginsNamespace<
 
   static validateNoDuplicatePlugins<D extends DefaultDependencies>(
     newFactories: PluginFactory<D>[],
-    existingFactories: PluginFactory<D>[],
+    hasPlugin: (factory: PluginFactory<D>) => boolean,
   ): void {
-    validateNoDuplicatePlugins(newFactories, existingFactories);
+    for (const factory of newFactories) {
+      if (hasPlugin(factory)) {
+        throw new Error(
+          `[router.usePlugin] Plugin factory already registered. ` +
+            `To re-register, first unsubscribe the existing plugin.`,
+        );
+      }
+    }
   }
 
   // =========================================================================
@@ -173,6 +179,14 @@ export class PluginsNamespace<
    */
   getAll(): PluginFactory<Dependencies>[] {
     return [...this.#plugins];
+  }
+
+  /**
+   * Checks if a plugin factory is registered.
+   * Used internally by validation to avoid array allocation.
+   */
+  has(factory: PluginFactory<Dependencies>): boolean {
+    return this.#plugins.has(factory);
   }
 
   // =========================================================================
