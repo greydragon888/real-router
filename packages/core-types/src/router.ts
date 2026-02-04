@@ -15,6 +15,7 @@ import type {
   NavigationOptions,
   RouterError,
   Unsubscribe,
+  CancelFn,
 } from "./base";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
 
@@ -182,4 +183,30 @@ export interface Listener {
 
 export interface Subscription {
   unsubscribe: Unsubscribe;
+}
+
+/**
+ * Navigator interface - a minimal, safe subset of Router methods.
+ *
+ * Provides only the essential navigation and state inspection methods.
+ * Excludes lifecycle methods (start, stop), plugin management, and internal APIs.
+ * Use this when you need to pass a limited router interface to components.
+ *
+ * For full router access, use the Router interface directly or the useRouter() hook.
+ */
+export interface Navigator {
+  navigate: (
+    routeName: string,
+    routeParamsOrDone?: Params | DoneFn,
+    optionsOrDone?: NavigationOptions | DoneFn,
+    done?: DoneFn,
+  ) => CancelFn;
+  getState: () => State | undefined;
+  isActiveRoute: (
+    name: string,
+    params?: Params,
+    strictEquality?: boolean,
+    ignoreQueryParams?: boolean,
+  ) => boolean;
+  subscribe: (listener: SubscribeFn) => Unsubscribe;
 }

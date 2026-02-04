@@ -22,6 +22,7 @@ export type {
   DoneFn,
   Listener,
   Middleware,
+  Navigator,
   NavigationOptions,
   Options,
   Params,

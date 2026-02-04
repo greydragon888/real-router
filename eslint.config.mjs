@@ -193,6 +193,7 @@ export default tsEslint.config(
       "@typescript-eslint/no-shadow": "error",
       "@typescript-eslint/method-signature-style": "error",
       "@typescript-eslint/unified-signatures": "off",
+      "@typescript-eslint/unbound-method": "off",
 
       // v8.50.0: Detect useless default assignments (x = undefined)
       "@typescript-eslint/no-useless-default-assignment": "warn",
