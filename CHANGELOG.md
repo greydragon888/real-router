@@ -5,6 +5,92 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-04]
+
+### @real-router/browser-plugin@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+
+### @real-router/core@0.5.0
+
+### Minor Changes
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `noValidate` option to disable validation in production (#53)
+
+  New configuration option for performance-critical environments:
+
+  ```typescript
+  const router = createRouter(routes, {
+    noValidate: process.env.NODE_ENV === "production",
+  });
+  ```
+
+  When enabled, skips argument validation in ~40 public methods.
+  Constructor always validates options object itself.
+
+### Patch Changes
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Make middleware unsubscribe function idempotent (#53)
+
+  Calling unsubscribe multiple times no longer throws an error.
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize `usePlugin()` for single-plugin calls (#53)
+
+  Skip array/Set allocation when registering a single plugin.
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/types@0.3.0
+
+### @real-router/helpers@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+
+### @real-router/logger-plugin@0.2.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+
+### @real-router/persistent-params-plugin@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+
+### @real-router/react@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+  - @real-router/browser-plugin@0.1.8
+  - @real-router/helpers@0.1.8
+
+### @real-router/types@0.3.0
+
+### Minor Changes
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `noValidate` option to disable validation in production (#53)
+
+  New configuration option for performance-critical environments:
+
+  ```typescript
+  const router = createRouter(routes, {
+    noValidate: process.env.NODE_ENV === "production",
+  });
+  ```
+
+  When enabled, skips argument validation in ~40 public methods.
+  Constructor always validates options object itself.
+
 ## [2026-01-30]
 
 ### @real-router/browser-plugin@0.1.7
