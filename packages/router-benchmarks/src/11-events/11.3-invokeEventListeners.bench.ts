@@ -7,30 +7,36 @@ import { createSimpleRouter } from "../helpers";
 // 11.3.1 Invoking $$success listeners
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.addEventListener("$$success", () => {});
   router.addEventListener("$$success", () => {});
   router.start();
 
   bench("11.3.1 Invoking $$success listeners", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 11.3.2 Invoking listeners when no subscribers
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.start();
 
   bench("11.3.2 Invoking listeners when no subscribers", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 11.3.3 Invoking listeners with state freezing
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.addEventListener("$$success", () => {
     // States should be frozen
@@ -38,13 +44,15 @@ import { createSimpleRouter } from "../helpers";
   router.start();
 
   bench("11.3.3 Invoking listeners with state freezing", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 11.3.4 Invoking multiple listeners for same event
 {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   for (let i = 0; i < 10; i++) {
     router.addEventListener("$$success", () => {});
@@ -53,6 +61,6 @@ import { createSimpleRouter } from "../helpers";
   router.start();
 
   bench("11.3.4 Invoking multiple listeners for same event", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }

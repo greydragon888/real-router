@@ -8,6 +8,16 @@ import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(
+      cloneRouter(router, {
+        api: { fetch: () => Promise.resolve({}) },
+        auth: { isAuthenticated: () => true },
+      }),
+    );
+  }
+
   bench("13.2.1 Cloning with mock dependencies", () => {
     do_not_optimize(
       cloneRouter(router, {
@@ -18,6 +28,16 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(
+      router.clone({
+        api: { fetch: () => Promise.resolve({}) },
+        auth: { isAuthenticated: () => true },
+      }),
+    );
+  }
 
   bench("13.2.1 Cloning with mock dependencies", () => {
     do_not_optimize(
@@ -30,6 +50,7 @@ if (IS_ROUTER5) {
 }
 
 // 13.2.2 Cloning in beforeEach (test isolation)
+// Note: Has internal loop of 1000 iterations, serves as warmup
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
@@ -61,6 +82,15 @@ if (IS_ROUTER5) {
     }));
   }
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = cloneRouter(router);
+
+    cloned.start();
+    cloned.navigate("about");
+    cloned.stop();
+  }
+
   bench("13.2.3 Clone preserves middleware and plugins", () => {
     const cloned = cloneRouter(router);
 
@@ -80,6 +110,15 @@ if (IS_ROUTER5) {
     router.usePlugin(() => ({
       onTransitionStart: () => {},
     }));
+  }
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    const cloned = router.clone();
+
+    cloned.start();
+    cloned.navigate("about");
+    cloned.stop();
   }
 
   bench("13.2.3 Clone preserves middleware and plugins", () => {

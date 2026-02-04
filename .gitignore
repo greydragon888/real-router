@@ -14,6 +14,7 @@ dist
 .turbo
 .vitest
 .claude
+.sisyphus
 .bench
 .vitest-bench
 .bundle-reports

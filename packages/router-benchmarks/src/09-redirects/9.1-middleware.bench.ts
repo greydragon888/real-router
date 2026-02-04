@@ -8,9 +8,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => (toState, fromState, done) => {
     if (toState.name === "about") {
-      done(undefined, _router.makeState("home", {}, "/"));
+      const target = fromState?.name === "home" ? "users" : "home";
+
+      done(
+        undefined,
+        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
+      );
     } else {
       done();
     }
@@ -26,9 +32,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => (toState, fromState, done) => {
     if (toState.name === "user") {
-      done(undefined, _router.makeState("home", {}, "/"));
+      const target = fromState?.name === "home" ? "about" : "home";
+
+      done(
+        undefined,
+        _router.makeState(target, {}, target === "home" ? "/" : "/about"),
+      );
     } else {
       done();
     }
@@ -44,9 +56,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => (toState, fromState, done) => {
     if (toState.name === "about") {
-      const redirectState = _router.makeState("home", {}, "/");
+      const target = fromState?.name === "home" ? "users" : "home";
+      const redirectState = _router.makeState(
+        target,
+        {},
+        target === "home" ? "/" : "/users",
+      );
 
       done(undefined, redirectState);
     } else {
@@ -63,6 +81,8 @@ import { createSimpleRouter } from "../helpers";
 // 9.1.4 Chain of redirects
 {
   const router = createSimpleRouter();
+  // Track redirect count to alternate final destination
+  let redirectCount = 0;
 
   router.useMiddleware((_router) => (toState, _fromState, done) => {
     if (toState.name === "about") {
@@ -73,7 +93,17 @@ import { createSimpleRouter } from "../helpers";
   });
   router.useMiddleware((_router) => (toState, _fromState, done) => {
     if (toState.name === "users") {
-      done(undefined, _router.makeState("home", {}, "/"));
+      // Alternate final destination to avoid SAME_STATES
+      const target = redirectCount++ % 2 === 0 ? "home" : "user";
+
+      done(
+        undefined,
+        _router.makeState(
+          target,
+          target === "user" ? { id: "1" } : {},
+          target === "home" ? "/" : "/users/1",
+        ),
+      );
     } else {
       done();
     }
@@ -89,9 +119,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => (toState, fromState, done) => {
     if (toState.name === "user" && toState.params.id === "admin") {
-      done(undefined, _router.makeState("home", {}, "/"));
+      const target = fromState?.name === "home" ? "about" : "home";
+
+      done(
+        undefined,
+        _router.makeState(target, {}, target === "home" ? "/" : "/about"),
+      );
     } else {
       done();
     }
@@ -107,9 +143,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => (toState, fromState, done) => {
     if (toState.name === "about") {
-      done(undefined, _router.makeState("home", {}, "/"));
+      const target = fromState?.name === "home" ? "users" : "home";
+
+      done(
+        undefined,
+        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
+      );
     } else {
       done();
     }
@@ -125,10 +167,16 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => async (toState, _fromState, done) => {
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.useMiddleware((_router) => async (toState, fromState, done) => {
     if (toState.name === "about") {
       await Promise.resolve();
-      done(undefined, _router.makeState("home", {}, "/"));
+      const target = fromState?.name === "home" ? "users" : "home";
+
+      done(
+        undefined,
+        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
+      );
     } else {
       done();
     }

@@ -69,6 +69,8 @@ if (IS_ROUTER5) {
 // 13.6.3 Cloning during original navigation
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.useMiddleware(() => (_toState, _fromState, done) => {
     // Clone during middleware execution
@@ -79,10 +81,12 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("13.6.3 Cloning during original navigation", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routes = ["about", "home"];
+  let index = 0;
 
   router.useMiddleware(() => (_toState, _fromState, done) => {
     // Clone during middleware execution
@@ -93,7 +97,7 @@ if (IS_ROUTER5) {
   router.start();
 
   bench("13.6.3 Cloning during original navigation", () => {
-    router.navigate("about");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -101,11 +105,21 @@ if (IS_ROUTER5) {
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(cloneRouter(router));
+  }
+
   bench("13.6.4 Cloning basic router", () => {
     do_not_optimize(cloneRouter(router));
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(router.clone());
+  }
 
   bench("13.6.4 Cloning basic router", () => {
     do_not_optimize(router.clone());

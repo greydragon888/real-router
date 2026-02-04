@@ -266,17 +266,17 @@ export function validateShouldUpdateNodeArgs(
 }
 
 /**
- * Validates routes against existing route tree state.
+ * Validates routes for addition to the router.
  * Checks for duplicates, parent existence, and forwardTo targets/cycles.
  *
  * @param routes - Routes to validate
- * @param tree - Current route tree
+ * @param tree - Current route tree (optional for initial validation)
  * @param forwardMap - Current forward map for cycle detection
  */
 export function validateRoutes<Dependencies extends DefaultDependencies>(
   routes: Route<Dependencies>[],
-  tree: RouteTree,
-  forwardMap: Record<string, string>,
+  tree?: RouteTree,
+  forwardMap?: Record<string, string>,
 ): void {
   // Tracking sets for duplicate detection
   const seenNames = new Set<string>();
@@ -286,9 +286,12 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
     // Use route-tree's validateRoute for structural validation
     // (type, name, path, duplicates, parent exists, children array)
     // Note: validateRoute handles children recursively
+    // When tree is undefined, only batch validation is performed (initial routes)
     validateRoute(route, "addRoute", tree, "", seenNames, seenPathsByParent);
   }
 
-  // Validate forwardTo targets and cycles
-  validateForwardToTargets(routes, forwardMap, tree);
+  // Validate forwardTo targets and cycles (only when tree is available)
+  if (tree && forwardMap) {
+    validateForwardToTargets(routes, forwardMap, tree);
+  }
 }

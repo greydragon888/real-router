@@ -4,50 +4,20 @@ import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 
-// JIT Warmup: Pre-warm cloning code paths to avoid cold-start bias
-// Without this, the first benchmarks would be significantly slower due to JIT compilation
-{
-  const warmupRouter = createSimpleRouter();
-
-  for (let i = 0; i < 100; i++) {
-    // Warmup: basic cloning
-    const cloned = IS_ROUTER5
-      ? cloneRouter(warmupRouter)
-      : warmupRouter.clone();
-
-    // Warmup: clone with dependencies
-    const clonedWithDeps = IS_ROUTER5
-      ? cloneRouter(warmupRouter, { req: { url: "/" } })
-      : warmupRouter.clone({ req: { url: "/" } });
-
-    // Warmup: full SSR cycle
-    cloned.start("/about");
-    do_not_optimize(cloned.getState());
-    cloned.stop();
-
-    clonedWithDeps.start("/");
-    clonedWithDeps.stop();
-  }
-}
-
-// 13.1.1 Basic cloning for SSR request
-if (IS_ROUTER5) {
-  const router = createSimpleRouter();
-
-  bench("13.1.1 Basic cloning for SSR request", () => {
-    do_not_optimize(cloneRouter(router));
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  bench("13.1.1 Basic cloning for SSR request", () => {
-    do_not_optimize(router.clone());
-  }).gc("inner");
-}
-
 // 13.1.2 Cloning with request dependency injection
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
+
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(
+      cloneRouter(router, {
+        req: { url: "/about" },
+        res: { send: () => {} },
+        cookies: { sessionId: "abc123" },
+      }),
+    );
+  }
 
   bench("13.1.2 Cloning with request dependency injection", () => {
     do_not_optimize(
@@ -61,6 +31,17 @@ if (IS_ROUTER5) {
 } else {
   const router = createSimpleRouter();
 
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
+    do_not_optimize(
+      router.clone({
+        req: { url: "/about" },
+        res: { send: () => {} },
+        cookies: { sessionId: "abc123" },
+      }),
+    );
+  }
+
   bench("13.1.2 Cloning with request dependency injection", () => {
     do_not_optimize(
       router.clone({
@@ -72,30 +53,8 @@ if (IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 13.1.3 Full SSR cycle: clone -> start -> getState -> stop
-if (IS_ROUTER5) {
-  const router = createSimpleRouter();
-
-  bench("13.1.3 Full SSR cycle: clone -> start -> getState -> stop", () => {
-    const cloned = cloneRouter(router);
-
-    cloned.start("/about");
-    do_not_optimize(cloned.getState());
-    cloned.stop();
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  bench("13.1.3 Full SSR cycle: clone -> start -> getState -> stop", () => {
-    const cloned = router.clone();
-
-    cloned.start("/about");
-    do_not_optimize(cloned.getState());
-    cloned.stop();
-  }).gc("inner");
-}
-
 // 13.1.4 Sequential clones (request flow simulation)
+// Note: Has internal loop of 100 iterations, serves as warmup
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
@@ -121,6 +80,7 @@ if (IS_ROUTER5) {
 }
 
 // 13.1.5 Parallel clones (concurrent requests)
+// Note: Has internal loop of 50 iterations, serves as warmup
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 

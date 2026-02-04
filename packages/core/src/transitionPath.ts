@@ -1,7 +1,5 @@
 // packages/real-router/modules/transitionPath.ts
 
-import { logger } from "@real-router/logger";
-
 import type { Params, State } from "@real-router/types";
 
 /**
@@ -121,24 +119,17 @@ function extractSegmentParams(name: string, state: State): SegmentParams {
       continue;
     }
 
-    // Check type and add to result
+    // Only include primitives in segment params comparison.
+    // Complex types (arrays, nested objects) are handled by query param serialization.
+    // Note: symbol/function/bigint are rejected by isParams validation before reaching this code.
     if (
       typeof value === "string" ||
       typeof value === "number" ||
       typeof value === "boolean"
     ) {
       result[key] = String(value);
-    } else {
-      // Warn about unsupported complex types (arrays, nested objects)
-      // Note: After null check and primitive check, only objects remain here.
-      // symbol/function/bigint are rejected by isParams validation before reaching this code.
-      logger.warn(
-        "transitionPath.extractSegmentParams",
-        `Unsupported param type for key "${key}": ${typeof value}. ` +
-          `Only primitives (string, number, boolean) are supported.`,
-        typeof value,
-      );
     }
+    // Complex types silently skipped - they're serialized as query params elsewhere
   }
 
   return result;

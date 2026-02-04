@@ -168,14 +168,6 @@ export interface RouteTree {
  */
 export interface TreeBuildOptions {
   /**
-   * Skip validation when building the tree.
-   * Use this only when routes have already been validated externally.
-   *
-   * @default false
-   */
-  skipValidation?: boolean;
-
-  /**
    * Skip sorting children when building the tree.
    * Use this when routes are already sorted by priority, or when sorting
    * is not needed (e.g., for read-only trees where order doesn't matter).
@@ -229,15 +221,13 @@ export interface RouteTreeBuilder {
    * Build the final immutable route tree.
    *
    * This will:
-   * 1. Validate all routes (unless skipValidation is true)
-   * 2. Build the tree structure
+   * 1. Build the tree structure
+   * 2. Sort children for correct matching order
    * 3. Compute all caches
-   * 4. Sort children for correct matching order
-   * 5. Freeze and return the tree
+   * 4. Freeze and return the tree
    *
    * @param options - Build options
    * @returns Immutable RouteTree
-   * @throws {Error} If validation fails
    */
   build: (options?: TreeBuildOptions) => RouteTree;
 }

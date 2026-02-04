@@ -20,42 +20,6 @@ import { createSimpleRouter } from "../helpers";
   }).gc("inner");
 }
 
-// 8.7.2 State with deeply nested parameters
-{
-  const router = createSimpleRouter();
-  const params = {
-    level1: {
-      level2: {
-        level3: {
-          level4: {
-            level5: "deep value",
-          },
-        },
-      },
-    },
-  };
-
-  bench("8.7.2 State with deeply nested parameters", () => {
-    for (let i = 0; i < 100; i++) {
-      do_not_optimize(router.makeState("home", params, "/"));
-    }
-  }).gc("inner");
-}
-
-// 8.7.3 State with large string parameters
-{
-  const router = createSimpleRouter();
-  const largeString = "a".repeat(10_000);
-
-  bench("8.7.3 State with large string parameters", () => {
-    for (let i = 0; i < 100; i++) {
-      do_not_optimize(
-        router.makeState("user", { id: largeString }, `/users/${largeString}`),
-      );
-    }
-  }).gc("inner");
-}
-
 // 8.7.4 Comparing states with identical parameters but different structure
 {
   const router = createSimpleRouter();
@@ -79,23 +43,6 @@ import { createSimpleRouter } from "../helpers";
   bench("8.7.6 Building state for non-existent route", () => {
     for (let i = 0; i < 100; i++) {
       do_not_optimize(router.buildState("nonexistent", {}));
-    }
-  }).gc("inner");
-}
-
-// 8.7.7 State with meta.options
-{
-  const router = createSimpleRouter();
-
-  bench("8.7.7 State with meta.options", () => {
-    for (let i = 0; i < 100; i++) {
-      do_not_optimize(
-        router.makeState("about", {}, "/about", {
-          params: {},
-          options: { reload: true, force: true },
-          redirected: false,
-        }),
-      );
     }
   }).gc("inner");
 }

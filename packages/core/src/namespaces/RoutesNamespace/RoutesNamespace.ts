@@ -98,11 +98,15 @@ export class RoutesNamespace<
   // Lifecycle handlers reference (set after construction)
   #lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
 
+  // When true, skips validation for production performance
+  readonly #noValidate: boolean;
+
   // =========================================================================
   // Constructor
   // =========================================================================
 
-  constructor(routes: Route<Dependencies>[] = []) {
+  constructor(routes: Route<Dependencies>[] = [], noValidate = false) {
+    this.#noValidate = noValidate;
     // Sanitize routes to store only essential properties
     for (const route of routes) {
       this.#definitions.push(sanitizeRoute(route));
@@ -120,7 +124,13 @@ export class RoutesNamespace<
     this.#registerAllRouteHandlers(routes);
 
     // Validate and cache forwardTo chains (detect cycles)
-    this.#validateAndCacheForwardMap();
+    // Skip validation in noValidate mode for production performance
+    if (noValidate) {
+      // Still need to cache resolved forwards, just skip validation
+      this.#cacheForwardMap();
+    } else {
+      this.#validateAndCacheForwardMap();
+    }
   }
 
   // =========================================================================
@@ -197,8 +207,8 @@ export class RoutesNamespace<
 
   static validateRoutes<Deps extends DefaultDependencies>(
     routes: Route<Deps>[],
-    tree: RouteTree,
-    forwardMap: Record<string, string>,
+    tree?: RouteTree,
+    forwardMap?: Record<string, string>,
   ): void {
     validateRoutes(routes, tree, forwardMap);
   }
@@ -264,7 +274,7 @@ export class RoutesNamespace<
    */
   setRootPath(newRootPath: string): void {
     this.#rootPath = newRootPath;
-    this.#rebuildTree(true);
+    this.#rebuildTree();
   }
 
   /**
@@ -307,10 +317,10 @@ export class RoutesNamespace<
     this.#registerAllRouteHandlers(routes);
 
     // Rebuild tree
-    this.#rebuildTree(true);
+    this.#rebuildTree();
 
     // Validate and cache forwardTo chains
-    this.#validateAndCacheForwardMap();
+    this.#refreshForwardMap();
   }
 
   /**
@@ -330,10 +340,10 @@ export class RoutesNamespace<
     this.#clearRouteConfigurations(name);
 
     // Rebuild tree
-    this.#rebuildTree(true);
+    this.#rebuildTree();
 
     // Revalidate forward chains
-    this.#validateAndCacheForwardMap();
+    this.#refreshForwardMap();
 
     return true;
   }
@@ -368,7 +378,7 @@ export class RoutesNamespace<
         this.#config.forwardMap[name] = updates.forwardTo;
       }
 
-      this.#validateAndCacheForwardMap();
+      this.#refreshForwardMap();
     }
 
     // Update defaultParams
@@ -436,7 +446,7 @@ export class RoutesNamespace<
     }
 
     // Rebuild empty tree
-    this.#rebuildTree(true);
+    this.#rebuildTree();
   }
 
   // =========================================================================
@@ -446,8 +456,18 @@ export class RoutesNamespace<
   /**
    * Builds a URL path for a route.
    * Note: Argument validation is done by facade (Router.ts) via validateBuildPathArgs.
+   *
+   * @param route - Route name
+   * @param params - Route parameters
+   * @param options - Router options
+   * @param segments - Optional pre-computed segments to avoid duplicate lookup
    */
-  buildPath(route: string, params?: Params, options?: Options): string {
+  buildPath(
+    route: string,
+    params?: Params,
+    options?: Options,
+    segments?: readonly unknown[],
+  ): string {
     if (route === constants.UNKNOWN_ROUTE) {
       return isString(params?.path) ? params.path : "";
     }
@@ -468,7 +488,14 @@ export class RoutesNamespace<
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
       this.#buildOptionsCache ?? createBuildOptions(options!);
 
-    return routeNodeBuildPath(this.#tree, route, encodedParams, buildOptions);
+    return routeNodeBuildPath(
+      this.#tree,
+      route,
+      encodedParams,
+      buildOptions,
+      // Cast to RouteTree[] - segments come from getSegmentsByName which returns RouteTree[]
+      segments as readonly RouteTree[] | undefined,
+    );
   }
 
   /**
@@ -922,12 +949,11 @@ export class RoutesNamespace<
   // Private methods
   // =========================================================================
 
-  #rebuildTree(skipValidation = false): void {
+  #rebuildTree(): void {
     this.#tree = createRouteTree(
       DEFAULT_ROUTE_NAME,
       this.#rootPath,
       this.#definitions,
-      { skipValidation },
     );
   }
 
@@ -969,6 +995,17 @@ export class RoutesNamespace<
     return params;
   }
 
+  /**
+   * Refreshes forward map cache, conditionally validating based on noValidate flag.
+   */
+  #refreshForwardMap(): void {
+    if (this.#noValidate) {
+      this.#cacheForwardMap();
+    } else {
+      this.#validateAndCacheForwardMap();
+    }
+  }
+
   #validateAndCacheForwardMap(): void {
     // Clear existing cache
     for (const key in this.#resolvedForwardMap) {
@@ -981,6 +1018,28 @@ export class RoutesNamespace<
         fromRoute,
         this.#config.forwardMap,
       );
+    }
+  }
+
+  /**
+   * Caches forward chains without validation (noValidate mode).
+   * Simply resolves chains without cycle detection or max depth checks.
+   */
+  #cacheForwardMap(): void {
+    // Clear existing cache
+    for (const key in this.#resolvedForwardMap) {
+      delete this.#resolvedForwardMap[key];
+    }
+
+    // Resolve chains without validation
+    for (const fromRoute of Object.keys(this.#config.forwardMap)) {
+      let current = fromRoute;
+
+      while (this.#config.forwardMap[current]) {
+        current = this.#config.forwardMap[current];
+      }
+
+      this.#resolvedForwardMap[fromRoute] = current;
     }
   }
 

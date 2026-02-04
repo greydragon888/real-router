@@ -6,6 +6,13 @@ import { createRouter } from "../helpers";
 
 import type { Route } from "../helpers";
 
+/**
+ * Batch size for stable measurements.
+ * Sub-µs operations need batching because measurement overhead
+ * is comparable to the operation itself.
+ */
+const BATCH = 100;
+
 const routes: Route[] = [
   { name: "home", path: "/" },
   { name: "about", path: "/about" },
@@ -21,8 +28,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.1.1 Building path for simple route", () => {
-    do_not_optimize(router.buildPath("about"));
+  bench(`7.1.1 Building path for simple route (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("about"));
+    }
   }).gc("inner");
 }
 
@@ -30,8 +39,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.1.2 Building path with parameters", () => {
-    do_not_optimize(router.buildPath("user", { id: "123" }));
+  bench(`7.1.2 Building path with parameters (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("user", { id: "123" }));
+    }
   }).gc("inner");
 }
 
@@ -39,8 +50,10 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.1.3 Building path for nested route", () => {
-    do_not_optimize(router.buildPath("users.profile", { id: "123" }));
+  bench(`7.1.3 Building path for nested route (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("users.profile", { id: "123" }));
+    }
   }).gc("inner");
 }
 
@@ -48,8 +61,15 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
-  bench("7.1.4 Building path with query parameters", () => {
-    do_not_optimize(router.buildPath("about", { search: "test", page: "1" }));
+  // JIT warmup for stable measurements
+  for (let i = 0; i < 300; i++) {
+    router.buildPath("about", { search: `test${i}`, page: String(i) });
+  }
+
+  bench(`7.1.4 Building path with query parameters (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("about", { search: "test", page: "1" }));
+    }
   }).gc("inner");
 }
 
@@ -59,8 +79,10 @@ const routes: Route[] = [
     urlParamsEncoding: "uriComponent",
   });
 
-  bench("7.1.5 Building path with parameter encoding", () => {
-    do_not_optimize(router.buildPath("user", { id: "test@example.com" }));
+  bench(`7.1.5 Building path with parameter encoding (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("user", { id: "test@example.com" }));
+    }
   }).gc("inner");
 }
 
@@ -74,8 +96,10 @@ const routes: Route[] = [
     },
   ]);
 
-  bench("7.1.6 Building path with defaultParams", () => {
-    do_not_optimize(router.buildPath("search"));
+  bench(`7.1.6 Building path with defaultParams (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("search"));
+    }
   }).gc("inner");
 }
 
@@ -89,8 +113,17 @@ const routes: Route[] = [
     },
   ]);
 
-  bench("7.1.7 Building path with custom encoder", () => {
-    do_not_optimize(router.buildPath("custom", { id: "123" }));
+  // JIT warmup for stable measurements
+  for (let i = 0; i < 1000; i++) {
+    router.buildPath("custom", { id: String(i) });
+  }
+
+  const BATCH_ENCODER = 500;
+
+  bench(`7.1.7 Building path with custom encoder (×${BATCH_ENCODER})`, () => {
+    for (let i = 0; i < BATCH_ENCODER; i++) {
+      do_not_optimize(router.buildPath("custom", { id: "123" }));
+    }
   }).gc("inner");
 }
 
@@ -100,12 +133,14 @@ const routes: Route[] = [
     trailingSlash: "always",
   });
 
-  bench("7.1.8 Building path with trailing slash", () => {
-    do_not_optimize(router.buildPath("about"));
+  bench(`7.1.8 Building path with trailing slash (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      do_not_optimize(router.buildPath("about"));
+    }
   }).gc("inner");
 }
 
-// 7.1.9 Multiple buildPath calls
+// 7.1.9 Multiple buildPath calls (already batched - 30 ops per iteration)
 {
   const router = createRouter(routes);
 

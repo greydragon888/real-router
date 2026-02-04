@@ -76,57 +76,6 @@ const routes: Route<TestDependencies>[] = [
 // Helper: routes to alternate between to avoid same-state short-circuit
 const alternatingRoutes = ["about", "home"];
 
-// JIT Warmup: Pre-warm dependency access code paths to avoid cold-start bias
-{
-  const warmupRouter = createRouter(routes, {}, testDependencies);
-
-  warmupRouter.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-
-      do_not_optimize(getDep("authService"));
-      do_not_optimize(getDep("logger"));
-      do_not_optimize(getDep("config"));
-      done();
-    },
-  );
-
-  warmupRouter.canActivate("about", (_router, depsOrGetDep) => () => {
-    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-
-    do_not_optimize(getDep("authService"));
-
-    return true;
-  });
-
-  warmupRouter.canActivate("home", (_router, depsOrGetDep) => () => {
-    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-
-    do_not_optimize(getDep("authService"));
-
-    return true;
-  });
-
-  warmupRouter.usePlugin((_router, depsOrGetDep) => {
-    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-
-    return {
-      onTransitionSuccess: () => {
-        do_not_optimize(getDep("analytics"));
-      },
-    };
-  });
-
-  warmupRouter.start("/");
-
-  for (let i = 0; i < 100; i++) {
-    warmupRouter.navigate(alternatingRoutes[i % 2]);
-  }
-
-  warmupRouter.stop();
-}
-
 // 3.5.1 Batch: Router creation with dependencies (1000 iterations)
 {
   bench(
