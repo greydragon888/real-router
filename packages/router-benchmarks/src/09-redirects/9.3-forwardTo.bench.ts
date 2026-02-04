@@ -11,14 +11,19 @@ import type { Route } from "../helpers";
   const routes: Route[] = [
     { name: "home", path: "/" },
     { name: "about", path: "/about" },
-    { name: "alias", path: "/alias", forwardTo: "about" },
+    { name: "users", path: "/users" },
+    // Two aliases forwarding to different destinations to avoid SAME_STATES
+    { name: "alias1", path: "/alias1", forwardTo: "about" },
+    { name: "alias2", path: "/alias2", forwardTo: "users" },
   ];
   const router = createRouter(routes);
+  const aliases = ["alias1", "alias2"];
+  let index = 0;
 
   router.start();
 
   bench("9.3.1 Automatic forward from forwardTo", () => {
-    router.navigate("alias");
+    router.navigate(aliases[index++ % 2]);
   }).gc("inner");
 }
 
@@ -30,11 +35,14 @@ import type { Route } from "../helpers";
     { name: "profile", path: "/profile/:id", forwardTo: "user" },
   ];
   const router = createRouter(routes);
+  // Alternate IDs to avoid SAME_STATES
+  const ids = ["123", "456"];
+  let index = 0;
 
   router.start();
 
   bench("9.3.2 Forward with parameters", () => {
-    router.navigate("profile", { id: "123" });
+    router.navigate("profile", { id: ids[index++ % 2] });
   }).gc("inner");
 }
 
@@ -42,15 +50,21 @@ import type { Route } from "../helpers";
 {
   const routes: Route[] = [
     { name: "home", path: "/" },
-    { name: "final", path: "/final" },
-    { name: "middle", path: "/middle", forwardTo: "final" },
-    { name: "start", path: "/start", forwardTo: "middle" },
+    // Two chains ending at different destinations to avoid SAME_STATES
+    { name: "final1", path: "/final1" },
+    { name: "middle1", path: "/middle1", forwardTo: "final1" },
+    { name: "start1", path: "/start1", forwardTo: "middle1" },
+    { name: "final2", path: "/final2" },
+    { name: "middle2", path: "/middle2", forwardTo: "final2" },
+    { name: "start2", path: "/start2", forwardTo: "middle2" },
   ];
   const router = createRouter(routes);
+  const starts = ["start1", "start2"];
+  let index = 0;
 
   router.start();
 
   bench("9.3.3 Chain of forward routes", () => {
-    router.navigate("start");
+    router.navigate(starts[index++ % 2]);
   }).gc("inner");
 }

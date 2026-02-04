@@ -10,7 +10,7 @@
     "eslint.config.*",
     "vitest.config.*"
   ],
-  "globalEnv": ["BENCH_ROUTER"],
+  "globalEnv": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"],
   "tasks": {
     "build": {
       "dependsOn": ["^build", "test"],

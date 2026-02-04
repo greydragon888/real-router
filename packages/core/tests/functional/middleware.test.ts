@@ -814,10 +814,9 @@ describe("core/middleware", () => {
         });
       });
 
-      it("should log warning when unsubscribe called after clearMiddleware", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
-
-        const factory = () => transitionMiddleware;
+      it("should handle unsubscribe safely after clearMiddleware (idempotent)", () => {
+        const tracker = createTrackingMiddleware();
+        const factory = () => tracker.middleware;
 
         router.clearMiddleware();
 
@@ -826,14 +825,11 @@ describe("core/middleware", () => {
         // Clear all middleware
         router.clearMiddleware();
 
-        // Unsubscribe after clear - should warn but not throw
+        // Unsubscribe after clear - should not throw (idempotent behavior)
         expect(() => {
           unsub();
+          unsub(); // Multiple calls also safe
         }).not.toThrowError();
-
-        expect(warnSpy).toHaveBeenCalled();
-
-        warnSpy.mockRestore();
       });
 
       it("should handle multiple unsubscribe calls safely", () => {

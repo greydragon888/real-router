@@ -19,6 +19,7 @@ export const defaultOptions: Options = {
   urlParamsEncoding: "default",
   allowNotFound: true,
   rewritePathOnMatch: true,
+  noValidate: false,
 } satisfies Options;
 
 /**

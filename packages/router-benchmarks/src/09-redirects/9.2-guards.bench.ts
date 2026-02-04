@@ -7,11 +7,14 @@ import { createSimpleRouter } from "../helpers";
 // 9.2.1 Redirect from canActivate guard
 {
   const router = createSimpleRouter();
+  let redirectCount = 0;
 
-  router.canActivate(
-    "about",
-    (_router) => () => _router.makeState("home", {}, "/"),
-  );
+  // Redirect to alternating destinations to avoid SAME_STATES
+  router.canActivate("about", (_router) => () => {
+    const target = redirectCount++ % 2 === 0 ? "home" : "users";
+
+    return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+  });
   router.start();
 
   bench("9.2.1 Redirect from canActivate guard", () => {
@@ -22,29 +25,53 @@ import { createSimpleRouter } from "../helpers";
 // 9.2.2 Redirect from canDeactivate guard
 {
   const router = createSimpleRouter();
+  let redirectCount = 0;
 
+  // Redirect to alternating destinations to avoid SAME_STATES
+  // Setup guards for both routes so we can alternate
+  router.canDeactivate("about", (_router) => () => {
+    const target = redirectCount++ % 2 === 0 ? "home" : "users";
+
+    return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+  });
   router.canDeactivate(
-    "about",
-    (_router) => () => _router.makeState("home", {}, "/"),
+    "home",
+    (_router) => () => _router.makeState("about", {}, "/about"),
+  );
+  router.canDeactivate(
+    "users",
+    (_router) => () => _router.makeState("about", {}, "/about"),
   );
   router.start();
   router.navigate("about");
 
+  // Navigate away from current route to trigger canDeactivate
+  const routes = ["users", "home"];
+  let index = 0;
+
   bench("9.2.2 Redirect from canDeactivate guard", () => {
-    router.navigate("users");
+    router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
 // 9.2.3 Redirect with context preservation
 {
   const router = createSimpleRouter();
+  let redirectCount = 0;
 
+  // Redirect to alternating destinations to avoid SAME_STATES
   router.canActivate(
     "user",
 
     (_router) => (toState) => {
       if (toState.params.id === "protected") {
-        return _router.makeState("home", {}, "/");
+        const target = redirectCount++ % 2 === 0 ? "home" : "about";
+
+        return _router.makeState(
+          target,
+          {},
+          target === "home" ? "/" : "/about",
+        );
       }
 
       return true;

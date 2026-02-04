@@ -9,7 +9,6 @@ import {
   LOGGER_CONTEXT,
 } from "./constants";
 import {
-  validateNoDuplicatePlugins,
   validatePlugin,
   validatePluginLimit,
   validateUsePluginArgs,
@@ -62,9 +61,16 @@ export class PluginsNamespace<
 
   static validateNoDuplicatePlugins<D extends DefaultDependencies>(
     newFactories: PluginFactory<D>[],
-    existingFactories: PluginFactory<D>[],
+    hasPlugin: (factory: PluginFactory<D>) => boolean,
   ): void {
-    validateNoDuplicatePlugins(newFactories, existingFactories);
+    for (const factory of newFactories) {
+      if (hasPlugin(factory)) {
+        throw new Error(
+          `[router.usePlugin] Plugin factory already registered. ` +
+            `To re-register, first unsubscribe the existing plugin.`,
+        );
+      }
+    }
   }
 
   // =========================================================================
@@ -109,6 +115,30 @@ export class PluginsNamespace<
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
     // Emit warnings for count thresholds (not validation, just warnings)
     this.#checkCountThresholds(factories.length);
+
+    // Fast path for single plugin (common case)
+    if (factories.length === 1) {
+      const factory = factories[0];
+      const cleanup = this.#startPlugin(factory);
+
+      this.#plugins.add(factory);
+
+      let unsubscribed = false;
+
+      return () => {
+        if (unsubscribed) {
+          return;
+        }
+
+        unsubscribed = true;
+        this.#plugins.delete(factory);
+        try {
+          cleanup();
+        } catch (error) {
+          logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
+        }
+      };
+    }
 
     // Deduplicate batch with warning (validation already done by facade)
     const seenInBatch = this.#deduplicateBatch(factories);
@@ -173,6 +203,14 @@ export class PluginsNamespace<
    */
   getAll(): PluginFactory<Dependencies>[] {
     return [...this.#plugins];
+  }
+
+  /**
+   * Checks if a plugin factory is registered.
+   * Used internally by validation to avoid array allocation.
+   */
+  has(factory: PluginFactory<Dependencies>): boolean {
+    return this.#plugins.has(factory);
   }
 
   // =========================================================================

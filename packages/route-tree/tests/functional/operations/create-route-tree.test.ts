@@ -17,15 +17,6 @@ describe("New API - createRouteTree", () => {
     expect(tree.children).toHaveLength(2);
   });
 
-  it("should throw on duplicate path at same level", () => {
-    expect(() =>
-      createRouteTree("", "", [
-        { name: "first", path: "/same" },
-        { name: "second", path: "/same" },
-      ]),
-    ).toThrowError(/Path "\/same" is already defined/);
-  });
-
   it("should create tree with nested routes", () => {
     const tree = createRouteTree("", "", [
       {

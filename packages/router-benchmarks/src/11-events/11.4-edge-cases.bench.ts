@@ -4,6 +4,11 @@ import { bench } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 50;
+
 // 11.4.1 Adding listener during dispatch
 {
   const router = createSimpleRouter();
@@ -102,15 +107,17 @@ import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
   const handler = () => {};
 
   bench(
-    "11.4.7 Multiple subscribe subscriptions with same function with unsubscribe",
+    `11.4.7 Multiple subscribe subscriptions with same function with unsubscribe (×${BATCH})`,
     () => {
-      const unsub1 = router.subscribe(handler);
-      const unsub2 = router.subscribe(handler);
-      const unsub3 = router.subscribe(handler);
+      for (let i = 0; i < BATCH; i++) {
+        const unsub1 = router.subscribe(handler);
+        const unsub2 = router.subscribe(handler);
+        const unsub3 = router.subscribe(handler);
 
-      unsub1();
-      unsub2();
-      unsub3();
+        unsub1();
+        unsub2();
+        unsub3();
+      }
     },
   ).gc("inner");
 }
@@ -213,10 +220,12 @@ if (!IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  bench("11.4.16 Removing listener via unsubscribe", () => {
-    const unsubscribe = router.addEventListener("$$success", () => {});
+  bench(`11.4.16 Removing listener via unsubscribe (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      const unsubscribe = router.addEventListener("$$success", () => {});
 
-    unsubscribe();
+      unsubscribe();
+    }
   }).gc("inner");
 }
 
@@ -224,13 +233,18 @@ if (!IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  bench("11.4.17 Multiple removal of same listener (idempotent)", () => {
-    const unsubscribe = router.addEventListener("$$success", () => {});
+  bench(
+    `11.4.17 Multiple removal of same listener (idempotent) (×${BATCH})`,
+    () => {
+      for (let i = 0; i < BATCH; i++) {
+        const unsubscribe = router.addEventListener("$$success", () => {});
 
-    unsubscribe();
-    unsubscribe();
-    unsubscribe();
-  }).gc("inner");
+        unsubscribe();
+        unsubscribe();
+        unsubscribe();
+      }
+    },
+  ).gc("inner");
 }
 
 // 11.4.18 Removing one of multiple listeners
@@ -241,9 +255,18 @@ if (!IS_ROUTER5) {
   router.addEventListener("$$success", () => {});
   router.addEventListener("$$success", () => {});
 
-  bench("11.4.18 Removing one of multiple listeners", () => {
+  // JIT warmup for stable memory measurements
+  for (let i = 0; i < 100; i++) {
     const unsubscribe = router.addEventListener("$$success", () => {});
 
     unsubscribe();
+  }
+
+  bench(`11.4.18 Removing one of multiple listeners (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      const unsubscribe = router.addEventListener("$$success", () => {});
+
+      unsubscribe();
+    }
   }).gc("inner");
 }

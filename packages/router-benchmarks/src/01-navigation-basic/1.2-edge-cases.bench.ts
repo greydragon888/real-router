@@ -163,40 +163,20 @@ if (!IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 1.2.8 Navigation with nested objects in parameters
-{
-  const routes: Route[] = [
-    { name: "home", path: "/" },
-    { name: "nested", path: "/nested?data" },
-  ];
-  const router = createRouter(routes, { queryParamsMode: "loose" });
-  const dataSets = [
-    { level1: { level2: { level3: { value: "deepA" } } } },
-    { level1: { level2: { level3: { value: "deepB" } } } },
-  ];
-  let index = 0;
-
-  router.start("/");
-
-  bench("1.2.8 Navigation with nested objects in parameters", () => {
-    router.navigate("nested", { data: dataSets[index++ % 2] });
-  }).gc("inner");
-}
-
 // 1.2.9 Fast sequential navigations
-// This test already alternates routes internally
+// Chain starts from about (not home) to avoid SAME_STATES on first navigate
 {
   const router = createSimpleRouter();
 
   router.start("/");
 
   bench("1.2.9 Fast sequential navigations", () => {
-    router.navigate("home");
     router.navigate("about");
     router.navigate("users");
     router.navigate("user", { id: "1" });
     router.navigate("home");
     router.navigate("about");
+    router.navigate("users");
   }).gc("inner");
 }
 

@@ -98,6 +98,12 @@ export class Router<
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
 
+  /**
+   * When true, skips argument validation in public methods for production performance.
+   * Constructor options are always validated (needed to validate noValidate itself).
+   */
+  readonly #noValidate: boolean;
+
   // ============================================================================
   // Constructor
   // ============================================================================
@@ -122,11 +128,26 @@ export class Router<
     // Validate inputs before creating namespaces
     // =========================================================================
 
+    // Always validate options (needed to validate noValidate itself)
     OptionsNamespace.validateOptions(options, "constructor");
-    DependenciesNamespace.validateDependenciesObject(
-      dependencies,
-      "constructor",
-    );
+
+    // Extract noValidate BEFORE creating namespaces
+    const noValidate = options.noValidate ?? false;
+
+    // Conditional validation for dependencies
+    if (!noValidate) {
+      DependenciesNamespace.validateDependenciesObject(
+        dependencies,
+        "constructor",
+      );
+    }
+
+    // Conditional validation for initial routes - structure and batch duplicates
+    // Validation happens BEFORE tree is built, so tree is not passed
+    if (!noValidate && routes.length > 0) {
+      RoutesNamespace.validateAddRouteArgs(routes);
+      RoutesNamespace.validateRoutes(routes);
+    }
 
     // =========================================================================
     // Create Namespaces
@@ -136,13 +157,14 @@ export class Router<
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
     this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
-    this.#routes = new RoutesNamespace<Dependencies>(routes);
+    this.#routes = new RoutesNamespace<Dependencies>(routes, noValidate);
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#middleware = new MiddlewareNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
     this.#navigation = new NavigationNamespace();
     this.#lifecycle = new RouterLifecycleNamespace();
     this.#clone = new CloneNamespace<Dependencies>();
+    this.#noValidate = noValidate;
 
     // =========================================================================
     // Setup Dependencies
@@ -234,15 +256,17 @@ export class Router<
   addRoute(routes: Route<Dependencies>[] | Route<Dependencies>): this {
     const routeArray = Array.isArray(routes) ? routes : [routes];
 
-    // 1. Static validation (route structure and properties)
-    RoutesNamespace.validateAddRouteArgs(routeArray);
+    if (!this.#noValidate) {
+      // 1. Static validation (route structure and properties)
+      RoutesNamespace.validateAddRouteArgs(routeArray);
 
-    // 2. State-dependent validation (duplicates, parent exists, forwardTo)
-    RoutesNamespace.validateRoutes(
-      routeArray,
-      this.#routes.getTree(),
-      this.#routes.getForwardRecord(),
-    );
+      // 2. State-dependent validation (duplicates, parent exists, forwardTo)
+      RoutesNamespace.validateRoutes(
+        routeArray,
+        this.#routes.getTree(),
+        this.#routes.getForwardRecord(),
+      );
+    }
 
     // 3. Execute (add definitions, register handlers, rebuild tree)
     this.#routes.addRoutes(routeArray);
@@ -252,7 +276,9 @@ export class Router<
 
   removeRoute(name: string): this {
     // Static validation
-    RoutesNamespace.validateRemoveRouteArgs(name);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateRemoveRouteArgs(name);
+    }
 
     // Instance validation (checks active route, navigation state)
     const canRemove = this.#routes.validateRemoveRoute(
@@ -301,20 +327,26 @@ export class Router<
   }
 
   getRoute(name: string): Route<Dependencies> | undefined {
-    validateRouteName(name, "getRoute");
+    if (!this.#noValidate) {
+      validateRouteName(name, "getRoute");
+    }
 
     return this.#routes.getRoute(name);
   }
 
   hasRoute(name: string): boolean {
-    validateRouteName(name, "hasRoute");
+    if (!this.#noValidate) {
+      validateRouteName(name, "hasRoute");
+    }
 
     return this.#routes.hasRoute(name);
   }
 
   updateRoute(name: string, updates: RouteConfigUpdate<Dependencies>): this {
     // Validate name and updates object structure (basic checks only)
-    RoutesNamespace.validateUpdateRouteBasicArgs(name, updates);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateUpdateRouteBasicArgs(name, updates);
+    }
 
     // Cache all property values upfront to protect against mutating getters.
     // This ensures consistent behavior regardless of getter side effects.
@@ -328,12 +360,14 @@ export class Router<
     } = updates;
 
     // Validate cached property values
-    RoutesNamespace.validateUpdateRoutePropertyTypes(
-      forwardTo,
-      defaultParams,
-      decodeParams,
-      encodeParams,
-    );
+    if (!this.#noValidate) {
+      RoutesNamespace.validateUpdateRoutePropertyTypes(
+        forwardTo,
+        defaultParams,
+        decodeParams,
+        encodeParams,
+      );
+    }
 
     // Warn if navigation is in progress
     if (this.#navigation.isNavigating()) {
@@ -344,7 +378,9 @@ export class Router<
     }
 
     // Instance validation (route existence, forwardTo checks) - use cached values
-    this.#routes.validateUpdateRoute(name, forwardTo);
+    if (!this.#noValidate) {
+      this.#routes.validateUpdateRoute(name, forwardTo);
+    }
 
     // Update route config
     this.#routes.updateRouteConfig(name, {
@@ -377,12 +413,14 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    RoutesNamespace.validateIsActiveRouteArgs(
-      name,
-      params,
-      strictEquality,
-      ignoreQueryParams,
-    );
+    if (!this.#noValidate) {
+      RoutesNamespace.validateIsActiveRouteArgs(
+        name,
+        params,
+        strictEquality,
+        ignoreQueryParams,
+      );
+    }
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
@@ -403,7 +441,9 @@ export class Router<
   }
 
   buildPath(route: string, params?: Params): string {
-    RoutesNamespace.validateBuildPathArgs(route);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateBuildPathArgs(route);
+    }
 
     return this.#routes.buildPath(route, params, this.#options.get());
   }
@@ -412,13 +452,18 @@ export class Router<
     path: string,
     source?: string,
   ): State<P, MP> | undefined {
-    RoutesNamespace.validateMatchPathArgs(path);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateMatchPathArgs(path);
+    }
 
     return this.#routes.matchPath<P, MP>(path, source, this.#options.get());
   }
 
   setRootPath(rootPath: string): void {
-    RoutesNamespace.validateSetRootPathArgs(rootPath);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateSetRootPathArgs(rootPath);
+    }
+
     this.#routes.setRootPath(rootPath);
   }
 
@@ -437,7 +482,9 @@ export class Router<
     meta?: StateMetaInput<MP>,
     forceId?: number,
   ): State<P, MP> {
-    StateNamespace.validateMakeStateArgs(name, params, path, forceId);
+    if (!this.#noValidate) {
+      StateNamespace.validateMakeStateArgs(name, params, path, forceId);
+    }
 
     return this.#state.makeState<P, MP>(name, params, path, meta, forceId);
   }
@@ -457,11 +504,13 @@ export class Router<
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
-    StateNamespace.validateAreStatesEqualArgs(
-      state1,
-      state2,
-      ignoreQueryParams,
-    );
+    if (!this.#noValidate) {
+      StateNamespace.validateAreStatesEqualArgs(
+        state1,
+        state2,
+        ignoreQueryParams,
+      );
+    }
 
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
@@ -470,11 +519,13 @@ export class Router<
     routeName: string,
     routeParams: P,
   ): SimpleState<P> {
-    RoutesNamespace.validateStateBuilderArgs(
-      routeName,
-      routeParams,
-      "forwardState",
-    );
+    if (!this.#noValidate) {
+      RoutesNamespace.validateStateBuilderArgs(
+        routeName,
+        routeParams,
+        "forwardState",
+      );
+    }
 
     return this.#routes.forwardState<P>(routeName, routeParams);
   }
@@ -483,11 +534,13 @@ export class Router<
     routeName: string,
     routeParams: Params,
   ): RouteTreeState | undefined {
-    RoutesNamespace.validateStateBuilderArgs(
-      routeName,
-      routeParams,
-      "buildState",
-    );
+    if (!this.#noValidate) {
+      RoutesNamespace.validateStateBuilderArgs(
+        routeName,
+        routeParams,
+        "buildState",
+      );
+    }
 
     // Call forwardState at facade level to allow plugin interception
     const { name, params } = this.forwardState(routeName, routeParams);
@@ -498,7 +551,9 @@ export class Router<
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
-    RoutesNamespace.validateShouldUpdateNodeArgs(nodeName);
+    if (!this.#noValidate) {
+      RoutesNamespace.validateShouldUpdateNodeArgs(nodeName);
+    }
 
     return this.#routes.shouldUpdateNode(nodeName);
   }
@@ -512,17 +567,22 @@ export class Router<
   }
 
   getOption<K extends keyof Options>(option: K): Options[K] {
-    OptionsNamespace.validateOptionName(option, "getOption");
-    OptionsNamespace.validateOptionExists(option, "getOption");
+    if (!this.#noValidate) {
+      OptionsNamespace.validateOptionName(option, "getOption");
+      OptionsNamespace.validateOptionExists(option, "getOption");
+    }
 
     return this.#options.getOption(option);
   }
 
   setOption(option: keyof Options, value: Options[keyof Options]): this {
-    OptionsNamespace.validateOptionName(option, "setOption");
-    OptionsNamespace.validateOptionExists(option, "setOption");
-    OptionsNamespace.validateNotLocked(this.#options.isLocked(), option);
-    OptionsNamespace.validateOptionValue(option, value, "setOption");
+    if (!this.#noValidate) {
+      OptionsNamespace.validateOptionName(option, "setOption");
+      OptionsNamespace.validateOptionExists(option, "setOption");
+      OptionsNamespace.validateNotLocked(this.#options.isLocked(), option);
+      OptionsNamespace.validateOptionValue(option, value, "setOption");
+    }
+
     this.#options.set(option, value);
 
     return this;
@@ -544,7 +604,9 @@ export class Router<
       | [startPathOrState: string | State, done: DoneFn]
   ): this {
     // Static validation
-    RouterLifecycleNamespace.validateStartArgs(args);
+    if (!this.#noValidate) {
+      RouterLifecycleNamespace.validateStartArgs(args);
+    }
 
     // Lock options when router starts
     this.#options.lock();
@@ -578,24 +640,26 @@ export class Router<
     name: string,
     canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
-    // 1. Validate input
-    validateRouteName(name, "canDeactivate");
-    RouteLifecycleNamespace.validateHandler(
-      canDeactivateHandler,
-      "canDeactivate",
-    );
+    if (!this.#noValidate) {
+      // 1. Validate input
+      validateRouteName(name, "canDeactivate");
+      RouteLifecycleNamespace.validateHandler(
+        canDeactivateHandler,
+        "canDeactivate",
+      );
 
-    // 2. Validate not registering
-    RouteLifecycleNamespace.validateNotRegistering(
-      this.#routeLifecycle.isRegistering(name),
-      name,
-      "canDeactivate",
-    );
+      // 2. Validate not registering
+      RouteLifecycleNamespace.validateNotRegistering(
+        this.#routeLifecycle.isRegistering(name),
+        name,
+        "canDeactivate",
+      );
+    }
 
     // 3. Check if overwrite and validate limit
     const isOverwrite = this.#routeLifecycle.hasCanDeactivate(name);
 
-    if (!isOverwrite) {
+    if (!isOverwrite && !this.#noValidate) {
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanDeactivate() + 1,
         "canDeactivate",
@@ -616,21 +680,26 @@ export class Router<
     name: string,
     canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
-    // 1. Validate input
-    validateRouteName(name, "canActivate");
-    RouteLifecycleNamespace.validateHandler(canActivateHandler, "canActivate");
+    if (!this.#noValidate) {
+      // 1. Validate input
+      validateRouteName(name, "canActivate");
+      RouteLifecycleNamespace.validateHandler(
+        canActivateHandler,
+        "canActivate",
+      );
 
-    // 2. Validate not registering
-    RouteLifecycleNamespace.validateNotRegistering(
-      this.#routeLifecycle.isRegistering(name),
-      name,
-      "canActivate",
-    );
+      // 2. Validate not registering
+      RouteLifecycleNamespace.validateNotRegistering(
+        this.#routeLifecycle.isRegistering(name),
+        name,
+        "canActivate",
+      );
+    }
 
     // 3. Check if overwrite and validate limit
     const isOverwrite = this.#routeLifecycle.hasCanActivate(name);
 
-    if (!isOverwrite) {
+    if (!isOverwrite && !this.#noValidate) {
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanActivate() + 1,
         "canActivate",
@@ -652,17 +721,22 @@ export class Router<
   // ============================================================================
 
   usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
-    // 1. Validate input arguments
-    PluginsNamespace.validateUsePluginArgs<Dependencies>(plugins);
+    if (!this.#noValidate) {
+      // 1. Validate input arguments
+      PluginsNamespace.validateUsePluginArgs<Dependencies>(plugins);
 
-    // 2. Validate limit
-    PluginsNamespace.validatePluginLimit(this.#plugins.count(), plugins.length);
+      // 2. Validate limit
+      PluginsNamespace.validatePluginLimit(
+        this.#plugins.count(),
+        plugins.length,
+      );
 
-    // 3. Validate no duplicates with existing plugins
-    PluginsNamespace.validateNoDuplicatePlugins(
-      plugins,
-      this.#plugins.getAll(),
-    );
+      // 3. Validate no duplicates with existing plugins
+      PluginsNamespace.validateNoDuplicatePlugins(
+        plugins,
+        this.#plugins.has.bind(this.#plugins),
+      );
+    }
 
     // 4. Execute (warnings, deduplication, initialization, commit)
     return this.#plugins.use(...plugins);
@@ -675,27 +749,34 @@ export class Router<
   useMiddleware(
     ...middlewares: MiddlewareFactory<Dependencies>[]
   ): Unsubscribe {
-    // 1. Validate input arguments
-    MiddlewareNamespace.validateUseMiddlewareArgs<Dependencies>(middlewares);
+    if (!this.#noValidate) {
+      // 1. Validate input arguments
+      MiddlewareNamespace.validateUseMiddlewareArgs<Dependencies>(middlewares);
 
-    // 2. Validate no duplicates
-    MiddlewareNamespace.validateNoDuplicates<Dependencies>(
-      middlewares,
-      this.#middleware.getFactories(),
-    );
+      // 2. Validate no duplicates
+      MiddlewareNamespace.validateNoDuplicates<Dependencies>(
+        middlewares,
+        this.#middleware.getFactories(),
+      );
 
-    // 3. Validate limit
-    MiddlewareNamespace.validateMiddlewareLimit(
-      this.#middleware.count(),
-      middlewares.length,
-    );
+      // 3. Validate limit
+      MiddlewareNamespace.validateMiddlewareLimit(
+        this.#middleware.count(),
+        middlewares.length,
+      );
+    }
 
     // 4. Initialize (without committing)
     const initialized = this.#middleware.initialize(...middlewares);
 
     // 5. Validate results
-    for (const { middleware, factory } of initialized) {
-      MiddlewareNamespace.validateMiddleware<Dependencies>(middleware, factory);
+    if (!this.#noValidate) {
+      for (const { middleware, factory } of initialized) {
+        MiddlewareNamespace.validateMiddleware<Dependencies>(
+          middleware,
+          factory,
+        );
+      }
     }
 
     // 6. Commit
@@ -716,30 +797,40 @@ export class Router<
     dependencyName: K,
     dependency: Dependencies[K],
   ): this {
-    DependenciesNamespace.validateSetDependencyArgs(dependencyName);
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateSetDependencyArgs(dependencyName);
+    }
+
     this.#dependencies.set(dependencyName, dependency);
 
     return this;
   }
 
   setDependencies(deps: Dependencies): this {
-    DependenciesNamespace.validateDependenciesObject(deps, "setDependencies");
-    DependenciesNamespace.validateDependencyLimit(
-      this.#dependencies.count(),
-      Object.keys(deps).length,
-      "setDependencies",
-    );
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateDependenciesObject(deps, "setDependencies");
+      DependenciesNamespace.validateDependencyLimit(
+        this.#dependencies.count(),
+        Object.keys(deps).length,
+        "setDependencies",
+      );
+    }
+
     this.#dependencies.setMultiple(deps);
 
     return this;
   }
 
   getDependency<K extends keyof Dependencies>(key: K): Dependencies[K] {
-    DependenciesNamespace.validateName(key, "getDependency");
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateName(key, "getDependency");
+    }
 
     const value = this.#dependencies.get(key);
 
-    DependenciesNamespace.validateDependencyExists(value, key);
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateDependencyExists(value, key as string);
+    }
 
     return value;
   }
@@ -749,14 +840,19 @@ export class Router<
   }
 
   removeDependency(dependencyName: keyof Dependencies): this {
-    DependenciesNamespace.validateName(dependencyName, "removeDependency");
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateName(dependencyName, "removeDependency");
+    }
+
     this.#dependencies.remove(dependencyName);
 
     return this;
   }
 
   hasDependency(dependencyName: keyof Dependencies): boolean {
-    DependenciesNamespace.validateName(dependencyName, "hasDependency");
+    if (!this.#noValidate) {
+      DependenciesNamespace.validateName(dependencyName, "hasDependency");
+    }
 
     return this.#dependencies.has(dependencyName);
   }
@@ -775,7 +871,9 @@ export class Router<
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
-    ObservableNamespace.validateListenerArgs(eventName, cb);
+    if (!this.#noValidate) {
+      ObservableNamespace.validateListenerArgs(eventName, cb);
+    }
 
     return this.#observable.addEventListener(eventName, cb);
   }
@@ -791,7 +889,9 @@ export class Router<
     done?: DoneFn,
   ): CancelFn {
     // 1. Validate route name
-    NavigationNamespace.validateNavigateArgs(routeName);
+    if (!this.#noValidate) {
+      NavigationNamespace.validateNavigateArgs(routeName);
+    }
 
     // 2. Parse polymorphic arguments
     const { params, opts, callback } = NavigationNamespace.parseNavigateArgs(
@@ -801,7 +901,9 @@ export class Router<
     );
 
     // 3. Validate parsed options
-    NavigationNamespace.validateNavigationOptions(opts, "navigate");
+    if (!this.#noValidate) {
+      NavigationNamespace.validateNavigationOptions(opts, "navigate");
+    }
 
     // 4. Execute navigation with parsed arguments
     return this.#navigation.navigate(routeName, params, opts, callback);
@@ -812,7 +914,9 @@ export class Router<
     done?: DoneFn,
   ): CancelFn {
     // 1. Validate arguments (before parsing)
-    NavigationNamespace.validateNavigateToDefaultArgs(optsOrDone, done);
+    if (!this.#noValidate) {
+      NavigationNamespace.validateNavigateToDefaultArgs(optsOrDone, done);
+    }
 
     // 2. Parse polymorphic arguments
     const { opts, callback } = NavigationNamespace.parseNavigateToDefaultArgs(
@@ -821,7 +925,9 @@ export class Router<
     );
 
     // 3. Validate parsed options
-    NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
+    if (!this.#noValidate) {
+      NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
+    }
 
     // 4. Execute navigation with parsed arguments
     return this.#navigation.navigateToDefault(opts, callback);
@@ -834,13 +940,15 @@ export class Router<
     callback: DoneFn,
     emitSuccess: boolean,
   ): CancelFn {
-    NavigationNamespace.validateNavigateToStateArgs(
-      toState,
-      fromState,
-      opts,
-      callback,
-      emitSuccess,
-    );
+    if (!this.#noValidate) {
+      NavigationNamespace.validateNavigateToStateArgs(
+        toState,
+        fromState,
+        opts,
+        callback,
+        emitSuccess,
+      );
+    }
 
     return this.#navigation.navigateToState(
       toState,
@@ -856,7 +964,9 @@ export class Router<
   // ============================================================================
 
   subscribe(listener: SubscribeFn): Unsubscribe {
-    ObservableNamespace.validateSubscribeListener(listener);
+    if (!this.#noValidate) {
+      ObservableNamespace.validateSubscribeListener(listener);
+    }
 
     return this.#observable.subscribe(listener);
   }
@@ -880,7 +990,9 @@ export class Router<
   // ============================================================================
 
   clone(dependencies?: Dependencies): Router<Dependencies> {
-    CloneNamespace.validateCloneArgs(dependencies);
+    if (!this.#noValidate) {
+      CloneNamespace.validateCloneArgs(dependencies);
+    }
 
     return this.#clone.clone(
       dependencies,
@@ -958,13 +1070,6 @@ export class Router<
         this.#state.set(state);
       },
       buildStateWithSegments: (routeName, routeParams) => {
-        // Validation must happen here since we bypass the facade method
-        RoutesNamespace.validateStateBuilderArgs(
-          routeName,
-          routeParams,
-          "buildStateWithSegments",
-        );
-
         // Call forwardState to allow plugin interception
         const { name, params } = this.forwardState(routeName, routeParams);
 
@@ -972,7 +1077,8 @@ export class Router<
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) => this.buildPath(route, params),
+      buildPath: (route, params, segments) =>
+        this.#routes.buildPath(route, params, this.#options.get(), segments),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {

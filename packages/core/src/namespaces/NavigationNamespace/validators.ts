@@ -18,6 +18,13 @@ import type {
 const noop = (): void => {};
 
 /**
+ * Cached frozen empty objects to reduce GC pressure.
+ * Safe because they're frozen and cannot be mutated.
+ */
+const EMPTY_PARAMS: Params = Object.freeze({});
+const EMPTY_OPTS: NavigationOptions = Object.freeze({});
+
+/**
  * Validates navigate route name argument.
  */
 export function validateNavigateArgs(name: unknown): asserts name is string {
@@ -141,21 +148,21 @@ export function parseNavigateArgs(
 ): ParsedNavigateArgs {
   if (typeof paramsOrDone === "function") {
     // Form: navigate(name, callback)
-    return { params: {}, opts: {}, callback: paramsOrDone };
+    return { params: EMPTY_PARAMS, opts: EMPTY_OPTS, callback: paramsOrDone };
   }
 
   // Forms: navigate(name), navigate(name, params), navigate(name, params, callback),
   //        navigate(name, params, opts), navigate(name, params, opts, callback)
   // Also handles: navigate(name, null/undefined, callback) - runtime defense
-  const params = paramsOrDone ?? {};
+  const params = paramsOrDone ?? EMPTY_PARAMS;
 
   if (typeof optsOrDone === "function") {
-    return { params, opts: {}, callback: optsOrDone };
+    return { params, opts: EMPTY_OPTS, callback: optsOrDone };
   }
 
   return {
     params,
-    opts: optsOrDone ?? {},
+    opts: optsOrDone ?? EMPTY_OPTS,
     callback: done ?? noop,
   };
 }
@@ -168,11 +175,11 @@ export function parseNavigateToDefaultArgs(
   done?: DoneFn,
 ): ParsedNavigateDefaultArgs {
   if (typeof optsOrDone === "function") {
-    return { opts: {}, callback: optsOrDone };
+    return { opts: EMPTY_OPTS, callback: optsOrDone };
   }
 
   return {
-    opts: optsOrDone ?? {},
+    opts: optsOrDone ?? EMPTY_OPTS,
     callback: done ?? noop,
   };
 }

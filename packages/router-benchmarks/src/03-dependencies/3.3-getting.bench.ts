@@ -4,6 +4,11 @@ import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 100;
+
 // 3.3.1 Getting single dependency
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
@@ -11,9 +16,11 @@ if (!IS_ROUTER5) {
   // @ts-expect-error - test dependency
   router.setDependency("service", { value: 1 });
 
-  bench("3.3.1 Getting single dependency", () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(router.getDependency("service"));
+  bench(`3.3.1 Getting single dependency (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      do_not_optimize(router.getDependency("service"));
+    }
   }).gc("inner");
 }
 
@@ -24,10 +31,12 @@ if (!IS_ROUTER5) {
   // @ts-expect-error - test dependency
   router.setDependency("service", { value: 1 });
 
-  bench("3.3.2 Multiple getting of single dependency", () => {
-    for (let i = 0; i < 10; i++) {
-      // @ts-expect-error - test dependency
-      do_not_optimize(router.getDependency("service"));
+  bench(`3.3.2 Multiple getting of single dependency (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      for (let j = 0; j < 10; j++) {
+        // @ts-expect-error - test dependency
+        do_not_optimize(router.getDependency("service"));
+      }
     }
   }).gc("inner");
 }
@@ -56,9 +65,11 @@ if (!IS_ROUTER5) {
   // @ts-expect-error - test dependency
   router.setDependency("service", { value: 1 });
 
-  bench("3.3.4 Checking dependency existence", () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(router.hasDependency("service"));
+  bench(`3.3.4 Checking dependency existence (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      do_not_optimize(router.hasDependency("service"));
+    }
   }).gc("inner");
 }
 

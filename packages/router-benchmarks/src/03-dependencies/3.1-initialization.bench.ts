@@ -6,6 +6,11 @@ import { createRouter, IS_ROUTER5 } from "../helpers";
 
 import type { Route } from "../helpers";
 
+/**
+ * Batch size for stable measurements on sub-µs operations.
+ */
+const BATCH = 100;
+
 const routes: Route[] = [
   { name: "home", path: "/" },
   { name: "about", path: "/about" },
@@ -15,9 +20,11 @@ const routes: Route[] = [
 if (!IS_ROUTER5) {
   const router = createRouter(routes);
 
-  bench("3.1.1 Setting empty dependencies", () => {
-    router.setDependencies({});
-    router.resetDependencies();
+  bench(`3.1.1 Setting empty dependencies (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies({});
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -25,10 +32,12 @@ if (!IS_ROUTER5) {
 if (!IS_ROUTER5) {
   const router = createRouter(routes);
 
-  bench("3.1.2 Setting single dependency", () => {
-    // @ts-expect-error - test dependency
-    router.setDependency("service", { name: "test" });
-    router.resetDependencies();
+  bench(`3.1.2 Setting single dependency (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      // @ts-expect-error - test dependency
+      router.setDependency("service", { name: "test" });
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -41,9 +50,11 @@ if (!IS_ROUTER5) {
     deps[`service${i}`] = { id: i };
   }
 
-  bench("3.1.3 Setting multiple dependencies", () => {
-    router.setDependencies(deps);
-    router.resetDependencies();
+  bench(`3.1.3 Setting multiple dependencies (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies(deps);
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -56,9 +67,11 @@ if (!IS_ROUTER5) {
     boolean: true,
   };
 
-  bench("3.1.4 Setting simple dependencies", () => {
-    router.setDependencies(simpleDeps);
-    router.resetDependencies();
+  bench(`3.1.4 Setting simple dependencies (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies(simpleDeps);
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -70,9 +83,11 @@ if (!IS_ROUTER5) {
     api: { fetch: () => Promise.resolve() },
   };
 
-  bench("3.1.5 Setting object dependencies", () => {
-    router.setDependencies(objectDeps);
-    router.resetDependencies();
+  bench(`3.1.5 Setting object dependencies (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies(objectDeps);
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
 
@@ -84,8 +99,10 @@ if (!IS_ROUTER5) {
     validator: Boolean,
   };
 
-  bench("3.1.6 Setting function dependencies", () => {
-    router.setDependencies(funcDeps);
-    router.resetDependencies();
+  bench(`3.1.6 Setting function dependencies (×${BATCH})`, () => {
+    for (let i = 0; i < BATCH; i++) {
+      router.setDependencies(funcDeps);
+      router.resetDependencies();
+    }
   }).gc("inner");
 }
