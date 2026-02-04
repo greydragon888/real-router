@@ -29,7 +29,7 @@ describe("useRouteNode", () => {
       wrapper: (props) => wrapper({ ...props, router }),
     });
 
-    expect(result.current.router).toStrictEqual(router);
+    expect(result.current.navigator).toBeDefined();
     expect(result.current.route).toStrictEqual(undefined);
     expect(result.current.previousRoute).toStrictEqual(undefined);
   });
@@ -257,7 +257,7 @@ describe("useRouteNode", () => {
 
       expect(result.current.route).toBeUndefined();
       expect(result.current.previousRoute).toBeUndefined();
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
     });
 
     it("should handle root node when navigating to non-existent route", () => {

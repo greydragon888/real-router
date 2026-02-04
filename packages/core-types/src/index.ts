@@ -35,6 +35,7 @@ export type {
   SubscribeFn,
   Listener,
   Subscription,
+  Navigator,
 } from "./router";
 
 export type {

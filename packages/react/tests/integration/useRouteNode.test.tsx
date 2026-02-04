@@ -37,7 +37,7 @@ describe("useRouteNode - Integration Tests", () => {
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
       expect(result.current.route?.name).toBe("users.list");
     });
 
@@ -46,7 +46,7 @@ describe("useRouteNode - Integration Tests", () => {
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
-      expect(result.current).toHaveProperty("router");
+      expect(result.current).toHaveProperty("navigator");
       expect(result.current).toHaveProperty("route");
       expect(result.current).toHaveProperty("previousRoute");
     });
@@ -404,7 +404,7 @@ describe("useRouteNode - Integration Tests", () => {
       router.start("/users/list");
 
       const NavigationComponent: FC = () => {
-        const { router: contextRouter, route } = useRouteNode("users");
+        const { navigator: contextNavigator, route } = useRouteNode("users");
 
         return (
           <div>
@@ -412,7 +412,7 @@ describe("useRouteNode - Integration Tests", () => {
             <button
               data-testid="navigate-btn"
               onClick={() => {
-                contextRouter.navigate("users.view", { id: "1" });
+                contextNavigator.navigate("users.view", { id: "1" });
               }}
             >
               Navigate
@@ -479,7 +479,7 @@ describe("useRouteNode - Integration Tests", () => {
 
       // Should return undefined route for non-matching node
       expect(result.current.route).toBeUndefined();
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
     });
 
     it("should handle router restart", () => {
@@ -497,7 +497,7 @@ describe("useRouteNode - Integration Tests", () => {
 
       // After restart, the component should still work
       // (though route might be stale until next navigation)
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
     });
 
     it("should handle rapid navigation", async () => {
@@ -530,14 +530,14 @@ describe("useRouteNode - Integration Tests", () => {
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
-      const initialRouter = result.current.router;
+      const initialNavigator = result.current.navigator;
 
       act(() => {
         router.navigate("users.view", { id: "1" });
       });
 
-      // Router reference should be stable
-      expect(result.current.router).toBe(initialRouter);
+      // Navigator reference should be stable
+      expect(result.current.navigator).toBe(initialNavigator);
     });
   });
 
