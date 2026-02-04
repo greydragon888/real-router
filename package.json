@@ -118,7 +118,8 @@
       "unrs-resolver"
     ],
     "overrides": {
-      "@types/node": "$@types/node"
+      "@types/node": "$@types/node",
+      "@isaacs/brace-expansion": "5.0.1"
     }
   },
   "packageManager": "pnpm@10.24.0"
