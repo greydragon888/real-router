@@ -3,7 +3,7 @@
 "@real-router/types": minor
 ---
 
-Add `noValidate` option to disable validation in production
+Add `noValidate` option to disable validation in production (#53)
 
 New configuration option for performance-critical environments:
 

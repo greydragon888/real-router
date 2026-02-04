@@ -17,6 +17,7 @@ pnpm changeset
 - **Separate by type** — don't mix features, fixes, and performance improvements in one changeset
 - **Public packages only** — skip private packages (`"private": true` in package.json)
 - **Multi-package changesets** — same description will be copied to ALL listed packages in CHANGELOG
+- **Include PR/issue reference** — add `(#XX)` to title for traceability in release notes
 
 ## File Naming Convention
 
@@ -37,7 +38,7 @@ Use descriptive kebab-case names that reflect the change:
 "@real-router/types": minor
 ---
 
-Short title describing the change
+Short title describing the change (#XX)
 
 Optional detailed description with:
 
@@ -91,7 +92,7 @@ Follow [Semantic Versioning](https://semver.org/):
 "@real-router/types": minor
 ---
 
-Add `noValidate` option to disable validation in production
+Add `noValidate` option to disable validation in production (#XX)
 
 New configuration option for performance-critical environments:
 
@@ -119,7 +120,7 @@ Constructor always validates options object itself.
 "@real-router/core": patch
 ---
 
-Make middleware unsubscribe function idempotent
+Make middleware unsubscribe function idempotent (#XX)
 
 Calling unsubscribe multiple times no longer throws an error.
 ```
@@ -133,7 +134,7 @@ Calling unsubscribe multiple times no longer throws an error.
 "@real-router/core": patch
 ---
 
-Optimize `usePlugin()` for single-plugin calls
+Optimize `usePlugin()` for single-plugin calls (#XX)
 
 Skip array/Set allocation when registering a single plugin.
 ```
@@ -147,7 +148,7 @@ Skip array/Set allocation when registering a single plugin.
 "@real-router/core": minor
 ---
 
-Remove deprecated `forward()` method
+Remove deprecated `forward()` method (#XX)
 
 **Breaking Change:** The `forward()` method has been removed.
 
