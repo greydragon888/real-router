@@ -1,5 +1,17 @@
 # @real-router/types
 
+## 0.4.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `Navigator` interface for safe router subset (#37)
+
+  New `Navigator` interface providing minimal router API for UI components:
+  - `navigate()` — navigate to route
+  - `getState()` — get current state
+  - `isActiveRoute()` — check if route is active
+  - `subscribe()` — subscribe to route changes
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,5 +1,26 @@
 # @real-router/core
 
+## 0.6.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getNavigator()` method (#37)
+
+  New `Router.getNavigator()` method returns a frozen, cached `Navigator` instance with safe subset of router methods for UI components.
+
+  ```typescript
+  const navigator = router.getNavigator();
+  navigator.navigate("home");
+  navigator.getState();
+  navigator.isActiveRoute("home");
+  navigator.subscribe(listener);
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/types@0.4.0
+
 ## 0.5.0
 
 ### Minor Changes
