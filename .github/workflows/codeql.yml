@@ -48,4 +48,5 @@ jobs:
         with:
           fail-on-severity: moderate
           config-file: ./.github/dependency-review-config.yml
-          comment-summary-in-pr: always
+          comment-summary-in-pr: on-failure
+          allow-dependencies-licenses: workspace:*

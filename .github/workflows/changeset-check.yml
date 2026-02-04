@@ -58,7 +58,7 @@ jobs:
           echo "  pnpm changeset"
           echo ""
           echo "Or create a file manually in .changeset/ directory."
-          echo "See CLAUDE.md for changeset format guidelines."
+          echo "See .changeset/README.md for detailed guidelines and examples."
           echo ""
           echo "If this change doesn't need a release, add #trivial to PR title."
           exit 1
