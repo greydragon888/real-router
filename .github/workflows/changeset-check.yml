@@ -3,10 +3,66 @@ name: Changeset Check
 on:
   pull_request:
     branches: [master]
-    paths:
-      - ".changeset/**"
 
 jobs:
+  require-changeset:
+    name: Require Changeset
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for source changes requiring changeset
+        id: check
+        run: |
+          # Get files changed in PR
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+
+          # Public packages that require changesets
+          PUBLIC_PACKAGES="core|core-types|react|browser-plugin|logger|logger-plugin|helpers|persistent-params-plugin"
+
+          # Check if any source files in public packages changed
+          SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/" || true)
+
+          if [ -z "$SOURCE_CHANGED" ]; then
+            echo "No source files changed in public packages"
+            echo "needs_changeset=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Source files changed:"
+          echo "$SOURCE_CHANGED"
+          echo "needs_changeset=true" >> $GITHUB_OUTPUT
+
+          # Check for changeset files
+          CHANGESETS=$(echo "$CHANGED" | grep -E '^\.changeset/.*\.md$' | grep -v README.md || true)
+
+          if [ -z "$CHANGESETS" ]; then
+            echo "has_changeset=false" >> $GITHUB_OUTPUT
+          else
+            echo "Changesets found:"
+            echo "$CHANGESETS"
+            echo "has_changeset=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Fail if changeset missing
+        if: steps.check.outputs.needs_changeset == 'true' && steps.check.outputs.has_changeset == 'false'
+        run: |
+          echo "::error::Source files changed but no changeset found!"
+          echo ""
+          echo "Public package source files were modified. A changeset is required."
+          echo ""
+          echo "To add a changeset, run:"
+          echo "  pnpm changeset"
+          echo ""
+          echo "Or create a file manually in .changeset/ directory."
+          echo "See CLAUDE.md for changeset format guidelines."
+          echo ""
+          echo "If this change doesn't need a release, add #trivial to PR title."
+          exit 1
+
   check-pr-reference:
     name: Check PR Reference
     runs-on: ubuntu-latest
