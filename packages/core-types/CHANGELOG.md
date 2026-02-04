@@ -1,5 +1,22 @@
 # @real-router/types
 
+## 0.3.0
+
+### Minor Changes
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `noValidate` option to disable validation in production (#53)
+
+  New configuration option for performance-critical environments:
+
+  ```typescript
+  const router = createRouter(routes, {
+    noValidate: process.env.NODE_ENV === "production",
+  });
+  ```
+
+  When enabled, skips argument validation in ~40 public methods.
+  Constructor always validates options object itself.
+
 ## 0.2.0
 
 ### Minor Changes
