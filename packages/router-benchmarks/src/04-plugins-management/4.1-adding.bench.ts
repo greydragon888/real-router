@@ -26,26 +26,6 @@ const BATCH = 50;
   }).gc("inner");
 }
 
-// 4.1.2 Adding multiple plugins in single call with cleanup
-{
-  const router = createSimpleRouter();
-
-  bench(
-    `4.1.2 Adding multiple plugins in single call with cleanup (×${BATCH})`,
-    () => {
-      for (let i = 0; i < BATCH; i++) {
-        const unsubscribe = router.usePlugin(
-          () => ({ onTransitionStart: () => {} }),
-          () => ({ onTransitionSuccess: () => {} }),
-          () => ({ onTransitionError: () => {} }),
-        );
-
-        unsubscribe();
-      }
-    },
-  ).gc("inner");
-}
-
 // 4.1.3 Sequential plugin adding with cleanup
 {
   const router = createSimpleRouter();
@@ -138,52 +118,6 @@ const BATCH = 50;
         router.canDeactivate("about", () => () => true);
         // Overwrite with true to effectively clear the guard
         router.canDeactivate("about", true);
-      }
-    },
-  ).gc("inner");
-}
-
-// 4.1.9 Adding guards for multiple routes with cleanup
-{
-  const router = createSimpleRouter();
-
-  bench(
-    `4.1.9 Adding guards for multiple routes with cleanup (×${BATCH})`,
-    () => {
-      for (let i = 0; i < BATCH; i++) {
-        router.canActivate("home", () => () => true);
-        router.canActivate("about", () => () => true);
-        router.canActivate("users", () => () => true);
-        router.canDeactivate("home", () => () => true);
-        router.canDeactivate("about", () => () => true);
-        // Overwrite with true to effectively clear guards
-        router.canActivate("home", true);
-        router.canActivate("about", true);
-        router.canActivate("users", true);
-        router.canDeactivate("home", true);
-        router.canDeactivate("about", true);
-      }
-    },
-  ).gc("inner");
-}
-
-// 4.1.10 Adding guards for nested routes with cleanup
-{
-  const router = createSimpleRouter();
-
-  bench(
-    `4.1.10 Adding guards for nested routes with cleanup (×${BATCH})`,
-    () => {
-      for (let i = 0; i < BATCH; i++) {
-        router.canActivate("users", () => () => true);
-        router.canActivate("user", () => () => true);
-        router.canDeactivate("users", () => () => true);
-        router.canDeactivate("user", () => () => true);
-        // Overwrite with true to effectively clear guards
-        router.canActivate("users", true);
-        router.canActivate("user", true);
-        router.canDeactivate("users", true);
-        router.canDeactivate("user", true);
       }
     },
   ).gc("inner");

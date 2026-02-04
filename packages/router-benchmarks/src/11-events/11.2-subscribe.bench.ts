@@ -65,19 +65,3 @@ const BATCH = 50;
     },
   ).gc("inner");
 }
-
-// 11.2.4 Getting data in subscribe handler
-{
-  const router = createSimpleRouter();
-  const routes = ["about", "home"];
-  let index = 0;
-
-  router.subscribe(() => {
-    // Access route and previousRoute in handler
-  });
-  router.start();
-
-  bench("11.2.4 Getting data in subscribe handler", () => {
-    router.navigate(routes[index++ % 2]);
-  }).gc("inner");
-}

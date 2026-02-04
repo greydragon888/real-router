@@ -24,32 +24,6 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   }).gc("inner");
 }
 
-// 12.3.2 Navigation with 50 asynchronous middleware
-{
-  const router = createSimpleRouter();
-  const alternatingRoutes = ["about", "home"];
-  let index = 0;
-
-  // Add 50 middleware (max limit)
-  for (let i = 0; i < 50; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      Promise.resolve()
-        .then(() => {
-          done();
-        })
-        .catch(() => {
-          // Error handling
-        });
-    });
-  }
-
-  router.start();
-
-  bench("12.3.2 Navigation with 50 asynchronous middleware", () => {
-    router.navigate(alternatingRoutes[index++ % 2]);
-  }).gc("inner");
-}
-
 // 12.3.3 Thousand navigations with 10 middleware
 {
   const router = createSimpleRouter();

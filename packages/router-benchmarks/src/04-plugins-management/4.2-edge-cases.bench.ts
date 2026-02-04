@@ -62,38 +62,6 @@ const BATCH = 50;
   ).gc("inner");
 }
 
-// 4.2.4 Guard returning boolean value
-{
-  const router = createSimpleRouter();
-
-  router.canActivate("about", () => () => true);
-  router.start();
-  const routes = ["about", "home"];
-  let index = 0;
-
-  bench("4.2.4 Guard returning boolean value", () => {
-    router.navigate(routes[index++ % 2]);
-  }).gc("inner");
-}
-
-// 4.2.5 Guard returning Promise<boolean>
-{
-  const router = createSimpleRouter();
-
-  router.canActivate("about", () => () => Promise.resolve(true));
-  router.start();
-  const routes = ["about", "home"];
-  let index = 0;
-
-  bench("4.2.5 Guard returning Promise<boolean>", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(routes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
-  }).gc("inner");
-}
-
 // 4.2.6 Guard returning State
 {
   const router = createSimpleRouter();
@@ -247,24 +215,4 @@ const BATCH = 50;
       unsubscribe();
     }
   }).gc("inner");
-}
-
-// 4.2.14 Full middleware cleanup via clearMiddleware
-{
-  const router = createSimpleRouter();
-
-  bench(
-    `4.2.14 Full middleware cleanup via clearMiddleware (×${BATCH})`,
-    () => {
-      for (let b = 0; b < BATCH; b++) {
-        for (let i = 0; i < 5; i++) {
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
-          });
-        }
-
-        router.clearMiddleware();
-      }
-    },
-  ).gc("inner");
 }

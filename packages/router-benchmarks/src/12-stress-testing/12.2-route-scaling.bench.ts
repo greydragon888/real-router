@@ -316,27 +316,3 @@ if (IS_ROUTER5) {
     }
   }).gc("inner");
 }
-
-// 12.2.7 MatchPath in router with 500 routes
-if (IS_ROUTER5) {
-  const router = createSimpleRouter();
-
-  for (let i = 0; i < 500; i++) {
-    // @ts-expect-error - use method from router5
-    router.add({ name: `route${i}`, path: `/route${i}` });
-  }
-
-  bench("12.2.7 MatchPath in router with 500 routes", () => {
-    do_not_optimize(router.matchPath("/route499"));
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  for (let i = 0; i < 500; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
-  }
-
-  bench("12.2.7 MatchPath in router with 500 routes", () => {
-    do_not_optimize(router.matchPath("/route499"));
-  }).gc("inner");
-}
