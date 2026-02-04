@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-04]
 
+### @real-router/browser-plugin@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/core@0.6.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getNavigator()` method (#37)
+
+  New `Router.getNavigator()` method returns a frozen, cached `Navigator` instance with safe subset of router methods for UI components.
+
+  ```typescript
+  const navigator = router.getNavigator();
+  navigator.navigate("home");
+  navigator.getState();
+  navigator.isActiveRoute("home");
+  navigator.subscribe(listener);
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/types@0.4.0
+
+### @real-router/helpers@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/logger-plugin@0.2.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/persistent-params-plugin@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/react@0.2.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useNavigator()` hook and update React bindings (#37)
+
+  **New:**
+  - `useNavigator()` hook for direct Navigator access
+  - `NavigatorContext` for providing Navigator to components
+
+  **BREAKING CHANGE:**
+  - `useRoute()` now returns `{ navigator, route, previousRoute }` instead of `{ router, ... }`
+  - `useRouteNode()` now returns `{ navigator, route, previousRoute }` instead of `{ router, ... }`
+
+  **Migration:**
+
+  ```tsx
+  // Before
+  const { router, route } = useRoute();
+  router.navigate("home");
+
+  // After
+  const { navigator, route } = useRoute();
+  navigator.navigate("home");
+
+  // For full Router access:
+  const router = useRouter();
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+  - @real-router/browser-plugin@0.1.9
+  - @real-router/helpers@0.1.9
+
+### @real-router/types@0.4.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `Navigator` interface for safe router subset (#37)
+
+  New `Navigator` interface providing minimal router API for UI components:
+  - `navigate()` — navigate to route
+  - `getState()` — get current state
+  - `isActiveRoute()` — check if route is active
+  - `subscribe()` — subscribe to route changes
+
+
 ### @real-router/browser-plugin@0.1.8
 
 ### Patch Changes

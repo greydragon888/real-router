@@ -1,5 +1,41 @@
 # @real-router/react
 
+## 0.2.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useNavigator()` hook and update React bindings (#37)
+
+  **New:**
+  - `useNavigator()` hook for direct Navigator access
+  - `NavigatorContext` for providing Navigator to components
+
+  **BREAKING CHANGE:**
+  - `useRoute()` now returns `{ navigator, route, previousRoute }` instead of `{ router, ... }`
+  - `useRouteNode()` now returns `{ navigator, route, previousRoute }` instead of `{ router, ... }`
+
+  **Migration:**
+
+  ```tsx
+  // Before
+  const { router, route } = useRoute();
+  router.navigate("home");
+
+  // After
+  const { navigator, route } = useRoute();
+  navigator.navigate("home");
+
+  // For full Router access:
+  const router = useRouter();
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+  - @real-router/browser-plugin@0.1.9
+  - @real-router/helpers@0.1.9
+
 ## 0.1.8
 
 ### Patch Changes

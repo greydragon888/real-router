@@ -1,6 +1,6 @@
 {
   "name": "@real-router/core",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "type": "commonjs",
   "description": "A simple, powerful, view-agnostic, modular and extensible router",
   "main": "./dist/cjs/index.js",
