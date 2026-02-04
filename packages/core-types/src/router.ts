@@ -183,3 +183,27 @@ export interface Listener {
 export interface Subscription {
   unsubscribe: Unsubscribe;
 }
+
+/**
+ * Navigator interface - a minimal, safe subset of Router methods.
+ *
+ * Provides only the essential navigation and state inspection methods.
+ * Excludes lifecycle methods (start, stop), plugin management, and internal APIs.
+ * Use this when you need to pass a limited router interface to components.
+ *
+ * For full router access, use the Router interface directly or the useRouter() hook.
+ */
+export interface Navigator {
+  navigate: (
+    routeName: string,
+    params?: Params,
+    options?: NavigationOptions,
+  ) => Promise<State | undefined>;
+  getState: () => State | undefined;
+  isActive: (
+    routeName: string,
+    params?: Params,
+    strictEquality?: boolean,
+  ) => boolean;
+  subscribe: (fn: SubscribeFn) => Subscription;
+}
