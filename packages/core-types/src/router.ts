@@ -15,6 +15,7 @@ import type {
   NavigationOptions,
   RouterError,
   Unsubscribe,
+  CancelFn,
 } from "./base";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
 
@@ -196,14 +197,16 @@ export interface Subscription {
 export interface Navigator {
   navigate: (
     routeName: string,
-    params?: Params,
-    options?: NavigationOptions,
-  ) => Promise<State | undefined>;
+    routeParamsOrDone?: Params | DoneFn,
+    optionsOrDone?: NavigationOptions | DoneFn,
+    done?: DoneFn,
+  ) => CancelFn;
   getState: () => State | undefined;
-  isActive: (
-    routeName: string,
+  isActiveRoute: (
+    name: string,
     params?: Params,
     strictEquality?: boolean,
+    ignoreQueryParams?: boolean,
   ) => boolean;
-  subscribe: (fn: SubscribeFn) => Subscription;
+  subscribe: (listener: SubscribeFn) => Unsubscribe;
 }

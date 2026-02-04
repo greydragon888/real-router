@@ -43,7 +43,7 @@ describe("useRouteNode - Performance Tests", () => {
         renderOptions: { wrapper },
       });
 
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
       expect(result.current.route?.name).toBe("users.list");
     });
 

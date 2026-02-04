@@ -43,7 +43,7 @@ describe("useRoute - Performance Tests", () => {
         renderOptions: { wrapper },
       });
 
-      expect(result.current.router).toBe(router);
+      expect(result.current.navigator).toBeDefined();
       expect(result.current.route?.name).toBe("users.list");
     });
 
@@ -136,14 +136,14 @@ describe("useRoute - Performance Tests", () => {
         renderOptions: { wrapper },
       });
 
-      const initialRouter = result.current.router;
+      const initialNavigator = result.current.navigator;
 
       act(() => {
         router.navigate("about");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
-      expect(result.current.router).toBe(initialRouter);
+      expect(result.current.navigator).toBe(initialNavigator);
     });
 
     it("should update route on navigation", () => {

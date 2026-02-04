@@ -1,6 +1,12 @@
 // packages/react/modules/types.ts
 
-import type { Params, Router, RouterError, State } from "@real-router/core";
+import type {
+  Params,
+  Navigator,
+  Router,
+  RouterError,
+  State,
+} from "@real-router/core";
 import type { MouseEvent, ReactNode } from "react";
 
 export interface RouteState<
@@ -12,7 +18,7 @@ export interface RouteState<
 }
 
 export type RouteContext = {
-  router: Router;
+  navigator: Navigator;
 } & RouteState;
 
 export interface BaseLinkProps {

@@ -2,7 +2,7 @@
 
 import { useMemo, useSyncExternalStore } from "react";
 
-import { RouteContext, RouterContext } from "./context";
+import { NavigatorContext, RouteContext, RouterContext } from "./context";
 
 import type { RouteState } from "./types";
 import type { Router } from "@real-router/core";
@@ -17,6 +17,9 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   router,
   children,
 }) => {
+  // Get navigator instance from router
+  const navigator = useMemo(() => router.getNavigator(), [router]);
+
   // Local store state to hold route information
   const store = useMemo(() => {
     let currentState: RouteState = {
@@ -46,9 +49,11 @@ export const RouterProvider: FC<RouteProviderProps> = ({
 
   return (
     <RouterContext.Provider value={router}>
-      <RouteContext.Provider value={{ router, ...state }}>
-        {children}
-      </RouteContext.Provider>
+      <NavigatorContext.Provider value={navigator}>
+        <RouteContext.Provider value={{ navigator, ...state }}>
+          {children}
+        </RouteContext.Provider>
+      </NavigatorContext.Provider>
     </RouterContext.Provider>
   );
 };

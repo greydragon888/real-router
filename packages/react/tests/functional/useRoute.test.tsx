@@ -27,12 +27,16 @@ describe("useRoute hook", () => {
     router.stop();
   });
 
-  it("should return router", () => {
+  it("should return navigator", () => {
     const { result } = renderHook(() => useRoute(), {
       wrapper: wrapper(router),
     });
 
-    expect(result.current.router).toStrictEqual(router);
+    expect(result.current.navigator).toBeDefined();
+    expect(result.current.navigator.navigate).toBeDefined();
+    expect(result.current.navigator.getState).toBeDefined();
+    expect(result.current.navigator.isActiveRoute).toBeDefined();
+    expect(result.current.navigator.subscribe).toBeDefined();
   });
 
   it("should return current route", () => {

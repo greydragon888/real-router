@@ -61,12 +61,14 @@ export function useRouteNode(nodeName: string): RouteContext {
   );
 
   // Return memoized context - useMemo ensures stable reference when deps unchanged
+  const navigator = router.getNavigator();
+
   return useMemo(
     (): RouteContext => ({
-      router,
+      navigator,
       route: state.route,
       previousRoute: state.previousRoute,
     }),
-    [router, state.route, state.previousRoute],
+    [navigator, state.route, state.previousRoute],
   );
 }

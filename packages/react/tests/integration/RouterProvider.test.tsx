@@ -123,15 +123,15 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Context Values", () => {
-    it("should provide router in RouteContext", () => {
+    it("should provide navigator in RouteContext", () => {
       router.start("/users/list");
 
-      let routerFromRouteContext: Router | undefined;
+      let navigatorFromRouteContext: any;
 
       const ContextCapture: FC = () => {
         const context = useContext(RouteContext);
 
-        routerFromRouteContext = context?.router;
+        navigatorFromRouteContext = context?.navigator;
 
         return null;
       };
@@ -142,7 +142,11 @@ describe("RouterProvider - Integration Tests", () => {
         </RouterProvider>,
       );
 
-      expect(routerFromRouteContext).toBe(router);
+      expect(navigatorFromRouteContext).toBeDefined();
+      expect(navigatorFromRouteContext.navigate).toBeDefined();
+      expect(navigatorFromRouteContext.getState).toBeDefined();
+      expect(navigatorFromRouteContext.isActiveRoute).toBeDefined();
+      expect(navigatorFromRouteContext.subscribe).toBeDefined();
     });
 
     it("should have undefined previousRoute on initial render", () => {
