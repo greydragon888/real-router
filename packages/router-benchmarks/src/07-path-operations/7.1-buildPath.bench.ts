@@ -61,6 +61,11 @@ const routes: Route[] = [
 {
   const router = createRouter(routes);
 
+  // JIT warmup for stable measurements
+  for (let i = 0; i < 300; i++) {
+    router.buildPath("about", { search: `test${i}`, page: String(i) });
+  }
+
   bench(`7.1.4 Building path with query parameters (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
       do_not_optimize(router.buildPath("about", { search: "test", page: "1" }));
@@ -108,8 +113,15 @@ const routes: Route[] = [
     },
   ]);
 
-  bench(`7.1.7 Building path with custom encoder (×${BATCH})`, () => {
-    for (let i = 0; i < BATCH; i++) {
+  // JIT warmup for stable measurements
+  for (let i = 0; i < 1000; i++) {
+    router.buildPath("custom", { id: String(i) });
+  }
+
+  const BATCH_ENCODER = 500;
+
+  bench(`7.1.7 Building path with custom encoder (×${BATCH_ENCODER})`, () => {
+    for (let i = 0; i < BATCH_ENCODER; i++) {
       do_not_optimize(router.buildPath("custom", { id: "123" }));
     }
   }).gc("inner");
