@@ -286,6 +286,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/logger':
+        specifier: workspace:^
+        version: link:../logger
       router5:
         specifier: 8.0.1
         version: 8.0.1
