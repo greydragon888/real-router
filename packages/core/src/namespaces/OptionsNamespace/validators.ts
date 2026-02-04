@@ -196,8 +196,14 @@ export function validateOptions(
   }
 
   for (const [key, value] of Object.entries(options)) {
+    // Skip optional fields that aren't in defaultOptions (limits, logger, etc.)
     if (!isObjKey(key, defaultOptions)) {
-      throw new TypeError(`[router.${methodName}] Unknown option: "${key}"`);
+      if (key !== "limits" && key !== "logger") {
+        throw new TypeError(`[router.${methodName}] Unknown option: "${key}"`);
+      }
+
+      // Skip validation for optional fields - they're handled separately
+      continue;
     }
 
     // Skip undefined values for conditional configuration

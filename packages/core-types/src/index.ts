@@ -38,6 +38,9 @@ export type {
   Navigator,
 } from "./router";
 
+// Limits configuration
+export type { LimitsConfig } from "./limits";
+
 export type {
   PluginMethod,
   EventName,

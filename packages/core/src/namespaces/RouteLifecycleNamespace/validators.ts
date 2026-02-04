@@ -7,7 +7,7 @@
 
 import { isBoolean, getTypeDescription } from "type-guards";
 
-import { LIFECYCLE_LIMITS } from "./constants";
+import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
 
 import type { ActivationFnFactory } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
@@ -49,10 +49,11 @@ export function validateNotRegistering(
 export function validateHandlerLimit(
   currentCount: number,
   methodName: string,
+  maxLifecycleHandlers: number = DEFAULT_LIMITS.maxLifecycleHandlers,
 ): void {
-  if (currentCount >= LIFECYCLE_LIMITS.HARD_LIMIT) {
+  if (currentCount >= maxLifecycleHandlers) {
     throw new Error(
-      `[router.${methodName}] Lifecycle handler limit exceeded (${LIFECYCLE_LIMITS.HARD_LIMIT}). ` +
+      `[router.${methodName}] Lifecycle handler limit exceeded (${maxLifecycleHandlers}). ` +
         `This indicates too many routes with individual handlers. ` +
         `Consider using middleware for cross-cutting concerns.`,
     );

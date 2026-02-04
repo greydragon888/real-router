@@ -7,7 +7,7 @@
 
 import { getTypeDescription } from "type-guards";
 
-import { MIDDLEWARE_LIMITS } from "./constants";
+import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
 
 import type { MiddlewareFactory } from "../../types";
 import type { DefaultDependencies, Middleware } from "@real-router/types";
@@ -78,12 +78,13 @@ export function validateNoDuplicates<D extends DefaultDependencies>(
 export function validateMiddlewareLimit(
   currentCount: number,
   newCount: number,
+  maxMiddleware: number = DEFAULT_LIMITS.maxMiddleware,
 ): void {
   const totalSize = currentCount + newCount;
 
-  if (totalSize > MIDDLEWARE_LIMITS.HARD_LIMIT) {
+  if (totalSize > maxMiddleware) {
     throw new Error(
-      `[router.useMiddleware] Middleware limit exceeded (${MIDDLEWARE_LIMITS.HARD_LIMIT}). ` +
+      `[router.useMiddleware] Middleware limit exceeded (${maxMiddleware}). ` +
         `Current: ${currentCount}, Attempting to add: ${newCount}. ` +
         `This indicates an architectural problem. Consider consolidating middleware.`,
     );

@@ -9,7 +9,7 @@
 
 import { getTypeDescription } from "type-guards";
 
-import { DEPENDENCY_LIMITS } from "./constants";
+import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
 
 /**
  * Validates that dependency name is a string.
@@ -88,12 +88,13 @@ export function validateDependencyLimit(
   currentCount: number,
   newCount: number,
   methodName: string,
+  maxDependencies: number = DEFAULT_LIMITS.maxDependencies,
 ): void {
   const totalCount = currentCount + newCount;
 
-  if (totalCount >= DEPENDENCY_LIMITS.HARD_LIMIT) {
+  if (totalCount >= maxDependencies) {
     throw new Error(
-      `[router.${methodName}] Dependency limit exceeded (${DEPENDENCY_LIMITS.HARD_LIMIT}). ` +
+      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
         `Current: ${totalCount}. This is likely a bug in your code.`,
     );
   }

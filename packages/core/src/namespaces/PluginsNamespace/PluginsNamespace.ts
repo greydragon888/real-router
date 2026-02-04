@@ -2,21 +2,19 @@
 
 import { logger } from "@real-router/logger";
 
-import {
-  PLUGIN_LIMITS,
-  EVENTS_MAP,
-  EVENT_METHOD_NAMES,
-  LOGGER_CONTEXT,
-} from "./constants";
+import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
 import {
   validatePlugin,
   validatePluginLimit,
   validateUsePluginArgs,
 } from "./validators";
+import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
+import { computeThresholds } from "../LimitsNamespace/helpers";
 
 import type { PluginsDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { PluginFactory } from "../../types";
+import type { LimitsNamespace } from "../LimitsNamespace";
 import type {
   DefaultDependencies,
   Plugin,
@@ -34,11 +32,11 @@ export class PluginsNamespace<
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
 
-  // Router reference for plugin initialization (passed to plugin factories)
   #router: Router<Dependencies> | undefined;
 
-  // Dependencies injected via setDependencies (for internal @internal method calls)
   #deps: PluginsDependencies<Dependencies> | undefined;
+
+  #limits?: LimitsNamespace;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -55,8 +53,12 @@ export class PluginsNamespace<
     validatePlugin(plugin);
   }
 
-  static validatePluginLimit(currentCount: number, newCount: number): void {
-    validatePluginLimit(currentCount, newCount);
+  static validatePluginLimit(
+    currentCount: number,
+    newCount: number,
+    maxPlugins?: number,
+  ): void {
+    validatePluginLimit(currentCount, newCount, maxPlugins);
   }
 
   static validateNoDuplicatePlugins<D extends DefaultDependencies>(
@@ -77,20 +79,16 @@ export class PluginsNamespace<
   // Dependency injection
   // =========================================================================
 
-  /**
-   * Sets the router reference for plugin initialization.
-   * Plugins receive the router object directly as part of their API.
-   */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
   }
 
-  /**
-   * Sets dependencies for internal operations.
-   * These replace direct @internal method calls on router.
-   */
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
     this.#deps = deps;
+  }
+
+  setLimits(limits: LimitsNamespace): void {
+    this.#limits = limits;
   }
 
   // =========================================================================
@@ -217,16 +215,16 @@ export class PluginsNamespace<
   // Private methods
   // =========================================================================
 
-  /**
-   * Emits warnings for count thresholds.
-   * Validation (HARD_LIMIT) is done by facade.
-   */
   #checkCountThresholds(newCount: number): void {
     const totalCount = newCount + this.#plugins.size;
 
-    if (totalCount >= PLUGIN_LIMITS.ERROR) {
+    const maxPlugins =
+      this.#limits?.get().maxPlugins ?? DEFAULT_LIMITS.maxPlugins;
+    const { warn, error } = computeThresholds(maxPlugins);
+
+    if (totalCount >= error) {
       logger.error(LOGGER_CONTEXT, `${totalCount} plugins registered!`);
-    } else if (totalCount >= PLUGIN_LIMITS.WARN) {
+    } else if (totalCount >= warn) {
       logger.warn(LOGGER_CONTEXT, `${totalCount} plugins registered`);
     }
   }
