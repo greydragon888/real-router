@@ -116,6 +116,30 @@ export class PluginsNamespace<
     // Emit warnings for count thresholds (not validation, just warnings)
     this.#checkCountThresholds(factories.length);
 
+    // Fast path for single plugin (common case)
+    if (factories.length === 1) {
+      const factory = factories[0];
+      const cleanup = this.#startPlugin(factory);
+
+      this.#plugins.add(factory);
+
+      let unsubscribed = false;
+
+      return () => {
+        if (unsubscribed) {
+          return;
+        }
+
+        unsubscribed = true;
+        this.#plugins.delete(factory);
+        try {
+          cleanup();
+        } catch (error) {
+          logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
+        }
+      };
+    }
+
     // Deduplicate batch with warning (validation already done by facade)
     const seenInBatch = this.#deduplicateBatch(factories);
 

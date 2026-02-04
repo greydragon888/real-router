@@ -742,6 +742,34 @@ describe("core/plugins", () => {
         // Teardown should only be called once (idempotent unsubscribe)
         expect(teardown).toHaveBeenCalledTimes(1);
       });
+
+      it("should handle multiple unsubscribe calls safely with multi-plugin batch", () => {
+        const teardown1 = vi.fn();
+        const teardown2 = vi.fn();
+        const factory1 = () => ({ teardown: teardown1 });
+        const factory2 = () => ({ teardown: teardown2 });
+
+        const unsub = router.usePlugin(factory1, factory2);
+
+        unsub();
+
+        expect(teardown1).toHaveBeenCalledTimes(1);
+        expect(teardown2).toHaveBeenCalledTimes(1);
+
+        // Second call should be safe no-op
+        expect(() => {
+          unsub();
+        }).not.toThrowError();
+
+        // Third call should also be safe no-op
+        expect(() => {
+          unsub();
+        }).not.toThrowError();
+
+        // Teardowns should only be called once (idempotent unsubscribe)
+        expect(teardown1).toHaveBeenCalledTimes(1);
+        expect(teardown2).toHaveBeenCalledTimes(1);
+      });
     });
 
     // 🟡 IMPORTANT: Immutability protection
