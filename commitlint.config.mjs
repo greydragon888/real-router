@@ -37,7 +37,7 @@ export default {
     "type-enum": [2, "always", TYPES],
     "scope-enum": [2, "always", SCOPES],
     "scope-empty": [0],
-    "subject-case": [2, "always", "lower-case"],
+    "subject-case": [0], // Allow any case in subject
     "subject-max-length": [2, "always", 100],
     "body-max-line-length": [2, "always", 100],
   },

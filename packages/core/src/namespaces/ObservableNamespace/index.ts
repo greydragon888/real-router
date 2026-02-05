@@ -2,11 +2,7 @@
 
 export { ObservableNamespace } from "./ObservableNamespace";
 
-export {
-  MAX_EVENT_DEPTH,
-  MAX_LISTENERS_HARD_LIMIT,
-  validEventNames,
-} from "./constants";
+export { validEventNames } from "./constants";
 
 export { invokeFor } from "./helpers";
 

@@ -3,16 +3,17 @@
 import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
 
-import { LIFECYCLE_LIMITS } from "./constants";
 import {
   validateHandler,
   validateHandlerLimit,
   validateNotRegistering,
 } from "./validators";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { ActivationFnFactory } from "../../types";
+import type { ActivationFnFactory, Limits } from "../../types";
 import type { ActivationFn, DefaultDependencies } from "@real-router/types";
 
 /**
@@ -47,14 +48,13 @@ export class RouteLifecycleNamespace<
   readonly #canDeactivateFunctions = new Map<string, ActivationFn>();
   readonly #canActivateFunctions = new Map<string, ActivationFn>();
 
-  // Track routes currently being registered to prevent self-modification
   readonly #registering = new Set<string>();
 
-  // Router reference for factory compilation (passed to lifecycle factories)
   #router: Router<Dependencies> | undefined;
 
-  // Dependencies injected via setDependencies (for internal operations)
   #deps: RouteLifecycleDependencies<Dependencies> | undefined;
+
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -76,28 +76,24 @@ export class RouteLifecycleNamespace<
     validateNotRegistering(isRegistering, name, methodName);
   }
 
-  static validateHandlerLimit(currentCount: number, methodName: string): void {
-    validateHandlerLimit(currentCount, methodName);
+  static validateHandlerLimit(
+    currentCount: number,
+    methodName: string,
+    maxLifecycleHandlers?: number,
+  ): void {
+    validateHandlerLimit(currentCount, methodName, maxLifecycleHandlers);
   }
 
-  // =========================================================================
-  // Dependency injection
-  // =========================================================================
-
-  /**
-   * Sets the router reference for factory compilation.
-   * Lifecycle factories receive the router object directly as part of their API.
-   */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
   }
 
-  /**
-   * Sets dependencies for internal operations.
-   * These replace direct method calls on router.
-   */
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
+  }
+
+  setLimits(limits: Limits): void {
+    this.#limits = limits;
   }
 
   // =========================================================================
@@ -334,18 +330,22 @@ export class RouteLifecycleNamespace<
     }
   }
 
-  /**
-   * Emits warnings for count thresholds.
-   * Validation (HARD_LIMIT) is done by facade.
-   */
   #checkCountThresholds(currentSize: number, methodName: string): void {
-    if (currentSize >= LIFECYCLE_LIMITS.ERROR) {
+    const maxLifecycleHandlers = this.#limits.maxLifecycleHandlers;
+
+    if (maxLifecycleHandlers === 0) {
+      return;
+    }
+
+    const { warn, error } = computeThresholds(maxLifecycleHandlers);
+
+    if (currentSize >= error) {
       logger.error(
         `router.${methodName}`,
         `${currentSize} lifecycle handlers registered! ` +
-          `This is excessive. Hard limit at ${LIFECYCLE_LIMITS.HARD_LIMIT}.`,
+          `This is excessive. Hard limit at ${maxLifecycleHandlers}.`,
       );
-    } else if (currentSize >= LIFECYCLE_LIMITS.WARN) {
+    } else if (currentSize >= warn) {
       logger.warn(
         `router.${methodName}`,
         `${currentSize} lifecycle handlers registered. ` +

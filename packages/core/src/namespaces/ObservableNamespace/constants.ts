@@ -5,16 +5,6 @@ import { events } from "../../constants";
 import type { EventName } from "@real-router/types";
 
 /**
- * Max recursion depth to prevent stack overflow from circular event triggers
- */
-export const MAX_EVENT_DEPTH = 5;
-
-/**
- * Hard limit to prevent memory leaks from exponential listener creation
- */
-export const MAX_LISTENERS_HARD_LIMIT = 10_000;
-
-/**
  * Valid event names for validation
  */
 export const validEventNames = new Set<EventName>([

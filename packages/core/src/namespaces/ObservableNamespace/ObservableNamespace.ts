@@ -2,13 +2,9 @@
 
 import { logger } from "@real-router/logger";
 
-import {
-  MAX_EVENT_DEPTH,
-  MAX_LISTENERS_HARD_LIMIT,
-  validEventNames,
-} from "./constants";
+import { validEventNames } from "./constants";
 import { invokeFor } from "./helpers";
-import { events } from "../../constants";
+import { DEFAULT_LIMITS, events } from "../../constants";
 
 import type {
   EventMethodMap,
@@ -18,6 +14,7 @@ import type {
   SubscribeState,
   Subscription,
 } from "./types";
+import type { Limits } from "../../types";
 import type {
   EventName,
   EventsKeys,
@@ -59,33 +56,20 @@ const $$observable: typeof Symbol.observable =
  * Instance methods handle listener storage and invocation.
  */
 export class ObservableNamespace {
-  /**
-   * Event listeners storage. Using Set for O(1) operations and automatic deduplication.
-   * Sets are created lazily to reduce memory footprint when events are not used.
-   */
   readonly #callbacks: {
     [E in EventName]?: Set<Plugin[EventMethodMap[E]]>;
   } = {};
 
-  /**
-   * Tracks current recursion depth for each event type.
-   * Created lazily to reduce memory footprint when events are not dispatched.
-   */
   #eventDepthMap: Record<EventName, number> | null = null;
 
-  /**
-   * Track active observers for deduplication
-   * Using WeakMap to allow garbage collection of observers
-   */
   readonly #observerSubscriptions = new WeakMap<
     Observer,
     { unsubscribe: Unsubscribe; active: boolean }
   >();
 
-  /**
-   * Functional reference to get current state (set via setGetState)
-   */
   #getState: (() => State | undefined) | null = null;
+
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -141,16 +125,12 @@ export class ObservableNamespace {
     }
   }
 
-  // =========================================================================
-  // Dependency injection for state access
-  // =========================================================================
-
-  /**
-   * Sets the function to get current router state.
-   * Required for replay feature in observable().
-   */
   setGetState(getState: () => State | undefined): void {
     this.#getState = getState;
+  }
+
+  setLimits(limits: Limits): void {
+    this.#limits = limits;
   }
 
   // =========================================================================
@@ -281,7 +261,8 @@ export class ObservableNamespace {
       );
     }
 
-    // Limit warnings (business logic)
+    const maxListeners = this.#limits.maxListeners;
+
     if (set.size === 1000) {
       logger.warn(
         "router.addEventListener",
@@ -290,10 +271,9 @@ export class ObservableNamespace {
       );
     }
 
-    // Hard limit (business logic)
-    if (set.size >= MAX_LISTENERS_HARD_LIMIT) {
+    if (maxListeners !== 0 && set.size >= maxListeners) {
       throw new Error(
-        `[router.addEventListener] Maximum listener limit (${MAX_LISTENERS_HARD_LIMIT}) ` +
+        `[router.addEventListener] Maximum listener limit (${maxListeners}) ` +
           `reached for event "${eventName}". ` +
           `This is a critical memory leak. The application is creating listeners ` +
           `exponentially. Check for loops or recursive calls that register listeners.`,
@@ -539,17 +519,20 @@ export class ObservableNamespace {
     return this.#eventDepthMap;
   }
 
-  /**
-   * Checks recursion depth for event invocation (business logic).
-   */
   #checkRecursionDepth(eventName: (typeof events)[EventsKeys]): void {
+    const maxEventDepth = this.#limits.maxEventDepth;
+
+    if (maxEventDepth === 0) {
+      return;
+    }
+
     const depthMap = this.#getEventDepthMap();
     const depth = depthMap[eventName];
 
     /* v8 ignore next 5 -- @preserve defensive: protects against recursive plugins */
-    if (depth >= MAX_EVENT_DEPTH) {
+    if (depth >= maxEventDepth) {
       throw new Error(
-        `[Router] Maximum recursion depth (${MAX_EVENT_DEPTH}) exceeded for event: ${eventName}`,
+        `[Router] Maximum recursion depth (${maxEventDepth}) exceeded for event: ${eventName}`,
       );
     }
   }
