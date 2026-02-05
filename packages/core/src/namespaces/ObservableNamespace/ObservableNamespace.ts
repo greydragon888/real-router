@@ -6,14 +6,7 @@ import { validEventNames } from "./constants";
 import { invokeFor } from "./helpers";
 import { DEFAULT_LIMITS, events } from "../../constants";
 
-import type {
-  EventMethodMap,
-  Observer,
-  ObservableOptions,
-  RouterObservable,
-  SubscribeState,
-  Subscription,
-} from "./types";
+import type { EventMethodMap } from "./types";
 import type { Limits } from "../../types";
 import type {
   EventName,
@@ -25,29 +18,6 @@ import type {
   SubscribeFn,
   Unsubscribe,
 } from "@real-router/types";
-
-// ============================================================================
-// Symbol.observable support (TC39 proposal)
-// ============================================================================
-
-/**
- * Symbol.observable polyfill declaration for TC39 proposal
- *
- * @see https://github.com/tc39/proposal-observable
- */
-declare global {
-  interface SymbolConstructor {
-    readonly observable: unique symbol;
-  }
-}
-
-/**
- * Observable symbol - TC39 proposal with fallback
- */
-const $$observable: typeof Symbol.observable =
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime check for environments without Symbol.observable
-  (typeof Symbol === "function" && Symbol.observable) ||
-  ("@@observable" as unknown as typeof Symbol.observable);
 
 /**
  * Independent namespace for managing router observability (events).
@@ -61,13 +31,6 @@ export class ObservableNamespace {
   } = {};
 
   #eventDepthMap: Record<EventName, number> | null = null;
-
-  readonly #observerSubscriptions = new WeakMap<
-    Observer,
-    { unsubscribe: Unsubscribe; active: boolean }
-  >();
-
-  #getState: (() => State | undefined) | null = null;
 
   #limits: Limits = DEFAULT_LIMITS;
 
@@ -120,13 +83,9 @@ export class ObservableNamespace {
     if (typeof listener !== "function") {
       throw new TypeError(
         "[router.subscribe] Expected a function. " +
-          "For Observable pattern use router[Symbol.observable]().subscribe(observer)",
+          "For Observable pattern use @real-router/rx package",
       );
     }
-  }
-
-  setGetState(getState: () => State | undefined): void {
-    this.#getState = getState;
   }
 
   setLimits(limits: Limits): void {
@@ -301,181 +260,6 @@ export class ObservableNamespace {
         });
       },
     );
-  }
-
-  /**
-   * Returns a TC39-compliant Observable for router state changes.
-   * Supports deduplication, error isolation, replay, and AbortSignal.
-   */
-  observable(): RouterObservable {
-    const observableObj: RouterObservable = {
-      /**
-       * TC39 Observable spec: [Symbol.observable]() returns self
-       * Note: In Node.js where Symbol.observable is undefined, $$observable falls
-       * back to "@@observable" string, and this method gets overwritten by line below.
-       */
-      /* v8 ignore next 3 -- @preserve unreachable in Node.js: $$observable = "@@observable" when Symbol.observable is undefined */
-      [$$observable]() {
-        return observableObj;
-      },
-
-      /**
-       * Subscribe to router state changes - uses arrow function to bind `this`
-       */
-      subscribe: this.#subscribeImpl.bind(this),
-    };
-
-    // Add @@observable string key for RxJS compatibility
-    (observableObj as unknown as Record<string, unknown>)["@@observable"] =
-      () => observableObj;
-
-    return observableObj;
-  }
-
-  /**
-   * Internal implementation of observable subscribe
-   */
-  #subscribeImpl(
-    observer: Observer | ((value: SubscribeState) => void),
-    options: ObservableOptions = {},
-  ): Subscription {
-    // Normalize observer
-    const normalizedObserver: Observer =
-      typeof observer === "function" ? { next: observer } : observer;
-
-    // Check for duplicate subscription
-    const existing = this.#observerSubscriptions.get(normalizedObserver);
-
-    if (existing?.active) {
-      logger.warn(
-        "router.observable",
-        "Duplicate subscription prevented. Same observer already subscribed.",
-      );
-
-      return {
-        unsubscribe: existing.unsubscribe,
-        get closed() {
-          return !existing.active;
-        },
-      };
-    }
-
-    const { signal, replay = true } = options;
-
-    // Check if already aborted
-    if (signal?.aborted) {
-      return {
-        unsubscribe: () => {},
-        closed: true,
-      };
-    }
-
-    let closed = false;
-
-    // Create safe invoker with error isolation
-    const safeNext = (value: SubscribeState) => {
-      if (closed) {
-        return;
-      }
-
-      if (normalizedObserver.next) {
-        try {
-          normalizedObserver.next(value);
-        } catch (error) {
-          logger.error("router.observable", "Error in observer.next:", error);
-
-          // Call error handler if provided
-          if (normalizedObserver.error) {
-            try {
-              normalizedObserver.error(error);
-            } catch (errorHandlerError) {
-              logger.error(
-                "router.observable",
-                "Error in observer.error:",
-                errorHandlerError,
-              );
-            }
-          }
-        }
-      }
-    };
-
-    // Subscribe to TRANSITION_SUCCESS events
-    const unsubscribeFromEvents = this.addEventListener(
-      events.TRANSITION_SUCCESS,
-      (toState: State, fromState?: State) => {
-        safeNext({
-          route: toState,
-          previousRoute: fromState,
-        });
-      },
-    );
-
-    // Subscription object referenced by unsubscribe closure below
-    // (assigned synchronously before subscribe returns)
-    const subscription: { unsubscribe: Unsubscribe; active: boolean } = {
-      unsubscribe: undefined as unknown as Unsubscribe,
-      active: true,
-    };
-
-    // Create unsubscribe function
-    const unsubscribe = () => {
-      if (closed) {
-        return;
-      }
-
-      closed = true;
-
-      // Update tracking (subscription assigned synchronously before subscribe returns)
-      subscription.active = false;
-
-      // Remove event listener
-      unsubscribeFromEvents();
-
-      // Call complete handler
-      if (normalizedObserver.complete) {
-        try {
-          normalizedObserver.complete();
-        } catch (error) {
-          logger.error(
-            "router.observable",
-            "Error in observer.complete:",
-            error,
-          );
-        }
-      }
-    };
-
-    // Complete subscription object and track it
-    subscription.unsubscribe = unsubscribe;
-    this.#observerSubscriptions.set(normalizedObserver, subscription);
-
-    // Handle AbortSignal
-    if (signal) {
-      signal.addEventListener("abort", unsubscribe, { once: true });
-    }
-
-    // Replay current state if requested
-    if (replay && this.#getState) {
-      const currentState = this.#getState();
-
-      if (currentState) {
-        // Use queueMicrotask to ensure subscription is set up before replay
-        queueMicrotask(() => {
-          safeNext({
-            route: currentState,
-            previousRoute: undefined,
-          });
-        });
-      }
-    }
-
-    return {
-      unsubscribe,
-      get closed() {
-        return closed;
-      },
-    };
   }
 
   // =========================================================================

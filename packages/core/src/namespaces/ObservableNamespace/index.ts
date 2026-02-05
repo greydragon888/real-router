@@ -6,11 +6,4 @@ export { validEventNames } from "./constants";
 
 export { invokeFor } from "./helpers";
 
-export type {
-  EventMethodMap,
-  Observer,
-  ObservableOptions,
-  RouterObservable,
-  SubscribeState,
-  Subscription,
-} from "./types";
+export type { EventMethodMap, SubscribeState } from "./types";
