@@ -5,6 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-05]
+
+### @real-router/browser-plugin@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+
+### @real-router/core@0.7.0
+
+### Minor Changes
+
+- [#57](https://github.com/greydragon888/real-router/pull/57) [`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add configurable limits via `options.limits` (#38)
+
+  All router limits are now centralized into a single configuration object. Previously, limits were hardcoded in individual namespaces.
+
+  ```typescript
+  const router = createRouter(routes, {
+    limits: {
+      maxDependencies: 150,
+      maxPlugins: 75,
+    },
+  });
+
+  // Read-only access
+  console.log(router.limits);
+  // { maxDependencies: 150, maxPlugins: 75, maxMiddleware: 50, ... }
+  ```
+
+  **Available limits:**
+
+  | Limit                  | Default | Description                                |
+  | ---------------------- | ------- | ------------------------------------------ |
+  | `maxDependencies`      | 100     | Maximum registered dependencies            |
+  | `maxPlugins`           | 50      | Maximum registered plugins                 |
+  | `maxMiddleware`        | 50      | Maximum middleware functions               |
+  | `maxListeners`         | 10000   | Maximum event listeners per event type     |
+  | `maxEventDepth`        | 5       | Maximum nested event propagation depth     |
+  | `maxLifecycleHandlers` | 200     | Maximum canActivate/canDeactivate handlers |
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/types@0.5.0
+
+### @real-router/helpers@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+
+### @real-router/logger-plugin@0.2.10
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+
+### @real-router/persistent-params-plugin@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+
+### @real-router/react@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+  - @real-router/browser-plugin@0.1.10
+  - @real-router/helpers@0.1.10
+
+### @real-router/types@0.5.0
+
+### Minor Changes
+
+- [#57](https://github.com/greydragon888/real-router/pull/57) [`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LimitsConfig` interface and `limits` option (#38)
+
+  New `LimitsConfig` interface defines 6 configurable router limits:
+  - `maxDependencies`, `maxPlugins`, `maxMiddleware`
+  - `maxListeners`, `maxEventDepth`, `maxLifecycleHandlers`
+
+  The `Options` interface now includes `limits?: Partial<LimitsConfig>`.
+
 ## [2026-02-04]
 
 ### @real-router/browser-plugin@0.1.9

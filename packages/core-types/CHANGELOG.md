@@ -1,5 +1,17 @@
 # @real-router/types
 
+## 0.5.0
+
+### Minor Changes
+
+- [#57](https://github.com/greydragon888/real-router/pull/57) [`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LimitsConfig` interface and `limits` option (#38)
+
+  New `LimitsConfig` interface defines 6 configurable router limits:
+  - `maxDependencies`, `maxPlugins`, `maxMiddleware`
+  - `maxListeners`, `maxEventDepth`, `maxLifecycleHandlers`
+
+  The `Options` interface now includes `limits?: Partial<LimitsConfig>`.
+
 ## 0.4.0
 
 ### Minor Changes
