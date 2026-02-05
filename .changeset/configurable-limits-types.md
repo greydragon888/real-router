@@ -2,6 +2,10 @@
 "@real-router/types": minor
 ---
 
-Add `LimitsConfig` interface for configurable router limits (#38)
+Add `LimitsConfig` interface and `limits` option (#38)
 
-New interface for router limit configuration with 6 configurable limits.
+New `LimitsConfig` interface defines 6 configurable router limits:
+- `maxDependencies`, `maxPlugins`, `maxMiddleware`
+- `maxListeners`, `maxEventDepth`, `maxLifecycleHandlers`
+
+The `Options` interface now includes `limits?: Partial<LimitsConfig>`.

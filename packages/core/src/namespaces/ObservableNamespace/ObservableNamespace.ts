@@ -4,8 +4,7 @@ import { logger } from "@real-router/logger";
 
 import { validEventNames } from "./constants";
 import { invokeFor } from "./helpers";
-import { events } from "../../constants";
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
+import { DEFAULT_LIMITS, events } from "../../constants";
 
 import type {
   EventMethodMap,
@@ -15,7 +14,7 @@ import type {
   SubscribeState,
   Subscription,
 } from "./types";
-import type { LimitsNamespace } from "../LimitsNamespace";
+import type { Limits } from "../../types";
 import type {
   EventName,
   EventsKeys,
@@ -70,7 +69,7 @@ export class ObservableNamespace {
 
   #getState: (() => State | undefined) | null = null;
 
-  #limits?: LimitsNamespace;
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -130,7 +129,7 @@ export class ObservableNamespace {
     this.#getState = getState;
   }
 
-  setLimits(limits: LimitsNamespace): void {
+  setLimits(limits: Limits): void {
     this.#limits = limits;
   }
 
@@ -262,8 +261,7 @@ export class ObservableNamespace {
       );
     }
 
-    const maxListeners =
-      this.#limits?.get().maxListeners ?? DEFAULT_LIMITS.maxListeners;
+    const maxListeners = this.#limits.maxListeners;
 
     if (set.size === 1000) {
       logger.warn(
@@ -273,7 +271,7 @@ export class ObservableNamespace {
       );
     }
 
-    if (set.size >= maxListeners) {
+    if (maxListeners !== 0 && set.size >= maxListeners) {
       throw new Error(
         `[router.addEventListener] Maximum listener limit (${maxListeners}) ` +
           `reached for event "${eventName}". ` +
@@ -522,11 +520,14 @@ export class ObservableNamespace {
   }
 
   #checkRecursionDepth(eventName: (typeof events)[EventsKeys]): void {
+    const maxEventDepth = this.#limits.maxEventDepth;
+
+    if (maxEventDepth === 0) {
+      return;
+    }
+
     const depthMap = this.#getEventDepthMap();
     const depth = depthMap[eventName];
-
-    const maxEventDepth =
-      this.#limits?.get().maxEventDepth ?? DEFAULT_LIMITS.maxEventDepth;
 
     /* v8 ignore next 5 -- @preserve defensive: protects against recursive plugins */
     if (depth >= maxEventDepth) {

@@ -4,7 +4,7 @@
 
 Add configurable limits via `options.limits` (#38)
 
-Centralize all router limits into a single configuration object:
+All router limits are now centralized into a single configuration object. Previously, limits were hardcoded in individual namespaces.
 
 ```typescript
 const router = createRouter(routes, {
@@ -16,14 +16,16 @@ const router = createRouter(routes, {
 
 // Read-only access
 console.log(router.limits);
-// { maxDependencies: 150, maxPlugins: 75, ... }
+// { maxDependencies: 150, maxPlugins: 75, maxMiddleware: 50, ... }
 ```
 
-**Limits:**
+**Available limits:**
 
-- `maxDependencies` (default: 100)
-- `maxPlugins` (default: 50)
-- `maxMiddleware` (default: 50)
-- `maxListeners` (default: 10000)
-- `maxEventDepth` (default: 5)
-- `maxLifecycleHandlers` (default: 200)
+| Limit | Default | Description |
+|-------|---------|-------------|
+| `maxDependencies` | 100 | Maximum registered dependencies |
+| `maxPlugins` | 50 | Maximum registered plugins |
+| `maxMiddleware` | 50 | Maximum middleware functions |
+| `maxListeners` | 10000 | Maximum event listeners per event type |
+| `maxEventDepth` | 5 | Maximum nested event propagation depth |
+| `maxLifecycleHandlers` | 200 | Maximum canActivate/canDeactivate handlers |

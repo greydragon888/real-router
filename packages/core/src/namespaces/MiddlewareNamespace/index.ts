@@ -2,6 +2,4 @@
 
 export { MiddlewareNamespace } from "./MiddlewareNamespace";
 
-export { MIDDLEWARE_LIMITS } from "./constants";
-
 export type { MiddlewareDependencies } from "./types";

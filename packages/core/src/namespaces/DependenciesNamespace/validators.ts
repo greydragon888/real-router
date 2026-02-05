@@ -9,7 +9,7 @@
 
 import { getTypeDescription } from "type-guards";
 
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
+import { DEFAULT_LIMITS } from "../../constants";
 
 /**
  * Validates that dependency name is a string.
@@ -90,6 +90,10 @@ export function validateDependencyLimit(
   methodName: string,
   maxDependencies: number = DEFAULT_LIMITS.maxDependencies,
 ): void {
+  if (maxDependencies === 0) {
+    return;
+  }
+
   const totalCount = currentCount + newCount;
 
   if (totalCount >= maxDependencies) {

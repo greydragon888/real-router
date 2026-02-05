@@ -7,7 +7,7 @@
 
 import { getTypeDescription } from "type-guards";
 
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
+import { DEFAULT_LIMITS } from "../../constants";
 
 import type { MiddlewareFactory } from "../../types";
 import type { DefaultDependencies, Middleware } from "@real-router/types";
@@ -80,6 +80,10 @@ export function validateMiddlewareLimit(
   newCount: number,
   maxMiddleware: number = DEFAULT_LIMITS.maxMiddleware,
 ): void {
+  if (maxMiddleware === 0) {
+    return;
+  }
+
   const totalSize = currentCount + newCount;
 
   if (totalSize > maxMiddleware) {

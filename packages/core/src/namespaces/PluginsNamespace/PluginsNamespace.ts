@@ -8,13 +8,12 @@ import {
   validatePluginLimit,
   validateUsePluginArgs,
 } from "./validators";
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
-import { computeThresholds } from "../LimitsNamespace/helpers";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
 import type { PluginsDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { PluginFactory } from "../../types";
-import type { LimitsNamespace } from "../LimitsNamespace";
+import type { Limits, PluginFactory } from "../../types";
 import type {
   DefaultDependencies,
   Plugin,
@@ -36,7 +35,7 @@ export class PluginsNamespace<
 
   #deps: PluginsDependencies<Dependencies> | undefined;
 
-  #limits?: LimitsNamespace;
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -87,7 +86,7 @@ export class PluginsNamespace<
     this.#deps = deps;
   }
 
-  setLimits(limits: LimitsNamespace): void {
+  setLimits(limits: Limits): void {
     this.#limits = limits;
   }
 
@@ -216,10 +215,14 @@ export class PluginsNamespace<
   // =========================================================================
 
   #checkCountThresholds(newCount: number): void {
+    const maxPlugins = this.#limits.maxPlugins;
+
+    if (maxPlugins === 0) {
+      return;
+    }
+
     const totalCount = newCount + this.#plugins.size;
 
-    const maxPlugins =
-      this.#limits?.get().maxPlugins ?? DEFAULT_LIMITS.maxPlugins;
     const { warn, error } = computeThresholds(maxPlugins);
 
     if (totalCount >= error) {

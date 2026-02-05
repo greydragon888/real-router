@@ -7,7 +7,7 @@
 
 import { isBoolean, getTypeDescription } from "type-guards";
 
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
+import { DEFAULT_LIMITS } from "../../constants";
 
 import type { ActivationFnFactory } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
@@ -51,6 +51,10 @@ export function validateHandlerLimit(
   methodName: string,
   maxLifecycleHandlers: number = DEFAULT_LIMITS.maxLifecycleHandlers,
 ): void {
+  if (maxLifecycleHandlers === 0) {
+    return;
+  }
+
   if (currentCount >= maxLifecycleHandlers) {
     throw new Error(
       `[router.${methodName}] Lifecycle handler limit exceeded (${maxLifecycleHandlers}). ` +

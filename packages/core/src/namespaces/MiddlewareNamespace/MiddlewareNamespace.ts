@@ -8,13 +8,12 @@ import {
   validateNoDuplicates,
   validateUseMiddlewareArgs,
 } from "./validators";
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
-import { computeThresholds } from "../LimitsNamespace/helpers";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
 import type { InitializedMiddleware, MiddlewareDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { MiddlewareFactory } from "../../types";
-import type { LimitsNamespace } from "../LimitsNamespace";
+import type { Limits, MiddlewareFactory } from "../../types";
 import type {
   DefaultDependencies,
   Middleware,
@@ -40,7 +39,7 @@ export class MiddlewareNamespace<
 
   #deps: MiddlewareDependencies<Dependencies> | undefined;
 
-  #limits?: LimitsNamespace;
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -87,7 +86,7 @@ export class MiddlewareNamespace<
     this.#deps = deps;
   }
 
-  setLimits(limits: LimitsNamespace): void {
+  setLimits(limits: Limits): void {
     this.#limits = limits;
   }
 
@@ -190,10 +189,14 @@ export class MiddlewareNamespace<
   // =========================================================================
 
   #checkCountThresholds(newCount: number): void {
+    const maxMiddleware = this.#limits.maxMiddleware;
+
+    if (maxMiddleware === 0) {
+      return;
+    }
+
     const totalSize = newCount + this.#factories.size;
 
-    const maxMiddleware =
-      this.#limits?.get().maxMiddleware ?? DEFAULT_LIMITS.maxMiddleware;
     const { warn, error } = computeThresholds(maxMiddleware);
 
     if (totalSize >= error) {

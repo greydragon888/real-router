@@ -10,10 +10,10 @@ import {
   validateDependenciesObject,
   validateSetDependencyArgs,
 } from "./validators";
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
-import { computeThresholds } from "../LimitsNamespace/helpers";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
-import type { LimitsNamespace } from "../LimitsNamespace";
+import type { Limits } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
 
 /**
@@ -29,7 +29,7 @@ export class DependenciesNamespace<
     null,
   ) as Partial<Dependencies>;
 
-  #limits?: LimitsNamespace;
+  #limits: Limits = DEFAULT_LIMITS;
 
   constructor(initialDependencies: Partial<Dependencies> = {} as Dependencies) {
     this.setMultiple(initialDependencies);
@@ -79,7 +79,7 @@ export class DependenciesNamespace<
     );
   }
 
-  setLimits(limits: LimitsNamespace): void {
+  setLimits(limits: Limits): void {
     this.#limits = limits;
   }
 
@@ -217,10 +217,14 @@ export class DependenciesNamespace<
   // =========================================================================
 
   #checkDependencyCount(methodName: string): void {
+    const maxDependencies = this.#limits.maxDependencies;
+
+    if (maxDependencies === 0) {
+      return;
+    }
+
     const currentCount = Object.keys(this.#dependencies).length;
 
-    const maxDependencies =
-      this.#limits?.get().maxDependencies ?? DEFAULT_LIMITS.maxDependencies;
     const { warn, error } = computeThresholds(maxDependencies);
 
     if (currentCount === warn) {

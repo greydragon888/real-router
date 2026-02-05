@@ -9,6 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
+import { createLimits } from "./helpers";
 import {
   CloneNamespace,
   DependenciesNamespace,
@@ -22,11 +23,9 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
-import { LimitsNamespace } from "./namespaces/LimitsNamespace";
 import { isLoggerConfig } from "./typeGuards";
 
 import type { EventMethodMap } from "./namespaces";
-import type { LimitsConfig } from "./namespaces/LimitsNamespace/validators";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
 import type {
   NavigationDependencies,
@@ -39,6 +38,7 @@ import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNa
 import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
+  Limits,
   MiddlewareFactory,
   PluginFactory,
   Route,
@@ -85,16 +85,12 @@ export class Router<
   // Index signatures to satisfy interface
   [key: string]: unknown;
 
-  get limits(): Readonly<import("@real-router/types").LimitsConfig> {
-    return this.#limits.get();
-  }
-
   // ============================================================================
   // Namespaces
   // ============================================================================
 
   readonly #options: OptionsNamespace;
-  readonly #limits: LimitsNamespace;
+  readonly #limits: Limits;
   readonly #dependencies: DependenciesNamespace<Dependencies>;
   readonly #observable: ObservableNamespace;
   readonly #state: StateNamespace;
@@ -147,11 +143,6 @@ export class Router<
     // Extract noValidate BEFORE creating namespaces
     const noValidate = options.noValidate ?? false;
 
-    // Conditional validation for limits
-    if (!noValidate && options.limits !== undefined) {
-      LimitsNamespace.validateLimits(options.limits, "constructor");
-    }
-
     // Conditional validation for dependencies
     if (!noValidate) {
       DependenciesNamespace.validateDependenciesObject(
@@ -172,7 +163,7 @@ export class Router<
     // =========================================================================
 
     this.#options = new OptionsNamespace(options);
-    this.#limits = new LimitsNamespace(options.limits);
+    this.#limits = createLimits(options.limits);
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
     this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
@@ -607,10 +598,6 @@ export class Router<
     return this;
   }
 
-  getLimits(): Readonly<LimitsConfig> {
-    return this.#limits.get();
-  }
-
   // ============================================================================
   // Router Lifecycle
   // ============================================================================
@@ -686,7 +673,7 @@ export class Router<
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanDeactivate() + 1,
         "canDeactivate",
-        this.#limits.get().maxLifecycleHandlers,
+        this.#limits.maxLifecycleHandlers,
       );
     }
 
@@ -727,7 +714,7 @@ export class Router<
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanActivate() + 1,
         "canActivate",
-        this.#limits.get().maxLifecycleHandlers,
+        this.#limits.maxLifecycleHandlers,
       );
     }
 
@@ -754,7 +741,7 @@ export class Router<
       PluginsNamespace.validatePluginLimit(
         this.#plugins.count(),
         plugins.length,
-        this.#limits.get().maxPlugins,
+        this.#limits.maxPlugins,
       );
 
       // 3. Validate no duplicates with existing plugins
@@ -789,7 +776,7 @@ export class Router<
       MiddlewareNamespace.validateMiddlewareLimit(
         this.#middleware.count(),
         middlewares.length,
-        this.#limits.get().maxMiddleware,
+        this.#limits.maxMiddleware,
       );
     }
 
@@ -840,7 +827,7 @@ export class Router<
         this.#dependencies.count(),
         Object.keys(deps).length,
         "setDependencies",
-        this.#limits.get().maxDependencies,
+        this.#limits.maxDependencies,
       );
     }
 

@@ -1,870 +1,652 @@
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  expectTypeOf,
-} from "vitest";
+import { describe, it, expect } from "vitest";
 
-import { createTestRouter } from "../helpers";
+import { createRouter, events } from "@real-router/core";
 
 import type { Router } from "@real-router/core";
 
-let router: Router;
-
-describe("core/limits", () => {
-  beforeEach(() => {
-    router = createTestRouter();
-  });
-
-  afterEach(() => {
-    router.stop();
-  });
-
-  describe("default limits", () => {
-    it("should use default limits when no limits option provided", () => {
-      const limits = router.getLimits();
-
-      expect(limits).toBeDefined();
-      expect(limits.maxDependencies).toBe(100);
-      expect(limits.maxPlugins).toBe(50);
-      expect(limits.maxMiddleware).toBe(50);
-      expect(limits.maxListeners).toBe(10_000);
-      expect(limits.maxEventDepth).toBe(5);
-      expect(limits.maxLifecycleHandlers).toBe(200);
+describe("core/limits (integration via public API)", () => {
+  // 🔴 CRITICAL: Valid limits flow through createRouter()
+  describe("valid limits flow through createRouter()", () => {
+    it("should accept valid custom limit without error", () => {
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: 10 } });
+      }).not.toThrowError();
     });
 
-    it("should have correct default values matching original constants", () => {
-      const limits = router.getLimits();
-
-      // Verify all 6 limits are present
-      expect(Object.keys(limits)).toHaveLength(6);
-      expect(limits).toHaveProperty("maxDependencies");
-      expect(limits).toHaveProperty("maxPlugins");
-      expect(limits).toHaveProperty("maxMiddleware");
-      expect(limits).toHaveProperty("maxListeners");
-      expect(limits).toHaveProperty("maxEventDepth");
-      expect(limits).toHaveProperty("maxLifecycleHandlers");
+    it("should accept 0 (unlimited) without error", () => {
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: 0 } });
+      }).not.toThrowError();
     });
 
-    it("should work before router.start()", () => {
-      const limits = router.getLimits();
-
-      expect(limits).toBeDefined();
-      expect(limits.maxDependencies).toBe(100);
+    it("should accept empty limits object without error", () => {
+      expect(() => {
+        createRouter([], { limits: {} });
+      }).not.toThrowError();
     });
 
-    it("should work after router.start()", () => {
-      router.start();
-
-      const limits = router.getLimits();
-
-      expect(limits).toBeDefined();
-      expect(limits.maxDependencies).toBe(100);
+    it("should accept all valid limit keys", () => {
+      expect(() => {
+        createRouter([], {
+          limits: {
+            maxPlugins: 10,
+            maxMiddleware: 20,
+            maxDependencies: 50,
+            maxListeners: 30,
+            maxEventDepth: 5,
+            maxLifecycleHandlers: 100,
+          },
+        });
+      }).not.toThrowError();
     });
   });
 
-  describe("custom limits", () => {
-    it("should accept custom limits at creation", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 200,
-          maxPlugins: 100,
-        },
-      });
-
-      const limits = customRouter.getLimits();
-
-      expect(limits.maxDependencies).toBe(200);
-      expect(limits.maxPlugins).toBe(100);
-
-      customRouter.stop();
+  // 🔴 CRITICAL: Invalid limits rejected at construction
+  describe("invalid limits rejected at construction", () => {
+    it("should throw TypeError for non-integer maxPlugins (string)", () => {
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: "50" as any } });
+      }).toThrowError(TypeError);
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: "50" as any } });
+      }).toThrowError("must be an integer");
     });
 
-    it("should preserve default limits for non-specified values", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 150,
-        },
-      });
-
-      const limits = customRouter.getLimits();
-
-      // Custom value
-      expect(limits.maxDependencies).toBe(150);
-
-      // Default values for non-specified
-      expect(limits.maxPlugins).toBe(50);
-      expect(limits.maxMiddleware).toBe(50);
-      expect(limits.maxListeners).toBe(10_000);
-      expect(limits.maxEventDepth).toBe(5);
-      expect(limits.maxLifecycleHandlers).toBe(200);
-
-      customRouter.stop();
+    it("should throw TypeError for non-integer maxPlugins (float)", () => {
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: 1.5 } });
+      }).toThrowError(TypeError);
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: 1.5 } });
+      }).toThrowError("must be an integer");
     });
 
-    it("should accept partial limits with multiple custom values", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 500,
-          maxPlugins: 200,
-          maxMiddleware: 300,
-          maxEventDepth: 10,
-        },
-      });
-
-      const limits = customRouter.getLimits();
-
-      expect(limits.maxDependencies).toBe(500);
-      expect(limits.maxPlugins).toBe(200);
-      expect(limits.maxMiddleware).toBe(300);
-      expect(limits.maxEventDepth).toBe(10);
-
-      // Defaults for non-specified
-      expect(limits.maxListeners).toBe(10_000);
-      expect(limits.maxLifecycleHandlers).toBe(200);
-
-      customRouter.stop();
+    it("should throw RangeError for negative maxPlugins", () => {
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: -1 } });
+      }).toThrowError(RangeError);
+      expect(() => {
+        createRouter([], { limits: { maxPlugins: -1 } });
+      }).toThrowError("must be between 0 and");
     });
 
-    it("should accept all limits customized", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 200,
-          maxPlugins: 100,
-          maxMiddleware: 100,
-          maxListeners: 20_000,
-          maxEventDepth: 10,
-          maxLifecycleHandlers: 400,
-        },
-      });
+    it("should throw TypeError for unknown limit key", () => {
+      expect(() => {
+        createRouter([], { limits: { unknownLimit: 50 } as any });
+      }).toThrowError(TypeError);
+      expect(() => {
+        createRouter([], { limits: { unknownLimit: 50 } as any });
+      }).toThrowError("unknown limit");
+    });
 
-      const limits = customRouter.getLimits();
+    it("should throw TypeError when limits is null", () => {
+      expect(() => {
+        createRouter([], { limits: null as any });
+      }).toThrowError(TypeError);
+      expect(() => {
+        createRouter([], { limits: null as any });
+      }).toThrowError("expected plain object");
+    });
 
-      expect(limits.maxDependencies).toBe(200);
-      expect(limits.maxPlugins).toBe(100);
-      expect(limits.maxMiddleware).toBe(100);
-      expect(limits.maxListeners).toBe(20_000);
-      expect(limits.maxEventDepth).toBe(10);
-      expect(limits.maxLifecycleHandlers).toBe(400);
+    it("should throw TypeError when limits is array", () => {
+      expect(() => {
+        createRouter([], { limits: [] as any });
+      }).toThrowError(TypeError);
+      expect(() => {
+        createRouter([], { limits: [] as any });
+      }).toThrowError("expected plain object");
+    });
 
-      customRouter.stop();
+    it("should throw TypeError when limits is primitive", () => {
+      expect(() => {
+        createRouter([], { limits: 123 as any });
+      }).toThrowError(TypeError);
     });
   });
 
-  describe("immutability", () => {
-    it("should return frozen limits object", () => {
-      const limits = router.getLimits();
+  // 🔴 CRITICAL: Custom limits enforced (hard limit — facade validators)
+  describe("custom limits enforced", () => {
+    it("should enforce custom maxPlugins limit", () => {
+      const router = createRouter([], { limits: { maxPlugins: 2 } });
 
-      expect(Object.isFrozen(limits)).toBe(true);
+      // Register 2 plugins - should succeed
+      expect(() => {
+        router.usePlugin(() => ({}));
+        router.usePlugin(() => ({}));
+      }).not.toThrowError();
+
+      // 3rd plugin should throw
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
     });
 
-    it("should throw when trying to mutate limits", () => {
-      const limits = router.getLimits();
+    it("should enforce custom maxMiddleware limit", () => {
+      const router = createRouter([], { limits: { maxMiddleware: 1 } });
 
+      // Register 1 middleware - should succeed
       expect(() => {
-        (limits as any).maxDependencies = 999;
-      }).toThrowError(TypeError);
+        router.useMiddleware(() => (_toState, _fromState, done) => {
+          done();
+        });
+      }).not.toThrowError();
 
+      // 2nd middleware should throw
       expect(() => {
-        (limits as any).maxPlugins = 999;
-      }).toThrowError(TypeError);
-
-      expect(() => {
-        (limits as any).maxMiddleware = 999;
-      }).toThrowError(TypeError);
-
-      expect(() => {
-        (limits as any).maxListeners = 999;
-      }).toThrowError(TypeError);
-
-      expect(() => {
-        (limits as any).maxEventDepth = 999;
-      }).toThrowError(TypeError);
-
-      expect(() => {
-        (limits as any).maxLifecycleHandlers = 999;
-      }).toThrowError(TypeError);
+        router.useMiddleware(() => (_toState, _fromState, done) => {
+          done();
+        });
+      }).toThrowError("Middleware limit exceeded");
     });
 
-    it("should return same object reference on multiple calls", () => {
-      const limits1 = router.getLimits();
-      const limits2 = router.getLimits();
-      const limits3 = router.getLimits();
+    it("should enforce custom maxDependencies limit", () => {
+      const router = createRouter<{ dep1?: number; dep2?: number }>([], {
+        limits: { maxDependencies: 1 },
+      });
 
-      // Same frozen object (performance optimization)
-      expect(limits1).toBe(limits2);
-      expect(limits2).toBe(limits3);
-      expect(limits1).toBe(limits3);
+      // Set 1 dependency - should succeed
+      expect(() => {
+        router.setDependency("dep1", 1);
+      }).not.toThrowError();
+
+      // 2nd dependency should throw
+      expect(() => {
+        router.setDependency("dep2", 2);
+      }).toThrowError("Dependency limit exceeded");
     });
 
-    it("should handle multiple sequential calls correctly", () => {
-      const calls = Array.from({ length: 5 }, () => router.getLimits());
+    it("should enforce custom maxListeners limit", () => {
+      const router = createRouter([], { limits: { maxListeners: 1 } });
 
-      // All same frozen object (performance optimization)
-      for (let i = 0; i < calls.length; i++) {
-        for (let j = i + 1; j < calls.length; j++) {
-          expect(calls[i]).toBe(calls[j]);
+      // Add 1 listener - should succeed
+      expect(() => {
+        router.addEventListener(events.ROUTER_START, () => {});
+      }).not.toThrowError();
+
+      // 2nd listener should throw
+      expect(() => {
+        router.addEventListener(events.ROUTER_START, () => {});
+      }).toThrowError("Maximum listener limit");
+    });
+  });
+
+  // 🔴 CRITICAL: 0 = unlimited behavior (hard limit bypassed)
+  describe("0 = unlimited behavior", () => {
+    it("should allow unlimited plugins when maxPlugins = 0", () => {
+      const router = createRouter([], { limits: { maxPlugins: 0 } });
+
+      // Register many plugins - should not throw
+      expect(() => {
+        for (let i = 0; i < 10; i++) {
+          router.usePlugin(() => ({}));
         }
+      }).not.toThrowError();
+    });
+
+    it("should allow unlimited middleware when maxMiddleware = 0", () => {
+      const router = createRouter([], { limits: { maxMiddleware: 0 } });
+
+      // Register many middleware - should not throw
+      expect(() => {
+        for (let i = 0; i < 10; i++) {
+          router.useMiddleware(() => (_toState, _fromState, done) => {
+            done();
+          });
+        }
+      }).not.toThrowError();
+    });
+
+    it("should allow unlimited dependencies when maxDependencies = 0", () => {
+      const router = createRouter<Record<string, number>>([], {
+        limits: { maxDependencies: 0 },
+      });
+
+      // Set many dependencies at once via setDependencies - should not throw
+      // This covers validateDependencyLimit with maxDependencies === 0
+      const manyDeps: Record<string, number> = {};
+
+      for (let i = 0; i < 150; i++) {
+        manyDeps[`dep${i}`] = i;
       }
 
-      // All frozen
-      calls.forEach((limits) => {
-        expect(Object.isFrozen(limits)).toBe(true);
-      });
-    });
-
-    it("should prevent adding new properties to limits", () => {
-      const limits = router.getLimits();
-
       expect(() => {
-        (limits as any).newProperty = 123;
-      }).toThrowError(TypeError);
-    });
+        router.setDependencies(manyDeps);
+      }).not.toThrowError();
 
-    it("should prevent deleting properties from limits", () => {
-      const limits = router.getLimits();
-
+      // Also test setDependency to cover #checkDependencyCount early return
       expect(() => {
-        delete (limits as any).maxDependencies;
-      }).toThrowError(TypeError);
-    });
-  });
-
-  describe("validation", () => {
-    describe("type validation", () => {
-      it("should throw TypeError for non-number limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: "100" as any,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: "100" as any,
-            },
-          }),
-        ).toThrowError("must be a number");
-      });
-
-      it("should throw TypeError for null limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: null as any,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: null as any,
-            },
-          }),
-        ).toThrowError("must be a number");
-      });
-
-      it("should throw TypeError for undefined limit (when explicitly set)", () => {
-        // undefined is skipped during initialization, so this tests explicit undefined
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: undefined as any,
-            },
-          }),
-        ).not.toThrowError(); // undefined is skipped
-      });
-
-      it("should throw TypeError for boolean limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: true as any,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: true as any,
-            },
-          }),
-        ).toThrowError("must be a number");
-      });
-
-      it("should throw TypeError for object limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: {} as any,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: {} as any,
-            },
-          }),
-        ).toThrowError("must be a number");
-      });
-
-      it("should throw TypeError for array limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: [] as any,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: [] as any,
-            },
-          }),
-        ).toThrowError("must be a number");
-      });
+        router.setDependency("extraDep", 999);
+      }).not.toThrowError();
     });
 
-    describe("integer validation", () => {
-      it("should throw TypeError for non-integer limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 100.5,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 100.5,
-            },
-          }),
-        ).toThrowError("must be an integer");
-      });
+    it("should allow unlimited listeners when maxListeners = 0", () => {
+      const router = createRouter([], { limits: { maxListeners: 0 } });
 
-      it("should throw TypeError for float limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 99.99,
-            },
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 99.99,
-            },
-          }),
-        ).toThrowError("must be an integer");
-      });
-
-      it("should accept integer limits", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 100,
-              maxPlugins: 50,
-            },
-          }),
-        ).not.toThrowError();
-      });
-    });
-
-    describe("bounds validation", () => {
-      it("should throw RangeError for limit below minimum", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 0,
-            },
-          }),
-        ).toThrowError(RangeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 0,
-            },
-          }),
-        ).toThrowError("must be between");
-      });
-
-      it("should throw RangeError for negative limit", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: -100,
-            },
-          }),
-        ).toThrowError(RangeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: -100,
-            },
-          }),
-        ).toThrowError("must be between");
-      });
-
-      it("should throw RangeError for limit above maximum", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 10_001,
-            },
-          }),
-        ).toThrowError(RangeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 10_001,
-            },
-          }),
-        ).toThrowError("must be between");
-      });
-
-      it("should accept limit at minimum boundary", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 1,
-            },
-          }),
-        ).not.toThrowError();
-      });
-
-      it("should accept limit at maximum boundary", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 10_000,
-            },
-          }),
-        ).not.toThrowError();
-      });
-
-      it("should validate each limit with its own bounds", () => {
-        // maxPlugins: min=1, max=1000
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxPlugins: 0,
-            },
-          }),
-        ).toThrowError(RangeError);
-
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxPlugins: 1001,
-            },
-          }),
-        ).toThrowError(RangeError);
-
-        // maxEventDepth: min=1, max=100
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxEventDepth: 0,
-            },
-          }),
-        ).toThrowError(RangeError);
-
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxEventDepth: 101,
-            },
-          }),
-        ).toThrowError(RangeError);
-      });
-    });
-
-    describe("unknown limit validation", () => {
-      it("should throw TypeError for unknown limit key", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              unknownLimit: 100,
-            } as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              unknownLimit: 100,
-            } as any,
-          }),
-        ).toThrowError("unknown limit");
-      });
-
-      it("should throw TypeError for typo in limit name", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencie: 100,
-            } as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencie: 100,
-            } as any,
-          }),
-        ).toThrowError("unknown limit");
-      });
-    });
-
-    describe("limits object validation", () => {
-      it("should throw TypeError for non-object limits", () => {
-        expect(() =>
-          createTestRouter({
-            limits: "invalid" as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: "invalid" as any,
-          }),
-        ).toThrowError("expected plain object");
-      });
-
-      it("should throw TypeError for array as limits", () => {
-        expect(() =>
-          createTestRouter({
-            limits: [] as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: [] as any,
-          }),
-        ).toThrowError("expected plain object");
-      });
-
-      it("should throw TypeError for null as limits", () => {
-        expect(() =>
-          createTestRouter({
-            limits: null as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: null as any,
-          }),
-        ).toThrowError("expected plain object");
-      });
-
-      it("should throw TypeError for class instance as limits", () => {
-        class CustomLimits {
-          maxDependencies = 100;
+      // Add many listeners - should not throw
+      expect(() => {
+        for (let i = 0; i < 10; i++) {
+          router.addEventListener(events.ROUTER_START, () => {});
         }
+      }).not.toThrowError();
+    });
 
-        expect(() =>
-          createTestRouter({
-            limits: new CustomLimits() as any,
-          }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createTestRouter({
-            limits: new CustomLimits() as any,
-          }),
-        ).toThrowError("expected plain object");
+    it("should allow unlimited event depth when maxEventDepth = 0", () => {
+      const router = createRouter([{ name: "home", path: "/" }], {
+        limits: { maxEventDepth: 0 },
+        defaultRoute: "home",
       });
 
-      it("should accept empty limits object", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {} as any,
-          }),
-        ).not.toThrowError();
+      // Add listener BEFORE start to ensure event is emitted
+      let startEventReceived = false;
+
+      router.addEventListener(events.ROUTER_START, () => {
+        startEventReceived = true;
       });
 
-      it("should accept plain object with limits", () => {
-        expect(() =>
-          createTestRouter({
-            limits: {
-              maxDependencies: 100,
-            } as any,
-          }),
-        ).not.toThrowError();
-      });
+      // Start router - this triggers ROUTER_START event with maxEventDepth=0
+      expect(() => {
+        router.start();
+      }).not.toThrowError();
+
+      // Verify event was actually received (confirms event path was executed)
+      expect(startEventReceived).toBe(true);
+    });
+
+    it("should allow unlimited lifecycle handlers when maxLifecycleHandlers = 0", () => {
+      const router = createRouter([], { limits: { maxLifecycleHandlers: 0 } });
+
+      // Register many lifecycle handlers - should not throw
+      expect(() => {
+        for (let i = 0; i < 10; i++) {
+          router.canActivate(`route${i}`, true);
+          router.canDeactivate(`route${i}`, true);
+        }
+      }).not.toThrowError();
     });
   });
 
-  describe("threshold computation", () => {
-    it("should compute WARN as 20% of limit", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 100,
-        },
-      });
+  // 🟡 IMPORTANT: Default limits work (regression guard)
+  describe("default limits work", () => {
+    it("should enforce default maxPlugins limit (50)", () => {
+      const router = createRouter([]);
 
-      const limits = customRouter.getLimits();
+      // Register 50 plugins - should succeed
+      expect(() => {
+        for (let i = 0; i < 50; i++) {
+          router.usePlugin(() => ({}));
+        }
+      }).not.toThrowError();
 
-      // WARN = Math.floor(100 * 0.2) = 20
-      expect(limits.maxDependencies).toBe(100);
-
-      customRouter.stop();
+      // 51st plugin should throw
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
     });
 
-    it("should compute ERROR as 50% of limit", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 100,
-        },
-      });
+    it("should enforce default maxMiddleware limit (50)", () => {
+      const router = createRouter([]);
 
-      const limits = customRouter.getLimits();
+      // Register 50 middleware - should succeed
+      expect(() => {
+        for (let i = 0; i < 50; i++) {
+          router.useMiddleware(() => (_toState, _fromState, done) => {
+            done();
+          });
+        }
+      }).not.toThrowError();
 
-      // ERROR = Math.floor(100 * 0.5) = 50
-      expect(limits.maxDependencies).toBe(100);
-
-      customRouter.stop();
+      // 51st middleware should throw
+      expect(() => {
+        router.useMiddleware(() => (_toState, _fromState, done) => {
+          done();
+        });
+      }).toThrowError("Middleware limit exceeded");
     });
 
-    it("should use Math.floor for threshold computation", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 99, // 99 * 0.2 = 19.8 -> floor = 19
-        },
-      });
+    it("should enforce default maxDependencies limit (100)", () => {
+      const router = createRouter<Record<string, number>>([]);
 
-      const limits = customRouter.getLimits();
+      // Set 99 dependencies first
+      const deps99: Record<string, number> = {};
 
-      // Verify the limit is stored correctly
-      expect(limits.maxDependencies).toBe(99);
+      for (let i = 0; i < 99; i++) {
+        deps99[`dep${i}`] = i;
+      }
 
-      customRouter.stop();
+      expect(() => {
+        router.setDependencies(deps99);
+      }).not.toThrowError();
+
+      // Adding 2 more via setDependencies should throw (would be 101 total)
+      // This tests validateDependencyLimit throw path
+      expect(() => {
+        router.setDependencies({ dep99: 99, dep100: 100 });
+      }).toThrowError("Dependency limit exceeded");
     });
 
-    it("should handle threshold computation for all limits", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 100,
-          maxPlugins: 50,
-          maxMiddleware: 50,
-          maxListeners: 10_000,
-          maxEventDepth: 5,
-          maxLifecycleHandlers: 200,
-        },
-      });
+    it("should enforce default maxListeners limit (10000)", () => {
+      const router = createRouter([]);
 
-      const limits = customRouter.getLimits();
+      // Add 10000 listeners - should succeed
+      expect(() => {
+        for (let i = 0; i < 10_000; i++) {
+          router.addEventListener(events.ROUTER_START, () => {});
+        }
+      }).not.toThrowError();
 
-      // All limits should be stored correctly
-      expect(limits.maxDependencies).toBe(100);
-      expect(limits.maxPlugins).toBe(50);
-      expect(limits.maxMiddleware).toBe(50);
-      expect(limits.maxListeners).toBe(10_000);
-      expect(limits.maxEventDepth).toBe(5);
-      expect(limits.maxLifecycleHandlers).toBe(200);
-
-      customRouter.stop();
-    });
-  });
-
-  describe("type safety", () => {
-    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf for compile-time assertions
-    it("should be type-safe for getLimits return type", () => {
-      const limits = router.getLimits();
-
-      expectTypeOf(limits.maxDependencies).toBeNumber();
-      expectTypeOf(limits.maxPlugins).toBeNumber();
-      expectTypeOf(limits.maxMiddleware).toBeNumber();
-      expectTypeOf(limits.maxListeners).toBeNumber();
-      expectTypeOf(limits.maxEventDepth).toBeNumber();
-      expectTypeOf(limits.maxLifecycleHandlers).toBeNumber();
+      // 10001st listener should throw
+      expect(() => {
+        router.addEventListener(events.ROUTER_START, () => {});
+      }).toThrowError("Maximum listener limit");
     });
 
-    it("should return Readonly type", () => {
-      const limits = router.getLimits();
+    it("should work without explicit limits option", () => {
+      let router: Router;
 
-      // This should be caught at compile time, but we verify runtime behavior
-      expect(Object.isFrozen(limits)).toBe(true);
-    });
-  });
+      // No limits option - should use defaults
+      expect(() => {
+        router = createRouter([]);
+      }).not.toThrowError();
 
-  describe("integration with router lifecycle", () => {
-    it("should work before start()", () => {
-      const limits = router.getLimits();
+      // Verify default limits are enforced by registering plugins
+      expect(() => {
+        for (let i = 0; i < 50; i++) {
+          router!.usePlugin(() => ({}));
+        }
+      }).not.toThrowError();
 
-      expect(limits.maxDependencies).toBe(100);
-    });
-
-    it("should work after start()", () => {
-      router.start();
-
-      const limits = router.getLimits();
-
-      expect(limits.maxDependencies).toBe(100);
-    });
-
-    it("should work after stop()", () => {
-      router.start();
-      router.stop();
-
-      const limits = router.getLimits();
-
-      expect(limits.maxDependencies).toBe(100);
-    });
-
-    it("should maintain limits across multiple start/stop cycles", () => {
-      const limits1 = router.getLimits();
-
-      router.start();
-      const limits2 = router.getLimits();
-
-      router.stop();
-      const limits3 = router.getLimits();
-
-      // All should be the same frozen object
-      expect(limits1).toBe(limits2);
-      expect(limits2).toBe(limits3);
+      // 51st should throw (default limit)
+      expect(() => {
+        router!.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
     });
   });
 
-  describe("edge cases", () => {
-    it("should handle limits with minimum values for most limits", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 1,
-          maxPlugins: 1,
-          maxMiddleware: 1,
-          maxListeners: 1,
-          maxEventDepth: 1,
-          maxLifecycleHandlers: 10,
-        },
+  // 🟡 IMPORTANT: Warn/error threshold logging for dependencies
+  describe("dependency thresholds", () => {
+    it("should log warning at warn threshold (20% of maxDependencies)", async () => {
+      const { logger } = await import("@real-router/logger");
+      const { vi } = await import("vitest");
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
+      // Check happens BEFORE adding, so we need 20 existing deps to trigger warn
+      const router = createRouter<Record<string, number>>([], {
+        limits: { maxDependencies: 100 },
       });
 
-      const limits = customRouter.getLimits();
+      // Set 20 dependencies - no warning yet (count is checked before add)
+      for (let i = 0; i < 20; i++) {
+        router.setDependency(`dep${i}`, i);
+      }
 
-      expect(limits.maxDependencies).toBe(1);
-      expect(limits.maxPlugins).toBe(1);
-      expect(limits.maxMiddleware).toBe(1);
-      expect(limits.maxListeners).toBe(1);
-      expect(limits.maxEventDepth).toBe(1);
-      expect(limits.maxLifecycleHandlers).toBe(10);
+      expect(warnSpy).not.toHaveBeenCalled();
 
-      customRouter.stop();
+      // 21st dependency should trigger warning (count === 20 at check time)
+      router.setDependency("dep20", 20);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.setDependency",
+        expect.stringContaining("20 dependencies"),
+      );
+
+      warnSpy.mockRestore();
     });
 
-    it("should handle limits with maximum values", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxDependencies: 10_000,
-          maxPlugins: 1000,
-          maxMiddleware: 1000,
-          maxListeners: 100_000,
-          maxEventDepth: 100,
-          maxLifecycleHandlers: 10_000,
-        },
+    it("should log error at error threshold (50% of maxDependencies)", async () => {
+      const { logger } = await import("@real-router/logger");
+      const { vi } = await import("vitest");
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      // Custom limit of 100 means error at 50
+      // Check happens BEFORE adding, so we need 50 existing deps to trigger error
+      const router = createRouter<Record<string, number>>([], {
+        limits: { maxDependencies: 100 },
       });
 
-      const limits = customRouter.getLimits();
+      // Set 50 dependencies - no error yet (count is checked before add)
+      for (let i = 0; i < 50; i++) {
+        router.setDependency(`dep${i}`, i);
+      }
 
-      expect(limits.maxDependencies).toBe(10_000);
-      expect(limits.maxPlugins).toBe(1000);
-      expect(limits.maxMiddleware).toBe(1000);
-      expect(limits.maxListeners).toBe(100_000);
-      expect(limits.maxEventDepth).toBe(100);
-      expect(limits.maxLifecycleHandlers).toBe(10_000);
+      expect(errorSpy).not.toHaveBeenCalled();
 
-      customRouter.stop();
+      // 51st dependency should trigger error log (count === 50 at check time)
+      router.setDependency("dep50", 50);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "router.setDependency",
+        expect.stringContaining("50 dependencies"),
+      );
+
+      errorSpy.mockRestore();
+    });
+  });
+
+  // 🟡 IMPORTANT: Warn/error threshold logging for lifecycle handlers
+  describe("lifecycle handler thresholds", () => {
+    it("should enforce default maxLifecycleHandlers limit (200)", () => {
+      const router = createRouter([]);
+
+      // Register 199 canActivate handlers - should succeed
+      expect(() => {
+        for (let i = 0; i < 199; i++) {
+          router.canActivate(`route${i}`, true);
+        }
+      }).not.toThrowError();
+
+      // 200th handler should throw
+      expect(() => {
+        router.canActivate("route199", true);
+      }).toThrowError(/limit exceeded.*200/i);
     });
 
-    it("should handle large limit values", () => {
-      const customRouter = createTestRouter({
-        limits: {
-          maxListeners: 99_999,
-        },
+    it("should log warning at warn threshold (20% of maxLifecycleHandlers)", async () => {
+      const { logger } = await import("@real-router/logger");
+      const { vi } = await import("vitest");
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
+      const router = createRouter([], {
+        limits: { maxLifecycleHandlers: 100 },
       });
 
-      const limits = customRouter.getLimits();
+      // Register 19 handlers - no warning
+      for (let i = 0; i < 19; i++) {
+        router.canActivate(`route${i}`, true);
+      }
 
-      expect(limits.maxListeners).toBe(99_999);
+      expect(warnSpy).not.toHaveBeenCalled();
 
-      customRouter.stop();
+      // 20th handler should trigger warning
+      router.canActivate("route19", true);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.canActivate",
+        expect.stringContaining("20 lifecycle handlers"),
+      );
+
+      warnSpy.mockRestore();
     });
 
+    it("should log error at error threshold (50% of maxLifecycleHandlers)", async () => {
+      const { logger } = await import("@real-router/logger");
+      const { vi } = await import("vitest");
+      const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+
+      // Custom limit of 100 means error at 50
+      const router = createRouter([], {
+        limits: { maxLifecycleHandlers: 100 },
+      });
+
+      // Register 49 handlers - no error
+      for (let i = 0; i < 49; i++) {
+        router.canActivate(`route${i}`, true);
+      }
+
+      expect(errorSpy).not.toHaveBeenCalled();
+
+      // 50th handler should trigger error log
+      router.canActivate("route49", true);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        "router.canActivate",
+        expect.stringContaining("50 lifecycle handlers"),
+      );
+
+      errorSpy.mockRestore();
+    });
+  });
+
+  // 🟢 DESIRABLE: Edge cases and combinations
+  describe("edge cases and combinations", () => {
     it("should handle mixed custom and default limits", () => {
-      const customRouter = createTestRouter({
+      const router = createRouter([], {
         limits: {
-          maxDependencies: 500,
-          maxEventDepth: 20,
+          maxPlugins: 5, // Custom
+          // maxMiddleware uses default (50)
         },
       });
 
-      const limits = customRouter.getLimits();
+      // Custom limit enforced
+      expect(() => {
+        for (let i = 0; i < 5; i++) {
+          router.usePlugin(() => ({}));
+        }
+      }).not.toThrowError();
 
-      // Custom
-      expect(limits.maxDependencies).toBe(500);
-      expect(limits.maxEventDepth).toBe(20);
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
 
-      // Defaults
-      expect(limits.maxPlugins).toBe(50);
-      expect(limits.maxMiddleware).toBe(50);
-      expect(limits.maxListeners).toBe(10_000);
-      expect(limits.maxLifecycleHandlers).toBe(200);
+      // Default limit still enforced for middleware
+      expect(() => {
+        for (let i = 0; i < 50; i++) {
+          router.useMiddleware(() => (_toState, _fromState, done) => {
+            done();
+          });
+        }
+      }).not.toThrowError();
 
-      customRouter.stop();
-    });
-  });
-
-  describe("getLimits method", () => {
-    it("should return limits object", () => {
-      const limits = router.getLimits();
-
-      expect(limits).toBeDefined();
-      expect(typeof limits).toBe("object");
-    });
-
-    it("should return same reference on consecutive calls", () => {
-      const limits1 = router.getLimits();
-      const limits2 = router.getLimits();
-      const limits3 = router.getLimits();
-
-      expect(limits1).toBe(limits2);
-      expect(limits2).toBe(limits3);
+      expect(() => {
+        router.useMiddleware(() => (_toState, _fromState, done) => {
+          done();
+        });
+      }).toThrowError("Middleware limit exceeded");
     });
 
-    it("should return frozen object", () => {
-      const limits = router.getLimits();
+    it("should handle limit of 1 (minimum non-zero)", () => {
+      const router = createRouter([], { limits: { maxPlugins: 1 } });
 
-      expect(Object.isFrozen(limits)).toBe(true);
+      // 1 plugin should succeed
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).not.toThrowError();
+
+      // 2nd should throw
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
     });
 
-    it("should contain all required properties", () => {
-      const limits = router.getLimits();
+    it("should handle very large custom limits", () => {
+      const router = createRouter([], { limits: { maxPlugins: 1000 } });
 
-      const requiredProperties = [
-        "maxDependencies",
-        "maxPlugins",
-        "maxMiddleware",
-        "maxListeners",
-        "maxEventDepth",
-        "maxLifecycleHandlers",
-      ];
-
-      for (const prop of requiredProperties) {
-        expect(limits).toHaveProperty(prop);
-      }
+      // Should accept large limit without error
+      expect(() => {
+        for (let i = 0; i < 100; i++) {
+          router.usePlugin(() => ({}));
+        }
+      }).not.toThrowError();
     });
 
-    it("should not contain extra properties", () => {
-      const limits = router.getLimits();
+    it("should preserve limits in cloned router", () => {
+      const router = createRouter([], { limits: { maxPlugins: 3 } });
 
-      const keys = Object.keys(limits);
+      const cloned = router.clone();
 
-      expect(keys).toHaveLength(6);
+      // Cloned router should have same limits
+      expect(() => {
+        cloned.usePlugin(() => ({}));
+        cloned.usePlugin(() => ({}));
+        cloned.usePlugin(() => ({}));
+      }).not.toThrowError();
+
+      expect(() => {
+        cloned.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
+    });
+
+    it("should handle all limits set to 0 (unlimited everything)", () => {
+      const router = createRouter([], {
+        limits: {
+          maxPlugins: 0,
+          maxMiddleware: 0,
+          maxDependencies: 0,
+          maxListeners: 0,
+          maxEventDepth: 0,
+          maxLifecycleHandlers: 0,
+        },
+      });
+
+      // All operations should succeed without limits
+      expect(() => {
+        for (let i = 0; i < 20; i++) {
+          router.usePlugin(() => ({}));
+          router.useMiddleware(() => (_toState, _fromState, done) => {
+            done();
+          });
+        }
+      }).not.toThrowError();
+    });
+
+    it("should skip undefined limit values in config", () => {
+      // undefined values should be ignored, not cause errors
+      expect(() => {
+        createRouter([], {
+          limits: {
+            maxPlugins: undefined,
+            maxMiddleware: 50,
+          } as any,
+        });
+      }).not.toThrowError();
+
+      // maxPlugins should use default (50) when undefined
+      const router = createRouter([], {
+        limits: {
+          maxPlugins: undefined,
+        } as any,
+      });
+
+      // Register 50 plugins (default limit)
+      expect(() => {
+        for (let i = 0; i < 50; i++) {
+          router.usePlugin(() => ({}));
+        }
+      }).not.toThrowError();
+
+      // 51st should throw (default limit)
+      expect(() => {
+        router.usePlugin(() => ({}));
+      }).toThrowError("Plugin limit exceeded");
+    });
+
+    it("should accept limits: undefined (skip validation)", () => {
+      // When limits option is explicitly undefined, validateLimits is not called
+      expect(() => {
+        createRouter([], {
+          limits: undefined,
+        } as any);
+      }).not.toThrowError();
+    });
+
+    it("should accept logger option without error", () => {
+      // logger is an optional field not in defaultOptions
+      expect(() => {
+        createRouter([], {
+          logger: { level: "all" },
+        } as any);
+      }).not.toThrowError();
     });
   });
 });

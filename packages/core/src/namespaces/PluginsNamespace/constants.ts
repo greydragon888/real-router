@@ -10,15 +10,6 @@ import {
 import type { EventName } from "@real-router/types";
 
 /**
- * Plugin registry limits to prevent memory leaks.
- */
-export const PLUGIN_LIMITS = {
-  WARN: 10,
-  ERROR: 25,
-  HARD_LIMIT: 50,
-} as const;
-
-/**
  * Maps plugin method names to router event names.
  */
 export const EVENTS_MAP = {

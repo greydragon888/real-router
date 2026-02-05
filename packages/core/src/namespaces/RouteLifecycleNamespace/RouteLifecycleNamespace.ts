@@ -8,13 +8,12 @@ import {
   validateHandlerLimit,
   validateNotRegistering,
 } from "./validators";
-import { DEFAULT_LIMITS } from "../LimitsNamespace/constants";
-import { computeThresholds } from "../LimitsNamespace/helpers";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { ActivationFnFactory } from "../../types";
-import type { LimitsNamespace } from "../LimitsNamespace";
+import type { ActivationFnFactory, Limits } from "../../types";
 import type { ActivationFn, DefaultDependencies } from "@real-router/types";
 
 /**
@@ -55,7 +54,7 @@ export class RouteLifecycleNamespace<
 
   #deps: RouteLifecycleDependencies<Dependencies> | undefined;
 
-  #limits?: LimitsNamespace;
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -93,7 +92,7 @@ export class RouteLifecycleNamespace<
     this.#deps = deps;
   }
 
-  setLimits(limits: LimitsNamespace): void {
+  setLimits(limits: Limits): void {
     this.#limits = limits;
   }
 
@@ -332,9 +331,12 @@ export class RouteLifecycleNamespace<
   }
 
   #checkCountThresholds(currentSize: number, methodName: string): void {
-    const maxLifecycleHandlers =
-      this.#limits?.get().maxLifecycleHandlers ??
-      DEFAULT_LIMITS.maxLifecycleHandlers;
+    const maxLifecycleHandlers = this.#limits.maxLifecycleHandlers;
+
+    if (maxLifecycleHandlers === 0) {
+      return;
+    }
+
     const { warn, error } = computeThresholds(maxLifecycleHandlers);
 
     if (currentSize >= error) {
