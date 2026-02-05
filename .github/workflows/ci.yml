@@ -17,11 +17,10 @@ env:
 
 jobs:
   # Fast check to determine if CI should run
+  # Always runs to satisfy required status checks
   check:
     name: Check Changes
     runs-on: ubuntu-latest
-    # Skip for release PRs (code already validated by source PR)
-    if: ${{ !startsWith(github.head_ref || '', 'changeset-release/') }}
     outputs:
       should_run: ${{ steps.changes.outputs.should_run }}
     steps:
@@ -33,6 +32,13 @@ jobs:
       - name: Check for code changes
         id: changes
         run: |
+          # Skip for release PRs (code already validated by source PR)
+          if [[ "${{ github.head_ref }}" == changeset-release/* ]]; then
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            echo "🚀 Release PR detected, skipping CI"
+            exit 0
+          fi
+
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             BASE="${{ github.event.pull_request.base.sha }}"
             HEAD="${{ github.event.pull_request.head.sha }}"
@@ -56,45 +62,60 @@ jobs:
     name: Prepare (Cache Warm-up)
     runs-on: ubuntu-latest
     needs: [check]
-    if: needs.check.outputs.should_run == 'true'
+    # Always run to report status, but skip heavy steps if not needed
+    if: always()
     steps:
+      - name: Skip notification
+        if: needs.check.outputs.should_run != 'true'
+        run: echo "✅ Skipping CI - no code changes or release PR"
+
       - name: Checkout
+        if: needs.check.outputs.should_run == 'true'
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Fetch master for Turbo comparison
-        if: github.event_name == 'pull_request'
+        if: needs.check.outputs.should_run == 'true' && github.event_name == 'pull_request'
         run: git fetch origin master:master
 
       - name: Install pnpm
+        if: needs.check.outputs.should_run == 'true'
         uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
+        if: needs.check.outputs.should_run == 'true'
         uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Lint & Type Check
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm turbo run lint type-check ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
       - name: Test with Coverage
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm turbo run test ${{ github.event_name == 'pull_request' && '--affected' || '' }} -- --coverage
 
       - name: Build
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm turbo run build ${{ github.event_name == 'pull_request' && '--affected' || '' }}
 
       - name: Check dependency consistency
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:deps
 
       - name: Check for duplicate dependencies
+        if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:dedupe
 
       - name: Upload coverage artifacts
+        if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: coverage-reports
@@ -102,6 +123,7 @@ jobs:
           retention-days: 1
 
       - name: Upload build artifacts
+        if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v6
         with:
           name: dist
