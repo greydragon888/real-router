@@ -11,11 +11,17 @@ import type { Router } from "./Router";
 import type {
   ActivationFn,
   DefaultDependencies,
+  LimitsConfig,
   Middleware,
   Params,
   Plugin,
   RouteTreeState,
 } from "@real-router/types";
+
+/**
+ * Immutable limits configuration type.
+ */
+export type Limits = Readonly<LimitsConfig>;
 
 /**
  * Extended build result that includes segments for path building.

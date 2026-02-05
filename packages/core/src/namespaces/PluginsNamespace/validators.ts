@@ -7,7 +7,8 @@
 
 import { getTypeDescription, isObjKey } from "type-guards";
 
-import { PLUGIN_LIMITS, EVENTS_MAP } from "./constants";
+import { EVENTS_MAP } from "./constants";
+import { DEFAULT_LIMITS } from "../../constants";
 
 import type { PluginFactory } from "../../types";
 import type { DefaultDependencies, Plugin } from "@real-router/types";
@@ -64,12 +65,15 @@ export function validatePlugin(plugin: Plugin): void {
 export function validatePluginLimit(
   currentCount: number,
   newCount: number,
+  maxPlugins: number = DEFAULT_LIMITS.maxPlugins,
 ): void {
+  if (maxPlugins === 0) {
+    return;
+  }
+
   const totalCount = currentCount + newCount;
 
-  if (totalCount > PLUGIN_LIMITS.HARD_LIMIT) {
-    throw new Error(
-      `[router.usePlugin] Plugin limit exceeded (${PLUGIN_LIMITS.HARD_LIMIT})`,
-    );
+  if (totalCount > maxPlugins) {
+    throw new Error(`[router.usePlugin] Plugin limit exceeded (${maxPlugins})`);
   }
 }

@@ -9,6 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
+import { createLimits } from "./helpers";
 import {
   CloneNamespace,
   DependenciesNamespace,
@@ -37,6 +38,7 @@ import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNa
 import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
+  Limits,
   MiddlewareFactory,
   PluginFactory,
   Route,
@@ -88,6 +90,7 @@ export class Router<
   // ============================================================================
 
   readonly #options: OptionsNamespace;
+  readonly #limits: Limits;
   readonly #dependencies: DependenciesNamespace<Dependencies>;
   readonly #observable: ObservableNamespace;
   readonly #state: StateNamespace;
@@ -160,6 +163,7 @@ export class Router<
     // =========================================================================
 
     this.#options = new OptionsNamespace(options);
+    this.#limits = createLimits(options.limits);
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
     this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
@@ -669,6 +673,7 @@ export class Router<
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanDeactivate() + 1,
         "canDeactivate",
+        this.#limits.maxLifecycleHandlers,
       );
     }
 
@@ -709,6 +714,7 @@ export class Router<
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanActivate() + 1,
         "canActivate",
+        this.#limits.maxLifecycleHandlers,
       );
     }
 
@@ -735,6 +741,7 @@ export class Router<
       PluginsNamespace.validatePluginLimit(
         this.#plugins.count(),
         plugins.length,
+        this.#limits.maxPlugins,
       );
 
       // 3. Validate no duplicates with existing plugins
@@ -769,6 +776,7 @@ export class Router<
       MiddlewareNamespace.validateMiddlewareLimit(
         this.#middleware.count(),
         middlewares.length,
+        this.#limits.maxMiddleware,
       );
     }
 
@@ -819,6 +827,7 @@ export class Router<
         this.#dependencies.count(),
         Object.keys(deps).length,
         "setDependencies",
+        this.#limits.maxDependencies,
       );
     }
 
@@ -1027,6 +1036,13 @@ export class Router<
    * Called once in constructor after all namespaces are created.
    */
   #setupDependencies(): void {
+    // Set limits for all namespaces that use them
+    this.#dependencies.setLimits(this.#limits);
+    this.#plugins.setLimits(this.#limits);
+    this.#middleware.setLimits(this.#limits);
+    this.#observable.setLimits(this.#limits);
+    this.#routeLifecycle.setLimits(this.#limits);
+
     // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setDependencies()
     // will register pending canActivate handlers which need RouteLifecycleNamespace
     this.#routeLifecycle.setRouter(this);

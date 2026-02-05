@@ -1,14 +1,9 @@
 // packages/core/src/namespaces/index.ts
 
-export {
-  DependenciesNamespace,
-  DEPENDENCY_LIMITS,
-} from "./DependenciesNamespace";
+export { DependenciesNamespace } from "./DependenciesNamespace";
 
 export {
   invokeFor,
-  MAX_EVENT_DEPTH,
-  MAX_LISTENERS_HARD_LIMIT,
   ObservableNamespace,
   validEventNames,
 } from "./ObservableNamespace";
@@ -27,19 +22,15 @@ export {
 
 export { StateNamespace } from "./StateNamespace";
 
-export { MiddlewareNamespace, MIDDLEWARE_LIMITS } from "./MiddlewareNamespace";
+export { MiddlewareNamespace } from "./MiddlewareNamespace";
 
 export {
   PluginsNamespace,
-  PLUGIN_LIMITS,
   EVENTS_MAP,
   EVENT_METHOD_NAMES,
 } from "./PluginsNamespace";
 
-export {
-  RouteLifecycleNamespace,
-  LIFECYCLE_LIMITS,
-} from "./RouteLifecycleNamespace";
+export { RouteLifecycleNamespace } from "./RouteLifecycleNamespace";
 
 export {
   RoutesNamespace,

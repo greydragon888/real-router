@@ -2,17 +2,18 @@
 
 import { logger } from "@real-router/logger";
 
-import { MIDDLEWARE_LIMITS } from "./constants";
 import {
   validateMiddleware,
   validateMiddlewareLimit,
   validateNoDuplicates,
   validateUseMiddlewareArgs,
 } from "./validators";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
 import type { InitializedMiddleware, MiddlewareDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { MiddlewareFactory } from "../../types";
+import type { Limits, MiddlewareFactory } from "../../types";
 import type {
   DefaultDependencies,
   Middleware,
@@ -34,11 +35,11 @@ export class MiddlewareNamespace<
     Middleware
   >();
 
-  // Router reference for middleware initialization (passed to middleware factories)
   #router: Router<Dependencies> | undefined;
 
-  // Dependencies injected via setDependencies (for internal operations)
   #deps: MiddlewareDependencies<Dependencies> | undefined;
+
+  #limits: Limits = DEFAULT_LIMITS;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -65,28 +66,28 @@ export class MiddlewareNamespace<
     validateNoDuplicates<D>(newFactories, existingFactories);
   }
 
-  static validateMiddlewareLimit(currentCount: number, newCount: number): void {
-    validateMiddlewareLimit(currentCount, newCount);
+  static validateMiddlewareLimit(
+    currentCount: number,
+    newCount: number,
+    maxMiddleware?: number,
+  ): void {
+    validateMiddlewareLimit(currentCount, newCount, maxMiddleware);
   }
 
   // =========================================================================
   // Dependency injection
   // =========================================================================
 
-  /**
-   * Sets the router reference for middleware initialization.
-   * Middleware factories receive the router object directly as part of their API.
-   */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
   }
 
-  /**
-   * Sets dependencies for internal operations.
-   * These replace direct method calls on router.
-   */
   setDependencies(deps: MiddlewareDependencies<Dependencies>): void {
     this.#deps = deps;
+  }
+
+  setLimits(limits: Limits): void {
+    this.#limits = limits;
   }
 
   // =========================================================================
@@ -187,21 +188,25 @@ export class MiddlewareNamespace<
   // Private methods
   // =========================================================================
 
-  /**
-   * Checks count thresholds and logs warnings/errors.
-   * Does not throw - limit validation is done by facade.
-   */
   #checkCountThresholds(newCount: number): void {
+    const maxMiddleware = this.#limits.maxMiddleware;
+
+    if (maxMiddleware === 0) {
+      return;
+    }
+
     const totalSize = newCount + this.#factories.size;
 
-    if (totalSize >= MIDDLEWARE_LIMITS.ERROR) {
+    const { warn, error } = computeThresholds(maxMiddleware);
+
+    if (totalSize >= error) {
       logger.error(
         "router.useMiddleware",
         `${totalSize} middleware registered! ` +
           `This is excessive and will impact performance. ` +
-          `Hard limit at ${MIDDLEWARE_LIMITS.HARD_LIMIT}.`,
+          `Hard limit at ${maxMiddleware}.`,
       );
-    } else if (totalSize >= MIDDLEWARE_LIMITS.WARN) {
+    } else if (totalSize >= warn) {
       logger.warn(
         "router.useMiddleware",
         `${totalSize} middleware registered. ` +

@@ -1,6 +1,9 @@
 // packages/real-router/modules/helpers.ts
 
-import type { State, Options } from "@real-router/types";
+import { DEFAULT_LIMITS } from "./constants";
+
+import type { Limits } from "./types";
+import type { State, Options, LimitsConfig } from "@real-router/types";
 import type { BuildOptions, TrailingSlashMode } from "route-tree";
 
 export { getTypeDescription } from "type-guards";
@@ -215,4 +218,27 @@ export function createBuildOptions(options: Options): BuildOptions {
   }
 
   return buildOptions;
+}
+
+/**
+ * Computes warning and error thresholds for a given limit.
+ * WARN threshold: 20% of limit
+ * ERROR threshold: 50% of limit
+ */
+export function computeThresholds(limit: number): {
+  warn: number;
+  error: number;
+} {
+  return {
+    warn: Math.floor(limit * 0.2),
+    error: Math.floor(limit * 0.5),
+  };
+}
+
+/**
+ * Merges user limits with defaults.
+ * Returns frozen object for immutability.
+ */
+export function createLimits(userLimits: Partial<LimitsConfig> = {}): Limits {
+  return { ...DEFAULT_LIMITS, ...userLimits };
 }

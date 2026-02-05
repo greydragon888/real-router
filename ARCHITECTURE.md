@@ -188,6 +188,35 @@ interface State {
 - Need to **redirect** or **transform** state? → Middleware
 - Need to **observe** without modifying? → Plugin
 
+## Resource Limits
+
+Router enforces configurable limits to prevent resource exhaustion:
+
+```typescript
+createRouter(routes, {
+  limits: {
+    maxPlugins: 100,      // Default: 50
+    maxMiddleware: 100,   // Default: 50
+    maxDependencies: 200, // Default: 100
+  },
+});
+```
+
+| Limit                  | Default | Protects Against                    |
+| ---------------------- | ------- | ----------------------------------- |
+| `maxPlugins`           | 50      | Plugin stack overflow               |
+| `maxMiddleware`        | 50      | Middleware chain overflow           |
+| `maxDependencies`      | 100     | Circular/excessive dependencies     |
+| `maxListeners`         | 10,000  | Event listener memory leaks         |
+| `maxEventDepth`        | 5       | Recursive event infinite loops      |
+| `maxLifecycleHandlers` | 200     | Guard function accumulation         |
+
+**Design:**
+- **Centralized** — All limits defined in `core/constants.ts` (`DEFAULT_LIMITS`, `LIMIT_BOUNDS`)
+- **Immutable** — Set at creation, cannot change at runtime
+- **Injected** — Router calls `namespace.setLimits()` during initialization
+- **0 = unlimited** — Any limit set to 0 disables the check
+
 ## Route Tree
 
 Routes form a hierarchical tree structure:

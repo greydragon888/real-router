@@ -3,7 +3,6 @@
 import { logger } from "@real-router/logger";
 import { getTypeDescription } from "type-guards";
 
-import { DEPENDENCY_LIMITS } from "./constants";
 import {
   validateDependencyExists,
   validateDependencyLimit,
@@ -11,7 +10,10 @@ import {
   validateDependenciesObject,
   validateSetDependencyArgs,
 } from "./validators";
+import { DEFAULT_LIMITS } from "../../constants";
+import { computeThresholds } from "../../helpers";
 
+import type { Limits } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
 
 /**
@@ -23,13 +25,13 @@ import type { DefaultDependencies } from "@real-router/types";
 export class DependenciesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  // Null-prototype object to avoid prototype pollution
   readonly #dependencies: Partial<Dependencies> = Object.create(
     null,
   ) as Partial<Dependencies>;
 
+  #limits: Limits = DEFAULT_LIMITS;
+
   constructor(initialDependencies: Partial<Dependencies> = {} as Dependencies) {
-    // Note: validation should be done by facade before calling constructor
     this.setMultiple(initialDependencies);
   }
 
@@ -67,8 +69,18 @@ export class DependenciesNamespace<
     currentCount: number,
     newCount: number,
     methodName: string,
+    maxDependencies?: number,
   ): void {
-    validateDependencyLimit(currentCount, newCount, methodName);
+    validateDependencyLimit(
+      currentCount,
+      newCount,
+      methodName,
+      maxDependencies,
+    );
+  }
+
+  setLimits(limits: Limits): void {
+    this.#limits = limits;
   }
 
   // =========================================================================
@@ -205,24 +217,31 @@ export class DependenciesNamespace<
   // =========================================================================
 
   #checkDependencyCount(methodName: string): void {
+    const maxDependencies = this.#limits.maxDependencies;
+
+    if (maxDependencies === 0) {
+      return;
+    }
+
     const currentCount = Object.keys(this.#dependencies).length;
 
-    if (currentCount === DEPENDENCY_LIMITS.WARN) {
+    const { warn, error } = computeThresholds(maxDependencies);
+
+    if (currentCount === warn) {
       logger.warn(
         `router.${methodName}`,
-        `${DEPENDENCY_LIMITS.WARN} dependencies registered. ` +
-          `Consider if all are necessary.`,
+        `${warn} dependencies registered. ` + `Consider if all are necessary.`,
       );
-    } else if (currentCount === DEPENDENCY_LIMITS.ERROR) {
+    } else if (currentCount === error) {
       logger.error(
         `router.${methodName}`,
-        `${DEPENDENCY_LIMITS.ERROR} dependencies registered! ` +
+        `${error} dependencies registered! ` +
           `This indicates architectural problems. ` +
-          `Hard limit at ${DEPENDENCY_LIMITS.HARD_LIMIT}.`,
+          `Hard limit at ${maxDependencies}.`,
       );
-    } else if (currentCount >= DEPENDENCY_LIMITS.HARD_LIMIT) {
+    } else if (currentCount >= maxDependencies) {
       throw new Error(
-        `[router.${methodName}] Dependency limit exceeded (${DEPENDENCY_LIMITS.HARD_LIMIT}). ` +
+        `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
           `Current: ${currentCount}. This is likely a bug in your code. ` +
           `If you genuinely need more dependencies, your architecture needs refactoring.`,
       );

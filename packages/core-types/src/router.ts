@@ -17,6 +17,7 @@ import type {
   Unsubscribe,
   CancelFn,
 } from "./base";
+import type { LimitsConfig } from "./limits";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
 
 // Logger types (duplicated from @real-router/logger to avoid dependency)
@@ -120,6 +121,14 @@ export interface Options {
    * @default undefined
    */
   logger?: Partial<LoggerConfig>;
+
+  /**
+   * Router resource limits configuration.
+   * Controls maximum allowed values for various router operations.
+   *
+   * @default DEFAULT_LIMITS (from LimitsNamespace)
+   */
+  limits?: Partial<LimitsConfig>;
 
   /**
    * Disables argument validation in public router methods.
