@@ -31,7 +31,6 @@ import type {
   NavigationDependencies,
   TransitionDependencies,
 } from "./namespaces/NavigationNamespace";
-import type { RouterObservable } from "./namespaces/ObservableNamespace";
 import type { PluginsDependencies } from "./namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "./namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNamespace";
@@ -986,20 +985,6 @@ export class Router<
     return this.#observable.subscribe(listener);
   }
 
-  /**
-   * TC39 Observable spec: router[Symbol.observable]() returns observable
-   */
-  [Symbol.observable](): RouterObservable {
-    return this.#observable.observable();
-  }
-
-  /**
-   * RxJS compatibility: router["@@observable"]() returns observable
-   */
-  ["@@observable"](): RouterObservable {
-    return this.#observable.observable();
-  }
-
   // ============================================================================
   // Cloning
   // ============================================================================
@@ -1156,9 +1141,6 @@ export class Router<
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);
-
-    // Observable needs access to state for replay feature
-    this.#observable.setGetState(() => this.#state.get());
 
     // StateNamespace needs access to route config and path building
     this.#state.setDependencies({

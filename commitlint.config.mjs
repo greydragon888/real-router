@@ -25,6 +25,7 @@ export const SCOPES = [
   "logger-plugin",
   "persistent-params-plugin",
   "react",
+  "rx",
   "router-benchmarks",
   "deps",
   "config",
