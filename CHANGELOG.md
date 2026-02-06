@@ -5,6 +5,113 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-06]
+
+### @real-router/browser-plugin@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
+### @real-router/core@0.8.0
+
+### Minor Changes
+
+- [#59](https://github.com/greydragon888/real-router/pull/59) [`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `router[Symbol.observable]()` from core — Observable API moved to `@real-router/rx` (#41)
+
+  **Breaking Change:** `router[Symbol.observable]()` and `router["@@observable"]()` are removed from core.
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  router[Symbol.observable]().subscribe(observer);
+
+  // After
+  import { observable } from "@real-router/rx";
+  observable(router).subscribe(observer);
+
+  // Or with state stream
+  import { state$ } from "@real-router/rx";
+  state$(router).subscribe((state) => console.log(state));
+  ```
+
+  **Why:** Achieves zero bundle cost for users who don't need reactive streams (~2KB savings).
+
+### @real-router/helpers@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
+### @real-router/logger-plugin@0.2.11
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
+### @real-router/persistent-params-plugin@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
+### @real-router/react@0.2.2
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+  - @real-router/browser-plugin@0.1.11
+  - @real-router/helpers@0.1.11
+
+### @real-router/rx@0.2.0
+
+### Minor Changes
+
+- [#59](https://github.com/greydragon888/real-router/pull/59) [`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e) Thanks [@greydragon888](https://github.com/greydragon888)! - Initial release of @real-router/rx — reactive Observable API for Real-Router (#41)
+
+  New package providing zero-cost opt-in Observable functionality:
+  - `state$(router)` — reactive state stream with replay semantics
+  - `events$(router)` — typed event stream for all router events
+  - `observable(router)` — TC39 Observable wrapper for RxJS interop
+  - Operators: `map`, `filter`, `debounceTime`, `distinctUntilChanged`, `takeUntil`
+  - `pipe()` for operator composition (supports 1-9 operators)
+  - `Symbol.asyncIterator` for `for await...of` support
+  - AbortSignal support for automatic unsubscription
+  - Full TC39 Observable compliance with `Symbol.observable` and `@@observable`
+
+  **Design decisions:**
+  - `unsubscribe()` does not trigger `complete` callback — aligns with TC39 Observable spec
+  - `distinctUntilChanged` comparator receives `(previous, current)` matching RxJS convention
+  - `debounceTime` flushes pending value on source `complete`
+  - `debounceTime` validates duration parameter (throws RangeError on negative/NaN/Infinity)
+  - `filter` operator has type guard overload
+  - Unhandled errors reported via `console.error`
+
+  **Example:**
+
+  ```typescript
+  import { state$, map, filter, distinctUntilChanged } from "@real-router/rx";
+
+  state$(router)
+    .pipe(
+      map(({ route }) => route.params.userId),
+      filter((id) => id !== undefined),
+      distinctUntilChanged(),
+    )
+    .subscribe((userId) => fetchUser(userId));
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
 ## [2026-02-05]
 
 ### @real-router/browser-plugin@0.1.10
