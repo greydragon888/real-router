@@ -19,6 +19,21 @@ const PACKAGES_DIR = join(ROOT_DIR, "packages");
 const ROOT_CHANGELOG = join(ROOT_DIR, "CHANGELOG.md");
 
 /**
+ * Determine change priority for sorting:
+ * 1 = Minor with breaking changes (highest priority)
+ * 2 = Minor without breaking changes
+ * 3 = Patch changes (lowest priority)
+ */
+function getChangePriority(content) {
+  const hasMinor = /^### Minor Changes/m.test(content);
+  const hasBreaking = /\*\*Breaking|\bBREAKING\b/i.test(content);
+
+  if (hasMinor && hasBreaking) return 1;
+  if (hasMinor) return 2;
+  return 3;
+}
+
+/**
  * Check if content has any changes (excludes empty sections)
  */
 function hasMeaningfulChanges(content) {
@@ -199,12 +214,22 @@ function main() {
     return;
   }
 
-  // Sort by package name, then by version (descending)
+  // Sort by: 1) change priority (breaking > minor > patch), 2) package name, 3) version desc
   packageChanges.sort((a, b) => {
+    const priorityA = getChangePriority(a.content);
+    const priorityB = getChangePriority(b.content);
+
+    // First by priority (lower number = higher priority)
+    if (priorityA !== priorityB) {
+      return priorityA - priorityB;
+    }
+
+    // Then by package name
     if (a.name !== b.name) {
       return a.name.localeCompare(b.name);
     }
-    // Compare versions: higher versions first
+
+    // Then by version (higher versions first)
     return b.version.localeCompare(a.version, undefined, { numeric: true });
   });
 
@@ -258,7 +283,9 @@ function main() {
   console.log(`✅ Aggregated ${packageChanges.length} package changelog(s) to root CHANGELOG.md`);
 
   for (const pkg of packageChanges) {
-    console.log(`   - ${pkg.name}@${pkg.version}`);
+    const priority = getChangePriority(pkg.content);
+    const label = priority === 1 ? "BREAKING" : priority === 2 ? "minor" : "patch";
+    console.log(`   - ${pkg.name}@${pkg.version} (${label})`);
   }
 }
 

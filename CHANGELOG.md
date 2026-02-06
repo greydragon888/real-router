@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-06]
 
-### @real-router/browser-plugin@0.1.11
-
-### Patch Changes
-
-- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
-  - @real-router/core@0.8.0
-
 ### @real-router/core@0.8.0
 
 ### Minor Changes
@@ -38,6 +31,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ```
 
   **Why:** Achieves zero bundle cost for users who don't need reactive streams (~2KB savings).
+
+### @real-router/rx@0.1.0
+
+### Minor Changes
+
+- [#59](https://github.com/greydragon888/real-router/pull/59) [`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e) Thanks [@greydragon888](https://github.com/greydragon888)! - Initial release of @real-router/rx (#41)
+
+  New package providing zero-cost opt-in Observable functionality for Real-Router:
+  - `state$(router)` — reactive state stream with replay semantics
+  - `events$(router)` — typed event stream for all router events
+  - `observable(router)` — TC39 Observable wrapper for RxJS interop
+  - Operators: `map`, `filter`, `debounceTime`, `distinctUntilChanged`, `takeUntil`
+  - Full TC39 Observable compliance with `Symbol.observable`
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
+
+### @real-router/browser-plugin@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
+  - @real-router/core@0.8.0
 
 ### @real-router/helpers@0.1.11
 
@@ -69,57 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.11
   - @real-router/helpers@0.1.11
 
-### @real-router/rx@0.2.0
-
-### Minor Changes
-
-- [#59](https://github.com/greydragon888/real-router/pull/59) [`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e) Thanks [@greydragon888](https://github.com/greydragon888)! - Initial release of @real-router/rx — reactive Observable API for Real-Router (#41)
-
-  New package providing zero-cost opt-in Observable functionality:
-  - `state$(router)` — reactive state stream with replay semantics
-  - `events$(router)` — typed event stream for all router events
-  - `observable(router)` — TC39 Observable wrapper for RxJS interop
-  - Operators: `map`, `filter`, `debounceTime`, `distinctUntilChanged`, `takeUntil`
-  - `pipe()` for operator composition (supports 1-9 operators)
-  - `Symbol.asyncIterator` for `for await...of` support
-  - AbortSignal support for automatic unsubscription
-  - Full TC39 Observable compliance with `Symbol.observable` and `@@observable`
-
-  **Design decisions:**
-  - `unsubscribe()` does not trigger `complete` callback — aligns with TC39 Observable spec
-  - `distinctUntilChanged` comparator receives `(previous, current)` matching RxJS convention
-  - `debounceTime` flushes pending value on source `complete`
-  - `debounceTime` validates duration parameter (throws RangeError on negative/NaN/Infinity)
-  - `filter` operator has type guard overload
-  - Unhandled errors reported via `console.error`
-
-  **Example:**
-
-  ```typescript
-  import { state$, map, filter, distinctUntilChanged } from "@real-router/rx";
-
-  state$(router)
-    .pipe(
-      map(({ route }) => route.params.userId),
-      filter((id) => id !== undefined),
-      distinctUntilChanged(),
-    )
-    .subscribe((userId) => fetchUser(userId));
-  ```
-
-### Patch Changes
-
-- Updated dependencies [[`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e)]:
-  - @real-router/core@0.8.0
-
 ## [2026-02-05]
-
-### @real-router/browser-plugin@0.1.10
-
-### Patch Changes
-
-- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
-  - @real-router/core@0.7.0
 
 ### @real-router/core@0.7.0
 
@@ -158,6 +126,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
   - @real-router/types@0.5.0
 
+### @real-router/types@0.5.0
+
+### Minor Changes
+
+- [#57](https://github.com/greydragon888/real-router/pull/57) [`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LimitsConfig` interface and `limits` option (#38)
+
+  New `LimitsConfig` interface defines 6 configurable router limits:
+  - `maxDependencies`, `maxPlugins`, `maxMiddleware`
+  - `maxListeners`, `maxEventDepth`, `maxLifecycleHandlers`
+
+  The `Options` interface now includes `limits?: Partial<LimitsConfig>`.
+
+### @real-router/browser-plugin@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c)]:
+  - @real-router/core@0.7.0
+
 ### @real-router/helpers@0.1.10
 
 ### Patch Changes
@@ -188,68 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.10
   - @real-router/helpers@0.1.10
 
-### @real-router/types@0.5.0
-
-### Minor Changes
-
-- [#57](https://github.com/greydragon888/real-router/pull/57) [`8856681`](https://github.com/greydragon888/real-router/commit/8856681e7a2300acf7aa4db2ff77f50567eddb2c) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `LimitsConfig` interface and `limits` option (#38)
-
-  New `LimitsConfig` interface defines 6 configurable router limits:
-  - `maxDependencies`, `maxPlugins`, `maxMiddleware`
-  - `maxListeners`, `maxEventDepth`, `maxLifecycleHandlers`
-
-  The `Options` interface now includes `limits?: Partial<LimitsConfig>`.
-
 ## [2026-02-04]
-
-### @real-router/browser-plugin@0.1.9
-
-### Patch Changes
-
-- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
-  - @real-router/core@0.6.0
-
-### @real-router/core@0.6.0
-
-### Minor Changes
-
-- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getNavigator()` method (#37)
-
-  New `Router.getNavigator()` method returns a frozen, cached `Navigator` instance with safe subset of router methods for UI components.
-
-  ```typescript
-  const navigator = router.getNavigator();
-  navigator.navigate("home");
-  navigator.getState();
-  navigator.isActiveRoute("home");
-  navigator.subscribe(listener);
-  ```
-
-### Patch Changes
-
-- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
-  - @real-router/types@0.4.0
-
-### @real-router/helpers@0.1.9
-
-### Patch Changes
-
-- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
-  - @real-router/core@0.6.0
-
-### @real-router/logger-plugin@0.2.9
-
-### Patch Changes
-
-- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
-  - @real-router/core@0.6.0
-
-### @real-router/persistent-params-plugin@0.1.9
-
-### Patch Changes
-
-- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
-  - @real-router/core@0.6.0
 
 ### @real-router/react@0.2.0
 
@@ -287,6 +213,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.9
   - @real-router/helpers@0.1.9
 
+### @real-router/core@0.6.0
+
+### Minor Changes
+
+- [#55](https://github.com/greydragon888/real-router/pull/55) [`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `getNavigator()` method (#37)
+
+  New `Router.getNavigator()` method returns a frozen, cached `Navigator` instance with safe subset of router methods for UI components.
+
+  ```typescript
+  const navigator = router.getNavigator();
+  navigator.navigate("home");
+  navigator.getState();
+  navigator.isActiveRoute("home");
+  navigator.subscribe(listener);
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/types@0.4.0
+
 ### @real-router/types@0.4.0
 
 ### Minor Changes
@@ -299,13 +246,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `isActiveRoute()` — check if route is active
   - `subscribe()` — subscribe to route changes
 
-
-### @real-router/browser-plugin@0.1.8
+### @real-router/browser-plugin@0.1.9
 
 ### Patch Changes
 
-- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
-  - @real-router/core@0.5.0
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/helpers@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/logger-plugin@0.2.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
+
+### @real-router/persistent-params-plugin@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`f5a0cab`](https://github.com/greydragon888/real-router/commit/f5a0cabdc3d749d45e741d155bea3fc67df46e08)]:
+  - @real-router/core@0.6.0
 
 ### @real-router/core@0.5.0
 
@@ -337,6 +304,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
   - @real-router/types@0.3.0
 
+### @real-router/types@0.3.0
+
+### Minor Changes
+
+- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `noValidate` option to disable validation in production (#53)
+
+  New configuration option for performance-critical environments:
+
+  ```typescript
+  const router = createRouter(routes, {
+    noValidate: process.env.NODE_ENV === "production",
+  });
+  ```
+
+  When enabled, skips argument validation in ~40 public methods.
+  Constructor always validates options object itself.
+
+### @real-router/browser-plugin@0.1.8
+
+### Patch Changes
+
+- Updated dependencies [[`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb), [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb)]:
+  - @real-router/core@0.5.0
+
 ### @real-router/helpers@0.1.8
 
 ### Patch Changes
@@ -367,33 +358,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.8
   - @real-router/helpers@0.1.8
 
-### @real-router/types@0.3.0
-
-### Minor Changes
-
-- [#53](https://github.com/greydragon888/real-router/pull/53) [`101656f`](https://github.com/greydragon888/real-router/commit/101656fadc5f73d246b3772fc457ff4a570687fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `noValidate` option to disable validation in production (#53)
-
-  New configuration option for performance-critical environments:
-
-  ```typescript
-  const router = createRouter(routes, {
-    noValidate: process.env.NODE_ENV === "production",
-  });
-  ```
-
-  When enabled, skips argument validation in ~40 public methods.
-  Constructor always validates options object itself.
-
 ## [2026-01-30]
-
-### @real-router/browser-plugin@0.1.7
-
-### Patch Changes
-
-- [`402c61c`](https://github.com/greydragon888/real-router/commit/402c61c68e62e50cf69af15bd7ff0e4ed5563777) Thanks [@greydragon888](https://github.com/greydragon888)! - Updated to use Plugin Development API
-
-- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
-  - @real-router/core@0.4.0
 
 ### @real-router/core@0.4.0
 
@@ -438,6 +403,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Closes #36
 
+### @real-router/browser-plugin@0.1.7
+
+### Patch Changes
+
+- [`402c61c`](https://github.com/greydragon888/real-router/commit/402c61c68e62e50cf69af15bd7ff0e4ed5563777) Thanks [@greydragon888](https://github.com/greydragon888)! - Updated to use Plugin Development API
+
+- Updated dependencies [[`338d6ed`](https://github.com/greydragon888/real-router/commit/338d6ed2a2f8aba246cfc81fd30d996f18096572)]:
+  - @real-router/core@0.4.0
+
 ### @real-router/helpers@0.1.7
 
 ### Patch Changes
@@ -471,6 +445,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/helpers@0.1.7
 
 ## [2026-01-28]
+
+### @real-router/core@0.3.0
+
+### Minor Changes
+
+- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
+
+  Types moved to `@real-router/core`:
+  - `Router` (class replaces interface)
+  - `Route`
+  - `RouteConfigUpdate`
+  - `ActivationFnFactory`
+  - `MiddlewareFactory`
+  - `PluginFactory`
+  - `BuildStateResultWithSegments`
+
+  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
+
+  ```diff
+  - import type { Router, Route, PluginFactory } from "@real-router/types";
+  + import type { Router, Route, PluginFactory } from "@real-router/core";
+  ```
+
+  This change eliminates circular type dependencies between packages.
+
+- [`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor internal architecture to namespace-based design (#34)
+
+  Internal refactoring from functional decorator composition to class-based namespace architecture:
+  - 11 namespace classes with true encapsulation via private fields (`#`)
+  - Clean separation of concerns (Options, Dependencies, State, Routes, Navigation, etc.)
+  - Improved maintainability and testability
+
+  **No breaking changes** — public API remains 100% backward compatible.
+
+### Patch Changes
+
+- Updated dependencies [[`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
+  - @real-router/types@0.2.0
+
+### @real-router/types@0.2.0
+
+### Minor Changes
+
+- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
+
+  Types moved to `@real-router/core`:
+  - `Router` (class replaces interface)
+  - `Route`
+  - `RouteConfigUpdate`
+  - `ActivationFnFactory`
+  - `MiddlewareFactory`
+  - `PluginFactory`
+  - `BuildStateResultWithSegments`
+
+  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
+
+  ```diff
+  - import type { Router, Route, PluginFactory } from "@real-router/types";
+  + import type { Router, Route, PluginFactory } from "@real-router/core";
+  ```
+
+  This change eliminates circular type dependencies between packages.
+
+### @real-router/logger@0.2.0
+
+### Minor Changes
+
+- fix: bundle internal dependencies, publish logger package
+  - Make logger public as @real-router/logger
+  - Bundle type-guards, route-tree, search-params into consuming packages
+  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
+  - Update release workflow to publish logger first
+
+  This fixes installation failures where npm couldn't resolve workspace-only packages.
+
+### @real-router/logger@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
 
 ### @real-router/browser-plugin@0.1.6
 
@@ -533,44 +587,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
   - @real-router/core@0.2.1
-
-### @real-router/core@0.3.0
-
-### Minor Changes
-
-- [`f6449e2`](https://github.com/greydragon888/real-router/commit/f6449e27ae65deb4cd99afb4b98dcce1deb0ddcd) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor internal architecture to namespace-based design (#34)
-
-  Internal refactoring from functional decorator composition to class-based namespace architecture:
-  - 11 namespace classes with true encapsulation via private fields (`#`)
-  - Clean separation of concerns (Options, Dependencies, State, Routes, Navigation, etc.)
-  - Improved maintainability and testability
-
-  **No breaking changes** — public API remains 100% backward compatible.
-
-- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
-
-  Types moved to `@real-router/core`:
-  - `Router` (class replaces interface)
-  - `Route`
-  - `RouteConfigUpdate`
-  - `ActivationFnFactory`
-  - `MiddlewareFactory`
-  - `PluginFactory`
-  - `BuildStateResultWithSegments`
-
-  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
-
-  ```diff
-  - import type { Router, Route, PluginFactory } from "@real-router/types";
-  + import type { Router, Route, PluginFactory } from "@real-router/core";
-  ```
-
-  This change eliminates circular type dependencies between packages.
-
-### Patch Changes
-
-- Updated dependencies [[`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f)]:
-  - @real-router/types@0.2.0
 
 ### @real-router/core@0.2.4
 
@@ -677,24 +693,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
   - @real-router/core@0.2.1
-
-### @real-router/logger@0.2.0
-
-### Minor Changes
-
-- fix: bundle internal dependencies, publish logger package
-  - Make logger public as @real-router/logger
-  - Bundle type-guards, route-tree, search-params into consuming packages
-  - Use dts-bundle-generator for TypeScript declarations (inlines all types)
-  - Update release workflow to publish logger first
-
-  This fixes installation failures where npm couldn't resolve workspace-only packages.
-
-### @real-router/logger@0.1.0
-
-### Minor Changes
-
-- Initial public release with full routing functionality
 
 ### @real-router/logger-plugin@0.2.6
 
@@ -903,105 +901,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.2
   - @real-router/helpers@0.1.2
 
-### @real-router/types@0.2.0
-
-### Minor Changes
-
-- [#34](https://github.com/greydragon888/real-router/pull/34) [`3cd1024`](https://github.com/greydragon888/real-router/commit/3cd10240f69747b0bf489e55a5fdd40eab95bb8f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Move Router-dependent types from `@real-router/types` to `@real-router/core` (#31)
-
-  Types moved to `@real-router/core`:
-  - `Router` (class replaces interface)
-  - `Route`
-  - `RouteConfigUpdate`
-  - `ActivationFnFactory`
-  - `MiddlewareFactory`
-  - `PluginFactory`
-  - `BuildStateResultWithSegments`
-
-  **Migration:** If you import these types from `@real-router/types`, change your imports to `@real-router/core`:
-
-  ```diff
-  - import type { Router, Route, PluginFactory } from "@real-router/types";
-  + import type { Router, Route, PluginFactory } from "@real-router/core";
-  ```
-
-  This change eliminates circular type dependencies between packages.
-
-### @real-router/types@0.1.0
-
-### Minor Changes
-
-- Initial public release with full routing functionality
-
 ## [2026-01-24]
-
-### @real-router/logger-plugin@0.2.1
-
-### Patch Changes
-
-- [#15](https://github.com/greydragon888/real-router/pull/15) [`b83baf1`](https://github.com/greydragon888/real-router/commit/b83baf12f6a4d3e067d1c561ce72195fe9b3bd48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix logger-plugin configuration options being ignored
-  - Replace `logger` singleton with direct `console` calls to make plugin logs independent of router configuration
-  - Enable `loggerPluginFactory(options)` to accept configuration parameter
-  - Implement `level` option filtering (`all`, `transitions`, `errors`, `none`)
-  - Implement `showParamsDiff` option to control parameter diff logging
-  - Implement `showTiming` option to control timing information display
-
-
-### @real-router/browser-plugin@0.1.1
-
-### Patch Changes
-
-- [#11](https://github.com/greydragon888/real-router/pull/11) [`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add internal isomorphic logger package for centralized logging
-
-  ### New Features
-
-  **Isomorphic Logger** — works in browser, Node.js, and environments without `console`:
-  - Three severity levels: `log`, `warn`, `error`
-  - Four threshold configurations: `all`, `warn-error`, `error-only`, `none`
-  - Safe console access (checks `typeof console !== "undefined"`)
-  - Optional callback for custom log processing (error tracking, analytics, console emulation)
-  - `callbackIgnoresLevel` option to bypass level filtering for callbacks
-
-  **Router Configuration:**
-
-  ```typescript
-  const router = createRouter(routes, {
-    logger: {
-      level: "error-only",
-      callback: (level, context, message) => {
-        if (level === "error") Sentry.captureMessage(message);
-      },
-      callbackIgnoresLevel: true,
-    },
-  });
-  ```
-
-  ### Changes by Package
-
-  **@real-router/core:**
-  - Add `options.logger` configuration support in `createRouter()`
-  - Migrate all internal `console.*` calls to centralized logger
-
-  **@real-router/browser-plugin:**
-  - Migrate warning messages to centralized logger
-
-  **@real-router/logger-plugin:**
-  - Use internal logger instead of direct console output
-
-- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
-  - @real-router/core@0.2.0
-
-### @real-router/browser-plugin@0.1.0
-
-### Minor Changes
-
-- Initial public release with full routing functionality
-
-### Patch Changes
-
-- Updated dependencies []:
-  - type-guards@0.1.0
-  - @real-router/core@0.1.0
 
 ### @real-router/core@0.2.0
 
@@ -1057,35 +957,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - core-types@0.1.0
   - route-tree@0.1.0
 
-### @real-router/helpers@0.1.1
-
-### Patch Changes
-
-- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
-  - @real-router/core@0.2.0
-
-### @real-router/helpers@0.1.0
-
-### Minor Changes
-
-- Initial public release with full routing functionality
-
-### Patch Changes
-
-- Updated dependencies []:
-  - @real-router/core@0.1.0
-
-### @real-router/logger-plugin@0.2.1
-
-### Patch Changes
-
-- [#15](https://github.com/greydragon888/real-router/pull/15) [`b83baf1`](https://github.com/greydragon888/real-router/commit/b83baf12f6a4d3e067d1c561ce72195fe9b3bd48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix logger-plugin configuration options being ignored
-  - Replace `logger` singleton with direct `console` calls to make plugin logs independent of router configuration
-  - Enable `loggerPluginFactory(options)` to accept configuration parameter
-  - Implement `level` option filtering (`all`, `transitions`, `errors`, `none`)
-  - Implement `showParamsDiff` option to control parameter diff logging
-  - Implement `showTiming` option to control timing information display
-
 ### @real-router/logger-plugin@0.2.0
 
 ### Minor Changes
@@ -1101,20 +972,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Transition success (27.29μs)   // fast transitions (<0.1ms)
   ```
 
-  **Performance API Integration** — marks and measures for browser DevTools:
-
-  ```
-  Marks:
-  ├── router:transition-start:{from}→{to}
-  ├── router:transition-end:{from}→{to}
-  ├── router:transition-cancel:{from}→{to}
-  └── router:transition-error:{from}→{to}
-
-  Measures:
-  ├── router:transition:{from}→{to}
-  ├── router:transition-cancelled:{from}→{to}
-  └── router:transition-failed:{from}→{to}
-  ```
+  **Performance API Integration** — marks and measures for browser DevTools
 
   ### Configuration
 
@@ -1126,55 +984,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     }),
   );
   ```
-
-  ### Implementation Details
-  - Monotonic time provider with environment-aware fallback:
-    - Browser: `performance.now()`
-    - Node.js 16+: `performance.now()` from `perf_hooks`
-    - Node.js <16: `Date.now()` with monotonic emulation (handles NTP sync, DST)
-  - Safe Performance API access — graceful no-op if unavailable
-
-### Patch Changes
-
-- [#11](https://github.com/greydragon888/real-router/pull/11) [`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6) Thanks [@greydragon888](https://github.com/greydragon888)! - Add internal isomorphic logger package for centralized logging
-
-  ### New Features
-
-  **Isomorphic Logger** — works in browser, Node.js, and environments without `console`:
-  - Three severity levels: `log`, `warn`, `error`
-  - Four threshold configurations: `all`, `warn-error`, `error-only`, `none`
-  - Safe console access (checks `typeof console !== "undefined"`)
-  - Optional callback for custom log processing (error tracking, analytics, console emulation)
-  - `callbackIgnoresLevel` option to bypass level filtering for callbacks
-
-  **Router Configuration:**
-
-  ```typescript
-  const router = createRouter(routes, {
-    logger: {
-      level: "error-only",
-      callback: (level, context, message) => {
-        if (level === "error") Sentry.captureMessage(message);
-      },
-      callbackIgnoresLevel: true,
-    },
-  });
-  ```
-
-  ### Changes by Package
-
-  **@real-router/core:**
-  - Add `options.logger` configuration support in `createRouter()`
-  - Migrate all internal `console.*` calls to centralized logger
-
-  **@real-router/browser-plugin:**
-  - Migrate warning messages to centralized logger
-
-  **@real-router/logger-plugin:**
-  - Use internal logger instead of direct console output
-
-- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
-  - @real-router/core@0.2.0
 
 ### @real-router/logger-plugin@0.1.0
 
@@ -1188,12 +997,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - logger@0.1.0
   - @real-router/core@0.1.0
 
-### @real-router/persistent-params-plugin@0.1.1
+### @real-router/browser-plugin@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
 
 ### Patch Changes
 
-- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
-  - @real-router/core@0.2.0
+- Updated dependencies []:
+  - type-guards@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/helpers@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @real-router/core@0.1.0
 
 ### @real-router/persistent-params-plugin@0.1.0
 
@@ -1219,6 +1044,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/browser-plugin@0.1.0
   - @real-router/helpers@0.1.0
   - @real-router/core@0.1.0
+
+### @real-router/browser-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+
+### @real-router/helpers@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+
+### @real-router/logger-plugin@0.2.1
+
+### Patch Changes
+
+- [#15](https://github.com/greydragon888/real-router/pull/15) [`b83baf1`](https://github.com/greydragon888/real-router/commit/b83baf12f6a4d3e067d1c561ce72195fe9b3bd48) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix logger-plugin configuration options being ignored
+  - Replace `logger` singleton with direct `console` calls to make plugin logs independent of router configuration
+  - Enable `loggerPluginFactory(options)` to accept configuration parameter
+  - Implement `level` option filtering (`all`, `transitions`, `errors`, `none`)
+  - Implement `showParamsDiff` option to control parameter diff logging
+  - Implement `showTiming` option to control timing information display
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
+
+### @real-router/persistent-params-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ae9e067`](https://github.com/greydragon888/real-router/commit/ae9e06717ed5771e4ff2d67976ad221cb57dfcc6)]:
+  - @real-router/core@0.2.0
 
 ### @real-router/react@0.1.1
 
