@@ -633,7 +633,7 @@ describe("core/routes/addRoute", () => {
         router.addRoute({
           name: "async-decoder",
           path: "/async-decoder/:id",
-          // eslint-disable-next-line @typescript-eslint/require-await -- testing runtime validation
+
           decodeParams: (async (params: Params) => params) as any,
         });
       }).toThrowError(/decodeparams cannot be async/i);
@@ -644,7 +644,7 @@ describe("core/routes/addRoute", () => {
         router.addRoute({
           name: "async-encoder",
           path: "/async-encoder/:id",
-          // eslint-disable-next-line @typescript-eslint/require-await -- testing runtime validation
+
           encodeParams: (async (params: Params) => params) as any,
         });
       }).toThrowError(/encodeparams cannot be async/i);

@@ -16,6 +16,11 @@
     "limit": "5 kB"
   },
   {
+    "name": "@real-router/rx (ESM)",
+    "path": "packages/rx/dist/esm/index.mjs",
+    "limit": "5 kB"
+  },
+  {
     "name": "@real-router/helpers (ESM)",
     "path": "packages/helpers/dist/esm/index.mjs",
     "limit": "3 kB"

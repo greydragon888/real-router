@@ -6,4 +6,4 @@ export { validEventNames } from "./constants";
 
 export { invokeFor } from "./helpers";
 
-export type { EventMethodMap, SubscribeState } from "./types";
+export type { EventMethodMap } from "./types";

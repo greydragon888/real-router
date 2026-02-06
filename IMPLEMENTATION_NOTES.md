@@ -429,6 +429,7 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 | -------------------------------- | ----- |
 | @real-router/core                | 25 kB |
 | @real-router/react               | 10 kB |
+| @real-router/rx                  | 5 kB  |
 | @real-router/browser-plugin      | 5 kB  |
 | @real-router/helpers             | 3 kB  |
 | route-tree                       | 15 kB |

@@ -40,8 +40,8 @@ Creates a new router instance. [Wiki](https://github.com/greydragon888/real-rout
 
 ```typescript
 const router = createRouter(
-  routes,       // Route[] - route definitions
-  options,      // Partial<Options> - router options
+  routes, // Route[] - route definitions
+  options, // Partial<Options> - router options
   dependencies, // object - dependency injection
 );
 ```
@@ -159,9 +159,12 @@ Adds an event listener. Returns an unsubscribe function. [Wiki](https://github.c
 ```typescript
 import { events } from "@real-router/core";
 
-const unsubscribe = router.addEventListener(events.TRANSITION_START, (toState, fromState) => {
-  console.log("Starting:", toState.name);
-});
+const unsubscribe = router.addEventListener(
+  events.TRANSITION_START,
+  (toState, fromState) => {
+    console.log("Starting:", toState.name);
+  },
+);
 
 // To remove listener, call the returned unsubscribe function
 unsubscribe();
@@ -213,35 +216,41 @@ Returns: `void`\
 ### Routes
 
 #### `router.addRoute(route: Route): void`
+
 Add a route definition at runtime.\
 `route: Route` — route configuration object\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/addRoute)
 
 #### `router.removeRoute(name: string): void`
+
 Remove a route by name.\
 `name: string` — route name to remove\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/removeRoute)
 
 #### `router.getRoute(name: string): Route | undefined`
+
 Get route definition by name.\
 `name: string` — route name\
 Returns: `Route | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getRoute)
 
 #### `router.hasRoute(name: string): boolean`
+
 Check if a route exists.\
 `name: string` — route name\
 Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/hasRoute)
 
 #### `router.clearRoutes(): void`
+
 Remove all routes.
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/clearRoutes)
 
 #### `router.updateRoute(name: string, updates: Partial<Route>): void`
+
 Update route configuration.\
 `name: string` — route name\
 `updates: Partial<Route>` — properties to update\
@@ -261,17 +270,20 @@ router.updateRoute("old-url", { forwardTo: "new-url" });
 ### State Utilities
 
 #### `router.getPreviousState(): State | undefined`
+
 Get previous router state.\
 Returns: `State | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getPreviousState)
 
 #### `router.shouldUpdateNode(nodeName: string): (toState, fromState?) => boolean`
+
 Create a predicate to check if a route node should update during transition.\
 `nodeName: string` — route node name\
 Returns: predicate function\
 [Wiki](https://github.com/greydragon888/real-router/wiki/shouldUpdateNode)
 
 #### `router.areStatesEqual(state1: State, state2: State, ignoreQueryParams?: boolean): boolean`
+
 Compare two states for equality.\
 `state1: State` — first state\
 `state2: State` — second state\
@@ -284,6 +296,7 @@ Returns: `boolean`\
 ### Path Operations
 
 #### `router.buildPath(name: string, params?: Params): string`
+
 Build URL path from route name.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -291,6 +304,7 @@ Returns: `string`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/buildPath)
 
 #### `router.buildUrl(name: string, params?: Params, options?: object): string`
+
 Build full URL from route name (includes base path and query string).\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -299,6 +313,7 @@ Returns: `string`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/buildUrl)
 
 #### `router.isActiveRoute(name: string, params?: Params, strictEquality?: boolean, ignoreQueryParams?: boolean): boolean`
+
 Check if route is currently active.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -312,17 +327,20 @@ Returns: `boolean`\
 ### Dependencies
 
 #### `router.getDependency(name: string): unknown`
+
 Get a dependency by name.\
 `name: string` — dependency name\
 Returns: `unknown`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getDependency)
 
 #### `router.getDependencies(): Dependencies`
+
 Get all dependencies.\
 Returns: `Dependencies`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getDependencies)
 
 #### `router.setDependency(name: string, value: unknown): void`
+
 Set a dependency.\
 `name: string` — dependency name\
 `value: unknown` — dependency value\
@@ -330,24 +348,28 @@ Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/setDependency)
 
 #### `router.setDependencies(deps: Dependencies): void`
+
 Set multiple dependencies.\
 `deps: Dependencies` — dependencies object\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/setDependencies)
 
 #### `router.hasDependency(name: string): boolean`
+
 Check if dependency exists.\
 `name: string` — dependency name\
 Returns: `boolean`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/hasDependency)
 
 #### `router.removeDependency(name: string): void`
+
 Remove a dependency.\
 `name: string` — dependency name\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/removeDependency)
 
 #### `router.resetDependencies(): void`
+
 Remove all dependencies.\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/resetDependencies)
@@ -357,17 +379,20 @@ Returns: `void`\
 ### Options
 
 #### `router.getOptions(): Options`
+
 Get all router options.\
 Returns: `Options`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getOptions)
 
 #### `router.getOption(name: keyof Options): unknown`
+
 Get a single router option by name.\
 `name: keyof Options` — option name\
 Returns: option value\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getOption)
 
 #### `router.setOption(name: string, value: unknown): void`
+
 Set a router option. Must be called before `start()`.\
 `name: string` — option name\
 `value: unknown` — option value\
@@ -379,12 +404,14 @@ Returns: `void`\
 ### Other
 
 #### `router.clone(dependencies?: Dependencies): Router`
+
 Clone router for SSR.\
 `dependencies?: Dependencies` — override dependencies\
 Returns: `Router`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/clone)
 
 #### `router.cancel(): void`
+
 Cancel the current navigation in progress.\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/cancel)
@@ -398,6 +425,7 @@ The following methods are designed for **plugin authors**. They provide low-leve
 These methods are stable but intended for plugin development, not application code.
 
 #### `router.matchPath(path: string, source?: string): State | undefined`
+
 Match URL path to route state.\
 `path: string` — URL path to match\
 `source?: string` — navigation source identifier\
@@ -405,6 +433,7 @@ Returns: `State | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/matchPath)
 
 #### `router.makeState(name, params?, path?, meta?, forceId?): State`
+
 Create State with custom `meta.id` for history restoration.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -415,6 +444,7 @@ Returns: `State`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/makeState)
 
 #### `router.buildState(name: string, params?: Params): State | undefined`
+
 Validate route and build state with segment metadata.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -422,6 +452,7 @@ Returns: `State | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/buildState)
 
 #### `router.forwardState(name: string, params: Params): { name: string; params: Params }`
+
 Resolve route forwarding and merge default params.\
 `name: string` — route name\
 `params: Params` — route parameters\
@@ -429,6 +460,7 @@ Returns: `{ name, params }` — resolved route name and merged params\
 [Wiki](https://github.com/greydragon888/real-router/wiki/forwardState)
 
 #### `router.navigateToState(toState, fromState, opts, done, emitSuccess): CancelFn`
+
 Navigate with pre-built State object.\
 `toState: State` — target state\
 `fromState: State | undefined` — current state\
@@ -439,12 +471,14 @@ Returns: `CancelFn`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/navigateToState)
 
 #### `router.setRootPath(rootPath: string): void`
+
 Dynamically modify router base path.\
 `rootPath: string` — new root path prefix\
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/setRootPath)
 
 #### `router.getRootPath(): string`
+
 Read current base path.\
 Returns: `string`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getRootPath)
@@ -455,16 +489,16 @@ Returns: `string`\
 
 ```typescript
 interface Options {
-  defaultRoute: string;            // Default route name (default: "")
-  defaultParams: Params;           // Default route params (default: {})
-  trailingSlash: "strict" | "never" | "always" | "preserve";  // (default: "preserve")
-  caseSensitive: boolean;          // Case-sensitive matching (default: false)
-  urlParamsEncoding: "default" | "uri" | "uriComponent" | "none";  // (default: "default")
-  queryParamsMode: "default" | "strict" | "loose";  // (default: "loose")
+  defaultRoute: string; // Default route name (default: "")
+  defaultParams: Params; // Default route params (default: {})
+  trailingSlash: "strict" | "never" | "always" | "preserve"; // (default: "preserve")
+  caseSensitive: boolean; // Case-sensitive matching (default: false)
+  urlParamsEncoding: "default" | "uri" | "uriComponent" | "none"; // (default: "default")
+  queryParamsMode: "default" | "strict" | "loose"; // (default: "loose")
   queryParams?: QueryParamsOptions; // Query parameter parsing options
-  allowNotFound: boolean;          // Allow navigation to unknown routes (default: true)
-  rewritePathOnMatch: boolean;     // Rewrite path on successful match (default: false)
-  logger?: Partial<LoggerConfig>;  // Logger configuration
+  allowNotFound: boolean; // Allow navigation to unknown routes (default: true)
+  rewritePathOnMatch: boolean; // Rewrite path on successful match (default: false)
+  logger?: Partial<LoggerConfig>; // Logger configuration
 }
 ```
 
@@ -474,17 +508,8 @@ See [RouterOptions](https://github.com/greydragon888/real-router/wiki/RouterOpti
 
 ## Observable Support
 
-The router implements the [TC39 Observable](https://github.com/tc39/proposal-observable) interface:
-
-```typescript
-import { from } from "rxjs";
-
-from(router).subscribe(({ route, previousRoute }) => {
-  console.log("Route changed:", route.name);
-});
-```
-
-See [Symbol.observable](https://github.com/greydragon888/real-router/wiki/observable) for details.
+> **Note**: Observable API has been moved to `@real-router/rx` package for zero bundle cost.
+> See [@real-router/rx](../rx/README.md) for reactive stream APIs including `state$()`, `events$()`, operators, and TC39 Observable support.
 
 ---
 

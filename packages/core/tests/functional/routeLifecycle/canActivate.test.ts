@@ -650,7 +650,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should reject async function used directly as handler (not as factory)", () => {
       // async function returns Promise, not ActivationFn
-      // eslint-disable-next-line @typescript-eslint/require-await -- testing async behavior
+
       const asyncHandler = async () => true;
 
       expect(() => {
@@ -715,7 +715,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should accept factory returning async activation function", () => {
       // Factory returns async function (valid - async ActivationFn is supported)
-      // eslint-disable-next-line @typescript-eslint/require-await -- testing async behavior
+
       const factory = () => async () => true;
 
       expect(() => {
