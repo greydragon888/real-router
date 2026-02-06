@@ -1,5 +1,30 @@
 # @real-router/core
 
+## 0.8.0
+
+### Minor Changes
+
+- [#59](https://github.com/greydragon888/real-router/pull/59) [`72bd00a`](https://github.com/greydragon888/real-router/commit/72bd00a9a7057daab0cd0ccfea1166f37668f48e) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `router[Symbol.observable]()` from core — Observable API moved to `@real-router/rx` (#41)
+
+  **Breaking Change:** `router[Symbol.observable]()` and `router["@@observable"]()` are removed from core.
+
+  **Migration:**
+
+  ```typescript
+  // Before
+  router[Symbol.observable]().subscribe(observer);
+
+  // After
+  import { observable } from "@real-router/rx";
+  observable(router).subscribe(observer);
+
+  // Or with state stream
+  import { state$ } from "@real-router/rx";
+  state$(router).subscribe((state) => console.log(state));
+  ```
+
+  **Why:** Achieves zero bundle cost for users who don't need reactive streams (~2KB savings).
+
 ## 0.7.0
 
 ### Minor Changes
