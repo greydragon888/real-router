@@ -290,6 +290,9 @@ importers:
       '@real-router/logger':
         specifier: workspace:^
         version: link:../logger
+      '@real-router/rx':
+        specifier: workspace:^
+        version: link:../rx
       router5:
         specifier: 8.0.1
         version: 8.0.1
@@ -300,6 +303,12 @@ importers:
       mitata:
         specifier: 1.0.34
         version: 1.0.34
+
+  packages/rx:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
 
   packages/search-params: {}
 

@@ -10,6 +10,7 @@ real-router/
 │   ├── core/                 # Router implementation (facade + namespaces)
 │   ├── core-types/           # @real-router/types — shared TypeScript types
 │   ├── react/                # React integration (Provider, hooks, components)
+│   ├── rx/                   # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/       # Browser history synchronization
 │   ├── logger-plugin/        # Development logging with timing
 │   ├── persistent-params-plugin/  # Parameter persistence
@@ -47,16 +48,16 @@ real-router/
            │  └─────────────────────────────────────────┘   │
            └──────────────────────┬──────────────────────────┘
                                   │
-        ┌─────────────┬───────────┼───────────┬─────────────┐
-        │             │           │           │             │
-        ▼             ▼           ▼           ▼             ▼
-┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│browser-plugin│ │  react   │ │ helpers  │ │logger-   │ │persistent│
-│              │ │          │ │          │ │plugin    │ │-params   │
-└──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+        ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
+        │             │           │           │             │             │
+        ▼             ▼           ▼           ▼             ▼             ▼
+┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent│
+│              │ │          │ │          │ │          │ │plugin    │ │-params   │
+└──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
-**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
+**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
 
 **Internal packages (bundled):** `route-tree`, `search-params`, `type-guards`, `@real-router/logger`
 

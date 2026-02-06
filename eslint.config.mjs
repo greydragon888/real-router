@@ -732,6 +732,8 @@ export default tsEslint.config(
       "@typescript-eslint/no-non-null-assertion": "off",
       "@typescript-eslint/no-redundant-type-constituents": "off",
       "@typescript-eslint/no-invalid-void-type": "off",
+      "@typescript-eslint/require-await": "off",
+      "sonarjs/no-redundant-jump": "off",
       "@typescript-eslint/no-shadow": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/unbound-method": "off", // Conflicts with expect.any() in Vitest

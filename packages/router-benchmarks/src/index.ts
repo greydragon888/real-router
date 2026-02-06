@@ -184,6 +184,7 @@ const SECTION_IMPORTS: Record<number, string[]> = {
     "./13-cloning/13.5-isolation.bench",
     "./13-cloning/13.6-edge-cases.bench",
   ],
+  14: ["./14-rx/14.1-state$.bench"],
 };
 
 // Parse BENCH_SECTIONS environment variable
@@ -258,6 +259,7 @@ const SECTION_NAMES: Record<number, string> = {
   11: "11-events",
   12: "12-stress-testing",
   13: "13-cloning",
+  14: "14-rx",
 };
 
 // Mitata result types (not exported by the library)

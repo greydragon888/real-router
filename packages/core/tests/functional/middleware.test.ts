@@ -668,7 +668,6 @@ describe("core/middleware", () => {
 
       it("should reject async factory returning Promise", () => {
         // Async function returns Promise, not Middleware function
-        // eslint-disable-next-line @typescript-eslint/require-await
         const asyncFactory = async () => (toState: State) => toState;
 
         router.clearMiddleware();
@@ -1045,7 +1044,6 @@ describe("core/middleware", () => {
       it("should reject async generator function as factory", () => {
         router.clearMiddleware();
 
-        // eslint-disable-next-line @typescript-eslint/require-await
         async function* asyncGenFactory() {
           yield transitionMiddleware;
         }

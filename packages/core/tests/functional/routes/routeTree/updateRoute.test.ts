@@ -713,7 +713,6 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Async function - cast needed because TS doesn't allow async for this type
       expect(() =>
         router.updateRoute("ur-async-dec", {
-          // eslint-disable-next-line @typescript-eslint/require-await -- testing async rejection
           decodeParams: (async (params: Params) => params) as unknown as (
             params: Params,
           ) => Params,
@@ -729,7 +728,6 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Async function - cast needed because TS doesn't allow async for this type
       expect(() =>
         router.updateRoute("ur-async-enc", {
-          // eslint-disable-next-line @typescript-eslint/require-await -- testing async rejection
           encodeParams: (async (params: Params) => params) as unknown as (
             params: Params,
           ) => Params,
