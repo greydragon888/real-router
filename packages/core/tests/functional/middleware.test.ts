@@ -668,7 +668,6 @@ describe("core/middleware", () => {
 
       it("should reject async factory returning Promise", () => {
         // Async function returns Promise, not Middleware function
-
         const asyncFactory = async () => (toState: State) => toState;
 
         router.clearMiddleware();
