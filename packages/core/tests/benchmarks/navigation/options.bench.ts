@@ -261,7 +261,7 @@ boxplot(() => {
         { name: "about", path: "/about" },
         { name: "contact", path: "/contact" },
       ];
-      const router = createCustomRouter(routes, { caseSensitive: false });
+      const router = createCustomRouter(routes);
 
       router.start();
 

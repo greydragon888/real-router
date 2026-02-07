@@ -83,9 +83,7 @@ barplot(() => {
 
     bench("build: 50 routes skipSort", function* () {
       yield () => {
-        createRouteTreeBuilder("", "")
-          .addMany(routes)
-          .build({ skipSort: true });
+        createRouteTreeBuilder("", "").addMany(routes).build({});
       };
     }).gc("inner");
 
@@ -101,7 +99,7 @@ barplot(() => {
       yield () => {
         createRouteTreeBuilder("", "")
           .addMany(routes)
-          .build({ skipSort: true, skipFreeze: true });
+          .build({ skipFreeze: true });
       };
     }).gc("inner");
   });

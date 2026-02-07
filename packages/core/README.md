@@ -492,7 +492,6 @@ interface Options {
   defaultRoute: string; // Default route name (default: "")
   defaultParams: Params; // Default route params (default: {})
   trailingSlash: "strict" | "never" | "always" | "preserve"; // (default: "preserve")
-  caseSensitive: boolean; // Case-sensitive matching (default: false)
   urlParamsEncoding: "default" | "uri" | "uriComponent" | "none"; // (default: "default")
   queryParamsMode: "default" | "strict" | "loose"; // (default: "loose")
   queryParams?: QueryParamsOptions; // Query parameter parsing options

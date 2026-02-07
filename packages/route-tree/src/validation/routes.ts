@@ -103,14 +103,9 @@ export function validateRoutePath(
   }
 
   // Absolute paths under parameterized parents
-  // RouteTree has parser with urlParams array
-  // Also support legacy hasUrlParams for backwards compatibility
+  // Check if parent has URL parameters via paramTypeMap
   const hasUrlParams =
-    parentNode?.parser &&
-    (("urlParams" in parentNode.parser &&
-      parentNode.parser.urlParams.length > 0) ||
-      ("hasUrlParams" in parentNode.parser &&
-        (parentNode.parser as { hasUrlParams?: boolean }).hasUrlParams));
+    parentNode && Object.values(parentNode.paramTypeMap).includes("url");
 
   if (path.startsWith("~") && hasUrlParams) {
     throw new Error(

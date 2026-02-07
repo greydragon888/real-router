@@ -13,9 +13,6 @@ export { createRouteTree, createRouteTreeBuilder } from "./createRouteTree";
 export { DuplicateRouteError, InvalidRouteError } from "../validation/errors";
 
 export type {
-  PathBuildOptions,
-  PathTestOptions,
-  PathParser,
   RouteDefinition,
   RouteTree,
   TreeBuildOptions,

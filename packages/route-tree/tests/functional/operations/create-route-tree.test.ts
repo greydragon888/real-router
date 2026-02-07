@@ -14,7 +14,7 @@ describe("New API - createRouteTree", () => {
     ]);
 
     expect(tree.name).toBe("");
-    expect(tree.children).toHaveLength(2);
+    expect(tree.children.size).toBe(2);
   });
 
   it("should create tree with nested routes", () => {
@@ -29,8 +29,8 @@ describe("New API - createRouteTree", () => {
       },
     ]);
 
-    expect(tree.children[0].name).toBe("users");
-    expect(tree.children[0].children).toHaveLength(2);
+    expect([...tree.children.values()][0].name).toBe("users");
+    expect([...tree.children.values()][0].children.size).toBe(2);
   });
 
   it("should handle dot-notation names", () => {
@@ -39,8 +39,10 @@ describe("New API - createRouteTree", () => {
       { name: "users.profile", path: "/:id" },
     ]);
 
-    expect(tree.children[0].name).toBe("users");
-    expect(tree.children[0].children[0].name).toBe("profile");
+    expect([...tree.children.values()][0].name).toBe("users");
+    expect([...[...tree.children.values()][0].children.values()][0].name).toBe(
+      "profile",
+    );
   });
 
   it("should precompute fullName for all nodes", () => {
@@ -52,38 +54,24 @@ describe("New API - createRouteTree", () => {
       },
     ]);
 
-    expect(tree.children[0].fullName).toBe("users");
-    expect(tree.children[0].children[0].fullName).toBe("users.profile");
+    expect([...tree.children.values()][0].fullName).toBe("users");
+    expect(
+      [...[...tree.children.values()][0].children.values()][0].fullName,
+    ).toBe("users.profile");
   });
 
-  it("should precompute childrenByName Map", () => {
+  it("should provide children Map for name-based lookup", () => {
     const tree = createRouteTree("", "", [
       { name: "home", path: "/home" },
       { name: "about", path: "/about" },
     ]);
 
-    expect(tree.childrenByName.get("home")).toBe(
-      tree.children.find((c) => c.name === "home"),
+    expect(tree.children.get("home")).toBe(
+      [...tree.children.values()].find((c) => c.name === "home"),
     );
-    expect(tree.childrenByName.get("about")).toBe(
-      tree.children.find((c) => c.name === "about"),
+    expect(tree.children.get("about")).toBe(
+      [...tree.children.values()].find((c) => c.name === "about"),
     );
-  });
-
-  it("should precompute parentSegments", () => {
-    const tree = createRouteTree("", "", [
-      {
-        name: "users",
-        path: "/users",
-        children: [{ name: "profile", path: "/:id" }],
-      },
-    ]);
-
-    const usersNode = tree.children[0];
-    const profileNode = usersNode.children[0];
-
-    expect(profileNode.parentSegments).toHaveLength(1);
-    expect(profileNode.parentSegments[0]).toBe(usersNode);
   });
 
   it("should handle root with parser (query params)", () => {
@@ -91,7 +79,7 @@ describe("New API - createRouteTree", () => {
       { name: "home", path: "/home" },
     ]);
 
-    expect(tree.parser).not.toBeNull();
-    expect(tree.parser?.queryParams).toContain("globalParam");
+    expect(tree.path).toBe("?globalParam");
+    expect(tree.paramTypeMap.globalParam).toBe("query");
   });
 });

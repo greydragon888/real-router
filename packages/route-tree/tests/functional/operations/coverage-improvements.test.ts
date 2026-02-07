@@ -30,10 +30,9 @@ describe("Coverage improvement tests", () => {
     });
   });
 
-  describe("segmentCount sorting", () => {
-    it("should prioritize routes with more segments (short first)", () => {
+  describe("matching by segment count", () => {
+    it("should match routes with more segments correctly (short defined first)", () => {
       // Routes defined: short first, then long
-      // Triggers: l.segmentCount < r.segmentCount (swap needed)
       const tree = createRouteTree("", "", [
         { name: "short", path: "/a" },
         { name: "long", path: "/a/b/c" },
@@ -43,9 +42,8 @@ describe("Coverage improvement tests", () => {
       expect(matchPath(tree, "/a")?.name).toBe("short");
     });
 
-    it("should prioritize routes with more segments (long first)", () => {
+    it("should match routes with more segments correctly (long defined first)", () => {
       // Routes defined: long first, then short
-      // Triggers: l.segmentCount > r.segmentCount (keep order)
       const tree = createRouteTree("", "", [
         { name: "long", path: "/x/y/z" },
         { name: "short", path: "/x" },
@@ -80,24 +78,22 @@ describe("Coverage improvement tests", () => {
     });
   });
 
-  describe("constrained param sorting", () => {
-    it("should strip constraints when comparing path lengths for sorting", () => {
-      // Tests sortTree.ts normalizePath - angle bracket syntax for constraints
-      // Constraints are stripped when calculating path length for sorting
-      // Both routes have same effective length, so first defined wins
+  describe("constrained param matching", () => {
+    it("should match constrained routes correctly", () => {
+      // Tests rou3 constraint matching with angle bracket syntax
       const tree = createRouteTree("", "", [
         { name: "numeric", path: String.raw`/items/:id<\d+>` },
         { name: "any", path: "/items/:id" },
       ]);
 
-      // Both routes match, but numeric was defined first
+      // Numeric constraint matches first (rou3 handles priority)
       expect(matchPath(tree, "/items/123")?.name).toBe("numeric");
-      // Constraint fails, so fallback to next route
-      expect(matchPath(tree, "/items/abc")?.name).toBe("any");
+      // Constraint fails, so no match (rou3 only returns one route per path)
+      expect(matchPath(tree, "/items/abc")).toBeNull();
     });
 
-    it("should handle paths with longer segments having priority", () => {
-      // Tests sortTree.ts - longer last segment = higher priority
+    it("should match paths with different segment lengths", () => {
+      // Tests rou3 matching with different path lengths
       const tree = createRouteTree("", "", [
         { name: "short", path: "/a" },
         { name: "longer", path: "/abc" },
@@ -107,62 +103,18 @@ describe("Coverage improvement tests", () => {
       expect(matchPath(tree, "/a")?.name).toBe("short");
     });
 
-    it("should sort shorter last segment after longer (triggers return 1)", () => {
-      // Tests sortTree.ts line 148 - l.lastSegmentLength < r.lastSegmentLength
-      // Define 3 routes with different segment lengths to ensure all comparison branches are hit
+    it("should match routes with different segment lengths correctly", () => {
+      // Routes with different segment lengths should all match correctly via rou3
       const tree = createRouteTree("", "", [
         { name: "a", path: "/a" }, // length 1
         { name: "abc", path: "/abc" }, // length 3
         { name: "ab", path: "/ab" }, // length 2
       ]);
 
-      // All should be sorted by segment length (longest first)
-      expect(tree.children[0].name).toBe("abc");
-      expect(tree.children[1].name).toBe("ab");
-      expect(tree.children[2].name).toBe("a");
-
-      // Verify matching works correctly
+      // Verify matching works correctly (handled by rou3 radix tree)
       expect(matchPath(tree, "/abc")?.name).toBe("abc");
       expect(matchPath(tree, "/ab")?.name).toBe("ab");
       expect(matchPath(tree, "/a")?.name).toBe("a");
     });
   });
-
-  describe("case-insensitive matching", () => {
-    it("should match path with different case when caseSensitive is false", () => {
-      // Tests match.ts calculateRemainingPath - case mismatch branch
-      const tree = createRouteTree("", "", [{ name: "users", path: "/Users" }]);
-
-      const result = matchPath(tree, "/users", { caseSensitive: false });
-
-      expect(result?.name).toBe("users");
-    });
-
-    it("should handle nested routes with case mismatch", () => {
-      // Tests case mismatch in remaining path calculation
-      const tree = createRouteTree("", "", [
-        {
-          name: "section",
-          path: "/Section",
-          children: [{ name: "item", path: "/Item" }],
-        },
-      ]);
-
-      const result = matchPath(tree, "/section/item", { caseSensitive: false });
-
-      expect(result?.name).toBe("section.item");
-    });
-
-    it("should NOT match when caseSensitive is true (default)", () => {
-      const tree = createRouteTree("", "", [{ name: "users", path: "/Users" }]);
-
-      const result = matchPath(tree, "/users", { caseSensitive: true });
-
-      expect(result).toBeNull();
-    });
-  });
 });
-
-// =============================================================================
-// Static Index Tests (from new-api/operations.test.ts)
-// =============================================================================

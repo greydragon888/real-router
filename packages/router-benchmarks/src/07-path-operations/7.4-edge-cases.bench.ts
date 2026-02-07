@@ -149,13 +149,11 @@ const routes: Route[] = [
 
 // 7.4.14 Matching with case-insensitive paths
 {
-  const router = createRouter(routes, {
-    caseSensitive: false,
-  });
+  const router = createRouter(routes);
 
-  bench(`7.4.14 Matching with case-insensitive paths (×${BATCH_MATCH})`, () => {
+  bench(`7.4.14 Matching with case-sensitive paths (×${BATCH_MATCH})`, () => {
     for (let i = 0; i < BATCH_MATCH; i++) {
-      do_not_optimize(router.matchPath("/USERS/123"));
+      do_not_optimize(router.matchPath("/users/123"));
     }
   }).gc("inner");
 }

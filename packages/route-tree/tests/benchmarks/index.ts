@@ -7,10 +7,9 @@
  * Categories:
  * 1. matchPath - URL matching (HOT PATH)
  * 2. buildPath - URL generation via router API
- * 3. buildPathFromPattern - standalone path building (R4 optimization)
- * 4. add/build - route tree construction
- * 5. scenarios - SPA/Enterprise real-world scenarios
- * 6. realistic-usage
+ * 3. add/build - route tree construction
+ * 4. scenarios - SPA/Enterprise real-world scenarios
+ * 5. realistic-usage
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,7 +20,6 @@ import { run } from "mitata";
 // Import all benchmark files (they register benchmarks via summary/bench)
 import "./matchPath.bench";
 import "./buildPath.bench";
-import "./buildPathFromPattern.bench";
 import "./add.bench";
 import "./scenarios.bench";
 import "./realistic-usage.bench";

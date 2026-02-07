@@ -69,13 +69,6 @@ export interface Options {
   trailingSlash: "strict" | "never" | "always" | "preserve";
 
   /**
-   * Whether route names are case-sensitive.
-   *
-   * @default false
-   */
-  caseSensitive: boolean;
-
-  /**
    * How to encode URL parameters.
    * - "default": Standard encoding
    * - "uri": URI encoding (encodeURI)

@@ -26,7 +26,6 @@ bench("5.1.2 Batch creating 100 routers with full settings", () => {
         defaultRoute: "home",
         defaultParams: { lang: "en" },
         trailingSlash: "strict",
-        caseSensitive: false,
         urlParamsEncoding: "default",
         queryParamsMode: "loose",
         allowNotFound: false,

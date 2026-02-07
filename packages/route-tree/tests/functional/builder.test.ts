@@ -12,9 +12,10 @@ describe("createRouteTree", () => {
       ]);
 
       expect(tree.name).toBe("");
-      expect(tree.children).toHaveLength(2);
-      expect(tree.children[0].name).toBe("users");
-      expect(tree.children[1].name).toBe("home");
+      expect(tree.children.size).toBe(2);
+      // Children are in definition order
+      expect([...tree.children.values()][0].name).toBe("home");
+      expect([...tree.children.values()][1].name).toBe("users");
     });
 
     it("should create a tree with nested routes", () => {
@@ -26,10 +27,12 @@ describe("createRouteTree", () => {
         },
       ]);
 
-      expect(tree.children).toHaveLength(1);
-      expect(tree.children[0].name).toBe("users");
-      expect(tree.children[0].children).toHaveLength(1);
-      expect(tree.children[0].children[0].name).toBe("profile");
+      expect(tree.children.size).toBe(1);
+      expect([...tree.children.values()][0].name).toBe("users");
+      expect([...tree.children.values()][0].children.size).toBe(1);
+      expect(
+        [...[...tree.children.values()][0].children.values()][0].name,
+      ).toBe("profile");
     });
 
     it("should handle dot-notation names", () => {
@@ -38,9 +41,11 @@ describe("createRouteTree", () => {
         { name: "users.profile", path: "/:id" },
       ]);
 
-      expect(tree.children[0].name).toBe("users");
-      expect(tree.children[0].children).toHaveLength(1);
-      expect(tree.children[0].children[0].name).toBe("profile");
+      expect([...tree.children.values()][0].name).toBe("users");
+      expect([...tree.children.values()][0].children.size).toBe(1);
+      expect(
+        [...[...tree.children.values()][0].children.values()][0].name,
+      ).toBe("profile");
     });
   });
 
@@ -54,18 +59,21 @@ describe("createRouteTree", () => {
         },
       ]);
 
-      expect(tree.children[0].fullName).toBe("users");
-      expect(tree.children[0].children[0].fullName).toBe("users.profile");
+      expect([...tree.children.values()][0].fullName).toBe("users");
+      expect(
+        [...[...tree.children.values()][0].children.values()][0].fullName,
+      ).toBe("users.profile");
     });
 
-    it("should compute childrenByName Map", () => {
+    it("should provide children Map for name-based lookup", () => {
       const tree = createRouteTree("", "", [
         { name: "home", path: "/" },
         { name: "users", path: "/users" },
       ]);
 
-      expect(tree.childrenByName.get("home")).toBe(tree.children[1]);
-      expect(tree.childrenByName.get("users")).toBe(tree.children[0]);
+      // Children are in definition order
+      expect(tree.children.get("home")).toBe([...tree.children.values()][0]);
+      expect(tree.children.get("users")).toBe([...tree.children.values()][1]);
     });
 
     it("should compute nonAbsoluteChildren", () => {
@@ -80,42 +88,11 @@ describe("createRouteTree", () => {
         },
       ]);
 
-      const usersNode = tree.children[0];
+      const usersNode = [...tree.children.values()][0];
 
-      expect(usersNode.children).toHaveLength(2);
+      expect(usersNode.children.size).toBe(2);
       expect(usersNode.nonAbsoluteChildren).toHaveLength(1);
       expect(usersNode.nonAbsoluteChildren[0].name).toBe("profile");
-    });
-
-    it("should compute absoluteDescendants", () => {
-      const tree = createRouteTree("", "", [
-        {
-          name: "users",
-          path: "/users",
-          children: [
-            { name: "profile", path: "/:id" },
-            { name: "admin", path: "~/admin" },
-          ],
-        },
-      ]);
-
-      expect(tree.absoluteDescendants).toHaveLength(1);
-      expect(tree.absoluteDescendants[0].name).toBe("admin");
-    });
-
-    it("should compute parentSegments", () => {
-      const tree = createRouteTree("", "", [
-        {
-          name: "users",
-          path: "/users",
-          children: [{ name: "profile", path: "/:id" }],
-        },
-      ]);
-
-      const profileNode = tree.children[0].children[0];
-
-      expect(profileNode.parentSegments).toHaveLength(1);
-      expect(profileNode.parentSegments[0].name).toBe("users");
     });
 
     it("should set parent reference correctly", () => {
@@ -128,28 +105,10 @@ describe("createRouteTree", () => {
       ]);
 
       expect(tree.parent).toBeNull();
-      expect(tree.children[0].parent).toBe(tree);
-      expect(tree.children[0].children[0].parent).toBe(tree.children[0]);
-    });
-  });
-
-  describe("sorting", () => {
-    it("should sort children by routing priority", () => {
-      const tree = createRouteTree("", "", [
-        { name: "splat", path: "/*path" },
-        { name: "home", path: "/" },
-        { name: "users", path: "/users" },
-        { name: "dynamic", path: "/:id" },
-      ]);
-
-      const names = tree.children.map((c) => c.name);
-
-      // More specific routes should come first
-      // Sorting order: users (most specific), dynamic, splat, home (root "/" is always last)
-      expect(names[0]).toBe("users");
-      expect(names[1]).toBe("dynamic");
-      expect(names[2]).toBe("splat");
-      expect(names[3]).toBe("home"); // "/" always sorts last
+      expect([...tree.children.values()][0].parent).toBe(tree);
+      expect(
+        [...[...tree.children.values()][0].children.values()][0].parent,
+      ).toBe([...tree.children.values()][0]);
     });
   });
 
@@ -170,7 +129,7 @@ describe("createRouteTreeBuilder", () => {
       .add({ name: "users", path: "/users" })
       .build();
 
-    expect(tree.children).toHaveLength(2);
+    expect(tree.children.size).toBe(2);
   });
 
   it("should build tree with addMany()", () => {
@@ -181,7 +140,7 @@ describe("createRouteTreeBuilder", () => {
       ])
       .build();
 
-    expect(tree.children).toHaveLength(2);
+    expect(tree.children.size).toBe(2);
   });
 
   it("should chain add() and addMany()", () => {
@@ -194,38 +153,7 @@ describe("createRouteTreeBuilder", () => {
       .add({ name: "contact", path: "/contact" })
       .build();
 
-    expect(tree.children).toHaveLength(4);
-  });
-});
-
-describe("skipSort option", () => {
-  it("should skip sorting when skipSort is true", () => {
-    // Without skipSort, routes are sorted by priority (users before home)
-    // With skipSort, routes maintain definition order
-    const tree = createRouteTree(
-      "",
-      "",
-      [
-        { name: "home", path: "/" },
-        { name: "users", path: "/users" },
-      ],
-      { skipSort: true },
-    );
-
-    // With skipSort, definition order is preserved
-    expect(tree.children[0].name).toBe("home");
-    expect(tree.children[1].name).toBe("users");
-  });
-
-  it("should sort by default (without skipSort)", () => {
-    const tree = createRouteTree("", "", [
-      { name: "home", path: "/" },
-      { name: "users", path: "/users" },
-    ]);
-
-    // Without skipSort, routes are sorted by priority (users before home because "/" sorts last)
-    expect(tree.children[0].name).toBe("users");
-    expect(tree.children[1].name).toBe("home");
+    expect(tree.children.size).toBe(4);
   });
 });
 
@@ -246,173 +174,6 @@ describe("skipFreeze option", () => {
     // Tree should be frozen by default
     expect(Object.isFrozen(tree)).toBe(true);
     expect(Object.isFrozen(tree.children)).toBe(true);
-  });
-
-  it("should not freeze static children index arrays when skipFreeze is true", () => {
-    // This test ensures we cover the freeze branch in computeStaticChildrenIndex
-    const tree = createRouteTree(
-      "",
-      "",
-      [
-        { name: "users", path: "/users" },
-        { name: "products", path: "/products" },
-      ],
-      { skipFreeze: true },
-    );
-
-    // Static index should exist but arrays not frozen
-    expect(tree.staticChildrenByFirstSegment.size).toBe(2);
-
-    const usersRoutes = tree.staticChildrenByFirstSegment.get("users");
-
-    expect(usersRoutes).toBeDefined();
-    expect(Object.isFrozen(usersRoutes)).toBe(false);
-  });
-});
-
-describe("staticChildrenByFirstSegment", () => {
-  it("should index static routes by first segment", () => {
-    const tree = createRouteTree("", "", [
-      { name: "users", path: "/users" },
-      { name: "products", path: "/products" },
-    ]);
-
-    expect(tree.staticChildrenByFirstSegment.size).toBe(2);
-    expect(tree.staticChildrenByFirstSegment.get("users")).toHaveLength(1);
-    expect(tree.staticChildrenByFirstSegment.get("products")).toHaveLength(1);
-  });
-
-  it("should group multiple routes with same first segment", () => {
-    const tree = createRouteTree("", "", [
-      { name: "users", path: "/users" },
-      { name: "users-admin", path: "/users/admin" },
-    ]);
-
-    // Both routes start with "users"
-    expect(tree.staticChildrenByFirstSegment.get("users")).toHaveLength(2);
-  });
-
-  it("should not index dynamic routes", () => {
-    const tree = createRouteTree("", "", [
-      { name: "dynamic", path: "/:id" },
-      { name: "splat", path: "/*path" },
-    ]);
-
-    // Dynamic routes should not be indexed
-    expect(tree.staticChildrenByFirstSegment.size).toBe(0);
-  });
-
-  it("should handle routes with query params in path", () => {
-    const tree = createRouteTree("", "", [
-      { name: "settings", path: "/settings?tab" },
-    ]);
-
-    // Should extract "settings" as first segment, ignoring query
-    expect(tree.staticChildrenByFirstSegment.get("settings")).toHaveLength(1);
-  });
-
-  it("should handle routes with query before nested segment", () => {
-    // Edge case: query marker appears before second slash in path
-    // This tests the queryPos < end branch in extractFirstStaticSegment
-    // Path like "/api?v/extra" has ? before the second /
-    const tree = createRouteTree("", "", [
-      { name: "search", path: "/search?q/results" },
-    ]);
-
-    // Should extract "search" as first segment, stopping at query
-    expect(tree.staticChildrenByFirstSegment.get("search")).toHaveLength(1);
-  });
-
-  it("should handle mixed static and dynamic routes", () => {
-    const tree = createRouteTree("", "", [
-      { name: "users", path: "/users" },
-      { name: "dynamic", path: "/:id" },
-      { name: "products", path: "/products" },
-    ]);
-
-    // Only static routes should be indexed
-    expect(tree.staticChildrenByFirstSegment.size).toBe(2);
-    expect(tree.staticChildrenByFirstSegment.get("users")).toBeDefined();
-    expect(tree.staticChildrenByFirstSegment.get("products")).toBeDefined();
-  });
-
-  it("should be empty map for nodes with no static children", () => {
-    const tree = createRouteTree("", "", [{ name: "dynamic", path: "/:id" }]);
-
-    expect(tree.staticChildrenByFirstSegment.size).toBe(0);
-  });
-
-  it("should store keys in lowercase for case-insensitive lookup", () => {
-    const tree = createRouteTree("", "", [{ name: "users", path: "/Users" }]);
-
-    // Key should be lowercase
-    expect(tree.staticChildrenByFirstSegment.get("users")).toBeDefined();
-    expect(tree.staticChildrenByFirstSegment.get("Users")).toBeUndefined();
-  });
-
-  it("should compute index for nested children", () => {
-    const tree = createRouteTree("", "", [
-      {
-        name: "users",
-        path: "/users",
-        children: [
-          { name: "profile", path: "/profile" },
-          { name: "settings", path: "/settings" },
-        ],
-      },
-    ]);
-
-    const usersNode = tree.children[0];
-
-    expect(usersNode.staticChildrenByFirstSegment.size).toBe(2);
-    expect(usersNode.staticChildrenByFirstSegment.get("profile")).toHaveLength(
-      1,
-    );
-    expect(usersNode.staticChildrenByFirstSegment.get("settings")).toHaveLength(
-      1,
-    );
-  });
-
-  it("should index routes with relative paths (no leading slash)", () => {
-    const tree = createRouteTree("", "", [
-      {
-        name: "users",
-        path: "/users",
-        children: [
-          // Relative path without leading slash
-          { name: "profile", path: "profile" },
-          { name: "settings", path: "settings" },
-        ],
-      },
-    ]);
-
-    const usersNode = tree.children[0];
-
-    // Should still be indexed by first segment
-    expect(usersNode.staticChildrenByFirstSegment.size).toBe(2);
-    expect(usersNode.staticChildrenByFirstSegment.get("profile")).toHaveLength(
-      1,
-    );
-    expect(usersNode.staticChildrenByFirstSegment.get("settings")).toHaveLength(
-      1,
-    );
-  });
-
-  it("should handle routes with query params but no slashes", () => {
-    const tree = createRouteTree("", "", [
-      {
-        name: "users",
-        path: "/users",
-        children: [{ name: "search", path: "search?q" }],
-      },
-    ]);
-
-    const usersNode = tree.children[0];
-
-    // Should extract "search" as first segment (stripping query)
-    expect(usersNode.staticChildrenByFirstSegment.get("search")).toHaveLength(
-      1,
-    );
   });
 });
 
@@ -436,14 +197,14 @@ describe("mutation testing coverage - buildTree", () => {
       ]);
 
       // If mutant `true` was used, it would find "first" (index 0) instead of "second"
-      const parentNode = tree.childrenByName.get("parent");
-      const secondNode = parentNode?.childrenByName.get("second");
-      const firstNode = parentNode?.childrenByName.get("first");
+      const parentNode = tree.children.get("parent");
+      const secondNode = parentNode?.children.get("second");
+      const firstNode = parentNode?.children.get("first");
 
       // "nested" should be under "second", NOT under "first"
-      expect(secondNode?.children).toHaveLength(1);
-      expect(secondNode?.childrenByName.get("nested")).toBeDefined();
-      expect(firstNode?.children).toHaveLength(0);
+      expect(secondNode?.children.size).toBe(1);
+      expect(secondNode?.children.get("nested")).toBeDefined();
+      expect(firstNode?.children.size).toBe(0);
     });
 
     it("should correctly resolve 3-level deep dot-notation names", () => {
@@ -471,10 +232,10 @@ describe("mutation testing coverage - buildTree", () => {
 
       // Verify tree1 has correct structure (without dot-notation)
       expect(
-        tree1.childrenByName.get("level1")?.childrenByName.get("level2"),
+        tree1.children.get("level1")?.children.get("level2"),
       ).toBeDefined();
       expect(
-        tree1.childrenByName.get("level1")?.childrenByName.get("sibling2"),
+        tree1.children.get("level1")?.children.get("sibling2"),
       ).toBeDefined();
 
       // Second tree: test deep dot-notation resolution
@@ -494,12 +255,12 @@ describe("mutation testing coverage - buildTree", () => {
       ]);
 
       // Verify the dot-notation route was added to the correct parent
-      const aNode = tree2.childrenByName.get("a");
-      const bNode = aNode?.childrenByName.get("b");
+      const aNode = tree2.children.get("a");
+      const bNode = aNode?.children.get("b");
 
-      expect(bNode?.children).toHaveLength(2);
-      expect(bNode?.childrenByName.get("c")).toBeDefined();
-      expect(bNode?.childrenByName.get("d")).toBeDefined();
+      expect(bNode?.children.size).toBe(2);
+      expect(bNode?.children.get("c")).toBeDefined();
+      expect(bNode?.children.get("d")).toBeDefined();
     });
 
     it("should get correct final name from parts.at(-1) (line 125)", () => {
@@ -514,13 +275,13 @@ describe("mutation testing coverage - buildTree", () => {
       ]);
 
       // The route should be named "notifications" (last part), not "settings" (second part)
-      const settingsNode = tree.childrenByName
-        .get("users")
-        ?.childrenByName.get("settings");
+      const settingsNode = tree.children.get("users")?.children.get("settings");
 
-      expect(settingsNode?.children).toHaveLength(1);
-      expect(settingsNode?.children[0].name).toBe("notifications");
-      expect(settingsNode?.children[0].fullName).toBe(
+      expect(settingsNode?.children.size).toBe(1);
+      expect([...(settingsNode?.children.values() ?? [])][0].name).toBe(
+        "notifications",
+      );
+      expect([...(settingsNode?.children.values() ?? [])][0].fullName).toBe(
         "users.settings.notifications",
       );
     });
@@ -538,12 +299,12 @@ describe("mutation testing coverage - buildTree", () => {
         }, // has children - processed first
       ]);
 
-      const parentNode = tree.childrenByName.get("parent");
+      const parentNode = tree.children.get("parent");
 
       expect(parentNode).toBeDefined();
-      expect(parentNode?.children).toHaveLength(2);
-      expect(parentNode?.childrenByName.get("nested")).toBeDefined();
-      expect(parentNode?.childrenByName.get("child")).toBeDefined();
+      expect(parentNode?.children.size).toBe(2);
+      expect(parentNode?.children.get("nested")).toBeDefined();
+      expect(parentNode?.children.get("child")).toBeDefined();
     });
 
     it("should handle route with empty children array as simple route", () => {
@@ -553,7 +314,7 @@ describe("mutation testing coverage - buildTree", () => {
         { name: "sibling", path: "/sibling" },
       ]);
 
-      expect(tree.children).toHaveLength(2);
+      expect(tree.children.size).toBe(2);
     });
   });
 });
@@ -565,7 +326,7 @@ describe("mutation testing coverage - computeCaches", () => {
         { name: "user", path: "/user/:id" },
       ]);
 
-      expect(tree.children[0].staticPath).toBeNull();
+      expect([...tree.children.values()][0].staticPath).toBeNull();
     });
 
     it("should return null for routes with queryParams only", () => {
@@ -573,7 +334,7 @@ describe("mutation testing coverage - computeCaches", () => {
         { name: "search", path: "/search?q" },
       ]);
 
-      expect(tree.children[0].staticPath).toBeNull();
+      expect([...tree.children.values()][0].staticPath).toBeNull();
     });
 
     it("should return null for routes with spatParams only", () => {
@@ -581,102 +342,13 @@ describe("mutation testing coverage - computeCaches", () => {
         { name: "files", path: "/files/*path" },
       ]);
 
-      expect(tree.children[0].staticPath).toBeNull();
+      expect([...tree.children.values()][0].staticPath).toBeNull();
     });
 
     it("should return static path for routes without any params", () => {
       const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
-      expect(tree.children[0].staticPath).toBe("/about");
-    });
-  });
-
-  describe("extractFirstStaticSegment edge cases (lines 49, 57)", () => {
-    it("should handle path with query before slash (queryPos < end)", () => {
-      // Path like "/api?version/extra" where ? comes before /
-      // This specifically tests the `queryPos < end` branch
-      const tree = createRouteTree("", "", [
-        {
-          name: "root",
-          path: "/",
-          children: [{ name: "api", path: "api?v/nested" }],
-        },
-      ]);
-
-      const rootNode = tree.children[0];
-
-      expect(rootNode.staticChildrenByFirstSegment.get("api")).toHaveLength(1);
-    });
-
-    it("should handle path with query AFTER slash (queryPos > end, line 49)", () => {
-      // Path like "/users/profile?tab" where / comes before ?
-      // This tests that when queryPos > end, we use end (slash position)
-      // If the mutant `queryPos <= end` was used, it would incorrectly use queryPos
-      const tree = createRouteTree("", "", [
-        {
-          name: "root",
-          path: "/",
-          children: [{ name: "api", path: "/users/profile?tab" }],
-        },
-      ]);
-
-      const rootNode = tree.children[0];
-
-      // First segment should be "users" (up to first slash after start), not "users/profile"
-      expect(rootNode.staticChildrenByFirstSegment.get("users")).toHaveLength(
-        1,
-      );
-      expect(
-        rootNode.staticChildrenByFirstSegment.get("users/profile"),
-      ).toBeUndefined();
-    });
-
-    it("should handle path with no query and no slash after first segment (end === -1)", () => {
-      // Path like "users" with no slash or query after
-      // This tests the case where end === -1 (no more slashes)
-      const tree = createRouteTree("", "", [
-        {
-          name: "root",
-          path: "/",
-          children: [{ name: "simple", path: "users" }],
-        },
-      ]);
-
-      const rootNode = tree.children[0];
-
-      expect(rootNode.staticChildrenByFirstSegment.get("users")).toHaveLength(
-        1,
-      );
-    });
-
-    it("should return null for root slash path (segment === '')", () => {
-      // Path "/" should extract empty segment which returns null
-      const tree = createRouteTree("", "", [
-        {
-          name: "parent",
-          path: "/parent",
-          children: [{ name: "slash", path: "/" }],
-        },
-      ]);
-
-      const parentNode = tree.children[0];
-
-      // Root "/" child should not be indexed (returns null from extractFirstStaticSegment)
-      expect(parentNode.staticChildrenByFirstSegment.get("")).toBeUndefined();
-    });
-  });
-
-  describe("freeze behavior (lines 110-113)", () => {
-    it("should freeze static index arrays when freeze=true (default)", () => {
-      const tree = createRouteTree("", "", [
-        { name: "users", path: "/users" },
-        { name: "users2", path: "/users/extra" },
-      ]);
-
-      const usersRoutes = tree.staticChildrenByFirstSegment.get("users");
-
-      expect(usersRoutes).toBeDefined();
-      expect(Object.isFrozen(usersRoutes)).toBe(true);
+      expect([...tree.children.values()][0].staticPath).toBe("/about");
     });
   });
 });

@@ -19,7 +19,7 @@ import type { RouteTree } from "../types";
  *
  * Returns an array of segments from root to the target node.
  * All returned segments have parsers (root included only if it has parser).
- * Uses childrenByName Map for O(1) lookup at each level.
+ * Uses children Map for O(1) lookup at each level.
  *
  * @param tree - Route tree to search in
  * @param routeName - Dot-notation route name (e.g., "users.profile")
@@ -40,8 +40,8 @@ export function getSegmentsByName(
   // Optimize: avoid split() allocation for simple names without dots
   const names = routeName.includes(".") ? routeName.split(".") : [routeName];
 
-  // Handle root with parser (include it as first segment)
-  if (tree.parser) {
+  // Handle root with path (include it as first segment)
+  if (tree.path !== "") {
     segments.push(tree);
   }
 
@@ -49,7 +49,7 @@ export function getSegmentsByName(
   let currentNode: RouteTree = tree;
 
   for (const name of names) {
-    const segment = currentNode.childrenByName.get(name);
+    const segment = currentNode.children.get(name);
 
     if (!segment) {
       return null;
@@ -88,7 +88,7 @@ export function hasSegmentsByName(tree: RouteTree, routeName: string): boolean {
   let currentNode: RouteTree = tree;
 
   for (const name of names) {
-    const segment = currentNode.childrenByName.get(name);
+    const segment = currentNode.children.get(name);
 
     if (!segment) {
       return false;

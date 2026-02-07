@@ -870,7 +870,6 @@ describe("createBuildOptions", () => {
     defaultRoute: "",
     defaultParams: {},
     trailingSlash: "preserve",
-    caseSensitive: false,
     urlParamsEncoding: "default",
     queryParamsMode: "loose",
     allowNotFound: true,

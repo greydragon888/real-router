@@ -319,7 +319,6 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
 
       // Options should be the same after clearRoutes
-      expect(router.getOptions().caseSensitive).toBe(options.caseSensitive);
       expect(router.getOptions().trailingSlash).toBe(options.trailingSlash);
     });
 

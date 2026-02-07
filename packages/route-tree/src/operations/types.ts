@@ -11,13 +11,6 @@
 import type { RouteTree } from "../builder/types";
 import type { Options as QueryParamsOptions } from "search-params";
 
-// Re-export PathParser types from builder (used by operations internally)
-export type {
-  PathBuildOptions,
-  PathTestOptions,
-  PathParser,
-} from "../builder/types";
-
 // =============================================================================
 // Mode Types
 // =============================================================================
@@ -35,12 +28,7 @@ export type TrailingSlashMode = "default" | "never" | "always";
 /**
  * Controls URL parameter encoding strategy.
  */
-export type URLParamsEncodingType =
-  | "default"
-  | "uri"
-  | "uriComponent"
-  | "none"
-  | "legacy";
+export type URLParamsEncodingType = "default" | "uri" | "uriComponent" | "none";
 
 // =============================================================================
 // Options Types
@@ -59,13 +47,14 @@ export interface BasePathOptions {
 /**
  * Options for building paths.
  */
-export type BuildOptions = BasePathOptions;
+export interface BuildOptions extends BasePathOptions {
+  ignoreConstraints?: boolean;
+}
 
 /**
  * Options for matching paths.
  */
 export interface MatchOptions extends BasePathOptions {
-  caseSensitive?: boolean;
   strictTrailingSlash?: boolean;
   strongMatching?: boolean;
 }
@@ -146,28 +135,4 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
 
   /** Parameter metadata by segment */
   meta: RouteTreeStateMeta;
-}
-
-/**
- * Internal match response during tree traversal.
- */
-export interface MatchResponse {
-  segments: RouteTree[];
-  params: RouteParams;
-}
-
-/**
- * Pre-built match configuration.
- * Created once per match() call and reused throughout recursion.
- */
-export interface MatchConfig {
-  readonly queryParamsMode: "default" | "strict" | "loose";
-  readonly strictTrailingSlash: boolean;
-  readonly strongMatching: boolean;
-  readonly caseSensitive: boolean;
-  readonly queryParams?: MatchOptions["queryParams"];
-  readonly urlParamsEncoding?: MatchOptions["urlParamsEncoding"];
-  readonly fullTestOptions: Record<string, unknown>;
-  readonly partialTestOptions: Record<string, unknown>;
-  readonly buildOptions: Record<string, unknown>;
 }

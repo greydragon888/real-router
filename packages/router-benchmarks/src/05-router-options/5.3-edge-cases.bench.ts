@@ -37,7 +37,7 @@ const routes: Route[] = [
 bench("5.3.4 Creating with partial settings", () => {
   createRouter(routes, {
     trailingSlash: "never",
-    caseSensitive: true,
+    allowNotFound: false,
   });
 }).gc("inner");
 

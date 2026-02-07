@@ -77,6 +77,21 @@ describe("New API - buildPath", () => {
     expect(path).toBe("/route/test%24%40");
   });
 
+  it("should build with default encoding (preserves sub-delimiters)", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route/:param" },
+    ]);
+
+    const path = buildPath(
+      tree,
+      "route",
+      { param: "test value" },
+      { urlParamsEncoding: "default" },
+    );
+
+    expect(path).toBe("/route/test%20value");
+  });
+
   it("should handle trailingSlashMode always", () => {
     const tree = createRouteTree("", "", [{ name: "route", path: "/route" }]);
 
@@ -151,6 +166,48 @@ describe("New API - buildPath", () => {
       );
 
       expect(path).toBe("/route/test/");
+    });
+  });
+
+  describe("constraint validation", () => {
+    it("should validate constraints when building path", () => {
+      const tree = createRouteTree("", "", [
+        { name: "user", path: String.raw`/user/:id<\d+>` },
+      ]);
+
+      const path = buildPath(tree, "user", { id: "123" });
+
+      expect(path).toBe("/user/123");
+    });
+
+    it("should throw when constraint validation fails", () => {
+      const tree = createRouteTree("", "", [
+        { name: "user", path: String.raw`/user/:id<\d+>` },
+      ]);
+
+      expect(() => buildPath(tree, "user", { id: "abc" })).toThrowError();
+    });
+  });
+
+  describe("parameter type handling", () => {
+    it("should handle object parameters by stringifying", () => {
+      const tree = createRouteTree("", "", [
+        { name: "route", path: "/route/:data" },
+      ]);
+
+      const path = buildPath(tree, "route", { data: { key: "value" } });
+
+      expect(path).toBe("/route/%7B%22key%22:%22value%22%7D");
+    });
+
+    it("should handle null and undefined parameters", () => {
+      const tree = createRouteTree("", "", [
+        { name: "route", path: "/route/:id?/:name?" },
+      ]);
+
+      const path = buildPath(tree, "route", { id: null, name: undefined });
+
+      expect(path).toBe("/route/:id");
     });
   });
 });

@@ -17,7 +17,15 @@ import {
 } from "./helpers/generators";
 import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
 import { buildPath } from "../../src/operations/build";
-import { matchSegments } from "../../src/operations/match";
+import { MatcherService } from "../../src/services/MatcherService";
+
+function matchSegments(tree: any, path: string, options?: any) {
+  const matcher = new MatcherService();
+
+  matcher.registerTree(tree);
+
+  return matcher.match(path, options) ?? null;
+}
 
 // ============================================================================
 // SPA Application (~100 routes)

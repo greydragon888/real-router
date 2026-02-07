@@ -25,7 +25,6 @@ export default {
     "!src/builder/types.ts",
     "src/operations/index.ts",
     "!src/operations/types.ts",
-    "!src/builder/sortTree.ts",
     "!src/parser/path-parser/**/*.ts",
   ],
 

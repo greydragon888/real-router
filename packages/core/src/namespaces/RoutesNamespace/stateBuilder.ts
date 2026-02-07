@@ -10,13 +10,12 @@
  * @module core/stateBuilder
  */
 
-import { getMetaFromSegments } from "route-tree";
-
 import type {
   MatchResult,
   RouteParams,
   RouteTree,
   RouteTreeState,
+  RouteTreeStateMeta,
 } from "route-tree";
 
 /**
@@ -72,9 +71,15 @@ export function createRouteState<P extends RouteParams = RouteParams>(
 ): RouteTreeState<P> {
   const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
 
+  const meta: RouteTreeStateMeta = {};
+
+  for (const segment of matchResult.segments) {
+    meta[segment.fullName] = segment.paramTypeMap;
+  }
+
   return {
     name: resolvedName,
     params: matchResult.params,
-    meta: getMetaFromSegments(matchResult.segments),
+    meta,
   };
 }

@@ -45,12 +45,26 @@ export class StateNamespace {
   /**
    * Dependencies injected from Router.
    */
-  #deps: StateNamespaceDependencies | undefined;
+  #depsStore: StateNamespaceDependencies | undefined;
 
   /**
    * Cache for URL params by route name.
    */
   readonly #urlParamsCache = new Map<string, string[]>();
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): StateNamespaceDependencies {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] StateNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -180,7 +194,7 @@ export class StateNamespace {
    * Must be called before using makeState, areStatesEqual, etc.
    */
   setDependencies(deps: StateNamespaceDependencies): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
   }
 
   // =========================================================================
@@ -208,8 +222,7 @@ export class StateNamespace {
       : undefined;
 
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const defaultParamsConfig = this.#deps!.getDefaultParams();
+    const defaultParamsConfig = this.#deps.getDefaultParams();
     const hasDefaultParams = Object.hasOwn(defaultParamsConfig, name);
 
     // Conditional allocation: avoid spreading when no defaultParams exist
@@ -226,8 +239,7 @@ export class StateNamespace {
     const state: State<P, MP> = {
       name,
       params: mergedParams,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-      path: path ?? this.#deps!.buildPath(name, params),
+      path: path ?? this.#deps.buildPath(name, params),
       meta: madeMeta,
     };
 
@@ -313,8 +325,7 @@ export class StateNamespace {
       return cached;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const result = this.#deps!.getUrlParams(name);
+    const result = this.#deps.getUrlParams(name);
 
     this.#urlParamsCache.set(name, result);
 

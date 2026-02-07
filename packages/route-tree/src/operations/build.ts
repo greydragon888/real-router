@@ -11,6 +11,9 @@
 import { build as buildQueryString } from "search-params";
 
 import { getSegmentsByName } from "./query";
+import { validateConstraints } from "../services/constraintValidation";
+import { encodeParam } from "../services/encoding";
+import { inject } from "../services/inject";
 import { RouteNotFoundError } from "../validation/errors";
 
 import type {
@@ -18,6 +21,7 @@ import type {
   RouteParams,
   RouteTree,
   TrailingSlashMode,
+  URLParamsEncodingType,
 } from "../types";
 
 // =============================================================================
@@ -98,7 +102,7 @@ function tryStaticPathFast(tree: RouteTree, routeName: string): string | null {
     return staticPath ?? null;
   }
 
-  return tree.childrenByName.get(routeName)?.staticPath ?? null;
+  return tree.children.get(routeName)?.staticPath ?? null;
 }
 
 /**
@@ -199,32 +203,29 @@ function collectParamsFromSegments(
   let nonSearchParams: string[] | null = null;
 
   for (const segment of segments) {
-    // All segments from getSegmentsByName have parsers by design
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const parser = segment.parser!;
+    const { queryParams, urlParams, spatParams } = segment.paramMeta;
 
     // Use for-loop instead of spread (1.49x faster)
-    /* eslint-disable @typescript-eslint/prefer-for-of */
-    if (parser.queryParams.length > 0) {
+
+    if (queryParams.length > 0) {
       searchParams ??= [];
 
-      for (let i = 0; i < parser.queryParams.length; i++) {
-        searchParams.push(parser.queryParams[i]);
+      for (const queryParam of queryParams) {
+        searchParams.push(queryParam);
       }
     }
 
-    if (parser.urlParams.length > 0 || parser.spatParams.length > 0) {
+    if (urlParams.length > 0 || spatParams.length > 0) {
       nonSearchParams ??= [];
 
-      for (let i = 0; i < parser.urlParams.length; i++) {
-        nonSearchParams.push(parser.urlParams[i]);
+      for (const urlParam of urlParams) {
+        nonSearchParams.push(urlParam);
       }
 
-      for (let i = 0; i < parser.spatParams.length; i++) {
-        nonSearchParams.push(parser.spatParams[i]);
+      for (const spatParam of spatParams) {
+        nonSearchParams.push(spatParam);
       }
     }
-    /* eslint-enable @typescript-eslint/prefer-for-of */
   }
 
   return {
@@ -284,6 +285,36 @@ function buildSearchString(
 }
 
 /**
+ * Encodes URL parameters for a segment.
+ */
+function encodeSegmentParams(
+  params: RouteParams,
+  urlParams: readonly string[],
+  spatParams: readonly string[],
+  encoding: URLParamsEncodingType,
+): Record<string, string> {
+  const encodedParams: Record<string, string> = {};
+
+  for (const paramName of urlParams) {
+    const value = params[paramName];
+
+    if (value !== undefined && value !== null) {
+      const isSplatParam = spatParams.includes(paramName);
+      const stringValue =
+        typeof value === "object" ? JSON.stringify(value) : String(value);
+
+      encodedParams[paramName] = encodeParam(
+        stringValue,
+        encoding,
+        isSplatParam,
+      );
+    }
+  }
+
+  return encodedParams;
+}
+
+/**
  * Builds the path string from segments.
  */
 function buildPathString(
@@ -291,26 +322,32 @@ function buildPathString(
   params: RouteParams,
   options: BuildOptions,
 ): string {
-  // Direct assignment eliminates conditional mutants
-  // Parser handles undefined values the same as missing keys
-  const buildOptions: Record<string, unknown> = {
-    ignoreSearch: true,
-    queryParams: options.queryParams,
-    urlParamsEncoding: options.urlParamsEncoding,
-  };
-
   let path = "";
+  const encoding = options.urlParamsEncoding ?? "default";
+  const ignoreConstraints = options.ignoreConstraints ?? false;
 
   for (const segment of segments) {
-    // All segments from getSegmentsByName have parsers by design
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const segmentPath = segment.parser!.build(params, buildOptions);
+    const { constraintPatterns, urlParams, spatParams } = segment.paramMeta;
+
+    // Validate constraints (unless ignoreConstraints)
+    if (constraintPatterns.size > 0 && !ignoreConstraints) {
+      validateConstraints(params, constraintPatterns, segment.path);
+    }
+
+    // Encode and inject params
+    const encodedParams = encodeSegmentParams(
+      params,
+      urlParams,
+      spatParams,
+      encoding,
+    );
+    const pathPattern = segment.path.split("?")[0];
+    const segmentPath = inject(pathPattern, encodedParams);
 
     path = segment.absolute ? segmentPath : path + segmentPath;
   }
 
   // Always normalize - regex only matches actual "//" sequences
-  // Removed conditional check as it created equivalent mutants
   return path.replaceAll(/\/{2,}/g, "/");
 }
 

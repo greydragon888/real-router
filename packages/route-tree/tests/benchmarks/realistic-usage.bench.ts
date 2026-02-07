@@ -10,9 +10,17 @@
 import { barplot, bench, summary } from "mitata";
 
 import { createRouteTree } from "../../src/builder";
-import { matchSegments } from "../../src/operations/match";
+import { MatcherService } from "../../src/services/MatcherService";
 
 import type { MatchOptions } from "../../src/types";
+
+function matchSegments(tree: any, path: string, options?: any) {
+  const matcher = new MatcherService();
+
+  matcher.registerTree(tree);
+
+  return matcher.match(path, options) ?? null;
+}
 
 // =============================================================================
 // Test fixtures
@@ -56,7 +64,6 @@ const singleOption: MatchOptions = {
 // Based on packages/real-router/modules/core/routes.ts:165-171
 const realRouterRealOptions: MatchOptions = {
   trailingSlashMode: "default",
-  caseSensitive: false,
   strictTrailingSlash: false,
   strongMatching: false,
 };
@@ -65,7 +72,6 @@ const realRouterRealOptions: MatchOptions = {
 const realRouterWithQueryParams: MatchOptions = {
   trailingSlashMode: "default",
   queryParamsMode: "default",
-  caseSensitive: false,
   strictTrailingSlash: false,
   strongMatching: false,
 };

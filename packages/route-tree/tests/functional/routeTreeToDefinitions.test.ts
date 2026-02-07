@@ -29,10 +29,10 @@ describe("routeTreeToDefinitions", () => {
 
       const definitions = routeTreeToDefinitions(tree);
 
-      // Note: createRouteTree sorts children, so "users" comes before "home"
+      // Children are in definition order
       expect(definitions).toHaveLength(2);
-      expect(definitions[0]).toStrictEqual({ name: "users", path: "/users" });
-      expect(definitions[1]).toStrictEqual({ name: "home", path: "/" });
+      expect(definitions[0]).toStrictEqual({ name: "home", path: "/" });
+      expect(definitions[1]).toStrictEqual({ name: "users", path: "/users" });
     });
 
     it("should convert nested routes", () => {
@@ -177,11 +177,15 @@ describe("routeTreeToDefinitions", () => {
       const tree2 = createRouteTree("", "", extractedDefinitions);
 
       // Both trees should have the same structure
-      expect(tree2.children).toHaveLength(tree1.children.length);
-      expect(tree2.children[0].name).toBe(tree1.children[0].name);
-      expect(tree2.children[0].path).toBe(tree1.children[0].path);
-      expect(tree2.children[0].children).toHaveLength(
-        tree1.children[0].children.length,
+      expect(tree2.children).toHaveLength(tree1.children.size);
+      expect([...tree2.children.values()][0].name).toBe(
+        [...tree1.children.values()][0].name,
+      );
+      expect([...tree2.children.values()][0].path).toBe(
+        [...tree1.children.values()][0].path,
+      );
+      expect([...tree2.children.values()][0].children).toHaveLength(
+        [...tree1.children.values()][0].children.size,
       );
     });
   });

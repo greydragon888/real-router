@@ -59,7 +59,21 @@ export class RouterLifecycleNamespace {
   #active = false;
 
   // Dependencies injected via setDependencies (replaces full router reference)
-  #deps: RouterLifecycleDependencies | undefined;
+  #depsStore: RouterLifecycleDependencies | undefined;
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): RouterLifecycleDependencies {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] RouterLifecycleNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -85,7 +99,7 @@ export class RouterLifecycleNamespace {
    * Must be called before using lifecycle methods.
    */
   setDependencies(deps: RouterLifecycleDependencies): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
   }
 
   // =========================================================================
@@ -111,8 +125,7 @@ export class RouterLifecycleNamespace {
    * Starts the router with an optional path or state.
    */
   start(...args: StartRouterArguments): void {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const deps = this.#deps!;
+    const deps = this.#deps;
     const options = deps.getOptions();
     const [startPathOrState, done] = getStartRouterArguments(args);
 
@@ -328,8 +341,7 @@ export class RouterLifecycleNamespace {
    * Stops the router and resets state.
    */
   stop(): void {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const deps = this.#deps!;
+    const deps = this.#deps;
 
     // Issue #50: Always unset active flag when stopping
     // This cancels any in-flight transitions via isCancelled() check

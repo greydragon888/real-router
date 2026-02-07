@@ -3,12 +3,10 @@
 import { logger } from "@real-router/logger";
 import {
   createRouteTree,
-  getSegmentsByName,
-  hasSegmentsByName,
   nodeToDefinition,
-  matchSegments,
   buildPath as routeNodeBuildPath,
   routeTreeToDefinitions,
+  MatcherService,
 } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 
@@ -90,16 +88,31 @@ export class RoutesNamespace<
 
   #rootPath = "";
   #tree: RouteTree;
+  #matcherService: MatcherService;
   #buildOptionsCache: BuildOptions | undefined;
 
   // Dependencies injected via setDependencies (for facade method calls)
-  #deps: RoutesDependencies<Dependencies> | undefined;
+  #depsStore: RoutesDependencies<Dependencies> | undefined;
 
   // Lifecycle handlers reference (set after construction)
   #lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
 
   // When true, skips validation for production performance
   readonly #noValidate: boolean;
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): RoutesDependencies<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] RoutesNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
 
   // =========================================================================
   // Constructor
@@ -118,6 +131,10 @@ export class RoutesNamespace<
       this.#rootPath,
       this.#definitions,
     );
+
+    // Initialize matcher service and register tree
+    this.#matcherService = new MatcherService();
+    this.#matcherService.registerTree(this.#tree);
 
     // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
     // Note: canActivate handlers are registered later when #lifecycleNamespace is set
@@ -222,7 +239,7 @@ export class RoutesNamespace<
    * canActivate handlers from initial routes are deferred until deps are set.
    */
   setDependencies(deps: RoutesDependencies<Dependencies>): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
 
     // Register pending canActivate handlers that were deferred during construction
     for (const [routeName, handler] of this.#pendingCanActivate) {
@@ -281,21 +298,20 @@ export class RoutesNamespace<
    * Checks if a route exists.
    */
   hasRoute(name: string): boolean {
-    return hasSegmentsByName(this.#tree, name);
+    return this.#matcherService.hasRoute(name);
   }
 
   /**
    * Gets a route by name with all its configuration.
    */
   getRoute(name: string): Route<Dependencies> | undefined {
-    const segments = getSegmentsByName(this.#tree, name);
+    const segments = this.#matcherService.getSegmentsByName(name);
 
     if (!segments) {
       return undefined;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const targetNode = segments.at(-1)!;
+    const targetNode = this.#getLastSegment(segments);
     const definition = nodeToDefinition(targetNode);
 
     return this.#enrichRoute(definition, name);
@@ -510,7 +526,7 @@ export class RoutesNamespace<
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
     const matchOptions = createMatchOptions(opts);
-    const matchResult = matchSegments(this.#tree, path, matchOptions);
+    const matchResult = this.#matcherService.match(path, matchOptions);
 
     if (matchResult) {
       const routeState = createRouteState(matchResult);
@@ -531,8 +547,7 @@ export class RoutesNamespace<
         : path;
 
       // Create state using deps.makeState
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- deps is always set by Router.ts
-      return this.#deps!.makeState<P, MP>(routeName, routeParams, builtPath, {
+      return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
         params: meta as MP,
         options: {},
         source,
@@ -588,7 +603,7 @@ export class RoutesNamespace<
     resolvedName: string,
     resolvedParams: Params,
   ): RouteTreeState | undefined {
-    const segments = getSegmentsByName(this.#tree, resolvedName);
+    const segments = this.#matcherService.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
@@ -606,7 +621,7 @@ export class RoutesNamespace<
     resolvedName: string,
     resolvedParams: P,
   ): BuildStateResultWithSegments<P> | undefined {
-    const segments = getSegmentsByName(this.#tree, resolvedName);
+    const segments = this.#matcherService.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
@@ -656,8 +671,7 @@ export class RoutesNamespace<
     }
 
     // Note: empty string check is handled by Router.ts facade
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- deps is always set by Router.ts
-    const activeState = this.#deps!.getState();
+    const activeState = this.#deps.getState();
 
     if (!activeState) {
       return false;
@@ -690,13 +704,10 @@ export class RoutesNamespace<
         path: "",
       };
 
-      return (
-        /* v8 ignore next -- @preserve unreachable: #deps always set by Router constructor */
-        this.#deps?.areStatesEqual(
-          targetState,
-          activeState,
-          ignoreQueryParams,
-        ) ?? false
+      return this.#deps.areStatesEqual(
+        targetState,
+        activeState,
+        ignoreQueryParams,
       );
     }
 
@@ -766,7 +777,7 @@ export class RoutesNamespace<
    * Used by StateNamespace.
    */
   getUrlParams(name: string): string[] {
-    const segments = getSegmentsByName(this.#tree, name);
+    const segments = this.#matcherService.getSegmentsByName(name);
 
     if (!segments) {
       return [];
@@ -808,11 +819,9 @@ export class RoutesNamespace<
     sourceName: string,
     targetName: string,
   ): void {
-    // Note: hasRoute() is always called before this method, so segments are guaranteed to exist
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasRoute() validates existence
-    const sourceSegments = getSegmentsByName(this.#tree, sourceName)!;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasRoute() validates existence
-    const targetSegments = getSegmentsByName(this.#tree, targetName)!;
+    const context = "validateForwardToParamCompatibility";
+    const sourceSegments = this.#getSegmentsOrThrow(sourceName, context);
+    const targetSegments = this.#getSegmentsOrThrow(targetName, context);
 
     // Get source and target URL params using helper
     const sourceParams = this.#collectUrlParams(sourceSegments);
@@ -955,20 +964,53 @@ export class RoutesNamespace<
       this.#rootPath,
       this.#definitions,
     );
+
+    // Re-register tree in matcher service
+    this.#matcherService = new MatcherService();
+    this.#matcherService.registerTree(this.#tree);
+  }
+
+  /**
+   * Gets segments by name or throws if not found.
+   * Use when route existence has been validated by hasRoute() beforehand.
+   */
+  #getSegmentsOrThrow(name: string, context: string): readonly RouteTree[] {
+    const segments = this.#matcherService.getSegmentsByName(name);
+
+    /* v8 ignore next 4 -- @preserve: defensive check, hasRoute() validates before call */
+    if (!segments) {
+      throw new ReferenceError(
+        `[real-router] ${context}: route "${name}" does not exist`,
+      );
+    }
+
+    return segments;
+  }
+
+  /**
+   * Gets last segment from segments array.
+   * Use when segments array is guaranteed to be non-empty.
+   */
+  #getLastSegment(segments: readonly RouteTree[]): RouteTree {
+    const last = segments.at(-1);
+
+    /* v8 ignore next 3 -- @preserve: defensive check, segments always non-empty when called */
+    if (!last) {
+      throw new Error("[real-router] Internal error: empty segments array");
+    }
+
+    return last;
   }
 
   /**
    * Collects URL params from segments into a Set.
-   *
-   * @param segments - Non-null segments (caller must validate existence first)
    */
   #collectUrlParams(segments: readonly RouteTree[]): Set<string> {
     const params = new Set<string>();
 
     for (const segment of segments) {
       // Named routes always have parsers (null only for root without path)
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
-      for (const param of segment.parser!.urlParams) {
+      for (const param of segment.paramMeta.urlParams) {
         params.add(param);
       }
     }
@@ -986,8 +1028,7 @@ export class RoutesNamespace<
 
     for (const segment of segments) {
       // Named routes always have parsers (null only for root without path)
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
-      for (const param of segment.parser!.urlParams) {
+      for (const param of segment.paramMeta.urlParams) {
         params.push(param);
       }
     }
@@ -1098,9 +1139,11 @@ export class RoutesNamespace<
   ): void {
     // Register canActivate via deps.canActivate (allows tests to spy on router.canActivate)
     if (route.canActivate) {
-      if (this.#deps) {
+      // Note: Uses #depsStore directly because this method is called from constructor
+      // before setDependencies(). The getter #deps would throw if deps not set.
+      if (this.#depsStore) {
         // Deps available, register immediately
-        this.#deps.canActivate(fullName, route.canActivate);
+        this.#depsStore.canActivate(fullName, route.canActivate);
       } else {
         // Deps not set yet, store for later registration
         this.#pendingCanActivate.set(fullName, route.canActivate);
