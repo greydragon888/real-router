@@ -2413,6 +2413,679 @@ describe("SegmentMatcher", () => {
   });
 
   // ===========================================================================
+  // Splat/Wildcard Routes — match
+  // ===========================================================================
+
+  describe("match — splat routes", () => {
+    function createSplatMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher();
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+      });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          ["home", homeNode],
+          ["files", filesNode],
+        ]),
+        nonAbsoluteChildren: [homeNode, filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should match splat route and capture remaining path", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/docs/readme.md");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("files");
+      expect(result!.params).toStrictEqual({ path: "docs/readme.md" });
+    });
+
+    it("should match splat route with single segment", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/readme.md");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ path: "readme.md" });
+    });
+
+    it("should match splat route with deeply nested path", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/a/b/c/d/e");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ path: "a/b/c/d/e" });
+    });
+
+    it("should strip query string before splat matching", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/a/b?dl=true");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ path: "a/b" });
+    });
+
+    it("should strip hash before splat matching", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/a/b#section");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ path: "a/b" });
+    });
+
+    it("should decode percent-encoded splat values", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/my%20folder/my%20file.txt");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({
+        path: "my folder/my file.txt",
+      });
+    });
+
+    it("should return correct meta for splat route", () => {
+      const matcher = createSplatMatcher();
+
+      const result = matcher.match("/files/docs/readme.md");
+
+      expect(result).toBeDefined();
+      expect(result!.meta).toStrictEqual({
+        files: { path: "url" },
+      });
+    });
+
+    it("should prioritize static over splat", () => {
+      const matcher = new SegmentMatcher();
+
+      const staticChildNode = createInputNode({
+        name: "docs",
+        path: "/docs",
+        fullName: "files.docs",
+      });
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+        children: new Map([["docs", staticChildNode]]),
+        nonAbsoluteChildren: [staticChildNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // Static "docs" should win over splat
+      const staticResult = matcher.match("/files/docs");
+
+      expect(staticResult).toBeDefined();
+      expect(staticResult!.segments).toHaveLength(2);
+      expect(staticResult!.segments[1].fullName).toBe("files.docs");
+      expect(staticResult!.params).toStrictEqual({});
+
+      // Non-static path should fall through to splat
+      const splatResult = matcher.match("/files/other/file.txt");
+
+      expect(splatResult).toBeDefined();
+      expect(splatResult!.segments[0].fullName).toBe("files");
+      expect(splatResult!.params).toStrictEqual({ path: "other/file.txt" });
+    });
+
+    it("should prioritize param over splat", () => {
+      const matcher = new SegmentMatcher();
+
+      const paramChildNode = createInputNode({
+        name: "item",
+        path: "/:id",
+        fullName: "files.item",
+      });
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+        children: new Map([["item", paramChildNode]]),
+        nonAbsoluteChildren: [paramChildNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // Single segment matches param
+      const paramResult = matcher.match("/files/123");
+
+      expect(paramResult).toBeDefined();
+      expect(paramResult!.segments[1].fullName).toBe("files.item");
+      expect(paramResult!.params).toStrictEqual({ id: "123" });
+
+      // Multi-segment matches splat
+      const splatResult = matcher.match("/files/a/b/c");
+
+      expect(splatResult).toBeDefined();
+      expect(splatResult!.segments[0].fullName).toBe("files");
+      expect(splatResult!.params).toStrictEqual({ path: "a/b/c" });
+    });
+
+    it("should return undefined when no match at all", () => {
+      const matcher = createSplatMatcher();
+
+      expect(matcher.match("/unknown/path")).toBeUndefined();
+    });
+
+    it("should handle splat in nested route", () => {
+      const matcher = new SegmentMatcher();
+
+      const catchAllNode = createInputNode({
+        name: "catchall",
+        path: "/*path",
+        fullName: "app.catchall",
+      });
+
+      const appNode = createInputNode({
+        name: "app",
+        path: "/app",
+        fullName: "app",
+        children: new Map([["catchall", catchAllNode]]),
+        nonAbsoluteChildren: [catchAllNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["app", appNode]]),
+        nonAbsoluteChildren: [appNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/app/some/deep/path");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("app");
+      expect(result!.segments[1].fullName).toBe("app.catchall");
+      expect(result!.params).toStrictEqual({ path: "some/deep/path" });
+    });
+
+    it("should reject malformed percent encoding in splat", () => {
+      const matcher = createSplatMatcher();
+
+      expect(matcher.match("/files/bad%ZZpath")).toBeUndefined();
+    });
+
+    it("should handle case-insensitive static + splat", () => {
+      const matcher = new SegmentMatcher({ caseSensitive: false });
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/Files/Docs/README.md");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ path: "Docs/README.md" });
+    });
+
+    it("should skip decoding splat when urlParamsEncoding is none", () => {
+      const matcher = new SegmentMatcher({ urlParamsEncoding: "none" });
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/files/my%20folder/file.txt");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({
+        path: "my%20folder/file.txt",
+      });
+    });
+  });
+
+  // ===========================================================================
+  // Splat/Wildcard Routes — buildPath
+  // ===========================================================================
+
+  describe("buildPath — splat routes", () => {
+    it("should build path with splat param preserving /", () => {
+      const matcher = new SegmentMatcher();
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
+        "/files/docs/readme.md",
+      );
+    });
+
+    it("should prepend rootPath to splat path", () => {
+      const matcher = new SegmentMatcher();
+
+      const filesNode = createInputNode({
+        name: "files",
+        path: "/files/*path",
+        fullName: "files",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["files", filesNode]]),
+        nonAbsoluteChildren: [filesNode],
+      });
+
+      matcher.registerTree(rootNode);
+      matcher.setRootPath("/app");
+
+      expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
+        "/app/files/docs/readme.md",
+      );
+    });
+  });
+
+  // ===========================================================================
+  // Absolute Path Routes
+  // ===========================================================================
+
+  describe("absolute paths (~prefix)", () => {
+    it("should match absolute path from root", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["dashboard", dashboardNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/dashboard");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("admin");
+      expect(result!.segments[1].fullName).toBe("admin.dashboard");
+    });
+
+    it("should include full ancestor chain in matchSegments", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["dashboard", dashboardNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/dashboard");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("admin");
+      expect(result!.segments[1].fullName).toBe("admin.dashboard");
+    });
+
+    it("should buildPath for absolute route from root", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["dashboard", dashboardNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("admin.dashboard")).toBe("/dashboard");
+    });
+
+    it("should not match absolute route on parent path", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["dashboard", dashboardNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // Should NOT match at the concatenated parent path
+      expect(matcher.match("/app/admin/dashboard")).toBeUndefined();
+    });
+
+    it("should handle absolute path with params", () => {
+      const matcher = new SegmentMatcher();
+
+      const detailNode = createInputNode({
+        name: "detail",
+        path: "~/items/:id",
+        fullName: "admin.detail",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["detail", detailNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/items/42");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "42" });
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("admin");
+      expect(result!.segments[1].fullName).toBe("admin.detail");
+    });
+
+    it("should buildPath for absolute route with params", () => {
+      const matcher = new SegmentMatcher();
+
+      const detailNode = createInputNode({
+        name: "detail",
+        path: "~/items/:id",
+        fullName: "admin.detail",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["detail", detailNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("admin.detail", { id: "42" })).toBe("/items/42");
+    });
+
+    it("should handle order independence — absolute registered first", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const settingsNode = createInputNode({
+        name: "settings",
+        path: "/settings",
+        fullName: "admin.settings",
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([
+          ["dashboard", dashboardNode],
+          ["settings", settingsNode],
+        ]),
+        nonAbsoluteChildren: [settingsNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.match("/dashboard")).toBeDefined();
+      expect(matcher.match("/dashboard")!.segments[1].fullName).toBe(
+        "admin.dashboard",
+      );
+      expect(matcher.match("/app/admin/settings")).toBeDefined();
+      expect(matcher.match("/app/admin/settings")!.segments[1].fullName).toBe(
+        "admin.settings",
+      );
+    });
+
+    it("should return correct meta for absolute route", () => {
+      const matcher = new SegmentMatcher();
+
+      const dashboardNode = createInputNode({
+        name: "dashboard",
+        path: "~/dashboard",
+        fullName: "admin.dashboard",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["dashboard", dashboardNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/dashboard");
+
+      expect(result).toBeDefined();
+      expect(result!.meta).toStrictEqual({
+        admin: {},
+        "admin.dashboard": {},
+      });
+    });
+
+    it("should handle absolute root path", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "~/",
+        fullName: "admin.home",
+        absolute: true,
+      });
+
+      const adminNode = createInputNode({
+        name: "admin",
+        path: "/app/admin",
+        fullName: "admin",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["admin", adminNode]]),
+        nonAbsoluteChildren: [adminNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[1].fullName).toBe("admin.home");
+    });
+  });
+
+  // ===========================================================================
   // Slash-Child + Case-Insensitive
   // ===========================================================================
 

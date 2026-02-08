@@ -252,10 +252,14 @@ export class SegmentMatcher {
       segments.push(node);
     }
 
-    const matchPath = this.#buildFullPath(
-      parentPath,
-      node.paramMeta.pathPattern,
-    );
+    const isAbsolute = node.absolute;
+    const nodePath = isAbsolute
+      ? node.paramMeta.pathPattern.slice(1)
+      : node.paramMeta.pathPattern;
+
+    const matchPath = isAbsolute
+      ? nodePath
+      : this.#buildFullPath(parentPath, nodePath);
 
     let currentRoute: CompiledRoute | null = parentRoute;
 
@@ -263,7 +267,7 @@ export class SegmentMatcher {
       currentRoute = this.#compileAndRegisterRoute(
         node,
         matchPath,
-        parentPath,
+        isAbsolute ? "" : parentPath,
         segments,
         parentRoute,
       );
@@ -494,6 +498,17 @@ export class SegmentMatcher {
   }
 
   #processSegment(node: SegmentNode, segment: string): SegmentNode {
+    if (segment.startsWith("*")) {
+      const splatName = segment.slice(1);
+
+      if (!node.splatChild) {
+        node.splatChild = createSegmentNode();
+        node.splatName = splatName;
+      }
+
+      return node.splatChild;
+    }
+
     if (segment.startsWith(":")) {
       const paramName = segment
         .slice(1)
@@ -612,9 +627,16 @@ export class SegmentMatcher {
     }
     /* v8 ignore stop */
 
-    let node = this.#root;
+    return this.#traverseFrom(this.#root, path, 1, params);
+  }
 
-    let start = 1;
+  #traverseFrom(
+    startNode: SegmentNode,
+    path: string,
+    start: number,
+    params: Record<string, string>,
+  ): CompiledRoute | undefined {
+    let node = startNode;
     const len = path.length;
 
     while (start <= len) {
@@ -634,6 +656,26 @@ export class SegmentMatcher {
         next = node.paramChild;
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- paramName is always set when paramChild is created
         params[next.paramName!] = segment;
+      } else if (node.splatChild) {
+        // Try specific child routes of splatChild before wildcard capture (static > param > splat)
+        const childParams: Record<string, string> = {};
+        const specific = this.#traverseFrom(
+          node.splatChild,
+          path,
+          start,
+          childParams,
+        );
+
+        if (specific) {
+          Object.assign(params, childParams);
+
+          return specific;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- splatName is always set when splatChild is created
+        params[node.splatName!] = path.slice(start);
+
+        return node.splatChild.route;
       } else {
         return undefined;
       }
