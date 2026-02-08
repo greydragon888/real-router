@@ -103,7 +103,7 @@ function computeStaticPath(node: RouteTree): string | null {
  * Computes children Map from mutable children array.
  *
  * Children are stored in definition order. Matching priority is handled
- * by rou3's radix tree, not by iteration order.
+ * by the segment trie, not by iteration order.
  *
  * @param childrenArray - Array of processed child nodes
  * @returns ReadonlyMap of child name -> child node (in definition order)

@@ -2,31 +2,35 @@
  * match() Hot Path Micro-Benchmarks
  *
  * Purpose: Track optimization progress for specific bottlenecks
- * identified in the rou3 integration layer.
+ * identified in the segment trie integration layer.
  *
  * Target areas (from optimization plan):
  * - 1.1 segments.filter() per match → pre-filter at registration
- * - 1.2 {...result.params} spread → reuse rou3 params object
+ * - 1.2 {...result.params} spread → reuse params object
  * - 1.3 #parsePath() object allocation → inline into match()
  * - 1.4 #collectConstraintPatterns() → pre-compute at registration
  * - 1.5 new Set(declaredQueryParams) → pre-compute at registration
  * - 4.1 #appendSlashChild() per match → pre-compute at registration
  *
  * IMPORTANT: match() is a non-mutating operation.
- * MatcherService must be created OUTSIDE bench blocks.
+ * Matcher must be created OUTSIDE bench blocks.
  */
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
 import { createRouteTree } from "../../src/builder";
-import { MatcherService } from "../../src/services/MatcherService";
+import { createMatcher as createMatcherFactory } from "../../src/createMatcher";
 
+import type { CreateMatcherOptions, Matcher } from "../../src/createMatcher";
 import type { RouteDefinition } from "../../src/types";
 
 /** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
-function createMatcher(routes: RouteDefinition[]): MatcherService {
+function createMatcher(
+  routes: RouteDefinition[],
+  options?: CreateMatcherOptions,
+): Matcher {
   const tree = createRouteTree("", "", routes);
-  const matcher = new MatcherService();
+  const matcher = createMatcherFactory(options);
 
   matcher.registerTree(tree);
 
@@ -52,22 +56,9 @@ function createMatcher(routes: RouteDefinition[]): MatcherService {
     warmupMatcher.match("/");
     warmupMatcher.match("/users");
     warmupMatcher.match("/users/123");
-    warmupMatcher.match("/search?q=test&page=1", {
-      queryParamsMode: "default",
-    });
-    warmupMatcher.match("/search?q=test&page=1", {
-      queryParamsMode: "strict",
-    });
-    warmupMatcher.match("/search?q=test&page=1", {
-      queryParamsMode: "loose",
-    });
+    warmupMatcher.match("/search?q=test&page=1");
     warmupMatcher.match("/org/42");
-    warmupMatcher.match("/users", { strictTrailingSlash: false });
-    warmupMatcher.match("/users", {
-      trailingSlashMode: "default",
-      strictTrailingSlash: false,
-      strongMatching: false,
-    });
+    warmupMatcher.match("/users");
     warmupMatcher.match("/nonexistent");
   }
 }
@@ -176,26 +167,28 @@ barplot(() => {
       { name: "search", path: "/search?q&page&sort&filter&limit" },
     ]);
 
+    const matcherStrict = createMatcher(
+      [{ name: "search", path: "/search?q&page&sort&filter&limit" }],
+      { strictQueryParams: true },
+    );
+
     bench("hot: query default (2 params)", () => {
-      matcher.match("/search?q=test&page=1", { queryParamsMode: "default" });
+      matcher.match("/search?q=test&page=1");
     });
 
     bench("hot: query default (5 params)", () => {
-      matcher.match("/search?q=test&page=1&sort=date&filter=active&limit=10", {
-        queryParamsMode: "default",
-      });
+      matcher.match("/search?q=test&page=1&sort=date&filter=active&limit=10");
     });
 
     bench("hot: query strict (5 params)", () => {
-      matcher.match("/search?q=test&page=1&sort=date&filter=active&limit=10", {
-        queryParamsMode: "strict",
-      });
+      matcherStrict.match(
+        "/search?q=test&page=1&sort=date&filter=active&limit=10",
+      );
     });
 
-    bench("hot: query loose (5+2 params)", () => {
+    bench("hot: query default (5+2 extra params)", () => {
       matcher.match(
         "/search?q=test&page=1&sort=date&filter=active&limit=10&extra1=a&extra2=b",
-        { queryParamsMode: "loose" },
       );
     });
   });
@@ -349,35 +342,14 @@ barplot(() => {
   summary(() => {
     const matcher = createMatcher([{ name: "users", path: "/users/:id" }]);
 
-    bench("hot: no options", () => {
+    bench("hot: default options", () => {
       matcher.match("/users/123");
-    });
-
-    bench("hot: minimal options (1 field)", () => {
-      matcher.match("/users/123", { strictTrailingSlash: false });
-    });
-
-    bench("hot: real-router options (3 fields)", () => {
-      matcher.match("/users/123", {
-        trailingSlashMode: "default",
-        strictTrailingSlash: false,
-        strongMatching: false,
-      });
-    });
-
-    bench("hot: real-router full (4 fields)", () => {
-      matcher.match("/users/123", {
-        trailingSlashMode: "default",
-        queryParamsMode: "default",
-        strictTrailingSlash: false,
-        strongMatching: false,
-      });
     });
   });
 });
 
 // =============================================================================
-// 8. Wide tree: measures rou3 radix tree lookup scaling
+// 8. Wide tree: measures segment trie lookup scaling
 // =============================================================================
 
 lineplot(() => {

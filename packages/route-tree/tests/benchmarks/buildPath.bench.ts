@@ -11,7 +11,7 @@
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
 
-import { buildPath, createRouteTree } from "route-tree";
+import { createRouteTree } from "route-tree";
 
 import {
   generateDeepRouteName,
@@ -19,10 +19,20 @@ import {
   generateParams,
   generateRouteWithUrlParams,
 } from "./helpers/generators";
+import { createMatcher } from "../../src/createMatcher";
 
-/** Mitata state interface for generator benchmarks */
+import type { Matcher } from "../../src/createMatcher";
+
 interface BenchState {
   get: (name: string) => unknown;
+}
+
+function createRegisteredMatcher(tree: any): Matcher {
+  const matcher = createMatcher();
+
+  matcher.registerTree(tree);
+
+  return matcher;
 }
 
 // 2.1 Basic buildPath scenarios - boxplot shows distribution
@@ -41,17 +51,18 @@ boxplot(() => {
       },
     ];
     const tree = createRouteTree("", "", routes);
+    const matcher = createRegisteredMatcher(tree);
 
     bench("buildPath: simple (no params)", () => {
-      buildPath(tree, "users");
+      matcher.buildPath("users");
     });
 
     bench("buildPath: with 1 URL param", () => {
-      buildPath(tree, "user", { id: "123" });
+      matcher.buildPath("user", { id: "123" });
     });
 
     bench("buildPath: deep (3 levels)", () => {
-      buildPath(tree, "user.profile", { id: "123" });
+      matcher.buildPath("user.profile", { id: "123" });
     });
   });
 });
@@ -61,13 +72,14 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "search", path: "/search?q&page&sort&filter" }];
     const tree = createRouteTree("", "", routes);
+    const matcher = createRegisteredMatcher(tree);
 
     bench("buildPath: 1 query param", () => {
-      buildPath(tree, "search", { q: "test" });
+      matcher.buildPath("search", { q: "test" });
     });
 
     bench("buildPath: 4 query params", () => {
-      buildPath(tree, "search", {
+      matcher.buildPath("search", {
         q: "test",
         page: "1",
         sort: "date",
@@ -85,9 +97,10 @@ lineplot(() => {
       const route = generateRouteWithUrlParams(count);
       const tree = createRouteTree("", "", [route]);
       const params = generateParams(count);
+      const matcher = createRegisteredMatcher(tree);
 
       yield () => {
-        buildPath(tree, "route", params);
+        matcher.buildPath("route", params);
       };
     }).args("count", [1, 5, 10]);
   });
@@ -102,9 +115,10 @@ lineplot(() => {
       const tree = createRouteTree("", "", routes);
       const name = generateDeepRouteName(levels);
       const params = generateParams(levels);
+      const matcher = createRegisteredMatcher(tree);
 
       yield () => {
-        buildPath(tree, name, params);
+        matcher.buildPath(name, params);
       };
     }).args("levels", [3, 5, 10]);
   });
@@ -115,18 +129,22 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "search", path: "/search?q" }];
     const tree = createRouteTree("", "", routes);
+    const matcher = createRegisteredMatcher(tree);
 
     bench("buildPath: queryParamsMode default", () => {
-      buildPath(tree, "search", { q: "test" }, { queryParamsMode: "default" });
+      matcher.buildPath(
+        "search",
+        { q: "test" },
+        { queryParamsMode: "default" },
+      );
     });
 
     bench("buildPath: queryParamsMode strict", () => {
-      buildPath(tree, "search", { q: "test" }, { queryParamsMode: "strict" });
+      matcher.buildPath("search", { q: "test" }, { queryParamsMode: "strict" });
     });
 
     bench("buildPath: queryParamsMode loose (extra params)", () => {
-      buildPath(
-        tree,
+      matcher.buildPath(
         "search",
         { q: "test", extra: "val" },
         { queryParamsMode: "loose" },

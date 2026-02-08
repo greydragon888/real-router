@@ -1,5 +1,5 @@
 /**
- * Tests for route matching priority (handled by rou3 radix tree).
+ * Tests for route matching priority (handled by segment trie).
  */
 
 import { describe, it, expect } from "vitest";
@@ -7,7 +7,7 @@ import { describe, it, expect } from "vitest";
 import { matchPath } from "./helpers";
 import { createRouteTree } from "../../../src/builder/createRouteTree";
 
-describe("Matching priority (rou3)", () => {
+describe("Matching priority (segment trie)", () => {
   it("should match static routes before dynamic", () => {
     const tree = createRouteTree("", "", [
       { name: "param", path: "/:id" },

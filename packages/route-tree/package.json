@@ -50,7 +50,6 @@
   "sideEffects": false,
   "dependencies": {
     "path-matcher": "workspace:^",
-    "rou3": "0.7.12",
     "search-params": "workspace:^"
   }
 }
