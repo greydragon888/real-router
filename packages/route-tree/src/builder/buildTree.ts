@@ -8,9 +8,7 @@
  * @module builder/buildTree
  */
 
-import { defaultParserFactory } from "../parser/defaultParserFactory";
-
-import type { PathParser, RouteDefinition } from "../types";
+import type { RouteDefinition } from "../types";
 
 // =============================================================================
 // Mutable Node Type (internal)
@@ -24,17 +22,12 @@ export interface MutableRouteNode {
   name: string;
   path: string;
   absolute: boolean;
-  parser: PathParser | null;
   children: MutableRouteNode[];
   parent: MutableRouteNode | null;
 
   // These are computed later by computeCaches
   nonAbsoluteChildren: MutableRouteNode[];
-  absoluteDescendants: MutableRouteNode[];
-  childrenByName: Map<string, MutableRouteNode>;
-  parentSegments: MutableRouteNode[];
   fullName: string;
-  staticChildrenByFirstSegment: Map<string, MutableRouteNode[]>;
 }
 
 // =============================================================================
@@ -67,16 +60,11 @@ function createNode(
     name: definition.name,
     path: normalizedPath,
     absolute,
-    parser: normalizedPath ? defaultParserFactory.create(normalizedPath) : null,
     children: [],
     parent,
     // These will be computed by computeCaches
     nonAbsoluteChildren: [],
-    absoluteDescendants: [],
-    childrenByName: new Map(),
-    parentSegments: [],
     fullName: "",
-    staticChildrenByFirstSegment: new Map(),
   };
 
   // Recursively add children

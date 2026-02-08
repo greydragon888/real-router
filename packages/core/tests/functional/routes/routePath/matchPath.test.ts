@@ -528,66 +528,6 @@ describe("core/routes/routePath/matchPath", () => {
     });
   });
 
-  describe("case sensitivity", () => {
-    it("should match case-insensitively by default", () => {
-      const customRouter = createTestRouter({ caseSensitive: false });
-
-      customRouter.addRoute({ name: "page", path: "/page" });
-
-      expect(customRouter.matchPath("/page")?.name).toBe("page");
-      expect(customRouter.matchPath("/PAGE")?.name).toBe("page");
-      expect(customRouter.matchPath("/Page")?.name).toBe("page");
-      expect(customRouter.matchPath("/pAgE")?.name).toBe("page");
-    });
-
-    it("should match case-sensitively when caseSensitive is true", () => {
-      const customRouter = createTestRouter({ caseSensitive: true });
-
-      customRouter.addRoute({ name: "page", path: "/page" });
-
-      expect(customRouter.matchPath("/page")?.name).toBe("page");
-      expect(customRouter.matchPath("/PAGE")).toBeUndefined();
-      expect(customRouter.matchPath("/Page")).toBeUndefined();
-    });
-
-    it("should preserve parameter case regardless of caseSensitive option", () => {
-      const customRouter = createTestRouter({ caseSensitive: false });
-
-      customRouter.addRoute({ name: "user", path: "/user/:name" });
-
-      const state = customRouter.matchPath("/USER/JohnDoe");
-
-      expect(state?.name).toBe("user");
-      // Parameter value should preserve original case
-      expect(state?.params.name).toBe("JohnDoe");
-    });
-
-    it("should handle case sensitivity with nested routes", () => {
-      const customRouter = createTestRouter({ caseSensitive: true });
-
-      customRouter.addRoute({
-        name: "api",
-        path: "/api",
-        children: [{ name: "users", path: "/users" }],
-      });
-
-      expect(customRouter.matchPath("/api/users")?.name).toBe("api.users");
-      expect(customRouter.matchPath("/API/users")).toBeUndefined();
-      expect(customRouter.matchPath("/api/USERS")).toBeUndefined();
-    });
-
-    it("should handle case sensitivity with query params", () => {
-      const customRouter = createTestRouter({ caseSensitive: false });
-
-      customRouter.addRoute({ name: "search", path: "/search?q" });
-
-      const state = customRouter.matchPath("/SEARCH?q=Test");
-
-      expect(state?.name).toBe("search");
-      expect(state?.params.q).toBe("Test");
-    });
-  });
-
   describe("decoder", () => {
     it("should transform params using decodeParams", () => {
       const customRouter = createTestRouter();

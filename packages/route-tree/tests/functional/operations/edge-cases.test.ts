@@ -9,14 +9,14 @@ import { createRouteTree } from "../../../src/builder/createRouteTree";
 import { buildPath } from "../../../src/operations/build";
 
 describe("New API - edge cases for coverage", () => {
-  it("should sort routes with root slash path correctly", () => {
-    // Tests sortTree.ts line 21 - removeTrailingSlash with "/" path
+  it("should match routes with root slash path correctly", () => {
+    // Tests rou3 matching priority with "/" path
     const tree = createRouteTree("", "", [
       { name: "root", path: "/" },
       { name: "about", path: "/about" },
     ]);
 
-    // "/" should sort after "/about"
+    // Each path should match its specific route
     expect(matchPath(tree, "/about")?.name).toBe("about");
     expect(matchPath(tree, "/")?.name).toBe("root");
   });
@@ -60,25 +60,16 @@ describe("New API - edge cases for coverage", () => {
     expect(path).toBe("/route/");
   });
 
-  it("should handle routes with trailing slash in sorting", () => {
-    // Tests sortTree.ts line 21 - removeTrailingSlash with path ending in "/"
+  it("should handle routes with trailing slash in matching", () => {
+    // Tests rou3 matching with trailing slash paths
     const tree = createRouteTree("", "", [
       { name: "pathA", path: "/path-a/" },
       { name: "pathB", path: "/path-b" },
     ]);
 
-    // Both should be sortable and accessible
+    // Both routes should be accessible
     expect(matchPath(tree, "/path-a/")?.name).toBe("pathA");
     expect(matchPath(tree, "/path-b")?.name).toBe("pathB");
-  });
-
-  it("should handle case-insensitive path matching", () => {
-    // Tests match.ts line 472 - case-insensitive comparison
-    const tree = createRouteTree("", "", [{ name: "route", path: "/PATH" }]);
-
-    const result = matchPath(tree, "/path", { caseSensitive: false });
-
-    expect(result?.name).toBe("route");
   });
 
   it("should handle queryParamsMode loose in buildPath", () => {
@@ -112,8 +103,8 @@ describe("New API - edge cases for coverage", () => {
     expect(path).not.toContain("inherited");
   });
 
-  it("should handle deep nested routes for sorting", () => {
-    // Tests sortTree.ts segment count comparison
+  it("should handle deep nested routes in matching", () => {
+    // Tests rou3 matching with nested routes
     const tree = createRouteTree("", "", [
       {
         name: "level1",
@@ -133,21 +124,21 @@ describe("New API - edge cases for coverage", () => {
     expect(matchPath(tree, "/l1")?.name).toBe("level1");
   });
 
-  it("should sort routes without parser urlParams correctly", () => {
-    // Tests sortTree.ts lines 132-133 - parser?.urlParams.length ?? 0
+  it("should match static routes before dynamic", () => {
+    // Tests rou3 matching priority: static before dynamic
     const tree = createRouteTree("", "", [
       { name: "static", path: "/static" },
       { name: "dynamic", path: "/:id" },
     ]);
 
-    // Static route should be sorted before dynamic
+    // Static route should match before dynamic
     expect(matchPath(tree, "/static")?.name).toBe("static");
     expect(matchPath(tree, "/123")?.name).toBe("dynamic");
   });
 
-  it("should handle tree with parser and absoluteDescendants", () => {
-    // Tests match.ts line 246 - tree.parser exists AND tree.absoluteDescendants.length > 0
-    // Create tree with named root (has parser) containing an absolute route
+  it("should handle tree with absolute routes", () => {
+    // Tests rou3 matching of absolute paths (routes starting with ~)
+    // Create tree with named root containing an absolute route
     const tree = createRouteTree("app", "/app", [
       {
         name: "section",
@@ -156,7 +147,7 @@ describe("New API - edge cases for coverage", () => {
       },
     ]);
 
-    // Match the absolute path - this triggers the absoluteDescendants branch
+    // Match the absolute path - rou3 handles absolute routes
     const result = matchPath(tree, "/modal");
 
     expect(result?.name).toBe("app.section.modal");

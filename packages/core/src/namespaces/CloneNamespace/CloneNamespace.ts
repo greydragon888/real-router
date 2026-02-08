@@ -23,12 +23,40 @@ export class CloneNamespace<
   /**
    * Function to get cloning data from the source router.
    */
-  #getCloneData: (() => CloneData<Dependencies>) | undefined;
+  #getCloneDataStore: (() => CloneData<Dependencies>) | undefined;
 
   /**
    * Function to apply config to a new router.
    */
-  #applyConfig: ApplyConfigFn | undefined;
+  #applyConfigStore: ApplyConfigFn | undefined;
+
+  /**
+   * Gets clone data function or throws if not initialized.
+   */
+  get #getCloneData(): () => CloneData<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: always set by Router.ts */
+    if (!this.#getCloneDataStore) {
+      throw new Error(
+        "[real-router] CloneNamespace: getCloneData not initialized",
+      );
+    }
+
+    return this.#getCloneDataStore;
+  }
+
+  /**
+   * Gets apply config function or throws if not initialized.
+   */
+  get #applyConfig(): ApplyConfigFn {
+    /* v8 ignore next 3 -- @preserve: always set by Router.ts */
+    if (!this.#applyConfigStore) {
+      throw new Error(
+        "[real-router] CloneNamespace: applyConfig not initialized",
+      );
+    }
+
+    return this.#applyConfigStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -74,8 +102,8 @@ export class CloneNamespace<
     getCloneData: () => CloneData<Dependencies>,
     applyConfig: ApplyConfigFn,
   ): void {
-    this.#getCloneData = getCloneData;
-    this.#applyConfig = applyConfig;
+    this.#getCloneDataStore = getCloneData;
+    this.#applyConfigStore = applyConfig;
   }
 
   /**
@@ -89,8 +117,7 @@ export class CloneNamespace<
     factory: RouterFactory<Dependencies>,
   ): Router<Dependencies> {
     // Collect all data from source router
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const data = this.#getCloneData!();
+    const data = this.#getCloneData();
 
     // Merge dependencies
     const mergedDeps = {
@@ -121,8 +148,7 @@ export class CloneNamespace<
     }
 
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    this.#applyConfig!(
+    this.#applyConfig(
       newRouter as unknown as Router,
       data.routeConfig,
       data.resolvedForwardMap,

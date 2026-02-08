@@ -31,7 +31,7 @@
     "build": "tsup",
     "test": "vitest",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix",
+    "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
     "lint:package": "publint",
     "lint:types": "attw --pack ."
   },

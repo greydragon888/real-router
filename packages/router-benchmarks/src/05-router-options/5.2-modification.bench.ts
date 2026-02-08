@@ -27,7 +27,6 @@ const routes: Route[] = [
         "defaultParams",
         i % 2 === 0 ? { lang: "en" } : { lang: "ru" },
       ),
-    (i: number) => router.setOption("caseSensitive", i % 2 === 0),
     (i: number) =>
       router.setOption(
         "urlParamsEncoding",
@@ -41,7 +40,7 @@ const routes: Route[] = [
 
   bench("5.2.1 Batch changing 1000 options (mixed types)", () => {
     for (let i = 0; i < 1000; i++) {
-      do_not_optimize(optionSetters[i % 8](i));
+      do_not_optimize(optionSetters[i % 7](i));
     }
   }).gc("inner");
 }
@@ -55,8 +54,8 @@ const routes: Route[] = [
       do_not_optimize(
         router.setOption("trailingSlash", i % 2 === 0 ? "never" : "always"),
       );
-      do_not_optimize(router.setOption("caseSensitive", i % 2 === 0));
       do_not_optimize(router.setOption("allowNotFound", i % 2 === 0));
+      do_not_optimize(router.setOption("rewritePathOnMatch", i % 2 === 0));
     }
   }).gc("inner");
 }*/

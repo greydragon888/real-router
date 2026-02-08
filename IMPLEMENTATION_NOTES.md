@@ -550,6 +550,81 @@ mdfind -onlyin ./node_modules "kMDItemFSName == '*.ts'" | wc -l
 - Exclude `node_modules` from Time Machine backups
 - Exclude from antivirus real-time scanning (if applicable)
 
+## Supply-Chain Security
+
+### GitHub Actions Pinned by SHA
+
+All third-party GitHub Actions are pinned to commit SHAs instead of mutable tags (`v1`, `v2`):
+
+```yaml
+# ❌ BEFORE - mutable tag, can be hijacked
+uses: changesets/action@v1
+
+# ✅ AFTER - immutable commit SHA
+uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
+```
+
+**Pinned actions:**
+
+| Action                            | SHA        | Tag    |
+| --------------------------------- | ---------- | ------ |
+| `changesets/action`               | `c48e67d1` | v1.6.0 |
+| `codecov/codecov-action`          | `671740ac` | v5     |
+| `SonarSource/sonarqube-scan-action` | `a31c9398` | v7   |
+| `dependabot/fetch-metadata`       | `21025c70` | v2     |
+| `softprops/action-gh-release`     | `a06a81a0` | v2     |
+
+**Why:** Mutable tags can be force-pushed by a compromised maintainer. SHA pins are immutable — even if the tag is moved, the pinned commit stays the same.
+
+### Minimum Release Age
+
+`.npmrc`:
+
+```ini
+minimum-release-age=1440
+```
+
+Blocks installation of npm packages published less than 24 hours ago. Protects against compromised packages being installed before the community detects them.
+
+### Dependency License Review
+
+`.github/dependency-review-config.yml` defines allowed licenses for production dependencies. Dependency Review check fails on PRs that introduce packages with licenses outside the allow-list.
+
+**Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
+
+**MS-PL (Microsoft Public License):** Added for `rou3` dependency which is dual-licensed `MIT AND MS-PL`. MS-PL is a permissive license compatible with MIT.
+
+## Infrastructure Changes (rou3 Migration)
+
+### SonarQube Scanner Rename
+
+Package `sonarqube-scanner` renamed to `@sonar/scan` (upstream rename). Updated in `package.json`:
+
+```json
+// Before
+"sonarqube-scanner": "4.3.4"
+// After
+"@sonar/scan": "4.3.4"
+```
+
+Script updated: `sonar-scanner` → `sonar` in `package.json` scripts.
+
+### Core Package Exports
+
+Removed `"./dist/*": "./dist/*"` wildcard export from `packages/core/package.json`. This was used by `router-benchmarks` to load compiled dist directly. Replaced with direct require of `@real-router/core/dist/cjs/index.js`.
+
+### Vitest: Removed `clearMocks`
+
+Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true` + `mockReset: true` already cover all cleanup. `clearMocks` was redundant (subset of `mockReset`).
+
+### Workspace Cleanup
+
+`pnpm-workspace.yaml`: removed `tools/*` glob and `minimumReleaseAgeExclude` entries for legacy `router6`/`router6-types` packages.
+
+### knip: Router Benchmarks Entry
+
+Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`.
+
 ## Logger Package
 
 ### Why?

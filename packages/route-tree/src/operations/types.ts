@@ -11,13 +11,6 @@
 import type { RouteTree } from "../builder/types";
 import type { Options as QueryParamsOptions } from "search-params";
 
-// Re-export PathParser types from builder (used by operations internally)
-export type {
-  PathBuildOptions,
-  PathTestOptions,
-  PathParser,
-} from "../builder/types";
-
 // =============================================================================
 // Mode Types
 // =============================================================================
@@ -35,12 +28,7 @@ export type TrailingSlashMode = "default" | "never" | "always";
 /**
  * Controls URL parameter encoding strategy.
  */
-export type URLParamsEncodingType =
-  | "default"
-  | "uri"
-  | "uriComponent"
-  | "none"
-  | "legacy";
+export type URLParamsEncodingType = "default" | "uri" | "uriComponent" | "none";
 
 // =============================================================================
 // Options Types
@@ -59,13 +47,14 @@ export interface BasePathOptions {
 /**
  * Options for building paths.
  */
-export type BuildOptions = BasePathOptions;
+export interface BuildOptions extends BasePathOptions {
+  ignoreConstraints?: boolean;
+}
 
 /**
  * Options for matching paths.
  */
 export interface MatchOptions extends BasePathOptions {
-  caseSensitive?: boolean;
   strictTrailingSlash?: boolean;
   strongMatching?: boolean;
 }
@@ -123,11 +112,17 @@ export interface RouteParams {
  * This is used by matchSegments() to return detailed matching info.
  */
 export interface MatchResult<P extends RouteParams = RouteParams> {
-  /** Matched route segments from root to matched node */
+  /** Matched route segments (with slashChild) — for createRouteState() */
   readonly segments: readonly RouteTree[];
+
+  /** Matched route segments (without slashChild) — for buildPath() */
+  readonly buildSegments: readonly RouteTree[];
 
   /** Extracted parameters (URL params + query params) */
   readonly params: P;
+
+  /** Pre-computed route meta (segment fullName → paramTypeMap) */
+  readonly meta: Readonly<RouteTreeStateMeta>;
 }
 
 // =============================================================================
@@ -146,28 +141,4 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
 
   /** Parameter metadata by segment */
   meta: RouteTreeStateMeta;
-}
-
-/**
- * Internal match response during tree traversal.
- */
-export interface MatchResponse {
-  segments: RouteTree[];
-  params: RouteParams;
-}
-
-/**
- * Pre-built match configuration.
- * Created once per match() call and reused throughout recursion.
- */
-export interface MatchConfig {
-  readonly queryParamsMode: "default" | "strict" | "loose";
-  readonly strictTrailingSlash: boolean;
-  readonly strongMatching: boolean;
-  readonly caseSensitive: boolean;
-  readonly queryParams?: MatchOptions["queryParams"];
-  readonly urlParamsEncoding?: MatchOptions["urlParamsEncoding"];
-  readonly fullTestOptions: Record<string, unknown>;
-  readonly partialTestOptions: Record<string, unknown>;
-  readonly buildOptions: Record<string, unknown>;
 }

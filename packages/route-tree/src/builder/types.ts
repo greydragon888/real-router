@@ -8,57 +8,7 @@
  * @module builder/types
  */
 
-import type { Options as QueryParamsOptions } from "search-params";
-
-// =============================================================================
-// Path Parser Types
-// =============================================================================
-
-/**
- * Options for building a path from parameters.
- */
-export interface PathBuildOptions {
-  ignoreSearch?: boolean;
-  urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none" | "legacy";
-  queryParams?: QueryParamsOptions;
-}
-
-/**
- * Options for testing/matching a path.
- */
-export interface PathTestOptions {
-  caseSensitive?: boolean;
-  queryParams?: QueryParamsOptions;
-  urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none" | "legacy";
-  delimited?: boolean;
-  strictTrailingSlash?: boolean;
-}
-
-/**
- * Interface for path parsing and building.
- */
-export interface PathParser {
-  readonly path: string;
-  readonly urlParams: string[];
-  readonly queryParams: string[];
-  readonly spatParams: string[];
-  readonly hasUrlParams: boolean;
-  readonly hasSpatParam: boolean;
-  readonly hasMatrixParams: boolean;
-  readonly hasQueryParams: boolean;
-  build: (
-    params?: Record<string, unknown>,
-    options?: PathBuildOptions,
-  ) => string;
-  test: (
-    path: string,
-    options?: PathTestOptions,
-  ) => Record<string, unknown> | null;
-  partialTest: (
-    path: string,
-    options?: PathTestOptions,
-  ) => Record<string, unknown> | null;
-}
+import type { ParamMeta } from "../services/buildParamMeta";
 
 // =============================================================================
 // Route Definition Types
@@ -87,7 +37,6 @@ export interface RouteDefinition {
  * All caches are pre-computed at build time:
  * - nonAbsoluteChildren: filtered children without absolute paths
  * - absoluteDescendants: all descendants with absolute paths (recursive)
- * - childrenByName: Map for O(1) child lookup
  * - parentSegments: array from root to parent
  * - fullName: pre-computed "users.profile" instead of runtime join
  */
@@ -103,11 +52,11 @@ export interface RouteTree {
   /** Whether this route uses absolute path matching (path starts with "~") */
   readonly absolute: boolean;
 
-  /** Path parser (null for root node without path) */
-  readonly parser: PathParser | null;
+  /** Child route nodes (Map for O(1) lookup by name) */
+  readonly children: ReadonlyMap<string, RouteTree>;
 
-  /** Child route nodes */
-  readonly children: readonly RouteTree[];
+  /** Parameter metadata extracted from path pattern (replaces parser dependency) */
+  readonly paramMeta: ParamMeta;
 
   // === Pre-computed Caches ===
 
@@ -117,21 +66,12 @@ export interface RouteTree {
   /** Children without absolute paths (for regular matching) */
   readonly nonAbsoluteChildren: readonly RouteTree[];
 
-  /** All descendants with absolute paths (recursive, for absolute matching) */
-  readonly absoluteDescendants: readonly RouteTree[];
-
-  /** Map of child name -> child node for O(1) lookup */
-  readonly childrenByName: ReadonlyMap<string, RouteTree>;
-
-  /** Path from root to this node's parent (for building full paths) */
-  readonly parentSegments: readonly RouteTree[];
-
   /** Pre-computed full name (e.g., "users.profile") */
   readonly fullName: string;
 
   /**
    * Pre-computed static path for routes without parameters.
-   * Used by buildPath fast path to avoid parser.build() overhead.
+   * Used by buildPath fast path to avoid inject() overhead.
    * Only set when route has no URL params, query params, or splat params.
    */
   readonly staticPath: string | null;
@@ -142,40 +82,12 @@ export interface RouteTree {
    * Maps param name → "url" | "query".
    */
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
-
-  /**
-   * Index for O(1) lookup of static children by first path segment.
-   *
-   * Key: first static segment (e.g., "users" for "/users" or "/users/:id")
-   * Value: array of routes starting with this segment
-   *
-   * Used by matchChildren() to skip linear search for static routes.
-   * Empty map for nodes with no static children.
-   *
-   * @example
-   * // For routes: /users, /products, /users/:id
-   * staticChildrenByFirstSegment.get("users") → [UsersRoute, UsersIdRoute]
-   * staticChildrenByFirstSegment.get("products") → [ProductsRoute]
-   */
-  readonly staticChildrenByFirstSegment: ReadonlyMap<
-    string,
-    readonly RouteTree[]
-  >;
 }
 
 /**
  * Options for building a route tree.
  */
 export interface TreeBuildOptions {
-  /**
-   * Skip sorting children when building the tree.
-   * Use this when routes are already sorted by priority, or when sorting
-   * is not needed (e.g., for read-only trees where order doesn't matter).
-   *
-   * @default false
-   */
-  skipSort?: boolean;
-
   /**
    * Skip freezing the tree after building.
    * This improves performance but allows mutation of the tree.
@@ -222,7 +134,7 @@ export interface RouteTreeBuilder {
    *
    * This will:
    * 1. Build the tree structure
-   * 2. Sort children for correct matching order
+   * 2. Register routes with rou3 radix tree for matching
    * 3. Compute all caches
    * 4. Freeze and return the tree
    *

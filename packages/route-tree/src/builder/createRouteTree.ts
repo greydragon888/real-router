@@ -10,7 +10,6 @@
 
 import { buildTree } from "./buildTree";
 import { computeCaches } from "./computeCaches";
-import { sortTree } from "./sortTree";
 
 import type {
   RouteDefinition,
@@ -61,12 +60,7 @@ export function createRouteTreeBuilder(
       // Step 1: Build mutable tree structure
       const mutableTree = buildTree(name, path, routes);
 
-      // Step 2: Sort all children (unless skipped)
-      if (!options?.skipSort) {
-        sortTree(mutableTree);
-      }
-
-      // Step 3: Compute all caches and optionally freeze
+      // Step 2: Compute all caches and optionally freeze
       const freeze = !options?.skipFreeze;
 
       return computeCaches(mutableTree, freeze);
@@ -86,7 +80,7 @@ export function createRouteTreeBuilder(
  * @param name - Root node name (typically empty string)
  * @param path - Root node path (typically empty string)
  * @param routes - Route definitions to add
- * @param options - Build options (e.g., skipSort, skipFreeze)
+ * @param options - Build options (e.g., skipFreeze)
  * @returns Immutable RouteTree
  *
  * @example

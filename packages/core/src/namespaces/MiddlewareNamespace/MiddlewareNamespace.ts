@@ -35,11 +35,37 @@ export class MiddlewareNamespace<
     Middleware
   >();
 
-  #router: Router<Dependencies> | undefined;
-
-  #deps: MiddlewareDependencies<Dependencies> | undefined;
-
+  #routerStore: Router<Dependencies> | undefined;
+  #depsStore: MiddlewareDependencies<Dependencies> | undefined;
   #limits: Limits = DEFAULT_LIMITS;
+
+  /**
+   * Gets router or throws if not initialized.
+   */
+  get #router(): Router<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
+    if (!this.#routerStore) {
+      throw new Error(
+        "[real-router] MiddlewareNamespace: router not initialized",
+      );
+    }
+
+    return this.#routerStore;
+  }
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): MiddlewareDependencies<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] MiddlewareNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -79,11 +105,11 @@ export class MiddlewareNamespace<
   // =========================================================================
 
   setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
+    this.#routerStore = router;
   }
 
   setDependencies(deps: MiddlewareDependencies<Dependencies>): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
   }
 
   setLimits(limits: Limits): void {
@@ -113,14 +139,8 @@ export class MiddlewareNamespace<
     const initialized: InitializedMiddleware<Dependencies>[] = [];
 
     for (const factory of factories) {
-      // Router and deps are guaranteed to be set at this point
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const router = this.#router!;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const deps = this.#deps!;
-
       // Middleware factories receive full router as part of their public API
-      const middleware = factory(router, deps.getDependency);
+      const middleware = factory(this.#router, this.#deps.getDependency);
 
       initialized.push({ factory, middleware });
     }

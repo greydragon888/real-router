@@ -31,11 +31,35 @@ export class PluginsNamespace<
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
 
-  #router: Router<Dependencies> | undefined;
-
-  #deps: PluginsDependencies<Dependencies> | undefined;
-
+  #routerStore: Router<Dependencies> | undefined;
+  #depsStore: PluginsDependencies<Dependencies> | undefined;
   #limits: Limits = DEFAULT_LIMITS;
+
+  /**
+   * Gets router or throws if not initialized.
+   */
+  get #router(): Router<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
+    if (!this.#routerStore) {
+      throw new Error("[real-router] PluginsNamespace: router not initialized");
+    }
+
+    return this.#routerStore;
+  }
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): PluginsDependencies<Dependencies> {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] PluginsNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -79,11 +103,11 @@ export class PluginsNamespace<
   // =========================================================================
 
   setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
+    this.#routerStore = router;
   }
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
   }
 
   setLimits(limits: Limits): void {
@@ -256,15 +280,9 @@ export class PluginsNamespace<
   }
 
   #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
-    // Router and deps are guaranteed to be set at this point
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const router = this.#router!;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const deps = this.#deps!;
-
     // Bind getDependency to preserve 'this' context when called from factory
     // Plugin factories receive full router as part of their public API
-    const appliedPlugin = pluginFactory(router, deps.getDependency);
+    const appliedPlugin = pluginFactory(this.#router, this.#deps.getDependency);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
 
@@ -278,13 +296,13 @@ export class PluginsNamespace<
       if (methodName in appliedPlugin) {
         if (typeof appliedPlugin[methodName] === "function") {
           removeEventListeners.push(
-            deps.addEventListener(
+            this.#deps.addEventListener(
               EVENTS_MAP[methodName],
               appliedPlugin[methodName],
             ),
           );
 
-          if (methodName === "onStart" && deps.isStarted()) {
+          if (methodName === "onStart" && this.#deps.isStarted()) {
             logger.warn(
               LOGGER_CONTEXT,
               "Router already started, onStart will not be called",

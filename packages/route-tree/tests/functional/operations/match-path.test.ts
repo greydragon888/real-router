@@ -107,6 +107,54 @@ describe("New API - matchPath", () => {
     expect(result?.params.param).toBe("test$@");
   });
 
+  it("should match with uri encoding", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route/:param" },
+    ]);
+
+    const result = matchPath(tree, "/route/test%20value", {
+      urlParamsEncoding: "uri",
+    });
+
+    expect(result?.params.param).toBe("test value");
+  });
+
+  it("should match with default encoding", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route/:param" },
+    ]);
+
+    const result = matchPath(tree, "/route/test%24%40", {
+      urlParamsEncoding: "default",
+    });
+
+    expect(result?.params.param).toBe("test$@");
+  });
+
+  it("should match with no encoding", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route/:param" },
+    ]);
+
+    const result = matchPath(tree, "/route/test%24%40", {
+      urlParamsEncoding: "none",
+    });
+
+    expect(result?.params.param).toBe("test%24%40");
+  });
+
+  it("should match with default encoding and special characters", () => {
+    const tree = createRouteTree("", "", [
+      { name: "route", path: "/route/:param" },
+    ]);
+
+    const result = matchPath(tree, "/route/test%2Bvalue", {
+      urlParamsEncoding: "default",
+    });
+
+    expect(result?.params.param).toBe("test+value");
+  });
+
   it("should use DEFAULT_CONFIG when only trailingSlashMode is set", () => {
     // trailingSlashMode doesn't affect matchPath, so we use DEFAULT_CONFIG
     // This tests the second fast path in getMatchConfig (line 222)
@@ -122,7 +170,6 @@ describe("New API - matchPath", () => {
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", {
-      caseSensitive: true,
       strictTrailingSlash: false,
     });
 
@@ -136,7 +183,6 @@ describe("New API - matchPath", () => {
     ]);
 
     const result = matchPath(tree, "/users/123", {
-      caseSensitive: true,
       strongMatching: true,
     });
 
@@ -151,7 +197,6 @@ describe("New API - matchPath", () => {
     ]);
 
     const result = matchPath(tree, "/users/123", {
-      caseSensitive: true,
       strongMatching: false,
     });
 
@@ -164,7 +209,6 @@ describe("New API - matchPath", () => {
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", {
-      caseSensitive: true,
       strictTrailingSlash: true,
     });
 
@@ -176,7 +220,6 @@ describe("New API - matchPath", () => {
     const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
     const result = matchPath(tree, "/about", {
-      caseSensitive: false,
       strictTrailingSlash: true,
     });
 
@@ -190,7 +233,6 @@ describe("New API - matchPath", () => {
     ]);
 
     const result = matchPath(tree, "/users/123", {
-      caseSensitive: false,
       strongMatching: false,
     });
 
@@ -258,7 +300,7 @@ describe("New API - matchPath", () => {
     expect(segments!.length).toBeGreaterThanOrEqual(1);
 
     // The first segment should be root since it has parser
-    expect(tree.parser).not.toBeNull();
+    expect(tree.path).toBe("?globalParam");
     expect(segments![0]).toBe(tree);
   });
 });

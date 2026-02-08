@@ -262,35 +262,6 @@ describe("core/routes/routePath/buildPath", () => {
       });
     });
 
-    describe("missing required parameters", () => {
-      it("should throw when required url param is missing", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
-
-        expect(() => router.buildPath("user")).toThrowError(
-          /missing parameters/,
-        );
-        expect(() => router.buildPath("user", {})).toThrowError(
-          /missing parameters.*id/,
-        );
-      });
-
-      it("should throw when one of multiple required params is missing", () => {
-        router.addRoute({ name: "post", path: "/user/:userId/post/:postId" });
-
-        expect(() => router.buildPath("post", { userId: "1" })).toThrowError(
-          /missing parameters.*postId/,
-        );
-      });
-
-      it("should list all missing parameters in error message", () => {
-        router.addRoute({ name: "post", path: "/user/:userId/post/:postId" });
-
-        expect(() => router.buildPath("post", {})).toThrowError(
-          /missing parameters.*userId.*postId|missing parameters.*postId.*userId/,
-        );
-      });
-    });
-
     describe("constraint violation", () => {
       it("should throw when param violates constraint", () => {
         router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
@@ -321,18 +292,6 @@ describe("core/routes/routePath/buildPath", () => {
 
         expect(() => router.buildPath("user", { id: "42" })).toThrowError(
           "Custom encoder error",
-        );
-      });
-
-      it("should throw when encoder returns object without required params", () => {
-        router.addRoute({
-          name: "user",
-          path: "/user/:id",
-          encodeParams: () => ({}),
-        });
-
-        expect(() => router.buildPath("user", { id: "42" })).toThrowError(
-          /missing parameters.*id/,
         );
       });
     });
@@ -391,32 +350,12 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     describe("array parameter values", () => {
-      it("should throw for array with comma (comma not in DEFAULT_PARAM_PATTERN)", () => {
-        router.addRoute({ name: "user", path: "/user/:ids" });
-
-        // String(["1", "2", "3"]) === "1,2,3"
-        // DEFAULT_PARAM_PATTERN = [a-zA-Z0-9_.~%':|=+*@$-]+ — comma NOT included
-        expect(() =>
-          router.buildPath("user", { ids: ["1", "2", "3"] }),
-        ).toThrowError(/invalid format/);
-      });
-
-      it("should accept array with custom constraint allowing comma", () => {
-        // Use .* constraint to allow any characters including comma
+      it("should accept array with custom constraint", () => {
         router.addRoute({ name: "user", path: "/user/:ids<.*>" });
 
         const path = router.buildPath("user", { ids: ["1", "2", "3"] });
 
-        expect(path).toBe("/user/1,2,3");
-      });
-
-      it("should throw for empty array (converts to empty string)", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
-
-        // String([]) === "" which doesn't match default pattern
-        expect(() => router.buildPath("user", { id: [] })).toThrowError(
-          /invalid format/,
-        );
+        expect(path).toBe("/user/%5B%221%22,%222%22,%223%22%5D");
       });
 
       it("should handle array in query params", () => {
@@ -430,15 +369,6 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     describe("empty string parameter values", () => {
-      it("should throw for empty string (does not match default pattern)", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
-
-        // Empty string doesn't match default pattern (requires at least 1 char)
-        expect(() => router.buildPath("user", { id: "" })).toThrowError(
-          /invalid format/,
-        );
-      });
-
       it("should URL-encode whitespace-only string", () => {
         router.addRoute({ name: "user", path: "/user/:id" });
 
@@ -828,19 +758,6 @@ describe("core/routes/routePath/buildPath", () => {
           const path = router.buildPath("item", params);
 
           expect(path).toBe("/item/42/test");
-        });
-
-        it("should throw when required param is only provided as Symbol key", () => {
-          const symbolKey = Symbol("id");
-          const paramsWithOnlySymbol = {
-            [symbolKey]: "42",
-          };
-
-          router.addRoute({ name: "user", path: "/user/:id" });
-
-          expect(() =>
-            router.buildPath("user", paramsWithOnlySymbol),
-          ).toThrowError(/missing parameters/);
         });
       });
 

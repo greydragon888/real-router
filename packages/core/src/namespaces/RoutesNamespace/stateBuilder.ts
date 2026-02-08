@@ -10,8 +10,6 @@
  * @module core/stateBuilder
  */
 
-import { getMetaFromSegments } from "route-tree";
-
 import type {
   MatchResult,
   RouteParams,
@@ -32,19 +30,7 @@ import type {
  * ```
  */
 export function buildNameFromSegments(segments: readonly RouteTree[]): string {
-  let name = "";
-
-  for (const segment of segments) {
-    if (segment.name) {
-      if (name) {
-        name += ".";
-      }
-
-      name += segment.name;
-    }
-  }
-
-  return name;
+  return segments.at(-1)?.fullName ?? "";
 }
 
 /**
@@ -75,6 +61,6 @@ export function createRouteState<P extends RouteParams = RouteParams>(
   return {
     name: resolvedName,
     params: matchResult.params,
-    meta: getMetaFromSegments(matchResult.segments),
+    meta: matchResult.meta,
   };
 }

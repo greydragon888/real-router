@@ -20,8 +20,8 @@ Named route tree with high-performance matching and path building for Real-Route
 
 ### Performance Optimizations
 
-- **O(1) route lookup** — `childrenByName` Map for instant access by name
-- **O(1) static segment matching** — `staticChildrenByFirstSegment` index
+- **O(1) route lookup** — `children` Map for instant access by name
+- **Radix tree matching** — rou3-powered high-performance route matching
 - **Pre-computed caches** — `staticPath`, `fullName`, `paramTypeMap`
 - **Lazy allocation** — arrays created only when needed
 - **Immutable by default** — frozen trees prevent accidental mutations
@@ -31,24 +31,18 @@ Named route tree with high-performance matching and path building for Real-Route
 ```typescript
 interface RouteTree {
   // Core
-  readonly name: string;                    // "users"
-  readonly path: string;                    // "/users/:id"
-  readonly absolute: boolean;               // path starts with "~"
-  readonly parser: PathParser | null;       // path parser
-  readonly children: readonly RouteTree[];
+  readonly name: string; // "users"
+  readonly path: string; // "/users/:id"
+  readonly absolute: boolean; // path starts with "~"
+  readonly children: ReadonlyMap<string, RouteTree>; // Map for O(1) lookup by name
 
   // Pre-computed caches
   readonly parent: RouteTree | null;
-  readonly fullName: string;                // "users.profile"
-  readonly staticPath: string | null;       // pre-built for parameterless routes
-  readonly childrenByName: ReadonlyMap<string, RouteTree>;
-  readonly staticChildrenByFirstSegment: ReadonlyMap<string, readonly RouteTree[]>;
+  readonly fullName: string; // "users.profile"
+  readonly staticPath: string | null; // pre-built for parameterless routes
   readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
-
-  // Additional caches
+  readonly paramMeta: ParamMeta; // parameter metadata
   readonly nonAbsoluteChildren: readonly RouteTree[];
-  readonly absoluteDescendants: readonly RouteTree[];
-  readonly parentSegments: readonly RouteTree[];
 }
 ```
 
@@ -73,39 +67,7 @@ const tree = createRouteTree("", "", [
 
 ```typescript
 interface TreeBuildOptions {
-  skipValidation?: boolean;  // Skip route validation
-  skipSort?: boolean;        // Skip children sorting
-  skipFreeze?: boolean;      // Skip Object.freeze
-}
-```
-
----
-
-### `matchSegments(tree, path, options?)`
-
-Matches a URL path against the route tree.
-
-```typescript
-import { matchSegments } from "route-tree";
-
-const result = matchSegments(tree, "/users/123/edit");
-// → {
-//     segments: [usersNode, profileNode, editNode],
-//     params: { id: "123" }
-//   }
-```
-
-**Options:**
-
-```typescript
-interface MatchOptions {
-  trailingSlashMode?: "default" | "never" | "always";
-  strictTrailingSlash?: boolean;  // Require exact trailing slash match
-  caseSensitive?: boolean;        // Case-sensitive matching
-  strongMatching?: boolean;       // Strict segment boundaries
-  queryParamsMode?: "default" | "strict" | "loose";
-  queryParams?: QueryParamsOptions;
-  urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none" | "legacy";
+  skipFreeze?: boolean; // Skip Object.freeze
 }
 ```
 
@@ -136,7 +98,7 @@ interface BuildOptions {
   trailingSlashMode?: "default" | "always" | "never";
   queryParamsMode?: "default" | "strict" | "loose";
   queryParams?: QueryParamsOptions;
-  urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none" | "legacy";
+  urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none";
 }
 ```
 
@@ -155,33 +117,6 @@ const segments = getSegmentsByName(tree, "users.profile");
 
 ---
 
-### `hasSegmentsByName(tree, routeName)`
-
-Checks if a route exists (more efficient than `getSegmentsByName` when only checking existence).
-
-```typescript
-import { hasSegmentsByName } from "route-tree";
-
-hasSegmentsByName(tree, "users.profile");  // true
-hasSegmentsByName(tree, "unknown.route");  // false
-```
-
----
-
-### `getMetaFromSegments(segments, params)`
-
-Extracts metadata from matched segments.
-
-```typescript
-import { getMetaFromSegments, matchSegments } from "route-tree";
-
-const match = matchSegments(tree, "/users/123");
-const meta = getMetaFromSegments(match.segments, match.params);
-// → { params: { id: "123" }, ... }
-```
-
----
-
 ### `validateRoute(route)`
 
 Validates a route definition at runtime.
@@ -189,9 +124,9 @@ Validates a route definition at runtime.
 ```typescript
 import { validateRoute } from "route-tree";
 
-validateRoute({ name: "users", path: "/users" });     // OK
-validateRoute({ name: "123bad", path: "/path" });     // throws
-validateRoute({ name: "test", path: "//double" });    // throws
+validateRoute({ name: "users", path: "/users" }); // OK
+validateRoute({ name: "123bad", path: "/path" }); // throws
+validateRoute({ name: "test", path: "//double" }); // throws
 ```
 
 ---
@@ -231,7 +166,6 @@ import type {
   // Options
   BuildOptions,
   MatchOptions,
-  TreeBuildOptions,
 
   // Results
   MatchResult,
@@ -241,8 +175,6 @@ import type {
 
   // Mode types
   TrailingSlashMode,
-  QueryParamsMode,
-  URLParamsEncodingType,
 } from "route-tree";
 ```
 
@@ -292,30 +224,26 @@ import type {
 
 1. **Validation** — validate route definitions
 2. **Tree Building** — create mutable tree structure
-3. **Sorting** — sort children for correct matching order
+3. **rou3 Registration** — register routes in radix tree for matching
 4. **Cache Computing** — compute all lookup caches
 5. **Freezing** — make tree immutable
 
 ### Matching Algorithm
 
-1. **Static Index Lookup** — O(1) lookup by first path segment
-2. **Dynamic Fallback** — linear search for parameterized routes
-3. **Recursive Descent** — match remaining path against children
+Route matching is powered by [rou3](https://github.com/unjs/rou3), a high-performance radix tree router:
+
+1. **Radix Tree Lookup** — rou3 finds matching route using radix tree
+2. **Parameter Extraction** — extract URL parameters from matched path
+3. **Segment Resolution** — build segment chain from matched route
 
 ```
 /users/123/edit
   ↓
-staticChildrenByFirstSegment.get("users") → [usersNode]
+rou3.findRoute("/users/123/edit") → "users.profile.edit"
   ↓
-Match usersNode, remaining: /123/edit
+Extract params: { id: "123" }
   ↓
-Dynamic fallback: /:id → profileNode
-  ↓
-Match profileNode, remaining: /edit
-  ↓
-staticChildrenByFirstSegment.get("edit") → [editNode]
-  ↓
-Match complete: [usersNode, profileNode, editNode]
+Build segments: [usersNode, profileNode, editNode]
 ```
 
 ## Dependencies

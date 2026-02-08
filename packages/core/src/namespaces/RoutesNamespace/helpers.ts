@@ -28,7 +28,6 @@ export function createEmptyConfig(): RouteConfig {
 export function createMatchOptions(options: Options): MatchOptions {
   return {
     ...createBuildOptions(options),
-    caseSensitive: options.caseSensitive,
     strictTrailingSlash: options.trailingSlash === "strict",
     strongMatching: false,
   };
@@ -346,13 +345,11 @@ function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
 
   for (const segment of segments) {
     // Named routes always have parsers (null only for root without path)
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
-    for (const param of segment.parser!.urlParams) {
+    for (const param of segment.paramMeta.urlParams) {
       params.add(param);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- route-tree guarantees parser for named routes
-    for (const param of segment.parser!.spatParams) {
+    for (const param of segment.paramMeta.spatParams) {
       params.add(param);
     }
   }
@@ -361,14 +358,14 @@ function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
 }
 
 /**
- * Checks if a route exists in the tree by navigating through childrenByName.
+ * Checks if a route exists in the tree by navigating through children Map.
  */
 function routeExistsInTree(tree: RouteTree, routeName: string): boolean {
   const segments = routeName.split(".");
   let current: RouteTree | undefined = tree;
 
   for (const segment of segments) {
-    current = current.childrenByName.get(segment);
+    current = current.children.get(segment);
 
     if (!current) {
       return false;

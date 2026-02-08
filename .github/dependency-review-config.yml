@@ -13,4 +13,5 @@ allow-licenses:
   - CC-BY-4.0
   - BlueOak-1.0.0
   - Python-2.0
+  - MS-PL
   - LGPL-3.0-only

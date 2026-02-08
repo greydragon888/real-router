@@ -1,6 +1,6 @@
 {
   "name": "route-tree",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Named route tree with matching and path building",
   "main": "./dist/cjs/index.js",
@@ -42,13 +42,14 @@
   "scripts": {
     "build": "tsup",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache src/ tests/ --fix",
+    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
     "test": "vitest run",
     "test:mutation": "stryker run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
   },
   "sideEffects": false,
   "dependencies": {
+    "rou3": "0.7.12",
     "search-params": "workspace:^"
   }
 }

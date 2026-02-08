@@ -1,11 +1,11 @@
 /**
- * Tests for matchSegments with static index.
+ * Tests for MatcherService with static index.
  */
 
 import { describe, it, expect } from "vitest";
 
+import { matchSegments } from "./helpers";
 import { createRouteTree } from "../../../src/builder/createRouteTree";
-import { matchSegments } from "../../../src/operations/match";
 
 describe("matchSegments with static index", () => {
   it("should return null when no routes match (empty static index)", () => {
@@ -197,7 +197,7 @@ describe("matchSegments with static index", () => {
 
   it("should try multiple static candidates when first doesn't match (line 368 false branch)", () => {
     // Routes with same first segment "api" but different full paths
-    // Both will be indexed under "api" in staticChildrenByFirstSegment
+    // rou3 handles matching priority via radix tree
     const tree = createRouteTree("", "", [
       {
         name: "parent",
@@ -244,7 +244,7 @@ describe("matchSegments with static index", () => {
         path: "/parent",
         children: [
           { name: "static", path: "/static" },
-          { name: "catch", path: "*splat" }, // No leading slash
+          { name: "catch", path: "/*splat" },
         ],
       },
     ]);

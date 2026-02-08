@@ -2,57 +2,57 @@
   {
     "name": "@real-router/core (ESM)",
     "path": "packages/core/dist/esm/index.mjs",
-    "limit": "25 kB"
+    "limit": "22 kB"
   },
   {
     "name": "@real-router/react (ESM)",
     "path": "packages/react/dist/esm/index.mjs",
-    "limit": "10 kB",
+    "limit": "2 kB",
     "ignore": ["react", "react-dom"]
   },
   {
     "name": "@real-router/browser-plugin (ESM)",
     "path": "packages/browser-plugin/dist/esm/index.mjs",
-    "limit": "5 kB"
+    "limit": "4 kB"
   },
   {
     "name": "@real-router/rx (ESM)",
     "path": "packages/rx/dist/esm/index.mjs",
-    "limit": "5 kB"
+    "limit": "1.5 kB"
   },
   {
     "name": "@real-router/helpers (ESM)",
     "path": "packages/helpers/dist/esm/index.mjs",
-    "limit": "3 kB"
+    "limit": "0.5 kB"
   },
   {
     "name": "route-tree (ESM)",
     "path": "packages/route-tree/dist/esm/index.mjs",
-    "limit": "15 kB"
+    "limit": "6.5 kB"
   },
   {
     "name": "search-params (ESM)",
     "path": "packages/search-params/dist/esm/index.mjs",
-    "limit": "5 kB"
+    "limit": "1.5 kB"
   },
   {
     "name": "type-guards (ESM)",
     "path": "packages/type-guards/dist/esm/index.mjs",
-    "limit": "2 kB"
+    "limit": "1.5 kB"
   },
   {
     "name": "@real-router/logger (ESM)",
     "path": "packages/logger/dist/esm/index.mjs",
-    "limit": "3 kB"
+    "limit": "0.5 kB"
   },
   {
     "name": "@real-router/logger-plugin (ESM)",
     "path": "packages/logger-plugin/dist/esm/index.mjs",
-    "limit": "3 kB"
+    "limit": "1.5 kB"
   },
   {
     "name": "@real-router/persistent-params-plugin (ESM)",
     "path": "packages/persistent-params-plugin/dist/esm/index.mjs",
-    "limit": "3 kB"
+    "limit": "1.5 kB"
   }
 ]
