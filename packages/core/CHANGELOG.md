@@ -1,5 +1,31 @@
 # @real-router/core
 
+## 0.9.0
+
+### Minor Changes
+
+- [#61](https://github.com/greydragon888/real-router/pull/61) [`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate routing engine to rou3 and optimize path building (#40)
+
+  **BREAKING CHANGES:**
+  - Encoding mode `legacy` has been removed. Use `uri` instead (1:1 equivalent).
+  - `children.values()` iteration order now follows definition order instead of routing priority order. This affects `routeTreeToDefinitions()` output order. Matching behavior is unchanged (handled by rou3 radix tree).
+
+  **Performance improvements:**
+  - Migrated to rou3 radix tree for 1000x+ faster route matching
+  - Optimized path building with standalone services (inject, validateConstraints, encodeParam)
+  - Replaced parser metadata access with lightweight paramMeta structure
+  - Removed dead sorting code (~50 lines) — no longer needed with rou3
+
+  **Migration:**
+
+  ```typescript
+  // Before:
+  buildPath(tree, "route", params, { urlParamsEncoding: "legacy" });
+
+  // After:
+  buildPath(tree, "route", params, { urlParamsEncoding: "uri" });
+  ```
+
 ## 0.8.0
 
 ### Minor Changes
