@@ -5,6 +5,9 @@
 
 > A simple, powerful, view-agnostic, modular and extensible router for JavaScript applications.
 
+> **Warning**
+> This project is in **active development** (pre-1.0). The API is not stable and may change between releases. Use at your own risk until a stable 1.0 release.
+
 Real-Router is an **independent routing solution** inspired by the declarative routing philosophy of [router5](https://github.com/router5/router5), built from scratch with modern JavaScript, TypeScript-first design, and performance optimizations.
 
 ## Why Real-Router?

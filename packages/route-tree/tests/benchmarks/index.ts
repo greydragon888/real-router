@@ -17,12 +17,13 @@ import { fileURLToPath } from "node:url";
 
 import { run } from "mitata";
 
-// Import all benchmark files (they register benchmarks via summary/bench)
+// Import all benchmark files (they register benchmarks via summary/bench)anhthu2022
 import "./matchPath.bench";
 import "./buildPath.bench";
 import "./add.bench";
 import "./scenarios.bench";
 import "./realistic-usage.bench";
+import "./match-hotpath.bench";
 
 // ============================================================================
 // Run benchmarks and save results

@@ -4,6 +4,9 @@
  * Tests matchSegments with options patterns that match real-router usage.
  * Purpose: Validate if pre-computed config caching in match.ts is effective.
  *
+ * IMPORTANT: match() is a non-mutating operation.
+ * MatcherService must be created OUTSIDE bench blocks.
+ *
  * Key insight: real-router always passes 4-5 options, bypassing single-option cache paths.
  */
 
@@ -14,12 +17,13 @@ import { MatcherService } from "../../src/services/MatcherService";
 
 import type { MatchOptions } from "../../src/types";
 
-function matchSegments(tree: any, path: string, options?: any) {
+/** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
+function createMatcher(tree: any): MatcherService {
   const matcher = new MatcherService();
 
   matcher.registerTree(tree);
 
-  return matcher.match(path, options) ?? null;
+  return matcher;
 }
 
 // =============================================================================
@@ -43,6 +47,7 @@ const routes = [
 ];
 
 const tree = createRouteTree("", "", routes);
+const matcher = createMatcher(tree);
 
 // Test paths
 const SHALLOW_PATH = "/users";
@@ -84,19 +89,19 @@ barplot(() => {
   summary(() => {
     // Shallow match
     bench("shallow: no options (cached)", () => {
-      matchSegments(tree, SHALLOW_PATH, noOptions);
+      matcher.match(SHALLOW_PATH, noOptions);
     });
 
     bench("shallow: single option (partial cache)", () => {
-      matchSegments(tree, SHALLOW_PATH, singleOption);
+      matcher.match(SHALLOW_PATH, singleOption);
     });
 
     bench("shallow: real-router real (4 fields, no cache)", () => {
-      matchSegments(tree, SHALLOW_PATH, realRouterRealOptions);
+      matcher.match(SHALLOW_PATH, realRouterRealOptions);
     });
 
     bench("shallow: real-router + query (5 fields, no cache)", () => {
-      matchSegments(tree, SHALLOW_PATH, realRouterWithQueryParams);
+      matcher.match(SHALLOW_PATH, realRouterWithQueryParams);
     });
   });
 });
@@ -105,19 +110,19 @@ barplot(() => {
   summary(() => {
     // Deep match (3 levels)
     bench("deep: no options (cached)", () => {
-      matchSegments(tree, DEEP_PATH, noOptions);
+      matcher.match(DEEP_PATH, noOptions);
     });
 
     bench("deep: single option (partial cache)", () => {
-      matchSegments(tree, DEEP_PATH, singleOption);
+      matcher.match(DEEP_PATH, singleOption);
     });
 
     bench("deep: real-router real (4 fields, no cache)", () => {
-      matchSegments(tree, DEEP_PATH, realRouterRealOptions);
+      matcher.match(DEEP_PATH, realRouterRealOptions);
     });
 
     bench("deep: real-router + query (5 fields, no cache)", () => {
-      matchSegments(tree, DEEP_PATH, realRouterWithQueryParams);
+      matcher.match(DEEP_PATH, realRouterWithQueryParams);
     });
   });
 });
@@ -130,22 +135,22 @@ barplot(() => {
   summary(() => {
     // Isolate config creation cost by running same path
     bench("config: empty options (DEFAULT_CONFIG)", () => {
-      matchSegments(tree, DEEP_PATH);
+      matcher.match(DEEP_PATH);
     });
 
     bench("config: no options object", () => {
-      matchSegments(tree, DEEP_PATH, noOptions);
+      matcher.match(DEEP_PATH, noOptions);
     });
 
     bench("config: real-router pattern", () => {
-      matchSegments(tree, DEEP_PATH, realRouterRealOptions);
+      matcher.match(DEEP_PATH, realRouterRealOptions);
     });
 
     // Pre-created options object (simulates real-router caching options)
     const cachedOptions = { ...realRouterRealOptions };
 
     bench("config: real-router pre-cached object", () => {
-      matchSegments(tree, DEEP_PATH, cachedOptions);
+      matcher.match(DEEP_PATH, cachedOptions);
     });
   });
 });

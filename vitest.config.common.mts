@@ -50,7 +50,6 @@ export const commonConfig = defineConfig({
      * Test isolation settings
      * Clear mocks and restore mocked functions after each test
      */
-    clearMocks: true,
     restoreMocks: true,
     mockReset: true,
 

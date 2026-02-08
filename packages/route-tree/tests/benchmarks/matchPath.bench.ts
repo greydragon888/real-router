@@ -8,6 +8,9 @@
  * - Trailing slash modes
  * - Wide tree scaling (parameterized)
  * - Absolute paths
+ *
+ * IMPORTANT: match() is a non-mutating operation.
+ * MatcherService must be created OUTSIDE bench blocks.
  */
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
@@ -19,17 +22,19 @@ import {
   generateDeepTree,
   generateDeepTreeWithParams,
   generateRouteWithQueryParams,
+  generateSpaRoutes,
   generateWideTree,
 } from "./helpers/generators";
 import { createRouteTree } from "../../src/builder";
 import { MatcherService } from "../../src/services/MatcherService";
 
-function matchSegments(tree: any, path: string, options?: any) {
+/** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
+function createMatcher(tree: any): MatcherService {
   const matcher = new MatcherService();
 
   matcher.registerTree(tree);
 
-  return matcher.match(path, options) ?? null;
+  return matcher;
 }
 
 /** Mitata state interface for generator benchmarks */
@@ -37,22 +42,55 @@ interface BenchState {
   get: (name: string) => unknown;
 }
 
+// =============================================================================
+// JIT Warmup: Pre-warm all match code paths to avoid cold-start bias
+// Without this, the first benchmarks would be significantly slower due to
+// JIT compilation (~20x difference observed)
+// =============================================================================
+{
+  const warmupRoutes = generateSpaRoutes();
+  const warmupTree = createRouteTree("", "", warmupRoutes);
+  const warmupMatcher = createMatcher(warmupTree);
+
+  for (let i = 0; i < 100; i++) {
+    // Warmup: shallow match
+    warmupMatcher.match("/");
+    warmupMatcher.match("/users");
+
+    // Warmup: match with URL params
+    warmupMatcher.match("/users/123/details");
+
+    // Warmup: match with options
+    warmupMatcher.match("/users", { queryParamsMode: "default" });
+    warmupMatcher.match("/users", { queryParamsMode: "strict" });
+    warmupMatcher.match("/users", { queryParamsMode: "loose" });
+    warmupMatcher.match("/users", { trailingSlashMode: "default" });
+    warmupMatcher.match("/users", { trailingSlashMode: "never" });
+    warmupMatcher.match("/users", { trailingSlashMode: "always" });
+    warmupMatcher.match("/users", { strictTrailingSlash: true });
+
+    // Warmup: no match
+    warmupMatcher.match("/nonexistent-path-xyz");
+  }
+}
+
 // 1.1 Basic matching scenarios - boxplot shows distribution
 boxplot(() => {
   summary(() => {
     const routes = generateWideTree(50);
     const tree = createRouteTree("", "", routes);
+    const matcher = createMatcher(tree);
 
     bench("matchSegments: shallow first route", () => {
-      matchSegments(tree, "/route-0");
+      matcher.match("/route-0");
     });
 
     bench("matchSegments: shallow last route", () => {
-      matchSegments(tree, "/route-49");
+      matcher.match("/route-49");
     });
 
     bench("matchSegments: no match (worst case)", () => {
-      matchSegments(tree, "/nonexistent");
+      matcher.match("/nonexistent");
     });
   });
 });
@@ -64,10 +102,11 @@ lineplot(() => {
       const levels = state.get("levels") as number;
       const routes = generateDeepTree(levels);
       const tree = createRouteTree("", "", routes);
+      const matcher = createMatcher(tree);
       const path = generateDeepPath(levels);
 
       yield () => {
-        matchSegments(tree, path);
+        matcher.match(path);
       };
     }).args("levels", [5, 10, 20]);
   });
@@ -80,10 +119,11 @@ lineplot(() => {
       const count = state.get("count") as number;
       const routes = generateDeepTreeWithParams(count);
       const tree = createRouteTree("", "", routes);
+      const matcher = createMatcher(tree);
       const path = generateDeepPathWithParams(count);
 
       yield () => {
-        matchSegments(tree, path);
+        matcher.match(path);
       };
     }).args("count", [3, 5, 10]);
   });
@@ -94,21 +134,22 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "users", path: "/users?page&sort" }];
     const tree = createRouteTree("", "", routes);
+    const matcher = createMatcher(tree);
 
     bench("matchSegments: query default mode", () => {
-      matchSegments(tree, "/users?page=1&sort=name", {
+      matcher.match("/users?page=1&sort=name", {
         queryParamsMode: "default",
       });
     });
 
     bench("matchSegments: query strict mode", () => {
-      matchSegments(tree, "/users?page=1&sort=name", {
+      matcher.match("/users?page=1&sort=name", {
         queryParamsMode: "strict",
       });
     });
 
     bench("matchSegments: query loose mode", () => {
-      matchSegments(tree, "/users?page=1&sort=name&extra=val", {
+      matcher.match("/users?page=1&sort=name&extra=val", {
         queryParamsMode: "loose",
       });
     });
@@ -122,12 +163,13 @@ lineplot(() => {
       const count = state.get("count") as number;
       const route = generateRouteWithQueryParams(count);
       const tree = createRouteTree("", "", [route]);
+      const matcher = createMatcher(tree);
       const query = Array.from({ length: count }, (_, i) => `q${i}=v${i}`).join(
         "&",
       );
 
       yield () => {
-        matchSegments(tree, `/route?${query}`);
+        matcher.match(`/route?${query}`);
       };
     }).args("count", [5, 10, 20]);
   });
@@ -138,21 +180,22 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "users", path: "/users" }];
     const tree = createRouteTree("", "", routes);
+    const matcher = createMatcher(tree);
 
     bench("matchSegments: trailing slash default", () => {
-      matchSegments(tree, "/users/", { trailingSlashMode: "default" });
+      matcher.match("/users/", { trailingSlashMode: "default" });
     });
 
     bench("matchSegments: trailing slash never", () => {
-      matchSegments(tree, "/users/", { trailingSlashMode: "never" });
+      matcher.match("/users/", { trailingSlashMode: "never" });
     });
 
     bench("matchSegments: trailing slash always", () => {
-      matchSegments(tree, "/users", { trailingSlashMode: "always" });
+      matcher.match("/users", { trailingSlashMode: "always" });
     });
 
     bench("matchSegments: strictTrailingSlash", () => {
-      matchSegments(tree, "/users", { strictTrailingSlash: true });
+      matcher.match("/users", { strictTrailingSlash: true });
     });
   });
 });
@@ -166,9 +209,10 @@ lineplot(() => {
         const width = state.get("width") as number;
         const routes = generateWideTree(width);
         const tree = createRouteTree("", "", routes);
+        const matcher = createMatcher(tree);
 
         yield () => {
-          matchSegments(tree, `/route-${width - 1}`);
+          matcher.match(`/route-${width - 1}`);
         };
       },
     ).args("width", [10, 50, 100, 500]);
@@ -180,17 +224,18 @@ boxplot(() => {
   summary(() => {
     const routes = generateAbsoluteRoutes(10);
     const tree = createRouteTree("", "", routes);
+    const matcher = createMatcher(tree);
 
     bench("matchSegments: normal path", () => {
-      matchSegments(tree, "/normal/nested");
+      matcher.match("/normal/nested");
     });
 
     bench("matchSegments: absolute nested", () => {
-      matchSegments(tree, "/absolute");
+      matcher.match("/absolute");
     });
 
     bench("matchSegments: absolute modal", () => {
-      matchSegments(tree, "/modal-5");
+      matcher.match("/modal-5");
     });
   });
 });
