@@ -15,7 +15,6 @@ export const defaultOptions: Options = {
     booleanFormat: "none",
     nullFormat: "default",
   },
-  caseSensitive: false,
   urlParamsEncoding: "default",
   allowNotFound: true,
   rewritePathOnMatch: true,

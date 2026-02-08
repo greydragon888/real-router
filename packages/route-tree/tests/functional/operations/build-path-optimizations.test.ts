@@ -4,10 +4,9 @@
 
 import { describe, it, expect } from "vitest";
 
-import { matchPath } from "./helpers";
+import { matchPath, matchSegments } from "./helpers";
 import { createRouteTree } from "../../../src/builder/createRouteTree";
 import { buildPath } from "../../../src/operations/build";
-import { matchSegments } from "../../../src/operations/match";
 
 describe("buildPath staticPath fast path", () => {
   const tree = createRouteTree("", "", [
@@ -52,14 +51,14 @@ describe("buildPath staticPath fast path", () => {
   });
 
   it("should verify staticPath is precomputed for static routes", () => {
-    const child = tree.childrenByName.get("about");
+    const child = tree.children.get("about");
 
     expect(child?.staticPath).toBe("/about");
   });
 
   it("should verify staticPath is null for routes with params", () => {
-    const users = tree.childrenByName.get("users");
-    const profile = users?.childrenByName.get("profile");
+    const users = tree.children.get("users");
+    const profile = users?.children.get("profile");
 
     expect(profile?.staticPath).toBeNull();
   });
@@ -76,8 +75,8 @@ describe("buildPath staticPath fast path", () => {
       },
     ]);
 
-    const users = treeWithParentParams.childrenByName.get("users");
-    const settings = users?.childrenByName.get("settings");
+    const users = treeWithParentParams.children.get("users");
+    const settings = users?.children.get("settings");
 
     // staticPath should be null because parent has :id param
     expect(settings?.staticPath).toBeNull();
@@ -95,8 +94,8 @@ describe("buildPath staticPath fast path", () => {
       },
     ]);
 
-    const search = treeWithParentQuery.childrenByName.get("search");
-    const results = search?.childrenByName.get("results");
+    const search = treeWithParentQuery.children.get("search");
+    const results = search?.children.get("results");
 
     // staticPath should be null because parent has query param
     expect(results?.staticPath).toBeNull();
@@ -114,8 +113,8 @@ describe("buildPath staticPath fast path", () => {
       },
     ]);
 
-    const files = treeWithParentSplat.childrenByName.get("files");
-    const info = files?.childrenByName.get("info");
+    const files = treeWithParentSplat.children.get("files");
+    const info = files?.children.get("info");
 
     // staticPath should be null because parent has splat param
     expect(info?.staticPath).toBeNull();
@@ -139,9 +138,9 @@ describe("buildPath staticPath fast path", () => {
       },
     ]);
 
-    const app = treeWithAbsolute.childrenByName.get("app");
-    const modal = app?.childrenByName.get("modal");
-    const content = modal?.childrenByName.get("content");
+    const app = treeWithAbsolute.children.get("app");
+    const modal = app?.children.get("modal");
+    const content = modal?.children.get("content");
 
     // modal is absolute, so its staticPath should be "/modal"
     expect(modal?.staticPath).toBe("/modal");
@@ -165,9 +164,9 @@ describe("buildPath staticPath fast path", () => {
       },
     ]);
 
-    const a = deepTree.childrenByName.get("a");
-    const b = a?.childrenByName.get("b");
-    const c = b?.childrenByName.get("c");
+    const a = deepTree.children.get("a");
+    const b = a?.children.get("b");
+    const c = b?.children.get("c");
 
     expect(a?.staticPath).toBe("/a");
     expect(b?.staticPath).toBe("/a/b");
@@ -220,7 +219,7 @@ describe("buildPath staticPath fast path", () => {
       { name: "users", path: "/users" },
     ]);
 
-    const users = rootPathTree.childrenByName.get("users");
+    const users = rootPathTree.children.get("users");
 
     // staticPath should include root path
     expect(users?.staticPath).toBe("/api/users");
@@ -603,21 +602,6 @@ describe("default value mutations", () => {
     expect(resultStrict).toBeNull();
   });
 
-  it("should use caseSensitive=false by default (line 532)", () => {
-    // Tests line 532: caseSensitive defaults to false
-    const tree = createRouteTree("", "", [{ name: "About", path: "/About" }]);
-
-    // Default (false) allows case-insensitive matching
-    const resultDefault = matchPath(tree, "/about");
-
-    expect(resultDefault?.name).toBe("About");
-
-    // Explicit true requires case-sensitive match
-    const resultSensitive = matchPath(tree, "/about", { caseSensitive: true });
-
-    expect(resultSensitive).toBeNull();
-  });
-
   it("should use queryParamsMode=default by default (line 529)", () => {
     // Tests line 529: queryParamsMode defaults to "default"
     const tree = createRouteTree("", "", [{ name: "page", path: "/page" }]);
@@ -873,9 +857,9 @@ describe("additional edge cases for mutation coverage", () => {
     expect(result?.params.param).toBe("value");
   });
 
-  it("should handle tree.parser and absoluteDescendants iteration (line 240, 245)", () => {
-    // Tests lines 240 (tree.parser check) and 245 (absoluteDescendants loop)
-    // Root needs a path for parser to be created, not just query
+  it("should handle absolute routes with query params", () => {
+    // Tests rou3 matching of absolute routes with query parameters
+    // Root needs a path for query params to be inherited
     const tree = createRouteTree("app", "/app?globalParam", [
       {
         name: "section",
@@ -884,7 +868,7 @@ describe("additional edge cases for mutation coverage", () => {
       },
     ]);
 
-    // Root has parser (path + globalParam), section has absolute child (modal)
+    // Root has query param, section has absolute child (modal)
     const result = matchPath(tree, "/modal?globalParam=1");
 
     expect(result?.name).toBe("app.section.modal");
@@ -1351,7 +1335,7 @@ describe("build.ts mutation coverage", () => {
 
   describe("tryStaticPathFast function (lines 94-101)", () => {
     it("should handle route name without dot (line 101)", () => {
-      // Route name without "." - uses childrenByName.get()
+      // Route name without "." - uses children.get()
       const tree = createRouteTree("", "", [{ name: "about", path: "/about" }]);
 
       const path = buildPath(tree, "about");
@@ -1511,7 +1495,7 @@ describe("build.ts mutation coverage", () => {
     });
 
     it("should pass urlParamsEncoding to buildOptions when defined (line 289-291)", () => {
-      // Tests that urlParamsEncoding is passed to parser.build
+      // Tests that urlParamsEncoding is passed to inject()
       const tree = createRouteTree("", "", [
         { name: "route", path: "/route/:value" },
       ]);

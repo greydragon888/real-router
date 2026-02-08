@@ -26,11 +26,11 @@ describe("core/options", () => {
 
   describe("getOptions", () => {
     it("should return updated value after setOption", () => {
-      router.setOption("caseSensitive", true);
+      router.setOption("trailingSlash", "always");
 
       router.start();
 
-      expect(router.getOptions().caseSensitive).toBe(true);
+      expect(router.getOptions().trailingSlash).toBe("always");
     });
 
     // 🔴 CRITICAL: Performance - same frozen object every call
@@ -49,10 +49,6 @@ describe("core/options", () => {
       const opts = router.getOptions();
 
       // Mutations should throw in strict mode (Vitest runs in strict mode)
-      expect(() => {
-        opts.caseSensitive = !opts.caseSensitive;
-      }).toThrowError(TypeError);
-
       expect(() => {
         opts.allowNotFound = !opts.allowNotFound;
       }).toThrowError(TypeError);
@@ -98,7 +94,6 @@ describe("core/options", () => {
       // Check all required fields exist
       expect(opts).toHaveProperty("trailingSlash");
       expect(opts).toHaveProperty("queryParamsMode");
-      expect(opts).toHaveProperty("caseSensitive");
       expect(opts).toHaveProperty("urlParamsEncoding");
       expect(opts).toHaveProperty("allowNotFound");
       expect(opts).toHaveProperty("rewritePathOnMatch");
@@ -106,7 +101,6 @@ describe("core/options", () => {
       // Check default values
       expect(opts.trailingSlash).toBe("preserve");
       expect(opts.queryParamsMode).toBe("loose");
-      expect(opts.caseSensitive).toBe(false);
       expect(opts.urlParamsEncoding).toBe("default");
       expect(opts.allowNotFound).toBe(true);
       expect(opts.rewritePathOnMatch).toBe(true);
@@ -117,7 +111,7 @@ describe("core/options", () => {
       const opts = router.getOptions();
 
       expect(opts).toBeDefined();
-      expect(opts.caseSensitive).toBe(false);
+      expect(opts.trailingSlash).toBe("preserve");
     });
 
     // 🟡 IMPORTANT: Works after start()
@@ -127,13 +121,12 @@ describe("core/options", () => {
       const opts = router.getOptions();
 
       expect(opts).toBeDefined();
-      expect(opts.caseSensitive).toBe(false);
+      expect(opts.trailingSlash).toBe("preserve");
     });
 
     // 🟡 IMPORTANT: Reflects custom options from constructor
     it("should return custom options provided during router creation", () => {
       const customRouter = createTestRouter({
-        caseSensitive: true,
         trailingSlash: "always",
         allowNotFound: false,
         defaultRoute: "dashboard",
@@ -142,7 +135,6 @@ describe("core/options", () => {
 
       const opts = customRouter.getOptions();
 
-      expect(opts.caseSensitive).toBe(true);
       expect(opts.trailingSlash).toBe("always");
       expect(opts.allowNotFound).toBe(false);
       expect(opts.defaultRoute).toBe("dashboard");
@@ -188,14 +180,12 @@ describe("core/options", () => {
 
     // 🟢 DESIRABLE: Integration with setOption
     it("should reflect all changes made through setOption", () => {
-      router.setOption("caseSensitive", true);
       router.setOption("trailingSlash", "never");
       router.setOption("allowNotFound", false);
       router.setOption("defaultRoute", "dashboard");
 
       const opts = router.getOptions();
 
-      expect(opts.caseSensitive).toBe(true);
       expect(opts.trailingSlash).toBe("never");
       expect(opts.allowNotFound).toBe(false);
       expect(opts.defaultRoute).toBe("dashboard");
@@ -203,14 +193,12 @@ describe("core/options", () => {
 
     // 🟢 DESIRABLE: Shallow copy is sufficient
     it("should handle all option types correctly (primitives)", () => {
-      router.setOption("caseSensitive", true); // boolean
       router.setOption("trailingSlash", "always"); // string
       router.setOption("defaultRoute", "home"); // string | undefined
       router.setOption("defaultParams", { id: "123" }); // object
 
       const opts = router.getOptions();
 
-      expectTypeOf(opts.caseSensitive).toBeBoolean();
       expectTypeOf(opts.trailingSlash).toBeString();
 
       expect(opts.defaultRoute).toBe("home");
@@ -240,7 +228,7 @@ describe("core/options", () => {
       it("should throw error when setting option after start()", () => {
         router.start();
 
-        expect(() => router.setOption("caseSensitive", true)).toThrowError(
+        expect(() => router.setOption("trailingSlash", "always")).toThrowError(
           "Options cannot be changed after router.start()",
         );
       });
@@ -259,7 +247,6 @@ describe("core/options", () => {
         router.start();
 
         // These options should throw after start()
-        expect(() => router.setOption("caseSensitive", false)).toThrowError();
         expect(() => router.setOption("trailingSlash", "never")).toThrowError();
         expect(() => router.setOption("allowNotFound", false)).toThrowError();
         expect(() =>
@@ -288,15 +275,6 @@ describe("core/options", () => {
 
     // 🔴 CRITICAL: Type validation
     describe("type validation", () => {
-      it("should throw TypeError for wrong primitive type - boolean", () => {
-        expect(() =>
-          router.setOption("caseSensitive", "true" as any),
-        ).toThrowError(TypeError);
-        expect(() =>
-          router.setOption("caseSensitive", "true" as any),
-        ).toThrowError("expected boolean, got string");
-      });
-
       it("should throw TypeError for wrong primitive type - string", () => {
         expect(() =>
           router.setOption("trailingSlash", true as any),
@@ -308,17 +286,11 @@ describe("core/options", () => {
 
       it("should throw TypeError for undefined value", () => {
         expect(() =>
-          router.setOption("caseSensitive", undefined as any),
-        ).toThrowError(TypeError);
-        expect(() =>
           router.setOption("trailingSlash", undefined as any),
         ).toThrowError(TypeError);
       });
 
       it("should throw TypeError for null value", () => {
-        expect(() =>
-          router.setOption("caseSensitive", null as any),
-        ).toThrowError(TypeError);
         expect(() =>
           router.setOption("defaultRoute", null as any),
         ).toThrowError(TypeError);
@@ -657,7 +629,7 @@ describe("core/options", () => {
       });
 
       it("should throw TypeError for object with toString as optionName", () => {
-        const fakeKey = { toString: () => "caseSensitive" };
+        const fakeKey = { toString: () => "allowNotFound" };
 
         expect(() =>
           // @ts-expect-error: testing invalid input
@@ -672,11 +644,11 @@ describe("core/options", () => {
       it("should throw TypeError for Symbol as optionName", () => {
         expect(() =>
           // @ts-expect-error: testing invalid input
-          router.setOption(Symbol("caseSensitive"), true),
+          router.setOption(Symbol("allowNotFound"), true),
         ).toThrowError(TypeError);
         expect(() =>
           // @ts-expect-error: testing invalid input
-          router.setOption(Symbol("caseSensitive"), true),
+          router.setOption(Symbol("allowNotFound"), true),
         ).toThrowError("option name must be a string, got symbol");
       });
 
@@ -706,33 +678,27 @@ describe("core/options", () => {
     // 🟡 IMPORTANT: Fluent interface
     describe("fluent interface", () => {
       it("should return router instance for chaining", () => {
-        const result = router.setOption("caseSensitive", true);
+        const result = router.setOption("trailingSlash", "always");
 
         expect(result).toBe(router);
       });
 
       it("should support method chaining", () => {
         const result = router
-          .setOption("caseSensitive", true)
           .setOption("trailingSlash", "never")
           .setOption("allowNotFound", false)
           .setOption("defaultRoute", "home");
 
         expect(result).toBe(router);
-        expect(router.getOptions().caseSensitive).toBe(true);
         expect(router.getOptions().trailingSlash).toBe("never");
         expect(router.getOptions().allowNotFound).toBe(false);
         expect(router.getOptions().defaultRoute).toBe("home");
       });
 
       it("should allow chaining with start()", () => {
-        router
-          .setOption("caseSensitive", true)
-          .setOption("trailingSlash", "always")
-          .start();
+        router.setOption("trailingSlash", "always").start();
 
         expect(router.isActive()).toBe(true);
-        expect(router.getOptions().caseSensitive).toBe(true);
         expect(router.getOptions().trailingSlash).toBe("always");
       });
     });
@@ -740,25 +706,24 @@ describe("core/options", () => {
     // 🟢 DESIRABLE: Idempotence
     describe("idempotence", () => {
       it("should allow setting same value multiple times", () => {
-        router.setOption("caseSensitive", true);
-        router.setOption("caseSensitive", true);
-        router.setOption("caseSensitive", true);
+        router.setOption("trailingSlash", "always");
+        router.setOption("trailingSlash", "always");
 
-        expect(router.getOptions().caseSensitive).toBe(true);
+        expect(router.getOptions().trailingSlash).toBe("always");
       });
 
       it("should allow toggling values", () => {
-        router.setOption("caseSensitive", true);
+        router.setOption("trailingSlash", "always");
 
-        expect(router.getOptions().caseSensitive).toBe(true);
+        expect(router.getOptions().trailingSlash).toBe("always");
 
-        router.setOption("caseSensitive", false);
+        router.setOption("trailingSlash", "never");
 
-        expect(router.getOptions().caseSensitive).toBe(false);
+        expect(router.getOptions().trailingSlash).toBe("never");
 
-        router.setOption("caseSensitive", true);
+        router.setOption("trailingSlash", "always");
 
-        expect(router.getOptions().caseSensitive).toBe(true);
+        expect(router.getOptions().trailingSlash).toBe("always");
       });
     });
 
@@ -799,22 +764,10 @@ describe("core/options", () => {
         ).toThrowError("expected string, got object");
       });
 
-      // Edge Case #8: Truthy/falsy values should be rejected for boolean options
-      it("should reject number 1 for boolean option", () => {
-        expect(() => router.setOption("caseSensitive", 1 as any)).toThrowError(
+      // Edge Case #8: Truthy/falsy values should be rejected for string options
+      it("should reject number for string option", () => {
+        expect(() => router.setOption("trailingSlash", 1 as any)).toThrowError(
           TypeError,
-        );
-        expect(() => router.setOption("caseSensitive", 1 as any)).toThrowError(
-          "expected boolean, got number",
-        );
-      });
-
-      it("should reject number 0 for boolean option", () => {
-        expect(() => router.setOption("caseSensitive", 0 as any)).toThrowError(
-          TypeError,
-        );
-        expect(() => router.setOption("caseSensitive", 0 as any)).toThrowError(
-          "expected boolean, got number",
         );
       });
 
@@ -879,29 +832,6 @@ describe("core/options", () => {
 
     // 🟡 IMPORTANT: Integration - effect on matchPath
     describe("integration with matchPath", () => {
-      it("should apply caseSensitive option to matchPath", () => {
-        router.setOption("caseSensitive", true);
-        router.start();
-
-        // Route is defined as 'users.view' with path '/users/view/:id'
-        const matchLower = router.matchPath("/users/view/123");
-        const matchUpper = router.matchPath("/Users/View/123");
-
-        expect(matchLower).toBeDefined();
-        expect(matchUpper).toBeUndefined(); // case doesn't match
-      });
-
-      it("should ignore case when caseSensitive is false", () => {
-        router.setOption("caseSensitive", false);
-        router.start();
-
-        const matchLower = router.matchPath("/users/view/123");
-        const matchUpper = router.matchPath("/Users/View/123");
-
-        expect(matchLower).toBeDefined();
-        expect(matchUpper).toBeDefined(); // case is ignored
-      });
-
       it("should apply trailingSlash option to matchPath", () => {
         router.setOption("trailingSlash", "strict");
         router.start();
@@ -927,24 +857,7 @@ describe("core/options", () => {
       ).toThrowError('Unknown option: "unknownOption"');
     });
 
-    it("should skip undefined values during initialization (line 79)", () => {
-      // Should not throw when option value is undefined
-      expect(() =>
-        createRouter([], {
-          defaultRoute: "home",
-          caseSensitive: undefined,
-        } as any),
-      ).not.toThrowError();
-
-      const testRouter = createRouter([], {
-        defaultRoute: "home",
-        caseSensitive: undefined,
-      } as any);
-
-      // caseSensitive should not be set (undefined skip)
-      // The option may remain undefined or keep default
-      expect(testRouter.getOptions().defaultRoute).toBe("home");
-    });
+    // Test removed: caseSensitive option no longer exists (router is always case-sensitive)
 
     it("should throw TypeError for array as options in createRouter (line 194)", () => {
       expect(() => createRouter([], [] as any)).toThrowError(TypeError);
@@ -955,7 +868,7 @@ describe("core/options", () => {
 
     it("should throw TypeError for class instance as options in createRouter (line 194)", () => {
       class CustomOptions {
-        caseSensitive = true;
+        allowNotFound = true;
       }
 
       expect(() => createRouter([], new CustomOptions() as any)).toThrowError(
@@ -965,14 +878,24 @@ describe("core/options", () => {
         "Invalid options: expected plain object, got CustomOptions",
       );
     });
+
+    it("should skip validation for undefined option values (line 229)", () => {
+      // When an option has undefined value, validation is skipped (no error thrown)
+      // The undefined value is still assigned via spread, overriding the default
+      // This allows conditional configuration like: { trailingSlash: condition ? "always" : undefined }
+      expect(() =>
+        createRouter(
+          [{ name: "test", path: "/test" }],
+          // @ts-expect-error: testing undefined value for conditional config
+          { trailingSlash: undefined, allowNotFound: true },
+        ),
+      ).not.toThrowError();
+    });
   });
 
   describe("getOption", () => {
     it("should return a single option value", () => {
       // Values should match getOptions()
-      expect(router.getOption("caseSensitive")).toBe(
-        router.getOptions().caseSensitive,
-      );
       expect(router.getOption("trailingSlash")).toBe(
         router.getOptions().trailingSlash,
       );
@@ -982,9 +905,9 @@ describe("core/options", () => {
     });
 
     it("should return updated value after setOption", () => {
-      router.setOption("caseSensitive", true);
+      router.setOption("trailingSlash", "always");
 
-      expect(router.getOption("caseSensitive")).toBe(true);
+      expect(router.getOption("trailingSlash")).toBe("always");
     });
 
     it("should throw TypeError for non-string option name", () => {
@@ -1008,10 +931,8 @@ describe("core/options", () => {
 
     // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf for compile-time assertions
     it("should be type-safe", () => {
-      const caseSensitive = router.getOption("caseSensitive");
       const trailingSlash = router.getOption("trailingSlash");
 
-      expectTypeOf(caseSensitive).toEqualTypeOf<boolean>();
       expectTypeOf(trailingSlash).toEqualTypeOf<
         "strict" | "never" | "always" | "preserve"
       >();

@@ -223,12 +223,12 @@ function checkTreeNameDuplicate(
   fullName: string,
   methodName: string,
 ): void {
-  // Use childrenByName Map for O(1) lookup
+  // Use children Map for O(1) lookup
   const segments = fullName.split(".");
   let current: RouteTree | undefined = rootNode;
 
   for (const segment of segments) {
-    current = current.childrenByName.get(segment);
+    current = current.children.get(segment);
 
     if (!current) {
       return; // Route doesn't exist
@@ -273,14 +273,14 @@ function checkTreePathDuplicate(
   parentName: string,
   routePath: string,
 ): void {
-  // Find parent node using childrenByName
+  // Find parent node using children Map
   let parentNode: RouteTree | undefined = rootNode;
 
   if (parentName !== "") {
     const segments = parentName.split(".");
 
     for (const segment of segments) {
-      parentNode = parentNode.childrenByName.get(segment);
+      parentNode = parentNode.children.get(segment);
 
       if (!parentNode) {
         return; // Parent doesn't exist, so no duplicate
@@ -288,7 +288,7 @@ function checkTreePathDuplicate(
     }
   }
 
-  for (const child of parentNode.children) {
+  for (const child of parentNode.children.values()) {
     if (child.path === routePath) {
       throw new Error(`Path "${routePath}" is already defined`);
     }
@@ -331,7 +331,7 @@ function checkParentExists(
     let current: RouteTree | undefined = rootNode;
 
     for (const segment of segments) {
-      current = current.childrenByName.get(segment);
+      current = current.children.get(segment);
 
       if (!current) {
         throw new Error(

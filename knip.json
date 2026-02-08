@@ -14,6 +14,10 @@
       "project": ["*.{ts,mts,js,mjs}"],
       "ignoreDependencies": ["terser", "fast-check"]
     },
+    "packages/router-benchmarks": {
+      "entry": ["src/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {

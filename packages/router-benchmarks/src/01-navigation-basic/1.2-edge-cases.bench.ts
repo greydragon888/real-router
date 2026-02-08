@@ -238,20 +238,18 @@ if (!IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 1.2.14 Navigation with case-insensitive route names
-// Note: router5 caseSensitive only affects paths, not route names
-// In router5, navigate("about") won't find route named "About"
+// 1.2.14 Navigation with standard route names
 if (!IS_ROUTER5) {
   const routes: Route[] = [
     { name: "home", path: "/" },
     { name: "about", path: "/about" },
   ];
-  const router = createRouter(routes, { caseSensitive: false });
+  const router = createRouter(routes);
   let index = 0;
 
   router.start("/");
 
-  bench("1.2.14 Navigation with caseSensitive = false", () => {
+  bench("1.2.14 Navigation with standard routes", () => {
     router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }

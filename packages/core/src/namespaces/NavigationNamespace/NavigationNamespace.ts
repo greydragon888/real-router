@@ -50,8 +50,36 @@ export class NavigationNamespace {
   #cancelCurrentTransition: CancelFn | null = null;
 
   // Dependencies injected via setDependencies (replaces full router reference)
-  #deps: NavigationDependencies | undefined;
-  #transitionDeps: TransitionDependencies | undefined;
+  #depsStore: NavigationDependencies | undefined;
+  #transitionDepsStore: TransitionDependencies | undefined;
+
+  /**
+   * Gets dependencies or throws if not initialized.
+   */
+  get #deps(): NavigationDependencies {
+    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    if (!this.#depsStore) {
+      throw new Error(
+        "[real-router] NavigationNamespace: dependencies not initialized",
+      );
+    }
+
+    return this.#depsStore;
+  }
+
+  /**
+   * Gets transition dependencies or throws if not initialized.
+   */
+  get #transitionDeps(): TransitionDependencies {
+    /* v8 ignore next 3 -- @preserve: transitionDeps always set by Router.ts */
+    if (!this.#transitionDepsStore) {
+      throw new Error(
+        "[real-router] NavigationNamespace: transition dependencies not initialized",
+      );
+    }
+
+    return this.#transitionDepsStore;
+  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -116,7 +144,7 @@ export class NavigationNamespace {
    * Must be called before using navigation methods.
    */
   setDependencies(deps: NavigationDependencies): void {
-    this.#deps = deps;
+    this.#depsStore = deps;
   }
 
   /**
@@ -124,7 +152,7 @@ export class NavigationNamespace {
    * Must be called before using navigation methods.
    */
   setTransitionDependencies(deps: TransitionDependencies): void {
-    this.#transitionDeps = deps;
+    this.#transitionDepsStore = deps;
   }
 
   // =========================================================================
@@ -161,10 +189,8 @@ export class NavigationNamespace {
     callback: DoneFn,
     emitSuccess: boolean,
   ): CancelFn {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const deps = this.#deps!;
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const transitionDeps = this.#transitionDeps!;
+    const deps = this.#deps;
+    const transitionDeps = this.#transitionDeps;
 
     // Warn about concurrent navigation (potential SSR race condition)
     if (this.#navigating) {
@@ -269,8 +295,7 @@ export class NavigationNamespace {
     opts: NavigationOptions,
     callback: DoneFn,
   ): CancelFn {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const deps = this.#deps!;
+    const deps = this.#deps;
 
     // Quick check of the state of the router
     if (!this.isRouterStarted()) {
@@ -352,8 +377,7 @@ export class NavigationNamespace {
    * Arguments should be pre-parsed and validated by facade.
    */
   navigateToDefault(opts: NavigationOptions, callback: DoneFn): CancelFn {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- always set by Router
-    const deps = this.#deps!;
+    const deps = this.#deps;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {

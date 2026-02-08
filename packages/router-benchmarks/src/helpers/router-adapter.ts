@@ -19,10 +19,17 @@ const routerModule = (() => {
       return require("router6");
     }
     default: {
-      // IMPORTANT: Explicitly load from dist to avoid tsx transpiling TypeScript source.
-      // tsx resolves workspace packages to src/*.ts, causing unfair benchmark comparison
-      // with external packages that load from compiled dist/*.js.
-      return require("@real-router/core/dist/cjs/index.js");
+      // IMPORTANT: Load compiled dist, not TypeScript source.
+      // tsx resolves workspace packages to src/*.ts, causing unfair benchmark comparison.
+      // Use absolute path to bypass Node 24 strict exports enforcement.
+      const path = require("node:path");
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- dynamic require returns `any`
+      const distPath: string = path.resolve(
+        __dirname,
+        "../../node_modules/@real-router/core/dist/cjs/index.js",
+      );
+
+      return require(distPath);
     }
   }
 })();

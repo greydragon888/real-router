@@ -19,18 +19,20 @@ export { createRouteTree } from "./builder/createRouteTree";
 // Operations
 // =============================================================================
 
-export { matchSegments } from "./operations/match";
-
 export { buildPath } from "./operations/build";
 
-export { getSegmentsByName, hasSegmentsByName } from "./operations/query";
-
-export { getMetaFromSegments } from "./operations/meta";
+export { getSegmentsByName } from "./operations/query";
 
 export {
   routeTreeToDefinitions,
   nodeToDefinition,
 } from "./operations/routeTreeToDefinitions";
+
+// =============================================================================
+// Services
+// =============================================================================
+
+export { MatcherService } from "./services/MatcherService";
 
 // =============================================================================
 // Validation

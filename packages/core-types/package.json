@@ -37,7 +37,7 @@
   "scripts": {
     "build": "tsup",
     "type-check": "tsc --noEmit",
-    "lint": "eslint --cache --ext .ts src/ --fix"
+    "lint": "eslint --cache --ext .ts src/ --fix --max-warnings 0"
   },
   "sideEffects": false
 }

@@ -1,5 +1,5 @@
 /**
- * Tests for route sorting.
+ * Tests for route matching priority (handled by rou3 radix tree).
  */
 
 import { describe, it, expect } from "vitest";
@@ -7,8 +7,8 @@ import { describe, it, expect } from "vitest";
 import { matchPath } from "./helpers";
 import { createRouteTree } from "../../../src/builder/createRouteTree";
 
-describe("New API - sorting", () => {
-  it("should sort routes by specificity", () => {
+describe("Matching priority (rou3)", () => {
+  it("should match static routes before dynamic", () => {
     const tree = createRouteTree("", "", [
       { name: "param", path: "/:id" },
       { name: "specific", path: "/specific" },
@@ -20,7 +20,7 @@ describe("New API - sorting", () => {
     expect(result?.name).toBe("specific");
   });
 
-  it("should sort splat routes last", () => {
+  it("should match static routes before splat", () => {
     const tree = createRouteTree("", "", [
       { name: "catch", path: "/*path" },
       { name: "specific", path: "/specific" },
@@ -34,7 +34,7 @@ describe("New API - sorting", () => {
     expect(matchPath(tree, "/anything/here")?.name).toBe("catch");
   });
 
-  it("should sort by segment count", () => {
+  it("should match by segment count", () => {
     const tree = createRouteTree("", "", [
       { name: "one", path: "/a" },
       { name: "two", path: "/a/b" },
@@ -46,7 +46,7 @@ describe("New API - sorting", () => {
     expect(matchPath(tree, "/a")?.name).toBe("one");
   });
 
-  it("should sort by URL params count", () => {
+  it("should match static segments before dynamic", () => {
     const tree = createRouteTree("", "", [
       { name: "twoParams", path: "/:a/:b" },
       { name: "oneParam", path: "/fixed/:a" },
@@ -57,38 +57,23 @@ describe("New API - sorting", () => {
     expect(matchPath(tree, "/fixed/123")?.name).toBe("oneParam");
   });
 
-  it("should sort by last segment length", () => {
+  it("should match exact paths", () => {
     const tree = createRouteTree("", "", [
       { name: "short", path: "/a" },
       { name: "long", path: "/abcdef" },
     ]);
 
-    // Both have same segment count, but 'long' has longer last segment
-    // This should work because sorting puts longer segments first
     expect(matchPath(tree, "/a")?.name).toBe("short");
     expect(matchPath(tree, "/abcdef")?.name).toBe("long");
   });
 
-  it("should preserve definition order for equal priority", () => {
-    const tree = createRouteTree("", "", [
-      { name: "first", path: "/path-a" },
-      { name: "second", path: "/path-b" },
-      { name: "third", path: "/path-c" },
-    ]);
-
-    // All have equal priority, order preserved
-    expect(tree.children[0].name).toBe("first");
-    expect(tree.children[1].name).toBe("second");
-    expect(tree.children[2].name).toBe("third");
-  });
-
-  it("should handle comparing two splat routes", () => {
+  it("should handle multiple splat routes", () => {
     const tree = createRouteTree("", "", [
       { name: "first", path: "/api/*rest" },
       { name: "second", path: "/static/*files" },
     ]);
 
-    // Both are splat routes - should sort by definition order
+    // Both are splat routes - each matches its prefix
     expect(matchPath(tree, "/api/v1/users")?.name).toBe("first");
     expect(matchPath(tree, "/static/images/logo.png")?.name).toBe("second");
   });

@@ -1,4 +1,4 @@
-import { createRouteTree, matchSegments } from "route-tree";
+import { createRouteTree, MatcherService } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
@@ -596,7 +596,10 @@ describe("core/stateBuilder", () => {
         },
       ]);
 
-      const result = matchSegments(tree, "/users/123");
+      const matcher = new MatcherService();
+
+      matcher.registerTree(tree);
+      const result = matcher.match("/users/123");
 
       expect(result).not.toBeNull();
       expect(buildNameFromSegments(result!.segments)).toBe("users.profile");
@@ -609,28 +612,23 @@ describe("core/stateBuilder", () => {
     it("skips segments with empty names", () => {
       const tree = createRouteTree("", "", [{ name: "home", path: "/home" }]);
 
-      const result = matchSegments(tree, "/home");
+      const matcher = new MatcherService();
+
+      matcher.registerTree(tree);
+      const result = matcher.match("/home");
 
       expect(result).not.toBeNull();
       expect(buildNameFromSegments(result!.segments)).toBe("home");
     });
 
-    it("skips segments with undefined name (line 43 falsy branch)", () => {
-      // Directly test with segments that have undefined/empty names
-      const segments = [
-        { name: undefined },
-        { name: "users" },
-        { name: "" },
-        { name: "profile" },
-        { name: undefined },
-      ];
+    it("returns fullName from last segment", () => {
+      const segments = [{ fullName: "users" }, { fullName: "users.profile" }];
 
-      // Should skip undefined and empty names, only building from "users" and "profile"
       expect(buildNameFromSegments(segments as any)).toBe("users.profile");
     });
 
-    it("handles all segments with falsy names", () => {
-      const segments = [{ name: undefined }, { name: "" }, { name: null }];
+    it("returns empty string when last segment has no fullName", () => {
+      const segments = [{ fullName: undefined }];
 
       expect(buildNameFromSegments(segments as any)).toBe("");
     });
@@ -646,7 +644,10 @@ describe("core/stateBuilder", () => {
         },
       ]);
 
-      const result = matchSegments(tree, "/users/123");
+      const matcher = new MatcherService();
+
+      matcher.registerTree(tree);
+      const result = matcher.match("/users/123");
 
       expect(result).not.toBeNull();
 
@@ -665,7 +666,10 @@ describe("core/stateBuilder", () => {
     it("uses explicit name when provided", () => {
       const tree = createRouteTree("", "", [{ name: "route", path: "/route" }]);
 
-      const result = matchSegments(tree, "/route");
+      const matcher = new MatcherService();
+
+      matcher.registerTree(tree);
+      const result = matcher.match("/route");
 
       expect(result).not.toBeNull();
 
@@ -679,7 +683,10 @@ describe("core/stateBuilder", () => {
         { name: "search", path: "/search?q&page" },
       ]);
 
-      const result = matchSegments(tree, "/search?q=test&page=1");
+      const matcher = new MatcherService();
+
+      matcher.registerTree(tree);
+      const result = matcher.match("/search?q=test&page=1");
 
       expect(result).not.toBeNull();
 

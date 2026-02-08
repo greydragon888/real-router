@@ -14,8 +14,7 @@
       },
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
-    },
-    "./dist/*": "./dist/*"
+    }
   },
   "files": [
     "dist"

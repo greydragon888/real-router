@@ -29,8 +29,10 @@ export function nodeToDefinition(node: RouteTree): RouteDefinition {
     path,
   };
 
-  if (node.children.length > 0) {
-    def.children = node.children.map((child) => nodeToDefinition(child));
+  if (node.children.size > 0) {
+    def.children = [...node.children.values()].map((child) =>
+      nodeToDefinition(child),
+    );
   }
 
   return def;
@@ -62,5 +64,5 @@ export function nodeToDefinition(node: RouteTree): RouteDefinition {
  * @returns Array of RouteDefinition objects (top-level routes only)
  */
 export function routeTreeToDefinitions(tree: RouteTree): RouteDefinition[] {
-  return tree.children.map((child) => nodeToDefinition(child));
+  return [...tree.children.values()].map((child) => nodeToDefinition(child));
 }

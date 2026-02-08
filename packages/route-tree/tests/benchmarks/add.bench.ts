@@ -25,6 +25,49 @@ interface BenchState {
   get: (name: string) => unknown;
 }
 
+// =============================================================================
+// JIT Warmup: Pre-warm builder code paths to stabilize RME
+// Without this, build benchmarks show unstable RME (~0.5%)
+// due to V8 JIT not optimizing freeze, Map/Set construction, dot-notation parsing
+// =============================================================================
+{
+  const warmupWide = generateWideTree(50);
+  const warmupDeep = generateDeepTree(5);
+
+  for (let i = 0; i < 100; i++) {
+    // Warmup: single route add + build
+    createRouteTreeBuilder("", "")
+      .add({ name: "users", path: "/users" })
+      .build();
+
+    // Warmup: batch addMany + build
+    createRouteTreeBuilder("", "").addMany(warmupWide).build();
+
+    // Warmup: nested routes
+    createRouteTreeBuilder("", "").addMany(warmupDeep).build();
+
+    // Warmup: build options (skipFreeze)
+    createRouteTreeBuilder("", "")
+      .addMany(warmupWide)
+      .build({ skipFreeze: true });
+
+    // Warmup: dot-notation parsing
+    createRouteTreeBuilder("", "")
+      .add({ name: "users", path: "/users" })
+      .add({ name: "users.profile", path: "/profile" })
+      .build();
+
+    // Warmup: incremental add
+    const builder = createRouteTreeBuilder("", "");
+
+    for (const route of warmupWide) {
+      builder.add(route);
+    }
+
+    builder.build();
+  }
+}
+
 // 3.1 Single route addition - barplot for validation comparison
 barplot(() => {
   summary(() => {
@@ -83,9 +126,7 @@ barplot(() => {
 
     bench("build: 50 routes skipSort", function* () {
       yield () => {
-        createRouteTreeBuilder("", "")
-          .addMany(routes)
-          .build({ skipSort: true });
+        createRouteTreeBuilder("", "").addMany(routes).build({});
       };
     }).gc("inner");
 
@@ -101,7 +142,7 @@ barplot(() => {
       yield () => {
         createRouteTreeBuilder("", "")
           .addMany(routes)
-          .build({ skipSort: true, skipFreeze: true });
+          .build({ skipFreeze: true });
       };
     }).gc("inner");
   });

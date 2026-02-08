@@ -1,7 +1,2 @@
 packages:
   - 'packages/*'
-  - 'tools/*'
-
-minimumReleaseAgeExclude:
-  - router6
-  - router6-types

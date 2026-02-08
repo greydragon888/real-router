@@ -5,6 +5,9 @@
  * - SPA Application (~100 routes)
  * - Enterprise Application (200+ routes)
  *
+ * IMPORTANT: match() is a non-mutating operation.
+ * MatcherService must be created OUTSIDE bench blocks.
+ *
  * Note: .gc("inner") is used for tests with heavy allocations to stabilize results
  */
 
@@ -17,7 +20,46 @@ import {
 } from "./helpers/generators";
 import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
 import { buildPath } from "../../src/operations/build";
-import { matchSegments } from "../../src/operations/match";
+import { MatcherService } from "../../src/services/MatcherService";
+
+/** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
+function createMatcher(tree: any): MatcherService {
+  const matcher = new MatcherService();
+
+  matcher.registerTree(tree);
+
+  return matcher;
+}
+
+// =============================================================================
+// JIT Warmup: Pre-warm tree construction and match code paths
+// Without this, init/build benchmarks show unstable RME (0.5-0.7%)
+// due to V8 JIT not optimizing Object.freeze, Map/Set, meta iteration
+// =============================================================================
+{
+  const warmupRoutes = generateSpaRoutes();
+
+  for (let i = 0; i < 100; i++) {
+    // Warmup: createRouteTree (freeze, paramMeta, staticPath)
+    const tree = createRouteTree("", "", warmupRoutes);
+
+    // Warmup: createRouteTreeBuilder + add + build
+    createRouteTreeBuilder("", "")
+      .addMany(warmupRoutes)
+      .add({ name: "dynamic", path: "/dynamic/:id" })
+      .build();
+
+    // Warmup: buildPath code paths
+    buildPath(tree, "users");
+    buildPath(tree, "users.view.details", { id: "123" });
+
+    // Warmup: match code paths
+    const matcher = createMatcher(tree);
+
+    matcher.match("/");
+    matcher.match("/users/123/details");
+  }
+}
 
 // ============================================================================
 // SPA Application (~100 routes)
@@ -41,17 +83,18 @@ boxplot(() => {
   summary(() => {
     const spaRoutes = generateSpaRoutes();
     const spaTree = createRouteTree("", "", spaRoutes);
+    const spaMatcher = createMatcher(spaTree);
 
     bench("SPA: matchSegments home (/)", () => {
-      matchSegments(spaTree, "/");
+      spaMatcher.match("/");
     });
 
     bench("SPA: matchSegments deep (/users/123/details)", () => {
-      matchSegments(spaTree, "/users/123/details");
+      spaMatcher.match("/users/123/details");
     });
 
     bench("SPA: matchSegments last resource (/help/456/history)", () => {
-      matchSegments(spaTree, "/help/456/history");
+      spaMatcher.match("/help/456/history");
     });
   });
 });
@@ -108,16 +151,16 @@ boxplot(() => {
   summary(() => {
     const enterpriseRoutes = generateEnterpriseRoutes();
     const enterpriseTree = createRouteTree("", "", enterpriseRoutes);
+    const enterpriseMatcher = createMatcher(enterpriseTree);
 
     bench("Enterprise: matchSegments home", () => {
-      matchSegments(enterpriseTree, "/");
+      enterpriseMatcher.match("/");
     });
 
     bench(
       "Enterprise: matchSegments deep admin (/admin/users/management/roles/permissions)",
       () => {
-        matchSegments(
-          enterpriseTree,
+        enterpriseMatcher.match(
           "/admin/users/management/roles/permissions?filter=active&sort=name&page=1&limit=10",
         );
       },
@@ -126,12 +169,12 @@ boxplot(() => {
     bench(
       "Enterprise: matchSegments last section (/legal/123/related/links)",
       () => {
-        matchSegments(enterpriseTree, "/legal/123/related/links");
+        enterpriseMatcher.match("/legal/123/related/links");
       },
     );
 
     bench("Enterprise: matchSegments absolute modal", () => {
-      matchSegments(enterpriseTree, "/modal/prompt/confirm");
+      enterpriseMatcher.match("/modal/prompt/confirm");
     });
   });
 });

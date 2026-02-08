@@ -132,7 +132,6 @@ pnpm outdated
 
 For any security-related questions that don't require immediate attention, you can also:
 
-- Open a [GitHub Discussion](https://github.com/greydragon888/real-router/discussions) with the "Security" tag
 - Check our [Security Advisories](https://github.com/greydragon888/real-router/security/advisories)
 
 ## Attribution
@@ -143,5 +142,5 @@ _No reports yet - you could be the first!_
 
 ---
 
-**Last Updated**: January 2026
-**Next Review**: April 2026
+**Last Updated**: February 2026
+**Next Review**: May 2026

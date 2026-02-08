@@ -39,7 +39,6 @@ export function createTestRouterWithADefaultRouter(): Router {
   const router = createRouter(routes, {
     defaultRoute: "test",
     trailingSlash: "never",
-    caseSensitive: false,
     queryParamsMode: "loose",
   });
 

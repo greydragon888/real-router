@@ -2,18 +2,33 @@
  * Test helpers for operations tests.
  */
 
-import { matchSegments } from "../../../src/operations/match";
-import { getMetaFromSegments } from "../../../src/operations/meta";
+import { MatcherService } from "../../../src/services/MatcherService";
 
 import type {
   MatchOptions,
+  MatchResult,
   RouteTree,
   RouteTreeState,
-  RouteTreeStateMeta,
 } from "../../../src/types";
 
 /**
- * Test helper - builds state from matchSegments result.
+ * Wrapper for MatcherService.match() that returns null instead of undefined.
+ * Provides backward compatibility with legacy matchSegments() behavior.
+ */
+export function matchSegments(
+  tree: RouteTree,
+  path: string,
+  options?: MatchOptions,
+): MatchResult | null {
+  const matcher = new MatcherService();
+
+  matcher.registerTree(tree);
+
+  return matcher.match(path, options) ?? null;
+}
+
+/**
+ * Test helper - builds state from MatcherService result.
  * This replicates the deleted matchPath function for test purposes.
  */
 export function matchPath(
@@ -21,42 +36,20 @@ export function matchPath(
   path: string,
   options: MatchOptions = {},
 ): RouteTreeState | null {
-  const result = matchSegments(tree, path, options);
+  const matcher = new MatcherService();
+
+  matcher.registerTree(tree);
+  const result = matcher.match(path, options);
 
   if (!result) {
     return null;
   }
 
-  let name = "";
-
-  for (const segment of result.segments) {
-    if (segment.name) {
-      if (name) {
-        name += ".";
-      }
-
-      name += segment.name;
-    }
-  }
-
-  let cachedMeta: RouteTreeStateMeta | null = null;
+  const name = result.segments.at(-1)?.fullName ?? "";
 
   return {
     name,
     params: result.params,
-    get meta(): RouteTreeStateMeta {
-      cachedMeta ??= getMetaFromSegments(result.segments);
-
-      return cachedMeta;
-    },
+    meta: result.meta,
   };
 }
-
-// Re-export commonly used functions
-
-export {
-  getMetaFromSegments,
-  buildParamTypeMap,
-} from "../../../src/operations/meta";
-
-export { matchSegments } from "../../../src/operations/match";

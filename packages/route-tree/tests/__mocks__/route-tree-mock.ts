@@ -10,32 +10,6 @@
 import type { RouteTree } from "route-tree";
 
 /**
- * Minimal PathParser interface for mocking.
- */
-interface PathParser {
-  readonly path: string;
-  readonly urlParams: string[];
-  readonly queryParams: string[];
-  readonly spatParams: string[];
-  readonly hasUrlParams: boolean;
-  readonly hasSpatParam: boolean;
-  readonly hasMatrixParams: boolean;
-  readonly hasQueryParams: boolean;
-  build: (
-    params?: Record<string, unknown>,
-    options?: Record<string, unknown>,
-  ) => string;
-  test: (
-    path: string,
-    options?: Record<string, unknown>,
-  ) => Record<string, unknown> | null;
-  partialTest: (
-    path: string,
-    options?: Record<string, unknown>,
-  ) => Record<string, unknown> | null;
-}
-
-/**
  * Route definition for building mock trees.
  */
 export interface MockRouteDefinition {
@@ -45,46 +19,22 @@ export interface MockRouteDefinition {
 }
 
 /**
- * Creates a minimal mock parser.
- */
-function createMockParser(
-  path: string,
-  hasUrlParams = false,
-): PathParser | null {
-  if (path === "") {
-    return null;
-  }
-
-  return {
-    path,
-    urlParams: hasUrlParams ? ["id"] : [],
-    queryParams: [],
-    spatParams: [],
-    hasUrlParams,
-    hasSpatParam: false,
-    hasMatrixParams: false,
-    hasQueryParams: false,
-    build: () => path,
-    test: () => null,
-    partialTest: () => null,
-  };
-}
-
-/**
  * Internal mutable node for building before freezing.
  */
 interface MutableRouteTree {
   name: string;
   path: string;
   absolute: boolean;
-  parser: PathParser | null;
-  children: MutableRouteTree[];
+  children: Map<string, MutableRouteTree>;
   parent: MutableRouteTree | null;
   nonAbsoluteChildren: MutableRouteTree[];
-  absoluteDescendants: MutableRouteTree[];
-  childrenByName: Map<string, MutableRouteTree>;
-  parentSegments: MutableRouteTree[];
   fullName: string;
+  paramMeta: {
+    urlParams: string[];
+    queryParams: string[];
+    spatParams: string[];
+  };
+  paramTypeMap: Record<string, "url" | "query">;
 }
 
 /**
@@ -115,19 +65,34 @@ export function createMockRouteTree(
   childDefs: MockRouteDefinition[] = [],
 ): RouteTree {
   const hasUrlParams = path.includes(":");
+  const hasQueryParams = path.includes("?");
+
+  // Build paramMeta and paramTypeMap
+  const paramMeta = {
+    urlParams: hasUrlParams ? ["id"] : [],
+    queryParams: hasQueryParams ? ["q"] : [],
+    spatParams: [],
+  };
+
+  const paramTypeMap: Record<string, "url" | "query"> = {};
+
+  for (const param of paramMeta.urlParams) {
+    paramTypeMap[param] = "url";
+  }
+  for (const param of paramMeta.queryParams) {
+    paramTypeMap[param] = "query";
+  }
 
   const root: MutableRouteTree = {
     name,
     path,
     absolute: path.startsWith("~"),
-    parser: createMockParser(path, hasUrlParams),
-    children: [],
+    children: new Map(),
     parent: null,
     nonAbsoluteChildren: [],
-    absoluteDescendants: [],
-    childrenByName: new Map(),
-    parentSegments: [],
     fullName: name,
+    paramMeta,
+    paramTypeMap,
   };
 
   // Build children recursively
@@ -135,52 +100,56 @@ export function createMockRouteTree(
     parent: MutableRouteTree,
     defs: MockRouteDefinition[],
     parentFullName: string,
-    parentSegments: MutableRouteTree[],
   ): void {
     for (const def of defs) {
       const fullName = parentFullName
         ? `${parentFullName}.${def.name}`
         : def.name;
       const childHasUrlParams = def.path.includes(":");
+      const childHasQueryParams = def.path.includes("?");
       const isAbsolute = def.path.startsWith("~");
+
+      const childParamMeta = {
+        urlParams: childHasUrlParams ? ["id"] : [],
+        queryParams: childHasQueryParams ? ["q"] : [],
+        spatParams: [],
+      };
+
+      const childParamTypeMap: Record<string, "url" | "query"> = {};
+
+      for (const param of childParamMeta.urlParams) {
+        childParamTypeMap[param] = "url";
+      }
+      for (const param of childParamMeta.queryParams) {
+        childParamTypeMap[param] = "query";
+      }
 
       const child: MutableRouteTree = {
         name: def.name,
         path: def.path,
         absolute: isAbsolute,
-        parser: createMockParser(def.path, childHasUrlParams),
-        children: [],
+        children: new Map(),
         parent,
         nonAbsoluteChildren: [],
-        absoluteDescendants: [],
-        childrenByName: new Map(),
-        parentSegments: [...parentSegments],
         fullName,
+        paramMeta: childParamMeta,
+        paramTypeMap: childParamTypeMap,
       };
 
-      parent.children.push(child);
-      parent.childrenByName.set(def.name, child);
+      parent.children.set(def.name, child);
 
-      if (isAbsolute) {
-        // Collect absolute descendants up to root
-        let current: MutableRouteTree | null = parent;
-
-        while (current) {
-          current.absoluteDescendants.push(child);
-          current = current.parent;
-        }
-      } else {
+      if (!isAbsolute) {
         parent.nonAbsoluteChildren.push(child);
       }
 
       // Recursively build nested children
       if (def.children) {
-        buildTree(child, def.children, fullName, [...parentSegments, child]);
+        buildTree(child, def.children, fullName);
       }
     }
   }
 
-  buildTree(root, childDefs, name, name ? [root] : []);
+  buildTree(root, childDefs, name);
 
   return root as unknown as RouteTree;
 }

@@ -1142,18 +1142,6 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should handle route path with matrix parameters", () => {
-      router.addRoute({
-        name: "product",
-        path: "/product/:id;color;size",
-      });
-
-      const state = router.matchPath("/product/123;color=red;size=M");
-
-      expect(state?.name).toBe("product");
-      expect(state?.params.id).toBe("123");
-    });
-
     it("should handle route path with optional query params", () => {
       router.addRoute({
         name: "docs",

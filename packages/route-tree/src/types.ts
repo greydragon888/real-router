@@ -33,9 +33,6 @@ export type {
 // =============================================================================
 
 export type {
-  PathBuildOptions,
-  PathTestOptions,
-  PathParser,
   RouteDefinition,
   RouteTree,
   TreeBuildOptions,
