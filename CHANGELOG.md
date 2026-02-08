@@ -5,6 +5,84 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-08]
+
+### @real-router/core@0.9.0
+
+### Minor Changes
+
+- [#61](https://github.com/greydragon888/real-router/pull/61) [`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate routing engine to rou3 and optimize path building (#40)
+
+  **BREAKING CHANGES:**
+  - Encoding mode `legacy` has been removed. Use `uri` instead (1:1 equivalent).
+  - `children.values()` iteration order now follows definition order instead of routing priority order. This affects `routeTreeToDefinitions()` output order. Matching behavior is unchanged (handled by rou3 radix tree).
+
+  **Performance improvements:**
+  - Migrated to rou3 radix tree for 1000x+ faster route matching
+  - Optimized path building with standalone services (inject, validateConstraints, encodeParam)
+  - Replaced parser metadata access with lightweight paramMeta structure
+  - Removed dead sorting code (~50 lines) — no longer needed with rou3
+
+  **Migration:**
+
+  ```typescript
+  // Before:
+  buildPath(tree, "route", params, { urlParamsEncoding: "legacy" });
+
+  // After:
+  buildPath(tree, "route", params, { urlParamsEncoding: "uri" });
+  ```
+
+### @real-router/types@0.1.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### @real-router/browser-plugin@0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+
+### @real-router/helpers@0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+
+### @real-router/logger-plugin@0.2.12
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+
+### @real-router/persistent-params-plugin@0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+
+### @real-router/react@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+  - @real-router/browser-plugin@0.1.12
+  - @real-router/helpers@0.1.12
+
+### @real-router/rx@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`7361cb0`](https://github.com/greydragon888/real-router/commit/7361cb03b5f00b078eb1e54fa43d29f1ea381998)]:
+  - @real-router/core@0.9.0
+
 ## [2026-02-06]
 
 ### @real-router/core@0.8.0
