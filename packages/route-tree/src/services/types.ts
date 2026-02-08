@@ -9,7 +9,11 @@
  */
 
 import type { RouteTree } from "../builder/types";
-import type { MatchOptions, MatchResult } from "../operations/types";
+import type {
+  MatchOptions,
+  MatchResult,
+  RouteTreeStateMeta,
+} from "../operations/types";
 
 // =============================================================================
 // Route Matcher Service
@@ -47,6 +51,14 @@ export interface IMatcherService {
    * @returns Array of route segments if found, undefined otherwise
    */
   getSegmentsByName: (name: string) => readonly RouteTree[] | undefined;
+
+  /**
+   * Get pre-computed meta by route name.
+   *
+   * @param name - Route name (dot-notation, e.g., "users.profile")
+   * @returns Frozen meta object if found, undefined otherwise
+   */
+  getMetaByName: (name: string) => Readonly<RouteTreeStateMeta> | undefined;
 
   /**
    * Check if a route exists by name.

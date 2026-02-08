@@ -621,22 +621,14 @@ describe("core/stateBuilder", () => {
       expect(buildNameFromSegments(result!.segments)).toBe("home");
     });
 
-    it("skips segments with undefined name (line 43 falsy branch)", () => {
-      // Directly test with segments that have undefined/empty names
-      const segments = [
-        { name: undefined },
-        { name: "users" },
-        { name: "" },
-        { name: "profile" },
-        { name: undefined },
-      ];
+    it("returns fullName from last segment", () => {
+      const segments = [{ fullName: "users" }, { fullName: "users.profile" }];
 
-      // Should skip undefined and empty names, only building from "users" and "profile"
       expect(buildNameFromSegments(segments as any)).toBe("users.profile");
     });
 
-    it("handles all segments with falsy names", () => {
-      const segments = [{ name: undefined }, { name: "" }, { name: null }];
+    it("returns empty string when last segment has no fullName", () => {
+      const segments = [{ fullName: undefined }];
 
       expect(buildNameFromSegments(segments as any)).toBe("");
     });

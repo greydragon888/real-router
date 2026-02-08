@@ -9,7 +9,6 @@ import type {
   MatchResult,
   RouteTree,
   RouteTreeState,
-  RouteTreeStateMeta,
 } from "../../../src/types";
 
 /**
@@ -26,24 +25,6 @@ export function matchSegments(
   matcher.registerTree(tree);
 
   return matcher.match(path, options) ?? null;
-}
-
-/**
- * Builds metadata from route segments.
- * Maps segment names to their parameter type maps.
- */
-function getMetaFromSegments(
-  segments: readonly RouteTree[],
-): RouteTreeStateMeta {
-  const meta: RouteTreeStateMeta = {};
-
-  for (const segment of segments) {
-    if (segment.name) {
-      meta[segment.fullName] = segment.paramTypeMap;
-    }
-  }
-
-  return meta;
 }
 
 /**
@@ -64,27 +45,11 @@ export function matchPath(
     return null;
   }
 
-  let name = "";
-
-  for (const segment of result.segments) {
-    if (segment.name) {
-      if (name) {
-        name += ".";
-      }
-
-      name += segment.name;
-    }
-  }
-
-  let cachedMeta: RouteTreeStateMeta | null = null;
+  const name = result.segments.at(-1)?.fullName ?? "";
 
   return {
     name,
     params: result.params,
-    get meta(): RouteTreeStateMeta {
-      cachedMeta ??= getMetaFromSegments(result.segments);
-
-      return cachedMeta;
-    },
+    meta: result.meta,
   };
 }

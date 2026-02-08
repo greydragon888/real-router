@@ -55,10 +55,13 @@ import type {
 } from "@real-router/types";
 import type {
   BuildOptions,
+  MatchOptions,
   RouteDefinition,
   RouteTree,
   RouteTreeState,
 } from "route-tree";
+
+const EMPTY_OPTIONS = Object.freeze({});
 
 /**
  * Independent namespace for managing routes.
@@ -90,6 +93,7 @@ export class RoutesNamespace<
   #tree: RouteTree;
   #matcherService: MatcherService;
   #buildOptionsCache: BuildOptions | undefined;
+  #matchOptionsCache: MatchOptions | undefined;
 
   // Dependencies injected via setDependencies (for facade method calls)
   #depsStore: RoutesDependencies<Dependencies> | undefined;
@@ -525,7 +529,9 @@ export class RoutesNamespace<
   ): State<P, MP> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
-    const matchOptions = createMatchOptions(opts);
+    const matchOptions =
+      this.#matchOptionsCache ??
+      (this.#matchOptionsCache = createMatchOptions(opts));
     const matchResult = this.#matcherService.match(path, matchOptions);
 
     if (matchResult) {
@@ -542,14 +548,24 @@ export class RoutesNamespace<
         decodedParams as P,
       );
 
-      const builtPath = opts.rewritePathOnMatch
-        ? this.buildPath(routeName, routeParams, opts)
-        : path;
+      let builtPath = path;
+
+      if (opts.rewritePathOnMatch) {
+        const cachedSegments =
+          routeName === name ? matchResult.buildSegments : undefined;
+
+        builtPath = this.buildPath(
+          routeName,
+          routeParams,
+          opts,
+          cachedSegments,
+        );
+      }
 
       // Create state using deps.makeState
       return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
         params: meta as MP,
-        options: {},
+        options: EMPTY_OPTIONS,
         source,
         redirected: false,
       });
@@ -575,7 +591,7 @@ export class RoutesNamespace<
     // Merge source route's defaultParams with provided params
     const paramsWithSource = Object.hasOwn(this.#config.defaultParams, name)
       ? { ...this.#config.defaultParams[name], ...params }
-      : { ...params };
+      : params;
 
     // If forwarded to different route, merge target's defaultParams
     if (
@@ -609,7 +625,13 @@ export class RoutesNamespace<
       return undefined;
     }
 
-    return createRouteState({ segments, params: resolvedParams }, resolvedName);
+    /* v8 ignore next -- @preserve: meta always exists when segments exist */
+    const meta = this.#matcherService.getMetaByName(resolvedName) ?? {};
+
+    return createRouteState(
+      { segments, buildSegments: segments, params: resolvedParams, meta },
+      resolvedName,
+    );
   }
 
   /**
@@ -627,8 +649,10 @@ export class RoutesNamespace<
       return undefined;
     }
 
+    /* v8 ignore next -- @preserve: meta always exists when segments exist */
+    const meta = this.#matcherService.getMetaByName(resolvedName) ?? {};
     const state = createRouteState<P>(
-      { segments, params: resolvedParams },
+      { segments, buildSegments: segments, params: resolvedParams, meta },
       resolvedName,
     );
 
@@ -641,6 +665,7 @@ export class RoutesNamespace<
    */
   initBuildOptionsCache(options: Options): void {
     this.#buildOptionsCache = createBuildOptions(options);
+    this.#matchOptionsCache = createMatchOptions(options);
   }
 
   /**
@@ -649,6 +674,7 @@ export class RoutesNamespace<
    */
   clearBuildOptionsCache(): void {
     this.#buildOptionsCache = undefined;
+    this.#matchOptionsCache = undefined;
   }
 
   // =========================================================================

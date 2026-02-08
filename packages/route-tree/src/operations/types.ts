@@ -112,11 +112,17 @@ export interface RouteParams {
  * This is used by matchSegments() to return detailed matching info.
  */
 export interface MatchResult<P extends RouteParams = RouteParams> {
-  /** Matched route segments from root to matched node */
+  /** Matched route segments (with slashChild) — for createRouteState() */
   readonly segments: readonly RouteTree[];
+
+  /** Matched route segments (without slashChild) — for buildPath() */
+  readonly buildSegments: readonly RouteTree[];
 
   /** Extracted parameters (URL params + query params) */
   readonly params: P;
+
+  /** Pre-computed route meta (segment fullName → paramTypeMap) */
+  readonly meta: Readonly<RouteTreeStateMeta>;
 }
 
 // =============================================================================

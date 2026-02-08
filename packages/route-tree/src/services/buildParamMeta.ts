@@ -76,6 +76,13 @@ export interface ParamMeta {
    * ```
    */
   readonly constraintPatterns: ReadonlyMap<string, ConstraintPattern>;
+
+  /**
+   * Path pattern without query string, pre-computed for buildPath.
+   *
+   * @example "/users/:id" from "/users/:id?q&page"
+   */
+  readonly pathPattern: string;
 }
 
 /**
@@ -232,5 +239,6 @@ export function buildParamMeta(path: string): ParamMeta {
     spatParams,
     paramTypeMap,
     constraintPatterns,
+    pathPattern: path,
   };
 }

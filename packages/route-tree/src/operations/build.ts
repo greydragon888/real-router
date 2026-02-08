@@ -341,14 +341,13 @@ function buildPathString(
       spatParams,
       encoding,
     );
-    const pathPattern = segment.path.split("?")[0];
-    const segmentPath = inject(pathPattern, encodedParams);
+    const segmentPath = inject(segment.paramMeta.pathPattern, encodedParams);
 
     path = segment.absolute ? segmentPath : path + segmentPath;
   }
 
-  // Always normalize - regex only matches actual "//" sequences
-  return path.replaceAll(/\/{2,}/g, "/");
+  // Only normalize when double slashes are actually present
+  return path.includes("//") ? path.replaceAll(/\/{2,}/g, "/") : path;
 }
 
 /**

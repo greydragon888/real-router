@@ -15,7 +15,6 @@ import type {
   RouteParams,
   RouteTree,
   RouteTreeState,
-  RouteTreeStateMeta,
 } from "route-tree";
 
 /**
@@ -31,19 +30,7 @@ import type {
  * ```
  */
 export function buildNameFromSegments(segments: readonly RouteTree[]): string {
-  let name = "";
-
-  for (const segment of segments) {
-    if (segment.name) {
-      if (name) {
-        name += ".";
-      }
-
-      name += segment.name;
-    }
-  }
-
-  return name;
+  return segments.at(-1)?.fullName ?? "";
 }
 
 /**
@@ -71,15 +58,9 @@ export function createRouteState<P extends RouteParams = RouteParams>(
 ): RouteTreeState<P> {
   const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
 
-  const meta: RouteTreeStateMeta = {};
-
-  for (const segment of matchResult.segments) {
-    meta[segment.fullName] = segment.paramTypeMap;
-  }
-
   return {
     name: resolvedName,
     params: matchResult.params,
-    meta,
+    meta: matchResult.meta,
   };
 }

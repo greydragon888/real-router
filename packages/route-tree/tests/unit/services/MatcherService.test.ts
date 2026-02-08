@@ -95,6 +95,8 @@ describe("MatcherService", () => {
 
       expect(result).toBeDefined();
       expect(result?.params).toStrictEqual({ id: "123" });
+      expect(result?.meta).toBeDefined();
+      expect(result?.meta).toHaveProperty("users");
     });
 
     it("should match nested routes", () => {
@@ -456,6 +458,36 @@ describe("MatcherService", () => {
       const segments = service.getSegmentsByName("users");
 
       expect(segments).toBeUndefined();
+    });
+  });
+
+  describe("getMetaByName", () => {
+    it("should return pre-computed meta for existing route", () => {
+      const service = new MatcherService();
+      const tree = createRouteTree("", "", [
+        {
+          name: "users",
+          path: "/users",
+          children: [{ name: "profile", path: "/:id" }],
+        },
+      ]);
+
+      service.registerTree(tree);
+
+      const meta = service.getMetaByName("users.profile");
+
+      expect(meta).toBeDefined();
+      expect(meta).toHaveProperty("users");
+      expect(meta).toHaveProperty("users.profile");
+    });
+
+    it("should return undefined for non-existing route", () => {
+      const service = new MatcherService();
+      const tree = createRouteTree("", "", [{ name: "home", path: "/" }]);
+
+      service.registerTree(tree);
+
+      expect(service.getMetaByName("nonexistent")).toBeUndefined();
     });
   });
 
