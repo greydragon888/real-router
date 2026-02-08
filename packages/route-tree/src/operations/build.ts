@@ -8,11 +8,10 @@
  * @module operations/build
  */
 
+import { validateConstraints, encodeParam } from "path-matcher";
 import { build as buildQueryString } from "search-params";
 
 import { getSegmentsByName } from "./query";
-import { validateConstraints } from "../services/constraintValidation";
-import { encodeParam } from "../services/encoding";
 import { inject } from "../services/inject";
 import { RouteNotFoundError } from "../validation/errors";
 

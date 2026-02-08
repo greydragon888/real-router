@@ -1,8 +1,8 @@
 {
-  "name": "route-tree",
-  "version": "0.2.0",
+  "name": "path-matcher",
+  "version": "0.1.0",
   "private": true,
-  "description": "Named route tree with matching and path building",
+  "description": "Path matching utilities for route-tree",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
@@ -24,8 +24,7 @@
     "url": "git+https://github.com/greydragon888/real-router.git"
   },
   "keywords": [
-    "route tree",
-    "named route",
+    "path matching",
     "route matching",
     "real-router"
   ],
@@ -43,14 +42,7 @@
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "test": "vitest run",
-    "test:mutation": "stryker run",
-    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
+    "test": "vitest run"
   },
-  "sideEffects": false,
-  "dependencies": {
-    "path-matcher": "workspace:^",
-    "rou3": "0.7.12",
-    "search-params": "workspace:^"
-  }
+  "sideEffects": false
 }

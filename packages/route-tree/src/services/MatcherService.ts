@@ -1,12 +1,9 @@
 // packages/route-tree/src/services/MatcherService.ts
 
+import { validateConstraints, DECODING_METHODS } from "path-matcher";
 import { addRoute, createRouter, findRoute } from "rou3";
 import { parse as parseQueryParams } from "search-params";
 
-import { validateConstraints } from "./constraintValidation";
-import { DECODING_METHODS } from "./encoding";
-
-import type { ConstraintPattern } from "./buildParamMeta";
 import type { IMatcherService } from "./types";
 import type { RouteTree } from "../builder/types";
 import type {
@@ -16,6 +13,7 @@ import type {
   RouteTreeStateMeta,
   URLParamsEncodingType,
 } from "../operations/types";
+import type { ConstraintPattern } from "path-matcher";
 import type { Options as QueryParamsOptions } from "search-params";
 
 const RAW_UNICODE_PATTERN = /[\u0080-\uFFFF]/;

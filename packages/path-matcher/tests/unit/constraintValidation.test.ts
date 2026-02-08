@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { validateConstraints } from "../../../src/services/constraintValidation";
+import { validateConstraints } from "../../src/constraintValidation";
 
-import type { ConstraintPattern } from "../../../src/services/buildParamMeta";
+import type { ConstraintPattern } from "../../src/types";
 
 describe("validateConstraints", () => {
   it("passes validation for matching constraint", () => {

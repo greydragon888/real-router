@@ -8,7 +8,7 @@
  * @module builder/computeCaches
  */
 
-import { buildParamMeta } from "../services/buildParamMeta";
+import { buildParamMeta } from "path-matcher";
 
 import type { MutableRouteNode } from "./buildTree";
 import type { RouteTree } from "../types";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildParamMeta } from "../../../src/services/buildParamMeta";
+import { buildParamMeta } from "../../src/buildParamMeta";
 
 describe("buildParamMeta", () => {
   describe("URL parameters", () => {

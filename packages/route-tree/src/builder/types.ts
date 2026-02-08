@@ -8,7 +8,7 @@
  * @module builder/types
  */
 
-import type { ParamMeta } from "../services/buildParamMeta";
+import type { ParamMeta } from "path-matcher";
 
 // =============================================================================
 // Route Definition Types

@@ -1,14 +1,14 @@
-// packages/route-tree/src/services/constraintValidation.ts
+// packages/path-matcher/src/constraintValidation.ts
 
 /**
  * Constraint Validation.
  *
  * Validates parameter values against constraint patterns.
  *
- * @module services/constraintValidation
+ * @module constraintValidation
  */
 
-import type { ConstraintPattern } from "./buildParamMeta";
+import type { ConstraintPattern } from "./types";
 
 /**
  * Validates parameters against constraint patterns.

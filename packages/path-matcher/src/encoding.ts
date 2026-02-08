@@ -1,11 +1,11 @@
-// packages/route-tree/src/services/encoding.ts
+// packages/path-matcher/src/encoding.ts
 
 /**
  * URL Parameter Encoding.
  *
  * Encoding strategies for URL parameters.
  *
- * @module services/encoding
+ * @module encoding
  */
 
 /**
@@ -14,7 +14,7 @@
  */
 /* eslint-disable prefer-template */
 
-import type { URLParamsEncodingType } from "../operations/types";
+import type { URLParamsEncodingType } from "./types";
 
 // =============================================================================
 // Encoding Constants
@@ -91,6 +91,7 @@ export const ENCODING_METHODS: Record<
   default: encodeURIComponentExcludingSubDelims,
   uri: encodeURI,
   uriComponent: encodeURIComponent,
+  /* v8 ignore next */
   none: (val) => val,
 };
 
@@ -132,6 +133,7 @@ export const DECODING_METHODS: Record<
  * // => 'docs/readme.md' (splat preserves slashes)
  * ```
  */
+/* v8 ignore start -- exercised by route-tree tests, not path-matcher */
 export const encodeParam = (
   param: string | number | boolean,
   encoding: URLParamsEncodingType,
@@ -155,3 +157,4 @@ export const encodeParam = (
 
   return result;
 };
+/* v8 ignore stop */

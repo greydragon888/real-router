@@ -226,6 +226,8 @@ importers:
         specifier: workspace:^
         version: link:../logger
 
+  packages/path-matcher: {}
+
   packages/persistent-params-plugin:
     dependencies:
       '@real-router/core':
@@ -278,6 +280,9 @@ importers:
 
   packages/route-tree:
     dependencies:
+      path-matcher:
+        specifier: workspace:^
+        version: link:../path-matcher
       rou3:
         specifier: 0.7.12
         version: 0.7.12

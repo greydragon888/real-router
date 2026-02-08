@@ -1,4 +1,4 @@
-// packages/route-tree/src/services/buildParamMeta.ts
+// packages/path-matcher/src/buildParamMeta.ts
 
 /**
  * Route Parameter Metadata Extraction.
@@ -6,84 +6,10 @@
  * Extracts parameter metadata from route path patterns without requiring
  * a full path-parser instance. Replaces parser.urlParams/queryParams/spatParams.
  *
- * @module services/buildParamMeta
+ * @module buildParamMeta
  */
 
-/**
- * Constraint pattern for a URL parameter.
- */
-export interface ConstraintPattern {
-  /**
-   * Compiled RegExp for validating the parameter value.
-   *
-   * @example /^(\d+)$/ for constraint "<\\d+>"
-   */
-  readonly pattern: RegExp;
-
-  /**
-   * Raw constraint string from the route pattern.
-   *
-   * @example "<\\d+>"
-   */
-  readonly constraint: string;
-}
-
-/**
- * Parameter metadata extracted from a route path pattern.
- */
-export interface ParamMeta {
-  /**
-   * URL parameter names extracted from the path pattern.
-   *
-   * @example [":id", ":postId"] from "/users/:id/posts/:postId"
-   */
-  readonly urlParams: readonly string[];
-
-  /**
-   * Query parameter names extracted from the path pattern.
-   *
-   * @example ["q", "page"] from "/search?q&page"
-   */
-  readonly queryParams: readonly string[];
-
-  /**
-   * Splat parameter names extracted from the path pattern.
-   *
-   * @example ["path"] from "/files/*path"
-   */
-  readonly spatParams: readonly string[];
-
-  /**
-   * Map of parameter names to their type (url or query).
-   *
-   * @example { id: "url", q: "query" }
-   */
-  readonly paramTypeMap: Readonly<Record<string, "url" | "query">>;
-
-  /**
-   * Map of parameter names to their constraint patterns.
-   *
-   * Only includes parameters with explicit constraints (e.g., `:id<\\d+>`).
-   * Parameters without constraints are not included in this map.
-   *
-   * @example
-   * ```typescript
-   * buildParamMeta("/users/:id<\\d+>").constraintPatterns.get("id")
-   * // → { pattern: /^(\d+)$/, constraint: "<\\d+>" }
-   *
-   * buildParamMeta("/users/:id").constraintPatterns.size
-   * // → 0 (no constraints)
-   * ```
-   */
-  readonly constraintPatterns: ReadonlyMap<string, ConstraintPattern>;
-
-  /**
-   * Path pattern without query string, pre-computed for buildPath.
-   *
-   * @example "/users/:id" from "/users/:id?q&page"
-   */
-  readonly pathPattern: string;
-}
+import type { ConstraintPattern, ParamMeta } from "./types";
 
 /**
  * Extracts the regex pattern from a constraint string.
