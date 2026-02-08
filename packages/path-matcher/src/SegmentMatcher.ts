@@ -109,7 +109,7 @@ export class SegmentMatcher {
   }
 
   registerTree(node: MatcherInputNode): void {
-    this.#registerNode(node, "", []);
+    this.#registerNode(node, "", [], null);
   }
 
   match(path: string): MatchResult | undefined {
@@ -241,6 +241,7 @@ export class SegmentMatcher {
     node: MatcherInputNode,
     parentPath: string,
     segments: MatcherInputNode[],
+    parentRoute: CompiledRoute | null,
   ): void {
     const isRoot = node.fullName === "";
 
@@ -252,6 +253,8 @@ export class SegmentMatcher {
       parentPath,
       node.paramMeta.pathPattern,
     );
+
+    let currentRoute: CompiledRoute | null = parentRoute;
 
     if (!isRoot) {
       const frozenSegments = Object.freeze([...segments]);
@@ -275,9 +278,9 @@ export class SegmentMatcher {
         segments,
       );
 
-      const compiled: CompiledRoute = {
+      currentRoute = {
         name: node.fullName,
-        parent: null,
+        parent: parentRoute,
         depth: segments.length - 1,
         matchSegments: frozenSegments,
         buildSegments: frozenSegments,
@@ -291,23 +294,23 @@ export class SegmentMatcher {
         buildParamSlots,
       };
 
-      this.#routesByName.set(node.fullName, compiled);
+      this.#routesByName.set(node.fullName, currentRoute);
       this.#segmentsByName.set(node.fullName, frozenSegments);
       this.#metaByName.set(node.fullName, frozenMeta);
 
-      this.#insertIntoTrie(compiled, matchPath);
+      this.#insertIntoTrie(currentRoute, matchPath);
 
       if (node.paramMeta.urlParams.length === 0) {
         const cacheKey = this.#options.caseSensitive
           ? normalizedPath
           : normalizedPath.toLowerCase();
 
-        this.#staticCache.set(cacheKey, compiled);
+        this.#staticCache.set(cacheKey, currentRoute);
       }
     }
 
     for (const child of node.children.values()) {
-      this.#registerNode(child, matchPath, segments);
+      this.#registerNode(child, matchPath, segments, currentRoute);
     }
 
     if (!isRoot) {

@@ -1711,4 +1711,203 @@ describe("SegmentMatcher", () => {
       expect(matcher.buildPath("search", {})).toBe("/search/");
     });
   });
+
+  // ===========================================================================
+  // Nested Routes — matchSegments, meta, parent, depth
+  // ===========================================================================
+
+  describe("nested routes — hierarchical compilation", () => {
+    function createNestedMatcher(): {
+      matcher: SegmentMatcher;
+      usersNode: MatcherInputNode;
+      profileNode: MatcherInputNode;
+      settingsNode: MatcherInputNode;
+    } {
+      const matcher = new SegmentMatcher();
+
+      const settingsNode = createInputNode({
+        name: "settings",
+        path: "/settings?theme",
+        fullName: "users.profile.settings",
+      });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:userId?tab",
+        fullName: "users.profile",
+        children: new Map([["settings", settingsNode]]),
+        nonAbsoluteChildren: [settingsNode],
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users?page",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return { matcher, usersNode, profileNode, settingsNode };
+    }
+
+    it("should match 3-segment nested route with full matchSegments chain", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123/settings");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(3);
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.segments[1].fullName).toBe("users.profile");
+      expect(result!.segments[2].fullName).toBe("users.profile.settings");
+    });
+
+    it("should inherit params from ancestor segments", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123/settings");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ userId: "123" });
+    });
+
+    it("should build matchSegments as frozen array", () => {
+      const { matcher } = createNestedMatcher();
+
+      const segments = matcher.getSegmentsByName("users.profile.settings");
+
+      expect(segments).toBeDefined();
+      expect(Object.isFrozen(segments)).toBe(true);
+    });
+
+    it("should set buildSegments equal to matchSegments (pre slash-child)", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123/settings");
+
+      expect(result).toBeDefined();
+      expect(result!.buildSegments).toStrictEqual(result!.segments);
+    });
+
+    it("should build meta with paramTypeMap for each segment", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123/settings");
+
+      expect(result).toBeDefined();
+      expect(result!.meta).toStrictEqual({
+        users: { page: "query" },
+        "users.profile": { userId: "url", tab: "query" },
+        "users.profile.settings": { theme: "query" },
+      });
+    });
+
+    it("should freeze meta object", () => {
+      const { matcher } = createNestedMatcher();
+
+      const meta = matcher.getMetaByName("users.profile.settings");
+
+      expect(meta).toBeDefined();
+      expect(Object.isFrozen(meta)).toBe(true);
+    });
+
+    it("should aggregate declaredQueryParams from all ancestors", () => {
+      const { matcher } = createNestedMatcher();
+
+      const segments = matcher.getSegmentsByName("users.profile.settings");
+
+      expect(segments).toBeDefined();
+
+      const meta = matcher.getMetaByName("users.profile.settings");
+
+      expect(meta).toBeDefined();
+      expect(meta!.users).toHaveProperty("page", "query");
+      expect(meta!["users.profile"]).toHaveProperty("tab", "query");
+      expect(meta!["users.profile.settings"]).toHaveProperty("theme", "query");
+    });
+
+    it("should set parent reference on compiled route", () => {
+      const { matcher } = createNestedMatcher();
+
+      expect(matcher.hasRoute("users")).toBe(true);
+      expect(matcher.hasRoute("users.profile")).toBe(true);
+      expect(matcher.hasRoute("users.profile.settings")).toBe(true);
+
+      const result = matcher.match("/users/123/settings");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(3);
+    });
+
+    it("should set correct depth on nested routes", () => {
+      const { matcher } = createNestedMatcher();
+
+      const usersSegments = matcher.getSegmentsByName("users");
+      const profileSegments = matcher.getSegmentsByName("users.profile");
+      const settingsSegments = matcher.getSegmentsByName(
+        "users.profile.settings",
+      );
+
+      // depth = segments.length - 1: users→0, profile→1, settings→2
+      expect(usersSegments).toHaveLength(1);
+      expect(profileSegments).toHaveLength(2);
+      expect(settingsSegments).toHaveLength(3);
+    });
+
+    it("should buildPath for nested route concatenating ancestor paths", () => {
+      const { matcher } = createNestedMatcher();
+
+      expect(
+        matcher.buildPath("users.profile.settings", { userId: "123" }),
+      ).toBe("/users/123/settings");
+    });
+
+    it("should buildPath for intermediate nested route", () => {
+      const { matcher } = createNestedMatcher();
+
+      expect(matcher.buildPath("users.profile", { userId: "456" })).toBe(
+        "/users/456",
+      );
+    });
+
+    it("should buildPath for root-level nested route", () => {
+      const { matcher } = createNestedMatcher();
+
+      expect(matcher.buildPath("users")).toBe("/users");
+    });
+
+    it("should match intermediate nested route", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.segments[1].fullName).toBe("users.profile");
+      expect(result!.params).toStrictEqual({ userId: "123" });
+    });
+
+    it("should return correct meta for intermediate nested route", () => {
+      const { matcher } = createNestedMatcher();
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.meta).toStrictEqual({
+        users: { page: "query" },
+        "users.profile": { userId: "url", tab: "query" },
+      });
+    });
+  });
 });
