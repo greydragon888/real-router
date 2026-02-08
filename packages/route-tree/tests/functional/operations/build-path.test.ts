@@ -207,7 +207,8 @@ describe("New API - buildPath", () => {
 
       const path = buildPath(tree, "route", { id: null, name: undefined });
 
-      expect(path).toBe("/route/:id");
+      // Optional params with null/undefined are skipped (correct behavior)
+      expect(path).toBe("/route");
     });
   });
 });

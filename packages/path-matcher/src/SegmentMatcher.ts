@@ -196,17 +196,20 @@ export class SegmentMatcher {
     for (const [i, slot] of slots.entries()) {
       const value = params?.[slot.paramName];
 
-      /* v8 ignore start -- optional param handling: Task 6 scope */
       if (value === undefined || value === null) {
         if (!slot.isOptional) {
           throw new Error(`Missing required param: ${slot.paramName}`);
+        }
+
+        // Strip trailing separator before appending next static part
+        if (result.length > 1 && result.endsWith("/")) {
+          result = result.slice(0, -1);
         }
 
         result += parts[i + 1];
 
         continue;
       }
-      /* v8 ignore stop */
 
       const stringValue = String(value as string | number | boolean);
       const encoded = slot.encoder
@@ -257,56 +260,13 @@ export class SegmentMatcher {
     let currentRoute: CompiledRoute | null = parentRoute;
 
     if (!isRoot) {
-      const frozenSegments = Object.freeze([...segments]);
-
-      const meta: Record<string, Record<string, "url" | "query">> = {};
-
-      for (const segment of frozenSegments) {
-        meta[segment.fullName] = segment.paramTypeMap;
-      }
-
-      const frozenMeta = Object.freeze(meta);
-
-      const normalizedPath = this.#normalizeTrailingSlash(matchPath);
-      const hasTrailingSlash = matchPath.length > 1 && matchPath.endsWith("/");
-
-      const declaredQueryParams = this.#collectDeclaredQueryParams(segments);
-      const constraintPatterns = this.#collectConstraintPatterns(segments);
-
-      const { buildStaticParts, buildParamSlots } = this.#compileBuildParts(
-        normalizedPath,
+      currentRoute = this.#compileAndRegisterRoute(
+        node,
+        matchPath,
+        parentPath,
         segments,
+        parentRoute,
       );
-
-      currentRoute = {
-        name: node.fullName,
-        parent: parentRoute,
-        depth: segments.length - 1,
-        matchSegments: frozenSegments,
-        buildSegments: frozenSegments,
-        meta: frozenMeta,
-        declaredQueryParams,
-        declaredQueryParamsSet: new Set(declaredQueryParams),
-        hasTrailingSlash,
-        constraintPatterns,
-        hasConstraints: constraintPatterns.size > 0,
-        buildStaticParts,
-        buildParamSlots,
-      };
-
-      this.#routesByName.set(node.fullName, currentRoute);
-      this.#segmentsByName.set(node.fullName, frozenSegments);
-      this.#metaByName.set(node.fullName, frozenMeta);
-
-      this.#insertIntoTrie(currentRoute, matchPath);
-
-      if (node.paramMeta.urlParams.length === 0) {
-        const cacheKey = this.#options.caseSensitive
-          ? normalizedPath
-          : normalizedPath.toLowerCase();
-
-        this.#staticCache.set(cacheKey, currentRoute);
-      }
     }
 
     for (const child of node.children.values()) {
@@ -318,6 +278,117 @@ export class SegmentMatcher {
     }
   }
 
+  #compileAndRegisterRoute(
+    node: MatcherInputNode,
+    matchPath: string,
+    parentPath: string,
+    segments: MatcherInputNode[],
+    parentRoute: CompiledRoute | null,
+  ): CompiledRoute {
+    const isSlashChild = this.#isSlashChild(matchPath, parentPath);
+
+    const frozenSegments = Object.freeze([...segments]);
+
+    // Slash-child: buildSegments excludes the slash-child node itself
+    const buildSegments = isSlashChild
+      ? Object.freeze(segments.slice(0, -1))
+      : frozenSegments;
+
+    const frozenMeta = this.#buildMeta(frozenSegments);
+
+    const normalizedPath = this.#normalizeTrailingSlash(matchPath);
+
+    const declaredQueryParams = this.#collectDeclaredQueryParams(segments);
+    const constraintPatterns = this.#collectConstraintPatterns(segments);
+
+    // Slash-child: use parent path for buildParts (not slash-child's path)
+    const buildPath = isSlashChild
+      ? this.#normalizeTrailingSlash(parentPath)
+      : normalizedPath;
+
+    const { buildStaticParts, buildParamSlots } = this.#compileBuildParts(
+      buildPath,
+      isSlashChild ? segments.slice(0, -1) : segments,
+    );
+
+    const compiled: CompiledRoute = {
+      name: node.fullName,
+      parent: parentRoute,
+      depth: segments.length - 1,
+      matchSegments: frozenSegments,
+      buildSegments,
+      meta: frozenMeta,
+      declaredQueryParams,
+      declaredQueryParamsSet: new Set(declaredQueryParams),
+      hasTrailingSlash: matchPath.length > 1 && matchPath.endsWith("/"),
+      constraintPatterns,
+      hasConstraints: constraintPatterns.size > 0,
+      buildStaticParts,
+      buildParamSlots,
+    };
+
+    this.#routesByName.set(node.fullName, compiled);
+    this.#segmentsByName.set(node.fullName, frozenSegments);
+    this.#metaByName.set(node.fullName, frozenMeta);
+
+    if (isSlashChild) {
+      this.#registerSlashChild(compiled, parentPath);
+    } else {
+      this.#registerStandardRoute(compiled, matchPath, normalizedPath, node);
+    }
+
+    return compiled;
+  }
+
+  #buildMeta(
+    segments: readonly MatcherInputNode[],
+  ): Readonly<Record<string, Record<string, "url" | "query">>> {
+    const meta: Record<string, Record<string, "url" | "query">> = {};
+
+    for (const segment of segments) {
+      meta[segment.fullName] = segment.paramTypeMap;
+    }
+
+    return Object.freeze(meta);
+  }
+
+  #registerSlashChild(compiled: CompiledRoute, parentPath: string): void {
+    this.#insertSlashChildIntoTrie(compiled, parentPath);
+
+    const parentNormalized = this.#normalizeTrailingSlash(parentPath);
+    const cacheKey = this.#options.caseSensitive
+      ? parentNormalized
+      : parentNormalized.toLowerCase();
+
+    if (this.#staticCache.has(cacheKey)) {
+      this.#staticCache.set(cacheKey, compiled);
+    }
+  }
+
+  #registerStandardRoute(
+    compiled: CompiledRoute,
+    matchPath: string,
+    normalizedPath: string,
+    node: MatcherInputNode,
+  ): void {
+    this.#insertIntoTrie(compiled, matchPath);
+
+    if (node.paramMeta.urlParams.length === 0) {
+      const cacheKey = this.#options.caseSensitive
+        ? normalizedPath
+        : normalizedPath.toLowerCase();
+
+      this.#staticCache.set(cacheKey, compiled);
+    }
+  }
+
+  #isSlashChild(matchPath: string, parentPath: string): boolean {
+    const normalizedMatch = this.#normalizeTrailingSlash(matchPath);
+    const normalizedParent = this.#normalizeTrailingSlash(parentPath);
+
+    return normalizedMatch === normalizedParent;
+  }
+
   #insertIntoTrie(compiled: CompiledRoute, fullPath: string): void {
     const normalized = this.#normalizeTrailingSlash(fullPath);
 
@@ -327,20 +398,99 @@ export class SegmentMatcher {
       return;
     }
 
-    let node = this.#root;
-    let start = 1;
-    const len = normalized.length;
+    this.#insertIntoTrieFrom(this.#root, normalized, 1, compiled);
+  }
+
+  #insertIntoTrieFrom(
+    node: SegmentNode,
+    path: string,
+    start: number,
+    compiled: CompiledRoute,
+  ): void {
+    const len = path.length;
 
     while (start <= len) {
-      const end = normalized.indexOf("/", start);
+      const end = path.indexOf("/", start);
       const segmentEnd = end === -1 ? len : end;
-      const segment = normalized.slice(start, segmentEnd);
+      const segment = path.slice(start, segmentEnd);
+
+      if (segment.endsWith("?")) {
+        const paramName = segment
+          .slice(1)
+          // eslint-disable-next-line sonarjs/slow-regex -- Constraint pattern regex - bounded input from route definitions, not user input
+          .replaceAll(/<[^>]*>/g, "")
+          .replace(/\?$/, "");
+
+        if (!node.paramChild) {
+          node.paramChild = createSegmentNode();
+          node.paramChild.paramName = paramName;
+        }
+
+        // Path with param: continue recursively from paramChild
+        this.#insertIntoTrieFrom(
+          node.paramChild,
+          path,
+          segmentEnd + 1,
+          compiled,
+        );
+
+        // Path without param: skip this segment and continue from node
+        if (segmentEnd >= len) {
+          node.route ??= compiled;
+        } else {
+          this.#insertIntoTrieFrom(node, path, segmentEnd + 1, compiled);
+        }
+
+        return;
+      }
 
       node = this.#processSegment(node, segment);
       start = segmentEnd + 1;
     }
 
     node.route = compiled;
+  }
+
+  #insertSlashChildIntoTrie(compiled: CompiledRoute, parentPath: string): void {
+    const node = this.#walkTrie(parentPath);
+
+    node.slashChildRoute = compiled;
+  }
+
+  #walkTrie(fullPath: string): SegmentNode {
+    return this.#walkTrieFrom(this.#root, fullPath);
+  }
+
+  #walkTrieFrom(startNode: SegmentNode, path: string): SegmentNode {
+    const normalized = this.#normalizeTrailingSlash(path);
+
+    /* v8 ignore start -- defensive: slash-child always passes valid path */
+    if (normalized === "/" || normalized === "") {
+      return startNode;
+    }
+    /* v8 ignore stop */
+
+    let node = startNode;
+    let start = 1;
+    const len = normalized.length;
+
+    while (start <= len) {
+      const end = normalized.indexOf("/", start);
+      const segmentEnd = end === -1 ? len : end;
+
+      /* v8 ignore start -- defensive: indexOf always returns valid index for non-empty segments */
+      if (segmentEnd <= start) {
+        break;
+      }
+      /* v8 ignore stop */
+
+      const segment = normalized.slice(start, segmentEnd);
+
+      node = this.#processSegment(node, segment);
+      start = segmentEnd + 1;
+    }
+
+    return node;
   }
 
   #processSegment(node: SegmentNode, segment: string): SegmentNode {
@@ -458,7 +608,7 @@ export class SegmentMatcher {
   ): CompiledRoute | undefined {
     /* v8 ignore start -- root "/" is always in #staticCache */
     if (path.length === 1) {
-      return this.#root.route ?? this.#root.slashChildRoute;
+      return this.#root.slashChildRoute ?? this.#root.route;
     }
     /* v8 ignore stop */
 
@@ -492,9 +642,7 @@ export class SegmentMatcher {
       start = segmentEnd + 1;
     }
 
-    /* v8 ignore start -- slashChildRoute fallback populated in Task 5 */
-    return node.route ?? node.slashChildRoute;
-    /* v8 ignore stop */
+    return node.slashChildRoute ?? node.route;
   }
 
   #decodeParams(params: Record<string, string>): boolean {

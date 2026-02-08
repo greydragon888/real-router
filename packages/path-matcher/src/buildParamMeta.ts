@@ -51,6 +51,9 @@ function extractConstraintPattern(constraint: string): string {
 
 const URL_PARAM_RGX = /([:*])([^/?<]+)(<[^>]+>)?(\?)?/g;
 
+// eslint-disable-next-line sonarjs/slow-regex -- Optional param marker regex - bounded input from route definitions, not user input
+const OPTIONAL_PARAM_MARKER_RGX = /([:*][^/?<]+(?:<[^>]+>)?)\?(?=\/|$)/g;
+
 /**
  * Regex for matching query parameters in path patterns.
  *
@@ -115,7 +118,11 @@ export function buildParamMeta(path: string): ParamMeta {
   const paramTypeMap: Record<string, "url" | "query"> = {};
   const constraintPatterns = new Map<string, ConstraintPattern>();
 
-  const queryMatch = QUERY_PARAM_RGX.exec(path);
+  // Strip optional `?` markers (`:param?` where `?` is followed by `/` or end)
+  // before query detection to avoid `:param?/rest` being parsed as query `?/rest`
+  const strippedForQuery = path.replaceAll(OPTIONAL_PARAM_MARKER_RGX, "$1");
+
+  const queryMatch = QUERY_PARAM_RGX.exec(strippedForQuery);
 
   if (queryMatch !== null) {
     const queryString = queryMatch[1];

@@ -1708,7 +1708,7 @@ describe("SegmentMatcher", () => {
 
       matcher.registerTree(rootNode);
 
-      expect(matcher.buildPath("search", {})).toBe("/search/");
+      expect(matcher.buildPath("search", {})).toBe("/search");
     });
   });
 
@@ -1790,7 +1790,7 @@ describe("SegmentMatcher", () => {
       expect(Object.isFrozen(segments)).toBe(true);
     });
 
-    it("should set buildSegments equal to matchSegments (pre slash-child)", () => {
+    it("should set buildSegments equal to matchSegments (non slash-child)", () => {
       const { matcher } = createNestedMatcher();
 
       const result = matcher.match("/users/123/settings");
@@ -1908,6 +1908,547 @@ describe("SegmentMatcher", () => {
         users: { page: "query" },
         "users.profile": { userId: "url", tab: "query" },
       });
+    });
+  });
+
+  // ===========================================================================
+  // Slash-Child Routes
+  // ===========================================================================
+
+  describe("slash-child routes", () => {
+    function createSlashChildMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher();
+
+      const listNode = createInputNode({
+        name: "list",
+        path: "/",
+        fullName: "users.list",
+      });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([
+          ["list", listNode],
+          ["profile", profileNode],
+        ]),
+        nonAbsoluteChildren: [listNode, profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should match slash-child on parent path", () => {
+      const matcher = createSlashChildMatcher();
+
+      const result = matcher.match("/users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.segments[1].fullName).toBe("users.list");
+    });
+
+    it("should include slash-child in matchSegments but NOT in buildSegments", () => {
+      const matcher = createSlashChildMatcher();
+
+      const result = matcher.match("/users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.buildSegments).toHaveLength(1);
+      expect(result!.buildSegments[0].fullName).toBe("users");
+    });
+
+    it("should not affect sibling param routes", () => {
+      const matcher = createSlashChildMatcher();
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[1].fullName).toBe("users.profile");
+      expect(result!.params).toStrictEqual({ id: "123" });
+    });
+
+    it("should buildPath for slash-child using parent path", () => {
+      const matcher = createSlashChildMatcher();
+
+      expect(matcher.buildPath("users.list")).toBe("/users");
+    });
+
+    it("should handle slash-child with empty path (path: '')", () => {
+      const matcher = new SegmentMatcher();
+
+      const listNode = createInputNode({
+        name: "list",
+        path: "",
+        fullName: "users.list",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["list", listNode]]),
+        nonAbsoluteChildren: [listNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[1].fullName).toBe("users.list");
+      expect(result!.buildSegments).toHaveLength(1);
+    });
+
+    it("should handle slash-child with parent param route", () => {
+      const matcher = new SegmentMatcher();
+
+      const listNode = createInputNode({
+        name: "list",
+        path: "/",
+        fullName: "users.profile.list",
+      });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:type",
+        fullName: "users.profile",
+        children: new Map([["list", listNode]]),
+        nonAbsoluteChildren: [listNode],
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/admin");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(3);
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.segments[1].fullName).toBe("users.profile");
+      expect(result!.segments[2].fullName).toBe("users.profile.list");
+      expect(result!.params).toStrictEqual({ type: "admin" });
+    });
+
+    it("should return correct meta for slash-child", () => {
+      const matcher = createSlashChildMatcher();
+
+      const result = matcher.match("/users");
+
+      expect(result).toBeDefined();
+      expect(result!.meta).toStrictEqual({
+        users: {},
+        "users.list": {},
+      });
+    });
+
+    it("should not add slash-child to static cache", () => {
+      const matcher = createSlashChildMatcher();
+
+      const usersResult = matcher.match("/users");
+      const usersResult2 = matcher.match("/users");
+
+      expect(usersResult).toBeDefined();
+      expect(usersResult2).toBeDefined();
+      expect(usersResult!.segments[1].fullName).toBe("users.list");
+      expect(usersResult2!.segments[1].fullName).toBe("users.list");
+    });
+
+    it("should prefer parent route over slash-child", () => {
+      const matcher = new SegmentMatcher();
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(1);
+      expect(result!.segments[0].fullName).toBe("users");
+    });
+
+    it("should buildPath for slash-child with parent params", () => {
+      const matcher = new SegmentMatcher();
+
+      const listNode = createInputNode({
+        name: "list",
+        path: "/",
+        fullName: "users.profile.list",
+      });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:type",
+        fullName: "users.profile",
+        children: new Map([["list", listNode]]),
+        nonAbsoluteChildren: [listNode],
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("users.profile.list", { type: "admin" })).toBe(
+        "/users/admin",
+      );
+    });
+  });
+
+  // ===========================================================================
+  // Optional Params — match
+  // ===========================================================================
+
+  describe("match — optional params", () => {
+    function createOptionalParamMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search/:query?",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should match without optional param", () => {
+      const matcher = createOptionalParamMatcher();
+
+      const result = matcher.match("/search");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("search");
+      expect(result!.params).toStrictEqual({});
+    });
+
+    it("should match with optional param provided", () => {
+      const matcher = createOptionalParamMatcher();
+
+      const result = matcher.match("/search/hello");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("search");
+      expect(result!.params).toStrictEqual({ query: "hello" });
+    });
+
+    it("should handle optional param in middle of path", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search/:query?/results",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const withParam = matcher.match("/search/test/results");
+
+      expect(withParam).toBeDefined();
+      expect(withParam!.params).toStrictEqual({ query: "test" });
+
+      const withoutParam = matcher.match("/search/results");
+
+      expect(withoutParam).toBeDefined();
+      expect(withoutParam!.params).toStrictEqual({});
+    });
+
+    it("should handle consecutive optional params", () => {
+      const matcher = new SegmentMatcher();
+
+      const routeNode = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c?/d",
+        fullName: "route",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["route", routeNode]]),
+        nonAbsoluteChildren: [routeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const bothProvided = matcher.match("/a/x/y/d");
+
+      expect(bothProvided).toBeDefined();
+      expect(bothProvided!.params).toStrictEqual({ b: "x", c: "y" });
+
+      const noneProvided = matcher.match("/a/d");
+
+      expect(noneProvided).toBeDefined();
+      expect(noneProvided!.params).toStrictEqual({});
+    });
+
+    it("should decode percent-encoded optional param", () => {
+      const matcher = createOptionalParamMatcher();
+
+      const result = matcher.match("/search/hello%20world");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ query: "hello world" });
+    });
+  });
+
+  // ===========================================================================
+  // Optional Params — buildPath
+  // ===========================================================================
+
+  describe("buildPath — optional params", () => {
+    // eslint-disable-next-line sonarjs/no-identical-functions -- Test fixture intentionally similar to match suite - tests buildPath behavior vs match behavior
+    function createOptionalBuildMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search/:query?",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should build path without optional param", () => {
+      const matcher = createOptionalBuildMatcher();
+
+      expect(matcher.buildPath("search")).toBe("/search");
+    });
+
+    it("should build path with optional param provided", () => {
+      const matcher = createOptionalBuildMatcher();
+
+      expect(matcher.buildPath("search", { query: "hello" })).toBe(
+        "/search/hello",
+      );
+    });
+
+    it("should build path with null optional param", () => {
+      const matcher = createOptionalBuildMatcher();
+
+      expect(matcher.buildPath("search", { query: null })).toBe("/search");
+    });
+
+    it("should not produce double slash for optional-in-middle", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search/:query?/results",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("search", { query: "test" })).toBe(
+        "/search/test/results",
+      );
+      expect(matcher.buildPath("search", {})).toBe("/search/results");
+    });
+
+    it("should handle consecutive optionals in buildPath", () => {
+      const matcher = new SegmentMatcher();
+
+      const routeNode = createInputNode({
+        name: "route",
+        path: "/a/:b?/:c?/d",
+        fullName: "route",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["route", routeNode]]),
+        nonAbsoluteChildren: [routeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("route", { b: "x", c: "y" })).toBe("/a/x/y/d");
+      expect(matcher.buildPath("route", { b: "x" })).toBe("/a/x/d");
+      expect(matcher.buildPath("route", { c: "y" })).toBe("/a/y/d");
+      expect(matcher.buildPath("route", {})).toBe("/a/d");
+    });
+
+    it("should encode optional param values", () => {
+      const matcher = createOptionalBuildMatcher();
+
+      expect(matcher.buildPath("search", { query: "hello world" })).toBe(
+        "/search/hello%20world",
+      );
+    });
+
+    it("should handle optional param at root level", () => {
+      const matcher = new SegmentMatcher();
+
+      const routeNode = createInputNode({
+        name: "item",
+        path: "/:slug?",
+        fullName: "item",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["item", routeNode]]),
+        nonAbsoluteChildren: [routeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("item")).toBe("/");
+      expect(matcher.buildPath("item", { slug: "hello" })).toBe("/hello");
+    });
+  });
+
+  // ===========================================================================
+  // Slash-Child + Case-Insensitive
+  // ===========================================================================
+
+  describe("slash-child — case-insensitive", () => {
+    it("should update static cache for slash-child with case-insensitive matching", () => {
+      const matcher = new SegmentMatcher({ caseSensitive: false });
+
+      const listNode = createInputNode({
+        name: "list",
+        path: "/",
+        fullName: "users.list",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["list", listNode]]),
+        nonAbsoluteChildren: [listNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/Users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments).toHaveLength(2);
+      expect(result!.segments[1].fullName).toBe("users.list");
     });
   });
 });
