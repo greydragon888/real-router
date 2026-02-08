@@ -620,8 +620,8 @@ export class Router<
     // Lock options when router starts
     this.#options.lock();
 
-    // Initialize build options cache
-    this.#routes.initBuildOptionsCache(this.#options.get());
+    // Create matcher with finalized options
+    this.#routes.initMatcher(this.#options.get());
 
     // Forward to lifecycle namespace
     this.#lifecycle.start(...args);
@@ -631,9 +631,6 @@ export class Router<
 
   stop(): this {
     this.#lifecycle.stop();
-
-    // Clear build options cache
-    this.#routes.clearBuildOptionsCache();
 
     // Unlock options when router stops
     this.#options.unlock();
@@ -1095,8 +1092,8 @@ export class Router<
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params, segments) =>
-        this.#routes.buildPath(route, params, this.#options.get(), segments),
+      buildPath: (route, params) =>
+        this.#routes.buildPath(route, params, this.#options.get()),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {

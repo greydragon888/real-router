@@ -95,19 +95,24 @@ describe("core/routes/clearRoutes", () => {
       }));
 
       router.addRoute({
-        name: "encoded",
-        path: "/encoded/:id",
+        name: "withDecoder",
+        path: "/with-decoder/:id",
         decodeParams,
       });
 
+      expect(router.hasRoute("withDecoder")).toBe(true);
+
       // Verify decoder works before clear
-      expect(router.matchPath("/encoded/123")?.params.id).toBe(123);
+      const result = router.matchPath("/with-decoder/123");
+
+      expect(result?.name).toBe("withDecoder");
+      expect(result?.params.id).toBe(123);
 
       router.clearRoutes();
 
       // Route no longer exists after clear
-      expect(router.hasRoute("encoded")).toBe(false);
-      expect(router.matchPath("/encoded/123")).toBeUndefined();
+      expect(router.hasRoute("withDecoder")).toBe(false);
+      expect(router.matchPath("/with-decoder/123")).toBeUndefined();
     });
 
     it("should clear encoders", () => {

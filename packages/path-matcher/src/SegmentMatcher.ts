@@ -1,7 +1,8 @@
-import { ENCODING_METHODS } from "./encoding";
+import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
 
 import type {
   BuildParamSlot,
+  BuildPathOptions,
   CompiledRoute,
   ConstraintPattern,
   MatcherInputNode,
@@ -46,8 +47,13 @@ export function defaultBuildQueryString(
 
   for (const key of Object.keys(params)) {
     const value = params[key];
+    const encodedKey = encodeURIComponent(key);
 
-    parts.push(value === "" ? key : `${key}=${String(value)}`);
+    parts.push(
+      value === ""
+        ? encodedKey
+        : `${encodedKey}=${encodeURIComponent(String(value))}`,
+    );
   }
 
   return parts.join("&");
@@ -58,6 +64,9 @@ export function defaultBuildQueryString(
 // =============================================================================
 
 const RAW_UNICODE_PATTERN = /[\u0080-\uFFFF]/;
+
+// eslint-disable-next-line sonarjs/slow-regex -- Constraint pattern regex - bounded input from route definitions, not user input
+const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
 
 // =============================================================================
 // SegmentNode Factory
@@ -96,6 +105,7 @@ export class SegmentMatcher {
   readonly #staticCache = new Map<string, CompiledRoute>();
 
   #rootPath = "";
+  #rootQueryParams: readonly string[] = [];
 
   constructor(options?: SegmentMatcherOptions) {
     this.#options = {
@@ -109,40 +119,18 @@ export class SegmentMatcher {
   }
 
   registerTree(node: MatcherInputNode): void {
+    this.#rootQueryParams = node.paramMeta.queryParams;
     this.#registerNode(node, "", [], null);
   }
 
   match(path: string): MatchResult | undefined {
-    if (path === "") {
-      path = "/";
-    }
-    if (!path.startsWith("/")) {
+    const prepared = this.#preparePath(path);
+
+    if (!prepared) {
       return undefined;
     }
 
-    const hashIdx = path.indexOf("#");
-
-    if (hashIdx !== -1) {
-      path = path.slice(0, hashIdx);
-    }
-
-    if (RAW_UNICODE_PATTERN.test(path)) {
-      return undefined;
-    }
-
-    const qIdx = path.indexOf("?");
-    const pathPart = qIdx === -1 ? path : path.slice(0, qIdx);
-
-    const cleanPath = pathPart.includes("//")
-      ? pathPart.replaceAll(/\/{2,}/g, "/")
-      : pathPart;
-
-    const normalized =
-      !this.#options.strictTrailingSlash &&
-      cleanPath.length > 1 &&
-      cleanPath.endsWith("/")
-        ? cleanPath.slice(0, -1)
-        : cleanPath;
+    const [cleanPath, normalized, queryString] = prepared;
 
     const cacheKey = this.#options.caseSensitive
       ? normalized
@@ -150,12 +138,14 @@ export class SegmentMatcher {
     const cached = this.#staticCache.get(cacheKey);
 
     if (cached) {
-      return {
-        segments: cached.matchSegments,
-        buildSegments: cached.buildSegments,
-        params: {},
-        meta: cached.meta,
-      };
+      if (
+        this.#options.strictTrailingSlash &&
+        !this.#checkTrailingSlash(cleanPath, cached)
+      ) {
+        return undefined;
+      }
+
+      return this.#buildResult(cached, {}, queryString);
     }
 
     const params: Record<string, string> = {};
@@ -165,61 +155,48 @@ export class SegmentMatcher {
       return undefined;
     }
 
+    if (
+      this.#options.strictTrailingSlash &&
+      !this.#checkTrailingSlash(cleanPath, route)
+    ) {
+      return undefined;
+    }
+
+    if (route.hasConstraints && !this.#validateConstraints(params, route)) {
+      return undefined;
+    }
+
     if (!this.#decodeParams(params)) {
       return undefined;
     }
 
-    return {
-      segments: route.matchSegments,
-      buildSegments: route.buildSegments,
-      params,
-      meta: route.meta,
-    };
+    return this.#buildResult(route, params, queryString);
   }
 
-  buildPath(name: string, params?: Record<string, unknown>): string {
+  buildPath(
+    name: string,
+    params?: Record<string, unknown>,
+    options?: BuildPathOptions,
+  ): string {
     const route = this.#routesByName.get(name);
 
     if (!route) {
-      throw new Error(`Route not found: ${name}`);
+      throw new Error(`[buildPath] '${name}' is not defined`);
     }
 
-    const parts = route.buildStaticParts;
-    const slots = route.buildParamSlots;
-
-    if (slots.length === 0) {
-      return this.#rootPath + parts[0];
+    if (route.hasConstraints && params) {
+      this.#validateBuildConstraints(route, name, params);
     }
 
-    let result = this.#rootPath + parts[0];
+    const path = this.#buildUrlPath(route, params);
+    const finalPath = this.#applyTrailingSlash(path, options?.trailingSlash);
+    const queryString = this.#buildQueryStringForBuild(
+      route,
+      params,
+      options?.queryParamsMode,
+    );
 
-    for (const [i, slot] of slots.entries()) {
-      const value = params?.[slot.paramName];
-
-      if (value === undefined || value === null) {
-        if (!slot.isOptional) {
-          throw new Error(`Missing required param: ${slot.paramName}`);
-        }
-
-        // Strip trailing separator before appending next static part
-        if (result.length > 1 && result.endsWith("/")) {
-          result = result.slice(0, -1);
-        }
-
-        result += parts[i + 1];
-
-        continue;
-      }
-
-      const stringValue = String(value as string | number | boolean);
-      const encoded = slot.encoder
-        ? slot.encoder(stringValue)
-        : /* v8 ignore next */ encodeURIComponent(stringValue);
-
-      result += encoded + parts[i + 1];
-    }
-
-    return result;
+    return finalPath + (queryString ? `?${queryString}` : "");
   }
 
   getSegmentsByName(name: string): readonly MatcherInputNode[] | undefined {
@@ -240,6 +217,219 @@ export class SegmentMatcher {
     this.#rootPath = rootPath;
   }
 
+  #validateBuildConstraints(
+    route: CompiledRoute,
+    name: string,
+    params: Record<string, unknown>,
+  ): void {
+    for (const [paramName, constraint] of route.constraintPatterns) {
+      const value = params[paramName];
+
+      if (value !== undefined && value !== null) {
+        const stringValue =
+          typeof value === "object"
+            ? JSON.stringify(value)
+            : String(value as string | number | boolean);
+
+        if (!constraint.pattern.test(stringValue)) {
+          throw new Error(
+            `[buildPath] '${name}' — param '${paramName}' value '${stringValue}' does not match constraint '${constraint.constraint}'`,
+          );
+        }
+      }
+    }
+  }
+
+  #buildUrlPath(
+    route: CompiledRoute,
+    params: Record<string, unknown> | undefined,
+  ): string {
+    const parts = route.buildStaticParts;
+    const slots = route.buildParamSlots;
+
+    if (slots.length === 0) {
+      return this.#rootPath + parts[0];
+    }
+
+    let result = this.#rootPath + parts[0];
+
+    for (const [i, slot] of slots.entries()) {
+      const value = params?.[slot.paramName];
+
+      if (value === undefined || value === null) {
+        if (!slot.isOptional) {
+          throw new Error(`Missing required param: ${slot.paramName}`);
+        }
+
+        if (result.length > 1 && result.endsWith("/")) {
+          result = result.slice(0, -1);
+        }
+
+        result += parts[i + 1];
+
+        continue;
+      }
+
+      const stringValue =
+        typeof value === "object"
+          ? JSON.stringify(value)
+          : String(value as string | number | boolean);
+      const encoded = slot.encoder
+        ? slot.encoder(stringValue)
+        : /* v8 ignore next -- @preserve: encoder always set by #compileBuildParams */ encodeURIComponent(
+            stringValue,
+          );
+
+      result += encoded + parts[i + 1];
+    }
+
+    return result;
+  }
+
+  #applyTrailingSlash(
+    path: string,
+    mode: BuildPathOptions["trailingSlash"],
+  ): string {
+    if (mode === "always" && !path.endsWith("/")) {
+      return `${path}/`;
+    }
+
+    /* v8 ignore next 3 -- @preserve: trailing slash may not appear in buildStaticParts; integration-tested via core */
+    if (mode === "never" && path !== "/" && path.endsWith("/")) {
+      return path.slice(0, -1);
+    }
+
+    return path;
+  }
+
+  #buildQueryStringForBuild(
+    route: CompiledRoute,
+    params: Record<string, unknown> | undefined,
+    queryParamsMode: BuildPathOptions["queryParamsMode"],
+  ): string {
+    if (!params) {
+      return "";
+    }
+
+    const queryParamNames = [...route.declaredQueryParams];
+
+    if (queryParamsMode === "loose") {
+      const urlParamNames = new Set(
+        route.buildParamSlots.map((s) => s.paramName),
+      );
+
+      for (const p in params) {
+        if (
+          Object.hasOwn(params, p) &&
+          !route.declaredQueryParamsSet.has(p) &&
+          !urlParamNames.has(p)
+        ) {
+          queryParamNames.push(p);
+        }
+      }
+    }
+
+    const queryObj: Record<string, unknown> = {};
+
+    for (const name of queryParamNames) {
+      if (name in params) {
+        queryObj[name] = params[name];
+      }
+    }
+
+    if (Object.keys(queryObj).length === 0) {
+      return "";
+    }
+
+    return this.#options.buildQueryString(queryObj);
+  }
+
+  #preparePath(
+    path: string,
+  ):
+    | [cleanPath: string, normalized: string, queryString: string | undefined]
+    | undefined {
+    if (path === "") {
+      path = "/";
+    }
+
+    if (!path.startsWith("/")) {
+      return undefined;
+    }
+
+    const hashIdx = path.indexOf("#");
+
+    if (hashIdx !== -1) {
+      path = path.slice(0, hashIdx);
+    }
+
+    if (RAW_UNICODE_PATTERN.test(path)) {
+      return undefined;
+    }
+
+    if (this.#rootPath.length > 0) {
+      if (!path.startsWith(this.#rootPath)) {
+        return undefined;
+      }
+
+      path = path.slice(this.#rootPath.length) || "/";
+    }
+
+    const qIdx = path.indexOf("?");
+    const pathPart = qIdx === -1 ? path : path.slice(0, qIdx);
+    const queryString = qIdx === -1 ? undefined : path.slice(qIdx + 1);
+
+    if (pathPart.includes("//")) {
+      return undefined;
+    }
+
+    const cleanPath = pathPart;
+
+    const normalized =
+      cleanPath.length > 1 && cleanPath.endsWith("/")
+        ? cleanPath.slice(0, -1)
+        : cleanPath;
+
+    return [cleanPath, normalized, queryString];
+  }
+
+  #buildResult(
+    route: CompiledRoute,
+    params: Record<string, unknown>,
+    queryString: string | undefined,
+  ): MatchResult | undefined {
+    if (queryString !== undefined) {
+      const queryParams = this.#options.parseQueryString(queryString);
+
+      if (this.#options.strictQueryParams) {
+        const declared = route.declaredQueryParamsSet;
+
+        for (const key of Object.keys(queryParams)) {
+          if (!declared.has(key)) {
+            return undefined;
+          }
+        }
+      }
+
+      for (const key of Object.keys(queryParams)) {
+        params[key] = queryParams[key];
+      }
+    }
+
+    return {
+      segments: route.matchSegments,
+      buildSegments: route.buildSegments,
+      params,
+      meta: route.meta,
+    };
+  }
+
+  #checkTrailingSlash(cleanPath: string, route: CompiledRoute): boolean {
+    const inputHasSlash = cleanPath.length > 1 && cleanPath.endsWith("/");
+
+    return inputHasSlash === route.hasTrailingSlash;
+  }
+
   #registerNode(
     node: MatcherInputNode,
     parentPath: string,
@@ -253,9 +443,16 @@ export class SegmentMatcher {
     }
 
     const isAbsolute = node.absolute;
-    const nodePath = isAbsolute
-      ? node.paramMeta.pathPattern.slice(1)
-      : node.paramMeta.pathPattern;
+    const pathPattern = node.paramMeta.pathPattern;
+    const strippedPattern =
+      isAbsolute && pathPattern.startsWith("~")
+        ? pathPattern.slice(1)
+        : pathPattern;
+    const rawNodePath = isAbsolute ? strippedPattern : pathPattern;
+
+    // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
+    // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
+    const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
 
     const matchPath = isAbsolute
       ? nodePath
@@ -621,7 +818,7 @@ export class SegmentMatcher {
     path: string,
     params: Record<string, string>,
   ): CompiledRoute | undefined {
-    /* v8 ignore start -- root "/" is always in #staticCache */
+    /* v8 ignore start -- @preserve: root "/" is always in #staticCache */
     if (path.length === 1) {
       return this.#root.slashChildRoute ?? this.#root.route;
     }
@@ -688,9 +885,13 @@ export class SegmentMatcher {
   }
 
   #decodeParams(params: Record<string, string>): boolean {
-    if (this.#options.urlParamsEncoding === "none") {
+    const encoding = this.#options.urlParamsEncoding;
+
+    if (encoding === "none") {
       return true;
     }
+
+    const decode = DECODING_METHODS[encoding];
 
     for (const key in params) {
       const v = params[key];
@@ -703,7 +904,20 @@ export class SegmentMatcher {
         return false;
       }
 
-      params[key] = decodeURIComponent(v);
+      params[key] = decode(v);
+    }
+
+    return true;
+  }
+
+  #validateConstraints(
+    params: Record<string, string>,
+    route: CompiledRoute,
+  ): boolean {
+    for (const [paramName, constraint] of route.constraintPatterns) {
+      if (!constraint.pattern.test(params[paramName])) {
+        return false;
+      }
     }
 
     return true;
@@ -718,7 +932,7 @@ export class SegmentMatcher {
           return false;
         }
 
-        /* v8 ignore start -- codePointAt cannot return undefined due to bounds check above */
+        /* v8 ignore start -- @preserve: codePointAt cannot return undefined due to bounds check above */
         const hex1 = value.codePointAt(i + 1) ?? 0;
         const hex2 = value.codePointAt(i + 2) ?? 0;
         /* v8 ignore stop */
@@ -748,6 +962,11 @@ export class SegmentMatcher {
     segments: readonly MatcherInputNode[],
   ): readonly string[] {
     const queryParams: string[] = [];
+
+    // Include query params declared on the root node (e.g., from setRootPath("?mode"))
+    if (this.#rootQueryParams.length > 0) {
+      queryParams.push(...this.#rootQueryParams);
+    }
 
     for (const segment of segments) {
       if (segment.paramMeta.queryParams.length > 0) {

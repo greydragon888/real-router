@@ -150,6 +150,14 @@ export interface BuildParamSlot {
   readonly isOptional: boolean;
 }
 
+/**
+ * Per-call options for buildPath.
+ */
+export interface BuildPathOptions {
+  readonly queryParamsMode?: "default" | "strict" | "loose" | undefined;
+  readonly trailingSlash?: "default" | "always" | "never" | undefined;
+}
+
 // =============================================================================
 // Segment Trie Types
 // =============================================================================

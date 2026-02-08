@@ -19,8 +19,6 @@ export { createRouteTree } from "./builder/createRouteTree";
 // Operations
 // =============================================================================
 
-export { buildPath } from "./operations/build";
-
 export { getSegmentsByName } from "./operations/query";
 
 export {
@@ -29,10 +27,16 @@ export {
 } from "./operations/routeTreeToDefinitions";
 
 // =============================================================================
-// Services
+// Matcher Factory (encapsulates SegmentMatcher + search-params DI)
 // =============================================================================
 
-export { MatcherService } from "./services/MatcherService";
+export { createMatcher } from "./createMatcher";
+
+export type {
+  CreateMatcherOptions,
+  Matcher,
+  QueryParamsConfig,
+} from "./createMatcher";
 
 // =============================================================================
 // Validation

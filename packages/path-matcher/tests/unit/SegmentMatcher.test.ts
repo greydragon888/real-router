@@ -450,22 +450,20 @@ describe("SegmentMatcher", () => {
       expect(result!.segments[0].fullName).toBe("about");
     });
 
-    it("should normalize double slashes", () => {
+    it("should reject paths with double slashes", () => {
       const matcher = createStaticMatcher();
 
       const result = matcher.match("/about//");
 
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("about");
+      expect(result).toBeUndefined();
     });
 
-    it("should normalize multiple consecutive slashes", () => {
+    it("should reject paths with multiple consecutive slashes", () => {
       const matcher = createStaticMatcher();
 
       const result = matcher.match("///about");
 
-      expect(result).toBeDefined();
-      expect(result!.segments[0].fullName).toBe("about");
+      expect(result).toBeUndefined();
     });
 
     it("should reject raw unicode in path", () => {
@@ -760,7 +758,7 @@ describe("SegmentMatcher", () => {
       const matcher = createStaticMatcher();
 
       expect(() => matcher.buildPath("unknown")).toThrowError(
-        "Route not found: unknown",
+        "[buildPath] 'unknown' is not defined",
       );
     });
 
@@ -1271,13 +1269,12 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ id: "123" });
     });
 
-    it("should normalize double slashes before param matching", () => {
+    it("should reject paths with double slashes before param matching", () => {
       const matcher = createParamMatcher();
 
       const result = matcher.match("/users//123");
 
-      expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
+      expect(result).toBeUndefined();
     });
 
     it("should strip hash before param matching", () => {
@@ -1289,13 +1286,13 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ id: "123" });
     });
 
-    it("should strip query string before param matching", () => {
+    it("should parse query string and merge with URL params", () => {
       const matcher = createParamMatcher();
 
       const result = matcher.match("/users/123?foo=bar");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ id: "123" });
+      expect(result!.params).toStrictEqual({ id: "123", foo: "bar" });
     });
 
     it("should return correct meta for param routes", () => {
@@ -1709,6 +1706,103 @@ describe("SegmentMatcher", () => {
       matcher.registerTree(rootNode);
 
       expect(matcher.buildPath("search", {})).toBe("/search");
+    });
+
+    it("should validate constraints in buildPath", () => {
+      const matcher = new SegmentMatcher();
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: String.raw`/:id<\d+>`,
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // Valid
+      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
+        "/users/123",
+      );
+
+      // Invalid
+      expect(() =>
+        matcher.buildPath("users.profile", { id: "abc" }),
+      ).toThrowError(/does not match constraint/);
+
+      // Object value — serialized via JSON.stringify before constraint check
+      expect(() =>
+        matcher.buildPath("users.profile", { id: { foo: 1 } }),
+      ).toThrowError(/does not match constraint/);
+    });
+
+    it("should skip constraint validation for undefined optional param", () => {
+      const matcher = new SegmentMatcher();
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: String.raw`/:id<\d+>?`,
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // Optional param with constraint - should not throw when omitted
+      expect(matcher.buildPath("users.profile", {})).toBe("/users");
+    });
+
+    it("should serialize object params to JSON", () => {
+      const matcher = createParamBuildMatcher();
+
+      // Default encoding preserves sub-delimiters like : and ,
+      // JSON {"foo":"bar"} → encodeURIComponentExcludingSubDelims
+      const result = matcher.buildPath("users.profile", {
+        id: { foo: "bar" },
+      });
+
+      expect(result).toContain("/users/");
+      expect(result).toContain("foo");
+      expect(result).toContain("bar");
+    });
+
+    it("should serialize array params to JSON", () => {
+      const matcher = createParamBuildMatcher();
+
+      // Default encoding preserves commas: [1,2] → %5B1,2%5D
+      expect(matcher.buildPath("users.profile", { id: [1, 2] })).toBe(
+        "/users/%5B1,2%5D",
+      );
     });
   });
 
@@ -2476,13 +2570,13 @@ describe("SegmentMatcher", () => {
       expect(result!.params).toStrictEqual({ path: "a/b/c/d/e" });
     });
 
-    it("should strip query string before splat matching", () => {
+    it("should parse query string with splat matching", () => {
       const matcher = createSplatMatcher();
 
       const result = matcher.match("/files/a/b?dl=true");
 
       expect(result).toBeDefined();
-      expect(result!.params).toStrictEqual({ path: "a/b" });
+      expect(result!.params).toStrictEqual({ path: "a/b", dl: "true" });
     });
 
     it("should strip hash before splat matching", () => {
@@ -2754,6 +2848,356 @@ describe("SegmentMatcher", () => {
       expect(matcher.buildPath("files", { path: "docs/readme.md" })).toBe(
         "/app/files/docs/readme.md",
       );
+    });
+  });
+
+  // ===========================================================================
+  // buildPath — trailing slash options
+  // ===========================================================================
+
+  describe("buildPath — trailing slash options", () => {
+    it("should add trailing slash when mode is 'always'", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/home",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
+        "/home/",
+      );
+    });
+
+    it("should not double trailing slash when already present", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/home/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("home", {}, { trailingSlash: "always" })).toBe(
+        "/home/",
+      );
+    });
+
+    it("should remove trailing slash when mode is 'never'", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/home/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("home", {}, { trailingSlash: "never" })).toBe(
+        "/home",
+      );
+    });
+
+    it("should not remove slash from root path '/'", () => {
+      const matcher = new SegmentMatcher();
+
+      const indexNode = createInputNode({
+        name: "index",
+        path: "/",
+        fullName: "index",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["index", indexNode]]),
+        nonAbsoluteChildren: [indexNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("index", {}, { trailingSlash: "never" })).toBe(
+        "/",
+      );
+    });
+
+    it("should not modify path without trailingSlash option", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/home",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("home", {})).toBe("/home");
+    });
+  });
+
+  // ===========================================================================
+  // buildPath — query string options
+  // ===========================================================================
+
+  describe("buildPath — query string options", () => {
+    it("should include declared query params", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?q&page",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("search", { q: "test", page: "2" })).toBe(
+        "/search?q=test&page=2",
+      );
+    });
+
+    it("should omit query params not in params", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?q&page",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("search", { q: "hello" })).toBe(
+        "/search?q=hello",
+      );
+    });
+
+    it("should return path without query string when no query params are provided", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?q",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("search", {})).toBe("/search");
+    });
+
+    it("should inherit root query params to child routes", () => {
+      const matcher = new SegmentMatcher();
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users/:id",
+        fullName: "users",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "?mode",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("users", { id: "42", mode: "dev" })).toBe(
+        "/users/42?mode=dev",
+      );
+    });
+
+    it("should add undeclared params as query params in loose mode", () => {
+      const matcher = new SegmentMatcher();
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users/:id",
+        fullName: "users",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(
+        matcher.buildPath(
+          "users",
+          { id: "42", extra: "value", another: "one" },
+          { queryParamsMode: "loose" },
+        ),
+      ).toBe("/users/42?extra=value&another=one");
+    });
+
+    it("should not add undeclared params in default mode", () => {
+      const matcher = new SegmentMatcher();
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users/:id",
+        fullName: "users",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("users", { id: "42", extra: "value" })).toBe(
+        "/users/42",
+      );
+    });
+
+    it("should not duplicate declared query params in loose mode", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?q",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(
+        matcher.buildPath(
+          "search",
+          { q: "test", extra: "val" },
+          { queryParamsMode: "loose" },
+        ),
+      ).toBe("/search?q=test&extra=val");
+    });
+
+    it("should combine trailing slash and query params", () => {
+      const matcher = new SegmentMatcher();
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?q",
+        fullName: "search",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["search", searchNode]]),
+        nonAbsoluteChildren: [searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(
+        matcher.buildPath("search", { q: "test" }, { trailingSlash: "always" }),
+      ).toBe("/search/?q=test");
+    });
+
+    it("should return empty query string when no params given", () => {
+      const matcher = new SegmentMatcher();
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/home",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.buildPath("home")).toBe("/home");
     });
   });
 
@@ -3122,6 +3566,707 @@ describe("SegmentMatcher", () => {
       expect(result).toBeDefined();
       expect(result!.segments).toHaveLength(2);
       expect(result!.segments[1].fullName).toBe("users.list");
+    });
+  });
+
+  // ===========================================================================
+  // Query Parameters
+  // ===========================================================================
+
+  describe("match — query parameters", () => {
+    function createQueryMatcher(
+      options?: SegmentMatcherOptions,
+    ): SegmentMatcher {
+      const matcher = new SegmentMatcher(options);
+
+      const searchNode = createInputNode({
+        name: "search",
+        path: "/search?query&page",
+        fullName: "search",
+      });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          ["home", homeNode],
+          ["search", searchNode],
+        ]),
+        nonAbsoluteChildren: [homeNode, searchNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should include query params in match result (loose mode)", () => {
+      const matcher = createQueryMatcher();
+
+      const result = matcher.match("/search?query=hello&page=2");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ query: "hello", page: "2" });
+    });
+
+    it("should pass undeclared query params in loose mode", () => {
+      const matcher = createQueryMatcher();
+
+      const result = matcher.match("/search?query=hello&extra=yes");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({
+        query: "hello",
+        extra: "yes",
+      });
+    });
+
+    it("should reject undeclared query params in strict mode", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      const result = matcher.match("/search?query=hello&unknown=x");
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should accept declared query params in strict mode", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      const result = matcher.match("/search?query=hello&page=2");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ query: "hello", page: "2" });
+    });
+
+    it("should return empty params when no query string", () => {
+      const matcher = createQueryMatcher();
+
+      const result = matcher.match("/search");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({});
+    });
+
+    it("should merge URL params with query params", () => {
+      const matcher = new SegmentMatcher();
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id?tab",
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/123?tab=settings");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "123", tab: "settings" });
+    });
+
+    it("should use injected parseQueryString function", () => {
+      const customParser = (qs: string): Record<string, unknown> => ({
+        raw: qs,
+      });
+      const matcher = new SegmentMatcher({ parseQueryString: customParser });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["home", homeNode]]),
+        nonAbsoluteChildren: [homeNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/?custom=format");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ raw: "custom=format" });
+    });
+
+    it("should handle query string with keys only (no values)", () => {
+      const matcher = createQueryMatcher();
+
+      const result = matcher.match("/search?query");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ query: "" });
+    });
+
+    it("should handle strict mode with no query params on URL", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      const result = matcher.match("/search");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({});
+    });
+
+    it("should reject undeclared params via cache in strict mode", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      const result = matcher.match("/search?bad=param");
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should accept partial declared params in strict mode", () => {
+      const matcher = createQueryMatcher({ strictQueryParams: true });
+
+      const result = matcher.match("/search?query=hello");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ query: "hello" });
+    });
+  });
+
+  // ===========================================================================
+  // Trailing Slash (strict mode)
+  // ===========================================================================
+
+  describe("match — strict trailing slash", () => {
+    function createStrictSlashMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher({ strictTrailingSlash: true });
+
+      const trailingNode = createInputNode({
+        name: "trailing",
+        path: "/trailing/",
+        fullName: "trailing",
+      });
+
+      const noTrailingNode = createInputNode({
+        name: "notrailing",
+        path: "/notrailing",
+        fullName: "notrailing",
+      });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          ["home", homeNode],
+          ["trailing", trailingNode],
+          ["notrailing", noTrailingNode],
+        ]),
+        nonAbsoluteChildren: [homeNode, trailingNode, noTrailingNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should match route defined with trailing slash when URL has trailing slash", () => {
+      const matcher = createStrictSlashMatcher();
+
+      const result = matcher.match("/trailing/");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("trailing");
+    });
+
+    it("should reject route defined with trailing slash when URL has no trailing slash", () => {
+      const matcher = createStrictSlashMatcher();
+
+      expect(matcher.match("/trailing")).toBeUndefined();
+    });
+
+    it("should match route defined without trailing slash when URL has no trailing slash", () => {
+      const matcher = createStrictSlashMatcher();
+
+      const result = matcher.match("/notrailing");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("notrailing");
+    });
+
+    it("should reject route defined without trailing slash when URL has trailing slash", () => {
+      const matcher = createStrictSlashMatcher();
+
+      expect(matcher.match("/notrailing/")).toBeUndefined();
+    });
+
+    it("should match root path in strict mode", () => {
+      const matcher = createStrictSlashMatcher();
+
+      const result = matcher.match("/");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("home");
+    });
+
+    it("should handle strict trailing slash with param routes", () => {
+      const matcher = new SegmentMatcher({ strictTrailingSlash: true });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "123" });
+
+      expect(matcher.match("/users/123/")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
+  // Case Sensitivity (extended tests)
+  // ===========================================================================
+
+  describe("match — case sensitivity", () => {
+    function createCaseInsensitiveMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher({ caseSensitive: false });
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          ["home", homeNode],
+          ["users", usersNode],
+        ]),
+        nonAbsoluteChildren: [homeNode, usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should match uppercase static segment", () => {
+      const matcher = createCaseInsensitiveMatcher();
+
+      const result = matcher.match("/USERS");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("users");
+    });
+
+    it("should match mixed case static segment", () => {
+      const matcher = createCaseInsensitiveMatcher();
+
+      const result = matcher.match("/UsErS");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("users");
+    });
+
+    it("should preserve original case in param values", () => {
+      const matcher = createCaseInsensitiveMatcher();
+
+      const result = matcher.match("/users/JohnDoe");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "JohnDoe" });
+    });
+
+    it("should match case-insensitive static with case-preserving param", () => {
+      const matcher = createCaseInsensitiveMatcher();
+
+      const result = matcher.match("/USERS/JohnDoe");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.params).toStrictEqual({ id: "JohnDoe" });
+    });
+
+    it("should reject unknown path in case-sensitive mode", () => {
+      const matcher = new SegmentMatcher({ caseSensitive: true });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["users", usersNode]]),
+        nonAbsoluteChildren: [usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.match("/USERS")).toBeUndefined();
+    });
+  });
+
+  // ===========================================================================
+  // setRootPath (match behavior)
+  // ===========================================================================
+
+  describe("match — setRootPath", () => {
+    function createRootPathMatcher(): SegmentMatcher {
+      const matcher = new SegmentMatcher();
+
+      const profileNode = createInputNode({
+        name: "profile",
+        path: "/:id",
+        fullName: "users.profile",
+      });
+
+      const usersNode = createInputNode({
+        name: "users",
+        path: "/users",
+        fullName: "users",
+        children: new Map([["profile", profileNode]]),
+        nonAbsoluteChildren: [profileNode],
+      });
+
+      const homeNode = createInputNode({
+        name: "home",
+        path: "/",
+        fullName: "home",
+      });
+
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([
+          ["home", homeNode],
+          ["users", usersNode],
+        ]),
+        nonAbsoluteChildren: [homeNode, usersNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      return matcher;
+    }
+
+    it("should strip rootPath prefix before matching", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      const result = matcher.match("/app/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "123" });
+      expect(result!.segments[1].fullName).toBe("users.profile");
+    });
+
+    it("should return undefined when path does not start with rootPath", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      expect(matcher.match("/users/123")).toBeUndefined();
+    });
+
+    it("should match root path with rootPath prefix", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      const result = matcher.match("/app/");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("home");
+    });
+
+    it("should match root path when rootPath is the entire path", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      const result = matcher.match("/app");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("home");
+    });
+
+    it("should prepend rootPath in buildPath", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      expect(matcher.buildPath("users.profile", { id: "123" })).toBe(
+        "/app/users/123",
+      );
+    });
+
+    it("should handle nested rootPath", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/base/app");
+
+      const result = matcher.match("/base/app/users");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("users");
+    });
+
+    it("should handle rootPath with query string", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      const result = matcher.match("/app/users?page=1");
+
+      expect(result).toBeDefined();
+      expect(result!.segments[0].fullName).toBe("users");
+      expect(result!.params).toStrictEqual({ page: "1" });
+    });
+
+    it("should not affect matching when rootPath is empty", () => {
+      const matcher = createRootPathMatcher();
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "123" });
+    });
+
+    it("should use cache keys that are post-strip", () => {
+      const matcher = createRootPathMatcher();
+
+      matcher.setRootPath("/app");
+
+      const result1 = matcher.match("/app/users");
+      const result2 = matcher.match("/app/users");
+
+      expect(result1).toBeDefined();
+      expect(result2).toBeDefined();
+      expect(result1!.segments[0].fullName).toBe("users");
+      expect(result2!.segments[0].fullName).toBe("users");
+    });
+  });
+
+  // ===========================================================================
+  // Constraint Validation
+  // ===========================================================================
+
+  describe("constraint validation", () => {
+    it("should match when param satisfies numeric constraint", () => {
+      const matcher = new SegmentMatcher();
+      const userNode = createInputNode({
+        name: "user",
+        path: String.raw`/users/:id<\d+>`,
+        fullName: "user",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["user", userNode]]),
+        nonAbsoluteChildren: [userNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/123");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "123" });
+    });
+
+    it("should reject when param fails numeric constraint", () => {
+      const matcher = new SegmentMatcher();
+      const userNode = createInputNode({
+        name: "user",
+        path: String.raw`/users/:id<\d+>`,
+        fullName: "user",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["user", userNode]]),
+        nonAbsoluteChildren: [userNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/abc");
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should match without constraints (fast path, hasConstraints is false)", () => {
+      const matcher = new SegmentMatcher();
+      const userNode = createInputNode({
+        name: "user",
+        path: "/users/:id",
+        fullName: "user",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["user", userNode]]),
+        nonAbsoluteChildren: [userNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      const result = matcher.match("/users/abc");
+
+      expect(result).toBeDefined();
+      expect(result!.params).toStrictEqual({ id: "abc" });
+    });
+
+    it("should validate constraint against raw (pre-decode) param value", () => {
+      const matcher = new SegmentMatcher();
+      const userNode = createInputNode({
+        name: "user",
+        path: String.raw`/users/:id<\d+>`,
+        fullName: "user",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["user", userNode]]),
+        nonAbsoluteChildren: [userNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      // %33 decodes to "3", but raw value "%33" does NOT match \d+
+      const result = matcher.match("/users/%33");
+
+      expect(result).toBeUndefined();
+    });
+
+    it("should validate multiple constraints on different params", () => {
+      const matcher = new SegmentMatcher();
+      const postNode = createInputNode({
+        name: "post",
+        path: String.raw`/:postId<\d+>`,
+        fullName: "user.post",
+      });
+      const userNode = createInputNode({
+        name: "user",
+        path: String.raw`/users/:id<\d+>`,
+        fullName: "user",
+        children: new Map([["post", postNode]]),
+        nonAbsoluteChildren: [postNode],
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["user", userNode]]),
+        nonAbsoluteChildren: [userNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.match("/users/123/456")).toBeDefined();
+      expect(matcher.match("/users/123/456")!.params).toStrictEqual({
+        id: "123",
+        postId: "456",
+      });
+      expect(matcher.match("/users/abc/456")).toBeUndefined();
+      expect(matcher.match("/users/123/abc")).toBeUndefined();
+    });
+
+    it("should match with alpha constraint", () => {
+      const matcher = new SegmentMatcher();
+      const slugNode = createInputNode({
+        name: "slug",
+        path: String.raw`/posts/:slug<[a-z-]+>`,
+        fullName: "slug",
+      });
+      const rootNode = createInputNode({
+        name: "",
+        path: "",
+        fullName: "",
+        children: new Map([["slug", slugNode]]),
+        nonAbsoluteChildren: [slugNode],
+      });
+
+      matcher.registerTree(rootNode);
+
+      expect(matcher.match("/posts/hello-world")).toBeDefined();
+      expect(matcher.match("/posts/hello-world")!.params).toStrictEqual({
+        slug: "hello-world",
+      });
+      expect(matcher.match("/posts/Hello123")).toBeUndefined();
     });
   });
 });

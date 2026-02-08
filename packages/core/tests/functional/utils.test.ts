@@ -144,6 +144,12 @@ describe("core/utils", () => {
     });
 
     it("should match paths", () => {
+      router.start("");
+
+      expect(
+        router.buildPath("query", { param1: true, param2: false }),
+      ).toStrictEqual("/query?param1=true&param2=false");
+
       const match = router.matchPath<{ param1: boolean; param: boolean }>(
         "/query?param1=true&param2=false",
       );
@@ -152,6 +158,8 @@ describe("core/utils", () => {
         param1: true,
         param2: false,
       });
+
+      router.stop();
     });
 
     it("should match on start", () => {

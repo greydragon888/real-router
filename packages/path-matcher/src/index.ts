@@ -13,6 +13,7 @@ export { createSegmentNode, SegmentMatcher } from "./SegmentMatcher";
 
 export type {
   BuildParamSlot,
+  BuildPathOptions,
   CompiledRoute,
   ConstraintPattern,
   MatcherInputNode,

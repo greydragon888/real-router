@@ -323,13 +323,13 @@ export class NavigationNamespace {
       return noop;
     }
 
-    const { state: route, segments } = result;
+    const { state: route } = result;
 
     // create a target state
     const toState = deps.makeState(
       route.name,
       route.params,
-      deps.buildPath(route.name, route.params, segments),
+      deps.buildPath(route.name, route.params),
       {
         params: route.meta,
         options: opts,

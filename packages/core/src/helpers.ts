@@ -3,8 +3,7 @@
 import { DEFAULT_LIMITS } from "./constants";
 
 import type { Limits } from "./types";
-import type { State, Options, LimitsConfig } from "@real-router/types";
-import type { BuildOptions, TrailingSlashMode } from "route-tree";
+import type { State, LimitsConfig } from "@real-router/types";
 
 export { getTypeDescription } from "type-guards";
 
@@ -169,55 +168,6 @@ export function freezeStateInPlace<T extends State>(state: T): T {
   frozenRoots.add(state);
 
   return state;
-}
-
-// =============================================================================
-// Route Options Helpers
-// =============================================================================
-
-/**
- * Maps real-router trailingSlash option to route-tree's trailingSlashMode.
- *
- * @param trailingSlash - real-router trailing slash option
- * @returns route-tree trailing slash mode
- * @internal
- */
-function mapTrailingSlashMode(
-  trailingSlash: Options["trailingSlash"],
-): TrailingSlashMode {
-  switch (trailingSlash) {
-    case "never": {
-      return "never";
-    }
-    case "always": {
-      return "always";
-    }
-    default: {
-      return "default";
-    }
-  }
-}
-
-/**
- * Creates route-tree BuildOptions from real-router Options.
- * Used for buildPath caching in routerLifecycle.ts.
- *
- * @param options - real-router options
- * @returns route-tree build options
- */
-export function createBuildOptions(options: Options): BuildOptions {
-  const buildOptions: BuildOptions = {
-    trailingSlashMode: mapTrailingSlashMode(options.trailingSlash),
-    queryParamsMode: options.queryParamsMode,
-    urlParamsEncoding: options.urlParamsEncoding,
-  };
-
-  // Only include queryParams if defined (exactOptionalPropertyTypes)
-  if (options.queryParams !== undefined) {
-    buildOptions.queryParams = options.queryParams;
-  }
-
-  return buildOptions;
 }
 
 /**

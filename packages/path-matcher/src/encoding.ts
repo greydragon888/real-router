@@ -65,7 +65,6 @@ export const encodeURIComponentExcludingSubDelims = (
     return segment;
   }
 
-  /* v8 ignore next 2 */
   return segment.replaceAll(NEEDS_ENCODING_REGEX, (match) =>
     encodeURIComponent(match),
   );
@@ -91,7 +90,6 @@ export const ENCODING_METHODS: Record<
   default: encodeURIComponentExcludingSubDelims,
   uri: encodeURI,
   uriComponent: encodeURIComponent,
-  /* v8 ignore next */
   none: (val) => val,
 };
 
@@ -105,7 +103,6 @@ export const DECODING_METHODS: Record<
   default: decodeURIComponent,
   uri: decodeURI,
   uriComponent: decodeURIComponent,
-  /* v8 ignore next */
   none: (val) => val,
 };
 
@@ -133,7 +130,6 @@ export const DECODING_METHODS: Record<
  * // => 'docs/readme.md' (splat preserves slashes)
  * ```
  */
-/* v8 ignore start -- exercised by route-tree tests, not path-matcher */
 export const encodeParam = (
   param: string | number | boolean,
   encoding: URLParamsEncodingType,
@@ -157,4 +153,3 @@ export const encodeParam = (
 
   return result;
 };
-/* v8 ignore stop */

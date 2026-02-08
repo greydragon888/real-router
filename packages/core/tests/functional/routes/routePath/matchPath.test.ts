@@ -199,12 +199,11 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should decode URL-encoded unicode", () => {
-      router.addRoute({ name: "encoded", path: "/encoded/:text" });
+      router.addRoute({ name: "unicode", path: "/unicode/:text" });
 
-      // 日本 URL-encoded
-      const state = router.matchPath("/encoded/%E6%97%A5%E6%9C%AC");
+      const state = router.matchPath("/unicode/%E6%97%A5%E6%9C%AC");
 
-      expect(state?.name).toBe("encoded");
+      expect(state?.name).toBe("unicode");
       expect(state?.params.text).toBe("日本");
     });
 
@@ -272,16 +271,18 @@ describe("core/routes/routePath/matchPath", () => {
     it("should strictly enforce trailing slash when trailingSlash is strict", () => {
       const customRouter = createTestRouter({ trailingSlash: "strict" });
 
+      customRouter.start("");
+
       customRouter.addRoute({ name: "withSlash", path: "/with/" });
       customRouter.addRoute({ name: "withoutSlash", path: "/without" });
 
-      // Route defined with trailing slash
       expect(customRouter.matchPath("/with/")?.name).toBe("withSlash");
       expect(customRouter.matchPath("/with")).toBeUndefined();
 
-      // Route defined without trailing slash
       expect(customRouter.matchPath("/without")?.name).toBe("withoutSlash");
       expect(customRouter.matchPath("/without/")).toBeUndefined();
+
+      customRouter.stop();
     });
 
     it("should handle trailing slash with parameters", () => {
@@ -471,13 +472,13 @@ describe("core/routes/routePath/matchPath", () => {
     it("should NOT match path with undeclared query params in strict mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.addRoute({ name: "search", path: "/search" }); // No ?q declared
+      customRouter.start("");
 
-      // In strict mode, undeclared query params cause NO MATCH (not just filtering)
-      const state = customRouter.matchPath("/search?q=test");
+      customRouter.addRoute({ name: "search", path: "/search" });
 
-      // Route doesn't match because ?q is not declared
-      expect(state).toBeUndefined();
+      expect(customRouter.matchPath("/search?q=test")).toBeUndefined();
+
+      customRouter.stop();
     });
 
     it("should match path without query params in strict mode", () => {
@@ -505,12 +506,15 @@ describe("core/routes/routePath/matchPath", () => {
     it("should NOT match with extra undeclared params in strict mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.addRoute({ name: "search", path: "/search?q" }); // Only ?q declared
+      customRouter.start("");
 
-      // Extra undeclared param causes NO MATCH in strict mode
-      const state = customRouter.matchPath("/search?q=test&extra=ignored");
+      customRouter.addRoute({ name: "search", path: "/search?q" });
 
-      expect(state).toBeUndefined();
+      expect(
+        customRouter.matchPath("/search?q=test&extra=ignored"),
+      ).toBeUndefined();
+
+      customRouter.stop();
     });
 
     it("should handle mixed declared and undeclared params in default mode", () => {

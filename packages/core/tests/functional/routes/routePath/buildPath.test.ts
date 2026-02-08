@@ -267,7 +267,7 @@ describe("core/routes/routePath/buildPath", () => {
         router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
 
         expect(() => router.buildPath("user", { id: "abc" })).toThrowError(
-          /invalid format/,
+          /does not match constraint/,
         );
       });
 
@@ -439,7 +439,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         expect(() => router.buildPath("user", { id: "42" })).toThrowError(
-          /invalid format/,
+          /does not match constraint/,
         );
       });
     });
