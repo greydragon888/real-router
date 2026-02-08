@@ -255,14 +255,13 @@ if (!IS_ROUTER5) {
 }
 
 // 1.2.15 Navigation with allowNotFound option
-// Note: router5 does not support allowNotFound option via setOption
+// Note: router5 does not support allowNotFound option
 if (!IS_ROUTER5) {
-  const router = createSimpleRouter();
+  const router = createSimpleRouter({ allowNotFound: true });
   // Alternate between different non-existent routes to avoid same-state short-circuit
   const nonExistentRoutes = ["nonexistent-route-a", "nonexistent-route-b"];
   let index = 0;
 
-  router.setOption("allowNotFound", true);
   router.start("/");
 
   bench("1.2.15 Navigation with allowNotFound option", () => {

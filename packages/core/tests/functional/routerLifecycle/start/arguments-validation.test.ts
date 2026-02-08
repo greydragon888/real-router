@@ -45,8 +45,10 @@ describe("router.start() - arguments validation", () => {
 
       it("should handle start with defaultParams", () => {
         // Test the defaultParams ?? {} branch when defaultParams is defined
-        router.setOption("defaultRoute", "items");
-        router.setOption("defaultParams", { id: "123" });
+        router = createTestRouter({
+          defaultRoute: "items",
+          defaultParams: { id: "123" },
+        });
 
         router.start();
 
@@ -82,7 +84,7 @@ describe("router.start() - arguments validation", () => {
       it("should handle start when defaultRoute buildState fails", () => {
         // Test the case where buildState returns falsy in navigateToDefault
         // Use an invalid route name that doesn't exist
-        router.setOption("defaultRoute", "nonexistent-route");
+        router = createTestRouter({ defaultRoute: "nonexistent-route" });
 
         const callback = vi.fn();
 
@@ -155,7 +157,7 @@ describe("router.start() - arguments validation", () => {
       });
 
       it("should not handle start with invalid path when defaultRoute is present", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const startListener = vi.fn();
         const transitionErrorListener = vi.fn();
@@ -182,7 +184,7 @@ describe("router.start() - arguments validation", () => {
       });
 
       it("should handle start with invalid path when allowNotFound is true", () => {
-        router.setOption("allowNotFound", true);
+        router = createTestRouter({ allowNotFound: true });
 
         const startListener = vi.fn();
         const transitionSuccessListener = vi.fn();
@@ -315,7 +317,7 @@ describe("router.start() - arguments validation", () => {
       });
 
       it("should not handle start with invalid path and callback when defaultRoute is present", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const callback = vi.fn();
         const startListener = vi.fn();
@@ -344,7 +346,7 @@ describe("router.start() - arguments validation", () => {
       });
 
       it("should not handle start with invalid path and callback when allowNotFound is true", () => {
-        router.setOption("allowNotFound", true);
+        router = createTestRouter({ allowNotFound: true });
 
         const callback = vi.fn();
         const startListener = vi.fn();
@@ -447,7 +449,7 @@ describe("router.start() - arguments validation", () => {
 
       // Now correctly validates state objects and returns ROUTE_NOT_FOUND error
       it("should handle start with invalid state object and callback", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const startState = {
           name: "nonexistent.route",

@@ -11,9 +11,21 @@ import { errorCodes, events, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { DoneFn, Router } from "@real-router/core";
+import type { DoneFn, Params, Router } from "@real-router/core";
 
 let router: Router;
+
+/**
+ * Helper to recreate the router with specific defaultRoute/defaultParams
+ * and start it. Returns the new router (also assigns to `router` for afterEach).
+ */
+function withDefault(defaultRoute: string, defaultParams: Params = {}): Router {
+  router.stop();
+  router = createTestRouter({ defaultRoute, defaultParams });
+  router.start("/home");
+
+  return router;
+}
 
 describe("navigateToDefault", () => {
   beforeEach(() => {
@@ -56,9 +68,7 @@ describe("navigateToDefault", () => {
     it("should navigate to defaultRoute when defaultRoute is set", () => {
       const callback = vi.fn();
 
-      // Set up router with defaultRoute
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", {});
+      withDefault("users", {});
 
       router.navigateToDefault(callback);
 
@@ -75,8 +85,7 @@ describe("navigateToDefault", () => {
     it("should use empty object as params when defaultParams is not set", () => {
       const callback = vi.fn();
 
-      // Set only defaultRoute, no defaultParams
-      router.setOption("defaultRoute", "profile");
+      withDefault("profile");
 
       router.navigateToDefault(callback);
 
@@ -92,8 +101,7 @@ describe("navigateToDefault", () => {
     it("should pass navigation options through to state meta", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "orders");
-      router.setOption("defaultParams", {});
+      withDefault("orders", {});
 
       const options = { replace: true, source: "default" };
 
@@ -113,7 +121,7 @@ describe("navigateToDefault", () => {
     it("should pass callback through and invoke it on completion", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "settings");
+      withDefault("settings");
 
       router.navigateToDefault(callback);
 
@@ -128,8 +136,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const options = { force: true };
 
-      router.setOption("defaultRoute", "home");
-
+      // defaultRoute "home" is already set by createTestRouter default
       router.navigateToDefault(options, callback);
 
       expect(callback).toHaveBeenCalledWith(
@@ -144,7 +151,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should return cancel function when defaultRoute is set", () => {
-      router.setOption("defaultRoute", "users");
+      withDefault("users");
 
       const result = router.navigateToDefault();
 
@@ -155,8 +162,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const defaultParams = { id: 123, tab: "profile" };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
       router.navigateToDefault(callback);
 
@@ -172,8 +178,7 @@ describe("navigateToDefault", () => {
     it("should work with nested defaultRoute", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "settings.account");
-      router.setOption("defaultParams", { section: "privacy" });
+      withDefault("settings.account", { section: "privacy" });
 
       router.navigateToDefault(callback);
 
@@ -189,7 +194,7 @@ describe("navigateToDefault", () => {
     it("should delegate all navigation logic internally", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "admin.dashboard");
+      withDefault("admin.dashboard");
 
       router.navigateToDefault({ reload: true }, callback);
 
@@ -209,7 +214,7 @@ describe("navigateToDefault", () => {
 
   describe("when defaultRoute is set", () => {
     it("should navigate to defaultRoute with correct route name", () => {
-      router.setOption("defaultRoute", "users");
+      withDefault("users");
 
       router.navigateToDefault({}, (err, state) => {
         expect(err).toBeUndefined();
@@ -221,8 +226,7 @@ describe("navigateToDefault", () => {
     it("should navigate to defaultRoute with defaultParams if set", () => {
       const defaultParams = { id: 42, tab: "profile" };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -232,7 +236,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should navigate to nested defaultRoute correctly", () => {
-      router.setOption("defaultRoute", "orders.pending");
+      withDefault("orders.pending");
 
       router.navigateToDefault({}, (err, state) => {
         expect(err).toBeUndefined();
@@ -244,8 +248,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultRoute with complex path structure", () => {
       const params = { section: "section123", id: 456 };
 
-      router.setOption("defaultRoute", "section.view");
-      router.setOption("defaultParams", params);
+      withDefault("section.view", params);
 
       router.navigateToDefault({}, (err, state) => {
         expect(err).toBeUndefined();
@@ -259,7 +262,7 @@ describe("navigateToDefault", () => {
 
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "settings");
+      withDefault("settings");
 
       router.navigateToDefault(callback);
 
@@ -282,7 +285,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
 
       // Set up non-existent route as default
-      router.setOption("defaultRoute", "non.existent.route");
+      withDefault("non.existent.route");
 
       router.navigateToDefault(callback);
 
@@ -299,7 +302,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.setOption("defaultRoute", "admin");
+      withDefault("admin");
 
       router.canActivate("admin", () => blockingGuard);
 
@@ -318,7 +321,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const blockingMiddleware = vi.fn().mockReturnValue(false);
 
-      router.setOption("defaultRoute", "users");
+      withDefault("users");
       router.useMiddleware(() => blockingMiddleware);
 
       router.navigateToDefault(callback);
@@ -337,7 +340,7 @@ describe("navigateToDefault", () => {
     it("should respect navigation options when navigating to defaultRoute", () => {
       const onSuccess = vi.fn();
 
-      router.setOption("defaultRoute", "profile");
+      withDefault("profile");
 
       const unsubSuccess = router.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -367,16 +370,16 @@ describe("navigateToDefault", () => {
     });
 
     it("should work with force option to navigate to same route", () => {
+      // Create router with defaultRoute "profile"
+      withDefault("profile");
+
       // Navigate to profile first
       router.navigate("profile", {}, {}, (err) => {
         expect(err).toBeUndefined();
 
-        // Set profile as default
-        router.setOption("defaultRoute", "profile");
-
         // Navigate to default with force (same route)
-        router.navigateToDefault({ force: true }, (err, state) => {
-          expect(err).toBeUndefined();
+        router.navigateToDefault({ force: true }, (err2, state) => {
+          expect(err2).toBeUndefined();
           expect(state?.name).toBe("profile");
           expect(state?.meta?.options.force).toBe(true);
         });
@@ -386,7 +389,7 @@ describe("navigateToDefault", () => {
     it("should handle skipTransition option for defaultRoute navigation", () => {
       const onSuccess = vi.fn();
 
-      router.setOption("defaultRoute", "orders");
+      withDefault("orders");
 
       const unsubSuccess = router.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -408,7 +411,7 @@ describe("navigateToDefault", () => {
       const onStart = vi.fn();
       const onSuccess = vi.fn();
 
-      router.setOption("defaultRoute", "settings");
+      withDefault("settings");
 
       const unsubStart = router.addEventListener(
         events.TRANSITION_START,
@@ -445,8 +448,7 @@ describe("navigateToDefault", () => {
         id: 123,
       };
 
-      router.setOption("defaultRoute", "orders.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("orders.view", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -457,7 +459,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should work when router state changes after setting defaultRoute", () => {
-      router.setOption("defaultRoute", "users");
+      withDefault("users");
 
       // Navigate to different route first
       router.navigate("profile", {}, {}, (err) => {
@@ -465,8 +467,8 @@ describe("navigateToDefault", () => {
         expect(router.getState()?.name).toBe("profile");
 
         // Now navigate to default
-        router.navigateToDefault((err, state) => {
-          expect(err).toBeUndefined();
+        router.navigateToDefault((err2, state) => {
+          expect(err2).toBeUndefined();
           expect(state?.name).toBe("users");
           expect(router.getState()?.name).toBe("users");
         });
@@ -477,7 +479,7 @@ describe("navigateToDefault", () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn().mockReturnValue(true);
 
-      router.setOption("defaultRoute", "settings.account");
+      withDefault("settings.account");
       router.canActivate("settings.account", () => canActivateGuard);
       router.useMiddleware(() => middleware);
 
@@ -497,7 +499,7 @@ describe("navigateToDefault", () => {
 
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "users");
+      withDefault("users");
 
       router.useMiddleware(() => (_toState, _fromState, done) => {
         setTimeout(done, 50);
@@ -529,8 +531,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const defaultParams = { id: 42, category: "tech" };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
       router.navigateToDefault(callback);
 
@@ -548,8 +549,7 @@ describe("navigateToDefault", () => {
       const defaultParams = { id: 123 };
       const options = { replace: true, source: "auto" };
 
-      router.setOption("defaultRoute", "orders.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("orders.view", defaultParams);
 
       router.navigateToDefault(options, callback);
 
@@ -569,8 +569,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const defaultParams = { section: "section123", id: 456 };
 
-      router.setOption("defaultRoute", "section.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("section.view", defaultParams);
 
       router.navigateToDefault(callback);
 
@@ -588,8 +587,7 @@ describe("navigateToDefault", () => {
       const defaultParams = { userId: "user123" };
       const options = { force: true };
 
-      router.setOption("defaultRoute", "profile.user");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("profile.user", defaultParams);
 
       router.navigateToDefault(options, callback);
 
@@ -618,8 +616,7 @@ describe("navigateToDefault", () => {
         page: 1,
       };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
       router.navigateToDefault(callback);
 
@@ -635,8 +632,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultParams as empty object", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "profile");
-      router.setOption("defaultParams", {});
+      withDefault("profile", {});
 
       router.navigateToDefault(callback);
 
@@ -652,8 +648,7 @@ describe("navigateToDefault", () => {
     it("should use defaultParams for successful navigation", () => {
       const defaultParams = { id: 555 };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -666,8 +661,7 @@ describe("navigateToDefault", () => {
     it("should pass defaultParams through to final state", () => {
       const defaultParams = { param: "custom_value" };
 
-      router.setOption("defaultRoute", "withDefaultParam");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("withDefaultParam", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -680,8 +674,7 @@ describe("navigateToDefault", () => {
     it("should work with route that has encoded params", () => {
       const defaultParams = { one: "value1", two: "value2" };
 
-      router.setOption("defaultRoute", "withEncoder");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("withEncoder", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -694,8 +687,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultParams with nested route", () => {
       const defaultParams = { userId: "admin" };
 
-      router.setOption("defaultRoute", "profile.user");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("profile.user", defaultParams);
 
       router.navigateToDefault((err, state) => {
         expect(err).toBeUndefined();
@@ -708,8 +700,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultParams when navigation fails", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "non.existent.route");
-      router.setOption("defaultParams", { id: 999 });
+      withDefault("non.existent.route", { id: 999 });
 
       router.navigateToDefault(callback);
 
@@ -726,8 +717,7 @@ describe("navigateToDefault", () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
       const defaultParams = { id: 777 };
 
-      router.setOption("defaultRoute", "admin");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("admin", defaultParams);
 
       router.canActivate("admin", () => blockingGuard);
 
@@ -757,7 +747,6 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
 
       // Test different types of valid parameters (plain objects only)
-      // Note: Date and RegExp have custom prototypes and are not valid params
       const testCases = [
         { id: 123 },
         { name: "test", active: true },
@@ -768,8 +757,7 @@ describe("navigateToDefault", () => {
       testCases.forEach((defaultParams) => {
         callback.mockClear();
 
-        router.setOption("defaultRoute", "users");
-        router.setOption("defaultParams", defaultParams);
+        withDefault("users", defaultParams);
 
         router.navigateToDefault(callback);
 
@@ -781,31 +769,23 @@ describe("navigateToDefault", () => {
           }),
         );
       });
-      // router.stop() is called in afterEach
     });
 
-    it("should NOT be affected by mutation of defaultParams after setting", () => {
-      const callback = vi.fn();
+    it("should freeze defaultParams at construction (immutable options)", () => {
       const defaultParams = { id: 100, mutable: "original" };
 
-      router.setOption("defaultRoute", "users.view");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users.view", defaultParams);
 
-      // Mutate the original object after setting
-      // With frozen options, setOption creates a copy, so this won't affect router
-      defaultParams.mutable = "changed";
-      defaultParams.id = 200;
+      // Options are deep-frozen, so mutation throws TypeError
+      expect(() => {
+        defaultParams.mutable = "changed";
+      }).toThrowError(TypeError);
 
-      router.navigateToDefault(callback);
-
-      // Should use the ORIGINAL values (frozen copy was made at setOption time)
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: { id: 100, mutable: "original" },
-        }),
-      );
+      // Verify the router still has original values
+      expect(router.getOption("defaultParams")).toStrictEqual({
+        id: 100,
+        mutable: "original",
+      });
     });
 
     it("should handle defaultParams with special characters and values", () => {
@@ -819,8 +799,7 @@ describe("navigateToDefault", () => {
         float: 3.141_59,
       };
 
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", defaultParams);
+      withDefault("users", defaultParams);
 
       router.navigateToDefault(callback);
 
@@ -833,13 +812,11 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should work with dynamic defaultParams changes", () => {
+    it("should work with different constructor defaultParams", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "users.view");
-
-      // First navigation with initial params
-      router.setOption("defaultParams", { id: 1 });
+      // Test with first set of params
+      withDefault("users.view", { id: 1 });
 
       router.navigateToDefault(callback);
 
@@ -853,8 +830,8 @@ describe("navigateToDefault", () => {
 
       callback.mockClear();
 
-      // Change defaultParams and navigate again (router stays started)
-      router.setOption("defaultParams", { id: 2, new: "param" });
+      // Create a new router with different defaultParams
+      withDefault("users.view", { id: 2, new: "param" });
 
       router.navigateToDefault(callback);
 
@@ -870,8 +847,7 @@ describe("navigateToDefault", () => {
 
   describe("argument parsing", () => {
     beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { tab: "main" });
+      withDefault("users", { tab: "main" });
     });
 
     it("should handle no arguments", () => {
@@ -968,8 +944,7 @@ describe("navigateToDefault", () => {
 
   describe("navigation options", () => {
     beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { id: 123 });
+      withDefault("users", { id: 123 });
     });
 
     it("should pass replace option through to state meta", () => {
@@ -1100,15 +1075,14 @@ describe("navigateToDefault", () => {
 
   describe("error handling", () => {
     beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { id: 123 });
+      withDefault("users", { id: 123 });
     });
 
     it("should handle navigation errors correctly", () => {
       const callback = vi.fn();
 
       // Set a non-existent route as default
-      router.setOption("defaultRoute", "non.existent.route");
+      withDefault("non.existent.route");
 
       router.navigateToDefault(callback);
 
@@ -1122,7 +1096,7 @@ describe("navigateToDefault", () => {
     it("should handle non-existent defaultRoute", () => {
       const callback = vi.fn();
 
-      router.setOption("defaultRoute", "non.existent.route");
+      withDefault("non.existent.route");
 
       router.navigateToDefault(callback);
 
@@ -1138,7 +1112,7 @@ describe("navigateToDefault", () => {
       const callback = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.setOption("defaultRoute", "admin");
+      withDefault("admin");
       router.canActivate("admin", () => blockingGuard);
 
       router.navigateToDefault(callback);
@@ -1156,8 +1130,6 @@ describe("navigateToDefault", () => {
       vi.useFakeTimers();
 
       const callback = vi.fn();
-
-      router.setOption("defaultRoute", "users");
 
       // Add async middleware to enable cancellation
       router.useMiddleware(() => (_toState, _fromState, done) => {
@@ -1217,8 +1189,7 @@ describe("navigateToDefault", () => {
 
   describe("return value", () => {
     beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { id: 123 });
+      withDefault("users", { id: 123 });
     });
 
     it("should return cancel function that cancels defaultRoute navigation", () => {
@@ -1343,15 +1314,10 @@ describe("navigateToDefault", () => {
   });
 
   describe("router state integration", () => {
-    beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { id: 123 });
-    });
-
     it("should work when router is started", () => {
       const callback = vi.fn();
 
-      // Ensure router is started
+      withDefault("users", { id: 123 });
 
       router.navigateToDefault(callback);
 
@@ -1371,6 +1337,10 @@ describe("navigateToDefault", () => {
 
       // Stop router if it's running
       router.stop();
+      router = createTestRouter({
+        defaultRoute: "users",
+        defaultParams: { id: 123 },
+      });
 
       router.navigateToDefault(callback);
 
@@ -1384,12 +1354,10 @@ describe("navigateToDefault", () => {
       expect(router.isActive()).toBe(false);
     });
 
-    it("should respect router options changes after creation", () => {
+    it("should use constructor options for navigation", () => {
       const callback = vi.fn();
 
-      // Change options after router creation
-      router.setOption("defaultRoute", "profile");
-      router.setOption("defaultParams", { section: "settings" });
+      withDefault("profile", { section: "settings" });
 
       router.navigateToDefault(callback);
 
@@ -1402,12 +1370,11 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should work with router.setOptions() dynamic changes", () => {
+    it("should work with different option combinations via separate routers", () => {
       const callback = vi.fn();
 
-      // Test multiple dynamic changes
-      router.setOption("defaultRoute", "settings");
-      router.setOption("defaultParams", { view: "summary" });
+      // First router with settings default
+      withDefault("settings", { view: "summary" });
 
       router.navigateToDefault(callback);
 
@@ -1421,9 +1388,8 @@ describe("navigateToDefault", () => {
 
       callback.mockClear();
 
-      // Change again and test
-      router.setOption("defaultRoute", "admin.dashboard");
-      router.setOption("defaultParams", { tab: "users", filter: "active" });
+      // Second router with admin.dashboard default
+      withDefault("admin.dashboard", { tab: "users", filter: "active" });
 
       router.navigateToDefault({ replace: true }, callback);
 
@@ -1442,8 +1408,7 @@ describe("navigateToDefault", () => {
 
   describe("edge cases", () => {
     beforeEach(() => {
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { id: 123 });
+      withDefault("users", { id: 123 });
     });
 
     it("should handle router.getOptions() returning partial options", () => {
@@ -1468,9 +1433,7 @@ describe("navigateToDefault", () => {
 
       const callback = vi.fn();
 
-      // Set up circular scenario: defaultRoute navigates back to itself
-      router.setOption("defaultRoute", "users");
-      router.setOption("defaultParams", { redirect: "default" });
+      withDefault("users", { redirect: "default" });
 
       // Add middleware that could potentially cause circular navigation
       router.useMiddleware(() => (toState, _fromState, done) => {
@@ -1544,7 +1507,7 @@ describe("navigateToDefault", () => {
       expectTypeOf(cancel2).toBeFunction();
       expectTypeOf(cancel3).toBeFunction();
 
-      // Each should be different
+      // Each should be a different function
       expect(cancel1).not.toBe(cancel2);
       expect(cancel2).not.toBe(cancel3);
 

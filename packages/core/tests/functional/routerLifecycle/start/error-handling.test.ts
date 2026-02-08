@@ -122,7 +122,7 @@ describe("router.start() - error handling", () => {
       // Issue #50: Two-phase start - Router is NOT started if default route navigation fails
       it("should NOT start router when default route navigation fails (two-phase start)", () => {
         // Set invalid default route
-        router.setOption("defaultRoute", "nonexistent.route");
+        router = createTestRouter({ defaultRoute: "nonexistent.route" });
 
         const callback = vi.fn();
         const startListener = vi.fn();
@@ -218,7 +218,7 @@ describe("router.start() - error handling", () => {
       it("should catch and log exception from TRANSITION_ERROR event listener", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         // Add listener that throws on TRANSITION_ERROR
         router.addEventListener(events.TRANSITION_ERROR, () => {
@@ -497,7 +497,7 @@ describe("router.start() - error handling", () => {
   describe("Issue #44: router.start() should NOT silently fallback to defaultRoute on transition errors", () => {
     describe("transition error handling when defaultRoute is set", () => {
       beforeEach(() => {
-        router.setOption("defaultRoute", "home");
+        router = createTestRouter({ defaultRoute: "home" });
       });
 
       it("should return transition error to callback instead of falling back silently", () => {

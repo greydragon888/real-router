@@ -9,7 +9,6 @@ import { isObjKey, getTypeDescription } from "type-guards";
 
 import {
   defaultOptions,
-  UNLOCKED_OPTIONS,
   VALID_OPTION_VALUES,
   VALID_QUERY_PARAMS,
 } from "./constants";
@@ -41,18 +40,6 @@ export function validateOptionExists(
 ): void {
   if (!Object.hasOwn(defaultOptions, optionName)) {
     throw optionNotFoundError(methodName, optionName as keyof Options);
-  }
-}
-
-/**
- * Validates that options are not locked for this option.
- */
-export function validateNotLocked(isLocked: boolean, optionName: string): void {
-  if (isLocked && !UNLOCKED_OPTIONS.has(optionName as keyof Options)) {
-    throw new Error(
-      `[router.setOption] Options cannot be changed after router.start(). ` +
-        `Only defaultRoute/defaultParams can be changed after start.`,
-    );
   }
 }
 

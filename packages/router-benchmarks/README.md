@@ -173,7 +173,6 @@ Performance Summary:
 | 02  | Navigation Plugins | Sync/async middleware and guards            |
 | 03  | Dependencies       | Dependency injection operations             |
 | 04  | Plugins Management | Plugin registration and lifecycle           |
-| 05  | Router Options     | Options initialization and modification     |
 | 07  | Path Operations    | buildPath, matchPath, setRootPath           |
 | 08  | Current State      | State creation, comparison, building        |
 | 09  | Redirects          | Middleware redirects, guards, forwardTo     |
@@ -195,7 +194,6 @@ packages/router-benchmarks/
 │   ├── 02-navigation-plugins/
 │   ├── 03-dependencies/
 │   ├── 04-plugins-management/
-│   ├── 05-router-options/
 │   ├── 07-path-operations/
 │   ├── 08-current-state/
 │   ├── 09-redirects/

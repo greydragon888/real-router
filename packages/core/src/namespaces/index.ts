@@ -15,7 +15,6 @@ export {
   defaultOptions,
   optionNotFoundError,
   OptionsNamespace,
-  UNLOCKED_OPTIONS,
   VALID_OPTION_VALUES,
   VALID_QUERY_PARAMS,
 } from "./OptionsNamespace";

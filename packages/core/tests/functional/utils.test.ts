@@ -81,21 +81,25 @@ describe("core/utils", () => {
     it("should match deep `/` routes", () => {
       router.stop();
 
-      router.setOption("trailingSlash", "never");
+      const neverRouter = createTestRouter({ trailingSlash: "never" });
 
-      expect(omitMeta(router.matchPath("/profile"))).toStrictEqual({
+      expect(omitMeta(neverRouter.matchPath("/profile"))).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile",
       });
 
-      router.setOption("trailingSlash", "always");
+      neverRouter.stop();
 
-      expect(omitMeta(router.matchPath("/profile"))).toStrictEqual({
+      const alwaysRouter = createTestRouter({ trailingSlash: "always" });
+
+      expect(omitMeta(alwaysRouter.matchPath("/profile"))).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile/",
       });
+
+      alwaysRouter.stop();
     });
   });
 

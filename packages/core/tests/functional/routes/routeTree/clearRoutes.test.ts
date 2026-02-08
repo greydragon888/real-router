@@ -672,11 +672,11 @@ describe("core/routes/clearRoutes", () => {
       // Routes cleared
       expect(router.matchPath("/home")).toBeUndefined();
 
-      // Can add new routes and restart
-      // Issue #50: With two-phase start, we need to set new defaultRoute after clearRoutes
-      // since the old defaultRoute ("home") no longer exists
+      // Can add new routes and restart with new defaultRoute
+      // Issue #50: With two-phase start, we need a new router with new defaultRoute
+      // since the old defaultRoute ("home") no longer exists and setOption is removed
+      router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.setOption("defaultRoute", "dashboard");
       router.start();
 
       expect(router.getState()?.name).toBe("dashboard");

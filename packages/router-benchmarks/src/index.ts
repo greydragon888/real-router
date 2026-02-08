@@ -139,11 +139,6 @@ const SECTION_IMPORTS: Record<number, string[]> = {
     "./04-plugins-management/4.1-adding.bench",
     "./04-plugins-management/4.2-edge-cases.bench",
   ],
-  5: [
-    "./05-router-options/5.1-initialization.bench",
-    "./05-router-options/5.2-modification.bench",
-    "./05-router-options/5.3-edge-cases.bench",
-  ],
   7: [
     "./07-path-operations/7.1-buildPath.bench",
     "./07-path-operations/7.2-matchPath.bench",
@@ -251,7 +246,6 @@ const SECTION_NAMES: Record<number, string> = {
   2: "02-navigation-plugins",
   3: "03-dependencies",
   4: "04-plugins-management",
-  5: "05-router-options",
   6: "06-route-nodes",
   7: "07-path-operations",
   8: "08-current-state",

@@ -89,7 +89,7 @@ export class RoutesNamespace<
   #rootPath = "";
   #tree: RouteTree;
   #matcher: Matcher;
-  #matcherOptions?: CreateMatcherOptions;
+  readonly #matcherOptions: CreateMatcherOptions | undefined;
 
   // Dependencies injected via setDependencies (for facade method calls)
   #depsStore: RoutesDependencies<Dependencies> | undefined;
@@ -118,8 +118,14 @@ export class RoutesNamespace<
   // Constructor
   // =========================================================================
 
-  constructor(routes: Route<Dependencies>[] = [], noValidate = false) {
+  constructor(
+    routes: Route<Dependencies>[] = [],
+    noValidate = false,
+    matcherOptions?: CreateMatcherOptions,
+  ) {
     this.#noValidate = noValidate;
+    this.#matcherOptions = matcherOptions;
+
     // Sanitize routes to store only essential properties
     for (const route of routes) {
       this.#definitions.push(sanitizeRoute(route));
@@ -132,8 +138,8 @@ export class RoutesNamespace<
       this.#definitions,
     );
 
-    // Initialize matcher and register tree
-    this.#matcher = createMatcher();
+    // Initialize matcher with options and register tree
+    this.#matcher = createMatcher(matcherOptions);
     this.#matcher.registerTree(this.#tree);
 
     // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
@@ -635,27 +641,6 @@ export class RoutesNamespace<
     );
 
     return { state, segments: segments as readonly RouteTree[] };
-  }
-
-  /**
-   * Creates the matcher with finalized router options.
-   * Called at router.start() after options are frozen.
-   */
-  initMatcher(options: Options): void {
-    const matcherOptions: CreateMatcherOptions = {
-      strictTrailingSlash: options.trailingSlash === "strict",
-      strictQueryParams: options.queryParamsMode === "strict",
-      urlParamsEncoding: options.urlParamsEncoding,
-      queryParams:
-        /* v8 ignore next -- @preserve: queryParams always provided via defaults */
-        options.queryParams ?? {},
-    };
-
-    // Store options for use in #rebuildTree()
-    this.#matcherOptions = matcherOptions;
-
-    this.#matcher = createMatcher(matcherOptions);
-    this.#matcher.registerTree(this.#tree);
   }
 
   // =========================================================================

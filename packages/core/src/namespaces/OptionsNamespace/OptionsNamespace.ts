@@ -3,11 +3,9 @@
 import { defaultOptions } from "./constants";
 import { deepFreeze } from "./helpers";
 import {
-  validateNotLocked,
   validateOptionExists,
   validateOptionName,
   validateOptions,
-  validateOptionValue,
 } from "./validators";
 
 import type { Options } from "@real-router/types";
@@ -15,12 +13,12 @@ import type { Options } from "@real-router/types";
 /**
  * Independent namespace for managing router options.
  *
+ * Options are immutable after construction.
  * Static methods handle validation (called by facade).
- * Instance methods handle storage and lock state.
+ * Instance methods provide read-only access.
  */
 export class OptionsNamespace {
-  #options: Readonly<Options>;
-  #locked = false;
+  readonly #options: Readonly<Options>;
 
   constructor(initialOptions: Partial<Options> = {}) {
     // Note: validation should be done by facade before calling constructor
@@ -46,18 +44,6 @@ export class OptionsNamespace {
     validateOptionExists(optionName, methodName);
   }
 
-  static validateNotLocked(isLocked: boolean, optionName: string): void {
-    validateNotLocked(isLocked, optionName);
-  }
-
-  static validateOptionValue(
-    optionName: keyof Options,
-    value: unknown,
-    methodName: string,
-  ): void {
-    validateOptionValue(optionName, value, methodName);
-  }
-
   static validateOptions(
     options: unknown,
     methodName: string,
@@ -66,7 +52,7 @@ export class OptionsNamespace {
   }
 
   // =========================================================================
-  // Instance methods (trust input - already validated by facade)
+  // Instance methods (read-only access)
   // =========================================================================
 
   /**
@@ -85,50 +71,5 @@ export class OptionsNamespace {
    */
   getOption<K extends keyof Options>(optionName: K): Options[K] {
     return this.#options[optionName];
-  }
-
-  /**
-   * Sets a single option value.
-   * Input already validated by facade (including lock check).
-   *
-   * @param optionName - Already validated by facade
-   * @param value - Already validated by facade
-   */
-  set<K extends keyof Options>(optionName: K, value: Options[K]): void {
-    // Recreate frozen options with new value
-    // For nested objects (defaultParams), create a shallow copy to avoid
-    // sharing mutable references
-    const newValue =
-      value && typeof value === "object" && value.constructor === Object
-        ? { ...value }
-        : value;
-
-    this.#options = deepFreeze({
-      ...this.#options,
-      [optionName]: newValue,
-    });
-  }
-
-  /**
-   * Returns true if options are locked.
-   * Used by facade for lock validation.
-   */
-  isLocked(): boolean {
-    return this.#locked;
-  }
-
-  /**
-   * Locks options - called when router starts.
-   * After locking, only UNLOCKED_OPTIONS can be changed.
-   */
-  lock(): void {
-    this.#locked = true;
-  }
-
-  /**
-   * Unlocks options - called when router stops.
-   */
-  unlock(): void {
-    this.#locked = false;
   }
 }

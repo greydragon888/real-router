@@ -23,7 +23,7 @@ export const defaultOptions: Options = {
 
 /**
  * Valid values for string enum options.
- * Used for runtime validation in setOption/withOptions.
+ * Used for runtime validation in constructor options.
  */
 export const VALID_OPTION_VALUES = {
   trailingSlash: ["strict", "never", "always", "preserve"] as const,
@@ -39,11 +39,3 @@ export const VALID_QUERY_PARAMS = {
   booleanFormat: ["none", "string", "empty-true"] as const,
   nullFormat: ["default", "hidden"] as const,
 } as const;
-
-/**
- * Options that can be changed after router is locked (started).
- */
-export const UNLOCKED_OPTIONS = new Set<keyof Options>([
-  "defaultRoute",
-  "defaultParams",
-]);
