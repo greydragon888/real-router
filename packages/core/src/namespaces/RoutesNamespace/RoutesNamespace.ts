@@ -539,7 +539,22 @@ export class RoutesNamespace<
       let builtPath = path;
 
       if (opts.rewritePathOnMatch) {
-        builtPath = this.buildPath(routeName, routeParams, opts);
+        // Inline buildPath: skip UNKNOWN_ROUTE check (matchResult exists)
+        // and defaultParams re-merge (already done in forwardState).
+        // Encoder is still needed when decoder renames params.
+        const buildParams =
+          typeof this.#config.encoders[routeName] === "function"
+            ? this.#config.encoders[routeName]({
+                ...(routeParams as Params),
+              })
+            : (routeParams as Record<string, unknown>);
+
+        const ts = opts.trailingSlash;
+
+        builtPath = this.#matcher.buildPath(routeName, buildParams, {
+          trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+          queryParamsMode: opts.queryParamsMode,
+        });
       }
 
       // Create state using deps.makeState

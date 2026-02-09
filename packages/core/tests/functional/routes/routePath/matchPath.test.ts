@@ -625,7 +625,7 @@ describe("core/routes/routePath/matchPath", () => {
   });
 
   describe("encoder", () => {
-    it("should call encoder during matchPath when rewritePathOnMatch is true", () => {
+    it("should call encoder during matchPath when encoder is defined", () => {
       const customRouter = createTestRouter();
       let encoderCalled = false;
 
@@ -641,8 +641,8 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.matchPath("/enc/123");
 
-      // Current behavior: encoder IS called during matchPath because
-      // rewritePathOnMatch triggers this.buildPath() which uses encoder
+      // Encoder IS called during matchPath rewrite because decoder may rename
+      // params, requiring encoder to reverse the transformation for buildPath
       expect(encoderCalled).toBe(true);
     });
 
