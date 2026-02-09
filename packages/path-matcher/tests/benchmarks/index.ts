@@ -1,15 +1,13 @@
 /**
- * RouteTree Benchmarks Entry Point
+ * Path Matcher Benchmarks Entry Point
  *
  * Run: pnpm bench
- * Results: .bench/mitata-results.json
+ * Results: .bench/path-matcher-results.json
  *
  * Categories:
- * 1. matchPath - URL matching (HOT PATH)
- * 2. buildPath - URL generation via router API
- * 3. add/build - route tree construction
- * 4. scenarios - SPA/Enterprise real-world scenarios
- * 5. realistic-usage
+ * 1. match-hotpath - match() hot path micro-benchmarks
+ * 2. pipeline - match + buildPath pipeline
+ * 3. stress - extreme condition stress tests
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -17,14 +15,9 @@ import { fileURLToPath } from "node:url";
 
 import { run } from "mitata";
 
-// Import all benchmark files (they register benchmarks via summary/bench)anhthu2022
-import "./matchPath.bench";
-import "./buildPath.bench";
-import "./add.bench";
-import "./scenarios.bench";
-import "./realistic-usage.bench";
+// Import all benchmark files (they register benchmarks via summary/bench)
 import "./match-hotpath.bench";
-import "./integration-pipeline.bench";
+import "./pipeline.bench";
 import "./stress.bench";
 
 // ============================================================================
@@ -33,7 +26,7 @@ import "./stress.bench";
 
 // @ts-expect-error - import.meta.url is supported by tsx runtime
 const OUTPUT_DIR = fileURLToPath(new URL("../../.bench", import.meta.url));
-const OUTPUT_FILE = `${OUTPUT_DIR}/route-tree-results.json`;
+const OUTPUT_FILE = `${OUTPUT_DIR}/path-matcher-results.json`;
 
 interface HeapStats {
   avg: number;

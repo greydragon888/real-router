@@ -42,7 +42,8 @@
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
   },
   "sideEffects": false
 }

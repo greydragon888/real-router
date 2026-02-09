@@ -2,7 +2,7 @@
   {
     "name": "@real-router/core (ESM)",
     "path": "packages/core/dist/esm/index.mjs",
-    "limit": "22 kB"
+    "limit": "21 kB"
   },
   {
     "name": "@real-router/react (ESM)",
@@ -26,9 +26,14 @@
     "limit": "0.5 kB"
   },
   {
+    "name": "path-matcher (ESM)",
+    "path": "packages/path-matcher/dist/esm/index.mjs",
+    "limit": "4 kB"
+  },
+  {
     "name": "route-tree (ESM)",
     "path": "packages/route-tree/dist/esm/index.mjs",
-    "limit": "6.5 kB"
+    "limit": "6 kB"
   },
   {
     "name": "search-params (ESM)",
