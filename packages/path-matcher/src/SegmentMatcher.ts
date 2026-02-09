@@ -366,7 +366,6 @@ export class SegmentMatcher {
 
     return {
       segments: route.matchSegments,
-      buildSegments: route.buildSegments,
       params,
       meta: route.meta,
     };
@@ -408,11 +407,10 @@ export class SegmentMatcher {
       const lookupKey = this.#options.caseSensitive
         ? segment
         : segment.toLowerCase();
-      const staticChild = node.staticChildren[lookupKey];
       let next: SegmentNode;
 
       if (lookupKey in node.staticChildren) {
-        next = staticChild;
+        next = node.staticChildren[lookupKey];
       } else if (node.paramChild) {
         next = node.paramChild.node;
         params[node.paramChild.name] = segment;

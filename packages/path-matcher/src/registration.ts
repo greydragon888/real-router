@@ -107,12 +107,6 @@ function compileAndRegisterRoute(
   const slashChild = isSlashChild(matchPath, parentPath);
 
   const frozenSegments = Object.freeze([...segments]);
-
-  // Slash-child: buildSegments excludes the slash-child node itself
-  const buildSegments = slashChild
-    ? Object.freeze(segments.slice(0, -1))
-    : frozenSegments;
-
   const frozenMeta = buildMeta(frozenSegments);
 
   const normalizedPath = normalizeTrailingSlash(matchPath);
@@ -139,7 +133,6 @@ function compileAndRegisterRoute(
     parent: parentRoute,
     depth: segments.length - 1,
     matchSegments: frozenSegments,
-    buildSegments,
     meta: frozenMeta,
     declaredQueryParams,
     declaredQueryParamsSet: new Set(declaredQueryParams),

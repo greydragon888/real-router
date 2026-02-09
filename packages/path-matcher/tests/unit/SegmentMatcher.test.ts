@@ -118,7 +118,6 @@ describe("type compilation", () => {
       hasConstraints: false,
       buildStaticParts: ["/"],
       buildParamSlots: [],
-      buildSegments: [],
     };
 
     expect(route.name).toBe("home");
@@ -141,7 +140,6 @@ describe("type compilation", () => {
   it("should compile MatchResult interface", () => {
     const result: MatchResult = {
       segments: [],
-      buildSegments: [],
       params: {},
       meta: {},
     };
@@ -492,16 +490,6 @@ describe("SegmentMatcher", () => {
 
       expect(result).toBeDefined();
       expect(result!.meta).toStrictEqual({ about: {} });
-    });
-
-    it("should return correct buildSegments", () => {
-      const matcher = createStaticMatcher();
-
-      const result = matcher.match("/about");
-
-      expect(result).toBeDefined();
-      expect(result!.buildSegments).toHaveLength(1);
-      expect(result!.buildSegments[0].fullName).toBe("about");
     });
 
     it("should handle case-sensitive matching (default)", () => {
@@ -1302,17 +1290,6 @@ describe("SegmentMatcher", () => {
       });
     });
 
-    it("should return correct buildSegments for param routes", () => {
-      const matcher = createParamMatcher();
-
-      const result = matcher.match("/users/123");
-
-      expect(result).toBeDefined();
-      expect(result!.buildSegments).toHaveLength(2);
-      expect(result!.buildSegments[0].fullName).toBe("users");
-      expect(result!.buildSegments[1].fullName).toBe("users.profile");
-    });
-
     it("should handle slash-child with param parent", () => {
       const matcher = new SegmentMatcher();
 
@@ -1879,15 +1856,6 @@ describe("SegmentMatcher", () => {
       expect(Object.isFrozen(segments)).toBe(true);
     });
 
-    it("should set buildSegments equal to matchSegments (non slash-child)", () => {
-      const { matcher } = createNestedMatcher();
-
-      const result = matcher.match("/users/123/settings");
-
-      expect(result).toBeDefined();
-      expect(result!.buildSegments).toStrictEqual(result!.segments);
-    });
-
     it("should build meta with paramTypeMap for each segment", () => {
       const { matcher } = createNestedMatcher();
 
@@ -2055,17 +2023,6 @@ describe("SegmentMatcher", () => {
       expect(result!.segments[1].fullName).toBe("users.list");
     });
 
-    it("should include slash-child in matchSegments but NOT in buildSegments", () => {
-      const matcher = createSlashChildMatcher();
-
-      const result = matcher.match("/users");
-
-      expect(result).toBeDefined();
-      expect(result!.segments).toHaveLength(2);
-      expect(result!.buildSegments).toHaveLength(1);
-      expect(result!.buildSegments[0].fullName).toBe("users");
-    });
-
     it("should not affect sibling param routes", () => {
       const matcher = createSlashChildMatcher();
 
@@ -2115,7 +2072,6 @@ describe("SegmentMatcher", () => {
       expect(result).toBeDefined();
       expect(result!.segments).toHaveLength(2);
       expect(result!.segments[1].fullName).toBe("users.list");
-      expect(result!.buildSegments).toHaveLength(1);
     });
 
     it("should handle slash-child with parent param route", () => {

@@ -98,7 +98,7 @@ matcher.registerTree(tree);
 
 // Match URL to route
 const result = matcher.match("/users/123");
-// → { segments, params: { id: "123" }, meta, buildSegments }
+// → { segments, params: { id: "123" }, meta }
 
 // Build URL from route name
 matcher.buildPath("users.profile", { id: "123" });

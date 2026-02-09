@@ -138,7 +138,6 @@ export interface CompiledRoute {
 
   readonly buildStaticParts: readonly string[];
   readonly buildParamSlots: readonly BuildParamSlot[];
-  readonly buildSegments: readonly MatcherInputNode[];
 
   readonly forwardTo?: string;
   readonly defaultParams?: Readonly<Record<string, unknown>>;
@@ -176,7 +175,6 @@ export interface SegmentNode {
 
 export interface MatchResult {
   readonly segments: readonly MatcherInputNode[];
-  readonly buildSegments: readonly MatcherInputNode[];
   readonly params: Readonly<Record<string, unknown>>;
   readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
 }
