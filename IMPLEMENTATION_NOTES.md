@@ -425,17 +425,20 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 `.size-limit.json` defines per-package limits:
 
-| Package                          | Limit |
-| -------------------------------- | ----- |
-| @real-router/core                | 25 kB |
-| @real-router/react               | 10 kB |
-| @real-router/rx                  | 5 kB  |
-| @real-router/browser-plugin      | 5 kB  |
-| @real-router/helpers             | 3 kB  |
-| route-tree                       | 15 kB |
-| search-params                    | 5 kB  |
-| @real-router/types, type-guards  | 2 kB  |
-| logger-plugin, persistent-params | 3 kB  |
+| Package                            | Limit  |
+| ---------------------------------- | ------ |
+| @real-router/core                  | 21 kB  |
+| @real-router/react                 | 2 kB   |
+| @real-router/rx                    | 1.5 kB |
+| @real-router/browser-plugin        | 4 kB   |
+| @real-router/helpers               | 0.5 kB |
+| path-matcher                       | 4 kB   |
+| route-tree                         | 6.5 kB |
+| search-params                      | 1.5 kB |
+| type-guards                        | 1.5 kB |
+| @real-router/logger                | 0.5 kB |
+| @real-router/logger-plugin         | 1.5 kB |
+| @real-router/persistent-params     | 1.5 kB |
 
 React package ignores `react` and `react-dom` from size calculation.
 
@@ -592,9 +595,7 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
 
-**MS-PL (Microsoft Public License):** Added for `rou3` dependency which is dual-licensed `MIT AND MS-PL`. MS-PL is a permissive license compatible with MIT.
-
-## Infrastructure Changes (rou3 Migration)
+## Infrastructure Changes (rou3 Migration — historical)
 
 ### SonarQube Scanner Rename
 

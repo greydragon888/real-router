@@ -27,11 +27,11 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
-| Metric | Improvement |
-| --- | --- |
-| Navigation | 1.7–2x faster |
-| URL building | 4–10x faster |
-| Memory allocations | 1.4x fewer |
+| Metric | Improvement                           |
+| --- |---------------------------------------|
+| Navigation | 2x faster                             |
+| URL building | 5–10x faster                          |
+| Memory allocations | 1.5x fewer                            |
 | Scaling | Both O(1) — stable at any route count |
 
 ### Modern Architecture
