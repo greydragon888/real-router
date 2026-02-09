@@ -21,8 +21,10 @@ Named route tree with high-performance matching and path building for Real-Route
 ### Performance Optimizations
 
 - **O(1) route lookup** — `children` Map for instant access by name
-- **Radix tree matching** — rou3-powered high-performance route matching
+- **Segment Trie matching** — custom Segment Trie via `path-matcher` for O(segments) URL matching
+- **Static route cache** — parameterless routes resolved in O(1) via hash map
 - **Pre-computed caches** — `staticPath`, `fullName`, `paramTypeMap`
+- **Pre-compiled buildPath** — `buildStaticParts` + `buildParamSlots` for fast URL generation
 - **Lazy allocation** — arrays created only when needed
 - **Immutable by default** — frozen trees prevent accidental mutations
 
@@ -73,32 +75,49 @@ interface TreeBuildOptions {
 
 ---
 
-### `buildPath(tree, routeName, params?, options?)`
+### `createMatcher(options?)`
 
-Builds a URL path from route name and parameters.
+Creates a path matcher with search-params DI baked in. Returns a `Matcher` instance wrapping the `SegmentMatcher` from `path-matcher`.
 
 ```typescript
-import { buildPath } from "route-tree";
+import { createMatcher, createRouteTree } from "route-tree";
 
-buildPath(tree, "users.profile", { id: "123" });
+const tree = createRouteTree("", "", [
+  { name: "home", path: "/" },
+  { name: "users", path: "/users" },
+  { name: "users.profile", path: "/:id" },
+  { name: "search", path: "/search?q&page" },
+]);
+
+const matcher = createMatcher({
+  strictTrailingSlash: true,
+  queryParams: { booleanFormat: "string" },
+});
+
+matcher.registerTree(tree);
+
+// Match URL to route
+const result = matcher.match("/users/123");
+// → { segments, params: { id: "123" }, meta }
+
+// Build URL from route name
+matcher.buildPath("users.profile", { id: "123" });
 // → "/users/123"
 
-buildPath(tree, "users.profile.edit", { id: "123" });
-// → "/users/123/edit"
-
-// With query params
-buildPath(tree, "search", { q: "router", page: 1 });
+// Build with query params
+matcher.buildPath("search", { q: "router", page: 1 });
 // → "/search?q=router&page=1"
 ```
 
 **Options:**
 
 ```typescript
-interface BuildOptions {
-  trailingSlashMode?: "default" | "always" | "never";
-  queryParamsMode?: "default" | "strict" | "loose";
-  queryParams?: QueryParamsOptions;
+interface CreateMatcherOptions {
+  caseSensitive?: boolean; // default: true
+  strictTrailingSlash?: boolean; // default: false
+  strictQueryParams?: boolean; // default: false
   urlParamsEncoding?: "default" | "uri" | "uriComponent" | "none";
+  queryParams?: QueryParamsConfig;
 }
 ```
 
@@ -163,6 +182,11 @@ import type {
   RouteTree,
   RouteDefinition,
 
+  // Matcher types
+  CreateMatcherOptions,
+  Matcher,
+  QueryParamsConfig,
+
   // Options
   BuildOptions,
   MatchOptions,
@@ -211,6 +235,14 @@ import type {
 // Params: { q: "term", page: "1" }
 ```
 
+### Constraint Parameters
+
+```typescript
+{ name: "user", path: "/users/:id<\\d+>" }
+// Matches: /users/123
+// Does NOT match: /users/abc
+```
+
 ### Absolute Paths
 
 ```typescript
@@ -224,22 +256,25 @@ import type {
 
 1. **Validation** — validate route definitions
 2. **Tree Building** — create mutable tree structure
-3. **rou3 Registration** — register routes in radix tree for matching
-4. **Cache Computing** — compute all lookup caches
-5. **Freezing** — make tree immutable
+3. **Cache Computing** — compute all lookup caches
+4. **Freezing** — make tree immutable
 
 ### Matching Algorithm
 
-Route matching is powered by [rou3](https://github.com/unjs/rou3), a high-performance radix tree router:
+Route matching is powered by a custom Segment Trie (via `path-matcher`):
 
-1. **Radix Tree Lookup** — rou3 finds matching route using radix tree
-2. **Parameter Extraction** — extract URL parameters from matched path
-3. **Segment Resolution** — build segment chain from matched route
+1. **Static Cache Check** — O(1) lookup for parameterless routes
+2. **Segment Trie Traversal** — walk trie segment-by-segment with priority: static > param > splat
+3. **Parameter Extraction** — capture URL parameters during traversal
+4. **Constraint Validation** — validate params against regex constraints
+5. **Decoding** — decode percent-encoded parameter values
 
 ```
 /users/123/edit
   ↓
-rou3.findRoute("/users/123/edit") → "users.profile.edit"
+Static cache miss → traverse Segment Trie
+  ↓
+Walk: root → "users" (static) → "123" (param :id) → "edit" (static)
   ↓
 Extract params: { id: "123" }
   ↓
@@ -248,6 +283,7 @@ Build segments: [usersNode, profileNode, editNode]
 
 ## Dependencies
 
+- `path-matcher` — Segment Trie URL matching and path building (internal package)
 - `search-params` — query string parsing and building (internal package)
 
 ## Related Packages

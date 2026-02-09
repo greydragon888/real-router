@@ -16,6 +16,7 @@ export const TYPES = [
 export const SCOPES = [
   "core",
   "types",
+  "path-matcher",
   "route-tree",
   "search-params",
   "type-guards",

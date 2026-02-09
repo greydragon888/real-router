@@ -75,7 +75,7 @@ describe("router.start() - edge cases", () => {
 
   describe("Circular reference in params", () => {
     it("should reject state with circular reference in params", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const params: Record<string, unknown> = { id: "123" };
 
@@ -247,7 +247,7 @@ describe("router.start() - edge cases", () => {
   describe("State validation with isState()", () => {
     beforeEach(() => {
       // Disable fallback to UNKNOWN_ROUTE to get ROUTE_NOT_FOUND errors
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
     });
 
     it("should reject state with missing path field", () => {

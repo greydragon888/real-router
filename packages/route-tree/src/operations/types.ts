@@ -115,9 +115,6 @@ export interface MatchResult<P extends RouteParams = RouteParams> {
   /** Matched route segments (with slashChild) — for createRouteState() */
   readonly segments: readonly RouteTree[];
 
-  /** Matched route segments (without slashChild) — for buildPath() */
-  readonly buildSegments: readonly RouteTree[];
-
   /** Extracted parameters (URL params + query params) */
   readonly params: P;
 

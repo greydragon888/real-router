@@ -118,7 +118,7 @@ function processParamChunk(
  */
 function forEachParam(
   searchPart: string,
-  handler: (chunk: string, start: number, end: number) => void,
+  handler: (chunk: string) => void,
 ): void {
   let start = 0;
   const len = searchPart.length;
@@ -130,7 +130,7 @@ function forEachParam(
       end = len;
     }
 
-    handler(searchPart.slice(start, end), start, end);
+    handler(searchPart.slice(start, end));
     start = end + 1;
   }
 }
@@ -254,6 +254,10 @@ function parseIntoInternal(
 
 /**
  * Build a querystring from an object of parameters.
+ *
+ * Note: Empty arrays produce an empty string, so `parse(build({ items: [] }))`
+ * will not contain the `items` key. This is expected behavior for all array
+ * formats except `comma` (which produces `"items="` for empty arrays).
  *
  * @example
  * ```typescript

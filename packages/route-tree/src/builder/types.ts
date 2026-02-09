@@ -8,7 +8,7 @@
  * @module builder/types
  */
 
-import type { ParamMeta } from "../services/buildParamMeta";
+import type { ParamMeta } from "path-matcher";
 
 // =============================================================================
 // Route Definition Types
@@ -134,7 +134,7 @@ export interface RouteTreeBuilder {
    *
    * This will:
    * 1. Build the tree structure
-   * 2. Register routes with rou3 radix tree for matching
+   * 2. Register routes with segment trie for matching
    * 3. Compute all caches
    * 4. Freeze and return the tree
    *

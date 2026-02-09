@@ -10,7 +10,7 @@
  * - Absolute paths
  *
  * IMPORTANT: match() is a non-mutating operation.
- * MatcherService must be created OUTSIDE bench blocks.
+ * Matcher must be created OUTSIDE bench blocks.
  */
 
 import { barplot, bench, boxplot, lineplot, summary } from "mitata";
@@ -26,11 +26,13 @@ import {
   generateWideTree,
 } from "./helpers/generators";
 import { createRouteTree } from "../../src/builder";
-import { MatcherService } from "../../src/services/MatcherService";
+import { createMatcher as createMatcherFactory } from "../../src/createMatcher";
+
+import type { Matcher } from "../../src/createMatcher";
 
 /** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
-function createMatcher(tree: any): MatcherService {
-  const matcher = new MatcherService();
+function createMatcher(tree: any): Matcher {
+  const matcher = createMatcherFactory();
 
   matcher.registerTree(tree);
 
@@ -53,23 +55,9 @@ interface BenchState {
   const warmupMatcher = createMatcher(warmupTree);
 
   for (let i = 0; i < 100; i++) {
-    // Warmup: shallow match
     warmupMatcher.match("/");
     warmupMatcher.match("/users");
-
-    // Warmup: match with URL params
     warmupMatcher.match("/users/123/details");
-
-    // Warmup: match with options
-    warmupMatcher.match("/users", { queryParamsMode: "default" });
-    warmupMatcher.match("/users", { queryParamsMode: "strict" });
-    warmupMatcher.match("/users", { queryParamsMode: "loose" });
-    warmupMatcher.match("/users", { trailingSlashMode: "default" });
-    warmupMatcher.match("/users", { trailingSlashMode: "never" });
-    warmupMatcher.match("/users", { trailingSlashMode: "always" });
-    warmupMatcher.match("/users", { strictTrailingSlash: true });
-
-    // Warmup: no match
     warmupMatcher.match("/nonexistent-path-xyz");
   }
 }
@@ -134,24 +122,21 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "users", path: "/users?page&sort" }];
     const tree = createRouteTree("", "", routes);
-    const matcher = createMatcher(tree);
+    const matcherDefault = createMatcher(tree);
+    const matcherStrict = createMatcherFactory({ strictQueryParams: true });
+
+    matcherStrict.registerTree(tree);
 
     bench("matchSegments: query default mode", () => {
-      matcher.match("/users?page=1&sort=name", {
-        queryParamsMode: "default",
-      });
+      matcherDefault.match("/users?page=1&sort=name");
     });
 
     bench("matchSegments: query strict mode", () => {
-      matcher.match("/users?page=1&sort=name", {
-        queryParamsMode: "strict",
-      });
+      matcherStrict.match("/users?page=1&sort=name");
     });
 
-    bench("matchSegments: query loose mode", () => {
-      matcher.match("/users?page=1&sort=name&extra=val", {
-        queryParamsMode: "loose",
-      });
+    bench("matchSegments: query default (extra params)", () => {
+      matcherDefault.match("/users?page=1&sort=name&extra=val");
     });
   });
 });
@@ -180,22 +165,17 @@ barplot(() => {
   summary(() => {
     const routes = [{ name: "users", path: "/users" }];
     const tree = createRouteTree("", "", routes);
-    const matcher = createMatcher(tree);
+    const matcherDefault = createMatcher(tree);
+    const matcherStrict = createMatcherFactory({ strictTrailingSlash: true });
+
+    matcherStrict.registerTree(tree);
 
     bench("matchSegments: trailing slash default", () => {
-      matcher.match("/users/", { trailingSlashMode: "default" });
-    });
-
-    bench("matchSegments: trailing slash never", () => {
-      matcher.match("/users/", { trailingSlashMode: "never" });
-    });
-
-    bench("matchSegments: trailing slash always", () => {
-      matcher.match("/users", { trailingSlashMode: "always" });
+      matcherDefault.match("/users/");
     });
 
     bench("matchSegments: strictTrailingSlash", () => {
-      matcher.match("/users", { strictTrailingSlash: true });
+      matcherStrict.match("/users");
     });
   });
 });

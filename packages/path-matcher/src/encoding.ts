@@ -1,11 +1,11 @@
-// packages/route-tree/src/services/encoding.ts
+// packages/path-matcher/src/encoding.ts
 
 /**
  * URL Parameter Encoding.
  *
  * Encoding strategies for URL parameters.
  *
- * @module services/encoding
+ * @module encoding
  */
 
 /**
@@ -14,7 +14,7 @@
  */
 /* eslint-disable prefer-template */
 
-import type { URLParamsEncodingType } from "../operations/types";
+import type { URLParamsEncodingType } from "./types";
 
 // =============================================================================
 // Encoding Constants
@@ -65,7 +65,6 @@ export const encodeURIComponentExcludingSubDelims = (
     return segment;
   }
 
-  /* v8 ignore next 2 */
   return segment.replaceAll(NEEDS_ENCODING_REGEX, (match) =>
     encodeURIComponent(match),
   );
@@ -104,7 +103,6 @@ export const DECODING_METHODS: Record<
   default: decodeURIComponent,
   uri: decodeURI,
   uriComponent: decodeURIComponent,
-  /* v8 ignore next */
   none: (val) => val,
 };
 

@@ -193,21 +193,20 @@ describe("core/routes/routePath/buildPath", () => {
 
       cycleRouter.stop();
 
-      // Change options while stopped
-      cycleRouter.setOption("trailingSlash", "always");
+      // Second cycle — create router with new trailingSlash option
+      const cycleRouter2 = createTestRouter({ trailingSlash: "always" });
 
-      // Second cycle — new trailingSlash option should be used
-      cycleRouter.start("/home");
-      const path2 = cycleRouter.buildPath("home");
+      cycleRouter2.start("/home");
+      const path2 = cycleRouter2.buildPath("home");
 
       expect(path2).toBe("/home/");
 
-      cycleRouter.stop();
+      cycleRouter2.stop();
     });
 
     it("should apply trailingSlash option correctly", () => {
       router.stop();
-      router.setOption("trailingSlash", "always");
+      router = createTestRouter({ trailingSlash: "always" });
       router.start("/home");
 
       const path = router.buildPath("home");
@@ -215,7 +214,7 @@ describe("core/routes/routePath/buildPath", () => {
       expect(path).toBe("/home/");
 
       router.stop();
-      router.setOption("trailingSlash", "never");
+      router = createTestRouter({ trailingSlash: "never" });
       router.start("/home");
     });
   });
@@ -267,7 +266,7 @@ describe("core/routes/routePath/buildPath", () => {
         router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
 
         expect(() => router.buildPath("user", { id: "abc" })).toThrowError(
-          /invalid format/,
+          /does not match constraint/,
         );
       });
 
@@ -439,7 +438,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         expect(() => router.buildPath("user", { id: "42" })).toThrowError(
-          /invalid format/,
+          /does not match constraint/,
         );
       });
     });

@@ -30,8 +30,19 @@ export interface ArrayStrategy {
 // Helpers
 // =============================================================================
 
-const encodeValue = (value: unknown): string =>
-  encodeURIComponent(value as string | number | boolean);
+const encodeValue = (value: unknown): string => {
+  const type = typeof value;
+
+  if (type !== "string" && type !== "number" && type !== "boolean") {
+    const received = type === "object" && value === null ? "null" : type;
+
+    throw new TypeError(
+      `[search-params] Array element must be a string, number, or boolean — received ${received}`,
+    );
+  }
+
+  return encodeURIComponent(value as string | number | boolean);
+};
 
 // =============================================================================
 // Strategy Implementations

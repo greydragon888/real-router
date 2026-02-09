@@ -215,7 +215,7 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute({ name: "people", path: "/users" }, methodName, rootNode);
-      }).toThrowError('Path "/users" is already defined');
+      }).toThrowError('[router.add] Path "/users" is already defined');
     });
 
     it("should not throw when route does not exist", () => {
@@ -247,7 +247,7 @@ describe("validateRoute", () => {
           methodName,
           rootNode,
         );
-      }).toThrowError('Path "/profile" is already defined');
+      }).toThrowError('[router.add] Path "/profile" is already defined');
     });
 
     it("should not throw when parent does not exist for path check", () => {
@@ -311,7 +311,7 @@ describe("validateRoute", () => {
           undefined,
           seenPaths,
         );
-      }).toThrowError('Path "/users" is already defined');
+      }).toThrowError('[router.add] Path "/users" is already defined');
     });
 
     it("should add path to seenPaths map", () => {
@@ -463,7 +463,7 @@ describe("validateRoute", () => {
           undefined,
           seenPaths,
         );
-      }).toThrowError('Path "/same" is already defined');
+      }).toThrowError('[router.add] Path "/same" is already defined');
     });
   });
 
@@ -596,7 +596,7 @@ describe("validateRoute", () => {
           seenNames,
           seenPaths,
         );
-      }).toThrowError('Path "/existing" is already defined');
+      }).toThrowError('[router.add] Path "/existing" is already defined');
     });
 
     it("should NOT enter pathCheckParent branch when parentName is set (line 458 && !parentName)", () => {

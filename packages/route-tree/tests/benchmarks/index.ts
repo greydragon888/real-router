@@ -24,6 +24,8 @@ import "./add.bench";
 import "./scenarios.bench";
 import "./realistic-usage.bench";
 import "./match-hotpath.bench";
+import "./integration-pipeline.bench";
+import "./stress.bench";
 
 // ============================================================================
 // Run benchmarks and save results

@@ -81,21 +81,25 @@ describe("core/utils", () => {
     it("should match deep `/` routes", () => {
       router.stop();
 
-      router.setOption("trailingSlash", "never");
+      const neverRouter = createTestRouter({ trailingSlash: "never" });
 
-      expect(omitMeta(router.matchPath("/profile"))).toStrictEqual({
+      expect(omitMeta(neverRouter.matchPath("/profile"))).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile",
       });
 
-      router.setOption("trailingSlash", "always");
+      neverRouter.stop();
 
-      expect(omitMeta(router.matchPath("/profile"))).toStrictEqual({
+      const alwaysRouter = createTestRouter({ trailingSlash: "always" });
+
+      expect(omitMeta(alwaysRouter.matchPath("/profile"))).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile/",
       });
+
+      alwaysRouter.stop();
     });
   });
 
@@ -144,6 +148,12 @@ describe("core/utils", () => {
     });
 
     it("should match paths", () => {
+      router.start("");
+
+      expect(
+        router.buildPath("query", { param1: true, param2: false }),
+      ).toStrictEqual("/query?param1=true&param2=false");
+
       const match = router.matchPath<{ param1: boolean; param: boolean }>(
         "/query?param1=true&param2=false",
       );
@@ -152,6 +162,8 @@ describe("core/utils", () => {
         param1: true,
         param2: false,
       });
+
+      router.stop();
     });
 
     it("should match on start", () => {

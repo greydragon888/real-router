@@ -8,7 +8,7 @@
  * @module builder/computeCaches
  */
 
-import { buildParamMeta } from "../services/buildParamMeta";
+import { buildParamMeta } from "path-matcher";
 
 import type { MutableRouteNode } from "./buildTree";
 import type { RouteTree } from "../types";
@@ -34,6 +34,21 @@ function computeFullName(node: RouteTree): string {
 }
 
 /**
+ * Joins two path segments, preventing double slashes at the join point.
+ *
+ * @param base - Base path (e.g., "/users/")
+ * @param suffix - Path to append (e.g., "/profile")
+ * @returns Joined path without double slashes (e.g., "/users/profile")
+ */
+function joinPaths(base: string, suffix: string): string {
+  if (base.endsWith("/") && suffix.startsWith("/")) {
+    return base + suffix.slice(1);
+  }
+
+  return base + suffix;
+}
+
+/**
  * Computes static path for routes without parameters.
  *
  * Returns pre-built path string for fast buildPath lookup,
@@ -56,16 +71,14 @@ function computeStaticPath(node: RouteTree): string | null {
   }
 
   // Build the full path from parent segments + this segment
-  // Collect parent segments via parent chain (same logic as computeParentSegments)
+  // Collect parent segments via parent chain (unshift for correct order)
   const parentSegments: RouteTree[] = [];
   let current = node.parent;
 
   while (current?.path) {
-    parentSegments.push(current);
+    parentSegments.unshift(current);
     current = current.parent;
   }
-
-  parentSegments.reverse();
 
   let path = "";
 
@@ -85,14 +98,11 @@ function computeStaticPath(node: RouteTree): string | null {
       return null;
     }
 
-    path = segment.absolute ? segment.path : path + segment.path;
+    path = segment.absolute ? segment.path : joinPaths(path, segment.path);
   }
 
   // Add this node's path
-  path = node.absolute ? node.path : path + node.path;
-
-  // Normalize double slashes - always apply regex (avoids equivalent mutants)
-  return path.replaceAll(/\/{2,}/g, "/");
+  return node.absolute ? node.path : joinPaths(path, node.path);
 }
 
 // =============================================================================
@@ -103,7 +113,7 @@ function computeStaticPath(node: RouteTree): string | null {
  * Computes children Map from mutable children array.
  *
  * Children are stored in definition order. Matching priority is handled
- * by rou3's radix tree, not by iteration order.
+ * by the segment trie, not by iteration order.
  *
  * @param childrenArray - Array of processed child nodes
  * @returns ReadonlyMap of child name -> child node (in definition order)
@@ -118,6 +128,66 @@ function computeChildrenMap(
   }
 
   return map;
+}
+
+/**
+ * Builds a paramTypeMap from route parameter metadata.
+ *
+ * @param paramMeta - Parameter metadata from buildParamMeta
+ * @param paramMeta.urlParams - URL parameter names
+ * @param paramMeta.queryParams - Query parameter names
+ * @returns Map of parameter names to their types
+ */
+function buildParamTypeMap(paramMeta: {
+  readonly urlParams: readonly string[];
+  readonly queryParams: readonly string[];
+}): Record<string, "url" | "query"> {
+  const map: Record<string, "url" | "query"> = {};
+
+  for (const p of paramMeta.urlParams) {
+    map[p] = "url";
+  }
+
+  for (const p of paramMeta.queryParams) {
+    map[p] = "query";
+  }
+
+  return map;
+}
+
+/**
+ * Recursively processes child nodes and computes the children map.
+ *
+ * @param mutableChildren - Array of mutable child nodes
+ * @param parent - Already-processed parent node
+ * @param freeze - Whether to freeze the result
+ * @returns Children map and non-absolute children array
+ */
+function processChildren(
+  mutableChildren: readonly MutableRouteNode[],
+  parent: RouteTree,
+  freeze: boolean,
+): {
+  childrenMap: ReadonlyMap<string, RouteTree>;
+  nonAbsoluteChildren: RouteTree[];
+} {
+  const childrenArray: RouteTree[] = [];
+  const nonAbsoluteChildren: RouteTree[] = [];
+
+  for (const childMutable of mutableChildren) {
+    const child = processNode(childMutable, parent, freeze);
+
+    childrenArray.push(child);
+
+    if (!child.absolute) {
+      nonAbsoluteChildren.push(child);
+    }
+  }
+
+  return {
+    childrenMap: computeChildrenMap(childrenArray),
+    nonAbsoluteChildren,
+  };
 }
 
 /**
@@ -136,52 +206,39 @@ function processNode(
   parent: RouteTree | null,
   freeze: boolean,
 ): RouteTree {
-  const childrenArray: RouteTree[] = [];
-  const nonAbsoluteChildren: RouteTree[] = [];
-
   const paramMeta = buildParamMeta(mutable.path);
+  const paramTypeMap = buildParamTypeMap(paramMeta);
 
+  // Skeleton node: children and nonAbsoluteChildren are set after recursive
+  // child processing, which requires a parent reference to this node.
   const node = {
     name: mutable.name,
     path: mutable.path,
     absolute: mutable.absolute,
     parent,
-    children: new Map<string, RouteTree>() as ReadonlyMap<string, RouteTree>,
+    children: undefined as unknown as ReadonlyMap<string, RouteTree>,
     paramMeta,
-    nonAbsoluteChildren: [] as RouteTree[],
+    nonAbsoluteChildren: undefined as unknown as RouteTree[],
     fullName: "",
     staticPath: null as string | null,
-    paramTypeMap: {} as Record<string, "url" | "query">,
+    paramTypeMap,
   };
-
-  for (const p of paramMeta.urlParams) {
-    node.paramTypeMap[p] = "url";
-  }
-
-  for (const p of paramMeta.queryParams) {
-    node.paramTypeMap[p] = "query";
-  }
 
   node.fullName = computeFullName(node as RouteTree);
 
-  for (const childMutable of mutable.children) {
-    const child = processNode(childMutable, node as RouteTree, freeze);
+  const { childrenMap, nonAbsoluteChildren } = processChildren(
+    mutable.children,
+    node as RouteTree,
+    freeze,
+  );
 
-    childrenArray.push(child);
-
-    if (!child.absolute) {
-      nonAbsoluteChildren.push(child);
-    }
-  }
-
-  node.children = computeChildrenMap(childrenArray);
+  node.children = childrenMap;
   node.nonAbsoluteChildren = nonAbsoluteChildren;
-
   node.staticPath = computeStaticPath(node as RouteTree);
 
   if (freeze) {
-    Object.freeze(node.nonAbsoluteChildren);
-    Object.freeze(node.paramTypeMap);
+    Object.freeze(nonAbsoluteChildren);
+    Object.freeze(paramTypeMap);
     Object.freeze(node.children);
     Object.freeze(node);
   }

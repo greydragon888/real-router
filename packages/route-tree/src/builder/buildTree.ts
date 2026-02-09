@@ -103,14 +103,28 @@ function resolveParent(
 
   for (let i = 0; i < parts.length - 1; i++) {
     const partName = parts[i];
+    const found = current.children.find((c) => c.name === partName);
 
-    // validateRoutes ensures parent exists before building
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    current = current.children.find((c) => c.name === partName)!;
+    /* v8 ignore start -- defensive: validateRoutes ensures parent exists before buildTree */
+    if (!found) {
+      throw new Error(
+        `[buildTree] Parent segment "${partName}" not found in "${name}"`,
+      );
+    }
+    /* v8 ignore stop */
+
+    current = found;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  return { parent: current, finalName: parts.at(-1)! };
+  const finalName = parts.at(-1);
+
+  /* v8 ignore start -- defensive: split always produces non-empty last element for valid names */
+  if (!finalName) {
+    throw new Error(`[buildTree] Empty route name segments in "${name}"`);
+  }
+  /* v8 ignore stop */
+
+  return { parent: current, finalName };
 }
 
 /**

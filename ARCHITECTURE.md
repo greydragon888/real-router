@@ -16,7 +16,8 @@ real-router/
 │   ├── persistent-params-plugin/  # Parameter persistence
 │   ├── helpers/              # Route comparison utilities
 │   ├── logger/               # @real-router/logger — isomorphic logging
-│   ├── route-tree/           # URL parsing and path building (internal)
+│   ├── route-tree/           # Route tree building, validation, matcher factory (internal)
+│   ├── path-matcher/         # Segment Trie URL matching and path building (internal)
 │   ├── search-params/        # Query string handling (internal)
 │   └── type-guards/          # Runtime type validation (internal)
 ```
@@ -24,42 +25,46 @@ real-router/
 ## Package Dependencies
 
 ```
-                            ┌─────────────────┐
-                            │  @real-router/  │
-                            │     types       │
-                            └────────┬────────┘
-                                     │
-              ┌──────────────────────┼──────────────────────┐
-              │                      │                      │
-              ▼                      ▼                      ▼
-    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-    │  @real-router/  │    │   route-tree    │    │  type-guards    │
-    │     logger      │    │   (internal)    │    │   (internal)    │
-    └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-             │                      │                      │
-             │         ┌────────────┴────────────┐         │
-             │         │                         │         │
-             ▼         ▼                         ▼         ▼
-           ┌─────────────────────────────────────────────────┐
-           │              @real-router/core                  │
-           │  ┌─────────────────────────────────────────┐   │
-           │  │  Bundles: route-tree, type-guards,      │   │
-           │  │           search-params                 │   │
-           │  └─────────────────────────────────────────┘   │
-           └──────────────────────┬──────────────────────────┘
-                                  │
-        ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
-        │             │           │           │             │             │
-        ▼             ▼           ▼           ▼             ▼             ▼
-┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-│browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent│
-│              │ │          │ │          │ │          │ │plugin    │ │-params   │
-└──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+                              ┌─────────────────┐
+                              │  @real-router/  │
+                              │     types       │
+                              └────────┬────────┘
+                                       │
+                ┌──────────────────────┼──────────────────────┐
+                │                      │                      │
+                ▼                      ▼                      ▼
+      ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+      │  @real-router/  │    │   route-tree    │    │  type-guards    │
+      │     logger      │    │   (internal)    │    │   (internal)    │
+      └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
+               │              ┌───────┼───────┐              │
+               │              ▼       │       ▼              │
+               │   ┌──────────────┐   │  ┌──────────────┐   │
+               │   │ path-matcher │   │  │search-params │   │
+               │   │  (internal)  │   │  │  (internal)  │   │
+               │   └──────────────┘   │  └──────────────┘   │
+               │                      │                      │
+               ▼                      ▼                      ▼
+             ┌─────────────────────────────────────────────────┐
+             │              @real-router/core                  │
+             │  ┌─────────────────────────────────────────┐   │
+             │  │  Bundles: route-tree, path-matcher,     │   │
+             │  │  search-params, type-guards             │   │
+             │  └─────────────────────────────────────────┘   │
+             └──────────────────────┬──────────────────────────┘
+                                    │
+          ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
+          │             │           │           │             │             │
+          ▼             ▼           ▼           ▼             ▼             ▼
+  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent│
+  │              │ │          │ │          │ │          │ │plugin    │ │-params   │
+  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
 
-**Internal packages (bundled):** `route-tree`, `search-params`, `type-guards`, `@real-router/logger`
+**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `@real-router/logger`
 
 ## Core Architecture
 
@@ -243,7 +248,7 @@ Full paths:
   users.profile.settings → /users/:id/settings
 ```
 
-**Path matching:** O(segments) trie traversal
+**Path matching:** O(segments) Segment Trie traversal (via `path-matcher`)
 **Route lookup:** O(1) Map-based
 
 ## SSR Support

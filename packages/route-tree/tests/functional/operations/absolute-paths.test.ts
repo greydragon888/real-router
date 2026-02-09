@@ -6,25 +6,8 @@ import { describe, it, expect } from "vitest";
 
 import { matchPath } from "./helpers";
 import { createRouteTree } from "../../../src/builder/createRouteTree";
-import { buildPath } from "../../../src/operations/build";
 
 describe("New API - absolute paths", () => {
-  it("should handle absolute paths", () => {
-    const tree = createRouteTree("", "", [
-      {
-        name: "parent",
-        path: "/parent",
-        children: [
-          { name: "relative", path: "/relative" },
-          { name: "absolute", path: "~/absolute" },
-        ],
-      },
-    ]);
-
-    expect(buildPath(tree, "parent.relative")).toBe("/parent/relative");
-    expect(buildPath(tree, "parent.absolute")).toBe("/absolute");
-  });
-
   it("should match absolute paths", () => {
     const tree = createRouteTree("", "", [
       {
@@ -37,5 +20,26 @@ describe("New API - absolute paths", () => {
     const result = matchPath(tree, "/absolute");
 
     expect(result?.name).toBe("parent.absolute");
+  });
+
+  it("should compute staticPath for child of absolute route", () => {
+    const tree = createRouteTree("", "", [
+      {
+        name: "admin",
+        path: "/admin",
+        children: [
+          {
+            name: "dashboard",
+            path: "~/dashboard",
+            children: [{ name: "stats", path: "/stats" }],
+          },
+        ],
+      },
+    ]);
+
+    // Child of an absolute route should have correct staticPath
+    const result = matchPath(tree, "/dashboard/stats");
+
+    expect(result?.name).toBe("admin.dashboard.stats");
   });
 });

@@ -3,12 +3,10 @@
 import { getSegmentsByName } from "route-tree";
 import { getTypeDescription } from "type-guards";
 
-import { createBuildOptions } from "../../helpers";
-
 import type { RouteConfig } from "./types";
 import type { Route } from "../../types";
-import type { DefaultDependencies, Options, Params } from "@real-router/types";
-import type { MatchOptions, RouteDefinition, RouteTree } from "route-tree";
+import type { DefaultDependencies, Params } from "@real-router/types";
+import type { RouteDefinition, RouteTree } from "route-tree";
 
 /**
  * Creates an empty RouteConfig.
@@ -19,17 +17,6 @@ export function createEmptyConfig(): RouteConfig {
     encoders: Object.create(null) as Record<string, (params: Params) => Params>,
     defaultParams: Object.create(null) as Record<string, Params>,
     forwardMap: Object.create(null) as Record<string, string>,
-  };
-}
-
-/**
- * Creates RouteNode match options from real-router options.
- */
-export function createMatchOptions(options: Options): MatchOptions {
-  return {
-    ...createBuildOptions(options),
-    strictTrailingSlash: options.trailingSlash === "strict",
-    strongMatching: false,
   };
 }
 

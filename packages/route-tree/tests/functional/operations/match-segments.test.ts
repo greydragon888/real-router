@@ -1,5 +1,5 @@
 /**
- * Tests for MatcherService with static index.
+ * Tests for matchSegments with static index.
  */
 
 import { describe, it, expect } from "vitest";
@@ -129,30 +129,30 @@ describe("matchSegments with static index", () => {
     expect(result).toBeNull();
   });
 
-  it("should fall back to dynamic routes when static candidates don't match (line 392)", () => {
-    // Tree where static index finds candidates but they don't fully match
-    // Then falls back to dynamic routes which DO match
+  it("should fall back to dynamic routes when no static candidates exist", () => {
+    // SegmentMatcher uses a trie — static segments take priority and there
+    // is no backtracking. Test that dynamic routes match when there is no
+    // conflicting static segment at the first level.
     const tree = createRouteTree("", "", [
       {
         name: "parent",
         path: "/parent",
         children: [
-          // Static child - indexed under "users"
+          // Static child
           { name: "users-profile", path: "/users/profile" },
-          // Dynamic child - NOT indexed (dynamic first segment)
+          // Dynamic child
           { name: "catch-all", path: "/:path" },
         ],
       },
     ]);
 
-    // "/parent/users/settings" - "users" matches in static index but full path doesn't
-    // Falls back to dynamic /:path which matches "users/settings"
-    const result = matchSegments(tree, "/parent/users");
+    // "other" has no static match → falls through to dynamic /:path
+    const result = matchSegments(tree, "/parent/other");
 
     expect(result).not.toBeNull();
     expect(result!.segments).toHaveLength(2);
     expect(result!.segments[1].name).toBe("catch-all");
-    expect(result!.params).toStrictEqual({ path: "users" });
+    expect(result!.params).toStrictEqual({ path: "other" });
   });
 
   it("should match via static index successfully (branch 368)", () => {
@@ -197,7 +197,7 @@ describe("matchSegments with static index", () => {
 
   it("should try multiple static candidates when first doesn't match (line 368 false branch)", () => {
     // Routes with same first segment "api" but different full paths
-    // rou3 handles matching priority via radix tree
+    // Segment trie handles matching priority
     const tree = createRouteTree("", "", [
       {
         name: "parent",

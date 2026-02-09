@@ -3,11 +3,12 @@
 import { createRouter } from "./router-adapter";
 
 import type { Route, Router } from "@real-router/core";
+import type { Options } from "@real-router/types";
 
 /**
  * Creates a simple router with basic routes for benchmarking
  */
-export function createSimpleRouter(): Router {
+export function createSimpleRouter(options?: Partial<Options>): Router {
   const routes: Route[] = [
     { name: "home", path: "/" },
     { name: "about", path: "/about" },
@@ -15,7 +16,7 @@ export function createSimpleRouter(): Router {
     { name: "user", path: "/users/:id" },
   ];
 
-  return createRouter(routes);
+  return createRouter(routes, options);
 }
 
 /**
