@@ -520,53 +520,50 @@ export class RoutesNamespace<
   ): State<P, MP> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
+
     const matchResult = this.#matcher.match(path);
 
-    if (matchResult) {
-      const routeState = createRouteState(matchResult);
-      const { name, params, meta } = routeState;
+    if (!matchResult) {
+      return undefined;
+    }
 
-      const decodedParams =
-        typeof this.#config.decoders[name] === "function"
-          ? this.#config.decoders[name](params as Params)
-          : params;
+    const routeState = createRouteState(matchResult);
+    const { name, params, meta } = routeState;
 
-      const { name: routeName, params: routeParams } = this.forwardState<P>(
-        name,
-        decodedParams as P,
-      );
+    const decodedParams =
+      typeof this.#config.decoders[name] === "function"
+        ? this.#config.decoders[name](params as Params)
+        : params;
 
-      let builtPath = path;
+    const { name: routeName, params: routeParams } = this.forwardState<P>(
+      name,
+      decodedParams as P,
+    );
 
-      if (opts.rewritePathOnMatch) {
-        // Inline buildPath: skip UNKNOWN_ROUTE check (matchResult exists)
-        // and defaultParams re-merge (already done in forwardState).
-        // Encoder is still needed when decoder renames params.
-        const buildParams =
-          typeof this.#config.encoders[routeName] === "function"
-            ? this.#config.encoders[routeName]({
-                ...(routeParams as Params),
-              })
-            : (routeParams as Record<string, unknown>);
+    let builtPath = path;
 
-        const ts = opts.trailingSlash;
+    if (opts.rewritePathOnMatch) {
+      const buildParams =
+        typeof this.#config.encoders[routeName] === "function"
+          ? this.#config.encoders[routeName]({
+              ...(routeParams as Params),
+            })
+          : (routeParams as Record<string, unknown>);
 
-        builtPath = this.#matcher.buildPath(routeName, buildParams, {
-          trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
-          queryParamsMode: opts.queryParamsMode,
-        });
-      }
+      const ts = opts.trailingSlash;
 
-      // Create state using deps.makeState
-      return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
-        params: meta as MP,
-        options: EMPTY_OPTIONS,
-        source,
-        redirected: false,
+      builtPath = this.#matcher.buildPath(routeName, buildParams, {
+        trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+        queryParamsMode: opts.queryParamsMode,
       });
     }
 
-    return undefined;
+    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
+      params: meta as MP,
+      options: EMPTY_OPTIONS,
+      source,
+      redirected: false,
+    });
   }
 
   /**
