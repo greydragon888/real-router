@@ -33,7 +33,7 @@
   {
     "name": "route-tree (ESM)",
     "path": "packages/route-tree/dist/esm/index.mjs",
-    "limit": "6 kB"
+    "limit": "6.5 kB"
   },
   {
     "name": "search-params (ESM)",

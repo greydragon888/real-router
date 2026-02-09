@@ -9,7 +9,9 @@ export {
   DECODING_METHODS,
 } from "./encoding";
 
-export { createSegmentNode, SegmentMatcher } from "./SegmentMatcher";
+export { createSegmentNode } from "./pathUtils";
+
+export { SegmentMatcher } from "./SegmentMatcher";
 
 export type {
   BuildParamSlot,

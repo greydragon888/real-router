@@ -1,10 +1,15 @@
-import { DECODING_METHODS, ENCODING_METHODS } from "./encoding";
+import {
+  defaultBuildQueryString,
+  defaultParseQueryString,
+} from "./defaultQueryString";
+import { DECODING_METHODS } from "./encoding";
+import { createSegmentNode, normalizeTrailingSlash } from "./pathUtils";
+import { validatePercentEncoding } from "./percentEncoding";
+import { registerNode } from "./registration";
 
 import type {
-  BuildParamSlot,
   BuildPathOptions,
   CompiledRoute,
-  ConstraintPattern,
   MatcherInputNode,
   MatchResult,
   ResolvedMatcherOptions,
@@ -13,74 +18,10 @@ import type {
 } from "./types";
 
 // =============================================================================
-// Default DI Functions
-// =============================================================================
-
-export function defaultParseQueryString(
-  queryString: string,
-): Record<string, unknown> {
-  const params: Record<string, unknown> = {};
-
-  if (queryString.length === 0) {
-    return params;
-  }
-
-  const pairs = queryString.split("&");
-
-  for (const pair of pairs) {
-    const eqIdx = pair.indexOf("=");
-
-    if (eqIdx === -1) {
-      params[pair] = "";
-    } else {
-      params[pair.slice(0, eqIdx)] = pair.slice(eqIdx + 1);
-    }
-  }
-
-  return params;
-}
-
-export function defaultBuildQueryString(
-  params: Record<string, unknown>,
-): string {
-  const parts: string[] = [];
-
-  for (const key of Object.keys(params)) {
-    const value = params[key];
-    const encodedKey = encodeURIComponent(key);
-
-    parts.push(
-      value === ""
-        ? encodedKey
-        : `${encodedKey}=${encodeURIComponent(String(value))}`,
-    );
-  }
-
-  return parts.join("&");
-}
-
-// =============================================================================
 // Constants
 // =============================================================================
 
 const RAW_UNICODE_PATTERN = /[\u0080-\uFFFF]/;
-
-// eslint-disable-next-line sonarjs/slow-regex -- Constraint pattern regex - bounded input from route definitions, not user input
-const CONSTRAINT_PATTERN_RGX = /<[^>]*>/g;
-
-// =============================================================================
-// SegmentNode Factory
-// =============================================================================
-
-export function createSegmentNode(): SegmentNode {
-  return {
-    staticChildren: Object.create(null) as Record<string, SegmentNode>,
-    paramChild: undefined,
-    splatChild: undefined,
-    route: undefined,
-    slashChildRoute: undefined,
-  };
-}
 
 // =============================================================================
 // SegmentMatcher Class
@@ -118,7 +59,21 @@ export class SegmentMatcher {
 
   registerTree(node: MatcherInputNode): void {
     this.#rootQueryParams = node.paramMeta.queryParams;
-    this.#registerNode(node, "", [], null);
+    registerNode(
+      {
+        root: this.#root,
+        options: this.#options,
+        routesByName: this.#routesByName,
+        segmentsByName: this.#segmentsByName,
+        metaByName: this.#metaByName,
+        staticCache: this.#staticCache,
+        rootQueryParams: this.#rootQueryParams,
+      },
+      node,
+      "",
+      [],
+      null,
+    );
   }
 
   match(path: string): MatchResult | undefined {
@@ -381,7 +336,7 @@ export class SegmentMatcher {
 
     const cleanPath = pathPart;
 
-    const normalized = this.#normalizeTrailingSlash(cleanPath);
+    const normalized = normalizeTrailingSlash(cleanPath);
 
     return [cleanPath, normalized, queryString];
   }
@@ -421,379 +376,6 @@ export class SegmentMatcher {
     const inputHasSlash = cleanPath.length > 1 && cleanPath.endsWith("/");
 
     return inputHasSlash === route.hasTrailingSlash;
-  }
-
-  #registerNode(
-    node: MatcherInputNode,
-    parentPath: string,
-    segments: MatcherInputNode[],
-    parentRoute: CompiledRoute | null,
-  ): void {
-    const isRoot = node.fullName === "";
-
-    if (!isRoot) {
-      segments.push(node);
-    }
-
-    const isAbsolute = node.absolute;
-    const pathPattern = node.paramMeta.pathPattern;
-    const strippedPattern =
-      isAbsolute && pathPattern.startsWith("~")
-        ? pathPattern.slice(1)
-        : pathPattern;
-    const rawNodePath = isAbsolute ? strippedPattern : pathPattern;
-
-    // Strip constraint patterns (e.g., <\d+>, <[^/]+>) from path before trie insertion.
-    // Constraints like <[^/]+> contain "/" which breaks segment splitting in indexOf("/", start).
-    const nodePath = rawNodePath.replaceAll(CONSTRAINT_PATTERN_RGX, "");
-
-    const matchPath = isAbsolute
-      ? nodePath
-      : this.#buildFullPath(parentPath, nodePath);
-
-    let currentRoute: CompiledRoute | null = parentRoute;
-
-    if (!isRoot) {
-      currentRoute = this.#compileAndRegisterRoute(
-        node,
-        matchPath,
-        isAbsolute ? "" : parentPath,
-        segments,
-        parentRoute,
-      );
-    }
-
-    for (const child of node.children.values()) {
-      this.#registerNode(child, matchPath, segments, currentRoute);
-    }
-
-    if (!isRoot) {
-      segments.pop();
-    }
-  }
-
-  #compileAndRegisterRoute(
-    node: MatcherInputNode,
-    matchPath: string,
-    parentPath: string,
-    segments: MatcherInputNode[],
-    parentRoute: CompiledRoute | null,
-  ): CompiledRoute {
-    const isSlashChild = this.#isSlashChild(matchPath, parentPath);
-
-    const frozenSegments = Object.freeze([...segments]);
-
-    // Slash-child: buildSegments excludes the slash-child node itself
-    const buildSegments = isSlashChild
-      ? Object.freeze(segments.slice(0, -1))
-      : frozenSegments;
-
-    const frozenMeta = this.#buildMeta(frozenSegments);
-
-    const normalizedPath = this.#normalizeTrailingSlash(matchPath);
-
-    const declaredQueryParams = this.#collectDeclaredQueryParams(segments);
-    const constraintPatterns = this.#collectConstraintPatterns(segments);
-
-    // Slash-child: use parent path for buildParts (not slash-child's path)
-    const buildPath = isSlashChild
-      ? this.#normalizeTrailingSlash(parentPath)
-      : normalizedPath;
-
-    const { buildStaticParts, buildParamSlots } = this.#compileBuildParts(
-      buildPath,
-      isSlashChild ? segments.slice(0, -1) : segments,
-    );
-
-    const compiled: CompiledRoute = {
-      name: node.fullName,
-      parent: parentRoute,
-      depth: segments.length - 1,
-      matchSegments: frozenSegments,
-      buildSegments,
-      meta: frozenMeta,
-      declaredQueryParams,
-      declaredQueryParamsSet: new Set(declaredQueryParams),
-      hasTrailingSlash: matchPath.length > 1 && matchPath.endsWith("/"),
-      constraintPatterns,
-      hasConstraints: constraintPatterns.size > 0,
-      buildStaticParts,
-      buildParamSlots,
-    };
-
-    this.#routesByName.set(node.fullName, compiled);
-    this.#segmentsByName.set(node.fullName, frozenSegments);
-    this.#metaByName.set(node.fullName, frozenMeta);
-
-    if (isSlashChild) {
-      this.#registerSlashChild(compiled, parentPath);
-    } else {
-      this.#registerStandardRoute(compiled, matchPath, normalizedPath, node);
-    }
-
-    return compiled;
-  }
-
-  #buildMeta(
-    segments: readonly MatcherInputNode[],
-  ): Readonly<Record<string, Record<string, "url" | "query">>> {
-    const meta: Record<string, Record<string, "url" | "query">> = {};
-
-    for (const segment of segments) {
-      meta[segment.fullName] = segment.paramTypeMap;
-    }
-
-    return Object.freeze(meta);
-  }
-
-  #registerSlashChild(compiled: CompiledRoute, parentPath: string): void {
-    this.#insertSlashChildIntoTrie(compiled, parentPath);
-
-    const parentNormalized = this.#normalizeTrailingSlash(parentPath);
-    const cacheKey = this.#options.caseSensitive
-      ? parentNormalized
-      : parentNormalized.toLowerCase();
-
-    if (this.#staticCache.has(cacheKey)) {
-      this.#staticCache.set(cacheKey, compiled);
-    }
-  }
-
-  #registerStandardRoute(
-    compiled: CompiledRoute,
-    matchPath: string,
-    normalizedPath: string,
-    node: MatcherInputNode,
-  ): void {
-    this.#insertIntoTrie(compiled, matchPath);
-
-    if (node.paramMeta.urlParams.length === 0) {
-      const cacheKey = this.#options.caseSensitive
-        ? normalizedPath
-        : normalizedPath.toLowerCase();
-
-      this.#staticCache.set(cacheKey, compiled);
-    }
-  }
-
-  #isSlashChild(matchPath: string, parentPath: string): boolean {
-    const normalizedMatch = this.#normalizeTrailingSlash(matchPath);
-    const normalizedParent = this.#normalizeTrailingSlash(parentPath);
-
-    return normalizedMatch === normalizedParent;
-  }
-
-  #insertIntoTrie(compiled: CompiledRoute, fullPath: string): void {
-    const normalized = this.#normalizeTrailingSlash(fullPath);
-
-    if (normalized === "/") {
-      this.#root.route = compiled;
-
-      return;
-    }
-
-    this.#insertIntoTrieFrom(this.#root, normalized, 1, compiled);
-  }
-
-  #insertIntoTrieFrom(
-    node: SegmentNode,
-    path: string,
-    start: number,
-    compiled: CompiledRoute,
-  ): void {
-    const len = path.length;
-
-    while (start <= len) {
-      const end = path.indexOf("/", start);
-      const segmentEnd = end === -1 ? len : end;
-      const segment = path.slice(start, segmentEnd);
-
-      if (segment.endsWith("?")) {
-        const paramName = segment
-          .slice(1)
-          .replaceAll(CONSTRAINT_PATTERN_RGX, "")
-          .replace(/\?$/, "");
-
-        node.paramChild ??= { node: createSegmentNode(), name: paramName };
-
-        // Path with param: continue recursively from paramChild
-        this.#insertIntoTrieFrom(
-          node.paramChild.node,
-          path,
-          segmentEnd + 1,
-          compiled,
-        );
-
-        // Path without param: skip this segment and continue from node
-        if (segmentEnd >= len) {
-          node.route ??= compiled;
-        } else {
-          this.#insertIntoTrieFrom(node, path, segmentEnd + 1, compiled);
-        }
-
-        return;
-      }
-
-      node = this.#processSegment(node, segment);
-      start = segmentEnd + 1;
-    }
-
-    node.route = compiled;
-  }
-
-  #insertSlashChildIntoTrie(compiled: CompiledRoute, parentPath: string): void {
-    const node = this.#walkTrie(parentPath);
-
-    node.slashChildRoute = compiled;
-  }
-
-  #walkTrie(fullPath: string): SegmentNode {
-    return this.#walkTrieFrom(this.#root, fullPath);
-  }
-
-  #walkTrieFrom(startNode: SegmentNode, path: string): SegmentNode {
-    const normalized = this.#normalizeTrailingSlash(path);
-
-    /* v8 ignore start -- defensive: slash-child always passes valid path */
-    if (normalized === "/" || normalized === "") {
-      return startNode;
-    }
-    /* v8 ignore stop */
-
-    let node = startNode;
-    let start = 1;
-    const len = normalized.length;
-
-    while (start <= len) {
-      const end = normalized.indexOf("/", start);
-      const segmentEnd = end === -1 ? len : end;
-
-      /* v8 ignore start -- defensive: indexOf always returns valid index for non-empty segments */
-      if (segmentEnd <= start) {
-        break;
-      }
-      /* v8 ignore stop */
-
-      const segment = normalized.slice(start, segmentEnd);
-
-      node = this.#processSegment(node, segment);
-      start = segmentEnd + 1;
-    }
-
-    return node;
-  }
-
-  #processSegment(node: SegmentNode, segment: string): SegmentNode {
-    if (segment.startsWith("*")) {
-      const splatName = segment.slice(1);
-
-      node.splatChild ??= { node: createSegmentNode(), name: splatName };
-
-      return node.splatChild.node;
-    }
-
-    if (segment.startsWith(":")) {
-      const paramName = segment
-        .slice(1)
-        .replaceAll(CONSTRAINT_PATTERN_RGX, "")
-        .replace(/\?$/, "");
-
-      node.paramChild ??= { node: createSegmentNode(), name: paramName };
-
-      return node.paramChild.node;
-    }
-
-    const key = this.#options.caseSensitive ? segment : segment.toLowerCase();
-
-    if (!(key in node.staticChildren)) {
-      node.staticChildren[key] = createSegmentNode();
-    }
-
-    return node.staticChildren[key];
-  }
-
-  #buildFullPath(parentPath: string, nodePath: string): string {
-    if (parentPath === "") {
-      return nodePath;
-    }
-
-    if (nodePath === "") {
-      return parentPath;
-    }
-
-    return parentPath + nodePath;
-  }
-
-  #normalizeTrailingSlash(path: string): string {
-    if (path.length > 1 && path.endsWith("/")) {
-      return path.slice(0, -1);
-    }
-
-    return path;
-  }
-
-  #compileBuildParts(
-    normalizedPath: string,
-    segments: readonly MatcherInputNode[],
-  ): {
-    buildStaticParts: readonly string[];
-    buildParamSlots: readonly BuildParamSlot[];
-  } {
-    const allUrlParams = new Set<string>();
-    const allSplatParams = new Set<string>();
-
-    for (const segment of segments) {
-      for (const p of segment.paramMeta.urlParams) {
-        allUrlParams.add(p);
-      }
-
-      for (const p of segment.paramMeta.spatParams) {
-        allSplatParams.add(p);
-      }
-    }
-
-    if (allUrlParams.size === 0) {
-      return { buildStaticParts: [normalizedPath], buildParamSlots: [] };
-    }
-
-    const parts: string[] = [];
-    const slots: BuildParamSlot[] = [];
-
-    // eslint-disable-next-line sonarjs/single-char-in-character-classes -- character class is more readable than alternation
-    const paramRgx = /[:*]([\w]+)(?:<[^>]*>)?(\?)?/gu;
-    let lastIndex = 0;
-    let match: RegExpExecArray | null;
-
-    while ((match = paramRgx.exec(normalizedPath)) !== null) {
-      const paramName = match[1];
-      const isOptional = match[2] === "?";
-
-      parts.push(normalizedPath.slice(lastIndex, match.index));
-
-      const isSplat = allSplatParams.has(paramName);
-      const encoding = this.#options.urlParamsEncoding;
-      const encoder = isSplat
-        ? (value: string): string => {
-            const enc = ENCODING_METHODS[encoding];
-            const segs = value.split("/");
-            let result = enc(segs[0]);
-
-            for (let i = 1; i < segs.length; i++) {
-              result += `/${enc(segs[i])}`;
-            }
-
-            return result;
-          }
-        : ENCODING_METHODS[encoding];
-
-      slots.push({ paramName, isOptional, encoder });
-
-      lastIndex = match.index + match[0].length;
-    }
-
-    parts.push(normalizedPath.slice(lastIndex));
-
-    return { buildStaticParts: parts, buildParamSlots: slots };
   }
 
   #traverse(
@@ -880,7 +462,7 @@ export class SegmentMatcher {
         continue;
       }
 
-      if (!this.#validatePercentEncoding(v)) {
+      if (!validatePercentEncoding(v)) {
         return false;
       }
 
@@ -902,72 +484,11 @@ export class SegmentMatcher {
 
     return true;
   }
-
-  #validatePercentEncoding(value: string): boolean {
-    let i = 0;
-
-    while (i < value.length) {
-      if (value[i] === "%") {
-        if (i + 2 >= value.length) {
-          return false;
-        }
-
-        /* v8 ignore start -- @preserve: codePointAt cannot return undefined due to bounds check above */
-        const hex1 = value.codePointAt(i + 1) ?? 0;
-        const hex2 = value.codePointAt(i + 2) ?? 0;
-        /* v8 ignore stop */
-
-        if (!this.#isHexChar(hex1) || !this.#isHexChar(hex2)) {
-          return false;
-        }
-
-        i += 3;
-      } else {
-        i++;
-      }
-    }
-
-    return true;
-  }
-
-  #isHexChar(code: number): boolean {
-    return (
-      (code >= 48 && code <= 57) || // '0'-'9'
-      (code >= 65 && code <= 70) || // 'A'-'F'
-      (code >= 97 && code <= 102) // 'a'-'f'
-    );
-  }
-
-  #collectDeclaredQueryParams(
-    segments: readonly MatcherInputNode[],
-  ): readonly string[] {
-    const queryParams: string[] = [];
-
-    // Include query params declared on the root node (e.g., from setRootPath("?mode"))
-    if (this.#rootQueryParams.length > 0) {
-      queryParams.push(...this.#rootQueryParams);
-    }
-
-    for (const segment of segments) {
-      if (segment.paramMeta.queryParams.length > 0) {
-        queryParams.push(...segment.paramMeta.queryParams);
-      }
-    }
-
-    return queryParams;
-  }
-
-  #collectConstraintPatterns(
-    segments: readonly MatcherInputNode[],
-  ): ReadonlyMap<string, ConstraintPattern> {
-    const patterns = new Map<string, ConstraintPattern>();
-
-    for (const segment of segments) {
-      for (const [paramName, pattern] of segment.paramMeta.constraintPatterns) {
-        patterns.set(paramName, pattern);
-      }
-    }
-
-    return patterns;
-  }
 }
+
+export { createSegmentNode } from "./pathUtils";
+
+export {
+  defaultParseQueryString,
+  defaultBuildQueryString,
+} from "./defaultQueryString";
