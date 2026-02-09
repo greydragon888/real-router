@@ -570,4 +570,260 @@ describe("core/routes/routePath/matchPath", () => {
       );
     });
   });
+
+  // =========================================================================
+  // Regression tests for matchPath optimization safety
+  // These tests verify behavior of matchPath with config options
+  // (encoder, defaultParams, forwardTo) that MUST be preserved when
+  // optimizing the rewritePathOnMatch pipeline.
+  // =========================================================================
+
+  describe("defaultParams", () => {
+    it("should include defaultParams in matched state params", () => {
+      // Route "withDefaultParam" is defined in testRouters.ts:
+      // { name: "withDefaultParam", path: "/with-default/:param", defaultParams: { param: "hello" } }
+      const state = router.matchPath("/with-default/world");
+
+      expect(state?.name).toBe("withDefaultParam");
+      expect(state?.params.param).toBe("world");
+    });
+
+    it("should include defaultParams in matched state when URL param is missing", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute({
+        name: "page",
+        path: "/page?sort",
+        defaultParams: { sort: "name", limit: "10" },
+      });
+
+      const state = customRouter.matchPath("/page");
+
+      expect(state?.name).toBe("page");
+      // defaultParams are merged into state.params
+      expect(state?.params.sort).toBe("name");
+      expect(state?.params.limit).toBe("10");
+    });
+
+    it("should rebuild path with defaultParams query params when rewritePathOnMatch is true", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute({
+        name: "search",
+        path: "/search?q&sort",
+        defaultParams: { sort: "date" },
+      });
+
+      const state = customRouter.matchPath("/search?q=test");
+
+      expect(state?.name).toBe("search");
+      expect(state?.params.q).toBe("test");
+      expect(state?.params.sort).toBe("date");
+      // rewritePathOnMatch rebuilds path including defaultParams
+      expect(state?.path).toContain("sort=date");
+    });
+  });
+
+  describe("encoder", () => {
+    it("should call encoder during matchPath when rewritePathOnMatch is true", () => {
+      const customRouter = createTestRouter();
+      let encoderCalled = false;
+
+      customRouter.addRoute({
+        name: "enc",
+        path: "/enc/:id",
+        encodeParams: (params) => {
+          encoderCalled = true;
+
+          return params;
+        },
+      });
+
+      customRouter.matchPath("/enc/123");
+
+      // Current behavior: encoder IS called during matchPath because
+      // rewritePathOnMatch triggers this.buildPath() which uses encoder
+      expect(encoderCalled).toBe(true);
+    });
+
+    it("should NOT call encoder during matchPath when rewritePathOnMatch is false", () => {
+      const customRouter = createTestRouter({
+        rewritePathOnMatch: false,
+      });
+      let encoderCalled = false;
+
+      customRouter.addRoute({
+        name: "enc",
+        path: "/enc/:id",
+        encodeParams: (params) => {
+          encoderCalled = true;
+
+          return params;
+        },
+      });
+
+      customRouter.matchPath("/enc/123");
+
+      // With rewritePathOnMatch=false, buildPath is never called so encoder is skipped
+      expect(encoderCalled).toBe(false);
+    });
+
+    it("should use decoder during matchPath (paired with encoder)", () => {
+      // Route "withEncoder" is defined in testRouters.ts:
+      // encodeParams: ({one, two}) => ({param1: one, param2: two})
+      // decodeParams: ({param1, param2}) => ({one: param1, two: param2})
+      const state = router.matchPath("/encoded/hello/world");
+
+      expect(state?.name).toBe("withEncoder");
+      // Decoder transforms URL params to state params
+      expect(state?.params.one).toBe("hello");
+      expect(state?.params.two).toBe("world");
+    });
+
+    it("should rebuild path correctly when decoder transforms params", () => {
+      // With encoder+decoder, matchPath should:
+      // 1. match → params: {param1: "hello", param2: "world"}
+      // 2. decode → params: {one: "hello", two: "world"}
+      // 3. rewritePathOnMatch → buildPath("withEncoder", {one, two})
+      //    → encoder({one, two}) → {param1: "hello", param2: "world"}
+      //    → "/encoded/hello/world"
+      const state = router.matchPath("/encoded/hello/world");
+
+      expect(state?.path).toBe("/encoded/hello/world");
+    });
+  });
+
+  describe("forwardTo", () => {
+    it("should resolve forwardTo and use target route name", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        { name: "old", path: "/old", forwardTo: "new" },
+        { name: "new", path: "/new" },
+      ]);
+
+      const state = customRouter.matchPath("/old");
+
+      expect(state?.name).toBe("new");
+    });
+
+    it("should rebuild path for target route when forwardTo changes name", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        { name: "old-page", path: "/old-page", forwardTo: "new-page" },
+        { name: "new-page", path: "/new-page" },
+      ]);
+
+      const state = customRouter.matchPath("/old-page");
+
+      expect(state?.name).toBe("new-page");
+      // Path is rebuilt for the target route
+      expect(state?.path).toBe("/new-page");
+    });
+
+    it("should handle forwardTo with nested routes", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        { name: "inbox", path: "/inbox", forwardTo: "mail.inbox" },
+        {
+          name: "mail",
+          path: "/mail",
+          children: [{ name: "inbox", path: "/inbox" }],
+        },
+      ]);
+
+      const state = customRouter.matchPath("/inbox");
+
+      expect(state?.name).toBe("mail.inbox");
+      expect(state?.path).toBe("/mail/inbox");
+    });
+
+    it("should handle forwardTo with params", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        { name: "old-user", path: "/old-user/:id", forwardTo: "user" },
+        { name: "user", path: "/user/:id" },
+      ]);
+
+      const state = customRouter.matchPath("/old-user/42");
+
+      expect(state?.name).toBe("user");
+      expect(state?.params.id).toBe("42");
+      // Path is rebuilt for target route with matched params
+      expect(state?.path).toBe("/user/42");
+    });
+  });
+
+  describe("compound cases", () => {
+    it("should handle decoder + forwardTo combination", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        {
+          name: "old-item",
+          path: "/old-item/:id",
+          decodeParams: (p) => ({
+            id: Number(p.id),
+          }),
+          forwardTo: "new-item",
+        },
+        { name: "new-item", path: "/new-item/:id" },
+      ]);
+
+      const state = customRouter.matchPath("/old-item/99");
+
+      expect(state?.name).toBe("new-item");
+      expect(state?.params.id).toBe(99);
+    });
+
+    it("should handle defaultParams + forwardTo", () => {
+      const customRouter = createTestRouter();
+
+      customRouter.addRoute([
+        {
+          name: "old-list",
+          path: "/old-list",
+          defaultParams: { page: "1" },
+          forwardTo: "new-list",
+        },
+        { name: "new-list", path: "/new-list" },
+      ]);
+
+      const state = customRouter.matchPath("/old-list");
+
+      expect(state?.name).toBe("new-list");
+      expect(state?.params.page).toBe("1");
+    });
+
+    it("should handle rewritePathOnMatch=false with forwardTo", () => {
+      const customRouter = createTestRouter({ rewritePathOnMatch: false });
+
+      customRouter.addRoute([
+        { name: "alias", path: "/alias", forwardTo: "target" },
+        { name: "target", path: "/target" },
+      ]);
+
+      const state = customRouter.matchPath("/alias");
+
+      expect(state?.name).toBe("target");
+      // With rewritePathOnMatch=false, path is the original input
+      expect(state?.path).toBe("/alias");
+    });
+
+    it("should handle trailing slash normalization with params", () => {
+      const customRouter = createTestRouter({ trailingSlash: "never" });
+
+      customRouter.addRoute({ name: "item", path: "/item/:id" });
+
+      const state = customRouter.matchPath("/item/42/");
+
+      expect(state?.name).toBe("item");
+      expect(state?.params.id).toBe("42");
+      // trailingSlash: "never" removes trailing slash in rebuilt path
+      expect(state?.path).toBe("/item/42");
+    });
+  });
 });
