@@ -211,6 +211,35 @@ function validateRouteName(
 }
 
 /**
+ * Resolves a dot-notation route name to a node in the tree.
+ *
+ * @param rootNode - Root node to start from
+ * @param dotName - Dot-separated route name (e.g., "users.profile")
+ * @returns The resolved node, or undefined if not found
+ */
+function resolveByDotNotation(
+  rootNode: RouteTree,
+  dotName: string,
+): RouteTree | undefined {
+  // Fast path: single-segment names don't need splitting
+  if (!dotName.includes(".")) {
+    return rootNode.children.get(dotName);
+  }
+
+  let current: RouteTree | undefined = rootNode;
+
+  for (const segment of dotName.split(".")) {
+    current = current.children.get(segment);
+
+    if (!current) {
+      return undefined;
+    }
+  }
+
+  return current;
+}
+
+/**
  * Checks for duplicate route name in existing tree.
  *
  * @param rootNode - Root node to search in
@@ -223,19 +252,11 @@ function checkTreeNameDuplicate(
   fullName: string,
   methodName: string,
 ): void {
-  // Use children Map for O(1) lookup
-  const segments = fullName.split(".");
-  let current: RouteTree | undefined = rootNode;
-
-  for (const segment of segments) {
-    current = current.children.get(segment);
-
-    if (!current) {
-      return; // Route doesn't exist
-    }
+  if (resolveByDotNotation(rootNode, fullName)) {
+    throw new Error(
+      `[router.${methodName}] Route "${fullName}" already exists`,
+    );
   }
-
-  throw new Error(`[router.${methodName}] Route "${fullName}" already exists`);
 }
 
 /**
@@ -273,19 +294,11 @@ function checkTreePathDuplicate(
   parentName: string,
   routePath: string,
 ): void {
-  // Find parent node using children Map
-  let parentNode: RouteTree | undefined = rootNode;
+  const parentNode =
+    parentName === "" ? rootNode : resolveByDotNotation(rootNode, parentName);
 
-  if (parentName !== "") {
-    const segments = parentName.split(".");
-
-    for (const segment of segments) {
-      parentNode = parentNode.children.get(segment);
-
-      if (!parentNode) {
-        return; // Parent doesn't exist, so no duplicate
-      }
-    }
+  if (!parentNode) {
+    return; // Parent doesn't exist, so no duplicate
   }
 
   for (const child of parentNode.children.values()) {
@@ -327,17 +340,10 @@ function checkParentExists(
 
   // Check if parent exists in tree
   if (rootNode) {
-    const segments = parentName.split(".");
-    let current: RouteTree | undefined = rootNode;
-
-    for (const segment of segments) {
-      current = current.children.get(segment);
-
-      if (!current) {
-        throw new Error(
-          `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
-        );
-      }
+    if (!resolveByDotNotation(rootNode, parentName)) {
+      throw new Error(
+        `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
+      );
     }
 
     return; // Parent exists in tree
