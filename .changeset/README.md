@@ -290,12 +290,15 @@ Add new `noValidate` option
 
 ## CI Integration
 
-Our CI enforces changeset presence:
+Our CI enforces changeset rules (all checks block merge):
 
 ```yaml
 # .github/workflows/changeset-check.yml
-- If source files changed → changeset REQUIRED (blocks merge)
-- If changeset exists → must include PR reference (#XX)
+- If source files changed → changeset REQUIRED
+- If changeset exists:
+  - Must include PR/issue reference (#XX)
+  - Must contain only one package per file
+  - Must not reference private packages
 ```
 
 **Escape hatch:** Add `#trivial` to PR title to skip changeset requirement.

@@ -1,17 +1,14 @@
 ---
 "@real-router/core": minor
-"@real-router/types": minor
 ---
 
-Support dynamic defaultRoute and defaultParams via callback functions
+Support dynamic `defaultRoute` and `defaultParams` via callback functions (#39)
 
-This feature allows `defaultRoute` and `defaultParams` options to be callback functions that receive `getDependency` for dynamic value computation based on router dependencies.
+`defaultRoute` and `defaultParams` options now accept callback functions that receive `getDependency` for dynamic value computation based on router dependencies. Callbacks are resolved at point of use (`start()`, `navigateToDefault()`), never cached.
 
 **Breaking Type Change**: `router.getOptions().defaultRoute` now returns `string | DefaultRouteCallback` (was `string`). Similarly, `router.getOptions().defaultParams` now returns `Params | DefaultParamsCallback` (was `Params`). Code that assigns these values to typed variables may need type assertions or `typeof` checks.
 
-**Behavior Note**: A callback returning empty string `""` produces `ROUTE_NOT_FOUND` error (not `NO_START_PATH_OR_STATE`), because the function is truthy at early return checks but resolves to empty.
-
-**Example**:
+**Behavior Note**: A callback returning empty string `""` in `navigateToDefault()` returns noop (no navigation). In `start()` without path, it produces `ROUTE_NOT_FOUND` error (not `NO_START_PATH_OR_STATE`).
 
 ```typescript
 const router = createRouter(routes, {
