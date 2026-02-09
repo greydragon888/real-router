@@ -385,12 +385,19 @@ export class NavigationNamespace {
       return noop;
     }
 
-    const getDep = (name: string) => deps.getDependency(name as never);
-    const resolvedRoute = resolveOption(options.defaultRoute, getDep) as string;
+    const resolvedRoute = resolveOption(
+      options.defaultRoute,
+      deps.getDependency,
+    );
+
+    if (!resolvedRoute) {
+      return noop;
+    }
+
     const resolvedParams = resolveOption(
       options.defaultParams,
-      getDep,
-    ) as Params;
+      deps.getDependency,
+    );
 
     return this.navigate(resolvedRoute, resolvedParams, opts, callback);
   }

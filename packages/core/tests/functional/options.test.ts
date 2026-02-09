@@ -12,6 +12,7 @@ import { createRouter } from "@real-router/core";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
+import type { Options } from "@real-router/types";
 
 let router: Router;
 
@@ -738,27 +739,44 @@ describe("core/options", () => {
   });
 
   describe("dynamic default route/params with callbacks", () => {
-    it("should accept callback function for defaultRoute", () => {
+    it("should resolve callback defaultRoute via navigateToDefault", () => {
       const customRouter = createTestRouter({
         defaultRoute: () => "home",
       });
 
-      expect(() => {
-        customRouter.navigateToDefault();
-      }).not.toThrowError();
+      customRouter.start("/users");
+
+      const callback = vi.fn();
+
+      customRouter.navigateToDefault(callback);
+
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "home" }),
+      );
 
       customRouter.stop();
     });
 
-    it("should accept callback function for defaultParams", () => {
+    it("should resolve callback defaultParams via navigateToDefault", () => {
       const customRouter = createTestRouter({
-        defaultRoute: "home",
-        defaultParams: () => ({ id: "user-123" }),
+        defaultRoute: "users.view",
+        defaultParams: () => ({ id: "42" }),
       });
 
-      expect(() => {
-        customRouter.navigateToDefault();
-      }).not.toThrowError();
+      customRouter.start("/home");
+
+      const callback = vi.fn();
+
+      customRouter.navigateToDefault(callback);
+
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({
+          name: "users.view",
+          params: { id: "42" },
+        }),
+      );
 
       customRouter.stop();
     });
@@ -771,35 +789,64 @@ describe("core/options", () => {
       }).toThrowError(TypeError);
     });
 
-    it("navigateToDefault resolves callback defaultRoute via getDependency", (done: () => void) => {
+    it("navigateToDefault resolves callback defaultRoute via getDependency", () => {
       const customRouter = createTestRouter({
-        defaultRoute: ((getDep: any) => getDep("routeName")) as any,
-      }) as any;
-
-      customRouter.setDependency("routeName", "home");
-      customRouter.start();
-      customRouter.navigateToDefault({}, (err: any, state: any) => {
-        expect(err).toBeNull();
-        expect(state?.name).toBe("home");
-
-        customRouter.stop();
-        done();
+        defaultRoute: ((getDep: (name: string) => unknown) =>
+          getDep("routeName")) as Options["defaultRoute"],
       });
+
+      // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
+      customRouter.setDependency("routeName", "home");
+      customRouter.start("/users");
+
+      const callback = vi.fn();
+
+      customRouter.navigateToDefault(callback);
+
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "home" }),
+      );
+
+      customRouter.stop();
     });
 
-    it("start resolves callback defaultRoute via getDependency", (done: () => void) => {
+    it("start resolves callback defaultRoute via getDependency", () => {
       const customRouter = createTestRouter({
-        defaultRoute: ((getDep: any) => getDep("routeName")) as any,
-      }) as any;
-
-      customRouter.setDependency("routeName", "home");
-      customRouter.start((err: any, state: any) => {
-        expect(err).toBeNull();
-        expect(state?.name).toBe("home");
-
-        customRouter.stop();
-        done();
+        defaultRoute: ((getDep: (name: string) => unknown) =>
+          getDep("routeName")) as Options["defaultRoute"],
       });
+
+      // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
+      customRouter.setDependency("routeName", "home");
+
+      const callback = vi.fn();
+
+      customRouter.start(callback);
+
+      expect(callback).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "home" }),
+      );
+
+      customRouter.stop();
+    });
+
+    it("navigateToDefault returns noop when callback resolves to empty string", () => {
+      const customRouter = createTestRouter({
+        defaultRoute: () => "",
+      });
+
+      customRouter.start("/home");
+
+      const cancel = customRouter.navigateToDefault();
+
+      expect(typeof cancel).toBe("function");
+
+      // State should not change (noop)
+      expect(customRouter.getState()?.name).toBe("home");
+
+      customRouter.stop();
     });
   });
 });

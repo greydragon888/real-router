@@ -21,7 +21,7 @@ import type {
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
  */
-export interface NavigationDependencies<Dependencies = object> {
+export interface NavigationDependencies {
   /** Get router options */
   getOptions: () => Options;
 
@@ -66,8 +66,8 @@ export interface NavigationDependencies<Dependencies = object> {
     arg?: RouterErrorType | NavigationOptions,
   ) => void;
 
-  /** Get a dependency by name */
-  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
+  /** Get a dependency by name (untyped — used only for resolveOption) */
+  getDependency: (name: string) => unknown;
 }
 
 /**

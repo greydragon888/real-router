@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/OptionsNamespace/helpers.ts
 
-import type { Options } from "@real-router/types";
+import type { Options, Params } from "@real-router/types";
 
 /**
  * Creates a ReferenceError for option not found.
@@ -35,12 +35,25 @@ export function deepFreeze<T extends object>(obj: T): Readonly<T> {
  * Otherwise, returns the value as-is.
  */
 export function resolveOption(
-  value: unknown,
+  value: Options["defaultRoute"],
   getDependency: (name: string) => unknown,
-): unknown {
+): string;
+
+export function resolveOption(
+  value: Options["defaultParams"],
+  getDependency: (name: string) => unknown,
+): Params;
+
+// eslint-disable-next-line sonarjs/function-return-type -- overloads: string for defaultRoute, Params for defaultParams
+export function resolveOption(
+  value: Options["defaultRoute"] | Options["defaultParams"],
+  getDependency: (name: string) => unknown,
+): string | Params {
   if (typeof value === "function") {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    return value(getDependency);
+    // Runtime getDependency is (name: string) => unknown, but DefaultRouteCallback<object>
+    // expects <K extends keyof object>(name: K) => object[K] where keyof object = never.
+    // Cast needed to bridge generic constraint mismatch.
+    return value(getDependency as never);
   }
 
   return value;

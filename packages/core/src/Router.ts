@@ -1059,7 +1059,7 @@ export class Router<
     this.#plugins.setDependencies(pluginsDeps);
 
     // NavigationNamespace uses function injection
-    const navigationDeps: NavigationDependencies<Dependencies> = {
+    const navigationDeps: NavigationDependencies = {
       getOptions: () => this.#options.get(),
       hasRoute: (name) => this.#routes.hasRoute(name),
       getState: () => this.#state.get(),
@@ -1081,8 +1081,8 @@ export class Router<
       invokeEventListeners: (eventName, toState, fromState, arg) => {
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.#dependencies.get(dependencyName),
+      getDependency: (name: string) =>
+        this.#dependencies.get(name as keyof Dependencies),
     };
 
     this.#navigation.setDependencies(navigationDeps);
@@ -1100,7 +1100,7 @@ export class Router<
 
     // RouterLifecycleNamespace uses function injection
     // Use facade methods to ensure spies work and plugin interception is possible
-    const lifecycleDeps: RouterLifecycleDependencies<Dependencies> = {
+    const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.#options.get(),
       hasListeners: (eventName) => this.#observable.hasListeners(eventName),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
@@ -1119,8 +1119,8 @@ export class Router<
       // RouterLifecycleNamespace only uses matchPath without source parameter
       matchPath: (path, source?: string) =>
         this.#routes.matchPath(path, source, this.#options.get()),
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.#dependencies.get(dependencyName),
+      getDependency: (name: string) =>
+        this.#dependencies.get(name as keyof Dependencies),
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);
