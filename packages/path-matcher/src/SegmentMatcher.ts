@@ -76,9 +76,7 @@ export function createSegmentNode(): SegmentNode {
   return {
     staticChildren: Object.create(null) as Record<string, SegmentNode>,
     paramChild: undefined,
-    paramName: undefined,
     splatChild: undefined,
-    splatName: undefined,
     route: undefined,
     slashChildRoute: undefined,
   };
@@ -616,14 +614,11 @@ export class SegmentMatcher {
           .replaceAll(CONSTRAINT_PATTERN_RGX, "")
           .replace(/\?$/, "");
 
-        if (!node.paramChild) {
-          node.paramChild = createSegmentNode();
-          node.paramChild.paramName = paramName;
-        }
+        node.paramChild ??= { node: createSegmentNode(), name: paramName };
 
         // Path with param: continue recursively from paramChild
         this.#insertIntoTrieFrom(
-          node.paramChild,
+          node.paramChild.node,
           path,
           segmentEnd + 1,
           compiled,
@@ -692,12 +687,9 @@ export class SegmentMatcher {
     if (segment.startsWith("*")) {
       const splatName = segment.slice(1);
 
-      if (!node.splatChild) {
-        node.splatChild = createSegmentNode();
-        node.splatName = splatName;
-      }
+      node.splatChild ??= { node: createSegmentNode(), name: splatName };
 
-      return node.splatChild;
+      return node.splatChild.node;
     }
 
     if (segment.startsWith(":")) {
@@ -706,12 +698,9 @@ export class SegmentMatcher {
         .replaceAll(CONSTRAINT_PATTERN_RGX, "")
         .replace(/\?$/, "");
 
-      if (!node.paramChild) {
-        node.paramChild = createSegmentNode();
-        node.paramChild.paramName = paramName;
-      }
+      node.paramChild ??= { node: createSegmentNode(), name: paramName };
 
-      return node.paramChild;
+      return node.paramChild.node;
     }
 
     const key = this.#options.caseSensitive ? segment : segment.toLowerCase();
@@ -843,14 +832,13 @@ export class SegmentMatcher {
       if (lookupKey in node.staticChildren) {
         next = staticChild;
       } else if (node.paramChild) {
-        next = node.paramChild;
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- paramName is always set when paramChild is created
-        params[next.paramName!] = segment;
+        next = node.paramChild.node;
+        params[node.paramChild.name] = segment;
       } else if (node.splatChild) {
         // Try specific child routes of splatChild before wildcard capture (static > param > splat)
         const childParams: Record<string, string> = {};
         const specific = this.#traverseFrom(
-          node.splatChild,
+          node.splatChild.node,
           path,
           start,
           childParams,
@@ -862,10 +850,9 @@ export class SegmentMatcher {
           return specific;
         }
 
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- splatName is always set when splatChild is created
-        params[node.splatName!] = path.slice(start);
+        params[node.splatChild.name] = path.slice(start);
 
-        return node.splatChild.route;
+        return node.splatChild.node.route;
       } else {
         return undefined;
       }

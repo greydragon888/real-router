@@ -164,10 +164,8 @@ export interface BuildPathOptions {
 
 export interface SegmentNode {
   readonly staticChildren: Record<string, SegmentNode>;
-  paramChild?: SegmentNode | undefined;
-  paramName?: string | undefined;
-  splatChild?: SegmentNode | undefined;
-  splatName?: string | undefined;
+  paramChild?: { node: SegmentNode; name: string } | undefined;
+  splatChild?: { node: SegmentNode; name: string } | undefined;
   route?: CompiledRoute | undefined;
   slashChildRoute?: CompiledRoute | undefined;
 }

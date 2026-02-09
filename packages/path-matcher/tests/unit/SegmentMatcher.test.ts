@@ -172,9 +172,7 @@ describe("createSegmentNode", () => {
 
     expect(node).toHaveProperty("staticChildren");
     expect(node).toHaveProperty("paramChild");
-    expect(node).toHaveProperty("paramName");
     expect(node).toHaveProperty("splatChild");
-    expect(node).toHaveProperty("splatName");
     expect(node).toHaveProperty("route");
     expect(node).toHaveProperty("slashChildRoute");
   });
@@ -183,9 +181,7 @@ describe("createSegmentNode", () => {
     const node = createSegmentNode();
 
     expect(node.paramChild).toBeUndefined();
-    expect(node.paramName).toBeUndefined();
     expect(node.splatChild).toBeUndefined();
-    expect(node.splatName).toBeUndefined();
     expect(node.route).toBeUndefined();
     expect(node.slashChildRoute).toBeUndefined();
   });
@@ -212,9 +208,7 @@ describe("createSegmentNode", () => {
     expect(keys).toStrictEqual([
       "staticChildren",
       "paramChild",
-      "paramName",
       "splatChild",
-      "splatName",
       "route",
       "slashChildRoute",
     ]);
