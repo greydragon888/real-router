@@ -1,12 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  createBuildOptions,
-  deepFreezeState,
-  freezeStateInPlace,
-} from "../../../src/helpers";
+import { deepFreezeState, freezeStateInPlace } from "../../../src/helpers";
 
-import type { Options, Params, State } from "@real-router/types";
+import type { Params, State } from "@real-router/types";
 
 describe("deepFreezeState", () => {
   describe("basic functionality", () => {
@@ -861,84 +857,5 @@ describe("freezeStateInPlace", () => {
         (frozen.params.items as number[])[0] = 999;
       }).toThrowError();
     });
-  });
-});
-
-describe("createBuildOptions", () => {
-  // Base options with all required fields
-  const baseOptions: Options = {
-    defaultRoute: "",
-    defaultParams: {},
-    trailingSlash: "preserve",
-    urlParamsEncoding: "default",
-    queryParamsMode: "loose",
-    allowNotFound: true,
-    rewritePathOnMatch: true,
-  };
-
-  it("should create build options without queryParams when undefined", () => {
-    const options: Options = {
-      ...baseOptions,
-      trailingSlash: "never",
-      queryParamsMode: "loose",
-      urlParamsEncoding: "default",
-    };
-
-    const result = createBuildOptions(options);
-
-    expect(result).toStrictEqual({
-      trailingSlashMode: "never",
-      queryParamsMode: "loose",
-      urlParamsEncoding: "default",
-    });
-    expect(result).not.toHaveProperty("queryParams");
-  });
-
-  it("should include queryParams when defined", () => {
-    const queryParams = {
-      arrayFormat: "brackets" as const,
-      nullFormat: "hidden" as const,
-    };
-    const options: Options = {
-      ...baseOptions,
-      trailingSlash: "always",
-      queryParamsMode: "strict",
-      urlParamsEncoding: "uri",
-      queryParams,
-    };
-
-    const result = createBuildOptions(options);
-
-    expect(result).toStrictEqual({
-      trailingSlashMode: "always",
-      queryParamsMode: "strict",
-      urlParamsEncoding: "uri",
-      queryParams,
-    });
-    expect(result.queryParams).toBe(queryParams);
-  });
-
-  it("should map trailingSlash 'never' to trailingSlashMode 'never'", () => {
-    const options: Options = { ...baseOptions, trailingSlash: "never" };
-
-    const result = createBuildOptions(options);
-
-    expect(result.trailingSlashMode).toBe("never");
-  });
-
-  it("should map trailingSlash 'always' to trailingSlashMode 'always'", () => {
-    const options: Options = { ...baseOptions, trailingSlash: "always" };
-
-    const result = createBuildOptions(options);
-
-    expect(result.trailingSlashMode).toBe("always");
-  });
-
-  it("should map trailingSlash 'preserve' to trailingSlashMode 'default'", () => {
-    const options: Options = { ...baseOptions, trailingSlash: "preserve" };
-
-    const result = createBuildOptions(options);
-
-    expect(result.trailingSlashMode).toBe("default");
   });
 });

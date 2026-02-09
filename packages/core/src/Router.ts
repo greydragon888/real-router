@@ -60,12 +60,13 @@ import type {
   SubscribeFn,
   Unsubscribe,
 } from "@real-router/types";
+import type { CreateMatcherOptions } from "route-tree";
 
 /**
  * Router class with integrated namespace architecture.
  *
  * All functionality is provided by namespace classes:
- * - OptionsNamespace: getOptions, setOption
+ * - OptionsNamespace: getOptions, getOption (immutable)
  * - DependenciesNamespace: get/set/remove dependencies
  * - ObservableNamespace: event listeners, subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
@@ -166,7 +167,11 @@ export class Router<
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
     this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
-    this.#routes = new RoutesNamespace<Dependencies>(routes, noValidate);
+    this.#routes = new RoutesNamespace<Dependencies>(
+      routes,
+      noValidate,
+      deriveMatcherOptions(this.#options.get()),
+    );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#middleware = new MiddlewareNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
@@ -216,7 +221,6 @@ export class Router<
     // Options
     this.getOptions = this.getOptions.bind(this);
     this.getOption = this.getOption.bind(this);
-    this.setOption = this.setOption.bind(this);
 
     // Router Lifecycle
     this.isActive = this.isActive.bind(this);
@@ -584,19 +588,6 @@ export class Router<
     return this.#options.getOption(option);
   }
 
-  setOption(option: keyof Options, value: Options[keyof Options]): this {
-    if (!this.#noValidate) {
-      OptionsNamespace.validateOptionName(option, "setOption");
-      OptionsNamespace.validateOptionExists(option, "setOption");
-      OptionsNamespace.validateNotLocked(this.#options.isLocked(), option);
-      OptionsNamespace.validateOptionValue(option, value, "setOption");
-    }
-
-    this.#options.set(option, value);
-
-    return this;
-  }
-
   // ============================================================================
   // Router Lifecycle
   // ============================================================================
@@ -617,12 +608,6 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs(args);
     }
 
-    // Lock options when router starts
-    this.#options.lock();
-
-    // Initialize build options cache
-    this.#routes.initBuildOptionsCache(this.#options.get());
-
     // Forward to lifecycle namespace
     this.#lifecycle.start(...args);
 
@@ -631,12 +616,6 @@ export class Router<
 
   stop(): this {
     this.#lifecycle.stop();
-
-    // Clear build options cache
-    this.#routes.clearBuildOptionsCache();
-
-    // Unlock options when router stops
-    this.#options.unlock();
 
     return this;
   }
@@ -1095,8 +1074,8 @@ export class Router<
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params, segments) =>
-        this.#routes.buildPath(route, params, this.#options.get(), segments),
+      buildPath: (route, params) =>
+        this.#routes.buildPath(route, params, this.#options.get()),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
@@ -1210,4 +1189,20 @@ export class Router<
       },
     );
   }
+}
+
+/**
+ * Derives CreateMatcherOptions from router Options.
+ * Maps core option names to matcher option names.
+ */
+function deriveMatcherOptions(
+  options: Readonly<Options>,
+): CreateMatcherOptions {
+  return {
+    strictTrailingSlash: options.trailingSlash === "strict",
+    strictQueryParams: options.queryParamsMode === "strict",
+    urlParamsEncoding: options.urlParamsEncoding,
+    /* v8 ignore next -- @preserve branch: queryParams always set via defaultOptions */
+    queryParams: options.queryParams ?? {},
+  };
 }

@@ -190,6 +190,27 @@ describe("search-params", () => {
       );
     });
 
+    it("throws TypeError for object elements in arrays", () => {
+      expect(() => build({ items: [{ nested: "value" }] })).toThrowError(
+        TypeError,
+      );
+      expect(() => build({ items: [{ nested: "value" }] })).toThrowError(
+        "[search-params] Array element must be a string, number, or boolean — received object",
+      );
+    });
+
+    it("throws TypeError for null elements in arrays", () => {
+      expect(() => build({ items: [null] })).toThrowError(TypeError);
+      expect(() => build({ items: [null] })).toThrowError("received null");
+    });
+
+    it("throws TypeError for undefined elements in arrays", () => {
+      expect(() => build({ items: [undefined] })).toThrowError(TypeError);
+      expect(() => build({ items: [undefined] })).toThrowError(
+        "received undefined",
+      );
+    });
+
     it("handles null with default format", () => {
       expect(build({ value: null })).toBe("value");
     });

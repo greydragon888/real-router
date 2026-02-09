@@ -10,12 +10,7 @@
  * @module core/stateBuilder
  */
 
-import type {
-  MatchResult,
-  RouteParams,
-  RouteTree,
-  RouteTreeState,
-} from "route-tree";
+import type { RouteParams, RouteTreeState } from "route-tree";
 
 /**
  * Builds a dot-separated route name from segments.
@@ -29,23 +24,28 @@ import type {
  * buildNameFromSegments(segments); // "users.profile"
  * ```
  */
-export function buildNameFromSegments(segments: readonly RouteTree[]): string {
+export function buildNameFromSegments(
+  segments: readonly { fullName: string }[],
+): string {
   return segments.at(-1)?.fullName ?? "";
 }
 
 /**
- * Creates a RouteTreeState from a MatchResult.
+ * Creates a RouteTreeState from a match result.
  *
  * This function is the primary way to build a RouteTreeState when
- * you have a MatchResult from matchPathSegments() or other low-level APIs.
+ * you have a result from matcher.match().
  *
- * @param matchResult - Result from matchPathSegments() containing segments and params
+ * @param matchResult - Result from matcher.match() containing segments and params
+ * @param matchResult.segments - Matched route segments
+ * @param matchResult.params - Matched route params
+ * @param matchResult.meta - Matched route meta
  * @param name - Optional explicit name (if not provided, built from segments)
  * @returns RouteTreeState with name, params, and meta
  *
  * @example
  * ```typescript
- * const matchResult = routeNode.matchPathSegments("/users/123");
+ * const matchResult = matcher.match("/users/123");
  * if (matchResult) {
  *   const state = createRouteState(matchResult);
  *   // { name: "users.profile", params: { id: "123" }, meta: {...} }
@@ -53,14 +53,18 @@ export function buildNameFromSegments(segments: readonly RouteTree[]): string {
  * ```
  */
 export function createRouteState<P extends RouteParams = RouteParams>(
-  matchResult: MatchResult<P>,
+  matchResult: {
+    readonly segments: readonly { fullName: string }[];
+    readonly params: Readonly<Record<string, unknown>>;
+    readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
+  },
   name?: string,
 ): RouteTreeState<P> {
   const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
 
   return {
     name: resolvedName,
-    params: matchResult.params,
-    meta: matchResult.meta,
+    params: matchResult.params as P,
+    meta: matchResult.meta as Record<string, Record<string, "url" | "query">>,
   };
 }

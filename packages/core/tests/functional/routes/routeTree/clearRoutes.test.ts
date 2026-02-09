@@ -95,19 +95,24 @@ describe("core/routes/clearRoutes", () => {
       }));
 
       router.addRoute({
-        name: "encoded",
-        path: "/encoded/:id",
+        name: "withDecoder",
+        path: "/with-decoder/:id",
         decodeParams,
       });
 
+      expect(router.hasRoute("withDecoder")).toBe(true);
+
       // Verify decoder works before clear
-      expect(router.matchPath("/encoded/123")?.params.id).toBe(123);
+      const result = router.matchPath("/with-decoder/123");
+
+      expect(result?.name).toBe("withDecoder");
+      expect(result?.params.id).toBe(123);
 
       router.clearRoutes();
 
       // Route no longer exists after clear
-      expect(router.hasRoute("encoded")).toBe(false);
-      expect(router.matchPath("/encoded/123")).toBeUndefined();
+      expect(router.hasRoute("withDecoder")).toBe(false);
+      expect(router.matchPath("/with-decoder/123")).toBeUndefined();
     });
 
     it("should clear encoders", () => {
@@ -667,11 +672,11 @@ describe("core/routes/clearRoutes", () => {
       // Routes cleared
       expect(router.matchPath("/home")).toBeUndefined();
 
-      // Can add new routes and restart
-      // Issue #50: With two-phase start, we need to set new defaultRoute after clearRoutes
-      // since the old defaultRoute ("home") no longer exists
+      // Can add new routes and restart with new defaultRoute
+      // Issue #50: With two-phase start, we need a new router with new defaultRoute
+      // since the old defaultRoute ("home") no longer exists and setOption is removed
+      router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.setOption("defaultRoute", "dashboard");
       router.start();
 
       expect(router.getState()?.name).toBe("dashboard");

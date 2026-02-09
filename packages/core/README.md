@@ -391,14 +391,6 @@ Get a single router option by name.\
 Returns: option value\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getOption)
 
-#### `router.setOption(name: string, value: unknown): void`
-
-Set a router option. Must be called before `start()`.\
-`name: string` — option name\
-`value: unknown` — option value\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/setOption)
-
 ---
 
 ### Other

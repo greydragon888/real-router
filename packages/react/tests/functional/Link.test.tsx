@@ -52,8 +52,9 @@ describe("Link component", () => {
   });
 
   it("should have active class if default route is active", () => {
-    router.setOption("defaultRoute", "home");
-    router.start();
+    router = createTestRouter();
+    router.addRoute({ name: "home", path: "/home" });
+    router.start("/home");
 
     render(
       <RouterProvider router={router}>

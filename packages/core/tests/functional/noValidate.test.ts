@@ -144,13 +144,6 @@ describe("core/noValidate option", () => {
           router.getOption("unknownOption" as any),
         ).not.toThrowError();
       });
-
-      it("should skip validation in setOption", () => {
-        // Unknown option - would throw ReferenceError with noValidate: false
-        expect(() =>
-          router.setOption("unknownOption" as any, "value" as any),
-        ).not.toThrowError();
-      });
     });
 
     // Lifecycle

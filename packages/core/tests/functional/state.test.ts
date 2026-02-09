@@ -1,4 +1,4 @@
-import { createRouteTree, MatcherService } from "route-tree";
+import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
@@ -596,7 +596,7 @@ describe("core/stateBuilder", () => {
         },
       ]);
 
-      const matcher = new MatcherService();
+      const matcher = createMatcher();
 
       matcher.registerTree(tree);
       const result = matcher.match("/users/123");
@@ -612,7 +612,7 @@ describe("core/stateBuilder", () => {
     it("skips segments with empty names", () => {
       const tree = createRouteTree("", "", [{ name: "home", path: "/home" }]);
 
-      const matcher = new MatcherService();
+      const matcher = createMatcher();
 
       matcher.registerTree(tree);
       const result = matcher.match("/home");
@@ -644,7 +644,7 @@ describe("core/stateBuilder", () => {
         },
       ]);
 
-      const matcher = new MatcherService();
+      const matcher = createMatcher();
 
       matcher.registerTree(tree);
       const result = matcher.match("/users/123");
@@ -666,7 +666,7 @@ describe("core/stateBuilder", () => {
     it("uses explicit name when provided", () => {
       const tree = createRouteTree("", "", [{ name: "route", path: "/route" }]);
 
-      const matcher = new MatcherService();
+      const matcher = createMatcher();
 
       matcher.registerTree(tree);
       const result = matcher.match("/route");
@@ -683,7 +683,7 @@ describe("core/stateBuilder", () => {
         { name: "search", path: "/search?q&page" },
       ]);
 
-      const matcher = new MatcherService();
+      const matcher = createMatcher();
 
       matcher.registerTree(tree);
       const result = matcher.match("/search?q=test&page=1");

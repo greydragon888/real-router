@@ -275,10 +275,12 @@ describe("stop", () => {
     });
 
     it("should preserve router configuration after stop", () => {
-      // Set custom options
-      router.setOption("defaultRoute", "custom.default");
-      router.setOption("allowNotFound", true);
-      router.setOption("trailingSlash", "always");
+      // Create router with custom options
+      router = createTestRouter({
+        defaultRoute: "custom.default",
+        allowNotFound: true,
+        trailingSlash: "always",
+      });
 
       router.start();
       router.stop();
@@ -439,7 +441,7 @@ describe("stop", () => {
     });
 
     it("should stop router in UNKNOWN_ROUTE state", () => {
-      router.setOption("allowNotFound", true);
+      router = createTestRouter({ allowNotFound: true });
 
       router.start("/nonexistent/path");
 

@@ -1384,7 +1384,7 @@ describe("Browser Plugin", () => {
        */
 
       it("encodes HTML special characters in path params", () => {
-        // Note: rou3 only validates explicit constraints (e.g., :id<\d+>)
+        // Note: matcher only validates explicit constraints (e.g., :id<\d+>)
         // Use simpler XSS attempt without parentheses
         const url = router.buildUrl("users.view", {
           id: "<script>xss</script>",

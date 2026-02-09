@@ -31,7 +31,6 @@ for arg in "$@"; do
         echo "   2  Navigation Plugins"
         echo "   3  Dependencies"
         echo "   4  Plugins Management"
-        echo "   5  Router Options"
         echo "   7  Path Operations"
         echo "   8  Current State"
         echo "   9  Redirects"

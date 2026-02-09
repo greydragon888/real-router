@@ -1,0 +1,49 @@
+{
+  "name": "path-matcher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Path matching utilities for route-tree",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "path matching",
+    "route matching",
+    "real-router"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache src/ tests/ --fix --max-warnings 0",
+    "test": "vitest run",
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
+  },
+  "sideEffects": false
+}

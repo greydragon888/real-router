@@ -6,7 +6,7 @@
  * - Enterprise Application (200+ routes)
  *
  * IMPORTANT: match() is a non-mutating operation.
- * MatcherService must be created OUTSIDE bench blocks.
+ * Matcher must be created OUTSIDE bench blocks.
  *
  * Note: .gc("inner") is used for tests with heavy allocations to stabilize results
  */
@@ -19,12 +19,13 @@ import {
   generateSpaRoutes,
 } from "./helpers/generators";
 import { createRouteTree, createRouteTreeBuilder } from "../../src/builder";
-import { buildPath } from "../../src/operations/build";
-import { MatcherService } from "../../src/services/MatcherService";
+import { createMatcher as createMatcherFactory } from "../../src/createMatcher";
+
+import type { Matcher } from "../../src/createMatcher";
 
 /** Creates a pre-registered matcher for a given route tree (reusable across iterations) */
-function createMatcher(tree: any): MatcherService {
-  const matcher = new MatcherService();
+function createMatcher(tree: any): Matcher {
+  const matcher = createMatcherFactory();
 
   matcher.registerTree(tree);
 
@@ -49,12 +50,11 @@ function createMatcher(tree: any): MatcherService {
       .add({ name: "dynamic", path: "/dynamic/:id" })
       .build();
 
-    // Warmup: buildPath code paths
-    buildPath(tree, "users");
-    buildPath(tree, "users.view.details", { id: "123" });
-
-    // Warmup: match code paths
+    // Warmup: match + buildPath code paths
     const matcher = createMatcher(tree);
+
+    matcher.buildPath("users");
+    matcher.buildPath("users.view.details", { id: "123" });
 
     matcher.match("/");
     matcher.match("/users/123/details");
@@ -104,13 +104,14 @@ barplot(() => {
   summary(() => {
     const spaRoutes = generateSpaRoutes();
     const spaTree = createRouteTree("", "", spaRoutes);
+    const spaBuildMatcher = createMatcher(spaTree);
 
     bench("SPA: buildPath simple (users)", () => {
-      buildPath(spaTree, "users");
+      spaBuildMatcher.buildPath("users");
     });
 
     bench("SPA: buildPath deep (users.view.details)", () => {
-      buildPath(spaTree, "users.view.details", { id: "123" });
+      spaBuildMatcher.buildPath("users.view.details", { id: "123" });
     });
   });
 });
@@ -184,18 +185,22 @@ barplot(() => {
   summary(() => {
     const enterpriseRoutes = generateEnterpriseRoutes();
     const enterpriseTree = createRouteTree("", "", enterpriseRoutes);
+    const enterpriseBuildMatcher = createMatcher(enterpriseTree);
 
     bench("Enterprise: buildPath simple", () => {
-      buildPath(enterpriseTree, "products");
+      enterpriseBuildMatcher.buildPath("products");
     });
 
     bench("Enterprise: buildPath deep with query", () => {
-      buildPath(enterpriseTree, "admin.users.management.roles.permissions", {
-        filter: "active",
-        sort: "name",
-        page: "1",
-        limit: "10",
-      });
+      enterpriseBuildMatcher.buildPath(
+        "admin.users.management.roles.permissions",
+        {
+          filter: "active",
+          sort: "name",
+          page: "1",
+          limit: "10",
+        },
+      );
     });
   });
 });

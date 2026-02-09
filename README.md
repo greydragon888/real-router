@@ -14,14 +14,25 @@ Real-Router is an **independent routing solution** inspired by the declarative r
 
 ### Performance-First Design
 
-Real-Router delivers exceptional performance through algorithmic improvements:
+Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is an entire URL segment, natively reflecting the hierarchy of named routes.
 
-| Operation              | Optimization               |
-| ---------------------- | -------------------------- |
-| Route lookup           | O(1) Map-based operations  |
-| Path matching          | O(segments) trie traversal |
-| Event listener removal | O(1) hash-based removal    |
-| Memory footprint       | Optimized data structures  |
+**vs [router5](https://github.com/router5/router5):**
+
+| Metric | Improvement |
+| --- | --- |
+| Navigation | 2–3x faster |
+| URL building | 20–30x faster |
+| Memory allocations | 3x fewer |
+| Scaling | O(1) vs O(n) — up to 12x at 1000+ routes |
+
+**vs [router6](https://github.com/nicolo-ribaudo/router6):**
+
+| Metric | Improvement                           |
+| --- |---------------------------------------|
+| Navigation | 2x faster                             |
+| URL building | 5–10x faster                          |
+| Memory allocations | 1.5x fewer                            |
+| Scaling | Both O(1) — stable at any route count |
 
 ### Modern Architecture
 
@@ -125,11 +136,11 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 
 ### Plugins
 
-| Package                                                                    | Description                                  |
-| -------------------------------------------------------------------------- | -------------------------------------------- |
-| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser history and URL synchronization      |
-| [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking |
-| [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations     |
+| Package                                                                    | Description                                     |
+| -------------------------------------------------------------------------- |-------------------------------------------------|
+| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser history and URL synchronization         |
+| [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking    |
+| [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations        |
 
 ### Utilities
 

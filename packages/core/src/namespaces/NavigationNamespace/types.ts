@@ -48,12 +48,8 @@ export interface NavigationDependencies {
     meta?: StateMetaInput<MP>,
   ) => State<P, MP>;
 
-  /** Build path from route name and params (optional segments to avoid duplicate lookup) */
-  buildPath: (
-    route: string,
-    params?: Params,
-    segments?: readonly unknown[],
-  ) => string;
+  /** Build path from route name and params */
+  buildPath: (route: string, params?: Params) => string;
 
   /** Check if states are equal */
   areStatesEqual: (

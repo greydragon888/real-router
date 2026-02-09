@@ -211,6 +211,35 @@ function validateRouteName(
 }
 
 /**
+ * Resolves a dot-notation route name to a node in the tree.
+ *
+ * @param rootNode - Root node to start from
+ * @param dotName - Dot-separated route name (e.g., "users.profile")
+ * @returns The resolved node, or undefined if not found
+ */
+function resolveByDotNotation(
+  rootNode: RouteTree,
+  dotName: string,
+): RouteTree | undefined {
+  // Fast path: single-segment names don't need splitting
+  if (!dotName.includes(".")) {
+    return rootNode.children.get(dotName);
+  }
+
+  let current: RouteTree | undefined = rootNode;
+
+  for (const segment of dotName.split(".")) {
+    current = current.children.get(segment);
+
+    if (!current) {
+      return undefined;
+    }
+  }
+
+  return current;
+}
+
+/**
  * Checks for duplicate route name in existing tree.
  *
  * @param rootNode - Root node to search in
@@ -223,19 +252,11 @@ function checkTreeNameDuplicate(
   fullName: string,
   methodName: string,
 ): void {
-  // Use children Map for O(1) lookup
-  const segments = fullName.split(".");
-  let current: RouteTree | undefined = rootNode;
-
-  for (const segment of segments) {
-    current = current.children.get(segment);
-
-    if (!current) {
-      return; // Route doesn't exist
-    }
+  if (resolveByDotNotation(rootNode, fullName)) {
+    throw new Error(
+      `[router.${methodName}] Route "${fullName}" already exists`,
+    );
   }
-
-  throw new Error(`[router.${methodName}] Route "${fullName}" already exists`);
 }
 
 /**
@@ -272,25 +293,20 @@ function checkTreePathDuplicate(
   rootNode: RouteTree,
   parentName: string,
   routePath: string,
+  methodName: string,
 ): void {
-  // Find parent node using children Map
-  let parentNode: RouteTree | undefined = rootNode;
+  const parentNode =
+    parentName === "" ? rootNode : resolveByDotNotation(rootNode, parentName);
 
-  if (parentName !== "") {
-    const segments = parentName.split(".");
-
-    for (const segment of segments) {
-      parentNode = parentNode.children.get(segment);
-
-      if (!parentNode) {
-        return; // Parent doesn't exist, so no duplicate
-      }
-    }
+  if (!parentNode) {
+    return; // Parent doesn't exist, so no duplicate
   }
 
   for (const child of parentNode.children.values()) {
     if (child.path === routePath) {
-      throw new Error(`Path "${routePath}" is already defined`);
+      throw new Error(
+        `[router.${methodName}] Path "${routePath}" is already defined`,
+      );
     }
   }
 }
@@ -327,17 +343,10 @@ function checkParentExists(
 
   // Check if parent exists in tree
   if (rootNode) {
-    const segments = parentName.split(".");
-    let current: RouteTree | undefined = rootNode;
-
-    for (const segment of segments) {
-      current = current.children.get(segment);
-
-      if (!current) {
-        throw new Error(
-          `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
-        );
-      }
+    if (!resolveByDotNotation(rootNode, parentName)) {
+      throw new Error(
+        `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
+      );
     }
 
     return; // Parent exists in tree
@@ -361,11 +370,14 @@ function checkBatchPathDuplicate(
   seenPathsByParent: Map<string, Set<string>>,
   parentName: string,
   routePath: string,
+  methodName: string,
 ): void {
   const pathsAtLevel = seenPathsByParent.get(parentName);
 
   if (pathsAtLevel?.has(routePath)) {
-    throw new Error(`Path "${routePath}" is already defined`);
+    throw new Error(
+      `[router.${methodName}] Path "${routePath}" is already defined`,
+    );
   }
 
   if (pathsAtLevel) {
@@ -465,12 +477,17 @@ export function validateRoute(
 
   // Check for duplicate path in existing tree
   if (rootNode) {
-    checkTreePathDuplicate(rootNode, pathCheckParent, routePath);
+    checkTreePathDuplicate(rootNode, pathCheckParent, routePath, methodName);
   }
 
   // Check for duplicate path in current batch
   if (seenPathsByParent) {
-    checkBatchPathDuplicate(seenPathsByParent, pathCheckParent, routePath);
+    checkBatchPathDuplicate(
+      seenPathsByParent,
+      pathCheckParent,
+      routePath,
+      methodName,
+    );
   }
 
   // Validate children recursively

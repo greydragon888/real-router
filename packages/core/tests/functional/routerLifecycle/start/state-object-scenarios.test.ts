@@ -154,7 +154,7 @@ describe("router.start() - state object scenarios", () => {
     describe("invalid state object initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for non-existent route name", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const invalidState = {
           name: "nonexistent.route",
@@ -183,7 +183,7 @@ describe("router.start() - state object scenarios", () => {
 
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error for completely invalid route name", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const invalidState = {
           name: "totally.invalid.route",
@@ -208,7 +208,7 @@ describe("router.start() - state object scenarios", () => {
       });
 
       it("should handle empty route name in state object", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const invalidState = {
           name: "", // Empty route name
@@ -231,7 +231,7 @@ describe("router.start() - state object scenarios", () => {
       });
 
       it("should handle missing route name in state object", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const invalidState = {
           // Missing name property entirely
@@ -256,7 +256,7 @@ describe("router.start() - state object scenarios", () => {
 
       // Fix for issue: now returns ROUTE_NOT_FOUND error instead of throwing
       it("should return ROUTE_NOT_FOUND error when params have invalid type", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const invalidState = {
           name: "users.view", // Valid route
@@ -683,7 +683,7 @@ describe("router.start() - state object scenarios", () => {
       });
 
       it("should handle Promise rejection with custom error data", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const validPath = "/profile/user/123";
 
@@ -736,7 +736,7 @@ describe("router.start() - state object scenarios", () => {
   describe("Issue #42: router.start() should validate state objects when allowNotFound is false", () => {
     describe("invalid state object with allowNotFound = false", () => {
       beforeEach(() => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
       });
 
       it("should return ROUTE_NOT_FOUND error for invalid state object", () => {
@@ -851,7 +851,7 @@ describe("router.start() - state object scenarios", () => {
 
     describe("invalid state object with allowNotFound = true", () => {
       beforeEach(() => {
-        router.setOption("allowNotFound", true);
+        router = createTestRouter({ allowNotFound: true });
       });
 
       it("should accept invalid state object when allowNotFound is true", () => {
@@ -928,7 +928,7 @@ describe("router.start() - state object scenarios", () => {
 
     describe("consistency between string paths and state objects", () => {
       beforeEach(() => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
       });
 
       it("should handle invalid path string the same as invalid state object", () => {
@@ -936,15 +936,13 @@ describe("router.start() - state object scenarios", () => {
         const stateCallback = vi.fn();
 
         // First router with invalid path
-        const router1 = createTestRouter();
+        const router1 = createTestRouter({ allowNotFound: false });
 
-        router1.setOption("allowNotFound", false);
         router1.start("/nonexistent/path", pathCallback);
 
         // Second router with invalid state object
-        const router2 = createTestRouter();
+        const router2 = createTestRouter({ allowNotFound: false });
 
-        router2.setOption("allowNotFound", false);
         router2.start(
           { name: "nonexistent.route", params: {}, path: "/nonexistent" },
           stateCallback,
@@ -1019,7 +1017,7 @@ describe("router.start() - state object scenarios", () => {
     });
 
     it("should use replace: true for unknown route when allowNotFound is true", () => {
-      router.setOption("allowNotFound", true);
+      router = createTestRouter({ allowNotFound: true });
 
       const transitionSuccessListener = vi.fn();
 

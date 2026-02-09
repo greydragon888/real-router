@@ -194,6 +194,143 @@ async function main(): Promise<void> {
     });
   }
 
+  // ── 7.2.2 matchPath with parameters (×50) ──
+  console.log("\n── 7.2.2 matchPath with parameters ──");
+  {
+    const router = createRouter(routes);
+
+    await isolatedMeasure(
+      "7.2.2 matchPath with params (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/users/123"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("7.2.2 matchPath with params (×1)", () => {
+      do_not_optimize(router.matchPath("/users/123"));
+    });
+  }
+
+  // ── 7.2.3 matchPath with query parameters (×50) ──
+  console.log("\n── 7.2.3 matchPath with query parameters ──");
+  {
+    const router = createRouter(routes);
+
+    await isolatedMeasure(
+      "7.2.3 matchPath with query params (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/about?search=test&page=1"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("7.2.3 matchPath with query params (×1)", () => {
+      do_not_optimize(router.matchPath("/about?search=test&page=1"));
+    });
+  }
+
+  // ── 7.2.5 matchPath with parameter decoding (×50) ──
+  console.log("\n── 7.2.5 matchPath with parameter decoding ──");
+  {
+    const router = createRouter(routes, {
+      urlParamsEncoding: "uriComponent",
+    });
+
+    await isolatedMeasure(
+      "7.2.5 matchPath with param decoding (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/users/test%40example.com"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("7.2.5 matchPath with param decoding (×1)", () => {
+      do_not_optimize(router.matchPath("/users/test%40example.com"));
+    });
+  }
+
+  // ── 7.2.9 matchPath with trailing slash (×50) ──
+  console.log("\n── 7.2.9 matchPath with trailing slash ──");
+  {
+    const router = createRouter(routes, {
+      trailingSlash: "always",
+    });
+
+    await isolatedMeasure(
+      "7.2.9 matchPath with trailing slash (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/about/"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("7.2.9 matchPath with trailing slash (×1)", () => {
+      do_not_optimize(router.matchPath("/about/"));
+    });
+  }
+
+  // ── 7.4.8 matchPath with duplicate query params (×50) ──
+  console.log("\n── 7.4.8 matchPath with duplicate query params ──");
+  {
+    const optionalRoutes: Route[] = [
+      { name: "home", path: "/" },
+      { name: "user", path: "/users/:id" },
+      { name: "article", path: "/articles/:id?/:slug?" },
+    ];
+    const router = createRouter(optionalRoutes);
+
+    await isolatedMeasure(
+      "7.4.8 matchPath duplicate query params (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/?tag=1&tag=2&tag=3"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("7.4.8 matchPath duplicate query params (×1)", () => {
+      do_not_optimize(router.matchPath("/?tag=1&tag=2&tag=3"));
+    });
+  }
+
+  // ── 7.4.12 matchPath without optional parameters (×50) ──
+  console.log("\n── 7.4.12 matchPath without optional parameters ──");
+  {
+    const optionalRoutes: Route[] = [
+      { name: "home", path: "/" },
+      { name: "user", path: "/users/:id" },
+      { name: "article", path: "/articles/:id?/:slug?" },
+    ];
+    const router = createRouter(optionalRoutes);
+
+    await isolatedMeasure(
+      "7.4.12 matchPath without optional params (×50)",
+      () => {
+        for (let i = 0; i < 50; i++) {
+          do_not_optimize(router.matchPath("/articles"));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure(
+      "7.4.12 matchPath without optional params (×1)",
+      () => {
+        do_not_optimize(router.matchPath("/articles"));
+      },
+    );
+  }
+
   // ── 8.2.1 areStatesEqual mixed (×100) ──
   console.log("\n── 8.2.1 areStatesEqual mixed ──");
   {
@@ -256,6 +393,36 @@ async function main(): Promise<void> {
       },
       { gc: true },
     );
+  }
+
+  // ── 8.2.2 areStatesEqual with ignoreQueryParams (×100) ──
+  console.log("\n── 8.2.2 areStatesEqual with ignoreQueryParams ──");
+  {
+    const router = createSimpleRouter();
+    const state1 = router.makeState(
+      "about",
+      { search: "test" },
+      "/about?search=test",
+    );
+    const state2 = router.makeState(
+      "about",
+      { search: "other" },
+      "/about?search=other",
+    );
+
+    await isolatedMeasure(
+      "8.2.2 areStatesEqual ignoreQueryParams (×100)",
+      () => {
+        for (let i = 0; i < 100; i++) {
+          do_not_optimize(router.areStatesEqual(state1, state2, true));
+        }
+      },
+      { gc: true },
+    );
+
+    await isolatedMeasure("8.2.2 areStatesEqual ignoreQueryParams (×1)", () => {
+      do_not_optimize(router.areStatesEqual(state1, state2, true));
+    });
   }
 
   console.log("\nDone.\n");

@@ -275,9 +275,8 @@ boxplot(() => {
 
     // 1.2.15 Navigation with allowNotFound
     {
-      const router = createSimpleRouter();
+      const router = createSimpleRouter({ allowNotFound: true });
 
-      router.setOption("allowNotFound", true);
       router.start();
 
       const nonexistentRoutes = [

@@ -94,7 +94,7 @@ describe("router.start() - path string scenarios", () => {
 
   describe("unsuccessful path matching with defaultRoute", () => {
     it("should return error when path matching fails even with defaultRoute", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -117,7 +117,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should return error for nonexistent route even with defaultRoute", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -144,8 +144,10 @@ describe("router.start() - path string scenarios", () => {
 
     it("should handle error when default route navigation fails", () => {
       // Set invalid default route
-      router.setOption("defaultRoute", "invalid.default");
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({
+        defaultRoute: "invalid.default",
+        allowNotFound: false,
+      });
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -171,7 +173,7 @@ describe("router.start() - path string scenarios", () => {
 
   describe("unsuccessful path matching with allowNotFound", () => {
     it("should create not found state when path matching fails and allowNotFound is true", () => {
-      router.setOption("allowNotFound", true);
+      router = createTestRouter({ allowNotFound: true });
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -192,7 +194,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should successfully transition to not found state", () => {
-      router.setOption("allowNotFound", true);
+      router = createTestRouter({ allowNotFound: true });
 
       const callback = vi.fn();
       const startListener = vi.fn();
@@ -226,8 +228,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should prefer allowNotFound over defaultRoute when both are set", () => {
-      router.setOption("allowNotFound", true);
-      router.setOption("defaultRoute", "home");
+      router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const callback = vi.fn();
 
@@ -242,8 +243,7 @@ describe("router.start() - path string scenarios", () => {
 
   describe("allowNotFound with middleware errors", () => {
     it("should emit TRANSITION_ERROR only once when middleware fails for unknown route", () => {
-      router.setOption("allowNotFound", true);
-      router.setOption("defaultRoute", "home");
+      router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
 
@@ -263,8 +263,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should not attempt defaultRoute when middleware fails for unknown route", () => {
-      router.setOption("allowNotFound", true);
-      router.setOption("defaultRoute", "home");
+      router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
       let middlewareCallCount = 0;
@@ -281,8 +280,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should successfully transition to UNKNOWN_ROUTE when middleware succeeds", () => {
-      router.setOption("allowNotFound", true);
-      router.setOption("defaultRoute", "home");
+      router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
 
@@ -303,7 +301,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should handle whitespace-only path as invalid route", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
 
@@ -319,7 +317,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should handle path with double slashes", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
 
@@ -339,7 +337,7 @@ describe("router.start() - path string scenarios", () => {
     it("should handle allowNotFound option correctly", () => {
       const callback = vi.fn();
 
-      router.setOption("allowNotFound", true);
+      router = createTestRouter({ allowNotFound: true });
 
       // Start with non-existent route
       router.start("/non-existent", callback);
@@ -371,7 +369,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should ensure callback is called exactly once on route not found error", () => {
-      router.setOption("allowNotFound", false);
+      router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
 
@@ -391,7 +389,7 @@ describe("router.start() - path string scenarios", () => {
       const callback = vi.fn();
 
       // Configure default route
-      router.setOption("defaultRoute", "home");
+      router = createTestRouter({ defaultRoute: "home" });
 
       // Start without path - should use defaultRoute
       router.start(callback);

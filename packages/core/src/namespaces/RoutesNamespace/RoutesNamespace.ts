@@ -2,11 +2,10 @@
 
 import { logger } from "@real-router/logger";
 import {
+  createMatcher,
   createRouteTree,
   nodeToDefinition,
-  buildPath as routeNodeBuildPath,
   routeTreeToDefinitions,
-  MatcherService,
 } from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 
@@ -14,7 +13,6 @@ import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
 import {
   clearConfigEntries,
   createEmptyConfig,
-  createMatchOptions,
   paramsMatch,
   paramsMatchExcluding,
   removeFromDefinitions,
@@ -36,7 +34,6 @@ import {
   validateRoutes,
 } from "./validators";
 import { constants } from "../../constants";
-import { createBuildOptions } from "../../helpers";
 import { getTransitionPath } from "../../transitionPath";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
@@ -54,8 +51,8 @@ import type {
   State,
 } from "@real-router/types";
 import type {
-  BuildOptions,
-  MatchOptions,
+  CreateMatcherOptions,
+  Matcher,
   RouteDefinition,
   RouteTree,
   RouteTreeState,
@@ -91,9 +88,8 @@ export class RoutesNamespace<
 
   #rootPath = "";
   #tree: RouteTree;
-  #matcherService: MatcherService;
-  #buildOptionsCache: BuildOptions | undefined;
-  #matchOptionsCache: MatchOptions | undefined;
+  #matcher: Matcher;
+  readonly #matcherOptions: CreateMatcherOptions | undefined;
 
   // Dependencies injected via setDependencies (for facade method calls)
   #depsStore: RoutesDependencies<Dependencies> | undefined;
@@ -122,8 +118,14 @@ export class RoutesNamespace<
   // Constructor
   // =========================================================================
 
-  constructor(routes: Route<Dependencies>[] = [], noValidate = false) {
+  constructor(
+    routes: Route<Dependencies>[] = [],
+    noValidate = false,
+    matcherOptions?: CreateMatcherOptions,
+  ) {
     this.#noValidate = noValidate;
+    this.#matcherOptions = matcherOptions;
+
     // Sanitize routes to store only essential properties
     for (const route of routes) {
       this.#definitions.push(sanitizeRoute(route));
@@ -136,9 +138,9 @@ export class RoutesNamespace<
       this.#definitions,
     );
 
-    // Initialize matcher service and register tree
-    this.#matcherService = new MatcherService();
-    this.#matcherService.registerTree(this.#tree);
+    // Initialize matcher with options and register tree
+    this.#matcher = createMatcher(matcherOptions);
+    this.#matcher.registerTree(this.#tree);
 
     // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
     // Note: canActivate handlers are registered later when #lifecycleNamespace is set
@@ -302,20 +304,20 @@ export class RoutesNamespace<
    * Checks if a route exists.
    */
   hasRoute(name: string): boolean {
-    return this.#matcherService.hasRoute(name);
+    return this.#matcher.hasRoute(name);
   }
 
   /**
    * Gets a route by name with all its configuration.
    */
   getRoute(name: string): Route<Dependencies> | undefined {
-    const segments = this.#matcherService.getSegmentsByName(name);
+    const segments = this.#matcher.getSegmentsByName(name);
 
     if (!segments) {
       return undefined;
     }
 
-    const targetNode = this.#getLastSegment(segments);
+    const targetNode = this.#getLastSegment(segments as readonly RouteTree[]);
     const definition = nodeToDefinition(targetNode);
 
     return this.#enrichRoute(definition, name);
@@ -480,14 +482,8 @@ export class RoutesNamespace<
    * @param route - Route name
    * @param params - Route parameters
    * @param options - Router options
-   * @param segments - Optional pre-computed segments to avoid duplicate lookup
    */
-  buildPath(
-    route: string,
-    params?: Params,
-    options?: Options,
-    segments?: readonly unknown[],
-  ): string {
+  buildPath(route: string, params?: Params, options?: Options): string {
     if (route === constants.UNKNOWN_ROUTE) {
       return isString(params?.path) ? params.path : "";
     }
@@ -503,19 +499,14 @@ export class RoutesNamespace<
         ? this.#config.encoders[route]({ ...paramsWithDefault })
         : paramsWithDefault;
 
-    // Use cached buildOptions if available
-    const buildOptions =
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
-      this.#buildOptionsCache ?? createBuildOptions(options!);
+    // Map core trailingSlash to matcher: "preserve"/"strict" → default (no change)
+    const ts = options?.trailingSlash;
+    const trailingSlash = ts === "never" || ts === "always" ? ts : undefined;
 
-    return routeNodeBuildPath(
-      this.#tree,
-      route,
-      encodedParams,
-      buildOptions,
-      // Cast to RouteTree[] - segments come from getSegmentsByName which returns RouteTree[]
-      segments as readonly RouteTree[] | undefined,
-    );
+    return this.#matcher.buildPath(route, encodedParams, {
+      trailingSlash,
+      queryParamsMode: options?.queryParamsMode,
+    });
   }
 
   /**
@@ -529,49 +520,50 @@ export class RoutesNamespace<
   ): State<P, MP> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
-    const matchOptions =
-      this.#matchOptionsCache ??
-      (this.#matchOptionsCache = createMatchOptions(opts));
-    const matchResult = this.#matcherService.match(path, matchOptions);
 
-    if (matchResult) {
-      const routeState = createRouteState(matchResult);
-      const { name, params, meta } = routeState;
+    const matchResult = this.#matcher.match(path);
 
-      const decodedParams =
-        typeof this.#config.decoders[name] === "function"
-          ? this.#config.decoders[name](params as Params)
-          : params;
+    if (!matchResult) {
+      return undefined;
+    }
 
-      const { name: routeName, params: routeParams } = this.forwardState<P>(
-        name,
-        decodedParams as P,
-      );
+    const routeState = createRouteState(matchResult);
+    const { name, params, meta } = routeState;
 
-      let builtPath = path;
+    const decodedParams =
+      typeof this.#config.decoders[name] === "function"
+        ? this.#config.decoders[name](params as Params)
+        : params;
 
-      if (opts.rewritePathOnMatch) {
-        const cachedSegments =
-          routeName === name ? matchResult.buildSegments : undefined;
+    const { name: routeName, params: routeParams } = this.forwardState<P>(
+      name,
+      decodedParams as P,
+    );
 
-        builtPath = this.buildPath(
-          routeName,
-          routeParams,
-          opts,
-          cachedSegments,
-        );
-      }
+    let builtPath = path;
 
-      // Create state using deps.makeState
-      return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
-        params: meta as MP,
-        options: EMPTY_OPTIONS,
-        source,
-        redirected: false,
+    if (opts.rewritePathOnMatch) {
+      const buildParams =
+        typeof this.#config.encoders[routeName] === "function"
+          ? this.#config.encoders[routeName]({
+              ...(routeParams as Params),
+            })
+          : (routeParams as Record<string, unknown>);
+
+      const ts = opts.trailingSlash;
+
+      builtPath = this.#matcher.buildPath(routeName, buildParams, {
+        trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+        queryParamsMode: opts.queryParamsMode,
       });
     }
 
-    return undefined;
+    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
+      params: meta as MP,
+      options: EMPTY_OPTIONS,
+      source,
+      redirected: false,
+    });
   }
 
   /**
@@ -619,17 +611,17 @@ export class RoutesNamespace<
     resolvedName: string,
     resolvedParams: Params,
   ): RouteTreeState | undefined {
-    const segments = this.#matcherService.getSegmentsByName(resolvedName);
+    const segments = this.#matcher.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
     }
 
     /* v8 ignore next -- @preserve: meta always exists when segments exist */
-    const meta = this.#matcherService.getMetaByName(resolvedName) ?? {};
+    const meta = this.#matcher.getMetaByName(resolvedName) ?? {};
 
     return createRouteState(
-      { segments, buildSegments: segments, params: resolvedParams, meta },
+      { segments, params: resolvedParams, meta },
       resolvedName,
     );
   }
@@ -643,38 +635,24 @@ export class RoutesNamespace<
     resolvedName: string,
     resolvedParams: P,
   ): BuildStateResultWithSegments<P> | undefined {
-    const segments = this.#matcherService.getSegmentsByName(resolvedName);
+    const segments = this.#matcher.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
     }
 
     /* v8 ignore next -- @preserve: meta always exists when segments exist */
-    const meta = this.#matcherService.getMetaByName(resolvedName) ?? {};
+    const meta = this.#matcher.getMetaByName(resolvedName) ?? {};
     const state = createRouteState<P>(
-      { segments, buildSegments: segments, params: resolvedParams, meta },
+      {
+        segments: segments as readonly RouteTree[],
+        params: resolvedParams,
+        meta,
+      },
       resolvedName,
     );
 
-    return { state, segments };
-  }
-
-  /**
-   * Initializes buildOptions cache.
-   * Called from routerLifecycle at router.start().
-   */
-  initBuildOptionsCache(options: Options): void {
-    this.#buildOptionsCache = createBuildOptions(options);
-    this.#matchOptionsCache = createMatchOptions(options);
-  }
-
-  /**
-   * Clears buildOptions cache.
-   * Called from routerLifecycle at router.stop().
-   */
-  clearBuildOptionsCache(): void {
-    this.#buildOptionsCache = undefined;
-    this.#matchOptionsCache = undefined;
+    return { state, segments: segments as readonly RouteTree[] };
   }
 
   // =========================================================================
@@ -803,13 +781,13 @@ export class RoutesNamespace<
    * Used by StateNamespace.
    */
   getUrlParams(name: string): string[] {
-    const segments = this.#matcherService.getSegmentsByName(name);
+    const segments = this.#matcher.getSegmentsByName(name);
 
     if (!segments) {
       return [];
     }
 
-    return this.#collectUrlParamsArray(segments);
+    return this.#collectUrlParamsArray(segments as readonly RouteTree[]);
   }
 
   /**
@@ -991,9 +969,9 @@ export class RoutesNamespace<
       this.#definitions,
     );
 
-    // Re-register tree in matcher service
-    this.#matcherService = new MatcherService();
-    this.#matcherService.registerTree(this.#tree);
+    // Re-register tree in matcher (creates new instance, preserving options if set)
+    this.#matcher = createMatcher(this.#matcherOptions);
+    this.#matcher.registerTree(this.#tree);
   }
 
   /**
@@ -1001,7 +979,7 @@ export class RoutesNamespace<
    * Use when route existence has been validated by hasRoute() beforehand.
    */
   #getSegmentsOrThrow(name: string, context: string): readonly RouteTree[] {
-    const segments = this.#matcherService.getSegmentsByName(name);
+    const segments = this.#matcher.getSegmentsByName(name);
 
     /* v8 ignore next 4 -- @preserve: defensive check, hasRoute() validates before call */
     if (!segments) {
@@ -1010,7 +988,7 @@ export class RoutesNamespace<
       );
     }
 
-    return segments;
+    return segments as readonly RouteTree[];
   }
 
   /**

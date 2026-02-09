@@ -49,7 +49,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "rou3": "0.7.12",
+    "path-matcher": "workspace:^",
     "search-params": "workspace:^"
   }
 }

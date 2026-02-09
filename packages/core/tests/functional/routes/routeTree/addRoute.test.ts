@@ -296,7 +296,9 @@ describe("core/routes/addRoute", () => {
         },
         { name: "conflict-route", path: "/path-conflict" },
       ]);
-    }).toThrowError('Path "/path-conflict" is already defined');
+    }).toThrowError(
+      '[router.addRoute] Path "/path-conflict" is already defined',
+    );
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
     expect(router.hasRoute("pre-validation-test")).toBe(false);
@@ -308,7 +310,7 @@ describe("core/routes/addRoute", () => {
         { name: "batch-path-a", path: "/same-path" },
         { name: "batch-path-b", path: "/same-path" },
       ]);
-    }).toThrowError('Path "/same-path" is already defined');
+    }).toThrowError('[router.addRoute] Path "/same-path" is already defined');
   });
 
   describe("children handlers registration", () => {

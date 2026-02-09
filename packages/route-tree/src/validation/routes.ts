@@ -108,8 +108,9 @@ export function validateRoutePath(
     parentNode && Object.values(parentNode.paramTypeMap).includes("url");
 
   if (path.startsWith("~") && hasUrlParams) {
-    throw new Error(
-      `[router.${methodName}] Absolute path "${path}" cannot be used under parent route with URL parameters`,
+    throw createRouterError(
+      methodName,
+      `Absolute path "${path}" cannot be used under parent route with URL parameters`,
     );
   }
 }

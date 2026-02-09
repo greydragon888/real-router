@@ -1,14 +1,14 @@
-// packages/route-tree/src/services/constraintValidation.ts
+// packages/path-matcher/src/constraintValidation.ts
 
 /**
  * Constraint Validation.
  *
  * Validates parameter values against constraint patterns.
  *
- * @module services/constraintValidation
+ * @module constraintValidation
  */
 
-import type { ConstraintPattern } from "./buildParamMeta";
+import type { ConstraintPattern } from "./types";
 
 /**
  * Validates parameters against constraint patterns.
@@ -48,7 +48,7 @@ export function validateConstraints(
         : "[^/]+";
 
       throw new Error(
-        `Parameter '${paramName}' of '${path}' has invalid format: ` +
+        `[validateConstraints] Parameter '${paramName}' of '${path}' has invalid format: ` +
           `got '${value}', expected to match '${constraintPattern}'`,
       );
     }

@@ -12,13 +12,14 @@ import { run } from "mitata";
 
 // Import search-params benchmark
 import "./search-params.bench";
+import "./stress.bench";
 
 // ============================================================================
 // Run benchmarks and save results
 // ============================================================================
 
 // @ts-expect-error - import.meta.url is supported by tsx runtime
-const OUTPUT_DIR = fileURLToPath(new URL("../../../.bench", import.meta.url));
+const OUTPUT_DIR = fileURLToPath(new URL("../../.bench", import.meta.url));
 const OUTPUT_FILE = `${OUTPUT_DIR}/search-params-results.json`;
 
 interface HeapStats {

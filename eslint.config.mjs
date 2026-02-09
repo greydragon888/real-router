@@ -13,7 +13,8 @@ import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended"
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import vitestPlugin from "@vitest/eslint-plugin";
 import turboConfig from "eslint-config-turbo/flat";
-import eslintPluginImport from "eslint-plugin-import";
+import importX from "eslint-plugin-import-x";
+import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import jsdoc from "eslint-plugin-jsdoc";
 import vitestGlobals from "eslint-plugin-vitest-globals";
 import unicorn from "eslint-plugin-unicorn";
@@ -394,27 +395,28 @@ export default tsEslint.config(
   // ============================================
   // 6. IMPORT PLUGIN CONFIGURATION
   // ============================================
-  // Updated for eslint-plugin-import v2.32.0
-  // Changelog: https://github.com/import-js/eslint-plugin-import/releases
-  // Key changes since v2.31:
-  // - enforce-node-protocol-usage rule (v2.32.0)
-  // - TypeScript type definitions
+  // Migrated to eslint-plugin-import-x (actively maintained fork)
+  // https://github.com/un-ts/eslint-plugin-import-x
+  // Key advantages over eslint-plugin-import:
+  // - 16 deps vs 117, Rust-based unrs-resolver
+  // - Native package.json exports support
+  // - Active maintenance and flat config support
   {
     plugins: {
-      import: eslintPluginImport,
+      "import-x": importX,
     },
     settings: {
-      "import/resolver": {
-        typescript: {
+      "import-x/resolver-next": [
+        createTypeScriptImportResolver({
           alwaysTryTypes: true,
           project: ["./tsconfig.json", "packages/*/tsconfig.json"],
-        },
-      },
+        }),
+      ],
     },
     rules: {
-      ...eslintPluginImport.configs.recommended.rules,
-      ...eslintPluginImport.configs.typescript.rules,
-      "import/order": [
+      ...importX.flatConfigs.recommended.rules,
+      ...importX.flatConfigs.typescript.rules,
+      "import-x/order": [
         "error",
         {
           groups: [
@@ -440,27 +442,27 @@ export default tsEslint.config(
           "newlines-between": "always",
         },
       ],
-      "import/no-nodejs-modules": "off",
-      "import/no-commonjs": "error",
-      "import/no-unresolved": "error", // ✅ Enabled thanks to typescript resolver
+      "import-x/no-nodejs-modules": "off",
+      "import-x/no-commonjs": "error",
+      "import-x/no-unresolved": "error", // ✅ Enabled thanks to typescript resolver
       // Prevent duplicate imports, prefer separate type imports
       // Works in tandem with @typescript-eslint/consistent-type-imports
-      "import/no-duplicates": [
+      "import-x/no-duplicates": [
         "error",
         {
           "prefer-inline": false, // Keep type imports separate, not inline
         },
       ],
-      "import/no-cycle": ["error", { maxDepth: 3 }],
-      "import/no-self-import": "error",
-      "import/no-useless-path-segments": "error",
-      "import/first": "error",
-      "import/newline-after-import": "error",
-      "import/no-default-export": "warn",
+      "import-x/no-cycle": ["error", { maxDepth: 3 }],
+      "import-x/no-self-import": "error",
+      "import-x/no-useless-path-segments": "error",
+      "import-x/first": "error",
+      "import-x/newline-after-import": "error",
+      "import-x/no-default-export": "warn",
       // Ensure all imports are declared in package.json dependencies
       // Catches missing deps like "logger" that work due to hoisting
       // Only for src/ files - tests have too many false positives in monorepo
-      "import/no-extraneous-dependencies": [
+      "import-x/no-extraneous-dependencies": [
         "error",
         {
           devDependencies: true,
@@ -468,9 +470,6 @@ export default tsEslint.config(
           peerDependencies: true,
         },
       ],
-      // v2.32.0: Enforce node: protocol for Node.js built-ins
-      // This improves clarity and is required for some environments
-      "import/enforce-node-protocol-usage": ["warn", "always"],
     },
   },
 
@@ -604,7 +603,7 @@ export default tsEslint.config(
       "unicorn/prefer-top-level-await": "off", // Not supported everywhere
       "unicorn/no-array-reduce": "warn", // Only warning, reduce is sometimes convenient
       "unicorn/prefer-module": "off", // We already have ESM
-      "unicorn/prefer-node-protocol": "off", // Not critical for browser-side code
+      "unicorn/prefer-node-protocol": "warn", // Replaces import/enforce-node-protocol-usage
       "unicorn/filename-case": "off", // We have our own file naming conventions
       "unicorn/no-array-for-each": "off", // forEach is more readable than for-of in some cases
       "unicorn/prefer-spread": "warn",
@@ -743,9 +742,9 @@ export default tsEslint.config(
       "sonarjs/different-types-comparison": "off",
       "sonarjs/no-unused-collection": "off",
       "unicorn/consistent-function-scoping": "off",
-      "import/no-default-export": "off",
-      "import/no-unresolved": "off",
-      "import/no-extraneous-dependencies": "off",
+      "import-x/no-default-export": "off",
+      "import-x/no-unresolved": "off",
+      "import-x/no-extraneous-dependencies": "off",
       "prefer-const": "off",
       "prefer-rest-params": "off",
       // JSDoc rules relaxed for test files
@@ -813,9 +812,9 @@ export default tsEslint.config(
       "unicorn/consistent-function-scoping": "off",
       // Other benchmark-friendly rules
       "@typescript-eslint/explicit-function-return-type": "off",
-      "import/no-default-export": "off",
-      "import/no-unresolved": "off",
-      "import/no-extraneous-dependencies": "off",
+      "import-x/no-default-export": "off",
+      "import-x/no-unresolved": "off",
+      "import-x/no-extraneous-dependencies": "off",
       // JSDoc rules relaxed for benchmarks
       "jsdoc/informative-docs": "off",
     },
@@ -850,7 +849,7 @@ export default tsEslint.config(
       },
     },
     rules: {
-      "import/no-default-export": "off",
+      "import-x/no-default-export": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/explicit-module-boundary-types": "off",
       "unicorn/prefer-module": "off", // Config files can use CommonJS

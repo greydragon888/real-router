@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { validateConstraints } from "../../../src/services/constraintValidation";
+import { validateConstraints } from "../../src/constraintValidation";
 
-import type { ConstraintPattern } from "../../../src/services/buildParamMeta";
+import type { ConstraintPattern } from "../../src/types";
 
 describe("validateConstraints", () => {
   it("passes validation for matching constraint", () => {
@@ -23,7 +23,7 @@ describe("validateConstraints", () => {
     expect(() => {
       validateConstraints({ id: "abc" }, patterns, String.raw`/users/:id<\d+>`);
     }).toThrowError(
-      String.raw`Parameter 'id' of '/users/:id<\d+>' has invalid format: got 'abc', expected to match '\d+'`,
+      String.raw`[validateConstraints] Parameter 'id' of '/users/:id<\d+>' has invalid format: got 'abc', expected to match '\d+'`,
     );
   });
 

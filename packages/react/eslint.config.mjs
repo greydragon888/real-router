@@ -466,8 +466,8 @@ export default tsEslint.config(
       "sonarjs/different-types-comparison": "off",
       "sonarjs/no-unused-collection": "off",
       "unicorn/consistent-function-scoping": "off",
-      "import/no-default-export": "off",
-      "import/no-unresolved": "off",
+      "import-x/no-default-export": "off",
+      "import-x/no-unresolved": "off",
       "prefer-const": "off",
       "prefer-rest-params": "off",
 
@@ -518,9 +518,9 @@ export default tsEslint.config(
       "vitest/prefer-expect-assertions": "off",
       "vitest/max-expects": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
-      "import/no-default-export": "off",
+      "import-x/no-default-export": "off",
       "@typescript-eslint/no-unused-expressions": "off",
-      "import/no-unresolved": "off",
+      "import-x/no-unresolved": "off",
 
       // React Compiler rules (v7+) - disabled for benchmark files
       "react-hooks/globals": "off",

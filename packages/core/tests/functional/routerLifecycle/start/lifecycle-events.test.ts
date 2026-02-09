@@ -69,7 +69,7 @@ describe("router.start() - lifecycle events", () => {
   describe("Issue #45: Consistent TRANSITION_ERROR event emission for all error types", () => {
     describe("ROUTE_NOT_FOUND should emit TRANSITION_ERROR", () => {
       beforeEach(() => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
       });
 
       it("should emit TRANSITION_ERROR for invalid path", () => {
@@ -276,7 +276,7 @@ describe("router.start() - lifecycle events", () => {
 
     describe("consistency of TRANSITION_ERROR event parameters", () => {
       it("should have consistent event signature (toState, fromState, error) for ROUTE_NOT_FOUND", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const transitionErrorListener = vi.fn();
 
@@ -357,7 +357,7 @@ describe("router.start() - lifecycle events", () => {
 
     describe("no TRANSITION_SUCCESS emission on errors", () => {
       it("should NOT emit TRANSITION_SUCCESS for ROUTE_NOT_FOUND", () => {
-        router.setOption("allowNotFound", false);
+        router = createTestRouter({ allowNotFound: false });
 
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();

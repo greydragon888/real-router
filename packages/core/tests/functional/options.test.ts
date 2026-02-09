@@ -25,12 +25,12 @@ describe("core/options", () => {
   });
 
   describe("getOptions", () => {
-    it("should return updated value after setOption", () => {
-      router.setOption("trailingSlash", "always");
+    it("should return constructor-provided value", () => {
+      const customRouter = createTestRouter({ trailingSlash: "always" });
 
-      router.start();
+      expect(customRouter.getOptions().trailingSlash).toBe("always");
 
-      expect(router.getOptions().trailingSlash).toBe("always");
+      customRouter.stop();
     });
 
     // 🔴 CRITICAL: Performance - same frozen object every call
@@ -178,121 +178,55 @@ describe("core/options", () => {
       });
     });
 
-    // 🟢 DESIRABLE: Integration with setOption
-    it("should reflect all changes made through setOption", () => {
-      router.setOption("trailingSlash", "never");
-      router.setOption("allowNotFound", false);
-      router.setOption("defaultRoute", "dashboard");
+    // 🟢 DESIRABLE: Reflects multiple constructor options
+    it("should reflect all options set via constructor", () => {
+      const customRouter = createTestRouter({
+        trailingSlash: "never",
+        allowNotFound: false,
+      });
 
-      const opts = router.getOptions();
+      const opts = customRouter.getOptions();
 
       expect(opts.trailingSlash).toBe("never");
       expect(opts.allowNotFound).toBe(false);
-      expect(opts.defaultRoute).toBe("dashboard");
+
+      customRouter.stop();
     });
 
-    // 🟢 DESIRABLE: Shallow copy is sufficient
+    // 🟢 DESIRABLE: All option types are correct
     it("should handle all option types correctly (primitives)", () => {
-      router.setOption("trailingSlash", "always"); // string
-      router.setOption("defaultRoute", "home"); // string | undefined
-      router.setOption("defaultParams", { id: "123" }); // object
+      const customRouter = createTestRouter({
+        trailingSlash: "always",
+        defaultRoute: "home",
+        defaultParams: { id: "123" },
+      });
 
-      const opts = router.getOptions();
+      const opts = customRouter.getOptions();
 
       expectTypeOf(opts.trailingSlash).toBeString();
 
       expect(opts.defaultRoute).toBe("home");
       expect(opts.defaultParams).toStrictEqual({ id: "123" });
+
+      customRouter.stop();
     });
   });
 
-  describe("setOption", () => {
-    it("should update a specific option", () => {
-      router.setOption("allowNotFound", true);
-
-      router.start();
-
-      expect(router.getOptions().allowNotFound).toBe(true);
-    });
-
-    it("should override default options", () => {
-      router.setOption("trailingSlash", "always");
-
-      router.start();
-
-      expect(router.getOptions().trailingSlash).toBe("always");
-    });
-
-    // 🔴 CRITICAL: Block changes after start()
-    describe("blocking after start()", () => {
-      it("should throw error when setting option after start()", () => {
-        router.start();
-
-        expect(() => router.setOption("trailingSlash", "always")).toThrowError(
-          "Options cannot be changed after router.start()",
-        );
-      });
-
-      it("should throw error even when setting same value after start()", () => {
-        const currentValue = router.getOptions().allowNotFound;
-
-        router.start();
-
-        expect(() =>
-          router.setOption("allowNotFound", currentValue),
-        ).toThrowError("Options cannot be changed after router.start()");
-      });
-
-      it("should throw error for any option type after start()", () => {
-        router.start();
-
-        // These options should throw after start()
-        expect(() => router.setOption("trailingSlash", "never")).toThrowError();
-        expect(() => router.setOption("allowNotFound", false)).toThrowError();
-        expect(() =>
-          router.setOption("urlParamsEncoding", "uri"),
-        ).toThrowError();
-        expect(() =>
-          router.setOption("queryParams", { arrayFormat: "bracket" }),
-        ).toThrowError();
-      });
-
-      it("should allow changing defaultRoute and defaultParams after start()", () => {
-        router.start();
-
-        // These two options are special - they CAN be changed after start()
-        expect(() =>
-          router.setOption("defaultRoute", "home"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("defaultParams", { id: "1" }),
-        ).not.toThrowError();
-
-        expect(router.getOptions().defaultRoute).toBe("home");
-        expect(router.getOptions().defaultParams).toStrictEqual({ id: "1" });
-      });
-    });
-
+  describe("constructor validation", () => {
     // 🔴 CRITICAL: Type validation
     describe("type validation", () => {
       it("should throw TypeError for wrong primitive type - string", () => {
         expect(() =>
-          router.setOption("trailingSlash", true as any),
+          createRouter([], { trailingSlash: true as any }),
         ).toThrowError(TypeError);
-        expect(() => router.setOption("defaultRoute", 123 as any)).toThrowError(
-          TypeError,
-        );
-      });
-
-      it("should throw TypeError for undefined value", () => {
         expect(() =>
-          router.setOption("trailingSlash", undefined as any),
+          createRouter([], { defaultRoute: 123 as any }),
         ).toThrowError(TypeError);
       });
 
       it("should throw TypeError for null value", () => {
         expect(() =>
-          router.setOption("defaultRoute", null as any),
+          createRouter([], { defaultRoute: null as any }),
         ).toThrowError(TypeError);
       });
     });
@@ -301,10 +235,10 @@ describe("core/options", () => {
     describe("enum validation", () => {
       it("should throw TypeError for invalid trailingSlash value", () => {
         expect(() =>
-          router.setOption("trailingSlash", "INVALID" as any),
+          createRouter([], { trailingSlash: "INVALID" as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("trailingSlash", "INVALID" as any),
+          createRouter([], { trailingSlash: "INVALID" as any }),
         ).toThrowError(
           'expected one of "strict", "never", "always", "preserve"',
         );
@@ -312,69 +246,61 @@ describe("core/options", () => {
 
       it("should throw TypeError for invalid queryParamsMode value", () => {
         expect(() =>
-          router.setOption("queryParamsMode", "INVALID" as any),
+          createRouter([], { queryParamsMode: "INVALID" as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("queryParamsMode", "INVALID" as any),
+          createRouter([], { queryParamsMode: "INVALID" as any }),
         ).toThrowError('expected one of "default", "strict", "loose"');
       });
 
       it("should throw TypeError for invalid urlParamsEncoding value", () => {
         expect(() =>
-          router.setOption("urlParamsEncoding", "INVALID" as any),
+          createRouter([], { urlParamsEncoding: "INVALID" as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("urlParamsEncoding", "INVALID" as any),
+          createRouter([], { urlParamsEncoding: "INVALID" as any }),
         ).toThrowError(
           'expected one of "default", "uri", "uriComponent", "none"',
         );
       });
 
       it("should accept all valid trailingSlash values", () => {
-        expect(() =>
-          router.setOption("trailingSlash", "strict"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("trailingSlash", "never"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("trailingSlash", "always"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("trailingSlash", "preserve"),
-        ).not.toThrowError();
+        for (const value of [
+          "strict",
+          "never",
+          "always",
+          "preserve",
+        ] as const) {
+          expect(() =>
+            createRouter([], { trailingSlash: value }),
+          ).not.toThrowError();
+        }
       });
 
       it("should accept all valid queryParamsMode values", () => {
-        expect(() =>
-          router.setOption("queryParamsMode", "default"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("queryParamsMode", "strict"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("queryParamsMode", "loose"),
-        ).not.toThrowError();
+        for (const value of ["default", "strict", "loose"] as const) {
+          expect(() =>
+            createRouter([], { queryParamsMode: value }),
+          ).not.toThrowError();
+        }
       });
 
       it("should accept all valid urlParamsEncoding values", () => {
-        expect(() =>
-          router.setOption("urlParamsEncoding", "default"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("urlParamsEncoding", "uri"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("urlParamsEncoding", "uriComponent"),
-        ).not.toThrowError();
-        expect(() =>
-          router.setOption("urlParamsEncoding", "none"),
-        ).not.toThrowError();
+        for (const value of [
+          "default",
+          "uri",
+          "uriComponent",
+          "none",
+        ] as const) {
+          expect(() =>
+            createRouter([], { urlParamsEncoding: value }),
+          ).not.toThrowError();
+        }
       });
 
       it("should include invalid value in error message", () => {
         expect(() =>
-          router.setOption("trailingSlash", "typo-value" as any),
+          createRouter([], { trailingSlash: "typo-value" as any }),
         ).toThrowError('got "typo-value"');
       });
     });
@@ -382,33 +308,33 @@ describe("core/options", () => {
     // 🔴 CRITICAL: Object validation
     describe("object validation", () => {
       it("should reject array for object options", () => {
-        expect(() => router.setOption("queryParams", [] as any)).toThrowError(
+        expect(() => createRouter([], { queryParams: [] as any })).toThrowError(
           TypeError,
         );
-        expect(() => router.setOption("queryParams", [] as any)).toThrowError(
+        expect(() => createRouter([], { queryParams: [] as any })).toThrowError(
           "expected plain object",
         );
 
-        expect(() => router.setOption("defaultParams", [] as any)).toThrowError(
-          TypeError,
-        );
+        expect(() =>
+          createRouter([], { defaultParams: [] as any }),
+        ).toThrowError(TypeError);
       });
 
       it("should reject Date instance for object options", () => {
         expect(() =>
-          router.setOption("queryParams", new Date() as any),
+          createRouter([], { queryParams: new Date() as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("defaultParams", new Date() as any),
+          createRouter([], { defaultParams: new Date() as any }),
         ).toThrowError(TypeError);
       });
 
       it("should reject null for object options", () => {
-        expect(() => router.setOption("queryParams", null as any)).toThrowError(
-          TypeError,
-        );
         expect(() =>
-          router.setOption("defaultParams", null as any),
+          createRouter([], { queryParams: null as any }),
+        ).toThrowError(TypeError);
+        expect(() =>
+          createRouter([], { defaultParams: null as any }),
         ).toThrowError(TypeError);
       });
 
@@ -419,32 +345,34 @@ describe("core/options", () => {
         const instance = new CustomClass();
 
         expect(() =>
-          router.setOption("queryParams", instance as any),
+          createRouter([], { queryParams: instance as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("defaultParams", instance as any),
+          createRouter([], { defaultParams: instance as any }),
         ).toThrowError(TypeError);
       });
 
       it("should reject Object.create(null) for object options", () => {
         const nullProto = Object.create(null);
 
-        expect(() => router.setOption("queryParams", nullProto)).toThrowError(
+        expect(() => createRouter([], { queryParams: nullProto })).toThrowError(
           TypeError,
         );
-        expect(() => router.setOption("defaultParams", nullProto)).toThrowError(
-          TypeError,
-        );
+        expect(() =>
+          createRouter([], { defaultParams: nullProto }),
+        ).toThrowError(TypeError);
       });
 
       it("should accept plain objects for object options", () => {
-        expect(() => router.setOption("queryParams", {})).not.toThrowError();
+        expect(() => createRouter([], { queryParams: {} })).not.toThrowError();
         expect(() =>
-          router.setOption("queryParams", { arrayFormat: "brackets" }),
+          createRouter([], { queryParams: { arrayFormat: "brackets" } }),
         ).not.toThrowError();
-        expect(() => router.setOption("defaultParams", {})).not.toThrowError();
         expect(() =>
-          router.setOption("defaultParams", { id: "123" }),
+          createRouter([], { defaultParams: {} }),
+        ).not.toThrowError();
+        expect(() =>
+          createRouter([], { defaultParams: { id: "123" } }),
         ).not.toThrowError();
       });
 
@@ -456,10 +384,10 @@ describe("core/options", () => {
         };
 
         expect(() =>
-          router.setOption("defaultParams", withGetter),
+          createRouter([], { defaultParams: withGetter }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("defaultParams", withGetter),
+          createRouter([], { defaultParams: withGetter }),
         ).toThrowError('Getters not allowed in "defaultParams": "id"');
       });
 
@@ -468,14 +396,14 @@ describe("core/options", () => {
           get arrayFormat() {
             return "bracket";
           },
-        };
+        } as const;
 
-        expect(() => router.setOption("queryParams", withGetter)).toThrowError(
-          TypeError,
-        );
-        expect(() => router.setOption("queryParams", withGetter)).toThrowError(
-          "Getters not allowed",
-        );
+        expect(() =>
+          createRouter([], { queryParams: withGetter as any }),
+        ).toThrowError(TypeError);
+        expect(() =>
+          createRouter([], { queryParams: withGetter as any }),
+        ).toThrowError("Getters not allowed");
       });
 
       it("should accept objects with regular properties alongside rejected getters", () => {
@@ -486,10 +414,10 @@ describe("core/options", () => {
           },
         };
 
-        expect(() => router.setOption("defaultParams", mixed)).toThrowError(
+        expect(() => createRouter([], { defaultParams: mixed })).toThrowError(
           TypeError,
         );
-        expect(() => router.setOption("defaultParams", mixed)).toThrowError(
+        expect(() => createRouter([], { defaultParams: mixed })).toThrowError(
           'Getters not allowed in "defaultParams": "dangerousProp"',
         );
       });
@@ -497,105 +425,95 @@ describe("core/options", () => {
       // 🔴 CRITICAL: queryParams key validation
       it("should reject unknown keys in queryParams", () => {
         expect(() =>
-          router.setOption("queryParams", { unknownKey: "value" } as any),
+          createRouter([], { queryParams: { unknownKey: "value" } as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("queryParams", { unknownKey: "value" } as any),
+          createRouter([], { queryParams: { unknownKey: "value" } as any }),
         ).toThrowError('Unknown queryParams key: "unknownKey"');
       });
 
       // 🔴 CRITICAL: queryParams value validation
       it("should reject invalid arrayFormat value", () => {
         expect(() =>
-          router.setOption("queryParams", { arrayFormat: "invalid" } as any),
+          createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("queryParams", { arrayFormat: "invalid" } as any),
+          createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
         ).toThrowError('expected one of "none", "brackets", "index", "comma"');
       });
 
       it("should reject invalid booleanFormat value", () => {
         expect(() =>
-          router.setOption("queryParams", { booleanFormat: "wrong" } as any),
+          createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("queryParams", { booleanFormat: "wrong" } as any),
+          createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
         ).toThrowError('expected one of "none", "string", "empty-true"');
       });
 
       it("should reject invalid nullFormat value", () => {
         expect(() =>
-          router.setOption("queryParams", { nullFormat: "bad" } as any),
+          createRouter([], { queryParams: { nullFormat: "bad" } as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("queryParams", { nullFormat: "bad" } as any),
+          createRouter([], { queryParams: { nullFormat: "bad" } as any }),
         ).toThrowError('expected one of "default", "hidden"');
       });
 
       it("should accept all valid queryParams combinations", () => {
         expect(() =>
-          router.setOption("queryParams", {
-            arrayFormat: "none",
-            booleanFormat: "none",
-            nullFormat: "default",
+          createRouter([], {
+            queryParams: {
+              arrayFormat: "none",
+              booleanFormat: "none",
+              nullFormat: "default",
+            },
           }),
         ).not.toThrowError();
 
         expect(() =>
-          router.setOption("queryParams", {
-            arrayFormat: "brackets",
-            booleanFormat: "string",
-            nullFormat: "hidden",
+          createRouter([], {
+            queryParams: {
+              arrayFormat: "brackets",
+              booleanFormat: "string",
+              nullFormat: "hidden",
+            },
           }),
         ).not.toThrowError();
 
         expect(() =>
-          router.setOption("queryParams", {
-            arrayFormat: "index",
-            booleanFormat: "empty-true",
+          createRouter([], {
+            queryParams: {
+              arrayFormat: "index",
+              booleanFormat: "empty-true",
+            },
           }),
         ).not.toThrowError();
 
         expect(() =>
-          router.setOption("queryParams", { arrayFormat: "comma" }),
+          createRouter([], { queryParams: { arrayFormat: "comma" } }),
         ).not.toThrowError();
       });
     });
 
     // 🔴 CRITICAL: Non-existent option
     describe("non-existent options", () => {
-      it("should throw ReferenceError for unknown option name", () => {
+      it("should throw TypeError for unknown option name", () => {
         expect(() =>
-          router.setOption("unknownOption" as any, true),
-        ).toThrowError(ReferenceError);
+          createRouter([], { unknownOption: true } as any),
+        ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("unknownOption" as any, true),
-        ).toThrowError('option "unknownOption" not found');
-      });
-
-      it("should throw ReferenceError for typo in option name", () => {
-        expect(() =>
-          router.setOption("caseSensitve" as any, true),
-        ).toThrowError(ReferenceError);
-        expect(() =>
-          router.setOption("trailingslash" as any, "never"),
-        ).toThrowError(ReferenceError);
-      });
-
-      it("should protect against TypeScript bypass with runtime checks", () => {
-        const malformed: any = { name: "nonExistent", value: 123 };
-
-        expect(() =>
-          router.setOption(malformed.name, malformed.value),
-        ).toThrowError(ReferenceError);
-        expect(() =>
-          router.setOption(malformed.name, malformed.value),
-        ).toThrowError('option "nonExistent" not found');
+          createRouter([], { unknownOption: true } as any),
+        ).toThrowError('Unknown option: "unknownOption"');
       });
 
       it("should reject prototype pollution keys", () => {
+        // constructor is caught by the "expected plain object" check
+        // Other keys are caught by the "Unknown option" check
+        // __proto__ is safe: isObjKey uses `in` operator which finds it
+        // in defaultOptions prototype chain, so it's treated as known
+        // and its value is ignored in the options spread
         const dangerousKeys = [
-          "__proto__",
           "constructor",
           "hasOwnProperty",
           "toString",
@@ -603,148 +521,31 @@ describe("core/options", () => {
         ];
 
         for (const key of dangerousKeys) {
-          expect(() =>
-            // @ts-expect-error: testing prototype pollution
-            router.setOption(key, {}),
-          ).toThrowError(ReferenceError);
-          expect(() =>
-            // @ts-expect-error: testing prototype pollution
-            router.setOption(key, {}),
-          ).toThrowError(`option "${key}" not found`);
+          expect(() => createRouter([], { [key]: {} } as any)).toThrowError();
         }
-      });
-    });
-
-    // 🔴 CRITICAL: optionName type validation
-    describe("optionName type validation", () => {
-      it("should throw TypeError for number as optionName", () => {
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(123, true),
-        ).toThrowError(TypeError);
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(123, true),
-        ).toThrowError("option name must be a string, got number");
-      });
-
-      it("should throw TypeError for object with toString as optionName", () => {
-        const fakeKey = { toString: () => "allowNotFound" };
-
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(fakeKey, true),
-        ).toThrowError(TypeError);
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(fakeKey, true),
-        ).toThrowError("option name must be a string, got object");
-      });
-
-      it("should throw TypeError for Symbol as optionName", () => {
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(Symbol("allowNotFound"), true),
-        ).toThrowError(TypeError);
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(Symbol("allowNotFound"), true),
-        ).toThrowError("option name must be a string, got symbol");
-      });
-
-      it("should throw TypeError for null as optionName", () => {
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(null, true),
-        ).toThrowError(TypeError);
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(null, true),
-        ).toThrowError("option name must be a string, got object");
-      });
-
-      it("should throw TypeError for undefined as optionName", () => {
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(undefined, true),
-        ).toThrowError(TypeError);
-        expect(() =>
-          // @ts-expect-error: testing invalid input
-          router.setOption(undefined, true),
-        ).toThrowError("option name must be a string, got undefined");
-      });
-    });
-
-    // 🟡 IMPORTANT: Fluent interface
-    describe("fluent interface", () => {
-      it("should return router instance for chaining", () => {
-        const result = router.setOption("trailingSlash", "always");
-
-        expect(result).toBe(router);
-      });
-
-      it("should support method chaining", () => {
-        const result = router
-          .setOption("trailingSlash", "never")
-          .setOption("allowNotFound", false)
-          .setOption("defaultRoute", "home");
-
-        expect(result).toBe(router);
-        expect(router.getOptions().trailingSlash).toBe("never");
-        expect(router.getOptions().allowNotFound).toBe(false);
-        expect(router.getOptions().defaultRoute).toBe("home");
-      });
-
-      it("should allow chaining with start()", () => {
-        router.setOption("trailingSlash", "always").start();
-
-        expect(router.isActive()).toBe(true);
-        expect(router.getOptions().trailingSlash).toBe("always");
-      });
-    });
-
-    // 🟢 DESIRABLE: Idempotence
-    describe("idempotence", () => {
-      it("should allow setting same value multiple times", () => {
-        router.setOption("trailingSlash", "always");
-        router.setOption("trailingSlash", "always");
-
-        expect(router.getOptions().trailingSlash).toBe("always");
-      });
-
-      it("should allow toggling values", () => {
-        router.setOption("trailingSlash", "always");
-
-        expect(router.getOptions().trailingSlash).toBe("always");
-
-        router.setOption("trailingSlash", "never");
-
-        expect(router.getOptions().trailingSlash).toBe("never");
-
-        router.setOption("trailingSlash", "always");
-
-        expect(router.getOptions().trailingSlash).toBe("always");
       });
     });
 
     // 🟢 DESIRABLE: Edge cases
     describe("edge cases", () => {
       it("should accept empty string for defaultRoute", () => {
-        expect(() => router.setOption("defaultRoute", "")).not.toThrowError();
-        expect(router.getOptions().defaultRoute).toBe("");
+        const r = createRouter([], { defaultRoute: "" });
+
+        expect(r.getOptions().defaultRoute).toBe("");
       });
 
       it("should accept empty object for queryParams", () => {
-        expect(() => router.setOption("queryParams", {})).not.toThrowError();
-        expect(router.getOptions().queryParams).toStrictEqual({});
+        const r = createRouter([], { queryParams: {} });
+
+        expect(r.getOptions().queryParams).toStrictEqual({});
       });
 
       it("should accept empty object for defaultParams", () => {
-        expect(() => router.setOption("defaultParams", {})).not.toThrowError();
-        expect(router.getOptions().defaultParams).toStrictEqual({});
+        const r = createRouter([], { defaultParams: {} });
+
+        expect(r.getOptions().defaultParams).toStrictEqual({});
       });
 
-      // Edge Case #4: Objects with throwing toString/valueOf are safely rejected
       it("should safely reject object with throwing toString for string option", () => {
         const evilValue = {
           toString() {
@@ -757,92 +558,31 @@ describe("core/options", () => {
 
         // typeof check happens before any coercion
         expect(() =>
-          router.setOption("defaultRoute", evilValue as any),
+          createRouter([], { defaultRoute: evilValue as any }),
         ).toThrowError(TypeError);
         expect(() =>
-          router.setOption("defaultRoute", evilValue as any),
+          createRouter([], { defaultRoute: evilValue as any }),
         ).toThrowError("expected string, got object");
       });
 
-      // Edge Case #8: Truthy/falsy values should be rejected for string options
       it("should reject number for string option", () => {
-        expect(() => router.setOption("trailingSlash", 1 as any)).toThrowError(
-          TypeError,
-        );
+        expect(() =>
+          createRouter([], { trailingSlash: 1 as any }),
+        ).toThrowError(TypeError);
       });
 
-      // Edge Case #9: Frozen/sealed objects should be accepted
       it("should accept frozen object for defaultParams", () => {
         const frozenParams = Object.freeze({ id: "123" });
+        const r = createRouter([], { defaultParams: frozenParams });
 
-        expect(() =>
-          router.setOption("defaultParams", frozenParams),
-        ).not.toThrowError();
-        expect(router.getOptions().defaultParams).toStrictEqual({ id: "123" });
+        expect(r.getOptions().defaultParams).toStrictEqual({ id: "123" });
       });
 
       it("should accept sealed object for defaultParams", () => {
         const sealedParams = Object.seal({ id: "456" });
+        const r = createRouter([], { defaultParams: sealedParams });
 
-        expect(() =>
-          router.setOption("defaultParams", sealedParams),
-        ).not.toThrowError();
-        expect(router.getOptions().defaultParams).toStrictEqual({ id: "456" });
-      });
-
-      // Edge Case #10: Multiple rapid calls - last one wins
-      it("should handle multiple rapid calls correctly", () => {
-        for (let i = 0; i < 100; i++) {
-          router.setOption("defaultRoute", `route-${i}`);
-        }
-
-        expect(router.getOptions().defaultRoute).toBe("route-99");
-      });
-    });
-
-    // 🟡 IMPORTANT: Integration - effect on buildPath
-    describe("integration with buildPath", () => {
-      it("should apply trailingSlash option to buildPath", () => {
-        router.setOption("trailingSlash", "always");
-        router.start();
-
-        const path = router.buildPath("users.view", { id: "123" });
-
-        expect(path).toMatch(/\/$/); // ends with /
-      });
-
-      it("should apply trailingSlash 'never' option to buildPath", () => {
-        router.setOption("trailingSlash", "never");
-        router.start();
-
-        const path = router.buildPath("users.view", { id: "123" });
-
-        expect(path).not.toMatch(/\/$/); // doesn't end with /
-      });
-
-      it("should apply urlParamsEncoding option to buildPath", () => {
-        router.setOption("urlParamsEncoding", "uriComponent");
-        router.start();
-
-        const path = router.buildPath("users.view", { id: "hello world" });
-
-        expect(path).toContain("hello%20world");
-      });
-    });
-
-    // 🟡 IMPORTANT: Integration - effect on matchPath
-    describe("integration with matchPath", () => {
-      it("should apply trailingSlash option to matchPath", () => {
-        router.setOption("trailingSlash", "strict");
-        router.start();
-
-        // Route 'users.list' is defined as '/users/list' without trailing slash
-        const withoutSlash = router.matchPath("/users/list");
-        const withSlash = router.matchPath("/users/list/");
-
-        // In strict mode, trailing slash matters
-        expect(withoutSlash).toBeDefined();
-        expect(withSlash).toBeUndefined();
+        expect(r.getOptions().defaultParams).toStrictEqual({ id: "456" });
       });
     });
   });
@@ -856,8 +596,6 @@ describe("core/options", () => {
         createRouter([], { unknownOption: "value" } as any),
       ).toThrowError('Unknown option: "unknownOption"');
     });
-
-    // Test removed: caseSensitive option no longer exists (router is always case-sensitive)
 
     it("should throw TypeError for array as options in createRouter (line 194)", () => {
       expect(() => createRouter([], [] as any)).toThrowError(TypeError);
@@ -893,6 +631,64 @@ describe("core/options", () => {
     });
   });
 
+  // 🟡 IMPORTANT: Integration - effect on buildPath
+  describe("integration with buildPath", () => {
+    it("should apply trailingSlash option to buildPath", () => {
+      const r = createTestRouter({ trailingSlash: "always" });
+
+      r.start();
+
+      const path = r.buildPath("users.view", { id: "123" });
+
+      expect(path).toMatch(/\/$/); // ends with /
+
+      r.stop();
+    });
+
+    it("should apply trailingSlash 'never' option to buildPath", () => {
+      const r = createTestRouter({ trailingSlash: "never" });
+
+      r.start();
+
+      const path = r.buildPath("users.view", { id: "123" });
+
+      expect(path).not.toMatch(/\/$/); // doesn't end with /
+
+      r.stop();
+    });
+
+    it("should apply urlParamsEncoding option to buildPath", () => {
+      const r = createTestRouter({ urlParamsEncoding: "uriComponent" });
+
+      r.start();
+
+      const path = r.buildPath("users.view", { id: "hello world" });
+
+      expect(path).toContain("hello%20world");
+
+      r.stop();
+    });
+  });
+
+  // 🟡 IMPORTANT: Integration - effect on matchPath
+  describe("integration with matchPath", () => {
+    it("should apply trailingSlash option to matchPath", () => {
+      const r = createTestRouter({ trailingSlash: "strict" });
+
+      r.start();
+
+      // Route 'users.list' is defined as '/users/list' without trailing slash
+      const withoutSlash = r.matchPath("/users/list");
+      const withSlash = r.matchPath("/users/list/");
+
+      // In strict mode, trailing slash matters
+      expect(withoutSlash).toBeDefined();
+      expect(withSlash).toBeUndefined();
+
+      r.stop();
+    });
+  });
+
   describe("getOption", () => {
     it("should return a single option value", () => {
       // Values should match getOptions()
@@ -904,10 +700,12 @@ describe("core/options", () => {
       );
     });
 
-    it("should return updated value after setOption", () => {
-      router.setOption("trailingSlash", "always");
+    it("should return constructor-provided value", () => {
+      const customRouter = createTestRouter({ trailingSlash: "always" });
 
-      expect(router.getOption("trailingSlash")).toBe("always");
+      expect(customRouter.getOption("trailingSlash")).toBe("always");
+
+      customRouter.stop();
     });
 
     it("should throw TypeError for non-string option name", () => {
