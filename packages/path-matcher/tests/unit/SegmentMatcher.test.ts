@@ -118,7 +118,6 @@ describe("type compilation", () => {
       hasConstraints: false,
       buildStaticParts: ["/"],
       buildParamSlots: [],
-      buildParamNamesSet: new Set(),
       buildSegments: [],
     };
 

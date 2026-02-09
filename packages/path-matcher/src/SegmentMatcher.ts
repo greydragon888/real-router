@@ -310,11 +310,15 @@ export class SegmentMatcher {
     const queryParamNames = [...route.declaredQueryParams];
 
     if (queryParamsMode === "loose") {
+      const urlParamNames = new Set(
+        route.buildParamSlots.map((s) => s.paramName),
+      );
+
       for (const p in params) {
         if (
           Object.hasOwn(params, p) &&
           !route.declaredQueryParamsSet.has(p) &&
-          !route.buildParamNamesSet.has(p)
+          !urlParamNames.has(p)
         ) {
           queryParamNames.push(p);
         }
@@ -515,7 +519,6 @@ export class SegmentMatcher {
       hasConstraints: constraintPatterns.size > 0,
       buildStaticParts,
       buildParamSlots,
-      buildParamNamesSet: new Set(buildParamSlots.map((s) => s.paramName)),
     };
 
     this.#routesByName.set(node.fullName, compiled);
