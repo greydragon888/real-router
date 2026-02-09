@@ -1,5 +1,12 @@
 # @real-router/rx
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823), [`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823), [`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823)]:
+  - @real-router/core@0.10.0
+
 ## 0.1.1
 
 ### Patch Changes

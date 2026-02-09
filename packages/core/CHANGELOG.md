@@ -1,5 +1,33 @@
 # @real-router/core
 
+## 0.10.0
+
+### Minor Changes
+
+- [#69](https://github.com/greydragon888/real-router/pull/69) [`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `setOption()`, make options immutable (#63)
+
+  **Breaking Change:** Router options are now immutable after construction. The `setOption()` method has been removed along with the `lock()`/`unlock()` lifecycle.
+
+  Options that were previously changeable after `start()` (`defaultRoute`, `defaultParams`) must now be set in the constructor:
+
+  ```diff
+  - const router = createRouter(routes);
+  - router.setOption('defaultRoute', 'home');
+  - router.start();
+  + const router = createRouter(routes, { defaultRoute: 'home' });
+  + router.start();
+  ```
+
+- [#69](https://github.com/greydragon888/real-router/pull/69) [`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace rou3 with custom Segment Trie path matcher (#63)
+
+  The internal path matching engine has been replaced from rou3's radix tree to a custom Segment Trie matcher. Each trie edge represents an entire URL segment (not per-character prefix), enabling hierarchical named routing with static cache, pre-computed `buildPath` templates, and zero-allocation match.
+
+  The public API (`matchPath`, `buildPath`, `buildState`) is unchanged.
+
+### Patch Changes
+
+- [#69](https://github.com/greydragon888/real-router/pull/69) [`1aa5975`](https://github.com/greydragon888/real-router/commit/1aa597590d175ddc70f00424f9484fa4f025f823) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize `matchPath` by inlining `buildPath` and skipping `defaultParams` re-merge (#63)
+
 ## 0.9.0
 
 ### Minor Changes
