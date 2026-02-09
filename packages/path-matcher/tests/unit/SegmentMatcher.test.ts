@@ -759,7 +759,7 @@ describe("SegmentMatcher", () => {
       const matcher = createStaticMatcher();
 
       expect(() => matcher.buildPath("unknown")).toThrowError(
-        "[buildPath] 'unknown' is not defined",
+        "[SegmentMatcher.buildPath] 'unknown' is not defined",
       );
     });
 
@@ -1482,7 +1482,7 @@ describe("SegmentMatcher", () => {
       const matcher = createParamBuildMatcher();
 
       expect(() => matcher.buildPath("users.profile")).toThrowError(
-        "Missing required param: id",
+        "[SegmentMatcher.buildPath] Missing required param 'id'",
       );
     });
 
@@ -1491,7 +1491,7 @@ describe("SegmentMatcher", () => {
 
       expect(() =>
         matcher.buildPath("users.profile", { id: undefined }),
-      ).toThrowError("Missing required param: id");
+      ).toThrowError("[SegmentMatcher.buildPath] Missing required param 'id'");
     });
 
     it("should throw for explicitly null param", () => {
@@ -1499,7 +1499,7 @@ describe("SegmentMatcher", () => {
 
       expect(() =>
         matcher.buildPath("users.profile", { id: null }),
-      ).toThrowError("Missing required param: id");
+      ).toThrowError("[SegmentMatcher.buildPath] Missing required param 'id'");
     });
 
     it("should prepend rootPath to param path", () => {

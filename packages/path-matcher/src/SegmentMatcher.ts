@@ -181,7 +181,7 @@ export class SegmentMatcher {
     const route = this.#routesByName.get(name);
 
     if (!route) {
-      throw new Error(`[buildPath] '${name}' is not defined`);
+      throw new Error(`[SegmentMatcher.buildPath] '${name}' is not defined`);
     }
 
     if (route.hasConstraints && params) {
@@ -233,7 +233,7 @@ export class SegmentMatcher {
 
         if (!constraint.pattern.test(stringValue)) {
           throw new Error(
-            `[buildPath] '${name}' — param '${paramName}' value '${stringValue}' does not match constraint '${constraint.constraint}'`,
+            `[SegmentMatcher.buildPath] '${name}' — param '${paramName}' value '${stringValue}' does not match constraint '${constraint.constraint}'`,
           );
         }
       }
@@ -258,7 +258,9 @@ export class SegmentMatcher {
 
       if (value === undefined || value === null) {
         if (!slot.isOptional) {
-          throw new Error(`Missing required param: ${slot.paramName}`);
+          throw new Error(
+            `[SegmentMatcher.buildPath] Missing required param '${slot.paramName}'`,
+          );
         }
 
         if (result.length > 1 && result.endsWith("/")) {

@@ -293,6 +293,7 @@ function checkTreePathDuplicate(
   rootNode: RouteTree,
   parentName: string,
   routePath: string,
+  methodName: string,
 ): void {
   const parentNode =
     parentName === "" ? rootNode : resolveByDotNotation(rootNode, parentName);
@@ -303,7 +304,9 @@ function checkTreePathDuplicate(
 
   for (const child of parentNode.children.values()) {
     if (child.path === routePath) {
-      throw new Error(`Path "${routePath}" is already defined`);
+      throw new Error(
+        `[router.${methodName}] Path "${routePath}" is already defined`,
+      );
     }
   }
 }
@@ -367,11 +370,14 @@ function checkBatchPathDuplicate(
   seenPathsByParent: Map<string, Set<string>>,
   parentName: string,
   routePath: string,
+  methodName: string,
 ): void {
   const pathsAtLevel = seenPathsByParent.get(parentName);
 
   if (pathsAtLevel?.has(routePath)) {
-    throw new Error(`Path "${routePath}" is already defined`);
+    throw new Error(
+      `[router.${methodName}] Path "${routePath}" is already defined`,
+    );
   }
 
   if (pathsAtLevel) {
@@ -471,12 +477,17 @@ export function validateRoute(
 
   // Check for duplicate path in existing tree
   if (rootNode) {
-    checkTreePathDuplicate(rootNode, pathCheckParent, routePath);
+    checkTreePathDuplicate(rootNode, pathCheckParent, routePath, methodName);
   }
 
   // Check for duplicate path in current batch
   if (seenPathsByParent) {
-    checkBatchPathDuplicate(seenPathsByParent, pathCheckParent, routePath);
+    checkBatchPathDuplicate(
+      seenPathsByParent,
+      pathCheckParent,
+      routePath,
+      methodName,
+    );
   }
 
   // Validate children recursively

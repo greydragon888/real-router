@@ -48,7 +48,7 @@ export function validateConstraints(
         : "[^/]+";
 
       throw new Error(
-        `Parameter '${paramName}' of '${path}' has invalid format: ` +
+        `[validateConstraints] Parameter '${paramName}' of '${path}' has invalid format: ` +
           `got '${value}', expected to match '${constraintPattern}'`,
       );
     }

@@ -23,7 +23,7 @@ describe("validateConstraints", () => {
     expect(() => {
       validateConstraints({ id: "abc" }, patterns, String.raw`/users/:id<\d+>`);
     }).toThrowError(
-      String.raw`Parameter 'id' of '/users/:id<\d+>' has invalid format: got 'abc', expected to match '\d+'`,
+      String.raw`[validateConstraints] Parameter 'id' of '/users/:id<\d+>' has invalid format: got 'abc', expected to match '\d+'`,
     );
   });
 
