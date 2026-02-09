@@ -28,3 +28,20 @@ export function deepFreeze<T extends object>(obj: T): Readonly<T> {
 
   return obj;
 }
+
+/**
+ * Resolves an option value that can be static or a callback.
+ * If the value is a function, calls it with getDependency and returns the result.
+ * Otherwise, returns the value as-is.
+ */
+export function resolveOption(
+  value: unknown,
+  getDependency: (name: string) => unknown,
+): unknown {
+  if (typeof value === "function") {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    return value(getDependency);
+  }
+
+  return value;
+}

@@ -81,7 +81,7 @@ describe("core/options", () => {
       }).toThrowError(TypeError);
 
       expect(() => {
-        opts.defaultParams.id = "456";
+        (opts.defaultParams as Record<string, unknown>).id = "456";
       }).toThrowError(TypeError);
 
       customRouter.stop();
@@ -734,6 +734,72 @@ describe("core/options", () => {
       expectTypeOf(trailingSlash).toEqualTypeOf<
         "strict" | "never" | "always" | "preserve"
       >();
+    });
+  });
+
+  describe("dynamic default route/params with callbacks", () => {
+    it("should accept callback function for defaultRoute", () => {
+      const customRouter = createTestRouter({
+        defaultRoute: () => "home",
+      });
+
+      expect(() => {
+        customRouter.navigateToDefault();
+      }).not.toThrowError();
+
+      customRouter.stop();
+    });
+
+    it("should accept callback function for defaultParams", () => {
+      const customRouter = createTestRouter({
+        defaultRoute: "home",
+        defaultParams: () => ({ id: "user-123" }),
+      });
+
+      expect(() => {
+        customRouter.navigateToDefault();
+      }).not.toThrowError();
+
+      customRouter.stop();
+    });
+
+    it("should reject callback functions for other options", () => {
+      expect(() => {
+        createTestRouter({
+          trailingSlash: (() => "never") as never,
+        });
+      }).toThrowError(TypeError);
+    });
+
+    it("navigateToDefault resolves callback defaultRoute via getDependency", (done: () => void) => {
+      const customRouter = createTestRouter({
+        defaultRoute: ((getDep: any) => getDep("routeName")) as any,
+      }) as any;
+
+      customRouter.setDependency("routeName", "home");
+      customRouter.start();
+      customRouter.navigateToDefault({}, (err: any, state: any) => {
+        expect(err).toBeNull();
+        expect(state?.name).toBe("home");
+
+        customRouter.stop();
+        done();
+      });
+    });
+
+    it("start resolves callback defaultRoute via getDependency", (done: () => void) => {
+      const customRouter = createTestRouter({
+        defaultRoute: ((getDep: any) => getDep("routeName")) as any,
+      }) as any;
+
+      customRouter.setDependency("routeName", "home");
+      customRouter.start((err: any, state: any) => {
+        expect(err).toBeNull();
+        expect(state?.name).toBe("home");
+
+        customRouter.stop();
+        done();
+      });
     });
   });
 });

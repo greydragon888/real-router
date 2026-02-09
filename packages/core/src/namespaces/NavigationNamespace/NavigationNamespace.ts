@@ -14,6 +14,7 @@ import {
 } from "./validators";
 import { events, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
+import { resolveOption } from "../OptionsNamespace";
 
 import type {
   NavigationDependencies,
@@ -384,11 +385,13 @@ export class NavigationNamespace {
       return noop;
     }
 
-    return this.navigate(
-      options.defaultRoute,
+    const getDep = (name: string) => deps.getDependency(name as never);
+    const resolvedRoute = resolveOption(options.defaultRoute, getDep) as string;
+    const resolvedParams = resolveOption(
       options.defaultParams,
-      opts,
-      callback,
-    );
+      getDep,
+    ) as Params;
+
+    return this.navigate(resolvedRoute, resolvedParams, opts, callback);
   }
 }

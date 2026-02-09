@@ -25,7 +25,7 @@ export type StartRouterArguments =
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
  */
-export interface RouterLifecycleDependencies {
+export interface RouterLifecycleDependencies<Dependencies = object> {
   /** Get router options */
   getOptions: () => Options;
 
@@ -67,4 +67,7 @@ export interface RouterLifecycleDependencies {
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,
   ) => State<P, MP> | undefined;
+
+  /** Get a dependency by name */
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
 }

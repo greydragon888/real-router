@@ -9,6 +9,7 @@ import {
 import { getStartRouterArguments, resolveStartState } from "./helpers";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
+import { resolveOption } from "../OptionsNamespace";
 
 import type {
   RouterLifecycleDependencies,
@@ -297,7 +298,12 @@ export class RouterLifecycleNamespace {
 
     // Resolve start path/state: use defaultRoute if no explicit path provided
     // Note: Early return for "no path AND no defaultRoute" is handled above
-    const resolvedStartPathOrState = startPathOrState ?? options.defaultRoute;
+    const getDep = (name: string) => deps.getDependency(name as never);
+    const resolvedDefaultRoute = resolveOption(
+      options.defaultRoute,
+      getDep,
+    ) as string;
+    const resolvedStartPathOrState = startPathOrState ?? resolvedDefaultRoute;
 
     // Parse the start path or state
     const startState = resolveStartState(resolvedStartPathOrState, deps);
@@ -313,16 +319,16 @@ export class RouterLifecycleNamespace {
     // See: https://github.com/greydragon888/real-router/issues/43
     if (startState) {
       performTransition(startState, startOptions);
-    } else if (options.defaultRoute && !startPathOrState) {
+    } else if (resolvedDefaultRoute && !startPathOrState) {
       // IMPORTANT: Check !startPathOrState (original argument), NOT !resolvedStartPathOrState
       // This distinguishes between:
       //   - User called start() without path → use defaultRoute (this branch)
       //   - User called start('/invalid') with explicit path → error, no silent fallback
       // See: https://github.com/greydragon888/real-router/issues/44
 
-      const params = options.defaultParams;
+      const params = resolveOption(options.defaultParams, getDep) as Params;
 
-      navigateToDefault(options.defaultRoute, params, startOptions);
+      navigateToDefault(resolvedDefaultRoute, params, startOptions);
     } else if (options.allowNotFound) {
       performTransition(
         deps.makeNotFoundState(targetPath, startOptions),
