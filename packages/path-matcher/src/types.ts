@@ -138,6 +138,7 @@ export interface CompiledRoute {
 
   readonly buildStaticParts: readonly string[];
   readonly buildParamSlots: readonly BuildParamSlot[];
+  readonly buildParamNamesSet: ReadonlySet<string>;
   readonly buildSegments: readonly MatcherInputNode[];
 
   readonly forwardTo?: string;
