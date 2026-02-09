@@ -274,11 +274,7 @@ export class SegmentMatcher {
         typeof value === "object"
           ? JSON.stringify(value)
           : String(value as string | number | boolean);
-      const encoded = slot.encoder
-        ? slot.encoder(stringValue)
-        : /* v8 ignore next -- @preserve: encoder always set by #compileBuildParams */ encodeURIComponent(
-            stringValue,
-          );
+      const encoded = slot.encoder(stringValue);
 
       result += encoded + parts[i + 1];
     }
@@ -385,10 +381,7 @@ export class SegmentMatcher {
 
     const cleanPath = pathPart;
 
-    const normalized =
-      cleanPath.length > 1 && cleanPath.endsWith("/")
-        ? cleanPath.slice(0, -1)
-        : cleanPath;
+    const normalized = this.#normalizeTrailingSlash(cleanPath);
 
     return [cleanPath, normalized, queryString];
   }
@@ -618,8 +611,7 @@ export class SegmentMatcher {
       if (segment.endsWith("?")) {
         const paramName = segment
           .slice(1)
-          // eslint-disable-next-line sonarjs/slow-regex -- Constraint pattern regex - bounded input from route definitions, not user input
-          .replaceAll(/<[^>]*>/g, "")
+          .replaceAll(CONSTRAINT_PATTERN_RGX, "")
           .replace(/\?$/, "");
 
         if (!node.paramChild) {
@@ -709,8 +701,7 @@ export class SegmentMatcher {
     if (segment.startsWith(":")) {
       const paramName = segment
         .slice(1)
-        // eslint-disable-next-line sonarjs/slow-regex -- constraint pattern is user-controlled and bounded by segment length
-        .replaceAll(/<[^>]*>/g, "")
+        .replaceAll(CONSTRAINT_PATTERN_RGX, "")
         .replace(/\?$/, "");
 
       if (!node.paramChild) {
@@ -952,9 +943,9 @@ export class SegmentMatcher {
 
   #isHexChar(code: number): boolean {
     return (
-      (code >= 48 && code <= 57) ||
-      (code >= 65 && code <= 70) ||
-      (code >= 97 && code <= 102)
+      (code >= 48 && code <= 57) || // '0'-'9'
+      (code >= 65 && code <= 70) || // 'A'-'F'
+      (code >= 97 && code <= 102) // 'a'-'f'
     );
   }
 

@@ -146,7 +146,7 @@ export interface CompiledRoute {
 
 export interface BuildParamSlot {
   readonly paramName: string;
-  readonly encoder?: (value: string) => string;
+  readonly encoder: (value: string) => string;
   readonly isOptional: boolean;
 }
 

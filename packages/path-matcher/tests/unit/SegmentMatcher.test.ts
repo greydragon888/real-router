@@ -130,11 +130,12 @@ describe("type compilation", () => {
     const slot: BuildParamSlot = {
       paramName: "id",
       isOptional: false,
+      encoder: encodeURIComponent,
     };
 
     expect(slot.paramName).toBe("id");
     expect(slot.isOptional).toBe(false);
-    expect(slot.encoder).toBeUndefined();
+    expect(slot.encoder).toBe(encodeURIComponent);
   });
 
   it("should compile MatchResult interface", () => {
