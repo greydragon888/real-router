@@ -136,55 +136,11 @@ export interface NavigationOptions {
   reload?: boolean | undefined;
 
   /**
-   * Preview navigation without any side effects (dry-run mode).
-   *
-   * @description
-   * When `true`, returns the would-be target state via callback WITHOUT:
-   * - Executing canDeactivate/canActivate guards
-   * - Executing middleware
-   * - Updating router state (`router.getState()` remains unchanged)
-   * - Emitting any transition events (TRANSITION_START, TRANSITION_SUCCESS, etc.)
-   *
-   * The callback receives `(undefined, toState)` where `toState` is the computed
-   * target state that WOULD result from this navigation.
-   *
-   * @default false
-   *
-   * @remarks
-   * This option is useful for:
-   * - Validating that a route exists and params are correct
-   * - SSR: previewing state for pre-rendering without side effects
-   * - Dry-run before actual navigation
-   *
-   * @deprecated Consider using `router.buildState()` + `router.makeState()` instead
-   * for clearer intent. This option may be removed in a future major version.
-   *
-   * @example
-   * // Preview navigation - router.getState() is NOT changed
-   * router.navigate('users.view', { id: 123 }, { skipTransition: true }, (err, previewState) => {
-   *   console.log(previewState);        // { name: 'users.view', params: { id: 123 }, path: '/users/view/123', ... }
-   *   console.log(router.getState());   // Still the previous state!
-   * });
-   *
-   * @example
-   * // Recommended alternative (clearer intent)
-   * const route = router.buildState('users.view', { id: 123 });
-   * if (route) {
-   *   const path = router.buildPath(route.name, route.params);
-   *   const previewState = router.makeState(route.name, route.params, path, { params: route.meta });
-   * }
-   *
-   * @see {@link forceDeactivate} for skipping only canDeactivate guards
-   * @see {@link force} for forcing navigation while preserving lifecycle
-   */
-  skipTransition?: boolean | undefined;
-
-  /**
    * Force navigation even if target state equals current state.
    *
    * @description
    * When `true`, bypasses the "same state" equality check but still executes the full
-   * transition lifecycle (unlike `skipTransition`). Similar to `reload` but can be used
+   * transition lifecycle. Similar to `reload` but can be used
    * for any forced navigation scenario.
    *
    * Difference from `reload`:
@@ -203,7 +159,6 @@ export interface NavigationOptions {
    * router.navigate('analytics', { event: 'pageview' }, { force: true });
    *
    * @see {@link reload} for semantic equivalent (preferred for refresh scenarios)
-   * @see {@link skipTransition} for bypassing entire lifecycle
    */
   force?: boolean | undefined;
 
@@ -237,7 +192,6 @@ export interface NavigationOptions {
    *   });
    * }
    *
-   * @see {@link skipTransition} for bypassing all guards and middleware
    * @see {@link Router.clearCanDeactivate} for programmatically clearing guards
    */
   forceDeactivate?: boolean | undefined;

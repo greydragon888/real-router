@@ -386,27 +386,6 @@ describe("navigateToDefault", () => {
       });
     });
 
-    it("should handle skipTransition option for defaultRoute navigation", () => {
-      const onSuccess = vi.fn();
-
-      withDefault("orders");
-
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      router.navigateToDefault({ skipTransition: true }, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("orders");
-
-        // TRANSITION_SUCCESS should not be emitted with skipTransition
-        expect(onSuccess).not.toHaveBeenCalled();
-      });
-
-      unsubSuccess();
-    });
-
     it("should trigger all navigation lifecycle events for defaultRoute", () => {
       const onStart = vi.fn();
       const onSuccess = vi.fn();
@@ -1027,36 +1006,12 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should pass skipTransition option and skip events", () => {
-      const onSuccess = vi.fn();
-      const callback = vi.fn();
-      const options = { skipTransition: true };
-
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      router.navigateToDefault(options, callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "users" }),
-      );
-
-      // TRANSITION_SUCCESS should not be emitted with skipTransition
-      expect(onSuccess).not.toHaveBeenCalled();
-
-      unsubSuccess();
-    });
-
     it("should combine provided options with internal navigation", () => {
       const callback = vi.fn();
       const options = {
         replace: true,
         force: false,
         source: "default",
-        skipTransition: true,
         reload: false,
       };
 

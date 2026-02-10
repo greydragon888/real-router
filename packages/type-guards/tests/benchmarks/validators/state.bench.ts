@@ -134,7 +134,6 @@ boxplot(() => {
             options: {
               replace: false,
               reload: false,
-              skipTransition: false,
               force: false,
             },
             redirected: false,

@@ -206,22 +206,6 @@ if (!IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 1.2.12 Navigation with skipTransition flag
-{
-  const router = createSimpleRouter();
-  let index = 0;
-
-  router.start("/");
-
-  bench("1.2.12 Navigation with skipTransition flag", () => {
-    router.navigate(
-      alternatingRoutes[index++ % 2],
-      {},
-      { skipTransition: true },
-    );
-  }).gc("inner");
-}
-
 // 1.2.13 Navigation with different trailing slash modes
 {
   const routes: Route[] = [

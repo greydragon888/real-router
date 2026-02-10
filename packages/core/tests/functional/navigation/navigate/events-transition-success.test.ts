@@ -309,25 +309,6 @@ describe("router.navigate() - events transition success", () => {
       vi.useRealTimers();
     });
 
-    it("should not emit TRANSITION_SUCCESS when skipTransition option is set", () => {
-      const onSuccess = vi.fn();
-
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      router.navigate("users", {}, { skipTransition: true }, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("users");
-
-        // TRANSITION_SUCCESS should not be emitted when skipTransition is true
-        expect(onSuccess).not.toHaveBeenCalled();
-      });
-
-      unsubSuccess();
-    });
-
     it("should not emit TRANSITION_SUCCESS when navigation to same state without force", () => {
       const onSuccess = vi.fn();
 

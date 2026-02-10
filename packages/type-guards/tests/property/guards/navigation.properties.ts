@@ -71,7 +71,6 @@ describe("Router Type Guards Properties", () => {
     it("handles all optional fields", () => {
       expect(isNavigationOptions({ replace: true })).toBe(true);
       expect(isNavigationOptions({ reload: true })).toBe(true);
-      expect(isNavigationOptions({ skipTransition: true })).toBe(true);
       expect(isNavigationOptions({ force: true })).toBe(true);
       expect(isNavigationOptions({ state: { custom: "value" } })).toBe(true);
 
@@ -91,15 +90,6 @@ describe("Router Type Guards Properties", () => {
       "correctly validates reload field",
       (reload) => {
         expect(isNavigationOptions({ reload })).toBe(true);
-
-        return true;
-      },
-    );
-
-    test.prop([fc.boolean()], { numRuns: 2000 })(
-      "correctly validates skipTransition field",
-      (skipTransition) => {
-        expect(isNavigationOptions({ skipTransition })).toBe(true);
 
         return true;
       },

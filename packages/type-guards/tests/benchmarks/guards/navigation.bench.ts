@@ -26,10 +26,6 @@ boxplot(() => {
       isNavigationOptions({ reload: true });
     });
 
-    bench("isNavigationOptions: with skipTransition", () => {
-      isNavigationOptions({ skipTransition: true });
-    });
-
     bench("isNavigationOptions: with force", () => {
       isNavigationOptions({ force: true });
     });
@@ -46,7 +42,6 @@ boxplot(() => {
       isNavigationOptions({
         replace: true,
         reload: true,
-        skipTransition: true,
         force: true,
         forceDeactivate: true,
         redirected: true,
@@ -57,7 +52,6 @@ boxplot(() => {
       isNavigationOptions({
         replace: false,
         reload: false,
-        skipTransition: false,
         force: false,
         forceDeactivate: false,
         redirected: false,
@@ -68,7 +62,7 @@ boxplot(() => {
       isNavigationOptions({
         replace: true,
         reload: false,
-        skipTransition: true,
+        force: true,
       });
     });
 
@@ -95,10 +89,6 @@ boxplot(() => {
 
     bench("isNavigationOptions: reject number reload", () => {
       isNavigationOptions({ reload: 1 } as any);
-    });
-
-    bench("isNavigationOptions: reject null skipTransition", () => {
-      isNavigationOptions({ skipTransition: null } as any);
     });
 
     bench("isNavigationOptions: reject object force", () => {

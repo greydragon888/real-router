@@ -55,15 +55,6 @@ describe("router.navigate() - edge cases callback", () => {
       expect(router.isActive()).toBe(true);
     });
 
-    it("should not crash when callback throws with skipTransition", () => {
-      router.navigate("users", {}, { skipTransition: true }, () => {
-        throw new Error("Callback error on skipTransition");
-      });
-
-      // Router should still be operational
-      expect(router.isActive()).toBe(true);
-    });
-
     it("should not crash when router not started and callback throws", () => {
       router.stop();
 
@@ -122,111 +113,6 @@ describe("router.navigate() - edge cases callback", () => {
           expect.objectContaining({ name: "orders" }),
         );
         expect(router.getState()?.name).toBe("orders");
-      });
-    });
-
-    // -------------------------------------------------------------------------
-    // 12.5.1: skipTransition does NOT cancel active async navigation
-    // -------------------------------------------------------------------------
-
-    describe("skipTransition interaction with async navigation", () => {
-      it("should NOT cancel active async navigation when skipTransition is used", async () => {
-        const asyncCallback = vi.fn();
-        const skipCallback = vi.fn();
-
-        // Create an async guard that delays
-        const asyncGuard = vi.fn(
-          () =>
-            new Promise<boolean>((resolve) => {
-              setTimeout(() => {
-                resolve(true);
-              }, 50);
-            }),
-        );
-
-        router.canActivate("orders", () => asyncGuard);
-
-        // Start async navigation
-        router.navigate("orders", {}, {}, asyncCallback);
-
-        // Immediately call skipTransition (should NOT cancel the async navigation)
-        router.navigate("profile", {}, { skipTransition: true }, skipCallback);
-
-        // skipTransition callback should be called immediately with preview state
-        expect(skipCallback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "profile" }),
-        );
-
-        // Router state should NOT have changed (skipTransition doesn't update state)
-        // Note: Router starts at "home" route (default from createTestRouter)
-        expect(router.getState()?.name).toBe("home");
-
-        // Wait for async navigation to complete
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 100);
-        });
-
-        // Async navigation should have completed successfully (NOT cancelled)
-        expect(asyncCallback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "orders" }),
-        );
-
-        // Router state should now be "orders"
-        expect(router.getState()?.name).toBe("orders");
-      });
-
-      it("should allow multiple skipTransition calls without affecting async navigation", async () => {
-        const asyncCallback = vi.fn();
-        const skip1 = vi.fn();
-        const skip2 = vi.fn();
-        const skip3 = vi.fn();
-
-        const asyncGuard = vi.fn(
-          () =>
-            new Promise<boolean>((resolve) => {
-              setTimeout(() => {
-                resolve(true);
-              }, 50);
-            }),
-        );
-
-        router.canActivate("settings", () => asyncGuard);
-
-        // Start async navigation
-        router.navigate("settings", {}, {}, asyncCallback);
-
-        // Multiple skipTransition calls
-        router.navigate("users", {}, { skipTransition: true }, skip1);
-        router.navigate("profile", {}, { skipTransition: true }, skip2);
-        router.navigate("orders", {}, { skipTransition: true }, skip3);
-
-        // All skipTransition callbacks should receive their preview states
-        expect(skip1).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
-        expect(skip2).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "profile" }),
-        );
-        expect(skip3).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "orders" }),
-        );
-
-        // Wait for async navigation
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, 100);
-        });
-
-        // Original async navigation should complete
-        expect(asyncCallback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "settings" }),
-        );
-        expect(router.getState()?.name).toBe("settings");
       });
     });
   });
