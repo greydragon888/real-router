@@ -65,6 +65,9 @@ export interface NavigationDependencies {
     fromState?: State,
     arg?: RouterErrorType | NavigationOptions,
   ) => void;
+
+  /** Get a dependency by name (untyped — used only for resolveOption) */
+  getDependency: (name: string) => unknown;
 }
 
 /**

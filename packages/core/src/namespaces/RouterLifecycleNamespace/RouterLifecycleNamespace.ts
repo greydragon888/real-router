@@ -9,6 +9,7 @@ import {
 import { getStartRouterArguments, resolveStartState } from "./helpers";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
+import { resolveOption } from "../OptionsNamespace";
 
 import type {
   RouterLifecycleDependencies,
@@ -297,7 +298,19 @@ export class RouterLifecycleNamespace {
 
     // Resolve start path/state: use defaultRoute if no explicit path provided
     // Note: Early return for "no path AND no defaultRoute" is handled above
-    const resolvedStartPathOrState = startPathOrState ?? options.defaultRoute;
+    // Only resolve callback when needed (startPathOrState not provided)
+    let resolvedDefaultRoute: string | undefined;
+    let resolvedStartPathOrState: string | State;
+
+    if (startPathOrState === undefined) {
+      resolvedDefaultRoute = resolveOption(
+        options.defaultRoute,
+        deps.getDependency,
+      );
+      resolvedStartPathOrState = resolvedDefaultRoute;
+    } else {
+      resolvedStartPathOrState = startPathOrState;
+    }
 
     // Parse the start path or state
     const startState = resolveStartState(resolvedStartPathOrState, deps);
@@ -313,16 +326,21 @@ export class RouterLifecycleNamespace {
     // See: https://github.com/greydragon888/real-router/issues/43
     if (startState) {
       performTransition(startState, startOptions);
-    } else if (options.defaultRoute && !startPathOrState) {
+    } else if (
+      options.defaultRoute &&
+      !startPathOrState &&
+      resolvedDefaultRoute !== undefined
+    ) {
       // IMPORTANT: Check !startPathOrState (original argument), NOT !resolvedStartPathOrState
       // This distinguishes between:
       //   - User called start() without path → use defaultRoute (this branch)
       //   - User called start('/invalid') with explicit path → error, no silent fallback
       // See: https://github.com/greydragon888/real-router/issues/44
+      // resolvedDefaultRoute !== undefined narrows type (always true when !startPathOrState)
 
-      const params = options.defaultParams;
+      const params = resolveOption(options.defaultParams, deps.getDependency);
 
-      navigateToDefault(options.defaultRoute, params, startOptions);
+      navigateToDefault(resolvedDefaultRoute, params, startOptions);
     } else if (options.allowNotFound) {
       performTransition(
         deps.makeNotFoundState(targetPath, startOptions),

@@ -8,4 +8,4 @@ export {
   VALID_QUERY_PARAMS,
 } from "./constants";
 
-export { deepFreeze, optionNotFoundError } from "./helpers";
+export { deepFreeze, optionNotFoundError, resolveOption } from "./helpers";

@@ -1081,6 +1081,8 @@ export class Router<
       invokeEventListeners: (eventName, toState, fromState, arg) => {
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
+      getDependency: (name: string) =>
+        this.#dependencies.get(name as keyof Dependencies),
     };
 
     this.#navigation.setDependencies(navigationDeps);
@@ -1117,6 +1119,8 @@ export class Router<
       // RouterLifecycleNamespace only uses matchPath without source parameter
       matchPath: (path, source?: string) =>
         this.#routes.matchPath(path, source, this.#options.get()),
+      getDependency: (name: string) =>
+        this.#dependencies.get(name as keyof Dependencies),
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);

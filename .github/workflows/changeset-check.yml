@@ -63,8 +63,8 @@ jobs:
           echo "If this change doesn't need a release, add #trivial to PR title."
           exit 1
 
-  check-pr-reference:
-    name: Check PR Reference
+  validate-changesets:
+    name: Validate Changesets
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -75,8 +75,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check changesets for PR references
-        id: check
+      - name: Validate changesets
+        id: validate
         run: |
           # Get changeset files added/modified in this PR
           CHANGESETS=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- '.changeset/*.md' | grep -v README.md || true)
@@ -90,7 +90,9 @@ jobs:
           echo "has_changesets=true" >> $GITHUB_OUTPUT
           echo "Found changesets: $CHANGESETS"
 
-          # Check each changeset for #XX reference
+          HAS_ISSUES=false
+
+          # --- Check 1: Missing PR/issue references (#XX) ---
           MISSING_REFS=""
           for file in $CHANGESETS; do
             if [ -f "$file" ]; then
@@ -102,42 +104,137 @@ jobs:
 
           if [ -n "$MISSING_REFS" ]; then
             echo "missing_refs=true" >> $GITHUB_OUTPUT
-            echo "files=$MISSING_REFS" >> $GITHUB_OUTPUT
-            echo "⚠️ Changesets without PR reference:$MISSING_REFS"
+            echo "files_missing_refs=$MISSING_REFS" >> $GITHUB_OUTPUT
+            echo "::error::Changesets without PR reference:$MISSING_REFS"
+            HAS_ISSUES=true
           else
             echo "missing_refs=false" >> $GITHUB_OUTPUT
             echo "✅ All changesets have PR references"
           fi
 
+          # --- Check 2: Multi-package changesets ---
+          MULTI_PKG=""
+          for file in $CHANGESETS; do
+            if [ -f "$file" ]; then
+              # Count lines with quoted package names in frontmatter (between --- markers)
+              PKG_COUNT=$(sed -n '/^---$/,/^---$/p' "$file" | grep -c '"' || true)
+              if [ "$PKG_COUNT" -gt 1 ]; then
+                MULTI_PKG="$MULTI_PKG $file"
+              fi
+            fi
+          done
+
+          if [ -n "$MULTI_PKG" ]; then
+            echo "multi_pkg=true" >> $GITHUB_OUTPUT
+            echo "files_multi_pkg=$MULTI_PKG" >> $GITHUB_OUTPUT
+            echo "::error::Multi-package changesets found:$MULTI_PKG"
+            HAS_ISSUES=true
+          else
+            echo "multi_pkg=false" >> $GITHUB_OUTPUT
+            echo "✅ All changesets are single-package"
+          fi
+
+          # --- Check 3: Private packages in changesets ---
+          PRIVATE_PKGS="path-matcher|route-tree|router-benchmarks|search-params|type-guards"
+          PRIVATE_IN_CS=""
+          for file in $CHANGESETS; do
+            if [ -f "$file" ]; then
+              if grep -qE "\"($PRIVATE_PKGS)\"" "$file"; then
+                PRIVATE_IN_CS="$PRIVATE_IN_CS $file"
+              fi
+            fi
+          done
+
+          if [ -n "$PRIVATE_IN_CS" ]; then
+            echo "private_pkgs=true" >> $GITHUB_OUTPUT
+            echo "files_private_pkgs=$PRIVATE_IN_CS" >> $GITHUB_OUTPUT
+            echo "::error::Private packages in changesets:$PRIVATE_IN_CS"
+            HAS_ISSUES=true
+          else
+            echo "private_pkgs=false" >> $GITHUB_OUTPUT
+            echo "✅ No private packages in changesets"
+          fi
+
+          # --- Summary ---
+          if [ "$HAS_ISSUES" = true ]; then
+            echo "has_issues=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_issues=false" >> $GITHUB_OUTPUT
+            echo "✅ All changeset validations passed"
+          fi
+
       - name: Comment on PR
-        if: steps.check.outputs.missing_refs == 'true'
+        if: steps.validate.outputs.has_issues == 'true'
         uses: actions/github-script@v8
         with:
           script: |
-            const files = `${{ steps.check.outputs.files }}`.trim().split(/\s+/);
             const prNumber = context.issue.number;
-            const fileList = files.map(f => `- \`${f}\``).join('\n');
+            const sections = [];
+
+            // Section: Missing PR references
+            if (`${{ steps.validate.outputs.missing_refs }}` === 'true') {
+              const files = `${{ steps.validate.outputs.files_missing_refs }}`.trim().split(/\s+/);
+              const fileList = files.map(f => `- \`${f}\``).join('\n');
+              sections.push([
+                '### Missing PR Reference',
+                '',
+                "The following changeset(s) don't contain a PR/issue reference (`#XX`):",
+                '',
+                fileList,
+                '',
+                `**How to fix:** Edit the changeset description to include \`#${prNumber}\`:`,
+                '',
+                '```markdown',
+                '---',
+                '"@real-router/core": patch',
+                '---',
+                '',
+                `fix: description of the change (#${prNumber})`,
+                '```',
+              ].join('\n'));
+            }
+
+            // Section: Multi-package changesets
+            if (`${{ steps.validate.outputs.multi_pkg }}` === 'true') {
+              const files = `${{ steps.validate.outputs.files_multi_pkg }}`.trim().split(/\s+/);
+              const fileList = files.map(f => `- \`${f}\``).join('\n');
+              sections.push([
+                '### Multi-Package Changeset',
+                '',
+                'The following changeset(s) contain multiple packages:',
+                '',
+                fileList,
+                '',
+                '**Why this matters:** Multi-package changesets copy identical text to all listed packages\' CHANGELOGs. Create **separate changeset files** for each package instead.',
+                '',
+                '**How to fix:** Split into one file per package. See [.changeset/README.md](.changeset/README.md) for examples.',
+              ].join('\n'));
+            }
+
+            // Section: Private packages
+            if (`${{ steps.validate.outputs.private_pkgs }}` === 'true') {
+              const files = `${{ steps.validate.outputs.files_private_pkgs }}`.trim().split(/\s+/);
+              const fileList = files.map(f => `- \`${f}\``).join('\n');
+              sections.push([
+                '### Private Package in Changeset',
+                '',
+                'The following changeset(s) reference private packages:',
+                '',
+                fileList,
+                '',
+                '**Why this matters:** Private packages (`path-matcher`, `route-tree`, `router-benchmarks`, `search-params`, `type-guards`) are not published to npm and should not have changesets.',
+                '',
+                '**How to fix:** Remove the private package from the changeset frontmatter. Only include public `@real-router/*` packages.',
+              ].join('\n'));
+            }
 
             const body = [
-              '## ⚠️ Changeset Missing PR Reference',
+              '## ❌ Changeset Validation Failed',
               '',
-              "The following changeset file(s) don't contain a PR/issue reference (`#XX`):",
+              ...sections,
               '',
-              fileList,
-              '',
-              '**Why this matters:** PR references in changesets are used to link releases to their source tasks. This improves traceability in git history and release notes.',
-              '',
-              `**How to fix:** Edit the changeset description to include \`#${prNumber}\`:`,
-              '',
-              '```markdown',
               '---',
-              '"@real-router/core": patch',
-              '---',
-              '',
-              `fix: description of the change (#${prNumber})`,
-              '```',
-              '',
-              'This is a **warning only** — the PR can still be merged.',
+              '*See [.changeset/README.md](.changeset/README.md) for changeset guidelines.*',
             ].join('\n');
 
             // Check for existing comment
@@ -147,7 +244,7 @@ jobs:
               issue_number: prNumber,
             });
 
-            const marker = 'Changeset Missing PR Reference';
+            const marker = 'Changeset Validation Failed';
             const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
 
             if (existing) {
@@ -165,3 +262,33 @@ jobs:
                 body,
               });
             }
+
+      - name: Remove outdated comment
+        if: steps.validate.outputs.has_changesets == 'true' && steps.validate.outputs.has_issues == 'false'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const prNumber = context.issue.number;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const marker = 'Changeset Validation Failed';
+            const existing = comments.find(c => c.user.type === 'Bot' && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.deleteComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+              });
+            }
+
+      - name: Fail if validation issues found
+        if: steps.validate.outputs.has_issues == 'true'
+        run: |
+          echo "Changeset validation failed. See PR comment for details."
+          exit 1

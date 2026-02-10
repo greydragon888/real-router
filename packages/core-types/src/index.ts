@@ -26,6 +26,8 @@ export type {
 // PluginFactory, BuildStateResultWithSegments are in @real-router/core
 export type {
   Options,
+  DefaultRouteCallback,
+  DefaultParamsCallback,
   ActivationFn,
   DefaultDependencies,
   Config,
