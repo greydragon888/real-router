@@ -46,6 +46,7 @@ import type {
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
+  ForwardToCallback,
   Options,
   Params,
   State,
@@ -386,7 +387,7 @@ export class RoutesNamespace<
   updateRouteConfig(
     name: string,
     updates: {
-      forwardTo?: string | null | undefined;
+      forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
       defaultParams?: Params | null | undefined;
       decodeParams?: ((params: Params) => Params) | null | undefined;
       encodeParams?: ((params: Params) => Params) | null | undefined;
@@ -396,8 +397,13 @@ export class RoutesNamespace<
     if (updates.forwardTo !== undefined) {
       if (updates.forwardTo === null) {
         delete this.#config.forwardMap[name];
-      } else {
+        delete this.#config.forwardFnMap[name];
+      } else if (typeof updates.forwardTo === "string") {
+        delete this.#config.forwardFnMap[name];
         this.#config.forwardMap[name] = updates.forwardTo;
+      } else {
+        delete this.#config.forwardMap[name];
+        this.#config.forwardFnMap[name] = updates.forwardTo;
       }
 
       this.#refreshForwardMap();
@@ -460,6 +466,10 @@ export class RoutesNamespace<
 
     for (const key in this.#config.forwardMap) {
       delete this.#config.forwardMap[key];
+    }
+
+    for (const key in this.#config.forwardFnMap) {
+      delete this.#config.forwardFnMap[key];
     }
 
     // Clear forward cache
@@ -578,28 +588,59 @@ export class RoutesNamespace<
     name: string,
     params: P,
   ): { name: string; params: P } {
-    const resolvedName = this.#resolvedForwardMap[name] ?? name;
+    // Path 1: Dynamic forward
+    if (Object.hasOwn(this.#config.forwardFnMap, name)) {
+      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
+      const dynamicForward = this.#config.forwardFnMap[name];
+      const resolved = this.#resolveDynamicForward(
+        name,
+        dynamicForward,
+        params,
+      );
 
-    // Merge source route's defaultParams with provided params
-    const paramsWithSource = Object.hasOwn(this.#config.defaultParams, name)
-      ? { ...this.#config.defaultParams[name], ...params }
-      : params;
-
-    // If forwarded to different route, merge target's defaultParams
-    if (
-      resolvedName !== name &&
-      Object.hasOwn(this.#config.defaultParams, resolvedName)
-    ) {
       return {
-        name: resolvedName,
-        params: {
-          ...this.#config.defaultParams[resolvedName],
-          ...paramsWithSource,
-        } as P,
+        name: resolved,
+        params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
       };
     }
 
-    return { name: resolvedName, params: paramsWithSource };
+    // Path 2: Static forward (O(1) cached)
+    const staticForward = this.#resolvedForwardMap[name] ?? name;
+
+    // Path 3: Mixed chain (static target has dynamic forward)
+    if (
+      staticForward !== name &&
+      Object.hasOwn(this.#config.forwardFnMap, staticForward)
+    ) {
+      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
+      const targetDynamicForward = this.#config.forwardFnMap[staticForward];
+      const resolved = this.#resolveDynamicForward(
+        staticForward,
+        targetDynamicForward,
+        params,
+      );
+
+      return {
+        name: resolved,
+        params: this.#mergeDefaultParams(resolved, paramsWithSourceDefaults),
+      };
+    }
+
+    // Path 4: Static forward only
+    if (staticForward !== name) {
+      const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
+
+      return {
+        name: staticForward,
+        params: this.#mergeDefaultParams(
+          staticForward,
+          paramsWithSourceDefaults,
+        ),
+      };
+    }
+
+    // No forward - merge own defaults
+    return { name, params: this.#mergeDefaultParams(name, params) };
   }
 
   /**
@@ -933,7 +974,7 @@ export class RoutesNamespace<
    */
   validateUpdateRoute(
     name: string,
-    forwardTo: string | null | undefined,
+    forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
   ): void {
     // Validate route exists
     if (!this.hasRoute(name)) {
@@ -942,8 +983,12 @@ export class RoutesNamespace<
       );
     }
 
-    // Validate forwardTo target exists and is valid
-    if (forwardTo !== undefined && forwardTo !== null) {
+    // Validate forwardTo target exists and is valid (only for string forwardTo)
+    if (
+      forwardTo !== undefined &&
+      forwardTo !== null &&
+      typeof forwardTo === "string"
+    ) {
       if (!this.hasRoute(forwardTo)) {
         throw new Error(
           `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
@@ -961,6 +1006,95 @@ export class RoutesNamespace<
   // =========================================================================
   // Private methods
   // =========================================================================
+
+  /**
+   * Merges route's defaultParams with provided params.
+   */
+  #mergeDefaultParams<P extends Params = Params>(
+    routeName: string,
+    params: P,
+  ): P {
+    if (Object.hasOwn(this.#config.defaultParams, routeName)) {
+      return { ...this.#config.defaultParams[routeName], ...params } as P;
+    }
+
+    return params;
+  }
+
+  /**
+   * Resolves dynamic forwardTo chain with cycle detection and max depth.
+   * Throws if cycle detected, max depth exceeded, or invalid return type.
+   */
+  #resolveDynamicForward(
+    startName: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    startFn: ForwardToCallback<any>,
+    params: Params,
+  ): string {
+    const visited = new Set<string>([startName]);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+    let current = startFn(this.#deps.getDependency as any, params);
+    let depth = 0;
+    const MAX_DEPTH = 100;
+
+    // Validate initial return type
+    if (typeof current !== "string") {
+      throw new TypeError(
+        `forwardTo callback must return a string, got ${typeof current}`,
+      );
+    }
+
+    while (depth < MAX_DEPTH) {
+      // Check if target route exists
+
+      if (this.#matcher.getSegmentsByName(current) === undefined) {
+        throw new Error(`Route "${current}" does not exist`);
+      }
+
+      // Check for cycle
+      if (visited.has(current)) {
+        const chain = [...visited, current].join(" → ");
+
+        throw new Error(`Circular forwardTo detected: ${chain}`);
+      }
+
+      visited.add(current);
+
+      // Check if current has dynamic forward
+      if (Object.hasOwn(this.#config.forwardFnMap, current)) {
+        const fn = this.#config.forwardFnMap[current];
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+        current = fn(this.#deps.getDependency as any, params);
+
+        /* v8 ignore next 4 -- @preserve: defensive check, validated at registration */
+        if (typeof current !== "string") {
+          throw new TypeError(
+            `forwardTo callback must return a string, got ${typeof current}`,
+          );
+        }
+
+        depth++;
+        continue;
+      }
+
+      // Check if current has static forward
+      const staticForward = this.#config.forwardMap[current];
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (staticForward !== undefined) {
+        current = staticForward;
+        depth++;
+        continue;
+      }
+
+      // No more forwards - return current
+      return current;
+    }
+
+    throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
+  }
 
   #rebuildTree(): void {
     this.#tree = createRouteTree(
@@ -1096,6 +1230,7 @@ export class RoutesNamespace<
     clearConfigEntries(this.#config.encoders, shouldClear);
     clearConfigEntries(this.#config.defaultParams, shouldClear);
     clearConfigEntries(this.#config.forwardMap, shouldClear);
+    clearConfigEntries(this.#config.forwardFnMap, shouldClear);
 
     // Clear forwardMap entries pointing TO deleted route
     clearConfigEntries(this.#config.forwardMap, (key) =>
@@ -1178,17 +1313,42 @@ export class RoutesNamespace<
 
   #registerForwardTo(route: Route<Dependencies>, fullName: string): void {
     if (route.canActivate) {
+      /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
+      const forwardTarget =
+        typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
+
       logger.warn(
         "real-router",
         `Route "${fullName}" has both forwardTo and canActivate. ` +
           `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
-          `Move canActivate to the target route "${route.forwardTo}".`,
+          `Move canActivate to the target route "${forwardTarget}".`,
       );
     }
 
+    // Async validation ALWAYS runs (even with noValidate=true)
+    if (typeof route.forwardTo === "function") {
+      const isNativeAsync =
+        (route.forwardTo as { constructor: { name: string } }).constructor
+          .name === "AsyncFunction";
+      const isTranspiledAsync = route.forwardTo
+        .toString()
+        .includes("__awaiter");
+
+      if (isNativeAsync || isTranspiledAsync) {
+        throw new TypeError(
+          `forwardTo callback cannot be async for route "${fullName}". ` +
+            `Async functions break matchPath/buildPath.`,
+        );
+      }
+    }
+
     // forwardTo is guaranteed to exist at this point
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.#config.forwardMap[fullName] = route.forwardTo!;
+    if (typeof route.forwardTo === "string") {
+      this.#config.forwardMap[fullName] = route.forwardTo;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      this.#config.forwardFnMap[fullName] = route.forwardTo!;
+    }
   }
 
   #enrichRoute(
@@ -1200,10 +1360,15 @@ export class RoutesNamespace<
       path: routeDef.path,
     };
 
-    const forwardTo = this.#config.forwardMap[routeName];
+    const forwardToFn = this.#config.forwardFnMap[routeName];
+    const forwardToStr = this.#config.forwardMap[routeName];
 
-    if (forwardTo) {
-      route.forwardTo = forwardTo;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (forwardToFn !== undefined) {
+      route.forwardTo = forwardToFn;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    } else if (forwardToStr !== undefined) {
+      route.forwardTo = forwardToStr;
     }
 
     if (routeName in this.#config.defaultParams) {

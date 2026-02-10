@@ -5,7 +5,11 @@ import { getTypeDescription } from "type-guards";
 
 import type { RouteConfig } from "./types";
 import type { Route } from "../../types";
-import type { DefaultDependencies, Params } from "@real-router/types";
+import type {
+  DefaultDependencies,
+  ForwardToCallback,
+  Params,
+} from "@real-router/types";
 import type { RouteDefinition, RouteTree } from "route-tree";
 
 /**
@@ -17,6 +21,8 @@ export function createEmptyConfig(): RouteConfig {
     encoders: Object.create(null) as Record<string, (params: Params) => Params>,
     defaultParams: Object.create(null) as Record<string, Params>,
     forwardMap: Object.create(null) as Record<string, string>,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    forwardFnMap: Object.create(null) as Record<string, ForwardToCallback<any>>,
   };
 }
 
@@ -127,8 +133,39 @@ export function clearConfigEntries<T>(
 // ============================================================================
 
 /**
- * Validates route properties (canActivate, canDeactivate, defaultParams, async functions).
- * This ensures type safety at configuration time, not runtime.
+ * Validates forwardTo property type and async status.
+ */
+function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
+  if (forwardTo === undefined) {
+    return;
+  }
+
+  /* v8 ignore next 5 -- @preserve: defensive check, validated by TypeScript */
+  if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
+    throw new TypeError(
+      `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +
+        `got ${getTypeDescription(forwardTo)}`,
+    );
+  }
+
+  if (typeof forwardTo === "function") {
+    const isNativeAsync =
+      (forwardTo as { constructor: { name: string } }).constructor.name ===
+      "AsyncFunction";
+    const isTranspiledAsync = forwardTo.toString().includes("__awaiter");
+
+    if (isNativeAsync || isTranspiledAsync) {
+      throw new TypeError(
+        `[router.addRoute] forwardTo callback cannot be async for route "${fullName}". ` +
+          `Async functions break matchPath/buildPath.`,
+      );
+    }
+  }
+}
+
+/**
+ * Validates route properties for addRoute.
+ * Throws TypeError if any property is invalid.
  *
  * @param route - Route to validate
  * @param fullName - Full route name (with parent prefix)
@@ -191,6 +228,9 @@ export function validateRouteProperties<
       `[router.addRoute] encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
     );
   }
+
+  // Validate forwardTo type and async
+  validateForwardToProperty(route.forwardTo, fullName);
 
   // Recursively validate children
   if (route.children) {
@@ -297,6 +337,7 @@ function collectRouteNames<Dependencies extends DefaultDependencies>(
 
 /**
  * Collects all forwardTo mappings from a batch of routes (including children).
+ * Only collects string forwardTo values; callbacks are handled separately.
  */
 function collectForwardMappings<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
@@ -307,7 +348,7 @@ function collectForwardMappings<Dependencies extends DefaultDependencies>(
   for (const route of routes) {
     const fullName = parentName ? `${parentName}.${route.name}` : route.name;
 
-    if (route.forwardTo) {
+    if (route.forwardTo && typeof route.forwardTo === "string") {
       mappings.set(fullName, route.forwardTo);
     }
 

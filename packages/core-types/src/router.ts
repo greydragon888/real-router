@@ -44,6 +44,15 @@ export type DefaultRouteCallback<Dependencies = object> = (
 ) => string;
 
 /**
+ * Callback function for dynamically resolving the forward target route.
+ * Receives a dependency getter function and current route parameters.
+ */
+export type ForwardToCallback<Dependencies = object> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+  params: Params,
+) => string;
+
+/**
  * Callback function for dynamically resolving the default parameters.
  * Receives a dependency getter function to access router dependencies.
  */
