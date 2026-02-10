@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.6.0
+
+### Minor Changes
+
+- [#72](https://github.com/greydragon888/real-router/pull/72) [`bf33e8e`](https://github.com/greydragon888/real-router/commit/bf33e8ed110628c4657a9f2521d1f323b96f42a5) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `DefaultRouteCallback` and `DefaultParamsCallback` types (#39)
+
+  New callback type aliases for dynamic `defaultRoute` and `defaultParams` options. `Options.defaultRoute` is now `string | DefaultRouteCallback`, `Options.defaultParams` is now `Params | DefaultParamsCallback`.
+
 ## 0.5.0
 
 ### Minor Changes

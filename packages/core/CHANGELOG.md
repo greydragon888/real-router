@@ -1,5 +1,30 @@
 # @real-router/core
 
+## 0.11.0
+
+### Minor Changes
+
+- [#72](https://github.com/greydragon888/real-router/pull/72) [`bf33e8e`](https://github.com/greydragon888/real-router/commit/bf33e8ed110628c4657a9f2521d1f323b96f42a5) Thanks [@greydragon888](https://github.com/greydragon888)! - Support dynamic `defaultRoute` and `defaultParams` via callback functions (#39)
+
+  `defaultRoute` and `defaultParams` options now accept callback functions that receive `getDependency` for dynamic value computation based on router dependencies. Callbacks are resolved at point of use (`start()`, `navigateToDefault()`), never cached.
+
+  **Breaking Type Change**: `router.getOptions().defaultRoute` now returns `string | DefaultRouteCallback` (was `string`). Similarly, `router.getOptions().defaultParams` now returns `Params | DefaultParamsCallback` (was `Params`). Code that assigns these values to typed variables may need type assertions or `typeof` checks.
+
+  **Behavior Note**: A callback returning empty string `""` in `navigateToDefault()` returns noop (no navigation). In `start()` without path, it produces `ROUTE_NOT_FOUND` error (not `NO_START_PATH_OR_STATE`).
+
+  ```typescript
+  const router = createRouter(routes, {
+    defaultRoute: (getDep) =>
+      getDep("userRole") === "admin" ? "admin.dashboard" : "home",
+    defaultParams: (getDep) => ({ userId: getDep("currentUserId") }),
+  });
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`bf33e8e`](https://github.com/greydragon888/real-router/commit/bf33e8ed110628c4657a9f2521d1f323b96f42a5)]:
+  - @real-router/types@0.6.0
+
 ## 0.10.0
 
 ### Minor Changes

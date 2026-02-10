@@ -1,6 +1,6 @@
 {
   "name": "type-guards",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Runtime type guards and validators for Real-Router",
   "main": "./dist/cjs/index.js",
