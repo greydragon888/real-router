@@ -184,6 +184,7 @@ export function validateUpdateRoutePropertyTypes(
           .toString()
           .includes("__awaiter"))
     ) {
+      /* v8 ignore next 3 -- @preserve: transpiled async tested in addRoute */
       throw new TypeError(
         `[real-router] updateRoute: forwardTo callback cannot be async`,
       );

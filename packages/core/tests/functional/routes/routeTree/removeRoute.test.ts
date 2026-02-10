@@ -396,6 +396,25 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("area")).toBe(false);
       expect(router.hasRoute("area.page")).toBe(false);
     });
+
+    it("should clear forwardFnMap on removeRoute", () => {
+      router.addRoute({ name: "fn-target", path: "/fn-target" });
+      router.addRoute({
+        name: "fn-forward",
+        path: "/fn-forward",
+        forwardTo: () => "fn-target",
+      });
+
+      expect(router.forwardState("fn-forward", {}).name).toBe("fn-target");
+
+      const fnForwardRoute = router.getRoute("fn-forward");
+
+      expect(typeof fnForwardRoute?.forwardTo).toBe("function");
+
+      router.removeRoute("fn-forward");
+
+      expect(router.hasRoute("fn-forward")).toBe(false);
+    });
   });
 
   describe("early exit optimization (non-existent route)", () => {

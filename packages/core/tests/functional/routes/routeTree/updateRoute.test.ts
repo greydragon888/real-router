@@ -1280,4 +1280,74 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
     });
   });
+
+  describe("forwardTo function transitions", () => {
+    it("should update string forwardTo to function", () => {
+      router.addRoute({ name: "source", path: "/source" });
+      router.addRoute({ name: "target-a", path: "/target-a" });
+      router.addRoute({ name: "target-b", path: "/target-b" });
+
+      router.updateRoute("source", { forwardTo: "target-a" });
+
+      expect(router.forwardState("source", {}).name).toBe("target-a");
+
+      router.updateRoute("source", {
+        forwardTo: () => "target-b",
+      });
+
+      const result = router.forwardState("source", {});
+
+      expect(result.name).toBe("target-b");
+    });
+
+    it("should update function forwardTo to string", () => {
+      router.addRoute({ name: "dynamic-source", path: "/dynamic-source" });
+      router.addRoute({ name: "dest-1", path: "/dest-1" });
+      router.addRoute({ name: "dest-2", path: "/dest-2" });
+
+      router.updateRoute("dynamic-source", {
+        forwardTo: () => "dest-1",
+      });
+
+      expect(router.forwardState("dynamic-source", {}).name).toBe("dest-1");
+
+      router.updateRoute("dynamic-source", { forwardTo: "dest-2" });
+
+      expect(router.forwardState("dynamic-source", {}).name).toBe("dest-2");
+    });
+
+    it("should clear both maps when updating function to null", () => {
+      router.addRoute({ name: "clear-test", path: "/clear-test" });
+      router.addRoute({ name: "some-target", path: "/some-target" });
+
+      router.updateRoute("clear-test", {
+        forwardTo: () => "some-target",
+      });
+
+      expect(router.forwardState("clear-test", {}).name).toBe("some-target");
+
+      router.updateRoute("clear-test", { forwardTo: null });
+
+      expect(router.forwardState("clear-test", {}).name).toBe("clear-test");
+    });
+
+    it("should handle function → null → string sequence", () => {
+      router.addRoute({ name: "seq-test", path: "/seq-test" });
+      router.addRoute({ name: "final-dest", path: "/final-dest" });
+
+      router.updateRoute("seq-test", {
+        forwardTo: () => "final-dest",
+      });
+
+      expect(router.forwardState("seq-test", {}).name).toBe("final-dest");
+
+      router.updateRoute("seq-test", { forwardTo: null });
+
+      expect(router.forwardState("seq-test", {}).name).toBe("seq-test");
+
+      router.updateRoute("seq-test", { forwardTo: "final-dest" });
+
+      expect(router.forwardState("seq-test", {}).name).toBe("final-dest");
+    });
+  });
 });

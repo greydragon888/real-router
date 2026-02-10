@@ -1201,6 +1201,7 @@ export class Router<
         Object.assign(newConfig.encoders, config.encoders);
         Object.assign(newConfig.defaultParams, config.defaultParams);
         Object.assign(newConfig.forwardMap, config.forwardMap);
+        Object.assign(newConfig.forwardFnMap, config.forwardFnMap);
 
         typedRouter.#routes.setResolvedForwardMap({ ...resolvedForwardMap });
       },

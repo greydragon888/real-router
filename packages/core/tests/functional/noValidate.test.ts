@@ -453,5 +453,27 @@ describe("core/noValidate option", () => {
 
       testRouter.stop();
     });
+
+    it("should reject async forwardTo even with noValidate: true", () => {
+      const testRouter = createTestRouter({ noValidate: true });
+
+      expect(() => {
+        testRouter.addRoute({
+          name: "async-no-validate",
+          path: "/async-no-validate",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrowError(TypeError);
+
+      expect(() => {
+        testRouter.addRoute({
+          name: "async-no-validate",
+          path: "/async-no-validate",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrowError(/cannot be async/);
+
+      testRouter.stop();
+    });
   });
 });

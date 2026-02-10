@@ -1,6 +1,8 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { createRouter } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Params, Route, Router } from "@real-router/core";
@@ -1538,6 +1540,75 @@ describe("core/routes/addRoute", () => {
       // but it does protect against array structure changes
       expect(router.matchPath("/original")?.name).toBe("original");
       expect(router.matchPath("/added")).toBeUndefined();
+    });
+  });
+
+  describe("forwardTo function", () => {
+    it("should register forwardTo callback and resolve dynamically", () => {
+      const routerWithDeps = createRouter(
+        [
+          {
+            name: "dashboard",
+            path: "/dashboard",
+            forwardTo: (getDep) =>
+              getDep("user").isAdmin ? "admin-dash" : "user-dash",
+          },
+          { name: "admin-dash", path: "/admin-dash" },
+          { name: "user-dash", path: "/user-dash" },
+        ],
+        { defaultRoute: "admin-dash" },
+        { user: { isAdmin: true } },
+      );
+
+      routerWithDeps.start("");
+
+      const result = routerWithDeps.forwardState("dashboard", {});
+
+      expect(result.name).toBe("admin-dash");
+
+      routerWithDeps.stop();
+    });
+
+    it("should reject async forwardTo callback (native async)", () => {
+      expect(() => {
+        router.addRoute({
+          name: "async-forward",
+          path: "/async-forward",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrowError(TypeError);
+
+      expect(() => {
+        router.addRoute({
+          name: "async-forward",
+          path: "/async-forward",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrowError(/cannot be async/);
+    });
+
+    it("should reject async forwardTo callback (transpiled async with __awaiter)", () => {
+      // Simulate transpiled async function with __awaiter in toString()
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+      const transpiledAsync = new Function(
+        "return function() { return __awaiter(this, void 0, void 0, function*() { return 'target'; }); }",
+      )();
+
+      expect(() => {
+        router.addRoute({
+          name: "transpiled-async-forward",
+          path: "/transpiled-async-forward",
+          forwardTo: transpiledAsync,
+        });
+      }).toThrowError(TypeError);
+
+      expect(() => {
+        router.addRoute({
+          name: "transpiled-async-forward",
+          path: "/transpiled-async-forward",
+          forwardTo: transpiledAsync,
+        });
+      }).toThrowError(/cannot be async/);
     });
   });
 });

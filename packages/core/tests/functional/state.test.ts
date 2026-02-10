@@ -1,13 +1,15 @@
 import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
+
 import {
   buildNameFromSegments,
   createRouteState,
 } from "../../src/namespaces/RoutesNamespace/stateBuilder";
 import { createTestRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, Route } from "@real-router/core";
 
 let router: Router;
 
@@ -712,6 +714,266 @@ describe("core/stateBuilder", () => {
       expect(state?.params).toStrictEqual({ path: "/completely/unknown/path" });
 
       freshRouter.stop();
+    });
+  });
+
+  describe("forwardTo function", () => {
+    it("should resolve basic dynamic forwardTo with dependency", () => {
+      const testRouter = createRouter(
+        [
+          {
+            name: "dash",
+            path: "/dash",
+            forwardTo: (getDep) => (getDep("user").isAdmin ? "admin" : "user"),
+          },
+          { name: "admin", path: "/admin" },
+          { name: "user", path: "/user" },
+        ],
+        { defaultRoute: "user" },
+        { user: { isAdmin: true } },
+      );
+
+      testRouter.start("");
+
+      const result = testRouter.forwardState("dash", {});
+
+      expect(result.name).toBe("admin");
+
+      testRouter.stop();
+    });
+
+    it("should pass params to forwardTo callback", () => {
+      const testRouter = createRouter(
+        [
+          {
+            name: "item",
+            path: "/item/:type",
+            forwardTo: (_getDep, params) =>
+              params.type === "book" ? "book-viewer" : "default-viewer",
+          },
+          { name: "book-viewer", path: "/book-viewer" },
+          { name: "default-viewer", path: "/default-viewer" },
+        ],
+        { defaultRoute: "default-viewer" },
+        {},
+      );
+
+      testRouter.start("");
+
+      const result = testRouter.forwardState("item", { type: "book" });
+
+      expect(result.name).toBe("book-viewer");
+
+      testRouter.stop();
+    });
+
+    it("should detect cycles in dynamic forwardTo", () => {
+      const testRouter = createRouter(
+        [
+          { name: "cycle-a", path: "/cycle-a", forwardTo: () => "cycle-b" },
+          { name: "cycle-b", path: "/cycle-b", forwardTo: () => "cycle-a" },
+        ],
+        {},
+        {},
+      );
+
+      testRouter.start("");
+
+      expect(() => testRouter.forwardState("cycle-a", {})).toThrowError(
+        /Circular forwardTo/,
+      );
+
+      testRouter.stop();
+    });
+
+    it("should resolve mixed chain: static → dynamic", () => {
+      router.addRoute([
+        { name: "static-start", path: "/static-start", forwardTo: "dynamic" },
+        {
+          name: "dynamic",
+          path: "/dynamic",
+          forwardTo: () => "final-dest",
+        },
+        { name: "final-dest", path: "/final-dest" },
+      ]);
+
+      const result = router.forwardState("static-start", {});
+
+      expect(result.name).toBe("final-dest");
+    });
+
+    it("should resolve mixed chain: dynamic → static", () => {
+      router.addRoute([
+        {
+          name: "dynamic-start",
+          path: "/dynamic-start",
+          forwardTo: () => "static-mid",
+        },
+        { name: "static-mid", path: "/static-mid", forwardTo: "end" },
+        { name: "end", path: "/end" },
+      ]);
+
+      const result = router.forwardState("dynamic-start", {});
+
+      expect(result.name).toBe("end");
+    });
+
+    it("should resolve dynamic → dynamic chain", () => {
+      router.addRoute([
+        { name: "dyn-1", path: "/dyn-1", forwardTo: () => "dyn-2" },
+        { name: "dyn-2", path: "/dyn-2", forwardTo: () => "dyn-3" },
+        { name: "dyn-3", path: "/dyn-3" },
+      ]);
+
+      const result = router.forwardState("dyn-1", {});
+
+      expect(result.name).toBe("dyn-3");
+    });
+
+    it("should throw for non-existent target returned by function", () => {
+      router.addRoute({
+        name: "bad-fn",
+        path: "/bad-fn",
+        forwardTo: () => "nonexistent",
+      });
+
+      expect(() => router.forwardState("bad-fn", {})).toThrowError(
+        /does not exist/,
+      );
+    });
+
+    it("should bubble errors from forwardTo callback naturally", () => {
+      router.addRoute({
+        name: "error-fn",
+        path: "/error-fn",
+        forwardTo: () => {
+          throw new Error("Custom callback error");
+        },
+      });
+
+      expect(() => router.forwardState("error-fn", {})).toThrowError(
+        "Custom callback error",
+      );
+    });
+
+    it("should throw TypeError for non-string return from callback", () => {
+      router.addRoute({
+        name: "bad-return",
+        path: "/bad-return",
+        forwardTo: (() => 123) as any,
+      });
+
+      expect(() => router.forwardState("bad-return", {})).toThrowError(
+        TypeError,
+      );
+    });
+
+    it("should throw when exceeding max depth (100 hops)", () => {
+      const routes: Route[] = [];
+
+      for (let i = 0; i < 102; i++) {
+        if (i < 101) {
+          routes.push({
+            name: `hop-${i}`,
+            path: `/hop-${i}`,
+            forwardTo: () => `hop-${i + 1}`,
+          });
+        } else {
+          routes.push({
+            name: `hop-${i}`,
+            path: `/hop-${i}`,
+          });
+        }
+      }
+
+      router.addRoute(routes);
+
+      expect(() => router.forwardState("hop-0", {})).toThrowError(
+        /exceeds maximum depth/,
+      );
+    });
+
+    it("should work with buildState after dynamic forward resolution", () => {
+      router.addRoute([
+        { name: "build-fn", path: "/build-fn", forwardTo: () => "build-dest" },
+        { name: "build-dest", path: "/build-dest" },
+      ]);
+
+      const state = router.buildState("build-fn", {});
+
+      expect(state?.name).toBe("build-dest");
+    });
+
+    it("should work with rewritePathOnMatch and dynamic forwardTo", () => {
+      const testRouter = createTestRouter({ rewritePathOnMatch: true });
+
+      testRouter.addRoute([
+        {
+          name: "rewrite-fn",
+          path: "/rewrite-fn",
+          forwardTo: () => "rewrite-target",
+        },
+        { name: "rewrite-target", path: "/rewrite-target" },
+      ]);
+
+      testRouter.start("");
+
+      const state = testRouter.matchPath("/rewrite-fn");
+
+      expect(state?.name).toBe("rewrite-target");
+      expect(state?.path).toBe("/rewrite-target");
+
+      testRouter.stop();
+    });
+
+    it("should expose function in getRoute().forwardTo", () => {
+      const forwardFn = () => "target";
+
+      router.addRoute({
+        name: "get-fn",
+        path: "/get-fn",
+        forwardTo: forwardFn,
+      });
+
+      const route = router.getRoute("get-fn");
+
+      expect(route?.forwardTo).toBe(forwardFn);
+    });
+
+    it("should detect self-forward when function returns own name", () => {
+      router.addRoute({
+        name: "self-fn",
+        path: "/self-fn",
+        forwardTo: () => "self-fn",
+      });
+
+      expect(() => router.forwardState("self-fn", {})).toThrowError(
+        /Circular forwardTo/,
+      );
+    });
+
+    it("should throw for empty string returned from callback", () => {
+      router.addRoute({
+        name: "empty-return",
+        path: "/empty-return",
+        forwardTo: () => "",
+      });
+
+      expect(() => router.forwardState("empty-return", {})).toThrowError(
+        /does not exist/,
+      );
+    });
+
+    it("should not affect pure static forward chains", () => {
+      router.addRoute([
+        { name: "pure-a", path: "/pure-a", forwardTo: "pure-b" },
+        { name: "pure-b", path: "/pure-b", forwardTo: "pure-c" },
+        { name: "pure-c", path: "/pure-c" },
+      ]);
+
+      const result = router.forwardState("pure-a", {});
+
+      expect(result.name).toBe("pure-c");
     });
   });
 });

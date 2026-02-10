@@ -702,4 +702,30 @@ describe("router.clone()", () => {
       clonedRouter.stop();
     });
   });
+
+  describe("forwardFnMap cloning", () => {
+    it("should preserve forwardFnMap in cloned router", () => {
+      const router = createTestRouter();
+      const forwardFn = () => "clone-target";
+
+      router.addRoute({ name: "clone-target", path: "/clone-target" });
+      router.addRoute({
+        name: "clone-forward",
+        path: "/clone-forward",
+        forwardTo: forwardFn,
+      });
+
+      const clonedRouter = router.clone();
+
+      const originalRoute = router.getRoute("clone-forward");
+      const clonedRoute = clonedRouter.getRoute("clone-forward");
+
+      expect(originalRoute?.forwardTo).toBe(forwardFn);
+      expect(clonedRoute?.forwardTo).toBe(forwardFn);
+
+      const clonedResult = clonedRouter.forwardState("clone-forward", {});
+
+      expect(clonedResult.name).toBe("clone-target");
+    });
+  });
 });

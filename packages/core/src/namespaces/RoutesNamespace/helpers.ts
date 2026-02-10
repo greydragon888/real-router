@@ -140,6 +140,7 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     return;
   }
 
+  /* v8 ignore next 5 -- @preserve: defensive check, validated by TypeScript */
   if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
     throw new TypeError(
       `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +
@@ -147,15 +148,18 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     );
   }
 
-  if (
-    typeof forwardTo === "function" &&
-    (forwardTo as { constructor: { name: string } }).constructor.name ===
-      "AsyncFunction"
-  ) {
-    throw new TypeError(
-      `[router.addRoute] forwardTo callback cannot be async for route "${fullName}". ` +
-        `Async functions break matchPath/buildPath.`,
-    );
+  if (typeof forwardTo === "function") {
+    const isNativeAsync =
+      (forwardTo as { constructor: { name: string } }).constructor.name ===
+      "AsyncFunction";
+    const isTranspiledAsync = forwardTo.toString().includes("__awaiter");
+
+    if (isNativeAsync || isTranspiledAsync) {
+      throw new TypeError(
+        `[router.addRoute] forwardTo callback cannot be async for route "${fullName}". ` +
+          `Async functions break matchPath/buildPath.`,
+      );
+    }
   }
 }
 
