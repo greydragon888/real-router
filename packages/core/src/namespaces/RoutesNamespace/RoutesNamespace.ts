@@ -46,6 +46,7 @@ import type {
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
+  ForwardToCallback,
   Options,
   Params,
   State,
@@ -386,7 +387,7 @@ export class RoutesNamespace<
   updateRouteConfig(
     name: string,
     updates: {
-      forwardTo?: string | null | undefined;
+      forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
       defaultParams?: Params | null | undefined;
       decodeParams?: ((params: Params) => Params) | null | undefined;
       encodeParams?: ((params: Params) => Params) | null | undefined;
@@ -396,8 +397,13 @@ export class RoutesNamespace<
     if (updates.forwardTo !== undefined) {
       if (updates.forwardTo === null) {
         delete this.#config.forwardMap[name];
-      } else {
+        delete this.#config.forwardFnMap[name];
+      } else if (typeof updates.forwardTo === "string") {
+        delete this.#config.forwardFnMap[name];
         this.#config.forwardMap[name] = updates.forwardTo;
+      } else {
+        delete this.#config.forwardMap[name];
+        this.#config.forwardFnMap[name] = updates.forwardTo;
       }
 
       this.#refreshForwardMap();
@@ -933,7 +939,7 @@ export class RoutesNamespace<
    */
   validateUpdateRoute(
     name: string,
-    forwardTo: string | null | undefined,
+    forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
   ): void {
     // Validate route exists
     if (!this.hasRoute(name)) {
@@ -942,8 +948,12 @@ export class RoutesNamespace<
       );
     }
 
-    // Validate forwardTo target exists and is valid
-    if (forwardTo !== undefined && forwardTo !== null) {
+    // Validate forwardTo target exists and is valid (only for string forwardTo)
+    if (
+      forwardTo !== undefined &&
+      forwardTo !== null &&
+      typeof forwardTo === "string"
+    ) {
       if (!this.hasRoute(forwardTo)) {
         throw new Error(
           `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
@@ -1178,17 +1188,24 @@ export class RoutesNamespace<
 
   #registerForwardTo(route: Route<Dependencies>, fullName: string): void {
     if (route.canActivate) {
+      const forwardTarget =
+        typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
+
       logger.warn(
         "real-router",
         `Route "${fullName}" has both forwardTo and canActivate. ` +
           `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
-          `Move canActivate to the target route "${route.forwardTo}".`,
+          `Move canActivate to the target route "${forwardTarget}".`,
       );
     }
 
     // forwardTo is guaranteed to exist at this point
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.#config.forwardMap[fullName] = route.forwardTo!;
+    if (typeof route.forwardTo === "string") {
+      this.#config.forwardMap[fullName] = route.forwardTo;
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      this.#config.forwardFnMap[fullName] = route.forwardTo!;
+    }
   }
 
   #enrichRoute(

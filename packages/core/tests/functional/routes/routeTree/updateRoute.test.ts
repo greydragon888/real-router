@@ -1129,11 +1129,11 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() =>
           router.updateRoute("ur-invalid-fwd", { forwardTo: 123 as any }),
-        ).toThrowError(/forwardTo must be a string or null/);
+        ).toThrowError(/forwardTo must be a string, function, or null/);
 
         expect(() =>
           router.updateRoute("ur-invalid-fwd", { forwardTo: {} as any }),
-        ).toThrowError(/forwardTo must be a string or null/);
+        ).toThrowError(/forwardTo must be a string, function, or null/);
       });
     });
 

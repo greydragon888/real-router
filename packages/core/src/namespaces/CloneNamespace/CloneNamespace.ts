@@ -28,7 +28,7 @@ export class CloneNamespace<
   /**
    * Function to apply config to a new router.
    */
-  #applyConfigStore: ApplyConfigFn | undefined;
+  #applyConfigStore: ApplyConfigFn<Dependencies> | undefined;
 
   /**
    * Gets clone data function or throws if not initialized.
@@ -47,7 +47,7 @@ export class CloneNamespace<
   /**
    * Gets apply config function or throws if not initialized.
    */
-  get #applyConfig(): ApplyConfigFn {
+  get #applyConfig(): ApplyConfigFn<Dependencies> {
     /* v8 ignore next 3 -- @preserve: always set by Router.ts */
     if (!this.#applyConfigStore) {
       throw new Error(
@@ -100,7 +100,7 @@ export class CloneNamespace<
    */
   setCallbacks(
     getCloneData: () => CloneData<Dependencies>,
-    applyConfig: ApplyConfigFn,
+    applyConfig: ApplyConfigFn<Dependencies>,
   ): void {
     this.#getCloneDataStore = getCloneData;
     this.#applyConfigStore = applyConfig;
@@ -148,11 +148,7 @@ export class CloneNamespace<
     }
 
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
-    this.#applyConfig(
-      newRouter as unknown as Router,
-      data.routeConfig,
-      data.resolvedForwardMap,
-    );
+    this.#applyConfig(newRouter, data.routeConfig, data.resolvedForwardMap);
 
     return newRouter;
   }

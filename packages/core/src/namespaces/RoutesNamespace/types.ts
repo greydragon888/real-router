@@ -3,6 +3,7 @@
 import type { ActivationFnFactory } from "../../types";
 import type {
   DefaultDependencies,
+  ForwardToCallback,
   Params,
   State,
   StateMetaInput,
@@ -40,6 +41,9 @@ export interface RoutesDependencies<
     state2: State | undefined,
     ignoreQueryParams?: boolean,
   ) => boolean;
+
+  /** Get a dependency by name */
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
 }
 
 /**
@@ -58,4 +62,8 @@ export interface RouteConfig {
 
   /** Forward mappings (source -> target) */
   forwardMap: Record<string, string>;
+
+  /** Dynamic forward callbacks (source -> callback) */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  forwardFnMap: Record<string, ForwardToCallback<any>>;
 }
