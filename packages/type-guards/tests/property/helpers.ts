@@ -142,7 +142,6 @@ export const stateFullArbitrary = fc.record({
         fc.record({
           replace: fc.option(fc.boolean(), { nil: undefined }),
           reload: fc.option(fc.boolean(), { nil: undefined }),
-          skipTransition: fc.option(fc.boolean(), { nil: undefined }),
           force: fc.option(fc.boolean(), { nil: undefined }),
           state: fc.option(fc.dictionary(fc.string(), fc.anything()), {
             nil: undefined,
@@ -174,8 +173,6 @@ export const historyStateArbitrary = fc
     replace: fc.boolean(),
     hasReload: fc.boolean(),
     reload: fc.boolean(),
-    hasSkipTransition: fc.boolean(),
-    skipTransition: fc.boolean(),
     hasForce: fc.boolean(),
     force: fc.boolean(),
     hasState: fc.boolean(),
@@ -203,10 +200,6 @@ export const historyStateArbitrary = fc
 
       if (data.hasReload) {
         options.reload = data.reload;
-      }
-
-      if (data.hasSkipTransition) {
-        options.skipTransition = data.skipTransition;
       }
 
       if (data.hasForce) {
@@ -303,7 +296,6 @@ export const navigationOptionsArbitrary: fc.Arbitrary<NavigationOptions> =
   fc.record({
     replace: fc.option(fc.boolean(), { nil: undefined }),
     reload: fc.option(fc.boolean(), { nil: undefined }),
-    skipTransition: fc.option(fc.boolean(), { nil: undefined }),
     force: fc.option(fc.boolean(), { nil: undefined }),
     state: fc.option(fc.dictionary(fc.string(), fc.anything()), {
       nil: undefined,
@@ -321,10 +313,6 @@ export const invalidNavigationOptionsArbitrary = fc.oneof(
   // Wrong types for reload
   fc.record({
     reload: fc.oneof(fc.string(), fc.integer(), fc.constant(null)),
-  }) as fc.Arbitrary<Record<string, unknown>>,
-  // Wrong types for skipTransition
-  fc.record({
-    skipTransition: fc.oneof(fc.string(), fc.integer(), fc.constant(null)),
   }) as fc.Arbitrary<Record<string, unknown>>,
   // Wrong types for force
   fc.record({

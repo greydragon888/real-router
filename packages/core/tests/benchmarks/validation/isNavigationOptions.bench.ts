@@ -34,12 +34,11 @@ boxplot(() => {
     }).gc("inner");
 
     // All fields
-    bench("isNavigationOptions: all 6 fields", () => {
+    bench("isNavigationOptions: all fields", () => {
       do_not_optimize(
         isNavigationOptions({
           replace: true,
           reload: false,
-          skipTransition: true,
           force: false,
           forceDeactivate: true,
           redirected: false,
@@ -100,7 +99,7 @@ boxplot(() => {
         {},
         { replace: true },
         { reload: true },
-        { skipTransition: true, force: false },
+        { force: false },
         { replace: true, reload: false, force: true },
       ];
 

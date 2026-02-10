@@ -338,15 +338,6 @@ export class NavigationNamespace {
       },
     );
 
-    // Early return for skipTransition - no state equality check needed
-    // eslint-disable-next-line @typescript-eslint/no-deprecated,sonarjs/deprecation
-    if (opts.skipTransition) {
-      // toState is already frozen from makeState()
-      safeCallback(callback, undefined, toState);
-
-      return noop;
-    }
-
     const fromState = deps.getState();
 
     // Fast verification for the same states

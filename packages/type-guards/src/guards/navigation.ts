@@ -6,7 +6,6 @@ import type { NavigationOptions } from "@real-router/types";
 const NAVIGATION_OPTIONS_FIELDS = [
   "replace",
   "reload",
-  "skipTransition",
   "force",
   "forceDeactivate",
   "redirected",

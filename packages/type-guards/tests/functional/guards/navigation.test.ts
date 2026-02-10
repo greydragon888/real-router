@@ -13,7 +13,6 @@ describe("Router Type Guards", () => {
         isNavigationOptions({
           replace: true,
           reload: false,
-          skipTransition: true,
         }),
       ).toBe(true);
     });
@@ -39,7 +38,6 @@ describe("Router Type Guards", () => {
     it("rejects object with non-boolean field values", () => {
       expect(isNavigationOptions({ replace: "true" } as any)).toBe(false);
       expect(isNavigationOptions({ reload: 1 } as any)).toBe(false);
-      expect(isNavigationOptions({ skipTransition: null } as any)).toBe(false);
       expect(isNavigationOptions({ force: {} } as any)).toBe(false);
       expect(isNavigationOptions({ forceDeactivate: [] } as any)).toBe(false);
       expect(isNavigationOptions({ redirected: Symbol("test") } as any)).toBe(
@@ -58,7 +56,7 @@ describe("Router Type Guards", () => {
 
       expect(
         isNavigationOptions({
-          skipTransition: false, // valid
+          reload: false, // valid
           force: 123, // invalid
         } as any),
       ).toBe(false);
@@ -76,7 +74,6 @@ describe("Router Type Guards", () => {
         isNavigationOptions({
           replace: true,
           reload: false,
-          skipTransition: true,
           force: false,
           forceDeactivate: true,
           redirected: false,

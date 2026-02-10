@@ -165,23 +165,6 @@ if (IS_ROUTER5) {
   }).gc("inner");
 }
 
-// 12.5.7 Five thousand navigations with skipTransition flag
-{
-  const router = createSimpleRouter();
-
-  router.start();
-
-  bench("12.5.7 Five thousand navigations with skipTransition flag", () => {
-    for (let i = 0; i < 5000; i++) {
-      router.navigate(
-        i % 2 === 0 ? "about" : "users",
-        {},
-        { skipTransition: true },
-      );
-    }
-  }).gc("inner");
-}
-
 // 12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
