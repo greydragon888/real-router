@@ -14,6 +14,7 @@ const state = router.buildNavigationState("users.view", { id: 123 });
 if (state) {
   console.log(state.path); // '/users/view/123'
 }
+// Returns undefined if route not found
 ```
 
 **Migration from `skipTransition`:**

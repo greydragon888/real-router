@@ -22,7 +22,7 @@ describe("router.buildNavigationState()", () => {
     it("should return State for existing route with no params", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.name).toBe("home");
       expect(state?.params).toStrictEqual({});
     });
@@ -30,7 +30,7 @@ describe("router.buildNavigationState()", () => {
     it("should return State for existing route with params", () => {
       const state = router.buildNavigationState("items", { id: "123" });
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.name).toBe("items");
       expect(state?.params).toStrictEqual({ id: "123" });
     });
@@ -38,14 +38,14 @@ describe("router.buildNavigationState()", () => {
     it("should return State with correct path", () => {
       const state = router.buildNavigationState("items", { id: "456" });
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.path).toBe("/items/456");
     });
 
     it("should return State with correct meta", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.meta).toBeDefined();
       expect(state?.meta?.id).toBeGreaterThanOrEqual(0);
       expect(state?.meta?.params).toBeDefined();
@@ -54,7 +54,7 @@ describe("router.buildNavigationState()", () => {
     it("should return frozen State (immutable)", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(Object.isFrozen(state)).toBe(true);
       expect(Object.isFrozen(state?.params)).toBe(true);
       expect(Object.isFrozen(state?.meta)).toBe(true);
@@ -63,30 +63,30 @@ describe("router.buildNavigationState()", () => {
     it("should return State with meta.options as empty object", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.meta?.options).toStrictEqual({});
     });
 
     it("should return State with meta.redirected as false", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.meta?.redirected).toBe(false);
     });
   });
 
   describe("route not found", () => {
-    it("should return null for non-existent route", () => {
+    it("should return undefined for non-existent route", () => {
       const state = router.buildNavigationState("nonexistent");
 
-      expect(state).toBeNull();
+      expect(state).toBeUndefined();
     });
 
-    it("should return null (not undefined) for non-existent route", () => {
+    it("should return undefined (not null) for non-existent route", () => {
       const state = router.buildNavigationState("nonexistent.route");
 
-      expect(state).toBeNull();
-      expect(state).not.toBeUndefined();
+      expect(state).toBeUndefined();
+      expect(state).not.toBeNull();
     });
   });
 
@@ -100,7 +100,7 @@ describe("router.buildNavigationState()", () => {
 
       const state = router.buildNavigationState("old-route");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.name).toBe("home");
       expect(state?.path).toBe("/home");
     });
@@ -114,7 +114,7 @@ describe("router.buildNavigationState()", () => {
 
       const state = router.buildNavigationState("with-defaults");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.params).toStrictEqual({ id: "default-id" });
     });
   });
@@ -123,7 +123,7 @@ describe("router.buildNavigationState()", () => {
     it("should use empty object when params not provided", () => {
       const state = router.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.params).toStrictEqual({});
     });
   });
@@ -144,10 +144,10 @@ describe("router.buildNavigationState()", () => {
       ).toThrowError(/Invalid routeName/);
     });
 
-    it("should return null for empty string routeName", () => {
+    it("should return undefined for empty string routeName", () => {
       const state = router.buildNavigationState("");
 
-      expect(state).toBeNull();
+      expect(state).toBeUndefined();
     });
 
     it("should throw TypeError for invalid routeParams (string)", () => {
@@ -219,13 +219,13 @@ describe("router.buildNavigationState()", () => {
 
       const state = stoppedRouter.buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.name).toBe("home");
     });
   });
 
   describe("noValidate mode", () => {
-    it("should skip validation and return null for invalid input", () => {
+    it("should skip validation and return undefined for invalid input", () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
       noValidateRouter.start();
@@ -234,7 +234,7 @@ describe("router.buildNavigationState()", () => {
         123 as unknown as string,
       );
 
-      expect(result).toBeNull();
+      expect(result).toBeUndefined();
 
       noValidateRouter.stop();
     });
@@ -245,7 +245,7 @@ describe("router.buildNavigationState()", () => {
       const { buildNavigationState } = router;
       const state = buildNavigationState("home");
 
-      expect(state).not.toBeNull();
+      expect(state).toBeDefined();
       expect(state?.name).toBe("home");
     });
   });

@@ -562,7 +562,7 @@ export class Router<
     return this.#routes.buildStateResolved(name, params);
   }
 
-  buildNavigationState(name: string, params: Params = {}): State | null {
+  buildNavigationState(name: string, params: Params = {}): State | undefined {
     if (!this.#noValidate) {
       RoutesNamespace.validateStateBuilderArgs(
         name,
@@ -574,7 +574,7 @@ export class Router<
     const routeInfo = this.buildState(name, params);
 
     if (!routeInfo) {
-      return null;
+      return undefined;
     }
 
     return this.makeState(
