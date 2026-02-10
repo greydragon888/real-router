@@ -36,6 +36,22 @@ interface LoggerConfig {
 }
 
 /**
+ * Callback function for dynamically resolving the default route.
+ * Receives a dependency getter function to access router dependencies.
+ */
+export type DefaultRouteCallback<Dependencies = object> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+) => string;
+
+/**
+ * Callback function for dynamically resolving the default parameters.
+ * Receives a dependency getter function to access router dependencies.
+ */
+export type DefaultParamsCallback<Dependencies = object> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+) => Params;
+
+/**
  * Router configuration options.
  *
  * Note: For input, use `Partial<Options>` as all fields have defaults.
@@ -48,14 +64,14 @@ export interface Options {
    *
    * @default ""
    */
-  defaultRoute: string;
+  defaultRoute: string | DefaultRouteCallback;
 
   /**
    * Default parameters for the default route.
    *
    * @default {}
    */
-  defaultParams: Params;
+  defaultParams: Params | DefaultParamsCallback;
 
   /**
    * How to handle trailing slashes in URLs.

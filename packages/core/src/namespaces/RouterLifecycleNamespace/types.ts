@@ -67,4 +67,7 @@ export interface RouterLifecycleDependencies {
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,
   ) => State<P, MP> | undefined;
+
+  /** Get a dependency by name (untyped — used only for resolveOption) */
+  getDependency: (name: string) => unknown;
 }

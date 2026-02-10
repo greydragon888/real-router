@@ -134,6 +134,16 @@ export function validateOptionValue(
   value: unknown,
   methodName: string,
 ): void {
+  // Allow callback functions for dynamic default route/params options
+  // MUST be first check — before object branch (L140) which would reject
+  // functions via validatePlainObject for defaultParams (default = {})
+  if (
+    typeof value === "function" &&
+    (optionName === "defaultRoute" || optionName === "defaultParams")
+  ) {
+    return; // Valid — callback resolved at runtime
+  }
+
   const expectedValue = defaultOptions[optionName];
 
   // For object options - ensure plain objects only (not null, arrays, Date, etc)
