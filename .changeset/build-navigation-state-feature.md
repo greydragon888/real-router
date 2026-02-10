@@ -1,6 +1,5 @@
 ---
 "@real-router/core": minor
-"@real-router/types": minor
 ---
 
 Add `buildNavigationState()` and remove `skipTransition` option (#44)
