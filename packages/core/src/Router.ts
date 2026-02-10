@@ -564,12 +564,6 @@ export class Router<
 
   buildNavigationState(name: string, params: Params = {}): State | null {
     if (!this.#noValidate) {
-      if (name === "") {
-        throw new TypeError(
-          `[router.buildNavigationState] Invalid routeName: "". Expected non-empty string.`,
-        );
-      }
-
       RoutesNamespace.validateStateBuilderArgs(
         name,
         params,

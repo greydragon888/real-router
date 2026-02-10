@@ -1,4 +1,6 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+
+import { events } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -142,11 +144,10 @@ describe("router.buildNavigationState()", () => {
       ).toThrowError(/Invalid routeName/);
     });
 
-    it("should throw TypeError for empty string routeName", () => {
-      expect(() => router.buildNavigationState("")).toThrowError(TypeError);
-      expect(() => router.buildNavigationState("")).toThrowError(
-        /Invalid routeName/,
-      );
+    it("should return null for empty string routeName", () => {
+      const state = router.buildNavigationState("");
+
+      expect(state).toBeNull();
     });
 
     it("should throw TypeError for invalid routeParams (string)", () => {
@@ -174,16 +175,66 @@ describe("router.buildNavigationState()", () => {
     });
   });
 
+  describe("no side effects (pure function)", () => {
+    it("should not change router state", () => {
+      router.navigate("users", {}, {}, () => {});
+
+      const stateBefore = router.getState();
+
+      router.buildNavigationState("orders");
+
+      const stateAfter = router.getState();
+
+      expect(stateAfter).toBe(stateBefore);
+    });
+
+    it("should not emit any transition events", () => {
+      const onStart = vi.fn();
+      const onSuccess = vi.fn();
+      const onError = vi.fn();
+
+      const unsub1 = router.addEventListener(events.TRANSITION_START, onStart);
+      const unsub2 = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
+      const unsub3 = router.addEventListener(events.TRANSITION_ERROR, onError);
+
+      router.buildNavigationState("home");
+      router.buildNavigationState("nonexistent");
+
+      expect(onStart).not.toHaveBeenCalled();
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+
+      unsub1();
+      unsub2();
+      unsub3();
+    });
+  });
+
+  describe("stopped router", () => {
+    it("should work when router is not started", () => {
+      const stoppedRouter = createTestRouter();
+
+      const state = stoppedRouter.buildNavigationState("home");
+
+      expect(state).not.toBeNull();
+      expect(state?.name).toBe("home");
+    });
+  });
+
   describe("noValidate mode", () => {
-    it("should skip validation when noValidate is true", () => {
+    it("should skip validation and return null for invalid input", () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
       noValidateRouter.start();
 
-      // Should not throw even with invalid input
-      expect(() =>
-        noValidateRouter.buildNavigationState(123 as unknown as string),
-      ).not.toThrowError();
+      const result = noValidateRouter.buildNavigationState(
+        123 as unknown as string,
+      );
+
+      expect(result).toBeNull();
 
       noValidateRouter.stop();
     });
