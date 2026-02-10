@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-10]
 
+### @real-router/core@0.12.0
+
+### Minor Changes
+
+- [#75](https://github.com/greydragon888/real-router/pull/75) [`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95) Thanks [@greydragon888](https://github.com/greydragon888)! - Add dynamic `forwardTo` callback support (#43)
+
+  `forwardTo` now accepts `string | ForwardToCallback<Dependencies>` — a sync callback receiving `(getDependency, params)` that returns a target route name at navigation time. Enables role-based routing, feature flags, A/B testing, and tenant-specific routing.
+  - Separate storage: `forwardMap` (static, O(1) cached) + `forwardFnMap` (dynamic, resolved per-navigation)
+  - Mixed chain support: static-to-dynamic, dynamic-to-static, dynamic-to-dynamic
+  - Runtime validation: return type, target existence, cycle detection (visited Set, max depth 100)
+  - Sync-only enforcement: async callbacks rejected at registration (even with `noValidate: true`)
+  - Full support in `addRoute`, `updateRoute`, `removeRoute`, `clearRoutes`, `clone`, `matchPath`, `buildState`
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/types@0.7.0
+
+### @real-router/types@0.7.0
+
+### Minor Changes
+
+- [#75](https://github.com/greydragon888/real-router/pull/75) [`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `ForwardToCallback` type for dynamic route forwarding (#43)
+
+  New generic type `ForwardToCallback<Dependencies>` — a sync callback `(getDependency, params) => string` that enables runtime-conditional route forwarding.
+
+### @real-router/browser-plugin@0.1.15
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+
+### @real-router/helpers@0.1.15
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+
+### @real-router/logger-plugin@0.2.15
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+
+### @real-router/persistent-params-plugin@0.1.15
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+
+### @real-router/react@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+  - @real-router/browser-plugin@0.1.15
+  - @real-router/helpers@0.1.15
+
+### @real-router/rx@0.1.4
+
+### Patch Changes
+
+- Updated dependencies [[`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95)]:
+  - @real-router/core@0.12.0
+
+
 ### @real-router/core@0.11.0
 
 ### Minor Changes
