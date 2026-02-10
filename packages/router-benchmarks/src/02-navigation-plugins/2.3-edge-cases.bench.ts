@@ -110,25 +110,6 @@ const alternatingRoutes = ["about", "home"];
   }).gc("inner");
 }
 
-// 2.3.7 Combining skipTransition with middleware
-{
-  const router = createSimpleRouter();
-  let index = 0;
-
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
-  router.start("/");
-
-  bench("2.3.7 Combining skipTransition with middleware", () => {
-    router.navigate(
-      alternatingRoutes[index++ % 2],
-      {},
-      { skipTransition: true },
-    );
-  }).gc("inner");
-}
-
 // 2.3.8 Combining forceDeactivate with canDeactivate guards
 {
   const router = createSimpleRouter();

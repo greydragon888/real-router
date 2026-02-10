@@ -317,25 +317,6 @@ describe("router.navigate() - events transition start", () => {
       });
     });
 
-    it("should not emit TRANSITION_START when skipTransition option is set", () => {
-      const onStart = vi.fn();
-
-      const unsubStart = router.addEventListener(
-        events.TRANSITION_START,
-        onStart,
-      );
-
-      router.navigate("users", {}, { skipTransition: true }, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("users");
-
-        // TRANSITION_START should not be emitted when skipTransition is true
-        expect(onStart).not.toHaveBeenCalled();
-      });
-
-      unsubStart();
-    });
-
     it("should not emit TRANSITION_START when navigation to same state without force/reload", () => {
       const onStart = vi.fn();
 

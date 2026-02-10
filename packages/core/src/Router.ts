@@ -216,6 +216,7 @@ export class Router<
     this.areStatesEqual = this.areStatesEqual.bind(this);
     this.forwardState = this.forwardState.bind(this);
     this.buildState = this.buildState.bind(this);
+    this.buildNavigationState = this.buildNavigationState.bind(this);
     this.shouldUpdateNode = this.shouldUpdateNode.bind(this);
 
     // Options
@@ -559,6 +560,33 @@ export class Router<
     const { name, params } = this.forwardState(routeName, routeParams);
 
     return this.#routes.buildStateResolved(name, params);
+  }
+
+  buildNavigationState(name: string, params: Params = {}): State | undefined {
+    if (!this.#noValidate) {
+      RoutesNamespace.validateStateBuilderArgs(
+        name,
+        params,
+        "buildNavigationState",
+      );
+    }
+
+    const routeInfo = this.buildState(name, params);
+
+    if (!routeInfo) {
+      return undefined;
+    }
+
+    return this.makeState(
+      routeInfo.name,
+      routeInfo.params,
+      this.buildPath(routeInfo.name, routeInfo.params),
+      {
+        params: routeInfo.meta,
+        options: {},
+        redirected: false,
+      },
+    );
   }
 
   shouldUpdateNode(

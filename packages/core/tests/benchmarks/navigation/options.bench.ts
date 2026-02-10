@@ -2,7 +2,7 @@
  * Navigation options benchmarks
  *
  * Tests navigation with various options:
- * - reload, force, replace, skipTransition flags
+ * - reload, force, replace flags
  * - URL encoding options
  * - Trailing slash modes
  * - Case sensitivity
@@ -58,25 +58,6 @@ boxplot(() => {
             SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length],
             {},
             { force: true },
-          ),
-        );
-      }).gc("inner");
-    }
-
-    // 1.2.12 Navigation with skipTransition flag
-    {
-      const router = createSimpleRouter();
-
-      router.start();
-
-      let i = 0;
-
-      bench("navigate: skipTransition flag", () => {
-        do_not_optimize(
-          router.navigate(
-            SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length],
-            {},
-            { skipTransition: true },
           ),
         );
       }).gc("inner");
