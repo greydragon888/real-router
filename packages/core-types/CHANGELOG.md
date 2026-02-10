@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.7.0
+
+### Minor Changes
+
+- [#75](https://github.com/greydragon888/real-router/pull/75) [`c1ef6aa`](https://github.com/greydragon888/real-router/commit/c1ef6aac004b67b51b534f071992583393379d95) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `ForwardToCallback` type for dynamic route forwarding (#43)
+
+  New generic type `ForwardToCallback<Dependencies>` — a sync callback `(getDependency, params) => string` that enables runtime-conditional route forwarding.
+
 ## 0.6.0
 
 ### Minor Changes
