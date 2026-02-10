@@ -396,6 +396,71 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("area")).toBe(false);
       expect(router.hasRoute("area.page")).toBe(false);
     });
+
+    it("should remove route with dynamic forwardTo", () => {
+      router.addRoute({ name: "fn-target", path: "/fn-target" });
+      router.addRoute({
+        name: "fn-forward",
+        path: "/fn-forward",
+        forwardTo: () => "fn-target",
+      });
+
+      expect(router.forwardState("fn-forward", {}).name).toBe("fn-target");
+
+      const fnForwardRoute = router.getRoute("fn-forward");
+
+      expect(typeof fnForwardRoute?.forwardTo).toBe("function");
+
+      router.removeRoute("fn-forward");
+
+      expect(router.hasRoute("fn-forward")).toBe(false);
+    });
+
+    it("should not leak forwardFnMap entry after removeRoute and re-add", () => {
+      router.addRoute({ name: "re-target", path: "/re-target" });
+      router.addRoute({
+        name: "re-forward",
+        path: "/re-forward",
+        forwardTo: () => "re-target",
+      });
+
+      expect(router.forwardState("re-forward", {}).name).toBe("re-target");
+
+      router.removeRoute("re-forward");
+
+      // Re-add without forwardTo — should NOT have old dynamic forward
+      router.addRoute({ name: "re-forward", path: "/re-forward" });
+
+      expect(router.forwardState("re-forward", {}).name).toBe("re-forward");
+    });
+
+    it("should clear child forwardFnMap when parent removed", () => {
+      router.addRoute({ name: "fn-dest", path: "/fn-dest" });
+      router.addRoute({
+        name: "fn-parent",
+        path: "/fn-parent",
+        children: [
+          { name: "child", path: "/child", forwardTo: () => "fn-dest" },
+        ],
+      });
+
+      // Verify child forward works
+      expect(router.forwardState("fn-parent.child", {}).name).toBe("fn-dest");
+
+      // Remove parent — child forwardFnMap should be cleared
+      router.removeRoute("fn-parent");
+
+      // Re-add without forwardTo
+      router.addRoute({
+        name: "fn-parent",
+        path: "/fn-parent",
+        children: [{ name: "child", path: "/child" }],
+      });
+
+      expect(router.forwardState("fn-parent.child", {}).name).toBe(
+        "fn-parent.child",
+      );
+    });
   });
 
   describe("early exit optimization (non-existent route)", () => {

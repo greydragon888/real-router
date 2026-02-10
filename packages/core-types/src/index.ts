@@ -27,6 +27,7 @@ export type {
 export type {
   Options,
   DefaultRouteCallback,
+  ForwardToCallback,
   DefaultParamsCallback,
   ActivationFn,
   DefaultDependencies,

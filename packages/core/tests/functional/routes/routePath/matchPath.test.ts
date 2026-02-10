@@ -826,4 +826,20 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.path).toBe("/item/42");
     });
   });
+
+  describe("forwardTo function", () => {
+    it("should resolve dynamic forwardTo during matchPath", () => {
+      router.addRoute({ name: "match-target", path: "/match-target" });
+      router.addRoute({
+        name: "match-forward",
+        path: "/match-forward",
+        forwardTo: () => "match-target",
+      });
+
+      const state = router.matchPath("/match-forward");
+
+      expect(state?.name).toBe("match-target");
+      expect(state?.path).toBe("/match-target");
+    });
+  });
 });

@@ -168,10 +168,27 @@ export function validateUpdateRoutePropertyTypes(
   encodeParams: unknown,
 ): void {
   // Validate forwardTo type (existence check is done by instance method)
-  if (forwardTo !== undefined && forwardTo !== null && !isString(forwardTo)) {
-    throw new TypeError(
-      `[real-router] updateRoute: forwardTo must be a string or null, got ${getTypeDescription(forwardTo)}`,
-    );
+  if (forwardTo !== undefined && forwardTo !== null) {
+    if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
+      throw new TypeError(
+        `[real-router] updateRoute: forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
+      );
+    }
+
+    // Async check for function forwardTo (both native and transpiled)
+    /* v8 ignore next 9 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
+    if (
+      typeof forwardTo === "function" &&
+      ((forwardTo as { constructor: { name: string } }).constructor.name ===
+        "AsyncFunction" ||
+        (forwardTo as { toString: () => string })
+          .toString()
+          .includes("__awaiter"))
+    ) {
+      throw new TypeError(
+        `[real-router] updateRoute: forwardTo callback cannot be async`,
+      );
+    }
   }
 
   // Validate defaultParams

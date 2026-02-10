@@ -37,8 +37,10 @@ export type RouterFactory<Dependencies extends DefaultDependencies> = (
 /**
  * Function to apply route config to a new router.
  */
-export type ApplyConfigFn = (
-  router: Router,
+export type ApplyConfigFn<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = (
+  router: Router<Dependencies>,
   config: RouteConfig,
   resolvedForwardMap: Record<string, string>,
 ) => void;

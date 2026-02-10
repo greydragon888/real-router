@@ -1021,6 +1021,7 @@ export class Router<
 
     // RoutesNamespace uses function injection (will register pending canActivate handlers)
     // Use facade method for proper validation
+
     const routesDeps: RoutesDependencies<Dependencies> = {
       canActivate: (name, handler) => {
         this.canActivate(name, handler);
@@ -1030,6 +1031,7 @@ export class Router<
       getState: () => this.#state.get(),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
+      getDependency: (name) => this.#dependencies.get(name),
     };
 
     this.#routes.setDependencies(routesDeps);
@@ -1188,6 +1190,7 @@ export class Router<
         Object.assign(newConfig.encoders, config.encoders);
         Object.assign(newConfig.defaultParams, config.defaultParams);
         Object.assign(newConfig.forwardMap, config.forwardMap);
+        Object.assign(newConfig.forwardFnMap, config.forwardFnMap);
 
         typedRouter.#routes.setResolvedForwardMap({ ...resolvedForwardMap });
       },

@@ -11,6 +11,7 @@ import type { Router } from "./Router";
 import type {
   ActivationFn,
   DefaultDependencies,
+  ForwardToCallback,
   LimitsConfig,
   Middleware,
   Params,
@@ -65,7 +66,7 @@ export interface Route<
    * // Wrong: guard on source (will be ignored with warning)
    * { name: "old", path: "/old", forwardTo: "new", canActivate: myGuard }
    */
-  forwardTo?: string;
+  forwardTo?: string | ForwardToCallback<Dependencies>;
   /** Nested child routes. */
   children?: Route<Dependencies>[];
   /** Encodes state params to URL params. */
@@ -111,7 +112,7 @@ export interface RouteConfigUpdate<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   /** Set to null to remove forwardTo */
-  forwardTo?: string | null;
+  forwardTo?: string | ForwardToCallback<Dependencies> | null;
   /** Set to null to remove defaultParams */
   defaultParams?: Params | null;
   /** Set to null to remove decoder */
