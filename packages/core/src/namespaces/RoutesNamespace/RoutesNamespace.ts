@@ -468,6 +468,10 @@ export class RoutesNamespace<
       delete this.#config.forwardMap[key];
     }
 
+    for (const key in this.#config.forwardFnMap) {
+      delete this.#config.forwardFnMap[key];
+    }
+
     // Clear forward cache
     for (const key in this.#resolvedForwardMap) {
       delete this.#resolvedForwardMap[key];
@@ -570,95 +574,6 @@ export class RoutesNamespace<
       source,
       redirected: false,
     });
-  }
-
-  /**
-   * Merges route's defaultParams with provided params.
-   */
-  #mergeDefaultParams<P extends Params = Params>(
-    routeName: string,
-    params: P,
-  ): P {
-    if (Object.hasOwn(this.#config.defaultParams, routeName)) {
-      return { ...this.#config.defaultParams[routeName], ...params } as P;
-    }
-
-    return params;
-  }
-
-  /**
-   * Resolves dynamic forwardTo chain with cycle detection and max depth.
-   * Throws if cycle detected, max depth exceeded, or invalid return type.
-   */
-  #resolveDynamicForward(
-    startName: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    startFn: ForwardToCallback<any>,
-    params: Params,
-  ): string {
-    const visited = new Set<string>([startName]);
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    let current = startFn(this.#deps.getDependency as any, params);
-    let depth = 0;
-    const MAX_DEPTH = 100;
-
-    // Validate initial return type
-    if (typeof current !== "string") {
-      throw new TypeError(
-        `forwardTo callback must return a string, got ${typeof current}`,
-      );
-    }
-
-    while (depth < MAX_DEPTH) {
-      // Check if target route exists
-
-      if (this.#matcher.getSegmentsByName(current) === undefined) {
-        throw new Error(`Route "${current}" does not exist`);
-      }
-
-      // Check for cycle
-      if (visited.has(current)) {
-        const chain = [...visited, current].join(" → ");
-
-        throw new Error(`Circular forwardTo detected: ${chain}`);
-      }
-
-      visited.add(current);
-
-      // Check if current has dynamic forward
-      if (Object.hasOwn(this.#config.forwardFnMap, current)) {
-        const fn = this.#config.forwardFnMap[current];
-
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-        current = fn(this.#deps.getDependency as any, params);
-
-        /* v8 ignore next 4 -- @preserve: defensive check, validated at registration */
-        if (typeof current !== "string") {
-          throw new TypeError(
-            `forwardTo callback must return a string, got ${typeof current}`,
-          );
-        }
-
-        depth++;
-        continue;
-      }
-
-      // Check if current has static forward
-      const staticForward = this.#config.forwardMap[current];
-
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (staticForward !== undefined) {
-        current = staticForward;
-        depth++;
-        continue;
-      }
-
-      // No more forwards - return current
-      return current;
-    }
-
-    throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
   }
 
   /**
@@ -1092,6 +1007,95 @@ export class RoutesNamespace<
   // Private methods
   // =========================================================================
 
+  /**
+   * Merges route's defaultParams with provided params.
+   */
+  #mergeDefaultParams<P extends Params = Params>(
+    routeName: string,
+    params: P,
+  ): P {
+    if (Object.hasOwn(this.#config.defaultParams, routeName)) {
+      return { ...this.#config.defaultParams[routeName], ...params } as P;
+    }
+
+    return params;
+  }
+
+  /**
+   * Resolves dynamic forwardTo chain with cycle detection and max depth.
+   * Throws if cycle detected, max depth exceeded, or invalid return type.
+   */
+  #resolveDynamicForward(
+    startName: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    startFn: ForwardToCallback<any>,
+    params: Params,
+  ): string {
+    const visited = new Set<string>([startName]);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+    let current = startFn(this.#deps.getDependency as any, params);
+    let depth = 0;
+    const MAX_DEPTH = 100;
+
+    // Validate initial return type
+    if (typeof current !== "string") {
+      throw new TypeError(
+        `forwardTo callback must return a string, got ${typeof current}`,
+      );
+    }
+
+    while (depth < MAX_DEPTH) {
+      // Check if target route exists
+
+      if (this.#matcher.getSegmentsByName(current) === undefined) {
+        throw new Error(`Route "${current}" does not exist`);
+      }
+
+      // Check for cycle
+      if (visited.has(current)) {
+        const chain = [...visited, current].join(" → ");
+
+        throw new Error(`Circular forwardTo detected: ${chain}`);
+      }
+
+      visited.add(current);
+
+      // Check if current has dynamic forward
+      if (Object.hasOwn(this.#config.forwardFnMap, current)) {
+        const fn = this.#config.forwardFnMap[current];
+
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+        current = fn(this.#deps.getDependency as any, params);
+
+        /* v8 ignore next 4 -- @preserve: defensive check, validated at registration */
+        if (typeof current !== "string") {
+          throw new TypeError(
+            `forwardTo callback must return a string, got ${typeof current}`,
+          );
+        }
+
+        depth++;
+        continue;
+      }
+
+      // Check if current has static forward
+      const staticForward = this.#config.forwardMap[current];
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (staticForward !== undefined) {
+        current = staticForward;
+        depth++;
+        continue;
+      }
+
+      // No more forwards - return current
+      return current;
+    }
+
+    throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
+  }
+
   #rebuildTree(): void {
     this.#tree = createRouteTree(
       DEFAULT_ROUTE_NAME,
@@ -1226,6 +1230,7 @@ export class RoutesNamespace<
     clearConfigEntries(this.#config.encoders, shouldClear);
     clearConfigEntries(this.#config.defaultParams, shouldClear);
     clearConfigEntries(this.#config.forwardMap, shouldClear);
+    clearConfigEntries(this.#config.forwardFnMap, shouldClear);
 
     // Clear forwardMap entries pointing TO deleted route
     clearConfigEntries(this.#config.forwardMap, (key) =>

@@ -1022,28 +1022,17 @@ export class Router<
     // RoutesNamespace uses function injection (will register pending canActivate handlers)
     // Use facade method for proper validation
 
-    const routesDeps = {
-      canActivate: (
-        name: string,
-        handler: ActivationFnFactory<Dependencies>,
-      ) => {
+    const routesDeps: RoutesDependencies<Dependencies> = {
+      canActivate: (name, handler) => {
         this.canActivate(name, handler);
       },
-      makeState: (
-        name: string,
-        params?: Params,
-        path?: string,
-        meta?: StateMetaInput,
-      ) => this.#state.makeState(name, params, path, meta),
+      makeState: (name, params, path, meta) =>
+        this.#state.makeState(name, params, path, meta),
       getState: () => this.#state.get(),
-      areStatesEqual: (
-        state1?: State,
-        state2?: State,
-        ignoreQueryParams?: boolean,
-      ) => this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
-      getDependency: (name: string) =>
-        this.#dependencies.get(name as keyof Dependencies),
-    } as RoutesDependencies<Dependencies>;
+      areStatesEqual: (state1, state2, ignoreQueryParams) =>
+        this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
+      getDependency: (name) => this.#dependencies.get(name),
+    };
 
     this.#routes.setDependencies(routesDeps);
     this.#routes.setLifecycleNamespace(this.#routeLifecycle);

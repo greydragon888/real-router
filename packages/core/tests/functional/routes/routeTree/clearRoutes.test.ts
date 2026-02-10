@@ -688,4 +688,27 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/dashboard")).toBeUndefined();
     });
   });
+
+  describe("forwardFnMap cleanup", () => {
+    it("should clear forwardFnMap entries on clearRoutes", () => {
+      router.addRoute({ name: "fn-dest", path: "/fn-dest" });
+      router.addRoute({
+        name: "fn-src",
+        path: "/fn-src",
+        forwardTo: () => "fn-dest",
+      });
+
+      expect(router.forwardState("fn-src", {}).name).toBe("fn-dest");
+
+      router.clearRoutes();
+
+      // Re-add routes without forwardTo — should NOT have old dynamic forward
+      router.addRoute([
+        { name: "fn-dest", path: "/fn-dest" },
+        { name: "fn-src", path: "/fn-src" },
+      ]);
+
+      expect(router.forwardState("fn-src", {}).name).toBe("fn-src");
+    });
+  });
 });

@@ -176,6 +176,7 @@ export function validateUpdateRoutePropertyTypes(
     }
 
     // Async check for function forwardTo (both native and transpiled)
+    /* v8 ignore next 9 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
     if (
       typeof forwardTo === "function" &&
       ((forwardTo as { constructor: { name: string } }).constructor.name ===
@@ -184,7 +185,6 @@ export function validateUpdateRoutePropertyTypes(
           .toString()
           .includes("__awaiter"))
     ) {
-      /* v8 ignore next 3 -- @preserve: transpiled async tested in addRoute */
       throw new TypeError(
         `[real-router] updateRoute: forwardTo callback cannot be async`,
       );
