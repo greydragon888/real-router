@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-10]
 
+### @real-router/core@0.13.0
+
+### Minor Changes
+
+- [#78](https://github.com/greydragon888/real-router/pull/78) [`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `buildNavigationState()` and remove `skipTransition` option (#44)
+
+  **Breaking Change:** The `skipTransition` option has been removed from `NavigationOptions`.
+
+  **New API:**
+
+  ```typescript
+  // Pure function — returns State without navigating
+  const state = router.buildNavigationState("users.view", { id: 123 });
+  if (state) {
+    console.log(state.path); // '/users/view/123'
+  }
+  // Returns undefined if route not found
+  ```
+
+  **Migration from `skipTransition`:**
+
+  ```typescript
+  // Before
+  router.navigate('route', params, { skipTransition: true }, (err, state) => { ... });
+
+  // After
+  const state = router.buildNavigationState('route', params);
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/types@0.8.0
+
+### @real-router/types@0.8.0
+
+### Minor Changes
+
+- [#78](https://github.com/greydragon888/real-router/pull/78) [`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `skipTransition` from `NavigationOptions` type (#44)
+
+  **Breaking Change:** The `skipTransition` field has been removed from the `NavigationOptions` interface.
+
+### @real-router/browser-plugin@0.1.16
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+
+### @real-router/helpers@0.1.16
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+
+### @real-router/logger-plugin@0.2.16
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+
+### @real-router/persistent-params-plugin@0.1.16
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+
+### @real-router/react@0.2.7
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+  - @real-router/browser-plugin@0.1.16
+  - @real-router/helpers@0.1.16
+
+### @real-router/rx@0.1.5
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/core@0.13.0
+
+
 ### @real-router/core@0.12.0
 
 ### Minor Changes
