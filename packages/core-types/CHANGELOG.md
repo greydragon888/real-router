@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.8.0
+
+### Minor Changes
+
+- [#78](https://github.com/greydragon888/real-router/pull/78) [`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `skipTransition` from `NavigationOptions` type (#44)
+
+  **Breaking Change:** The `skipTransition` field has been removed from the `NavigationOptions` interface.
+
 ## 0.7.0
 
 ### Minor Changes

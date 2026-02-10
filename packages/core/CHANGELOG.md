@@ -1,5 +1,39 @@
 # @real-router/core
 
+## 0.13.0
+
+### Minor Changes
+
+- [#78](https://github.com/greydragon888/real-router/pull/78) [`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `buildNavigationState()` and remove `skipTransition` option (#44)
+
+  **Breaking Change:** The `skipTransition` option has been removed from `NavigationOptions`.
+
+  **New API:**
+
+  ```typescript
+  // Pure function — returns State without navigating
+  const state = router.buildNavigationState("users.view", { id: 123 });
+  if (state) {
+    console.log(state.path); // '/users/view/123'
+  }
+  // Returns undefined if route not found
+  ```
+
+  **Migration from `skipTransition`:**
+
+  ```typescript
+  // Before
+  router.navigate('route', params, { skipTransition: true }, (err, state) => { ... });
+
+  // After
+  const state = router.buildNavigationState('route', params);
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`f57f780`](https://github.com/greydragon888/real-router/commit/f57f78019afde605d693acdfea287eac4aee224a)]:
+  - @real-router/types@0.8.0
+
 ## 0.12.0
 
 ### Minor Changes
