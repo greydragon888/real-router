@@ -701,6 +701,35 @@ describe("router.clone()", () => {
       router.stop();
       clonedRouter.stop();
     });
+
+    it("should preserve canDeactivate from route config", () => {
+      const router = createTestRouter();
+      const guard = vi.fn().mockReturnValue(false);
+
+      router.addRoute({
+        name: "workspace",
+        path: "/workspace",
+        canDeactivate: () => guard,
+      });
+
+      const clonedRouter = router.clone();
+
+      clonedRouter.start("/");
+
+      clonedRouter.navigate("workspace", (err) => {
+        expect(err).toBeUndefined();
+
+        guard.mockClear();
+
+        clonedRouter.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(guard).toHaveBeenCalled();
+        });
+      });
+
+      router.stop();
+      clonedRouter.stop();
+    });
   });
 
   describe("forwardFnMap cloning", () => {
