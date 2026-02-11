@@ -1,5 +1,42 @@
 # @real-router/core
 
+## 0.14.0
+
+### Minor Changes
+
+- [#80](https://github.com/greydragon888/real-router/pull/80) [`f8eabef`](https://github.com/greydragon888/real-router/commit/f8eabef39ba72d1d5e3bab0b05ffb9c0241dc36d) Thanks [@greydragon888](https://github.com/greydragon888)! - Rename guard API and add route accessibility checks (#42)
+
+  ## New Methods
+  - **`addActivateGuard(name, guard)`** — Registers activation guard for a route.
+  - **`addDeactivateGuard(name, guard)`** — Registers deactivation guard for a route.
+  - **`removeActivateGuard(name)`** — Removes previously registered activation guard.
+  - **`removeDeactivateGuard(name)`** — Removes previously registered deactivation guard.
+  - **`canNavigateTo(name, params?)`** — Synchronously checks if navigation to a route would be allowed by guards. Returns `boolean`.
+
+  ## Removed (Breaking)
+  - **`canActivate(name, guard)`** — Removed. Use `addActivateGuard()` instead.
+  - **`canDeactivate(name, guard)`** — Removed. Use `addDeactivateGuard()` instead.
+
+  ## Enhanced
+  - **`getNavigator()`** — Navigator now includes `canNavigateTo` as 5th method.
+
+  ## Migration
+
+  ```diff
+  - router.canActivate('admin', guard)
+  + router.addActivateGuard('admin', guard)
+
+  - router.canDeactivate('editor', guard)
+  + router.addDeactivateGuard('editor', guard)
+  ```
+
+  **Note:** Route config field `canActivate` in route definitions does NOT change.
+
+### Patch Changes
+
+- Updated dependencies [[`f8eabef`](https://github.com/greydragon888/real-router/commit/f8eabef39ba72d1d5e3bab0b05ffb9c0241dc36d)]:
+  - @real-router/types@0.9.0
+
 ## 0.13.0
 
 ### Minor Changes

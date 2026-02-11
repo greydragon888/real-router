@@ -1,5 +1,14 @@
 # @real-router/types
 
+## 0.9.0
+
+### Minor Changes
+
+- [#80](https://github.com/greydragon888/real-router/pull/80) [`f8eabef`](https://github.com/greydragon888/real-router/commit/f8eabef39ba72d1d5e3bab0b05ffb9c0241dc36d) Thanks [@greydragon888](https://github.com/greydragon888)! - Add guard API and Navigator type signatures (#42)
+  - Add `addActivateGuard`, `addDeactivateGuard`, `removeActivateGuard`, `removeDeactivateGuard` to Router interface.
+  - Add `canNavigateTo` to Router and Navigator interfaces.
+  - Remove deprecated `canActivate` and `canDeactivate` from Router interface.
+
 ## 0.8.0
 
 ### Minor Changes
