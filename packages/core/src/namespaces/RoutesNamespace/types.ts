@@ -24,6 +24,12 @@ export interface RoutesDependencies<
     handler: ActivationFnFactory<Dependencies>,
   ) => void;
 
+  /** Register canDeactivate handler for a route */
+  addDeactivateGuard: (
+    name: string,
+    handler: ActivationFnFactory<Dependencies>,
+  ) => void;
+
   /** Create state object */
   makeState: <P extends Params = Params, MP extends Params = Params>(
     name: string,

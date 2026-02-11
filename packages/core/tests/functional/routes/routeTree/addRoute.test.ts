@@ -5,7 +5,12 @@ import { createRouter } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Params, Route, Router } from "@real-router/core";
+import type {
+  ActivationFnFactory,
+  Params,
+  Route,
+  Router,
+} from "@real-router/core";
 
 let router: Router;
 
@@ -1609,6 +1614,203 @@ describe("core/routes/addRoute", () => {
           forwardTo: transpiledAsync,
         });
       }).toThrowError(/cannot be async/);
+    });
+  });
+
+  describe("canDeactivate", () => {
+    it("should add canDeactivate that blocks navigation", () => {
+      const guard = vi.fn().mockReturnValue(false);
+      const guardFactory: ActivationFnFactory = () => guard;
+
+      router.addRoute({
+        name: "editor",
+        path: "/editor",
+        canDeactivate: guardFactory,
+      });
+
+      // Navigate TO route (should succeed)
+      router.navigate("editor", (err) => {
+        expect(err).toBeUndefined();
+        expect(router.getState()?.name).toBe("editor");
+
+        guard.mockClear();
+
+        // Navigate AWAY from route (should fail)
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe("CANNOT_DEACTIVATE");
+          expect(guard).toHaveBeenCalled();
+          expect(router.getState()?.name).toBe("editor"); // Still on editor
+        });
+      });
+    });
+
+    it("should add canDeactivate that allows navigation", () => {
+      const guard = vi.fn().mockReturnValue(true);
+      const guardFactory: ActivationFnFactory = () => guard;
+
+      router.addRoute({
+        name: "form",
+        path: "/form",
+        canDeactivate: guardFactory,
+      });
+
+      // Navigate TO route
+      router.navigate("form", (err) => {
+        expect(err).toBeUndefined();
+
+        guard.mockClear();
+
+        // Navigate AWAY from route (should succeed)
+        router.navigate("home", (err) => {
+          expect(err).toBeUndefined();
+          expect(guard).toHaveBeenCalled();
+          expect(router.getState()?.name).toBe("home");
+        });
+      });
+    });
+
+    it("should fire canDeactivate for all nested levels in reverse order", () => {
+      const parentGuard = vi.fn().mockReturnValue(true);
+      const childGuard = vi.fn().mockReturnValue(true);
+
+      router.addRoute({
+        name: "dashboard",
+        path: "/dashboard",
+        canDeactivate: () => parentGuard,
+        children: [
+          {
+            name: "settings",
+            path: "/settings",
+            canDeactivate: () => childGuard,
+          },
+        ],
+      });
+
+      // Navigate to child
+      router.navigate("dashboard.settings", (err) => {
+        expect(err).toBeUndefined();
+
+        parentGuard.mockClear();
+        childGuard.mockClear();
+
+        // Navigate away - both guards should fire, child first
+        router.navigate("home", (err) => {
+          expect(err).toBeUndefined();
+
+          // Both guards were called
+          expect(childGuard).toHaveBeenCalled();
+          expect(parentGuard).toHaveBeenCalled();
+
+          // Child guard called before parent (reverse order)
+          const childCallOrder = childGuard.mock.invocationCallOrder[0];
+          const parentCallOrder = parentGuard.mock.invocationCallOrder[0];
+
+          expect(childCallOrder).toBeLessThan(parentCallOrder);
+        });
+      });
+    });
+
+    it("should allow addDeactivateGuard to overwrite route config canDeactivate", () => {
+      const guard1 = vi.fn().mockReturnValue(false);
+      const guard2 = vi.fn().mockReturnValue(true);
+
+      router.addRoute({
+        name: "workspace",
+        path: "/workspace",
+        canDeactivate: () => guard1,
+      });
+
+      // Overwrite with addDeactivateGuard
+      router.addDeactivateGuard("workspace", () => guard2);
+
+      // Navigate to route
+      router.navigate("workspace", (err) => {
+        expect(err).toBeUndefined();
+
+        guard1.mockClear();
+        guard2.mockClear();
+
+        // Navigate away - guard2 should fire, guard1 should NOT
+        router.navigate("home", (err) => {
+          expect(err).toBeUndefined();
+          expect(guard2).toHaveBeenCalled();
+          expect(guard1).not.toHaveBeenCalled();
+        });
+      });
+    });
+
+    it("should return canDeactivate from getRoute() after addRoute", () => {
+      const guardFactory: ActivationFnFactory = () => () => true;
+
+      router.addRoute({
+        name: "account-settings",
+        path: "/account-settings",
+        canDeactivate: guardFactory,
+      });
+
+      const route = router.getRoute("account-settings");
+
+      expect(route).toBeDefined();
+      expect(route?.canDeactivate).toBe(guardFactory);
+    });
+
+    it("should register canDeactivate from constructor routes (pending flush)", () => {
+      const guard = vi.fn().mockReturnValue(false);
+      const guardFactory: ActivationFnFactory = () => guard;
+
+      // Create router with canDeactivate in constructor
+      const testRouter = createRouter([
+        { name: "home", path: "/" },
+        { name: "users", path: "/users" },
+        {
+          name: "document",
+          path: "/document",
+          canDeactivate: guardFactory,
+        },
+      ]);
+
+      // Start router - this flushes pendingCanDeactivate
+      testRouter.start("/");
+
+      // Navigate to document
+      testRouter.navigate("document", (err) => {
+        expect(err).toBeUndefined();
+
+        guard.mockClear();
+
+        // Navigate away - canDeactivate should fire (proves flush worked)
+        testRouter.navigate("home", (err) => {
+          expect(err?.code).toBe("CANNOT_DEACTIVATE");
+          expect(guard).toHaveBeenCalled();
+        });
+      });
+
+      testRouter.stop();
+    });
+
+    it("should warn when route has both forwardTo and canDeactivate", () => {
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+      router.addRoute([
+        {
+          name: "old-page",
+          path: "/old-page",
+          forwardTo: "new-page",
+          canDeactivate: () => () => true, // Will be ignored
+        },
+        { name: "new-page", path: "/new-page" },
+      ]);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "real-router",
+        expect.stringContaining("forwardTo and canDeactivate"),
+      );
+      expect(warnSpy).toHaveBeenCalledWith(
+        "real-router",
+        expect.stringContaining("old-page"),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 });

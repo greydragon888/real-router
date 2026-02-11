@@ -496,6 +496,87 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
   });
 
+  describe("canDeactivate", () => {
+    it("should add canDeactivate", () => {
+      const guard = vi.fn().mockReturnValue(false);
+      const guardFactory: ActivationFnFactory = () => guard;
+
+      router.addRoute({ name: "ur-editor", path: "/ur-editor" });
+      router.updateRoute("ur-editor", { canDeactivate: guardFactory });
+
+      // Navigate to route
+      router.navigate("ur-editor", (err) => {
+        expect(err).toBeUndefined();
+
+        guard.mockClear();
+
+        // Navigate away - should be blocked
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(guard).toHaveBeenCalled();
+        });
+      });
+    });
+
+    it("should remove canDeactivate when null", () => {
+      const guard = vi.fn().mockReturnValue(false);
+
+      router.addRoute({
+        name: "ur-form",
+        path: "/ur-form",
+        canDeactivate: () => guard,
+      });
+
+      // Navigate to route
+      router.navigate("ur-form", (err) => {
+        expect(err).toBeUndefined();
+
+        // Verify guard is active - navigation blocked
+        router.navigate("home", (err) => {
+          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+
+          guard.mockClear();
+
+          // Remove canDeactivate
+          router.updateRoute("ur-form", { canDeactivate: null });
+
+          // Now navigation should succeed
+          router.navigate("home", (err) => {
+            expect(err).toBeUndefined();
+            expect(guard).not.toHaveBeenCalled();
+          });
+        });
+      });
+    });
+
+    it("should update existing canDeactivate", () => {
+      const guard1 = vi.fn().mockReturnValue(false);
+      const guard2 = vi.fn().mockReturnValue(true);
+
+      router.addRoute({
+        name: "ur-page",
+        path: "/ur-page",
+        canDeactivate: () => guard1,
+      });
+      router.updateRoute("ur-page", { canDeactivate: () => guard2 });
+
+      // Navigate to route
+      router.navigate("ur-page", (err) => {
+        expect(err).toBeUndefined();
+
+        guard1.mockClear();
+        guard2.mockClear();
+
+        // Navigate away - new guard should fire, old guard should NOT
+        router.navigate("home", (err) => {
+          expect(err).toBeUndefined();
+          expect(guard2).toHaveBeenCalled();
+          expect(guard1).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
+
   describe("validation", () => {
     it("should throw ReferenceError for non-existent route", () => {
       expect(() =>
