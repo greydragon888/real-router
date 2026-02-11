@@ -293,14 +293,4 @@ export interface Router {
    * @returns true if navigation is allowed, false otherwise
    */
   canNavigateTo: (name: string, params?: Params) => boolean;
-
-  /**
-   * Get a minimal, safe Navigator interface for passing to components.
-   *
-   * The returned Navigator object is frozen and includes only essential methods:
-   * navigate, getState, isActiveRoute, canNavigateTo, subscribe.
-   *
-   * @returns Frozen Navigator object
-   */
-  getNavigator: () => Navigator;
 }

@@ -1,5 +1,6 @@
 // packages/react/modules/RouterProvider.tsx
 
+import { getNavigator } from "@real-router/core";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
@@ -18,7 +19,7 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   children,
 }) => {
   // Get navigator instance from router
-  const navigator = useMemo(() => router.getNavigator(), [router]);
+  const navigator = useMemo(() => getNavigator(router), [router]);
 
   // Local store state to hold route information
   const store = useMemo(() => {

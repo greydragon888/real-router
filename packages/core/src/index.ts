@@ -44,3 +44,5 @@ export { events, constants, errorCodes } from "./constants";
 export { RouterError } from "./RouterError";
 
 export { createRouter } from "./createRouter";
+
+export { getNavigator } from "./getNavigator";
