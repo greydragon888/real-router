@@ -87,6 +87,13 @@ export class RoutesNamespace<
     ActivationFnFactory<Dependencies>
   >();
 
+  // Pending canDeactivate handlers that need to be registered after router is set
+  // Key: route name, Value: canDeactivate factory
+  readonly #pendingCanDeactivate = new Map<
+    string,
+    ActivationFnFactory<Dependencies>
+  >();
+
   #rootPath = "";
   #tree: RouteTree;
   #matcher: Matcher;
@@ -255,6 +262,14 @@ export class RoutesNamespace<
 
     // Clear pending handlers after registration
     this.#pendingCanActivate.clear();
+
+    // Register pending canDeactivate handlers that were deferred during construction
+    for (const [routeName, handler] of this.#pendingCanDeactivate) {
+      deps.addDeactivateGuard(routeName, handler);
+    }
+
+    // Clear pending handlers after registration
+    this.#pendingCanDeactivate.clear();
   }
 
   /**
@@ -1289,6 +1304,19 @@ export class RoutesNamespace<
       }
     }
 
+    // Register canDeactivate via deps.canDeactivate (allows tests to spy on router.canDeactivate)
+    if (route.canDeactivate) {
+      // Note: Uses #depsStore directly because this method is called from constructor
+      // before setDependencies(). The getter #deps would throw if deps not set.
+      if (this.#depsStore) {
+        // Deps available, register immediately
+        this.#depsStore.addDeactivateGuard(fullName, route.canDeactivate);
+      } else {
+        // Deps not set yet, store for later registration
+        this.#pendingCanDeactivate.set(fullName, route.canDeactivate);
+      }
+    }
+
     // Register forwardTo
     if (route.forwardTo) {
       this.#registerForwardTo(route, fullName);
@@ -1322,6 +1350,19 @@ export class RoutesNamespace<
         `Route "${fullName}" has both forwardTo and canActivate. ` +
           `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
           `Move canActivate to the target route "${forwardTarget}".`,
+      );
+    }
+
+    if (route.canDeactivate) {
+      /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
+      const forwardTarget =
+        typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
+
+      logger.warn(
+        "real-router",
+        `Route "${fullName}" has both forwardTo and canDeactivate. ` +
+          `canDeactivate will be ignored because forwardTo creates a redirect (industry standard). ` +
+          `Move canDeactivate to the target route "${forwardTarget}".`,
       );
     }
 
@@ -1385,10 +1426,15 @@ export class RoutesNamespace<
 
     /* v8 ignore next -- @preserve unreachable: Router always sets lifecycleNamespace */
     if (this.#lifecycleNamespace) {
-      const [, canActivateFactories] = this.#lifecycleNamespace.getFactories();
+      const [canDeactivateFactories, canActivateFactories] =
+        this.#lifecycleNamespace.getFactories();
 
       if (routeName in canActivateFactories) {
         route.canActivate = canActivateFactories[routeName];
+      }
+
+      if (routeName in canDeactivateFactories) {
+        route.canDeactivate = canDeactivateFactories[routeName];
       }
     }
 

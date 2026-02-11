@@ -49,6 +49,8 @@ export interface Route<
   path: string;
   /** Factory function that returns a guard for route activation. */
   canActivate?: ActivationFnFactory<Dependencies>;
+  /** Factory function that returns a guard for route deactivation. */
+  canDeactivate?: ActivationFnFactory<Dependencies>;
   /**
    * Redirects navigation to another route.
    *
@@ -121,6 +123,8 @@ export interface RouteConfigUpdate<
   encodeParams?: ((params: Params) => Params) | null;
   /** Set to null to remove canActivate */
   canActivate?: ActivationFnFactory<Dependencies> | null;
+  /** Set to null to remove canDeactivate */
+  canDeactivate?: ActivationFnFactory<Dependencies> | null;
 }
 
 /**
