@@ -282,4 +282,20 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
+
+  it("should respect canDeactivate from route config", () => {
+    const guard = vi.fn().mockReturnValue(false);
+
+    router.addRoute({
+      name: "editor",
+      path: "/editor",
+      canDeactivate: () => guard,
+    });
+
+    router.start();
+    router.navigate("editor");
+
+    expect(router.canNavigateTo("home")).toBe(false);
+    expect(guard).toHaveBeenCalled();
+  });
 });

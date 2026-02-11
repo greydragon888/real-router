@@ -369,6 +369,7 @@ export class Router<
       decodeParams,
       encodeParams,
       canActivate,
+      canDeactivate,
     } = updates;
 
     // Validate cached property values
@@ -409,6 +410,16 @@ export class Router<
         this.#routeLifecycle.clearCanActivate(name);
       } else {
         this.addActivateGuard(name, canActivate);
+      }
+    }
+
+    // Handle canDeactivate separately (uses RouteLifecycleNamespace)
+    // Use facade method for proper validation
+    if (canDeactivate !== undefined) {
+      if (canDeactivate === null) {
+        this.#routeLifecycle.clearCanDeactivate(name);
+      } else {
+        this.addDeactivateGuard(name, canDeactivate);
       }
     }
 
@@ -1101,6 +1112,9 @@ export class Router<
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
         this.addActivateGuard(name, handler);
+      },
+      addDeactivateGuard: (name, handler) => {
+        this.addDeactivateGuard(name, handler);
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),
