@@ -1,31 +1,19 @@
-# 🚀 Pull Request
+## Summary
 
-## 📄 Summary
+<!-- 2-4 bullet points: what the user gets, not implementation details -->
 
-Briefly describe the change and its purpose.
+<!-- Uncomment sections below if applicable -->
 
-<!-- Example:
-- Migrated build system to `tsup`
-- Added basic tests for core router
--->
+<!-- ## New API -->
+<!-- Short code example of new public API -->
 
----
+<!-- ## Breaking changes -->
+<!-- Before/after code examples -->
 
-## ✅ Checklist
+## Test plan
 
-- [ ] The code compiles and passes existing tests
-- [ ] Tests were added/updated (if applicable)
-- [ ] Docs were updated (if applicable)
-- [ ] I've run `pnpm lint` and `pnpm test`
+<!-- Checklist of verifiable items -->
+- [ ] `pnpm type-check && pnpm lint && pnpm test -- --run` passes
+- [ ] 100% test coverage maintained
 
----
-
-## 🔗 Related Issues
-
-Closes #[issue_number] (if applicable)
-
----
-
-## 📸 Screenshots / Demo (if UI-related)
-
-_Add screenshots or a link to preview if needed._
+<!-- Closes #N -->
