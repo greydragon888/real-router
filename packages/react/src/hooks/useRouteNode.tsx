@@ -1,5 +1,6 @@
 // packages/react/modules/hooks/useRouteNode.tsx
 
+import { getNavigator } from "@real-router/core";
 import { useCallback, useMemo } from "react";
 
 import { useRouter } from "@real-router/react";
@@ -61,7 +62,7 @@ export function useRouteNode(nodeName: string): RouteContext {
   );
 
   // Return memoized context - useMemo ensures stable reference when deps unchanged
-  const navigator = router.getNavigator();
+  const navigator = useMemo(() => getNavigator(router), [router]);
 
   return useMemo(
     (): RouteContext => ({

@@ -50,7 +50,6 @@ import type {
   DoneFn,
   EventName,
   NavigationOptions,
-  Navigator,
   Options,
   Params,
   Plugin,
@@ -102,11 +101,6 @@ export class Router<
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
-
-  /**
-   * Cached Navigator instance. Lazily created on first getNavigator() call.
-   */
-  #navigator: Navigator | null = null;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -265,7 +259,6 @@ export class Router<
 
     // Cloning
     this.clone = this.clone.bind(this);
-    this.getNavigator = this.getNavigator.bind(this);
   }
 
   // ============================================================================
@@ -1072,18 +1065,6 @@ export class Router<
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
     );
-  }
-
-  getNavigator(): Navigator {
-    this.#navigator ??= Object.freeze({
-      navigate: this.navigate,
-      getState: this.getState,
-      isActiveRoute: this.isActiveRoute,
-      canNavigateTo: this.canNavigateTo,
-      subscribe: this.subscribe,
-    });
-
-    return this.#navigator;
   }
 
   // ============================================================================
