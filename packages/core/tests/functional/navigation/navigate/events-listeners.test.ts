@@ -162,7 +162,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Guard that blocks admin
-        freshRouter.canActivate("admin", () => () => false);
+        freshRouter.addActivateGuard("admin", () => () => false);
 
         await new Promise<void>((resolve) => {
           freshRouter.navigate("admin", {}, {}, () => {

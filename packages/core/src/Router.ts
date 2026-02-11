@@ -23,6 +23,7 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
+import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
 import type { EventMethodMap } from "./namespaces";
@@ -229,8 +230,11 @@ export class Router<
     this.stop = this.stop.bind(this);
 
     // Route Lifecycle (Guards)
-    this.canDeactivate = this.canDeactivate.bind(this);
-    this.canActivate = this.canActivate.bind(this);
+    this.addActivateGuard = this.addActivateGuard.bind(this);
+    this.addDeactivateGuard = this.addDeactivateGuard.bind(this);
+    this.removeActivateGuard = this.removeActivateGuard.bind(this);
+    this.removeDeactivateGuard = this.removeDeactivateGuard.bind(this);
+    this.canNavigateTo = this.canNavigateTo.bind(this);
 
     // Plugins
     this.usePlugin = this.usePlugin.bind(this);
@@ -261,6 +265,7 @@ export class Router<
 
     // Cloning
     this.clone = this.clone.bind(this);
+    this.getNavigator = this.getNavigator.bind(this);
   }
 
   // ============================================================================
@@ -408,9 +413,9 @@ export class Router<
     // Use facade method for proper validation
     if (canActivate !== undefined) {
       if (canActivate === null) {
-        this.#routeLifecycle.clearCanActivate(name, true);
+        this.#routeLifecycle.clearCanActivate(name);
       } else {
-        this.canActivate(name, canActivate);
+        this.addActivateGuard(name, canActivate);
       }
     }
 
@@ -652,23 +657,23 @@ export class Router<
   // Route Lifecycle (Guards)
   // ============================================================================
 
-  canDeactivate(
+  addDeactivateGuard(
     name: string,
     canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
       // 1. Validate input
-      validateRouteName(name, "canDeactivate");
+      validateRouteName(name, "addDeactivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canDeactivateHandler,
-        "canDeactivate",
+        "addDeactivateGuard",
       );
 
       // 2. Validate not registering
       RouteLifecycleNamespace.validateNotRegistering(
         this.#routeLifecycle.isRegistering(name),
         name,
-        "canDeactivate",
+        "addDeactivateGuard",
       );
     }
 
@@ -678,7 +683,7 @@ export class Router<
     if (!isOverwrite && !this.#noValidate) {
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanDeactivate() + 1,
-        "canDeactivate",
+        "addDeactivateGuard",
         this.#limits.maxLifecycleHandlers,
       );
     }
@@ -693,23 +698,23 @@ export class Router<
     return this;
   }
 
-  canActivate(
+  addActivateGuard(
     name: string,
     canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
       // 1. Validate input
-      validateRouteName(name, "canActivate");
+      validateRouteName(name, "addActivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canActivateHandler,
-        "canActivate",
+        "addActivateGuard",
       );
 
       // 2. Validate not registering
       RouteLifecycleNamespace.validateNotRegistering(
         this.#routeLifecycle.isRegistering(name),
         name,
-        "canActivate",
+        "addActivateGuard",
       );
     }
 
@@ -719,7 +724,7 @@ export class Router<
     if (!isOverwrite && !this.#noValidate) {
       RouteLifecycleNamespace.validateHandlerLimit(
         this.#routeLifecycle.countCanActivate() + 1,
-        "canActivate",
+        "addActivateGuard",
         this.#limits.maxLifecycleHandlers,
       );
     }
@@ -732,6 +737,67 @@ export class Router<
     );
 
     return this;
+  }
+
+  removeActivateGuard(name: string): void {
+    if (!this.#noValidate) {
+      validateRouteName(name, "removeActivateGuard");
+    }
+
+    this.#routeLifecycle.clearCanActivate(name);
+  }
+
+  removeDeactivateGuard(name: string): void {
+    if (!this.#noValidate) {
+      validateRouteName(name, "removeDeactivateGuard");
+    }
+
+    this.#routeLifecycle.clearCanDeactivate(name);
+  }
+
+  canNavigateTo(name: string, params?: Params): boolean {
+    if (!this.#noValidate) {
+      validateRouteName(name, "canNavigateTo");
+    }
+
+    if (!this.hasRoute(name)) {
+      return false;
+    }
+
+    const { name: resolvedName, params: resolvedParams } = this.forwardState(
+      name,
+      params ?? {},
+    );
+    const toState = this.makeState(resolvedName, resolvedParams);
+    const fromState = this.getState();
+
+    const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
+
+    for (const segment of toDeactivate) {
+      if (
+        !this.#routeLifecycle.checkDeactivateGuardSync(
+          segment,
+          toState,
+          fromState,
+        )
+      ) {
+        return false;
+      }
+    }
+
+    for (const segment of toActivate) {
+      if (
+        !this.#routeLifecycle.checkActivateGuardSync(
+          segment,
+          toState,
+          fromState,
+        )
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // ============================================================================
@@ -1013,6 +1079,7 @@ export class Router<
       navigate: this.navigate,
       getState: this.getState,
       isActiveRoute: this.isActiveRoute,
+      canNavigateTo: this.canNavigateTo,
       subscribe: this.subscribe,
     });
 
@@ -1051,8 +1118,8 @@ export class Router<
     // Use facade method for proper validation
 
     const routesDeps: RoutesDependencies<Dependencies> = {
-      canActivate: (name, handler) => {
-        this.canActivate(name, handler);
+      addActivateGuard: (name, handler) => {
+        this.addActivateGuard(name, handler);
       },
       makeState: (name, params, path, meta) =>
         this.#state.makeState(name, params, path, meta),

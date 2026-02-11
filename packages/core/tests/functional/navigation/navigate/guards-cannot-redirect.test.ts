@@ -27,17 +27,20 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("canDeactivate returns error when attempting redirect", () => {
       it("should return error when canDeactivate calls done with redirect error", () => {
-        router.canDeactivate("users", () => (_toState, _fromState, doneFn) => {
-          const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
-            redirect: {
-              name: "orders.pending",
-              params: {},
-              path: "/orders/pending",
-            },
-          });
+        router.addDeactivateGuard(
+          "users",
+          () => (_toState, _fromState, doneFn) => {
+            const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
+              redirect: {
+                name: "orders.pending",
+                params: {},
+                path: "/orders/pending",
+              },
+            });
 
-          doneFn(error);
-        });
+            doneFn(error);
+          },
+        );
 
         router.navigate("users");
 
@@ -51,7 +54,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should return error when canDeactivate returns different route state", () => {
-        router.canDeactivate("users", () => () => {
+        router.addDeactivateGuard("users", () => () => {
           return { name: "sign-in", params: {}, path: "/sign-in" };
         });
 
@@ -72,13 +75,16 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("canActivate returns error when attempting redirect", () => {
       it("should return error when canActivate calls done with redirect error", () => {
-        router.canActivate("profile", () => (_toState, _fromState, doneFn) => {
-          const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
-            redirect: { name: "sign-in", params: {}, path: "/sign-in" },
-          });
+        router.addActivateGuard(
+          "profile",
+          () => (_toState, _fromState, doneFn) => {
+            const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
+              redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+            });
 
-          doneFn(error);
-        });
+            doneFn(error);
+          },
+        );
 
         router.navigate("users");
 
@@ -89,7 +95,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should return error when canActivate returns different route state", () => {
-        router.canActivate("users.view", () => () => {
+        router.addActivateGuard("users.view", () => () => {
           return {
             name: "orders.view",
             params: { id: 42 },
@@ -111,7 +117,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error for Promise-based canActivate redirect via rejection", async () => {
         vi.useFakeTimers();
 
-        router.canActivate("profile", () => () => {
+        router.addActivateGuard("profile", () => () => {
           return new Promise((_resolve, reject) => {
             setTimeout(() => {
               const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
@@ -143,7 +149,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error for Promise-based canActivate returning different route", async () => {
         vi.useFakeTimers();
 
-        router.canActivate("profile", () => () => {
+        router.addActivateGuard("profile", () => () => {
           return new Promise((resolve) => {
             setTimeout(() => {
               resolve({
@@ -195,7 +201,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("guards blocking (not redirecting)", () => {
       it("should block with false return", () => {
-        router.canActivate("admin", () => () => false);
+        router.addActivateGuard("admin", () => () => false);
 
         router.navigate("users");
 
@@ -207,7 +213,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should block with error throw", () => {
-        router.canActivate("admin", () => () => {
+        router.addActivateGuard("admin", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             message: "Access denied",
           });
@@ -229,7 +235,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     it("should return error when canDeactivate returns redirect (guards cannot redirect)", async () => {
       router.navigate("users");
 
-      router.canDeactivate("users", () => (_toState, _fromState, done) => {
+      router.addDeactivateGuard("users", () => (_toState, _fromState, done) => {
         const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
           redirect: { name: "sign-in", params: {}, path: "/sign-in" },
         });
@@ -253,7 +259,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     it("should remain on current route when canDeactivate blocks with redirect", async () => {
       router.navigate("users");
 
-      router.canDeactivate("users", () => () => ({
+      router.addDeactivateGuard("users", () => () => ({
         name: "sign-in",
         params: {},
         path: "/sign-in",
@@ -279,7 +285,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 1: canDeactivate returning different state returns error
     it("should return error when canDeactivate returns different route state", async () => {
-      router.canDeactivate("users", () => () => ({
+      router.addDeactivateGuard("users", () => () => ({
         name: "admin",
         params: {},
         path: "/admin",
@@ -302,7 +308,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 2: canActivate returning different state returns error
     it("should return error when canActivate returns different route state", async () => {
-      router.canActivate("users", () => () => ({
+      router.addActivateGuard("users", () => () => ({
         name: "profile",
         params: {},
         path: "/profile",
@@ -321,13 +327,16 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 3: Same route state modification should NOT trigger re-navigation
     it("should allow guards to modify meta without re-navigation", async () => {
-      router.canActivate("users.view", () => (toState, _fromState, done) => {
-        // Modify meta and continue - same route, should just merge
-        done(undefined, {
-          ...toState,
-          meta: { ...toState.meta, normalized: true } as any,
-        });
-      });
+      router.addActivateGuard(
+        "users.view",
+        () => (toState, _fromState, done) => {
+          // Modify meta and continue - same route, should just merge
+          done(undefined, {
+            ...toState,
+            meta: { ...toState.meta, normalized: true } as any,
+          });
+        },
+      );
 
       const result = await new Promise<{ err: any; state: any }>((resolve) => {
         router.navigate("users.view", { id: "123" }, (err, state) => {
@@ -342,7 +351,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 4: Protected route blocks access
     it("should block access to protected route", async () => {
-      router.canActivate("admin", () => () => false);
+      router.addActivateGuard("admin", () => () => false);
 
       router.navigate("users");
 
@@ -369,13 +378,16 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         freshRouter.start();
 
-        freshRouter.canActivate("users", () => (_toState, _fromState, done) => {
-          done(
-            new RouterError(errorCodes.CANNOT_ACTIVATE, {
-              redirect: { name: "orders", params: {}, path: "/orders" },
-            }),
-          );
-        });
+        freshRouter.addActivateGuard(
+          "users",
+          () => (_toState, _fromState, done) => {
+            done(
+              new RouterError(errorCodes.CANNOT_ACTIVATE, {
+                redirect: { name: "orders", params: {}, path: "/orders" },
+              }),
+            );
+          },
+        );
 
         const result = await new Promise<{ err: any; state: any }>(
           (resolve) => {
@@ -397,7 +409,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         freshRouter.start();
 
-        freshRouter.canActivate("users", () => () => ({
+        freshRouter.addActivateGuard("users", () => () => ({
           name: "orders",
           params: {},
           path: "/orders",
@@ -423,7 +435,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         freshRouter.start();
 
-        freshRouter.canActivate("admin", () => () => false);
+        freshRouter.addActivateGuard("admin", () => () => false);
 
         const result = await new Promise<{ err: any; state: any }>(
           (resolve) => {

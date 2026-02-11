@@ -203,8 +203,8 @@ startsWithSegment("route", "");                   // false
 startsWithSegment(route, 'admin');
 
 // redirect removed — use guards:
-- router.canActivate('old', () => redirect('new'));
-+ router.canActivate('old', (to, from, done) => {
+- router.addActivateGuard('old', () => redirect('new'));
++ router.addActivateGuard('old', (to, from, done) => {
 +   done({ redirect: { name: 'new' } });
 + });
 ```

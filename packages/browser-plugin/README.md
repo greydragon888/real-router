@@ -169,7 +169,7 @@ router.usePlugin(
   }),
 );
 
-router.canDeactivate("checkout", () => (toState, fromState, done) => {
+router.addDeactivateGuard("checkout", () => (toState, fromState, done) => {
   if (hasUnsavedChanges()) {
     done({ error: new Error("Unsaved changes") });
   } else {

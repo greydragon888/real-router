@@ -135,7 +135,7 @@ describe("BaseLink - Integration Tests", () => {
     it("should recover from navigation error", async () => {
       let shouldFail = true;
 
-      router.canActivate("one-more-test", () => () => {
+      router.addActivateGuard("one-more-test", () => () => {
         if (shouldFail) {
           return Promise.reject(new Error("Navigation blocked"));
         }

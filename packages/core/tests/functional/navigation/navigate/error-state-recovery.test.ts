@@ -27,7 +27,7 @@ describe("router.navigate() - error state recovery", () => {
 
       expect(router.getState()?.name).toBe("home");
 
-      router.canActivate("users", () => () => false);
+      router.addActivateGuard("users", () => () => false);
       router.navigate("users", (err) => {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
@@ -41,7 +41,7 @@ describe("router.navigate() - error state recovery", () => {
 
       expect(router.getState()?.name).toBe("users");
 
-      router.canDeactivate("users", () => () => false);
+      router.addDeactivateGuard("users", () => () => false);
       router.navigate("home", (err) => {
         expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       });
@@ -67,7 +67,7 @@ describe("router.navigate() - error state recovery", () => {
     });
 
     it("should allow new navigation after guard error", async () => {
-      router.canActivate(
+      router.addActivateGuard(
         "users",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -115,7 +115,7 @@ describe("router.navigate() - error state recovery", () => {
 
   describe("async error handling (analysis 10.5)", () => {
     it("should handle Promise rejection in canActivate guard", async () => {
-      router.canActivate(
+      router.addActivateGuard(
         "users",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -139,7 +139,7 @@ describe("router.navigate() - error state recovery", () => {
     it("should handle Promise rejection in canDeactivate guard", async () => {
       router.navigate("users");
 
-      router.canDeactivate(
+      router.addDeactivateGuard(
         "users",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -184,7 +184,7 @@ describe("router.navigate() - error state recovery", () => {
     it("should cancel transition when router.stop() called during async guard", async () => {
       let guardCalled = false;
 
-      router.canActivate(
+      router.addActivateGuard(
         "users",
         () => () =>
           new Promise((resolve) => {

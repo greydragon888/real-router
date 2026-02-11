@@ -14,7 +14,7 @@ describe("core/route-lifecycle/forceDeactivate", () => {
   });
 
   it("should force deactivation if transition option is set", () => {
-    router.canDeactivate("orders.view", false);
+    router.addDeactivateGuard("orders.view", false);
 
     router.navigate("orders.view", { id: "1" });
 

@@ -410,7 +410,7 @@ describe("core/routes/routeTree/getRoute", () => {
         let routeDuringNavigation: ReturnType<typeof router.getRoute>;
 
         // Add async guard to make navigation async
-        router.canActivate("ec-slow", () => async () => {
+        router.addActivateGuard("ec-slow", () => async () => {
           // Read route during active navigation
           routeDuringNavigation = router.getRoute("ec-target");
           await new Promise((resolve) => setTimeout(resolve, 10));

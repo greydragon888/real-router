@@ -167,7 +167,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should close group on transition cancel", () => {
-      router.canDeactivate("home", () => () => false);
+      router.addDeactivateGuard("home", () => () => false);
       router.usePlugin(loggerPlugin);
       router.start();
 

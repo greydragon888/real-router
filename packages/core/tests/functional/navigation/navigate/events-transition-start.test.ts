@@ -94,7 +94,7 @@ describe("router.navigate() - events transition start", () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn().mockReturnValue(true);
 
-      router.canActivate("users.view", () => canActivateGuard);
+      router.addActivateGuard("users.view", () => canActivateGuard);
       router.useMiddleware(() => middleware);
 
       const unsubStart = router.addEventListener(
@@ -181,7 +181,7 @@ describe("router.navigate() - events transition start", () => {
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.canActivate("users.view", () => blockingGuard);
+      router.addActivateGuard("users.view", () => blockingGuard);
 
       const unsubStart = router.addEventListener(
         events.TRANSITION_START,

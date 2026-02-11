@@ -155,15 +155,22 @@ describe("core/noValidate option", () => {
       it("should skip validation in canDeactivate", () => {
         // Valid handler
         expect(() =>
-          router.canDeactivate("home", () => () => true),
+          router.addDeactivateGuard("home", () => () => true),
         ).not.toThrowError();
       });
 
       it("should skip validation in canActivate", () => {
         // Valid handler
         expect(() =>
-          router.canActivate("home", () => () => true),
+          router.addActivateGuard("home", () => () => true),
         ).not.toThrowError();
+      });
+
+      it("should skip validation in canNavigateTo", () => {
+        router.start();
+
+        // Invalid type would throw TypeError with noValidate: false
+        expect(() => router.canNavigateTo(123 as any)).not.toThrowError();
       });
     });
 

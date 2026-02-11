@@ -112,7 +112,7 @@ describe("router.clone()", () => {
     const router = createTestRouter();
     const canActivateGuard = vi.fn().mockReturnValue(false);
 
-    router.canActivate("admin", () => canActivateGuard);
+    router.addActivateGuard("admin", () => canActivateGuard);
 
     const clonedRouter = router.clone();
 
@@ -131,7 +131,7 @@ describe("router.clone()", () => {
     const router = createTestRouter();
     const canDeactivateGuard = vi.fn().mockReturnValue(false);
 
-    router.canDeactivate("users", () => canDeactivateGuard);
+    router.addDeactivateGuard("users", () => canDeactivateGuard);
 
     const clonedRouter = router.clone();
 
@@ -557,9 +557,9 @@ describe("router.clone()", () => {
       const canActivateUsers = vi.fn().mockReturnValue(true);
       const canDeactivateAdmin = vi.fn().mockReturnValue(true);
 
-      router.canActivate("home", () => canActivateHome);
-      router.canActivate("users", () => canActivateUsers);
-      router.canDeactivate("admin", () => canDeactivateAdmin);
+      router.addActivateGuard("home", () => canActivateHome);
+      router.addActivateGuard("users", () => canActivateUsers);
+      router.addDeactivateGuard("admin", () => canDeactivateAdmin);
 
       const clonedRouter = router.clone();
 
@@ -660,8 +660,8 @@ describe("router.clone()", () => {
       const canDeactivateHome = vi.fn().mockReturnValue(true);
 
       // Same route has both lifecycle handlers
-      router.canActivate("home", () => canActivateHome);
-      router.canDeactivate("home", () => canDeactivateHome);
+      router.addActivateGuard("home", () => canActivateHome);
+      router.addDeactivateGuard("home", () => canDeactivateHome);
 
       const clonedRouter = router.clone();
 
@@ -682,7 +682,7 @@ describe("router.clone()", () => {
       // Verify handlers are independent - adding to clone doesn't affect original
       const newHandler = vi.fn().mockReturnValue(true);
 
-      clonedRouter.canActivate("orders", () => newHandler);
+      clonedRouter.addActivateGuard("orders", () => newHandler);
 
       // Navigate on cloned router
       clonedRouter.navigate("orders", () => {

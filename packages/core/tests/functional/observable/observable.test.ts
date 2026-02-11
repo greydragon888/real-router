@@ -76,7 +76,7 @@ describe("core/observable", () => {
       it("should trigger TRANSITION_ERROR listener when navigation fails", () => {
         const cb = vi.fn();
 
-        router.canActivate("admin-protected", () => () => false);
+        router.addActivateGuard("admin-protected", () => () => false);
         router.addEventListener(events.TRANSITION_ERROR, cb);
         router.navigate("admin-protected", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);

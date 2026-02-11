@@ -69,8 +69,8 @@ describe("router.navigate() - transitions and cancellation", () => {
       () => middlewareMock1 as any,
       () => middlewareMock2 as any,
     );
-    router.canActivate("users", () => activateMock as any);
-    router.canDeactivate("users", () => deactivateMock as any);
+    router.addActivateGuard("users", () => activateMock as any);
+    router.addDeactivateGuard("users", () => deactivateMock as any);
 
     router.navigate("users");
 
@@ -88,7 +88,7 @@ describe("router.navigate() - transitions and cancellation", () => {
   describe("Issue #36: Safe behavior when router.stop() is called during navigation", () => {
     // router.stop() called inside guard should cancel transition
     it("should cancel transition when router.stop() is called inside canActivate", async () => {
-      router.canActivate("users", () => () => {
+      router.addActivateGuard("users", () => () => {
         router.stop(); // Stop router during guard
 
         return true; // Guard returns true, but router is stopped
@@ -153,7 +153,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
         const freshRouter = createTestRouter();
 
-        freshRouter.canActivate(
+        freshRouter.addActivateGuard(
           "users",
           () => () =>
             new Promise((_resolve, reject) => {
@@ -231,9 +231,12 @@ describe("router.navigate() - transitions and cancellation", () => {
 
         const freshRouter = createTestRouter();
 
-        freshRouter.canActivate("users", () => (_toState, _fromState, done) => {
-          doneFn = done;
-        });
+        freshRouter.addActivateGuard(
+          "users",
+          () => (_toState, _fromState, done) => {
+            doneFn = done;
+          },
+        );
 
         freshRouter.start();
 

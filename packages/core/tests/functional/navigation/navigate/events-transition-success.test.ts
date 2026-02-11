@@ -180,8 +180,8 @@ describe("router.navigate() - events transition success", () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       // Setup guards and middleware for different routes (not parent-child)
-      router.canActivate("profile", () => canActivateGuard);
-      router.canDeactivate("users", () => canDeactivateGuard);
+      router.addActivateGuard("profile", () => canActivateGuard);
+      router.addDeactivateGuard("users", () => canDeactivateGuard);
       router.useMiddleware(() => middleware);
 
       // Navigate to users first
@@ -234,7 +234,7 @@ describe("router.navigate() - events transition success", () => {
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.canActivate("users.view", () => blockingGuard);
+      router.addActivateGuard("users.view", () => blockingGuard);
 
       const unsubSuccess = router.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -364,7 +364,7 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Set up redirect from orders to profile
-      router.canActivate("orders", () => () => {
+      router.addActivateGuard("orders", () => () => {
         return { name: "profile", params: {}, path: "/profile" };
       });
 

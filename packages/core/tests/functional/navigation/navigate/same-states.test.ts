@@ -92,8 +92,8 @@ describe("router.navigate() - same states", () => {
         const canDeactivateGuard = vi.fn().mockReturnValue(true);
         const canActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("orders.pending", () => canDeactivateGuard);
-        router.canActivate("orders.pending", () => canActivateGuard);
+        router.addDeactivateGuard("orders.pending", () => canDeactivateGuard);
+        router.addActivateGuard("orders.pending", () => canActivateGuard);
 
         // First navigation
         router.navigate("orders.pending", {}, {}, () => {
@@ -137,7 +137,7 @@ describe("router.navigate() - same states", () => {
       it("should bypass guards when force is true", () => {
         const canDeactivateSpy = vi.fn().mockReturnValue(false); // Block deactivation
 
-        router.canDeactivate("orders.pending", () => canDeactivateSpy);
+        router.addDeactivateGuard("orders.pending", () => canDeactivateSpy);
 
         // First navigation
         router.navigate("orders.pending", {}, {}, () => {
