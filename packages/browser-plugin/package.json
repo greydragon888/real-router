@@ -1,6 +1,6 @@
 {
   "name": "@real-router/browser-plugin",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "type": "commonjs",
   "description": "Browser integration plugin with History API, hash routing, and popstate support",
   "main": "./dist/cjs/index.js",
