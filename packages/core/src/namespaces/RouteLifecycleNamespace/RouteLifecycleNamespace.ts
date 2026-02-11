@@ -227,9 +227,8 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanActivate(name: string, _silent = false): void {
+  clearCanActivate(name: string): void {
     this.#canActivateFactories.delete(name);
     this.#canActivateFunctions.delete(name);
   }
@@ -239,9 +238,8 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanDeactivate(name: string, _silent = false): void {
+  clearCanDeactivate(name: string): void {
     this.#canDeactivateFactories.delete(name);
     this.#canDeactivateFunctions.delete(name);
   }

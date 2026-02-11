@@ -117,7 +117,9 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(false);
   });
 
-  it("should return true when guard returns a State object", () => {
+  it("should return true when guard returns a State object (redirect attempt — permissive default)", () => {
+    // Guards cannot redirect in canNavigateTo context.
+    // A State return is treated as non-boolean, non-Promise, done-not-called → permissive true.
     const factory: ActivationFnFactory = () => (toState) => toState;
 
     ns.registerCanActivate("admin", factory, false);
@@ -126,6 +128,8 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     const fromState = createState("home");
 
     expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(true);
+    // No warning is emitted — this is intentional (State return is not an error)
+    expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 
   it("should return true when guard returns void (done not called synchronously)", () => {

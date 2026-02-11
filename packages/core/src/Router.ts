@@ -413,7 +413,7 @@ export class Router<
     // Use facade method for proper validation
     if (canActivate !== undefined) {
       if (canActivate === null) {
-        this.#routeLifecycle.clearCanActivate(name, true);
+        this.#routeLifecycle.clearCanActivate(name);
       } else {
         this.addActivateGuard(name, canActivate);
       }
@@ -756,6 +756,10 @@ export class Router<
   }
 
   canNavigateTo(name: string, params?: Params): boolean {
+    if (!this.#noValidate) {
+      validateRouteName(name, "canNavigateTo");
+    }
+
     if (!this.hasRoute(name)) {
       return false;
     }

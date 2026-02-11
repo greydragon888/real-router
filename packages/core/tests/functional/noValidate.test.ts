@@ -165,6 +165,13 @@ describe("core/noValidate option", () => {
           router.addActivateGuard("home", () => () => true),
         ).not.toThrowError();
       });
+
+      it("should skip validation in canNavigateTo", () => {
+        router.start();
+
+        // Invalid type would throw TypeError with noValidate: false
+        expect(() => router.canNavigateTo(123 as any)).not.toThrowError();
+      });
     });
 
     // Plugins & Middleware

@@ -1245,13 +1245,13 @@ export class RoutesNamespace<
 
       for (const n of Object.keys(canActivateFactories)) {
         if (shouldClear(n)) {
-          this.#lifecycleNamespace.clearCanActivate(n, true);
+          this.#lifecycleNamespace.clearCanActivate(n);
         }
       }
 
       for (const n of Object.keys(canDeactivateFactories)) {
         if (shouldClear(n)) {
-          this.#lifecycleNamespace.clearCanDeactivate(n, true);
+          this.#lifecycleNamespace.clearCanDeactivate(n);
         }
       }
     }

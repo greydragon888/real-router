@@ -90,7 +90,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("nonexistent")).toBe(false);
   });
 
-  it("should return true before router is started", () => {
+  it("should return true when route has no guards (started with no default route)", () => {
     expect(router.canNavigateTo("home")).toBe(true);
     expect(router.canNavigateTo("admin")).toBe(true);
   });
@@ -133,9 +133,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("users")).toBe(true);
   });
 
-  it("should return false if multiple deactivate guards block", () => {
-    router.addDeactivateGuard("users", () => () => false);
-    router.addDeactivateGuard("users", () => () => false);
+  it("should return false when overwritten deactivate guard blocks", () => {
+    router.addDeactivateGuard("users", () => () => true);
+    router.addDeactivateGuard("users", () => () => false); // overwrites previous
 
     router.start();
     router.navigate("users");
@@ -143,9 +143,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("home")).toBe(false);
   });
 
-  it("should return false if multiple activate guards block", () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.addActivateGuard("admin", () => () => false);
+  it("should return false when overwritten activate guard blocks", () => {
+    router.addActivateGuard("admin", () => () => true);
+    router.addActivateGuard("admin", () => () => false); // overwrites previous
 
     router.start();
     router.navigate("home");
@@ -249,6 +249,23 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
+  });
+
+  it("should throw TypeError for non-string route name", () => {
+    router.start();
+
+    // @ts-expect-error: testing invalid input
+    expect(() => router.canNavigateTo(123)).toThrowError(TypeError);
+    // @ts-expect-error: testing invalid input
+    expect(() => router.canNavigateTo(null)).toThrowError(TypeError);
+    // @ts-expect-error: testing invalid input
+    expect(() => router.canNavigateTo(undefined)).toThrowError(TypeError);
+  });
+
+  it("should throw TypeError for whitespace-only route name", () => {
+    router.start();
+
+    expect(() => router.canNavigateTo("   ")).toThrowError(TypeError);
   });
 
   it("should handle empty params object", () => {
