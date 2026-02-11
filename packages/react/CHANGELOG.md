@@ -1,5 +1,20 @@
 # @real-router/react
 
+## 0.3.0
+
+### Minor Changes
+
+- [#85](https://github.com/greydragon888/real-router/pull/85) [`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59) Thanks [@greydragon888](https://github.com/greydragon888)! - Update to use standalone `getNavigator` function (#83)
+
+  Update to use standalone `getNavigator` function. Fix `useRouteNode` navigator memoization bug.
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+  - @real-router/browser-plugin@0.1.18
+  - @real-router/helpers@0.1.18
+
 ## 0.2.8
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.10.0
+
+### Minor Changes
+
+- [#85](https://github.com/greydragon888/real-router/pull/85) [`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `getNavigator` from Router interface (#83)
+
+  Remove `getNavigator` from Router interface.
+
 ## 0.9.0
 
 ### Minor Changes

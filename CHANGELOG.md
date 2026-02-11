@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-11]
 
+### @real-router/core@0.15.0
+
+### Minor Changes
+
+- [#85](https://github.com/greydragon888/real-router/pull/85) [`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59) Thanks [@greydragon888](https://github.com/greydragon888)! - Extract `getNavigator` into standalone function (#83)
+
+  Extract `getNavigator` into standalone function. BREAKING: `Router.getNavigator()` method removed. Use `import { getNavigator } from '@real-router/core'` and call `getNavigator(router)` instead.
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/types@0.10.0
+
+### @real-router/react@0.3.0
+
+### Minor Changes
+
+- [#85](https://github.com/greydragon888/real-router/pull/85) [`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59) Thanks [@greydragon888](https://github.com/greydragon888)! - Update to use standalone `getNavigator` function (#83)
+
+  Update to use standalone `getNavigator` function. Fix `useRouteNode` navigator memoization bug.
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+  - @real-router/browser-plugin@0.1.18
+  - @real-router/helpers@0.1.18
+
+### @real-router/types@0.10.0
+
+### Minor Changes
+
+- [#85](https://github.com/greydragon888/real-router/pull/85) [`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `getNavigator` from Router interface (#83)
+
+  Remove `getNavigator` from Router interface.
+
+### @real-router/browser-plugin@0.1.18
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+
+### @real-router/helpers@0.1.18
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+
+### @real-router/logger-plugin@0.2.18
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+
+### @real-router/persistent-params-plugin@0.1.18
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+
+### @real-router/rx@0.1.7
+
+### Patch Changes
+
+- Updated dependencies [[`fa5e6b7`](https://github.com/greydragon888/real-router/commit/fa5e6b7e46bf6c9c6ce9b78503808df807de5c59)]:
+  - @real-router/core@0.15.0
+
+
 ### @real-router/core@0.14.0
 
 ### Minor Changes
