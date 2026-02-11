@@ -133,7 +133,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      router.canActivate("orders", asyncGuard);
+      router.addActivateGuard("orders", asyncGuard);
 
       const callback = vi.fn((err) => {
         expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
@@ -205,7 +205,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      router.canActivate("admin", failingGuard);
+      router.addActivateGuard("admin", failingGuard);
 
       const cancel = router.navigate("admin", (err) => {
         expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
@@ -422,7 +422,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useFakeTimers();
 
       // Set up redirect
-      router.canActivate("orders", () => () => {
+      router.addActivateGuard("orders", () => () => {
         return new Promise((resolve) => {
           setTimeout(() => {
             resolve({ name: "profile", params: {}, path: "/profile" });
@@ -449,7 +449,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       router.stop();
 
-      router.canActivate(
+      router.addActivateGuard(
         "admin",
         () => () =>
           new Promise((_resolve, reject) => {

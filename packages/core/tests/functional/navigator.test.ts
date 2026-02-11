@@ -16,15 +16,16 @@ describe("core/getNavigator", () => {
     router.stop();
   });
 
-  it("returns frozen object with exactly 4 methods", () => {
+  it("returns frozen object with exactly 5 methods", () => {
     const navigator = router.getNavigator();
 
     expect(Object.isFrozen(navigator)).toBe(true);
     expect(navigator).toHaveProperty("navigate");
     expect(navigator).toHaveProperty("getState");
     expect(navigator).toHaveProperty("isActiveRoute");
+    expect(navigator).toHaveProperty("canNavigateTo");
     expect(navigator).toHaveProperty("subscribe");
-    expect(Object.keys(navigator)).toHaveLength(4);
+    expect(Object.keys(navigator)).toHaveLength(5);
   });
 
   it("returns same cached instance", () => {
@@ -81,14 +82,24 @@ describe("core/getNavigator", () => {
     expect(callback).toHaveBeenCalledTimes(1);
   });
 
+  it("canNavigateTo delegates to router.canNavigateTo()", () => {
+    const navigator = router.getNavigator();
+
+    expect(navigator.canNavigateTo("home")).toBe(true);
+    expect(navigator.canNavigateTo("users")).toBe(true);
+    expect(navigator.canNavigateTo("users.view", { id: "123" })).toBe(true);
+    expect(navigator.canNavigateTo("nonexistent")).toBe(false);
+  });
+
   it("all methods are bound (work when destructured)", () => {
-    const { navigate, getState, isActiveRoute, subscribe } =
+    const { navigate, getState, isActiveRoute, canNavigateTo, subscribe } =
       router.getNavigator();
 
     navigate("home");
 
     expect(getState()?.name).toBe("home");
     expect(isActiveRoute("home")).toBe(true);
+    expect(canNavigateTo("users")).toBe(true);
 
     const unsubscribe = subscribe(() => {});
 

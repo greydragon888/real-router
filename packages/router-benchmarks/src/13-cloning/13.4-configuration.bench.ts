@@ -197,8 +197,8 @@ if (IS_ROUTER5) {
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  router.canActivate("about", () => () => true);
-  router.canDeactivate("users", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addDeactivateGuard("users", () => () => true);
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
@@ -223,8 +223,8 @@ if (IS_ROUTER5) {
 } else {
   const router = createSimpleRouter();
 
-  router.canActivate("about", () => () => true);
-  router.canDeactivate("users", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addDeactivateGuard("users", () => () => true);
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {

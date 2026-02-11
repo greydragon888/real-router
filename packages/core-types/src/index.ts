@@ -39,6 +39,7 @@ export type {
   Listener,
   Subscription,
   Navigator,
+  Router,
 } from "./router";
 
 // Limits configuration

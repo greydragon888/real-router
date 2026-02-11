@@ -46,8 +46,8 @@ describe("router.navigate() - unknown route", () => {
         { allowNotFound: true },
       );
 
-      freshRouter.canActivate("profile", () => canActivateGuard);
-      freshRouter.canDeactivate(
+      freshRouter.addActivateGuard("profile", () => canActivateGuard);
+      freshRouter.addDeactivateGuard(
         constants.UNKNOWN_ROUTE,
         () => canDeactivateGuard,
       );

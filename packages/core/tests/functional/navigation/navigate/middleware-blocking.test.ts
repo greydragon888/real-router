@@ -26,7 +26,10 @@ describe("router.navigate() - middleware blocking", () => {
       it("should block transition when canDeactivate returns false", () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
 
-        router.canDeactivate("orders.pending", () => blockingDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => blockingDeactivateGuard,
+        );
 
         // Navigate to initial state
         router.navigate("orders.pending");
@@ -45,8 +48,8 @@ describe("router.navigate() - middleware blocking", () => {
         const blockingGuard = vi.fn().mockReturnValue(false);
         const nextGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("orders", () => blockingGuard);
-        router.canDeactivate("orders.pending", () => nextGuard);
+        router.addDeactivateGuard("orders", () => blockingGuard);
+        router.addDeactivateGuard("orders.pending", () => nextGuard);
 
         router.navigate("orders.pending");
 
@@ -65,7 +68,7 @@ describe("router.navigate() - middleware blocking", () => {
       it("should block navigation if canDeactivate returns false", () => {
         router.navigate("users");
 
-        router.canDeactivate("users", () => () => false);
+        router.addDeactivateGuard("users", () => () => false);
 
         router.navigate("orders", (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
@@ -79,7 +82,7 @@ describe("router.navigate() - middleware blocking", () => {
       it("should block transition when canActivate returns false", () => {
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.canActivate("profile", () => blockingActivateGuard);
+        router.addActivateGuard("profile", () => blockingActivateGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -92,8 +95,8 @@ describe("router.navigate() - middleware blocking", () => {
         const blockingGuard = vi.fn().mockReturnValue(false);
         const nextGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate("settings", () => blockingGuard);
-        router.canActivate("settings.account", () => nextGuard);
+        router.addActivateGuard("settings", () => blockingGuard);
+        router.addActivateGuard("settings.account", () => nextGuard);
 
         router.navigate("settings.account", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -138,7 +141,7 @@ describe("router.navigate() - middleware blocking", () => {
         const passingGuard = vi.fn().mockReturnValue(true);
         const blockingMiddleware = vi.fn().mockReturnValue(false);
 
-        router.canActivate("orders", () => passingGuard);
+        router.addActivateGuard("orders", () => passingGuard);
         router.useMiddleware(() => blockingMiddleware);
 
         router.navigate("orders", {}, {}, (err) => {
@@ -157,7 +160,7 @@ describe("router.navigate() - middleware blocking", () => {
       it("should block transition when canDeactivate returns Promise.resolve(false)", () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
 
-        router.canDeactivate("orders.pending", () => blockingPromiseGuard);
+        router.addDeactivateGuard("orders.pending", () => blockingPromiseGuard);
 
         // Navigate to initial state
         router.navigate("orders.pending");
@@ -176,8 +179,8 @@ describe("router.navigate() - middleware blocking", () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
         const nextPromiseGuard = vi.fn().mockResolvedValue(true);
 
-        router.canDeactivate("orders", () => blockingPromiseGuard);
-        router.canDeactivate("orders.pending", () => nextPromiseGuard);
+        router.addDeactivateGuard("orders", () => blockingPromiseGuard);
+        router.addDeactivateGuard("orders.pending", () => nextPromiseGuard);
 
         router.navigate("orders.pending");
 
@@ -198,7 +201,7 @@ describe("router.navigate() - middleware blocking", () => {
       it("should block transition when canActivate returns Promise.resolve(false)", () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
 
-        router.canActivate("profile", () => blockingPromiseGuard);
+        router.addActivateGuard("profile", () => blockingPromiseGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -211,8 +214,8 @@ describe("router.navigate() - middleware blocking", () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
         const nextPromiseGuard = vi.fn().mockResolvedValue(true);
 
-        router.canActivate("settings", () => blockingPromiseGuard);
-        router.canActivate("settings.account", () => nextPromiseGuard);
+        router.addActivateGuard("settings", () => blockingPromiseGuard);
+        router.addActivateGuard("settings.account", () => nextPromiseGuard);
 
         router.navigate("settings.account", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -257,7 +260,7 @@ describe("router.navigate() - middleware blocking", () => {
         const passingPromiseGuard = vi.fn().mockResolvedValue(true);
         const blockingPromiseMiddleware = vi.fn().mockResolvedValue(false);
 
-        router.canActivate("orders", () => passingPromiseGuard);
+        router.addActivateGuard("orders", () => passingPromiseGuard);
         router.useMiddleware(() => blockingPromiseMiddleware);
 
         router.navigate("orders", {}, {}, (err) => {
@@ -276,7 +279,7 @@ describe("router.navigate() - middleware blocking", () => {
     it("should block transition when canActivate returns Promise.resolve(false)", async () => {
       const blockingGuard = vi.fn().mockResolvedValue(false);
 
-      router.canActivate("users", () => blockingGuard);
+      router.addActivateGuard("users", () => blockingGuard);
 
       const result = await new Promise<{ err: any; state: any }>((resolve) => {
         router.navigate("users", (err, state) => {
@@ -295,7 +298,7 @@ describe("router.navigate() - middleware blocking", () => {
 
       router.navigate("users");
 
-      router.canDeactivate("users", () => blockingGuard);
+      router.addDeactivateGuard("users", () => blockingGuard);
 
       const result = await new Promise<{ err: any; state: any }>((resolve) => {
         router.navigate("profile", (err, state) => {
@@ -329,7 +332,7 @@ describe("router.navigate() - middleware blocking", () => {
     it("should block transition when canActivate returns sync false", async () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.canActivate("users", () => blockingGuard);
+      router.addActivateGuard("users", () => blockingGuard);
 
       const result = await new Promise<{ err: any; state: any }>((resolve) => {
         router.navigate("users", (err, state) => {

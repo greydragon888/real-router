@@ -19,7 +19,7 @@ export interface RoutesDependencies<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   /** Register canActivate handler for a route */
-  canActivate: (
+  addActivateGuard: (
     name: string,
     handler: ActivationFnFactory<Dependencies>,
   ) => void;

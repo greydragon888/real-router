@@ -27,7 +27,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Deactivate guard failed");
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.canDeactivate("orders.pending", () => rejectingGuard);
+        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         // Navigate to initial state
         router.navigate("orders.pending");
@@ -48,8 +48,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
         const nextGuard = vi.fn().mockResolvedValue(true);
 
-        router.canDeactivate("orders", () => rejectingGuard);
-        router.canDeactivate("orders.pending", () => nextGuard);
+        router.addDeactivateGuard("orders", () => rejectingGuard);
+        router.addDeactivateGuard("orders.pending", () => nextGuard);
 
         router.navigate("orders.pending");
 
@@ -72,7 +72,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Activate guard failed");
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -87,8 +87,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
         const nextGuard = vi.fn().mockResolvedValue(true);
 
-        router.canActivate("settings", () => rejectingGuard);
-        router.canActivate("settings.account", () => nextGuard);
+        router.addActivateGuard("settings", () => rejectingGuard);
+        router.addActivateGuard("settings.account", () => nextGuard);
 
         router.navigate("settings.account", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -139,7 +139,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Middleware rejection");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
 
-        router.canActivate("orders", () => passingGuard);
+        router.addActivateGuard("orders", () => passingGuard);
         router.useMiddleware(() => rejectingMiddleware);
 
         router.navigate("orders", {}, {}, (err) => {
@@ -183,7 +183,7 @@ describe("router.navigate() - promise reject", () => {
         });
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -219,7 +219,7 @@ describe("router.navigate() - promise reject", () => {
 
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -237,7 +237,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectString = "Guard failed with string";
         const rejectingGuard = vi.fn().mockRejectedValue(rejectString);
 
-        router.canDeactivate("orders.pending", () => rejectingGuard);
+        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         // Navigate to initial state
         router.navigate("orders.pending");
@@ -258,7 +258,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectNumber = 404;
         const rejectingGuard = vi.fn().mockRejectedValue(rejectNumber);
 
-        router.canDeactivate("orders.pending", () => rejectingGuard);
+        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         router.navigate("orders.pending");
         rejectingGuard.mockClear();
@@ -274,7 +274,7 @@ describe("router.navigate() - promise reject", () => {
       it("should wrap null rejection in RouterError", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(null);
 
-        router.canDeactivate("orders.pending", () => rejectingGuard);
+        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         router.navigate("orders.pending");
         rejectingGuard.mockClear();
@@ -293,7 +293,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectString = "Activation failed";
         const rejectingGuard = vi.fn().mockRejectedValue(rejectString);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -307,7 +307,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectNumber = 403;
         const rejectingGuard = vi.fn().mockRejectedValue(rejectNumber);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -320,7 +320,7 @@ describe("router.navigate() - promise reject", () => {
       it("should wrap undefined rejection in RouterError", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(undefined);
 
-        router.canActivate("profile", () => rejectingGuard);
+        router.addActivateGuard("profile", () => rejectingGuard);
 
         router.navigate("profile", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);

@@ -10,7 +10,7 @@ import {
 
 let router: Router;
 
-describe("core/route-lifecycle/canActivate", () => {
+describe("core/route-lifecycle/addActivateGuard", () => {
   beforeEach(() => {
     router = createLifecycleTestRouter();
   });
@@ -21,7 +21,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
   it("should block navigation if route cannot be activated", () => {
     // Set up canActivate guard to block admin route
-    router.canActivate("admin", false);
+    router.addActivateGuard("admin", false);
 
     router.navigate("home");
 
@@ -34,7 +34,7 @@ describe("core/route-lifecycle/canActivate", () => {
   });
 
   it("should allow navigation if canActivate returns true", () => {
-    router.canActivate("admin", true);
+    router.addActivateGuard("admin", true);
 
     router.navigate("admin", (err) => {
       expect(err).toBe(undefined);
@@ -44,8 +44,8 @@ describe("core/route-lifecycle/canActivate", () => {
   });
 
   it("should override previous canActivate handler", () => {
-    router.canActivate("admin", false);
-    router.canActivate("admin", true);
+    router.addActivateGuard("admin", false);
+    router.addActivateGuard("admin", true);
 
     router.navigate("admin", (err) => {
       expect(err).toBe(undefined);
@@ -56,7 +56,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
   it("should block navigation if canActivate returns an Error", () => {
     // @ts-expect-error: for testing purposes
-    router.canActivate("admin", () => () => new Error("Access denied"));
+    router.addActivateGuard("admin", () => () => new Error("Access denied"));
 
     router.navigate("admin", (err) => {
       expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -65,7 +65,7 @@ describe("core/route-lifecycle/canActivate", () => {
   });
 
   it("should return error when canActivate returns a different route (guards cannot redirect)", () => {
-    router.canActivate("sign-in", () => () => ({
+    router.addActivateGuard("sign-in", () => () => ({
       name: "index",
       params: {},
       path: "/",
@@ -87,8 +87,8 @@ describe("core/route-lifecycle/canActivate", () => {
 
   describe("validation and edge cases", () => {
     it("should return router instance for method chaining (fluent interface)", () => {
-      const result1 = router.canActivate("admin", false);
-      const result2 = router.canActivate("users", true);
+      const result1 = router.addActivateGuard("admin", false);
+      const result2 = router.addActivateGuard("users", true);
 
       expect(result1).toBe(router);
       expect(result2).toBe(router);
@@ -96,12 +96,12 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should allow empty string as valid route name (root node)", () => {
       expect(() => {
-        router.canActivate("", true);
+        router.addActivateGuard("", true);
       }).not.toThrowError();
 
       // Verify guard is active by testing navigation behavior
       // Empty string guard affects all routes (root level)
-      router.canActivate("", false);
+      router.addActivateGuard("", false);
       router.navigate("home", (err) => {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
@@ -110,22 +110,22 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should throw TypeError for null route name", () => {
       expect(() => {
         // @ts-expect-error: testing null
-        router.canActivate(null, true);
+        router.addActivateGuard(null, true);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing null
-        router.canActivate(null, true);
+        router.addActivateGuard(null, true);
       }).toThrowError(/Route name must be a string/);
     });
 
     it("should throw TypeError for undefined route name", () => {
       expect(() => {
         // @ts-expect-error: testing undefined
-        router.canActivate(undefined, true);
+        router.addActivateGuard(undefined, true);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing undefined
-        router.canActivate(undefined, true);
+        router.addActivateGuard(undefined, true);
       }).toThrowError(/Route name must be a string/);
     });
 
@@ -133,49 +133,55 @@ describe("core/route-lifecycle/canActivate", () => {
       // Number
       expect(() => {
         // @ts-expect-error: testing number
-        router.canActivate(123, true);
+        router.addActivateGuard(123, true);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing number
-        router.canActivate(123, true);
+        router.addActivateGuard(123, true);
       }).toThrowError(/Route name must be a string/);
 
       // Object
       expect(() => {
         // @ts-expect-error: testing object
-        router.canActivate({}, true);
+        router.addActivateGuard({}, true);
       }).toThrowError(TypeError);
 
       // Array
       expect(() => {
         // @ts-expect-error: testing array
-        router.canActivate(["route"], true);
+        router.addActivateGuard(["route"], true);
       }).toThrowError(TypeError);
 
       // Symbol
       expect(() => {
         // @ts-expect-error: testing symbol
-        router.canActivate(Symbol("route"), true);
+        router.addActivateGuard(Symbol("route"), true);
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid handler types", () => {
       // @ts-expect-error: testing null
-      expect(() => router.canActivate("route1", null)).toThrowError(TypeError);
+      expect(() => router.addActivateGuard("route1", null)).toThrowError(
+        TypeError,
+      );
       // @ts-expect-error: testing undefined
-      expect(() => router.canActivate("route2", undefined)).toThrowError(
+      expect(() => router.addActivateGuard("route2", undefined)).toThrowError(
         TypeError,
       );
       // @ts-expect-error: testing number
-      expect(() => router.canActivate("route3", 123)).toThrowError(TypeError);
+      expect(() => router.addActivateGuard("route3", 123)).toThrowError(
+        TypeError,
+      );
       // @ts-expect-error: testing string
-      expect(() => router.canActivate("route4", "true")).toThrowError(
+      expect(() => router.addActivateGuard("route4", "true")).toThrowError(
         TypeError,
       );
       // @ts-expect-error: testing object
-      expect(() => router.canActivate("route5", {})).toThrowError(TypeError);
+      expect(() => router.addActivateGuard("route5", {})).toThrowError(
+        TypeError,
+      );
       // @ts-expect-error: testing NaN
-      expect(() => router.canActivate("route6", Number.NaN)).toThrowError(
+      expect(() => router.addActivateGuard("route6", Number.NaN)).toThrowError(
         TypeError,
       );
     });
@@ -183,21 +189,21 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should include descriptive error message for invalid handler", () => {
       expect(() => {
         // @ts-expect-error: testing null
-        router.canActivate("route", null);
+        router.addActivateGuard("route", null);
       }).toThrowError(
         /Handler must be a boolean or factory function.*got null/,
       );
 
       expect(() => {
         // @ts-expect-error: testing number
-        router.canActivate("route", 123);
+        router.addActivateGuard("route", 123);
       }).toThrowError(
         /Handler must be a boolean or factory function.*got number/,
       );
 
       expect(() => {
         // @ts-expect-error: testing string
-        router.canActivate("route", "true");
+        router.addActivateGuard("route", "true");
       }).toThrowError(
         /Handler must be a boolean or factory function.*got string/,
       );
@@ -206,12 +212,12 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should include descriptive error message when factory returns non-function", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
-        router.canActivate("route", () => null);
+        router.addActivateGuard("route", () => null);
       }).toThrowError(/Factory must return a function.*got null/);
 
       expect(() => {
         // @ts-expect-error: testing factory returning string
-        router.canActivate("route", () => "not a function");
+        router.addActivateGuard("route", () => "not a function");
       }).toThrowError(/Factory must return a function.*got string/);
     });
 
@@ -219,52 +225,52 @@ describe("core/route-lifecycle/canActivate", () => {
       // Factory returning null
       expect(() => {
         // @ts-expect-error: testing factory returning null
-        router.canActivate("route1", () => null);
+        router.addActivateGuard("route1", () => null);
       }).toThrowError(TypeError);
 
       // Factory returning undefined
       expect(() => {
         // @ts-expect-error: testing factory returning undefined
-        router.canActivate("route2", () => undefined);
+        router.addActivateGuard("route2", () => undefined);
       }).toThrowError(TypeError);
 
       // Factory returning object
       expect(() => {
         // @ts-expect-error: testing factory returning object
-        router.canActivate("route3", () => ({}));
+        router.addActivateGuard("route3", () => ({}));
       }).toThrowError(TypeError);
 
       // Factory returning number
       expect(() => {
         // @ts-expect-error: testing factory returning number
-        router.canActivate("route4", () => 42);
+        router.addActivateGuard("route4", () => 42);
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid route names", () => {
       // Only whitespace (empty string is valid root node)
       expect(() => {
-        router.canActivate("   ", true);
+        router.addActivateGuard("   ", true);
       }).toThrowError(TypeError);
 
       // Invalid characters
       expect(() => {
-        router.canActivate("route/name", true);
+        router.addActivateGuard("route/name", true);
       }).toThrowError(TypeError);
 
       // Leading dot
       expect(() => {
-        router.canActivate(".route", true);
+        router.addActivateGuard(".route", true);
       }).toThrowError(TypeError);
 
       // Trailing dot
       expect(() => {
-        router.canActivate("route.", true);
+        router.addActivateGuard("route.", true);
       }).toThrowError(TypeError);
 
       // Consecutive dots
       expect(() => {
-        router.canActivate("route..name", true);
+        router.addActivateGuard("route..name", true);
       }).toThrowError(TypeError);
     });
 
@@ -272,19 +278,19 @@ describe("core/route-lifecycle/canActivate", () => {
       const longButValidName = "a".repeat(10_000);
 
       expect(() => {
-        router.canActivate(longButValidName, true);
+        router.addActivateGuard(longButValidName, true);
       }).not.toThrowError();
 
       const tooLongName = "a".repeat(10_001);
 
       expect(() => {
-        router.canActivate(tooLongName, true);
+        router.addActivateGuard(tooLongName, true);
       }).toThrowError(TypeError);
     });
 
     it("should allow system routes with @@ prefix", () => {
       expect(() => {
-        router.canActivate("@@router/UNKNOWN_ROUTE", false);
+        router.addActivateGuard("@@router/UNKNOWN_ROUTE", false);
       }).not.toThrowError();
 
       // System routes can be registered - verified by no throw above
@@ -295,7 +301,7 @@ describe("core/route-lifecycle/canActivate", () => {
       // Guard can be registered for routes not in the tree
       // The guard simply won't be called during navigation
       expect(() => {
-        router.canActivate("nonexistent.route.path", true);
+        router.addActivateGuard("nonexistent.route.path", true);
       }).not.toThrowError();
 
       // Registration succeeds (no throw), guard won't affect navigation
@@ -310,7 +316,7 @@ describe("core/route-lifecycle/canActivate", () => {
       // @ts-expect-error: testing with custom dependency
       router.setDependency("testValue", "hello");
 
-      router.canActivate("testRoute", (r, getDep) => {
+      router.addActivateGuard("testRoute", (r, getDep) => {
         receivedRouter = r;
         receivedGetDependency = getDep;
 
@@ -333,7 +339,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
       let accessedDependency: unknown;
 
-      router.canActivate("testRoute", (_router, getDependency) => {
+      router.addActivateGuard("testRoute", (_router, getDependency) => {
         // @ts-expect-error: testing with custom dependency
         accessedDependency = getDependency("testApi");
 
@@ -351,12 +357,12 @@ describe("core/route-lifecycle/canActivate", () => {
       };
 
       expect(() => {
-        router.canActivate("problematic", factoryThatThrows);
+        router.addActivateGuard("problematic", factoryThatThrows);
       }).toThrowError("Factory initialization failed");
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
-        router.canActivate("problematic", true);
+        router.addActivateGuard("problematic", true);
       }).not.toThrowError();
 
       // Verify new guard works
@@ -369,12 +375,12 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should rollback if factory returns non-function", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
-        router.canActivate("invalid", () => null);
+        router.addActivateGuard("invalid", () => null);
       }).toThrowError(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
-        router.canActivate("invalid", false);
+        router.addActivateGuard("invalid", false);
       }).not.toThrowError();
     });
 
@@ -384,12 +390,12 @@ describe("core/route-lifecycle/canActivate", () => {
       };
 
       // Register some valid guards first
-      router.canActivate("valid1", true);
-      router.canActivate("valid2", false);
+      router.addActivateGuard("valid1", true);
+      router.addActivateGuard("valid2", false);
 
       // Try to register failing guard
       expect(() => {
-        router.canActivate("failing", factoryThatThrows);
+        router.addActivateGuard("failing", factoryThatThrows);
       }).toThrowError();
 
       // Verify valid guards still work correctly
@@ -403,7 +409,7 @@ describe("core/route-lifecycle/canActivate", () => {
 
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
-        router.canActivate("failing", true);
+        router.addActivateGuard("failing", true);
       }).not.toThrowError();
     });
   });
@@ -411,16 +417,16 @@ describe("core/route-lifecycle/canActivate", () => {
   describe("self-modification protection", () => {
     it("should throw Error if factory tries to overwrite itself via canActivate", () => {
       expect(() => {
-        router.canActivate("selfModify", (r) => {
+        router.addActivateGuard("selfModify", (r) => {
           // Try to overwrite during own registration
-          r.canActivate("selfModify", true);
+          r.addActivateGuard("selfModify", true);
 
           return () => true;
         });
       }).toThrowError(Error);
       expect(() => {
-        router.canActivate("selfModify2", (r) => {
-          r.canActivate("selfModify2", false);
+        router.addActivateGuard("selfModify2", (r) => {
+          r.addActivateGuard("selfModify2", false);
 
           return () => true;
         });
@@ -432,9 +438,9 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should allow factory to register OTHER routes during compilation", () => {
       let route2Registered = false;
 
-      router.canActivate("route1", (r) => {
+      router.addActivateGuard("route1", (r) => {
         // Registering a DIFFERENT route is allowed
-        r.canActivate("route2", false); // blocking guard
+        r.addActivateGuard("route2", false); // blocking guard
         route2Registered = true;
 
         return () => true;
@@ -454,12 +460,12 @@ describe("core/route-lifecycle/canActivate", () => {
 
     it("should maintain consistency after blocked self-modification", () => {
       // First, register a valid guard
-      router.canActivate("existing", false);
+      router.addActivateGuard("existing", false);
 
       // Try to register a guard that attempts self-modification
       expect(() => {
-        router.canActivate("problematic", (r) => {
-          r.canActivate("problematic", false);
+        router.addActivateGuard("problematic", (r) => {
+          r.addActivateGuard("problematic", false);
 
           return () => true;
         });
@@ -472,21 +478,21 @@ describe("core/route-lifecycle/canActivate", () => {
 
       // Verify problematic guard was rolled back (can be re-registered)
       expect(() => {
-        router.canActivate("problematic", true);
+        router.addActivateGuard("problematic", true);
       }).not.toThrowError();
     });
 
     it("should cleanup registering set even if factory throws", () => {
       // First attempt - factory throws
       expect(() => {
-        router.canActivate("throwingRoute", () => {
+        router.addActivateGuard("throwingRoute", () => {
           throw new Error("Factory error");
         });
       }).toThrowError("Factory error");
 
       // Second attempt - should not claim route is being registered
       expect(() => {
-        router.canActivate("throwingRoute", true);
+        router.addActivateGuard("throwingRoute", true);
       }).not.toThrowError();
 
       // Guard was successfully registered on second attempt
@@ -498,13 +504,13 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should log warning when overwriting existing guard", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
-      router.canActivate("route", true);
+      router.addActivateGuard("route", true);
 
       // First registration - no warning
       expect(warnSpy).not.toHaveBeenCalled();
 
       // Second registration - should warn
-      router.canActivate("route", false);
+      router.addActivateGuard("route", false);
 
       // Logger format: logger.warn(context, message)
       expect(warnSpy).toHaveBeenCalledWith(
@@ -516,14 +522,14 @@ describe("core/route-lifecycle/canActivate", () => {
     });
 
     it("should replace old guard with new one", () => {
-      router.canActivate("admin", true);
+      router.addActivateGuard("admin", true);
 
       // First guard allows navigation
       router.navigate("admin", (err) => {
         expect(err).toBeUndefined();
       });
 
-      router.canActivate("admin", false);
+      router.addActivateGuard("admin", false);
 
       // Navigate away first to test re-entering
       router.navigate("home");
@@ -543,11 +549,11 @@ describe("core/route-lifecycle/canActivate", () => {
 
       expect(() => {
         // @ts-expect-error: testing String object
-        router.canActivate(stringObj, true);
+        router.addActivateGuard(stringObj, true);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing String object
-        router.canActivate(stringObj, true);
+        router.addActivateGuard(stringObj, true);
       }).toThrowError(/Route name must be a string/);
     });
 
@@ -560,45 +566,45 @@ describe("core/route-lifecycle/canActivate", () => {
 
       expect(() => {
         // @ts-expect-error: testing object with toString
-        router.canActivate(objWithToString, true);
+        router.addActivateGuard(objWithToString, true);
       }).toThrowError(TypeError);
     });
 
     it("should reject route names with null bytes (security)", () => {
       // Null bytes are invalid - security concern (null byte injection)
       expect(() => {
-        router.canActivate("route\0hidden", true);
+        router.addActivateGuard("route\0hidden", true);
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.canActivate("route\0hidden", true);
+        router.addActivateGuard("route\0hidden", true);
       }).toThrowError(/Invalid route name/);
     });
 
     it("should reject Unicode and emoji in route names (ASCII only)", () => {
       // Validator only allows ASCII alphanumeric, underscore, hyphen
       expect(() => {
-        router.canActivate("route🚀", true);
+        router.addActivateGuard("route🚀", true);
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.canActivate("маршрут", true);
+        router.addActivateGuard("маршрут", true);
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.canActivate("路由", true);
+        router.addActivateGuard("路由", true);
       }).toThrowError(TypeError);
     });
 
     it("should reject zero-width characters (homoglyph attack protection)", () => {
       // Zero-width space (U+200B) - rejected for security
       expect(() => {
-        router.canActivate("admin\u200B", true);
+        router.addActivateGuard("admin\u200B", true);
       }).toThrowError(TypeError);
 
       // Zero-width non-joiner (U+200C)
       expect(() => {
-        router.canActivate("admin\u200C", true);
+        router.addActivateGuard("admin\u200C", true);
       }).toThrowError(TypeError);
     });
 
@@ -606,24 +612,24 @@ describe("core/route-lifecycle/canActivate", () => {
       // Map is not vulnerable to prototype pollution
       // Registration should succeed without errors
       expect(() => {
-        router.canActivate("__proto__", true);
+        router.addActivateGuard("__proto__", true);
       }).not.toThrowError();
 
       expect(() => {
-        router.canActivate("constructor", true);
+        router.addActivateGuard("constructor", true);
       }).not.toThrowError();
 
       expect(() => {
-        router.canActivate("hasOwnProperty", true);
+        router.addActivateGuard("hasOwnProperty", true);
       }).not.toThrowError();
 
       // All registered correctly - can overwrite them without "no handler" warning
       // (overwrite triggers warning only if handler exists, so no error = was registered)
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
-      router.canActivate("__proto__", false);
-      router.canActivate("constructor", false);
-      router.canActivate("hasOwnProperty", false);
+      router.addActivateGuard("__proto__", false);
+      router.addActivateGuard("constructor", false);
+      router.addActivateGuard("hasOwnProperty", false);
 
       // Should have logged overwrite warnings (meaning guards were registered)
       expect(warnSpy).toHaveBeenCalledTimes(3);
@@ -640,11 +646,11 @@ describe("core/route-lifecycle/canActivate", () => {
 
       expect(() => {
         // @ts-expect-error: testing Boolean object
-        router.canActivate("route", boolObj);
+        router.addActivateGuard("route", boolObj);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing Boolean object
-        router.canActivate("route", boolObj);
+        router.addActivateGuard("route", boolObj);
       }).toThrowError(/Handler must be a boolean or factory function/);
     });
 
@@ -654,11 +660,11 @@ describe("core/route-lifecycle/canActivate", () => {
 
       expect(() => {
         // @ts-expect-error: testing async as direct handler
-        router.canActivate("route", asyncHandler);
+        router.addActivateGuard("route", asyncHandler);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing async as direct handler
-        router.canActivate("route", asyncHandler);
+        router.addActivateGuard("route", asyncHandler);
       }).toThrowError(/Factory must return a function.*got Promise/);
     });
 
@@ -670,11 +676,11 @@ describe("core/route-lifecycle/canActivate", () => {
 
       expect(() => {
         // @ts-expect-error: testing generator
-        router.canActivate("route", generatorFactory);
+        router.addActivateGuard("route", generatorFactory);
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error: testing generator
-        router.canActivate("route", generatorFactory);
+        router.addActivateGuard("route", generatorFactory);
       }).toThrowError(/Factory must return a function/);
     });
 
@@ -688,7 +694,7 @@ describe("core/route-lifecycle/canActivate", () => {
       });
 
       expect(() => {
-        router.canActivate("proxyRoute", proxyFactory);
+        router.addActivateGuard("proxyRoute", proxyFactory);
       }).not.toThrowError();
 
       // Verify guard works via navigation
@@ -703,7 +709,7 @@ describe("core/route-lifecycle/canActivate", () => {
       }.bind({ allowed: true });
 
       expect(() => {
-        router.canActivate("boundRoute", factory);
+        router.addActivateGuard("boundRoute", factory);
       }).not.toThrowError();
 
       // Verify bound function's `this.allowed` (true) works via navigation
@@ -717,7 +723,7 @@ describe("core/route-lifecycle/canActivate", () => {
       const factory = () => async () => true;
 
       expect(() => {
-        router.canActivate("asyncActivation", factory);
+        router.addActivateGuard("asyncActivation", factory);
       }).not.toThrowError();
 
       // Async guards are supported - registration succeeds
@@ -728,15 +734,15 @@ describe("core/route-lifecycle/canActivate", () => {
     it("should allow factory to register multiple other routes during compilation", () => {
       const registeredRoutes: string[] = [];
 
-      router.canActivate("parent", (r) => {
+      router.addActivateGuard("parent", (r) => {
         // Register child routes during parent compilation
-        r.canActivate("parent.child1", true);
+        r.addActivateGuard("parent.child1", true);
         registeredRoutes.push("parent.child1");
 
-        r.canActivate("parent.child2", false);
+        r.addActivateGuard("parent.child2", false);
         registeredRoutes.push("parent.child2");
 
-        r.canActivate("parent.child3", () => () => true);
+        r.addActivateGuard("parent.child3", () => () => true);
         registeredRoutes.push("parent.child3");
 
         return () => true;
@@ -751,10 +757,10 @@ describe("core/route-lifecycle/canActivate", () => {
       // Verify all guards work by checking overwrite warnings
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
-      router.canActivate("parent", false);
-      router.canActivate("parent.child1", false);
-      router.canActivate("parent.child2", true);
-      router.canActivate("parent.child3", false);
+      router.addActivateGuard("parent", false);
+      router.addActivateGuard("parent.child1", false);
+      router.addActivateGuard("parent.child2", true);
+      router.addActivateGuard("parent.child3", false);
 
       // All 4 overwrites should trigger warnings
       expect(warnSpy).toHaveBeenCalledTimes(4);
@@ -763,9 +769,9 @@ describe("core/route-lifecycle/canActivate", () => {
     });
 
     it("should allow nested factory registration (factory within factory)", () => {
-      router.canActivate("level1", (r) => {
-        r.canActivate("level2", (r2) => {
-          r2.canActivate("level3", false); // blocking guard
+      router.addActivateGuard("level1", (r) => {
+        r.addActivateGuard("level2", (r2) => {
+          r2.addActivateGuard("level3", false); // blocking guard
 
           return () => true;
         });

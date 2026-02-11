@@ -7,6 +7,7 @@ settings:
 overrides:
   '@types/node': 25.2.2
   '@isaacs/brace-expansion': 5.0.1
+  axios: '>=1.13.5'
 
 importers:
 
@@ -2001,8 +2002,8 @@ packages:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
 
-  axios@1.13.2:
-    resolution: {integrity: sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==}
+  axios@1.13.5:
+    resolution: {integrity: sha512-cz4ur7Vb0xS4/KUN0tPWe44eqxrIu31me+fbang3ijiNscE129POzipJJA6zniq2C/Z6sJCjMimjS8Lc/GAs8Q==}
 
   b4a@1.7.3:
     resolution: {integrity: sha512-5Q2mfq2WfGuFp3uS//0s6baOJLMoVduPYVeNmDYxu5OUA1/cBfvr2RIS7vi62LdNj/urk1hfmj867I3qt6uZ7Q==}
@@ -5504,7 +5505,7 @@ snapshots:
 
   '@codspeed/core@5.0.1':
     dependencies:
-      axios: 1.13.2
+      axios: 1.13.5
       find-up: 6.3.0
       form-data: 4.0.5
       node-gyp-build: 4.8.4
@@ -6316,7 +6317,7 @@ snapshots:
   '@sonar/scan@4.3.4':
     dependencies:
       adm-zip: 0.5.16
-      axios: 1.13.2
+      axios: 1.13.5
       commander: 13.1.0
       fs-extra: 11.3.3
       hpagent: 1.2.0
@@ -6889,7 +6890,7 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
-  axios@1.13.2:
+  axios@1.13.5:
     dependencies:
       follow-redirects: 1.15.11
       form-data: 4.0.5

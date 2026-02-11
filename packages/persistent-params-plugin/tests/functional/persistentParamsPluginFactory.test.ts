@@ -551,7 +551,7 @@ describe("Persistent params plugin", () => {
         const spy = vi.fn();
 
         router.usePlugin(plugin);
-        router.canDeactivate("route1", () => () => true);
+        router.addDeactivateGuard("route1", () => () => true);
         router.start("/route1/1?mode=dev");
         router.subscribe(spy);
 

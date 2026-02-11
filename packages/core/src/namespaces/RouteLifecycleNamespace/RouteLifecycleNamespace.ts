@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isBoolean, getTypeDescription } from "type-guards";
+import { isBoolean, isPromise, getTypeDescription } from "type-guards";
 
 import {
   validateHandler,
@@ -14,7 +14,11 @@ import { computeThresholds } from "../../helpers";
 import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
 import type { ActivationFnFactory, Limits } from "../../types";
-import type { ActivationFn, DefaultDependencies } from "@real-router/types";
+import type {
+  ActivationFn,
+  DefaultDependencies,
+  State,
+} from "@real-router/types";
 
 /**
  * Converts a boolean value to an activation function factory.
@@ -223,9 +227,8 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanActivate(name: string, _silent = false): void {
+  clearCanActivate(name: string): void {
     this.#canActivateFactories.delete(name);
     this.#canActivateFunctions.delete(name);
   }
@@ -235,9 +238,8 @@ export class RouteLifecycleNamespace<
    * Input already validated by facade (not registering).
    *
    * @param name - Route name (already validated by facade)
-   * @param _silent - Unused (kept for API compatibility)
    */
-  clearCanDeactivate(name: string, _silent = false): void {
+  clearCanDeactivate(name: string): void {
     this.#canDeactivateFactories.delete(name);
     this.#canDeactivateFunctions.delete(name);
   }
@@ -289,6 +291,34 @@ export class RouteLifecycleNamespace<
    */
   getFunctions(): [Map<string, ActivationFn>, Map<string, ActivationFn>] {
     return [this.#canDeactivateFunctions, this.#canActivateFunctions];
+  }
+
+  checkActivateGuardSync(
+    name: string,
+    toState: State,
+    fromState: State | undefined,
+  ): boolean {
+    return this.#checkGuardSync(
+      this.#canActivateFunctions,
+      name,
+      toState,
+      fromState,
+      "checkActivateGuardSync",
+    );
+  }
+
+  checkDeactivateGuardSync(
+    name: string,
+    toState: State,
+    fromState: State | undefined,
+  ): boolean {
+    return this.#checkGuardSync(
+      this.#canDeactivateFunctions,
+      name,
+      toState,
+      fromState,
+      "checkDeactivateGuardSync",
+    );
   }
 
   // =========================================================================
@@ -347,6 +377,51 @@ export class RouteLifecycleNamespace<
       throw error;
     } finally {
       this.#registering.delete(name);
+    }
+  }
+
+  #checkGuardSync(
+    functions: Map<string, ActivationFn>,
+    name: string,
+    toState: State,
+    fromState: State | undefined,
+    methodName: string,
+  ): boolean {
+    const guardFn = functions.get(name);
+
+    if (!guardFn) {
+      return true;
+    }
+
+    let doneResult: boolean | undefined;
+
+    try {
+      const result = guardFn(toState, fromState, (err) => {
+        doneResult = !err;
+      });
+
+      if (typeof result === "boolean") {
+        return result;
+      }
+
+      if (isPromise(result)) {
+        logger.warn(
+          `router.${methodName}`,
+          `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
+        );
+
+        return false;
+      }
+
+      // done() was called synchronously
+      if (doneResult !== undefined) {
+        return doneResult;
+      }
+
+      // Guard returned void/State without calling done() synchronously — permissive default
+      return true;
+    } catch {
+      return false;
     }
   }
 

@@ -10,7 +10,7 @@ import { createSimpleRouter } from "../helpers";
   let redirectCount = 0;
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.canActivate("about", (_router) => () => {
+  router.addActivateGuard("about", (_router) => () => {
     const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
     return _router.makeState(target, {}, target === "home" ? "/" : "/users");
@@ -29,16 +29,16 @@ import { createSimpleRouter } from "../helpers";
 
   // Redirect to alternating destinations to avoid SAME_STATES
   // Setup guards for both routes so we can alternate
-  router.canDeactivate("about", (_router) => () => {
+  router.addDeactivateGuard("about", (_router) => () => {
     const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
     return _router.makeState(target, {}, target === "home" ? "/" : "/users");
   });
-  router.canDeactivate(
+  router.addDeactivateGuard(
     "home",
     (_router) => () => _router.makeState("about", {}, "/about"),
   );
-  router.canDeactivate(
+  router.addDeactivateGuard(
     "users",
     (_router) => () => _router.makeState("about", {}, "/about"),
   );
@@ -60,7 +60,7 @@ import { createSimpleRouter } from "../helpers";
   let redirectCount = 0;
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.canActivate(
+  router.addActivateGuard(
     "user",
 
     (_router) => (toState) => {

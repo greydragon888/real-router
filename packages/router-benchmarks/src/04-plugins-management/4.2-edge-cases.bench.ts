@@ -70,7 +70,7 @@ const BATCH = 50;
   const routes = ["about", "users"];
   let index = 0;
 
-  router.canActivate("about", () => () => ({
+  router.addActivateGuard("about", () => () => ({
     name: "home",
     params: {},
     path: "/",
@@ -86,7 +86,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.canActivate("about", true);
+  router.addActivateGuard("about", true);
   router.start();
   const routes = ["about", "home"];
   let index = 0;

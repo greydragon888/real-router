@@ -88,13 +88,13 @@ describe("SSR race conditions", () => {
       const clone2 = baseRouter.clone();
 
       // Add different guards to each clone
-      clone1.canActivate("admin", () => () => {
+      clone1.addActivateGuard("admin", () => () => {
         guardCallsClone1.push("clone1-admin");
 
         return true;
       });
 
-      clone2.canActivate("admin", () => () => {
+      clone2.addActivateGuard("admin", () => () => {
         guardCallsClone2.push("clone2-admin");
 
         return true;
@@ -144,7 +144,7 @@ describe("SSR race conditions", () => {
 
     it("should warn when navigate called during active async navigation", async () => {
       // Add async guard to make navigation async
-      router.canActivate("admin", () => async () => {
+      router.addActivateGuard("admin", () => async () => {
         // Start another navigation while this one is in progress
         router.navigate("public");
         // Allow time for warning to be logged
@@ -204,7 +204,7 @@ describe("SSR race conditions", () => {
       let secondNavCompleted = false;
 
       // Add async guard to first route
-      router.canActivate("admin", () => async () => {
+      router.addActivateGuard("admin", () => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         return true;

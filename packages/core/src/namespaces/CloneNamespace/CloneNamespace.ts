@@ -130,11 +130,11 @@ export class CloneNamespace<
 
     // Copy lifecycle factories
     for (const [name, handler] of Object.entries(data.canDeactivateFactories)) {
-      newRouter.canDeactivate(name, handler);
+      newRouter.addDeactivateGuard(name, handler);
     }
 
     for (const [name, handler] of Object.entries(data.canActivateFactories)) {
-      newRouter.canActivate(name, handler);
+      newRouter.addActivateGuard(name, handler);
     }
 
     // Copy middleware factories

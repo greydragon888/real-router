@@ -55,12 +55,12 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canActivate("about", () => async () => {
+  router.addActivateGuard("about", () => async () => {
     await Promise.resolve();
 
     return true;
   });
-  router.canActivate("home", () => async () => {
+  router.addActivateGuard("home", () => async () => {
     await Promise.resolve();
 
     return true;
@@ -81,12 +81,12 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canDeactivate("home", () => async () => {
+  router.addDeactivateGuard("home", () => async () => {
     await Promise.resolve();
 
     return true;
   });
-  router.canDeactivate("about", () => async () => {
+  router.addDeactivateGuard("about", () => async () => {
     await Promise.resolve();
 
     return true;
@@ -224,13 +224,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canActivate("about", () => async () => {
+  router.addActivateGuard("about", () => async () => {
     // Simulate async validation
     await Promise.resolve();
 
     return true;
   });
-  router.canActivate("home", () => async () => {
+  router.addActivateGuard("home", () => async () => {
     await Promise.resolve();
 
     return true;

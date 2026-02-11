@@ -207,7 +207,7 @@ describe("router.navigate() - route not found", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
-      router.canActivate("users", () => guard);
+      router.addActivateGuard("users", () => guard);
       router.useMiddleware(() => middleware);
 
       router.navigate("invalid.route", noop);
