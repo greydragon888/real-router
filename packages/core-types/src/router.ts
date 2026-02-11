@@ -235,5 +235,82 @@ export interface Navigator {
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ) => boolean;
+  canNavigateTo: (name: string, params?: Params) => boolean;
   subscribe: (listener: SubscribeFn) => Unsubscribe;
+}
+
+/**
+ * Router interface - public API for route navigation and lifecycle management.
+ *
+ * Defines the contract for router implementations. The actual Router class in
+ * @real-router/core implements this interface with full functionality.
+ *
+ * This interface uses `ActivationFn | boolean` for guard types to avoid circular
+ * dependencies. The concrete Router class in @real-router/core narrows this to
+ * `ActivationFnFactory | boolean` for more precise type checking.
+ */
+export interface Router {
+  /**
+   * Register an activation guard for a route.
+   *
+   * @param name - Route name
+   * @param guard - Guard function or boolean
+   * @returns this for method chaining
+   */
+  addActivateGuard: (name: string, guard: ActivationFn | boolean) => this;
+
+  /**
+   * Register a deactivation guard for a route.
+   *
+   * @param name - Route name
+   * @param guard - Guard function or boolean
+   * @returns this for method chaining
+   */
+  addDeactivateGuard: (name: string, guard: ActivationFn | boolean) => this;
+
+  /**
+   * Remove an activation guard from a route.
+   *
+   * @param name - Route name
+   */
+  removeActivateGuard: (name: string) => void;
+
+  /**
+   * Remove a deactivation guard from a route.
+   *
+   * @param name - Route name
+   */
+  removeDeactivateGuard: (name: string) => void;
+
+  /**
+   * Check if navigation to a route is allowed without performing actual navigation.
+   *
+   * Synchronously checks all activation and deactivation guards in the transition path.
+   * Async guards return false with a console warning.
+   *
+   * @param name - Route name to check
+   * @param params - Route parameters (optional)
+   * @returns true if navigation is allowed, false otherwise
+   */
+  canNavigateTo: (name: string, params?: Params) => boolean;
+
+  /**
+   * Get a minimal, safe Navigator interface for passing to components.
+   *
+   * The returned Navigator object is frozen and includes only essential methods:
+   * navigate, getState, isActiveRoute, canNavigateTo, subscribe.
+   *
+   * @returns Frozen Navigator object
+   */
+  getNavigator: () => Navigator;
+
+  /**
+   * @deprecated Use addActivateGuard() instead
+   */
+  canActivate: (name: string, guard: ActivationFn | boolean) => this;
+
+  /**
+   * @deprecated Use addDeactivateGuard() instead
+   */
+  canDeactivate: (name: string, guard: ActivationFn | boolean) => this;
 }
