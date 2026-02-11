@@ -110,12 +110,12 @@ Navigates to the default route. [Wiki](https://github.com/greydragon888/real-rou
 
 ### Guards
 
-#### `router.canActivate(name, guardFactory)`
+#### `router.addActivateGuard(name, guardFactory)`
 
 Registers a guard for route activation. [Wiki](https://github.com/greydragon888/real-router/wiki/canActivate)
 
 ```typescript
-router.canActivate("admin", () => (toState, fromState, done) => {
+router.addActivateGuard("admin", () => (toState, fromState, done) => {
   if (!isAuthenticated()) {
     done({ redirect: { name: "login" } });
   } else {
@@ -124,12 +124,12 @@ router.canActivate("admin", () => (toState, fromState, done) => {
 });
 ```
 
-#### `router.canDeactivate(name, guardFactory)`
+#### `router.addDeactivateGuard(name, guardFactory)`
 
 Registers a guard for route deactivation. [Wiki](https://github.com/greydragon888/real-router/wiki/canDeactivate)
 
 ```typescript
-router.canDeactivate("editor", () => (toState, fromState, done) => {
+router.addDeactivateGuard("editor", () => (toState, fromState, done) => {
   if (hasUnsavedChanges()) {
     done({ error: new Error("Unsaved changes") });
   } else {

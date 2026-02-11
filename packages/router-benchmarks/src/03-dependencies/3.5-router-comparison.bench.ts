@@ -147,14 +147,14 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.canActivate("about", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.canActivate("home", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -275,14 +275,14 @@ const alternatingRoutes = ["about", "home"];
     },
   );
 
-  router.canActivate("about", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.canActivate("home", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -316,14 +316,14 @@ const alternatingRoutes = ["about", "home"];
     },
   );
 
-  router.canActivate("about", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.canActivate("home", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -397,13 +397,13 @@ const alternatingRoutes = ["about", "home"];
   );
 
   // Auth guard
-  router.canActivate("about", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
     const auth = getDep("authService");
 
     return auth.isAuthenticated();
   });
-  router.canActivate("home", (_router, depsOrGetDep) => () => {
+  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
     const auth = getDep("authService");
 

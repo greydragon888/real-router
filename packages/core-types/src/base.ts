@@ -219,7 +219,7 @@ export interface NavigationOptions {
    *
    * @example
    * // Accessing redirect flag in lifecycle
-   * router.canActivate('dashboard', (toState, fromState) => {
+   * router.addActivateGuard('dashboard', (toState, fromState) => {
    *   if (toState.meta?.redirected) {
    *     console.log('This navigation is from a redirect');
    *   }

@@ -173,7 +173,7 @@ describe("router.navigate() - router not started", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
-      router.canActivate("users", () => guard);
+      router.addActivateGuard("users", () => guard);
       router.useMiddleware(() => middleware);
 
       router.navigate("users", noop);

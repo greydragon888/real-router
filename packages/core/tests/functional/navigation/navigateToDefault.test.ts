@@ -304,7 +304,7 @@ describe("navigateToDefault", () => {
 
       withDefault("admin");
 
-      router.canActivate("admin", () => blockingGuard);
+      router.addActivateGuard("admin", () => blockingGuard);
 
       router.navigateToDefault(callback);
 
@@ -459,7 +459,7 @@ describe("navigateToDefault", () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       withDefault("settings.account");
-      router.canActivate("settings.account", () => canActivateGuard);
+      router.addActivateGuard("settings.account", () => canActivateGuard);
       router.useMiddleware(() => middleware);
 
       router.navigateToDefault((err, state) => {
@@ -698,7 +698,7 @@ describe("navigateToDefault", () => {
 
       withDefault("admin", defaultParams);
 
-      router.canActivate("admin", () => blockingGuard);
+      router.addActivateGuard("admin", () => blockingGuard);
 
       const callback = vi.fn();
 
@@ -1068,7 +1068,7 @@ describe("navigateToDefault", () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
       withDefault("admin");
-      router.canActivate("admin", () => blockingGuard);
+      router.addActivateGuard("admin", () => blockingGuard);
 
       router.navigateToDefault(callback);
 

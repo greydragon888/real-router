@@ -101,7 +101,7 @@ if (!IS_ROUTER5) {
 
   // @ts-expect-error - test dependency
   router.setDependency("auth", { isAllowed: () => true });
-  router.canActivate("about", (_router, getDependency) => () => {
+  router.addActivateGuard("about", (_router, getDependency) => () => {
     // @ts-expect-error - test dependency
     do_not_optimize(getDependency("auth"));
 

@@ -45,8 +45,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canActivate("about", () => () => true);
-  router.canActivate("home", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addActivateGuard("home", () => () => true);
   router.start("/");
 
   bench("2.1.3 Navigation with synchronous canActivate guard", () => {
@@ -59,8 +59,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canDeactivate("home", () => () => true);
-  router.canDeactivate("about", () => () => true);
+  router.addDeactivateGuard("home", () => () => true);
+  router.addDeactivateGuard("about", () => () => true);
   router.start("/");
 
   bench("2.1.4 Navigation with synchronous canDeactivate guard", () => {
@@ -73,11 +73,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canDeactivate("home", () => () => true);
-  router.canDeactivate("about", () => () => true);
-  router.canActivate("about", () => () => true);
-  router.canActivate("home", () => () => true);
-  router.canActivate("users", () => () => true);
+  router.addDeactivateGuard("home", () => () => true);
+  router.addDeactivateGuard("about", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addActivateGuard("home", () => () => true);
+  router.addActivateGuard("users", () => () => true);
   router.start("/");
 
   bench("2.1.5 Navigation with multiple guards", () => {
@@ -125,8 +125,8 @@ const alternatingRoutes = ["about", "home"];
 
   router // @ts-expect-error - test dependency
     .setDependency("auth", { isAllowed: () => true });
-  router.canActivate("about", () => () => true);
-  router.canActivate("home", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addActivateGuard("home", () => () => true);
   router.start("/");
 
   bench("2.1.8 Navigation with guards using dependencies", () => {
@@ -156,9 +156,9 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canActivate("about", () => () => true);
-  router.canActivate("home", () => () => true);
-  router.canActivate("users", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addActivateGuard("home", () => () => true);
+  router.addActivateGuard("users", () => () => true);
   router.start("/");
 
   bench("2.1.10 Navigation with lightweight guards", () => {

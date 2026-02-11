@@ -25,7 +25,7 @@ describe("router.navigate() - error context", () => {
     it("should preserve error message when guard throws Error", () => {
       const errorMessage = "Custom guard error message";
 
-      router.canActivate("users", () => () => {
+      router.addActivateGuard("users", () => () => {
         throw new Error(errorMessage);
       });
 
@@ -36,7 +36,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should preserve error stack when guard throws Error", () => {
-      router.canActivate("users", () => () => {
+      router.addActivateGuard("users", () => () => {
         throw new Error("Error with stack");
       });
 
@@ -48,7 +48,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should include segment info in canActivate error", () => {
-      router.canActivate("users", () => () => {
+      router.addActivateGuard("users", () => () => {
         throw new Error("Guard error");
       });
 
@@ -61,7 +61,7 @@ describe("router.navigate() - error context", () => {
     it("should include segment info in canDeactivate error", () => {
       router.navigate("users");
 
-      router.canDeactivate("users", () => () => {
+      router.addDeactivateGuard("users", () => () => {
         throw new Error("Guard error");
       });
 
@@ -74,7 +74,7 @@ describe("router.navigate() - error context", () => {
     it("should preserve error message when Promise rejects with Error", async () => {
       const errorMessage = "Async rejection message";
 
-      router.canActivate(
+      router.addActivateGuard(
         "users",
         () => () => Promise.reject(new Error(errorMessage)),
       );
@@ -90,7 +90,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should handle Promise rejection with plain object", async () => {
-      router.canActivate(
+      router.addActivateGuard(
         "users",
         () => () => Promise.reject({ reason: "auth_failed", userId: 123 }),
       );

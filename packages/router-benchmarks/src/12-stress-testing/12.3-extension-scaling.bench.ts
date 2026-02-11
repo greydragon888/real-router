@@ -95,7 +95,7 @@ if (IS_ROUTER5) {
 
     // @ts-expect-error - use method from router5
     router.add({ name: routeName, path: `/${routeName}` });
-    router.canActivate(routeName, () => () => true);
+    router.addActivateGuard(routeName, () => () => true);
   }
 
   router.start();
@@ -116,7 +116,7 @@ if (IS_ROUTER5) {
     const routeName = `route${i}`;
 
     router.addRoute({ name: routeName, path: `/${routeName}` });
-    router.canActivate(routeName, () => () => true);
+    router.addActivateGuard(routeName, () => () => true);
   }
 
   router.start();
@@ -138,7 +138,7 @@ if (IS_ROUTER5) {
 
     // @ts-expect-error - use method from router5
     router.add({ name: routeName, path: `/${routeName}` });
-    router.canDeactivate(routeName, () => () => true);
+    router.addDeactivateGuard(routeName, () => () => true);
   }
 
   router.start();
@@ -154,7 +154,7 @@ if (IS_ROUTER5) {
     const routeName = `route${i}`;
 
     router.addRoute({ name: routeName, path: `/${routeName}` });
-    router.canDeactivate(routeName, () => () => true);
+    router.addDeactivateGuard(routeName, () => () => true);
   }
 
   router.start();
@@ -177,12 +177,15 @@ if (IS_ROUTER5) {
 
   // Add guards for nested routes (5 guards on each hierarchy level)
   for (let i = 0; i < 5; i++) {
-    router.canActivate("root", () => () => true);
-    router.canActivate("root.level1", () => () => true);
-    router.canActivate("root.level1.level2", () => () => true);
-    router.canActivate("root.level1.level2.level3", () => () => true);
-    router.canActivate("root.level1.level2.level3.level4", () => () => true);
-    router.canActivate(
+    router.addActivateGuard("root", () => () => true);
+    router.addActivateGuard("root.level1", () => () => true);
+    router.addActivateGuard("root.level1.level2", () => () => true);
+    router.addActivateGuard("root.level1.level2.level3", () => () => true);
+    router.addActivateGuard(
+      "root.level1.level2.level3.level4",
+      () => () => true,
+    );
+    router.addActivateGuard(
       "root.level1.level2.level3.level4.level5",
       () => () => true,
     );

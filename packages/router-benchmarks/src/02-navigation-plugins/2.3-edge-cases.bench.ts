@@ -33,12 +33,12 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   // Add guards to multiple routes
-  router.canActivate("home", () => () => true);
-  router.canDeactivate("home", () => () => true);
-  router.canActivate("about", () => () => true);
-  router.canDeactivate("about", () => () => true);
-  router.canActivate("users", () => () => true);
-  router.canDeactivate("users", () => () => true);
+  router.addActivateGuard("home", () => () => true);
+  router.addDeactivateGuard("home", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addDeactivateGuard("about", () => () => true);
+  router.addActivateGuard("users", () => () => true);
+  router.addDeactivateGuard("users", () => () => true);
   router.start("/");
 
   bench("2.3.2 Navigation with maximum number of guards", () => {
@@ -86,8 +86,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canActivate("about", () => () => true);
-  router.canActivate("home", () => () => true);
+  router.addActivateGuard("about", () => () => true);
+  router.addActivateGuard("home", () => () => true);
   router.start("/");
 
   bench("2.3.5 Guard always returning true", () => {
@@ -115,8 +115,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.canDeactivate("home", () => () => false);
-  router.canDeactivate("about", () => () => false);
+  router.addDeactivateGuard("home", () => () => false);
+  router.addDeactivateGuard("about", () => () => false);
   router.start("/");
 
   bench("2.3.8 Combining forceDeactivate with canDeactivate guards", () => {

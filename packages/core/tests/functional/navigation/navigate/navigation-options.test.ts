@@ -37,7 +37,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
   it("should merge states when canActivate guard returns modified state", () => {
     // Set up guard that returns new state
-    router.canActivate("profile", () => (toState, _fromState, cb) => {
+    router.addActivateGuard("profile", () => (toState, _fromState, cb) => {
       const modifiedState = {
         ...toState,
         meta: {
@@ -73,7 +73,7 @@ describe("router.navigate() - navigation meta and options", () => {
     // First navigate to establish fromState with meta params
     router.navigate("home", {}, { custom: "option" }, () => {
       // Now set up guard for next navigation
-      router.canActivate("settings", () => (toState, _fromState, cb) => {
+      router.addActivateGuard("settings", () => (toState, _fromState, cb) => {
         const modifiedState = {
           ...toState,
           meta: {
@@ -104,7 +104,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
   it("should handle state merge when canDeactivate modifies state", () => {
     // Set up canDeactivate guard that modifies the transition state
-    router.canDeactivate("home", () => (toState, _fromState, cb) => {
+    router.addDeactivateGuard("home", () => (toState, _fromState, cb) => {
       const modifiedState = {
         ...toState, // This is the target state (settings)
         meta: {
@@ -136,7 +136,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
   it("should preserve original navigation options in final state", () => {
     // Set up guard that adds some meta but preserves options
-    router.canActivate("profile", () => (toState, _fromState, cb) => {
+    router.addActivateGuard("profile", () => (toState, _fromState, cb) => {
       const modifiedState = {
         ...toState,
         meta: {
@@ -171,7 +171,7 @@ describe("router.navigate() - navigation meta and options", () => {
     let activateCallCount = 0;
 
     // canDeactivate modifies state when leaving home
-    router.canDeactivate("home", () => (toState, _fromState, cb) => {
+    router.addDeactivateGuard("home", () => (toState, _fromState, cb) => {
       deactivateCallCount++;
       const modifiedState = {
         ...toState,
@@ -189,7 +189,7 @@ describe("router.navigate() - navigation meta and options", () => {
     });
 
     // canActivate modifies state when entering profile
-    router.canActivate("profile", () => (toState, _fromState, cb) => {
+    router.addActivateGuard("profile", () => (toState, _fromState, cb) => {
       activateCallCount++;
       const modifiedState = {
         ...toState,
@@ -354,14 +354,14 @@ describe("router.navigate() - navigation meta and options", () => {
       freshRouter.navigate("users", {}, {});
 
       // Register first guard (factory pattern: () => guardFn)
-      freshRouter.canDeactivate("users", () => () => {
+      freshRouter.addDeactivateGuard("users", () => () => {
         callLog.push("guard1");
 
         return true;
       });
 
       // Register second guard for the SAME route - should REPLACE, not add
-      freshRouter.canDeactivate("users", () => () => {
+      freshRouter.addDeactivateGuard("users", () => () => {
         callLog.push("guard2");
 
         return true;
@@ -383,14 +383,14 @@ describe("router.navigate() - navigation meta and options", () => {
       freshRouter.start();
 
       // Register first guard (factory pattern: () => guardFn)
-      freshRouter.canActivate("users", () => () => {
+      freshRouter.addActivateGuard("users", () => () => {
         callLog.push("guard1");
 
         return true;
       });
 
       // Register second guard for the SAME route - should REPLACE, not add
-      freshRouter.canActivate("users", () => () => {
+      freshRouter.addActivateGuard("users", () => () => {
         callLog.push("guard2");
 
         return true;
@@ -414,7 +414,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
       // Register handler 10 times for the same route (factory pattern)
       for (let i = 0; i < 10; i++) {
-        freshRouter.canDeactivate("users", () => () => {
+        freshRouter.addDeactivateGuard("users", () => () => {
           callCount++;
 
           return true;
@@ -438,7 +438,7 @@ describe("router.navigate() - navigation meta and options", () => {
       freshRouter.navigate("users", {}, {});
 
       // Register guard for users (factory pattern)
-      freshRouter.canDeactivate("users", () => () => {
+      freshRouter.addDeactivateGuard("users", () => () => {
         callLog.push("users-guard");
 
         return true;
@@ -523,7 +523,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const cancelLog: string[] = [];
 
       // Add async guard that delays activation
-      freshRouter.canActivate("users", () => () => {
+      freshRouter.addActivateGuard("users", () => () => {
         return new Promise((resolve) =>
           setTimeout(() => {
             resolve(true);

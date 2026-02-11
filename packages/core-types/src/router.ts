@@ -303,14 +303,4 @@ export interface Router {
    * @returns Frozen Navigator object
    */
   getNavigator: () => Navigator;
-
-  /**
-   * @deprecated Use addActivateGuard() instead
-   */
-  canActivate: (name: string, guard: ActivationFn | boolean) => this;
-
-  /**
-   * @deprecated Use addDeactivateGuard() instead
-   */
-  canDeactivate: (name: string, guard: ActivationFn | boolean) => this;
 }

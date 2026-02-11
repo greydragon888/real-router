@@ -27,8 +27,8 @@ describe("router.navigate() - guards can activate", () => {
         const ordersActivateGuard = vi.fn().mockReturnValue(true);
         const pendingActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate("orders", () => ordersActivateGuard);
-        router.canActivate("orders.pending", () => pendingActivateGuard);
+        router.addActivateGuard("orders", () => ordersActivateGuard);
+        router.addActivateGuard("orders.pending", () => pendingActivateGuard);
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -42,8 +42,8 @@ describe("router.navigate() - guards can activate", () => {
         const settingsActivateGuard = vi.fn().mockReturnValue(true);
         const profileActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate("settings", () => settingsActivateGuard);
-        router.canActivate("settings.profile", () => profileActivateGuard);
+        router.addActivateGuard("settings", () => settingsActivateGuard);
+        router.addActivateGuard("settings.profile", () => profileActivateGuard);
 
         router.navigate("settings.profile", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -56,7 +56,7 @@ describe("router.navigate() - guards can activate", () => {
       it("should respect blocking canActivate guards", () => {
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.canActivate("orders.pending", () => blockingActivateGuard);
+        router.addActivateGuard("orders.pending", () => blockingActivateGuard);
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
@@ -70,7 +70,7 @@ describe("router.navigate() - guards can activate", () => {
       it("should not call canActivate handlers for non-existing route", () => {
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate(
+        router.addActivateGuard(
           "non.existent.route",
           () => nonExistentActivateGuard,
         );
@@ -86,8 +86,8 @@ describe("router.navigate() - guards can activate", () => {
         const existingActivateGuard = vi.fn().mockReturnValue(true);
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate("orders", () => existingActivateGuard);
-        router.canActivate(
+        router.addActivateGuard("orders", () => existingActivateGuard);
+        router.addActivateGuard(
           "orders.nonexistent",
           () => nonExistentActivateGuard,
         );
@@ -103,7 +103,7 @@ describe("router.navigate() - guards can activate", () => {
       it("should handle completely invalid route names", () => {
         const invalidActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canActivate(
+        router.addActivateGuard(
           "totally.invalid.route.name",
           () => invalidActivateGuard,
         );

@@ -155,14 +155,14 @@ describe("core/noValidate option", () => {
       it("should skip validation in canDeactivate", () => {
         // Valid handler
         expect(() =>
-          router.canDeactivate("home", () => () => true),
+          router.addDeactivateGuard("home", () => () => true),
         ).not.toThrowError();
       });
 
       it("should skip validation in canActivate", () => {
         // Valid handler
         expect(() =>
-          router.canActivate("home", () => () => true),
+          router.addActivateGuard("home", () => () => true),
         ).not.toThrowError();
       });
     });

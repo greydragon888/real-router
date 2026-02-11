@@ -67,7 +67,7 @@ function warmupJIT(): void {
       onTransitionSuccess: () => {},
     }));
     router.useMiddleware(warmupMiddleware);
-    router.canActivate("home", warmupGuard);
+    router.addActivateGuard("home", warmupGuard);
 
     // Pre-create states for start(state) warmup
     const warmupState = router.makeState("about", {}, "/about");

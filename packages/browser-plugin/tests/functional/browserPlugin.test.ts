@@ -1531,7 +1531,7 @@ describe("Browser Plugin", () => {
         router.navigate("home");
 
         // Add canDeactivate that returns false
-        router.canDeactivate("home", () => () => false);
+        router.addDeactivateGuard("home", () => () => false);
 
         // Navigate should fail
         await new Promise<void>((resolve) => {

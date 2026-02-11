@@ -250,7 +250,7 @@ export class RoutesNamespace<
 
     // Register pending canActivate handlers that were deferred during construction
     for (const [routeName, handler] of this.#pendingCanActivate) {
-      deps.canActivate(routeName, handler);
+      deps.addActivateGuard(routeName, handler);
     }
 
     // Clear pending handlers after registration
@@ -1282,7 +1282,7 @@ export class RoutesNamespace<
       // before setDependencies(). The getter #deps would throw if deps not set.
       if (this.#depsStore) {
         // Deps available, register immediately
-        this.#depsStore.canActivate(fullName, route.canActivate);
+        this.#depsStore.addActivateGuard(fullName, route.canActivate);
       } else {
         // Deps not set yet, store for later registration
         this.#pendingCanActivate.set(fullName, route.canActivate);

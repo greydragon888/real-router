@@ -174,7 +174,7 @@ describe("core/routes/removeRoute", () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({ name: "editor", path: "/editor" });
-      router.canDeactivate("editor", () => guard);
+      router.addDeactivateGuard("editor", () => guard);
 
       // Navigate to editor first
       router.navigate("editor", (err) => {
@@ -204,8 +204,8 @@ describe("core/routes/removeRoute", () => {
 
       router.addRoute({ name: "form1", path: "/form1" });
       router.addRoute({ name: "form2", path: "/form2" });
-      router.canDeactivate("form1", () => guard1);
-      router.canDeactivate("form2", () => guard2);
+      router.addDeactivateGuard("form1", () => guard1);
+      router.addDeactivateGuard("form2", () => guard2);
 
       router.removeRoute("form1");
 
@@ -227,7 +227,7 @@ describe("core/routes/removeRoute", () => {
         path: "/dashboard",
         canActivate: () => () => true,
       });
-      router.canDeactivate("dashboard", () => () => true);
+      router.addDeactivateGuard("dashboard", () => () => true);
 
       router.removeRoute("dashboard");
 
@@ -376,7 +376,7 @@ describe("core/routes/removeRoute", () => {
         path: "/area",
         children: [{ name: "page", path: "/page" }],
       });
-      router.canDeactivate("area.page", () => guard);
+      router.addDeactivateGuard("area.page", () => guard);
 
       // Verify guard works before removal
       router.navigate("area.page", () => {
@@ -518,7 +518,7 @@ describe("core/routes/removeRoute", () => {
         encodeParams: (p) => ({ ...p, id: `${p.id as number}` }),
         canActivate: () => activateGuard,
       });
-      router.canDeactivate("existing", () => deactivateGuard);
+      router.addDeactivateGuard("existing", () => deactivateGuard);
 
       // Attempt to remove non-existent route
       router.removeRoute("nonexistent");

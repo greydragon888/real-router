@@ -28,8 +28,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
         // Set up canDeactivate handlers
-        router.canDeactivate("orders", () => ordersDeactivateGuard);
-        router.canDeactivate("orders.pending", () => pendingDeactivateGuard);
+        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => pendingDeactivateGuard,
+        );
 
         // Navigate to initial state
         router.navigate("orders.pending", {}, {}, (err) => {
@@ -66,8 +69,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
         const accountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("settings", () => settingsDeactivateGuard);
-        router.canDeactivate("settings.account", () => accountDeactivateGuard);
+        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        router.addDeactivateGuard(
+          "settings.account",
+          () => accountDeactivateGuard,
+        );
 
         // Navigate to nested route
         router.navigate("settings.account", {}, {}, (err) => {
@@ -89,7 +95,10 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should respect canDeactivate blocking transition", () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Block transition
 
-        router.canDeactivate("orders.pending", () => blockingDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => blockingDeactivateGuard,
+        );
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -110,8 +119,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("orders", () => ordersDeactivateGuard);
-        router.canDeactivate("orders.pending", () => pendingDeactivateGuard);
+        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => pendingDeactivateGuard,
+        );
 
         // Navigate to initial state
         router.navigate("orders.pending", {}, {}, (err) => {
@@ -133,7 +145,10 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should bypass blocking guards when forceDeactivate is true", () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
 
-        router.canDeactivate("orders.pending", () => blockingDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => blockingDeactivateGuard,
+        );
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -152,8 +167,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
         const privacyDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
 
-        router.canDeactivate("settings", () => settingsDeactivateGuard);
-        router.canDeactivate("settings.privacy", () => privacyDeactivateGuard);
+        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        router.addDeactivateGuard(
+          "settings.privacy",
+          () => privacyDeactivateGuard,
+        );
 
         router.navigate("settings.privacy", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -177,8 +195,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("orders", () => ordersDeactivateGuard);
-        router.canDeactivate("orders.pending", () => pendingDeactivateGuard);
+        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => pendingDeactivateGuard,
+        );
 
         // Navigate to initial state
         router.navigate("orders.pending", {}, {}, (err) => {
@@ -200,7 +221,10 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should respect blocking guards in normal navigation", () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Blocks transition
 
-        router.canDeactivate("orders.pending", () => blockingDeactivateGuard);
+        router.addDeactivateGuard(
+          "orders.pending",
+          () => blockingDeactivateGuard,
+        );
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -220,8 +244,11 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
         const accountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("settings", () => settingsDeactivateGuard);
-        router.canDeactivate("settings.account", () => accountDeactivateGuard);
+        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        router.addDeactivateGuard(
+          "settings.account",
+          () => accountDeactivateGuard,
+        );
 
         router.navigate("settings.account", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -242,7 +269,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should verify that forceDeactivate: false calls guards normally", () => {
         const deactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("orders.pending", () => deactivateGuard);
+        router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();
@@ -260,7 +287,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should only skip guards on very first navigation (no current state)", () => {
         const profileDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.canDeactivate("profile", () => profileDeactivateGuard);
+        router.addDeactivateGuard("profile", () => profileDeactivateGuard);
 
         // Navigate to a different state first (not home, to avoid SAME_STATES)
         router.navigate("profile", {}, {}, (err) => {
@@ -282,7 +309,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should handle combination of fromState and forceDeactivate correctly", () => {
         const deactivateGuard = vi.fn().mockReturnValue(false); // Would block normally
 
-        router.canDeactivate("orders.pending", () => deactivateGuard);
+        router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         router.navigate("orders.pending", {}, {}, (err) => {
           expect(err).toBeUndefined();

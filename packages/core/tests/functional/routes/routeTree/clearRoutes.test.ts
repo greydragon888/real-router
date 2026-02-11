@@ -204,7 +204,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should clear canDeactivate handlers", () => {
       router.addRoute({ name: "editor", path: "/editor" });
-      router.canDeactivate("editor", () => () => false); // blocking guard
+      router.addDeactivateGuard("editor", () => () => false); // blocking guard
 
       router.navigate("editor");
 
@@ -241,7 +241,7 @@ describe("core/routes/clearRoutes", () => {
         path: "/route2",
         canActivate: () => () => false,
       });
-      router.canDeactivate("home", () => () => false);
+      router.addDeactivateGuard("home", () => () => false);
 
       router.clearRoutes();
 

@@ -124,7 +124,7 @@ describe("@real-router/rx - Integration Tests", () => {
     it("should filter events by TRANSITION_ERROR type", async () => {
       const errors: any[] = [];
 
-      router.canActivate("admin", () => () => false);
+      router.addActivateGuard("admin", () => () => false);
 
       events$(router)
         .pipe(filter((e) => e.type === "TRANSITION_ERROR"))
@@ -182,7 +182,7 @@ describe("@real-router/rx - Integration Tests", () => {
       let resolveDelay: (() => void) | undefined;
 
       // Add a slow canActivate that can be cancelled
-      router.canActivate("about", () => async () => {
+      router.addActivateGuard("about", () => async () => {
         await new Promise<void>((resolve) => {
           resolveDelay = resolve;
         });

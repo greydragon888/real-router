@@ -222,12 +222,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return true when guard calls done() without error", () => {
-    router.addActivateGuard(
-      "admin",
-      () => (_toState, _fromState, done) => {
-        done();
-      },
-    );
+    router.addActivateGuard("admin", () => (_toState, _fromState, done) => {
+      done();
+    });
     router.start();
     router.navigate("home");
 
@@ -235,12 +232,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return false when guard calls done() with error", () => {
-    router.addActivateGuard(
-      "admin",
-      () => (_toState, _fromState, done) => {
-        done(new Error("blocked"));
-      },
-    );
+    router.addActivateGuard("admin", () => (_toState, _fromState, done) => {
+      done({ code: "CANNOT_ACTIVATE" } as Parameters<typeof done>[0]);
+    });
     router.start();
     router.navigate("home");
 
@@ -248,12 +242,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return true when guard returns void without calling done()", () => {
-    router.addActivateGuard(
-      "admin",
-      () => () => {
-        // intentionally void — no return, no done()
-      },
-    );
+    router.addActivateGuard("admin", () => () => {
+      // intentionally void — no return, no done()
+    });
     router.start();
     router.navigate("home");
 

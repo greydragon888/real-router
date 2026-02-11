@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { RouteLifecycleNamespace } from "../../../../src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace";
 
-import type { State, ActivationFn } from "@real-router/types";
 import type { Router } from "../../../../src/Router";
 import type { ActivationFnFactory } from "../../../../src/types";
+import type { State, ActivationFn } from "@real-router/types";
 
 const createState = (name: string): State => ({
   name,

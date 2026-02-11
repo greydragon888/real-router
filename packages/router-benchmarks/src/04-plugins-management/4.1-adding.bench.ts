@@ -102,9 +102,9 @@ const BATCH_GUARDS = 200;
     `4.1.7 Adding canActivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
       for (let i = 0; i < BATCH_GUARDS; i++) {
-        router.canActivate("about", () => () => true);
+        router.addActivateGuard("about", () => () => true);
         // Overwrite with true to effectively clear the guard
-        router.canActivate("about", true);
+        router.addActivateGuard("about", true);
       }
     },
   ).gc("inner");
@@ -118,9 +118,9 @@ const BATCH_GUARDS = 200;
     `4.1.8 Adding canDeactivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
       for (let i = 0; i < BATCH_GUARDS; i++) {
-        router.canDeactivate("about", () => () => true);
+        router.addDeactivateGuard("about", () => () => true);
         // Overwrite with true to effectively clear the guard
-        router.canDeactivate("about", true);
+        router.addDeactivateGuard("about", true);
       }
     },
   ).gc("inner");

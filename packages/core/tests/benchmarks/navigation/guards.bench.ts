@@ -76,7 +76,7 @@ boxplot(() => {
       ];
       const router = createRouter(routes);
 
-      router.canActivate(
+      router.addActivateGuard(
         "about",
         createModifyingGuard("timestamp", Date.now()),
       );
@@ -101,9 +101,18 @@ boxplot(() => {
       ];
       const router = createRouter(routes);
 
-      router.canActivate("dashboard", createModifyingGuard("guard1", "done"));
-      router.canActivate("dashboard", createModifyingGuard("guard2", "done"));
-      router.canActivate("dashboard", createModifyingGuard("guard3", "done"));
+      router.addActivateGuard(
+        "dashboard",
+        createModifyingGuard("guard1", "done"),
+      );
+      router.addActivateGuard(
+        "dashboard",
+        createModifyingGuard("guard2", "done"),
+      );
+      router.addActivateGuard(
+        "dashboard",
+        createModifyingGuard("guard3", "done"),
+      );
 
       router.start();
 
@@ -121,7 +130,10 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let g = 1; g <= 5; g++) {
-        router.canActivate("admin", createModifyingGuard(`guard${g}`, "done"));
+        router.addActivateGuard(
+          "admin",
+          createModifyingGuard(`guard${g}`, "done"),
+        );
       }
 
       router.start();
@@ -218,8 +230,14 @@ boxplot(() => {
       const router = createRouter(routes);
 
       // 2 guards
-      router.canActivate("secure", createModifyingGuard("authGuard", "passed"));
-      router.canActivate("secure", createModifyingGuard("roleGuard", "passed"));
+      router.addActivateGuard(
+        "secure",
+        createModifyingGuard("authGuard", "passed"),
+      );
+      router.addActivateGuard(
+        "secure",
+        createModifyingGuard("roleGuard", "passed"),
+      );
 
       // 2 middleware
       router.useMiddleware(createModifyingMiddleware("loggingMw", "done"));
@@ -241,11 +259,20 @@ boxplot(() => {
       const router = createRouter(routes);
 
       // Auth guard (adds multiple params)
-      router.canActivate("order", createModifyingGuard("userId", "user_123"));
-      router.canActivate("order", createModifyingGuard("authenticated", true));
+      router.addActivateGuard(
+        "order",
+        createModifyingGuard("userId", "user_123"),
+      );
+      router.addActivateGuard(
+        "order",
+        createModifyingGuard("authenticated", true),
+      );
 
       // Permission guard
-      router.canActivate("order", createModifyingGuard("canViewOrder", true));
+      router.addActivateGuard(
+        "order",
+        createModifyingGuard("canViewOrder", true),
+      );
 
       // Logging middleware
       router.useMiddleware(createModifyingMiddleware("timestamp", Date.now()));
@@ -279,7 +306,7 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let g = 1; g <= 3; g++) {
-        router.canActivate("page", passthroughGuardFactory);
+        router.addActivateGuard("page", passthroughGuardFactory);
       }
 
       router.start();
@@ -298,7 +325,10 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let g = 1; g <= 3; g++) {
-        router.canActivate("page", createModifyingGuard(`guard${g}`, "done"));
+        router.addActivateGuard(
+          "page",
+          createModifyingGuard(`guard${g}`, "done"),
+        );
       }
 
       router.start();
