@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { getNavigator } from "../../src/getNavigator";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -17,7 +18,7 @@ describe("core/getNavigator", () => {
   });
 
   it("returns frozen object with exactly 5 methods", () => {
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
 
     expect(Object.isFrozen(navigator)).toBe(true);
     expect(navigator).toHaveProperty("navigate");
@@ -28,15 +29,27 @@ describe("core/getNavigator", () => {
     expect(Object.keys(navigator)).toHaveLength(5);
   });
 
-  it("returns same cached instance", () => {
-    const nav1 = router.getNavigator();
-    const nav2 = router.getNavigator();
+  it("returns new instance each call", () => {
+    const nav1 = getNavigator(router);
+    const nav2 = getNavigator(router);
 
-    expect(nav1).toBe(nav2);
+    expect(nav1).not.toBe(nav2);
+  });
+
+  it("router does not have getNavigator method", () => {
+    expect((router as any).getNavigator).toBeUndefined();
+  });
+
+  it("works with cloned router", () => {
+    const cloned = router.clone();
+    const nav = getNavigator(cloned);
+
+    expect(nav.getState).toBeTypeOf("function");
+    expect(nav.navigate).toBeTypeOf("function");
   });
 
   it("navigate works", () => {
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
     const callback = vi.fn();
 
     navigator.navigate("users", {}, {}, callback);
@@ -49,7 +62,7 @@ describe("core/getNavigator", () => {
 
   it("getState works", () => {
     router.navigate("users.view", { id: "123" });
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
     const state = navigator.getState();
 
     expect(state?.name).toBe("users.view");
@@ -58,7 +71,7 @@ describe("core/getNavigator", () => {
 
   it("isActiveRoute works", () => {
     router.navigate("users.view", { id: "123" });
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
 
     expect(navigator.isActiveRoute("users.view", { id: "123" })).toBe(true);
     expect(navigator.isActiveRoute("home")).toBe(false);
@@ -68,7 +81,7 @@ describe("core/getNavigator", () => {
   });
 
   it("subscribe works", () => {
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
     const callback = vi.fn();
     const unsubscribe = navigator.subscribe(callback);
 
@@ -83,7 +96,7 @@ describe("core/getNavigator", () => {
   });
 
   it("canNavigateTo delegates to router.canNavigateTo()", () => {
-    const navigator = router.getNavigator();
+    const navigator = getNavigator(router);
 
     expect(navigator.canNavigateTo("home")).toBe(true);
     expect(navigator.canNavigateTo("users")).toBe(true);
@@ -93,7 +106,7 @@ describe("core/getNavigator", () => {
 
   it("all methods are bound (work when destructured)", () => {
     const { navigate, getState, isActiveRoute, canNavigateTo, subscribe } =
-      router.getNavigator();
+      getNavigator(router);
 
     navigate("home");
 
