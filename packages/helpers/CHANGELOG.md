@@ -1,5 +1,12 @@
 # @real-router/helpers
 
+## 0.1.19
+
+### Patch Changes
+
+- Updated dependencies [[`178dba2`](https://github.com/greydragon888/real-router/commit/178dba2714ecf657dd384b96aa5c8558df8e0dde)]:
+  - @real-router/core@0.16.0
+
 ## 0.1.18
 
 ### Patch Changes
