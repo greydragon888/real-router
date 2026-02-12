@@ -9,10 +9,10 @@ import type { Router, State } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - navigation meta and options", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -220,19 +220,19 @@ describe("router.navigate() - navigation meta and options", () => {
       it("should have meta.redirected = false for direct navigation", async () => {
         const state = await router.navigate("users");
 
-        expect(state?.meta?.redirected).toBe(false);
+        expect(state.meta?.redirected).toBe(false);
       });
 
       it("should have meta.redirected = false for navigation with params", async () => {
         const state = await router.navigate("users.view", { id: "123" });
 
-        expect(state?.meta?.redirected).toBe(false);
+        expect(state.meta?.redirected).toBe(false);
       });
 
       it("should have meta.redirected = false for navigation with options", async () => {
         const state = await router.navigate("users", {}, { replace: true });
 
-        expect(state?.meta?.redirected).toBe(false);
+        expect(state.meta?.redirected).toBe(false);
       });
     });
 
@@ -252,12 +252,12 @@ describe("router.navigate() - navigation meta and options", () => {
     it("should have meta.redirected = false for normal navigation", async () => {
       const freshRouter = createTestRouter();
 
-      freshRouter.start();
+      await freshRouter.start();
 
       const resultState = await freshRouter.navigate("users", {}, {});
 
       expect(resultState).toBeDefined();
-      expect(resultState?.meta?.redirected).toBe(false);
+      expect(resultState.meta?.redirected).toBe(false);
 
       freshRouter.stop();
     });
@@ -265,7 +265,7 @@ describe("router.navigate() - navigation meta and options", () => {
     it("should have meta.redirected = true when opts.redirected is true", async () => {
       const freshRouter = createTestRouter();
 
-      freshRouter.start();
+      await freshRouter.start();
 
       // Simulate what would happen during a redirect
       const resultState = await freshRouter.navigate(
@@ -275,7 +275,7 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       expect(resultState).toBeDefined();
-      expect(resultState?.meta?.redirected).toBe(true);
+      expect(resultState.meta?.redirected).toBe(true);
 
       freshRouter.stop();
     });
@@ -284,7 +284,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const freshRouter = createTestRouter();
       const stateLog: { redirected: boolean | undefined }[] = [];
 
-      freshRouter.start();
+      await freshRouter.start();
 
       freshRouter.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -321,7 +321,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const freshRouter = createTestRouter();
       const callLog: string[] = [];
 
-      freshRouter.start();
+      await freshRouter.start();
       await freshRouter.navigate("users", {}, {});
 
       // Register first guard (factory pattern: () => guardFn)
@@ -351,7 +351,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const freshRouter = createTestRouter();
       const callLog: string[] = [];
 
-      freshRouter.start();
+      await freshRouter.start();
 
       // Register first guard (factory pattern: () => guardFn)
       freshRouter.addActivateGuard("users", () => () => {
@@ -380,7 +380,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const freshRouter = createTestRouter();
       let callCount = 0;
 
-      freshRouter.start();
+      await freshRouter.start();
       await freshRouter.navigate("users", {}, {});
 
       // Register handler 10 times for the same route (factory pattern)
@@ -405,7 +405,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const freshRouter = createTestRouter();
       const callLog: string[] = [];
 
-      freshRouter.start();
+      await freshRouter.start();
       await freshRouter.navigate("users", {}, {});
 
       // Register guard for users (factory pattern)
@@ -448,7 +448,7 @@ describe("router.navigate() - navigation meta and options", () => {
       const startLog: string[] = [];
       const cancelLog: string[] = [];
 
-      freshRouter.start();
+      await freshRouter.start();
 
       freshRouter.addEventListener(
         events.TRANSITION_START,
@@ -502,7 +502,7 @@ describe("router.navigate() - navigation meta and options", () => {
         );
       });
 
-      freshRouter.start();
+      await freshRouter.start();
 
       freshRouter.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -519,7 +519,7 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       // Start async navigation to users
-      freshRouter.navigate("users", {}, {});
+      await freshRouter.navigate("users", {}, {});
       // Immediately navigate to orders (should cancel users)
       await freshRouter.navigate("orders", {}, {});
 

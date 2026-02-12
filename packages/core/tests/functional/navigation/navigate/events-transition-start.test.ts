@@ -146,8 +146,8 @@ describe("router.navigate() - events transition start", () => {
       // Cancel the transition by awaiting and catching
       try {
         await cancelPromise;
-      } catch (err) {
-        expect((err as any)?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      } catch (error) {
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
 
       // TRANSITION_CANCEL should be emitted
@@ -181,9 +181,10 @@ describe("router.navigate() - events transition start", () => {
 
       try {
         await router.navigate("users.view", { id: 789 });
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect((err as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error) {
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
 
         // TRANSITION_START should still have been emitted
         expect(onStart).toHaveBeenCalledTimes(1);
@@ -311,9 +312,10 @@ describe("router.navigate() - events transition start", () => {
       // Try to navigate to same route without force/reload
       try {
         await router.navigate("orders", {}, {});
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect((err as any)?.code).toBe(errorCodes.SAME_STATES);
+      } catch (error) {
+        expect((error as any)?.code).toBe(errorCodes.SAME_STATES);
 
         // TRANSITION_START should not be emitted for blocked same-state navigation
         expect(onStart).not.toHaveBeenCalled();
@@ -333,9 +335,10 @@ describe("router.navigate() - events transition start", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect((err as any)?.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error) {
+        expect((error as any)?.code).toBe(errorCodes.ROUTER_NOT_STARTED);
 
         // TRANSITION_START should not be emitted when router is not started
         expect(onStart).not.toHaveBeenCalled();

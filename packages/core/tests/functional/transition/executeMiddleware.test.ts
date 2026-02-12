@@ -31,9 +31,10 @@ describe("transition/executeMiddleware", () => {
           fromState,
           () => false,
         );
+
         expect(result).toBe(toState);
-      } catch (err) {
-        expect(err).toBeInstanceOf(Error);
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
       }
 
       loggerSpy.mockRestore();
@@ -58,9 +59,10 @@ describe("transition/executeMiddleware", () => {
           fromState,
           () => false,
         );
+
         expect(result).toBe(toState);
-      } catch (err) {
-        expect(err).toBeInstanceOf(Error);
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
       }
 
       loggerSpy.mockRestore();
@@ -96,9 +98,10 @@ describe("transition/executeMiddleware", () => {
         cancelled = true;
 
         const result = await promise;
+
         expect(result).toBe(toState);
-      } catch (err) {
-        expect(err).toBeInstanceOf(Error);
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
       }
 
       loggerSpy.mockRestore();
@@ -123,9 +126,9 @@ describe("transition/executeMiddleware", () => {
           fromState,
           () => false,
         );
-      } catch (err) {
-        expect(err).toBeInstanceOf(Error);
-        expect((err as Error).message).toBe("Middleware error");
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe("Middleware error");
       }
 
       loggerSpy.mockRestore();

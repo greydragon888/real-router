@@ -19,10 +19,10 @@ let router: Router;
 const noop = () => undefined;
 
 describe("router.navigate() - concurrent navigation", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {

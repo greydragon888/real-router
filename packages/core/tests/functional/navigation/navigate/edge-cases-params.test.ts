@@ -27,36 +27,40 @@ describe("router.navigate() - edge cases params", () => {
       it("should return ROUTE_NOT_FOUND for consecutive dots (users..view)", async () => {
         try {
           await router.navigate("users..view", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         }
       });
 
       it("should return ROUTE_NOT_FOUND for leading dot (.users)", async () => {
         try {
           await router.navigate(".users", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         }
       });
 
       it("should return ROUTE_NOT_FOUND for trailing dot (users.)", async () => {
         try {
           await router.navigate("users.", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         }
       });
 
       it("should return ROUTE_NOT_FOUND for only dots (..)", async () => {
         try {
           await router.navigate("..", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         }
       });
     });

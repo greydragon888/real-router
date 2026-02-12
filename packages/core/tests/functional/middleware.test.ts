@@ -86,6 +86,7 @@ function createTrackingMiddleware(): {
   return {
     middleware: (toState) => {
       called = true;
+
       return toState;
     },
     wasCalled: () => called,
@@ -115,6 +116,7 @@ describe("core/middleware", () => {
 
       // Verify middleware is registered by checking it executes
       await router.navigate("users");
+
       expect(tracker.wasCalled()).toBe(true);
 
       tracker.reset();
@@ -122,6 +124,7 @@ describe("core/middleware", () => {
 
       // After clear, middleware should not execute
       await router.navigate("orders");
+
       expect(tracker.wasCalled()).toBe(false);
     });
 
@@ -132,6 +135,7 @@ describe("core/middleware", () => {
 
       // Verify middleware is registered
       await router.navigate("users");
+
       expect(tracker.wasCalled()).toBe(true);
 
       tracker.reset();
@@ -139,6 +143,7 @@ describe("core/middleware", () => {
 
       // After unsubscribe, middleware should not execute
       await router.navigate("orders");
+
       expect(tracker.wasCalled()).toBe(false);
     });
   });
@@ -352,7 +357,8 @@ describe("core/middleware", () => {
 
         // Original middleware should remain registered and execute
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
       });
 
       it("should include named factory name in duplicate error (line 162)", async () => {
@@ -395,7 +401,8 @@ describe("core/middleware", () => {
 
         // Middleware should only execute once (deduplication)
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         unsub();
       });
@@ -887,7 +894,8 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware(proxyFactory);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         tracker.reset();
         unsub();
@@ -972,7 +980,8 @@ describe("core/middleware", () => {
         router.useMiddleware(() => tracker.middleware);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
       });
 
       it("should work with bound function as factory", async () => {
@@ -995,7 +1004,8 @@ describe("core/middleware", () => {
         expect(boundFactory.name).toBe("bound contextFactory");
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         tracker.reset();
         unsub();
@@ -1013,7 +1023,8 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware(frozenFactory);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         tracker.reset();
         unsub();
@@ -1031,7 +1042,8 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware(sealedFactory);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         tracker.reset();
         unsub();
@@ -1093,7 +1105,8 @@ describe("core/middleware", () => {
         expect(unicodeFactory.name).toBe("日本語Factory🚀");
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         unsub();
       });
@@ -1112,7 +1125,8 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware(factory);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         unsub();
       });
@@ -1131,7 +1145,8 @@ describe("core/middleware", () => {
         const unsub = router.useMiddleware(factory);
 
         await router.navigate("users");
-      expect(tracker.wasCalled()).toBe(true);
+
+        expect(tracker.wasCalled()).toBe(true);
 
         unsub();
       });
@@ -1162,7 +1177,8 @@ describe("core/middleware", () => {
 
         // Navigate to trigger the middleware
         await router.navigate("users");
-      expect(true).toBe(true); // navigate succeeded);
+
+        expect(true).toBe(true); // navigate succeeded);
 
         // Verify getDependency was called and returned correct value
         expect(capturedToken).toBe("secret-token-123");

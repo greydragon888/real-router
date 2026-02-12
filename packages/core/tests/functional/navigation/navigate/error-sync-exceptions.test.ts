@@ -39,10 +39,11 @@ describe("router.navigate() - error sync exceptions", () => {
         // Navigate away - should fail with error
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe(errorMessage);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
         }
 
         expect(errorDeactivateGuard).toHaveBeenCalledTimes(1);
@@ -59,6 +60,7 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
 
         const err1 = await router.navigate("orders.pending", {}, {});
+
         expect(err1).toBeUndefined();
 
         errorGuard.mockClear();
@@ -66,10 +68,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe("First guard error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe("First guard error");
         }
 
         // Both guards should be called, but error stops transition
@@ -89,10 +92,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe(errorMessage);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
         }
 
         expect(errorActivateGuard).toHaveBeenCalledTimes(1);
@@ -109,10 +113,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("settings.account");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe("Activation error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe("Activation error");
         }
 
         expect(errorGuard).toHaveBeenCalledTimes(1);
@@ -132,10 +137,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe(errorMessage);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
         }
       });
 
@@ -152,10 +158,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe(errorMessage);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
         }
 
         expect(errorMiddleware).toHaveBeenCalledTimes(1);
@@ -176,10 +183,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
         try {
           await router.navigate("orders");
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.message).toBe(errorMessage);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
         }
       });
     });
@@ -197,12 +205,15 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect((err as any)?.message).toBe("canActivate failed synchronously");
-        expect((err as any)?.stack).toBeDefined();
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect((error as any)?.message).toBe(
+          "canActivate failed synchronously",
+        );
+        expect((error as any)?.stack).toBeDefined();
       }
     });
 
@@ -219,11 +230,12 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("index");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect((err as any)?.message).toBe(
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect((error as any)?.message).toBe(
           "canDeactivate failed synchronously",
         );
       }
@@ -240,11 +252,12 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((err as any)?.message).toBe("Middleware failed synchronously");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any)?.message).toBe("Middleware failed synchronously");
       }
     });
 
@@ -258,10 +271,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any).segment).toBe("users");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any).segment).toBe("users");
       }
     });
 
@@ -280,11 +294,12 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any).cause).toBe(rootCause);
-        expect((err as any).message).toBe("Hook error with cause");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any).cause).toBe(rootCause);
+        expect((error as any).message).toBe("Hook error with cause");
       }
     });
 
@@ -300,9 +315,10 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
+      } catch (error) {
+        expect(error).toBeDefined();
         // Router state should not change
         expect(router.getState()).toStrictEqual(initialState);
       }
@@ -319,12 +335,13 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect((err as any).custom).toBe("error");
-        expect((err as any).segment).toBe("users");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect((error as any).custom).toBe("error");
+        expect((error as any).segment).toBe("users");
       }
     });
 
@@ -339,12 +356,13 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((err as any).custom).toBe("middleware error");
-        expect((err as any).data).toBe(123);
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any).custom).toBe("middleware error");
+        expect((error as any).data).toBe(123);
       }
     });
 
@@ -361,11 +379,12 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("index");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect((err as any).segment).toBe("users");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect((error as any).segment).toBe("users");
       }
     });
 
@@ -380,10 +399,11 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
       }
     });
 
@@ -402,12 +422,13 @@ describe("router.navigate() - error sync exceptions", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((err as any).cause).toBe(rootCause);
-        expect((err as any).message).toBe("Middleware error with cause");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any).cause).toBe(rootCause);
+        expect((error as any).message).toBe("Middleware error with cause");
       }
     });
   });

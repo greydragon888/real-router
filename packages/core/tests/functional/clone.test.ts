@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { Router, State, RouterError } from "@real-router/core";
 
 /**
  * Creates a trackable plugin that records when its hooks are called.
@@ -50,7 +50,8 @@ function createTrackingMiddleware(id: string, orderTracker?: string[]) {
     factory: () => (_toState: State, _fromState: State | undefined) => {
       callCount++;
       orderTracker?.push(id);
-      return undefined;
+
+      return;
     },
     getCallCount: () => callCount,
     reset: () => {
@@ -99,6 +100,7 @@ describe("router.clone()", () => {
     await clonedRouter.start("/");
 
     const state = await clonedRouter.navigate("users");
+
     expect(state).toBeDefined();
     expect(tracker.getCallCount()).toBeGreaterThan(0);
 
@@ -118,9 +120,10 @@ describe("router.clone()", () => {
     // Verify canActivate is cloned - navigation to admin should be blocked
     try {
       await clonedRouter.navigate("admin");
+
       expect.fail("Should have thrown");
-    } catch (err) {
-      expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+    } catch (error) {
+      expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
       expect(canActivateGuard).toHaveBeenCalled();
     }
 
@@ -139,14 +142,16 @@ describe("router.clone()", () => {
 
     // Navigate to users first
     const state1 = await clonedRouter.navigate("users");
+
     expect(state1).toBeDefined();
 
     // Verify canDeactivate is cloned - leaving users should be blocked
     try {
       await clonedRouter.navigate("home");
+
       expect.fail("Should have thrown");
-    } catch (err) {
-      expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    } catch (error) {
+      expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
       expect(canDeactivateGuard).toHaveBeenCalled();
     }
 
@@ -212,6 +217,7 @@ describe("router.clone()", () => {
     await router.start("/");
 
     const state1 = await router.navigate("users");
+
     expect(state1).toBeDefined();
     // Middleware should NOT execute on original router
     expect(tracker.getCallCount()).toBe(0);
@@ -220,6 +226,7 @@ describe("router.clone()", () => {
     await clonedRouter.start("/");
 
     const state2 = await clonedRouter.navigate("users");
+
     expect(state2).toBeDefined();
     // Middleware should execute on cloned router
     expect(tracker.getCallCount()).toBeGreaterThan(0);
@@ -407,6 +414,7 @@ describe("router.clone()", () => {
       await clonedRouter.start("/");
 
       const state = await clonedRouter.navigate("users");
+
       expect(state).toBeDefined();
 
       clonedRouter.stop();
@@ -435,10 +443,11 @@ describe("router.clone()", () => {
       // The "admin" route has canActivate that blocks navigation
       try {
         await clonedRouter.navigate("admin");
+
         expect.fail("Should have thrown");
-      } catch (err) {
+      } catch (error) {
         // If lifecycle handlers are cloned, admin should be blocked
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       clonedRouter.stop();
@@ -523,6 +532,7 @@ describe("router.clone()", () => {
       await clonedRouter.start("/");
 
       const state = await clonedRouter.navigate("users");
+
       expect(state).toBeDefined();
       // Verify order is preserved
       expect(orderTracker).toStrictEqual(["mw1", "mw2", "mw3"]);
@@ -568,17 +578,22 @@ describe("router.clone()", () => {
 
       // Verify canActivate handlers are cloned
       const state1 = await clonedRouter.navigate("home");
+
       expect(state1).toBeDefined();
       expect(canActivateHome).toHaveBeenCalled();
 
       const state2 = await clonedRouter.navigate("users");
+
       expect(state2).toBeDefined();
       expect(canActivateUsers).toHaveBeenCalled();
 
       // Verify canDeactivate handler is cloned - navigate to admin then leave
       const state3 = await clonedRouter.navigate("admin");
+
       expect(state3).toBeDefined();
+
       const state4 = await clonedRouter.navigate("home");
+
       expect(state4).toBeDefined();
       expect(canDeactivateAdmin).toHaveBeenCalled();
 
@@ -611,6 +626,7 @@ describe("router.clone()", () => {
       await router.start("/");
 
       await router.navigate("users");
+
       // Only mw1 should execute on original router
       expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
       expect(mw2Tracker.getCallCount()).toBe(0);
@@ -620,6 +636,7 @@ describe("router.clone()", () => {
       await clone1.start("/");
 
       await clone1.navigate("users");
+
       // mw1 and mw2 should execute on clone1
       expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
       expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
@@ -630,6 +647,7 @@ describe("router.clone()", () => {
       await clone2.start("/");
 
       await clone2.navigate("users");
+
       // All three should execute on clone2
       expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
       expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
@@ -665,11 +683,13 @@ describe("router.clone()", () => {
 
       // Navigate to home to trigger canActivate
       const state1 = await clonedRouter.navigate("home");
+
       expect(state1).toBeDefined();
       expect(canActivateHome).toHaveBeenCalled();
 
       // Navigate away to trigger canDeactivate
       const state2 = await clonedRouter.navigate("users");
+
       expect(state2).toBeDefined();
       expect(canDeactivateHome).toHaveBeenCalled();
 
@@ -680,6 +700,7 @@ describe("router.clone()", () => {
 
       // Navigate on cloned router
       const state3 = await clonedRouter.navigate("orders");
+
       expect(state3).toBeDefined();
       expect(newHandler).toHaveBeenCalled();
 
@@ -688,6 +709,7 @@ describe("router.clone()", () => {
       await router.start("/");
 
       const state4 = await router.navigate("orders");
+
       expect(state4).toBeDefined();
       // Handler was NOT added to original, so it should NOT be called
       expect(newHandler).not.toHaveBeenCalled();
@@ -711,15 +733,17 @@ describe("router.clone()", () => {
       await clonedRouter.start("/");
 
       const state1 = await clonedRouter.navigate("workspace");
+
       expect(state1).toBeDefined();
 
       guard.mockClear();
 
       try {
         await clonedRouter.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(guard).toHaveBeenCalled();
       }
 

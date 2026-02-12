@@ -32,5 +32,6 @@ export async function createDependenciesTestRouter(
   const router = createRouter<TestDependencies>([], {}, initialDeps);
 
   await router.start();
+
   return router;
 }

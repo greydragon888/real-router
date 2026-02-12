@@ -69,6 +69,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate to users first to establish a baseline
         let err = await router.navigate("users", {}, {});
+
         expect(err).toBeUndefined();
 
         // Set up guards for routes
@@ -80,6 +81,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate to orders - users becomes inactive and should be cleaned up
         err = await router.navigate("orders", {}, {});
+
         expect(err).toBeUndefined();
 
         // users guard should be removed (was active, now inactive)
@@ -89,6 +91,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate back to users - orders becomes inactive
         err = await router.navigate("users", {}, {});
+
         expect(err).toBeUndefined();
 
         // orders guard should be removed
@@ -98,6 +101,7 @@ describe("router.navigate() - auto cleanup", () => {
       it("should only clean up segments that are not in active path for nested routes", async () => {
         // Navigate to users first to establish baseline
         let err = await router.navigate("users", {}, {});
+
         expect(err).toBeUndefined();
 
         // Set up guards
@@ -115,10 +119,12 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate to users.list
         err = await router.navigate("users.list", {}, {});
+
         expect(err).toBeUndefined();
 
         // Navigate to users.view (users remains active, but users.list becomes inactive)
         err = await router.navigate("users.view", { id: 123 }, {});
+
         expect(err).toBeUndefined();
 
         // users.list should be removed (was active, now inactive)
@@ -134,6 +140,7 @@ describe("router.navigate() - auto cleanup", () => {
       it("should handle complex nested route transitions correctly", async () => {
         // Navigate to users first
         let err = await router.navigate("users", {}, {});
+
         expect(err).toBeUndefined();
 
         // Set up guards
@@ -153,6 +160,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate through nested routes: settings.general -> settings.account -> users
         err = await router.navigate("settings.general", {}, {});
+
         expect(err).toBeUndefined();
 
         expect(hasCanDeactivate("settings")).toBe(true);
@@ -161,6 +169,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate within settings hierarchy
         err = await router.navigate("settings.account", {}, {});
+
         expect(err).toBeUndefined();
 
         // settings.general should be removed (settings remains active)
@@ -170,6 +179,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         // Navigate out of settings hierarchy completely
         err = await router.navigate("users", {}, {});
+
         expect(err).toBeUndefined();
 
         // All settings guards should be removed
@@ -198,9 +208,10 @@ describe("router.navigate() - auto cleanup", () => {
         // Try to navigate away (should be blocked)
         try {
           await router.navigate("orders", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
         }
 
         // Guard should NOT be removed (transition failed)
@@ -220,9 +231,10 @@ describe("router.navigate() - auto cleanup", () => {
 
         try {
           await router.navigate("profile", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
         // Guard should NOT be removed (transition failed)
@@ -247,9 +259,10 @@ describe("router.navigate() - auto cleanup", () => {
         // Try to navigate away (should be blocked)
         try {
           await router.navigate("orders", {}, {});
+
           expect.fail("Should have thrown error");
-        } catch (err) {
-          expect((err as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         }
 
         // Guard should NOT be removed (transition failed)
