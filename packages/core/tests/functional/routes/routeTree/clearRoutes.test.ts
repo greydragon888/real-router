@@ -177,7 +177,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("lifecycle cleanup", () => {
-    it("should clear canActivate handlers", () => {
+    it("should clear canActivate handlers", async () => {
       router.addRoute({
         name: "protected",
         path: "/protected",
@@ -185,9 +185,11 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Verify guard is active before clear
-      router.navigate("protected", (err) => {
+      try {
+        await router.navigate("protected");
+      } catch (err: any) {
         expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      }
 
       router.clearRoutes();
 
@@ -195,23 +197,23 @@ describe("core/routes/clearRoutes", () => {
       router.addRoute({ name: "protected", path: "/protected" });
 
       // Navigation should succeed (no guard after clear)
-      router.navigate("protected", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("protected");
 
       expect(router.getState()?.name).toBe("protected");
     });
 
-    it("should clear canDeactivate handlers", () => {
+    it("should clear canDeactivate handlers", async () => {
       router.addRoute({ name: "editor", path: "/editor" });
       router.addDeactivateGuard("editor", () => () => false); // blocking guard
 
-      router.navigate("editor");
+      await router.navigate("editor");
 
       // Try to leave - should be blocked
-      router.navigate("home", (err) => {
+      try {
+        await router.navigate("home");
+      } catch (err: any) {
         expect(err?.code).toBe("CANNOT_DEACTIVATE");
-      });
+      }
 
       expect(router.getState()?.name).toBe("editor");
 
@@ -220,17 +222,15 @@ describe("core/routes/clearRoutes", () => {
       // Re-add routes without guards
       router.addRoute({ name: "editor", path: "/editor" });
       router.addRoute({ name: "home", path: "/home" });
-      router.navigate("editor");
+      await router.navigate("editor");
 
       // Now leaving should work (guard was cleared)
-      router.navigate("home", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should clear all lifecycle handlers for all routes", () => {
+    it("should clear all lifecycle handlers for all routes", async () => {
       router.addRoute({
         name: "route1",
         path: "/route1",
@@ -251,13 +251,9 @@ describe("core/routes/clearRoutes", () => {
       router.addRoute({ name: "route2", path: "/route2" });
 
       // All navigations should work (all guards were cleared)
-      router.navigate("home");
-      router.navigate("route1", (err) => {
-        expect(err).toBeUndefined();
-      });
-      router.navigate("route2", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("home");
+      await router.navigate("route1");
+      await router.navigate("route2");
 
       expect(router.getState()?.name).toBe("route2");
     });
@@ -286,11 +282,10 @@ describe("core/routes/clearRoutes", () => {
 
     it("should preserve middleware", () => {
       const middlewareCalls: string[] = [];
-      const middleware =
-        () => (_toState: unknown, _fromState: unknown, done: () => void) => {
-          middlewareCalls.push("mw");
-          done();
-        };
+      const middleware = () => async () => {
+        middlewareCalls.push("mw");
+        return true;
+      };
 
       router.useMiddleware(middleware);
 
@@ -465,11 +460,10 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation (async)
-      const navigationPromise = new Promise<boolean>((resolve) => {
-        router.navigate("asyncRoute", {}, {}, (err) => {
-          resolve(!err);
-        });
-      });
+      const navigationPromise = router
+        .navigate("asyncRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -539,11 +533,7 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation
-      const navigationPromise = new Promise<void>((resolve) => {
-        router.navigate("tempRoute", {}, {}, () => {
-          resolve();
-        });
-      });
+      const navigationPromise = router.navigate("tempRoute").then(() => {});
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));

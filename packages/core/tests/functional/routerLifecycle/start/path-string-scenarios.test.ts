@@ -19,7 +19,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("successful path matching", () => {
-    it("should match path and transition to found state", () => {
+    it("should match path and transition to found state", async () => {
       const callback = vi.fn();
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -50,7 +50,7 @@ describe("router.start() - path string scenarios", () => {
       expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
     });
 
-    it("should handle path with query parameters", () => {
+    it("should handle path with query parameters", async () => {
       const callback = vi.fn();
       const transitionSuccessListener = vi.fn();
 
@@ -76,7 +76,7 @@ describe("router.start() - path string scenarios", () => {
       expect(currentState?.name).toBe("users.list");
     });
 
-    it("should preserve path parameters in matched state", () => {
+    it("should preserve path parameters in matched state", async () => {
       const callback = vi.fn();
 
       router.start("/users/view/456", callback);
@@ -93,7 +93,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("unsuccessful path matching with defaultRoute", () => {
-    it("should return error when path matching fails even with defaultRoute", () => {
+    it("should return error when path matching fails even with defaultRoute", async () => {
       router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
@@ -116,7 +116,7 @@ describe("router.start() - path string scenarios", () => {
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
 
-    it("should return error for nonexistent route even with defaultRoute", () => {
+    it("should return error for nonexistent route even with defaultRoute", async () => {
       router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
@@ -142,7 +142,7 @@ describe("router.start() - path string scenarios", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should handle error when default route navigation fails", () => {
+    it("should handle error when default route navigation fails", async () => {
       // Set invalid default route
       router = createTestRouter({
         defaultRoute: "invalid.default",
@@ -172,7 +172,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("unsuccessful path matching with allowNotFound", () => {
-    it("should create not found state when path matching fails and allowNotFound is true", () => {
+    it("should create not found state when path matching fails and allowNotFound is true", async () => {
       router = createTestRouter({ allowNotFound: true });
 
       const callback = vi.fn();
@@ -193,7 +193,7 @@ describe("router.start() - path string scenarios", () => {
       expect(currentState?.params.path).toBe("/invalid/path");
     });
 
-    it("should successfully transition to not found state", () => {
+    it("should successfully transition to not found state", async () => {
       router = createTestRouter({ allowNotFound: true });
 
       const callback = vi.fn();
@@ -227,7 +227,7 @@ describe("router.start() - path string scenarios", () => {
       expect(currentState?.params.path).toBe("/some/invalid/path");
     });
 
-    it("should prefer allowNotFound over defaultRoute when both are set", () => {
+    it("should prefer allowNotFound over defaultRoute when both are set", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const callback = vi.fn();
@@ -242,7 +242,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("allowNotFound with middleware errors", () => {
-    it("should emit TRANSITION_ERROR only once when middleware fails for unknown route", () => {
+    it("should emit TRANSITION_ERROR only once when middleware fails for unknown route", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
@@ -255,14 +255,18 @@ describe("router.start() - path string scenarios", () => {
 
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      router.start(invalidPath, (err) => {
+      try {
+       await router.start(invalidPath);
+     } catch (err: any) {
+
         expect(err).toBeDefined();
         expect(err?.code).toBe("TRANSITION_ERR");
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      });
+      
+     }
     });
 
-    it("should not attempt defaultRoute when middleware fails for unknown route", () => {
+    it("should not attempt defaultRoute when middleware fails for unknown route", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
@@ -291,7 +295,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("path string edge cases", () => {
-    it("should handle empty string as path (fallback to defaultRoute)", () => {
+    it("should handle empty string as path (fallback to defaultRoute)", async () => {
       router.start("");
 
       expect(router.isActive()).toBe(true);
@@ -299,7 +303,7 @@ describe("router.start() - path string scenarios", () => {
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should handle whitespace-only path as invalid route", () => {
+    it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
@@ -315,7 +319,7 @@ describe("router.start() - path string scenarios", () => {
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
 
-    it("should handle path with double slashes", () => {
+    it("should handle path with double slashes", async () => {
       router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
@@ -333,7 +337,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("callback protection with paths", () => {
-    it("should handle allowNotFound option correctly", () => {
+    it("should handle allowNotFound option correctly", async () => {
       const callback = vi.fn();
 
       router = createTestRouter({ allowNotFound: true });
@@ -351,7 +355,7 @@ describe("router.start() - path string scenarios", () => {
       );
     });
 
-    it("should ensure callback is called exactly once on successful transition", () => {
+    it("should ensure callback is called exactly once on successful transition", async () => {
       const callback = vi.fn();
 
       router.start("/users", callback);
@@ -367,7 +371,7 @@ describe("router.start() - path string scenarios", () => {
       );
     });
 
-    it("should ensure callback is called exactly once on route not found error", () => {
+    it("should ensure callback is called exactly once on route not found error", async () => {
       router = createTestRouter({ allowNotFound: false });
 
       const callback = vi.fn();
@@ -384,7 +388,7 @@ describe("router.start() - path string scenarios", () => {
       );
     });
 
-    it("should protect callback when using defaultRoute", () => {
+    it("should protect callback when using defaultRoute", async () => {
       const callback = vi.fn();
 
       // Configure default route
@@ -405,7 +409,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("return value with path strings", () => {
-    it("should return router instance for method chaining", () => {
+    it("should return router instance for method chaining", async () => {
       const validPath = "/users/list";
 
       // Call start and capture return value
@@ -416,7 +420,7 @@ describe("router.start() - path string scenarios", () => {
       expect(result).toBeInstanceOf(Object); // Router class instance
     });
 
-    it("should support method chaining with router methods that return router", () => {
+    it("should support method chaining with router methods that return router", async () => {
       const validPath = "/orders/view/123";
 
       // Method chaining should work for methods that return router
@@ -433,7 +437,7 @@ describe("router.start() - path string scenarios", () => {
       expect(router.getState()?.name).toBe("orders.view");
     });
 
-    it("should return router instance even when transition fails", () => {
+    it("should return router instance even when transition fails", async () => {
       const invalidPath = "/nonexistent/route";
 
       // Block all transitions to force failure
@@ -445,7 +449,7 @@ describe("router.start() - path string scenarios", () => {
       expect(result).toBe(router);
     });
 
-    it("should return router instance with callback parameter", () => {
+    it("should return router instance with callback parameter", async () => {
       const validPath = "/profile/me";
 
       const result = router.start(validPath, noop);

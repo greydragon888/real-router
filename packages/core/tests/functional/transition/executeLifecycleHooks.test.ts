@@ -20,7 +20,7 @@ describe("transition/executeLifecycleHooks", () => {
   });
 
   describe("safeCallback error handling", () => {
-    it("should catch and log error when callback throws", () => {
+    it("should catch and log error when callback throws", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
@@ -54,7 +54,7 @@ describe("transition/executeLifecycleHooks", () => {
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws after processing hooks", () => {
+    it("should catch and log error when callback throws after processing hooks", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
@@ -145,7 +145,7 @@ describe("transition/executeLifecycleHooks", () => {
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws on hook error", () => {
+    it("should catch and log error when callback throws on hook error", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
@@ -186,7 +186,7 @@ describe("transition/executeLifecycleHooks", () => {
   });
 
   describe("newState handling (line 107)", () => {
-    it("should skip state checks when newState equals currentState (same reference)", () => {
+    it("should skip state checks when newState equals currentState (same reference)", async () => {
       const toState = createState("users");
       const fromState = createState("home");
       const callback = vi.fn();
@@ -213,7 +213,7 @@ describe("transition/executeLifecycleHooks", () => {
       expect(callback).toHaveBeenCalledWith(undefined, toState);
     });
 
-    it("should skip state checks when newState is not a valid state object", () => {
+    it("should skip state checks when newState is not a valid state object", async () => {
       const toState = createState("users");
       const fromState = createState("home");
       const callback = vi.fn();
