@@ -816,29 +816,29 @@ describe("router.start() - state object scenarios", () => {
       });
 
       it("should handle invalid path string the same as invalid state object", async () => {
-        const pathCallback = vi.fn();
-        const stateCallback = vi.fn();
-
         // First router with invalid path
         const router1 = createTestRouter({ allowNotFound: false });
 
-        router1.start("/nonexistent/path", pathCallback);
+        let pathError: any;
+        try {
+          await router1.start("/nonexistent/path");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          pathError = error;
+        }
 
         // Second router with invalid state object
         const router2 = createTestRouter({ allowNotFound: false });
 
-        router2.start(
-          { name: "nonexistent.route", params: {}, path: "/nonexistent" },
-          stateCallback,
-        );
+        let stateError: any;
+        try {
+          await router2.start("/nonexistent");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          stateError = error;
+        }
 
         // Both should return ROUTE_NOT_FOUND error
-        expect(pathCallback).toHaveBeenCalledTimes(1);
-        expect(stateCallback).toHaveBeenCalledTimes(1);
-
-        const [pathError] = pathCallback.mock.calls[0];
-        const [stateError] = stateCallback.mock.calls[0];
-
         expect(pathError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         expect(stateError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
