@@ -23,7 +23,7 @@ describe("router.navigate() - events listeners", () => {
 
   describe("Issue #52: Recursive event listeners", () => {
     describe("TRANSITION_START event pollution", () => {
-      it("should demonstrate current behavior: analytics fires for all redirects", () => {
+      it("should demonstrate current behavior: analytics fires for all redirects", async () => {
         const freshRouter = createTestRouter();
         const analyticsLog: string[] = [];
 
@@ -49,7 +49,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Navigate to admin (will be redirected to users)
-        freshRouter.navigate("admin");
+        await freshRouter.navigate("admin");
 
         // Current behavior: analytics fires for BOTH admin AND users
         // This is the bug - analytics should only fire for final destination
@@ -61,7 +61,7 @@ describe("router.navigate() - events listeners", () => {
         freshRouter.stop();
       });
 
-      it("should demonstrate nested redirects cause exponential listener calls", () => {
+      it("should demonstrate nested redirects cause exponential listener calls", async () => {
         const freshRouter = createTestRouter();
         const callLog: string[] = [];
 
@@ -87,7 +87,7 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        freshRouter.navigate("admin");
+        await freshRouter.navigate("admin");
 
         // Current: effect fires for admin, profile, AND users
         // Expected (ideal): effect fires only for users (final destination)
@@ -116,15 +116,10 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        await new Promise<void>((resolve) => {
-          // Navigate and then redirect in callback
-          freshRouter.navigate("admin", {}, {}, () => {
-            // After admin completes, navigate to users
-            freshRouter.navigate("users", {}, {}, () => {
-              resolve();
-            });
-          });
-        });
+        // Navigate and then redirect in callback
+        await freshRouter.navigate("admin");
+        // After admin completes, navigate to users
+        await freshRouter.navigate("users");
 
         // Each successful navigation fires TRANSITION_SUCCESS
         // Both admin and users navigations completed successfully
@@ -164,11 +159,7 @@ describe("router.navigate() - events listeners", () => {
         // Guard that blocks admin
         freshRouter.addActivateGuard("admin", () => () => false);
 
-        await new Promise<void>((resolve) => {
-          freshRouter.navigate("admin", {}, {}, () => {
-            resolve();
-          });
-        });
+        await freshRouter.navigate("admin");
 
         // Error listener fires once for the blocked navigation
         expect(errorLog).toStrictEqual(["error:CANNOT_ACTIVATE"]);
@@ -178,7 +169,7 @@ describe("router.navigate() - events listeners", () => {
     });
 
     describe("Multiple listeners interaction", () => {
-      it("should execute all listeners at each recursion level", () => {
+      it("should execute all listeners at each recursion level", async () => {
         const freshRouter = createTestRouter();
         const listener1Calls: string[] = [];
         const listener2Calls: string[] = [];
@@ -214,7 +205,7 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        freshRouter.navigate("admin");
+        await freshRouter.navigate("admin");
 
         // All 3 listeners fire for both admin and users
         expect(listener1Calls).toStrictEqual(["admin", "users"]);
@@ -226,7 +217,7 @@ describe("router.navigate() - events listeners", () => {
     });
 
     describe("Order of execution", () => {
-      it("should maintain listener registration order at each level", () => {
+      it("should maintain listener registration order at each level", async () => {
         const freshRouter = createTestRouter();
         const executionOrder: string[] = [];
 
@@ -257,7 +248,7 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        freshRouter.navigate("admin");
+        await freshRouter.navigate("admin");
 
         // Order shows: all listeners for admin, then all for users
         expect(executionOrder).toStrictEqual([
@@ -276,7 +267,7 @@ describe("router.navigate() - events listeners", () => {
     });
 
     describe("Recursion depth tracking", () => {
-      it("should track all states in redirect chain", () => {
+      it("should track all states in redirect chain", async () => {
         const freshRouter = createTestRouter();
         const redirects: string[] = [];
 
@@ -296,7 +287,7 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        freshRouter.navigate("users");
+        await freshRouter.navigate("users");
 
         // All redirects in the chain are tracked
         // Current behavior: each redirect triggers all listeners

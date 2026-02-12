@@ -23,51 +23,51 @@ describe("router.navigate() - guards can activate", () => {
 
   describe("canActivate for existing and non-existing routes", () => {
     describe("call canActivate when route exists", () => {
-      it("should call canActivate handlers for existing route", () => {
+      it("should call canActivate handlers for existing route", async () => {
         const ordersActivateGuard = vi.fn().mockReturnValue(true);
         const pendingActivateGuard = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard("orders", () => ordersActivateGuard);
         router.addActivateGuard("orders.pending", () => pendingActivateGuard);
 
-        router.navigate("orders.pending", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+        const state = await router.navigate("orders.pending");
+        expect(state).toBeDefined();
 
-          expect(ordersActivateGuard).toHaveBeenCalledTimes(1);
-          expect(pendingActivateGuard).toHaveBeenCalledTimes(1);
-        });
+        expect(ordersActivateGuard).toHaveBeenCalledTimes(1);
+        expect(pendingActivateGuard).toHaveBeenCalledTimes(1);
       });
 
-      it("should call canActivate handlers for nested existing routes", () => {
+      it("should call canActivate handlers for nested existing routes", async () => {
         const settingsActivateGuard = vi.fn().mockReturnValue(true);
         const profileActivateGuard = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard("settings", () => settingsActivateGuard);
         router.addActivateGuard("settings.profile", () => profileActivateGuard);
 
-        router.navigate("settings.profile", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+        const state = await router.navigate("settings.profile");
+        expect(state).toBeDefined();
 
-          expect(settingsActivateGuard).toHaveBeenCalledTimes(1);
-          expect(profileActivateGuard).toHaveBeenCalledTimes(1);
-        });
+        expect(settingsActivateGuard).toHaveBeenCalledTimes(1);
+        expect(profileActivateGuard).toHaveBeenCalledTimes(1);
       });
 
-      it("should respect blocking canActivate guards", () => {
+      it("should respect blocking canActivate guards", async () => {
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
         router.addActivateGuard("orders.pending", () => blockingActivateGuard);
 
-        router.navigate("orders.pending", {}, {}, (err) => {
+        try {
+          await router.navigate("orders.pending");
+          expect.fail("Should have thrown");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
           expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
     });
 
     describe("do not call canActivate when route does not exist", () => {
-      it("should not call canActivate handlers for non-existing route", () => {
+      it("should not call canActivate handlers for non-existing route", async () => {
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard(
@@ -75,14 +75,16 @@ describe("router.navigate() - guards can activate", () => {
           () => nonExistentActivateGuard,
         );
 
-        router.navigate("non.existent.route", {}, {}, (err) => {
+        try {
+          await router.navigate("non.existent.route");
+          expect.fail("Should have thrown");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
           expect(nonExistentActivateGuard).not.toHaveBeenCalled();
-        });
+        }
       });
 
-      it("should not call canActivate for partially non-existing nested routes", () => {
+      it("should not call canActivate for partially non-existing nested routes", async () => {
         const existingActivateGuard = vi.fn().mockReturnValue(true);
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
@@ -92,15 +94,17 @@ describe("router.navigate() - guards can activate", () => {
           () => nonExistentActivateGuard,
         );
 
-        router.navigate("orders.nonexistent", {}, {}, (err) => {
+        try {
+          await router.navigate("orders.nonexistent");
+          expect.fail("Should have thrown");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
           expect(existingActivateGuard).not.toHaveBeenCalled();
           expect(nonExistentActivateGuard).not.toHaveBeenCalled();
-        });
+        }
       });
 
-      it("should handle completely invalid route names", () => {
+      it("should handle completely invalid route names", async () => {
         const invalidActivateGuard = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard(
@@ -108,11 +112,13 @@ describe("router.navigate() - guards can activate", () => {
           () => invalidActivateGuard,
         );
 
-        router.navigate("totally.invalid.route.name", {}, {}, (err) => {
+        try {
+          await router.navigate("totally.invalid.route.name");
+          expect.fail("Should have thrown");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
           expect(invalidActivateGuard).not.toHaveBeenCalled();
-        });
+        }
       });
     });
   });
