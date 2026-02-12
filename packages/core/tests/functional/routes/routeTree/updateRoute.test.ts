@@ -956,7 +956,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Start async navigation
-      router.navigate("ur-async", {}, {}, () => {});
+      router.navigate("ur-async");
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1171,9 +1171,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept arrow function as canActivate factory", async () => {
-        const guard = vi.fn((_toState, _fromState, done) => {
-          done();
-        });
+        const guard = vi.fn().mockReturnValue(true);
 
         router.addRoute({ name: "ur-arrow-guard", path: "/ur-arrow-guard" });
 
