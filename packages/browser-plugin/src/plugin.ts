@@ -199,16 +199,14 @@ export function browserPluginFactory(
      * Overrides router.start to integrate with browser location.
      * If no start path is provided, uses current browser URL.
      */
-    router.start = (...args: StartRouterArguments) => {
-      const [startPath, done] = getStartRouterArguments(args, browser, options);
+    router.start = async (...args: StartRouterArguments) => {
+      const startPath = getStartRouterArguments(args, browser, options);
 
-      if (startPath) {
-        routerStart(startPath, done);
-      } else {
-        routerStart(done);
+      if (startPath !== undefined) {
+        return routerStart(startPath);
       }
 
-      return router;
+      return routerStart();
     };
 
     /**
@@ -313,7 +311,7 @@ export function browserPluginFactory(
      * Protected against concurrent transitions and handles errors gracefully.
      * Defers events during transitions to prevent browser history desync.
      */
-    function onPopState(evt: PopStateEvent) {
+    async function onPopState(evt: PopStateEvent) {
       // Race condition protection: defer event if transition in progress
       if (isTransitioning) {
         console.warn(
@@ -353,30 +351,41 @@ export function browserPluginFactory(
         // 2. shouldSkipTransition returns true when !state (utils.ts:136)
         isTransitioning = true;
 
-        // Use internal navigateToState with emitSuccess = true
-        // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
-        router.navigateToState(
+        try {
+          // Use internal navigateToState with emitSuccess = true
+          // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by shouldSkipTransition
-          state!,
-          routerState,
-          transitionOptions,
-          (err: RouterError | undefined, toState: State | undefined) => {
-            isTransitioning = false;
-            handleTransitionResult(
-              err,
-              toState,
-              routerState,
-              isNewState,
-              router,
-              browser,
-              options,
-            );
+          const toState = await router.navigateToState(
+            state!,
+            routerState,
+            transitionOptions,
+            true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
+          );
 
-            // Process any deferred popstate events after transition completes
-            processDeferredEvent();
-          },
-          true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
-        );
+          handleTransitionResult(
+            undefined,
+            toState,
+            routerState,
+            isNewState,
+            router,
+            browser,
+            options,
+          );
+        } catch (err) {
+          handleTransitionResult(
+            err as RouterError,
+            undefined,
+            routerState,
+            isNewState,
+            router,
+            browser,
+            options,
+          );
+        } finally {
+          isTransitioning = false;
+          // Process any deferred popstate events after transition completes
+          processDeferredEvent();
+        }
       } catch (error) {
         isTransitioning = false;
         console.error(

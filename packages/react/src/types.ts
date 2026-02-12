@@ -1,12 +1,6 @@
 // packages/react/modules/types.ts
 
-import type {
-  Params,
-  Navigator,
-  Router,
-  RouterError,
-  State,
-} from "@real-router/core";
+import type { Params, Navigator, Router, State } from "@real-router/core";
 import type { MouseEvent, ReactNode } from "react";
 
 export interface RouteState<
@@ -36,8 +30,6 @@ export interface BaseLinkProps {
   activeStrict?: boolean;
   ignoreQueryParams?: boolean;
   onClick?: (evt: MouseEvent<HTMLAnchorElement>) => void;
-  successCallback?: (state?: State) => void;
-  errorCallback?: (err: RouterError) => void;
   target?: string;
   children?: ReactNode;
   previousRoute?: State;

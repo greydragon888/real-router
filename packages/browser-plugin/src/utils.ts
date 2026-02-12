@@ -13,10 +13,9 @@ import type {
 } from "./types";
 import type {
   Router,
-  State,
-  DoneFn,
   NavigationOptions,
   RouterError,
+  State,
 } from "@real-router/core";
 
 /**
@@ -56,35 +55,24 @@ export const escapeRegExp = (str: string): string => {
  * @param args - Arguments passed to router.start()
  * @param browser - Browser API instance
  * @param options - Browser plugin options
- * @returns Tuple of [startPathOrState, done callback]
+ * @returns Start path, or undefined to use current location
  */
 export function getStartRouterArguments(
   args: StartRouterArguments,
   browser: Browser,
   options: BrowserPluginOptions,
-): [startPathOrState: string | State | undefined, done: DoneFn] {
+): string | undefined {
   if (args.length === 0) {
     const location = browser.getLocation(options);
 
     if (location === "/") {
-      return [undefined, noop];
+      return undefined;
     }
 
-    return [location, noop];
+    return location;
   }
 
-  if (args.length === 1) {
-    if (typeof args[0] === "function") {
-      return [browser.getLocation(options), args[0]];
-    }
-
-    return [args[0], noop];
-  }
-
-  // args.length === 2
-  const [pathOrState, done] = args as [string | State, DoneFn];
-
-  return [pathOrState, done];
+  return args[0];
 }
 
 /**

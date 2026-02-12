@@ -393,12 +393,8 @@ export class RouteLifecycleNamespace<
       return true;
     }
 
-    let doneResult: boolean | undefined;
-
     try {
-      const result = guardFn(toState, fromState, (err) => {
-        doneResult = !err;
-      });
+      const result = guardFn(toState, fromState);
 
       if (typeof result === "boolean") {
         return result;

@@ -8,7 +8,6 @@ import { useStableValue } from "../hooks/useStableValue";
 import { shouldNavigate } from "../utils";
 
 import type { BaseLinkProps } from "../types";
-import type { RouterError, State } from "@real-router/core";
 import type { FC, MouseEvent } from "react";
 
 /**
@@ -24,8 +23,6 @@ export const BaseLink: FC<BaseLinkProps> = memo(
     activeStrict = false,
     ignoreQueryParams = true,
     onClick,
-    successCallback,
-    errorCallback,
     target,
     router,
     children,
@@ -75,35 +72,10 @@ export const BaseLink: FC<BaseLinkProps> = memo(
         // Prevent default link behavior
         evt.preventDefault();
 
-        // Create navigation callback if needed
-        const done =
-          successCallback || errorCallback
-            ? (err?: RouterError, state?: State) => {
-                if (err) {
-                  errorCallback?.(err);
-                } else {
-                  successCallback?.(state);
-                }
-              }
-            : undefined;
-
-        // Perform navigation
-        if (done) {
-          router.navigate(routeName, stableParams, stableOptions, done);
-        } else {
-          router.navigate(routeName, stableParams, stableOptions);
-        }
+        // Perform navigation (fire-and-forget)
+        router.navigate(routeName, stableParams, stableOptions);
       },
-      [
-        onClick,
-        target,
-        router,
-        routeName,
-        stableParams,
-        stableOptions,
-        successCallback,
-        errorCallback,
-      ],
+      [onClick, target, router, routeName, stableParams, stableOptions],
     );
 
     // Build className efficiently
@@ -149,8 +121,6 @@ export const BaseLink: FC<BaseLinkProps> = memo(
       prevProps.activeStrict === nextProps.activeStrict &&
       prevProps.ignoreQueryParams === nextProps.ignoreQueryParams &&
       prevProps.onClick === nextProps.onClick &&
-      prevProps.successCallback === nextProps.successCallback &&
-      prevProps.errorCallback === nextProps.errorCallback &&
       prevProps.target === nextProps.target &&
       prevProps.children === nextProps.children
     );
