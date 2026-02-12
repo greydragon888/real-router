@@ -206,7 +206,7 @@ describe("router.navigate() - events transition success", () => {
       router.clearMiddleware();
     });
 
-    it("should not emit TRANSITION_SUCCESS when transition fails", () => {
+    it("should not emit TRANSITION_SUCCESS when transition fails", async () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
@@ -255,12 +255,15 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Set up async middleware to allow cancellation
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50); // Delay to allow cancellation
-      });
+      const asyncMiddleware = vi
+        .fn()
+        .mockImplementation((_toState: any, _fromState: any, done: any) => {
+          setTimeout(() => done(), 50);
+        });
+      router.useMiddleware(() => asyncMiddleware);
 
       const promise = router.navigate("users.view", { id: 456 });
-      const cancel = () => router.cancel();
+      const cancel = () => (router as any).cancel();
 
       // Cancel immediately
       cancel();

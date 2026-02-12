@@ -50,9 +50,8 @@ describe("navigateToDefault", () => {
       // Start at a specific route since there's no defaultRoute
       await freshRouter.start("/users");
 
-      // navigateToDefault should return a Promise even when no defaultRoute
-      const promise = freshRouter.navigateToDefault();
-      const cancel = (promise as any).cancel;
+      // navigateToDefault should return a cancel function even when no defaultRoute
+      const cancel = freshRouter.navigateToDefault();
 
       expect(typeof cancel).toBe("function");
 

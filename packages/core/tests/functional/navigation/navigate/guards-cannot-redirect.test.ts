@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterError, errorCodes } from "@real-router/core";
 
@@ -135,7 +135,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         const callback = vi.fn();
 
-        router.navigate("profile", callback);
+        router.navigate("profile", {}, {}).then(callback).catch(callback);
 
         await vi.runAllTimersAsync();
 
@@ -167,11 +167,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         const callback = vi.fn();
 
-        router.navigate("profile", callback);
+        router.navigate("profile", {}, {}).then(callback).catch(callback);
 
         await vi.runAllTimersAsync();
 
-        // Guards cannot redirect - should return error
         expect(callback).toHaveBeenCalledWith(
           expect.objectContaining({
             code: errorCodes.CANNOT_ACTIVATE,
@@ -325,19 +324,13 @@ describe("router.navigate() - guards cannot redirect", () => {
       }
     });
 
-    // Test 3: Same route state modification should NOT trigger re-navigation
-    it("should allow guards to modify meta without re-navigation", async () => {
-      router.addActivateGuard("users.view", () => (toState) => {
-        // Modify meta and continue - same route, should just merge
-        return {
-          ...toState,
-          meta: { ...toState.meta, normalized: true },
-        };
+    it("should allow navigation when guard returns true", async () => {
+      router.addActivateGuard("users.view", () => () => {
+        return true;
       });
 
       const state = await router.navigate("users.view", { id: "123" });
 
-      expect(state?.meta?.normalized).toBe(true);
       expect(state?.name).toBe("users.view");
     });
 

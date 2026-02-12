@@ -66,7 +66,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     } catch (err: any) {
       expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
     }
-      expect(router.isActiveRoute("admin")).toBe(false);
+    expect(router.isActiveRoute("admin")).toBe(false);
   });
 
   it("should return error when canActivate returns a different route (guards cannot redirect)", async () => {
@@ -76,16 +76,18 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       path: "/",
     }));
 
+    let err: any;
     try {
       await router.navigate("sign-in");
-    } catch (err: any) {
+    } catch (e: any) {
+      err = e;
     }
-      // Guards cannot redirect - should return CANNOT_ACTIVATE error
-      expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      expect(err?.attemptedRedirect).toStrictEqual({
-        name: "index",
-        params: {},
-        path: "/",
+    // Guards cannot redirect - should return CANNOT_ACTIVATE error
+    expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    expect(err?.attemptedRedirect).toStrictEqual({
+      name: "index",
+      params: {},
+      path: "/",
     });
 
     // Should remain on previous state, not redirect to index
@@ -375,12 +377,14 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).not.toThrowError();
 
       // Verify new guard works
+      let err: any;
       try {
         await router.navigate("problematic");
-      } catch (err: any) {
+      } catch (e: any) {
+        err = e;
       }
-        // Route may not exist in tree, but registration succeeded
-        expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      // Route may not exist in tree, but registration succeeded
+      expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
     });
 
     it("should rollback if factory returns non-function", async () => {

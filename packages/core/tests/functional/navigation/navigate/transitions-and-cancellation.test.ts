@@ -1,11 +1,11 @@
 import { logger } from "@real-router/logger";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { DoneFn, Router } from "@real-router/core";
+import type { Router } from "@real-router/core";
 
 let router: Router;
 const noop = () => undefined;
@@ -28,9 +28,10 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     vi.useFakeTimers();
 
-    router.useMiddleware(() => async () => {
-      await new Promise((resolve) => setTimeout(resolve, 20));
-    });
+    const middleware = (_toState: any, _fromState: any, done: any): void => {
+      setTimeout(() => done(), 20);
+    };
+    router.useMiddleware(() => middleware as any);
 
     const promises = Array.from({ length: 5 })
       .fill(null)
@@ -48,12 +49,12 @@ describe("router.navigate() - transitions and cancellation", () => {
     vi.useRealTimers();
   });
 
-  it("should do nothing if cancel is called after transition finished", () => {
-    const cancel = router.navigate("users");
+  it("should do nothing if cancel is called after transition finished", async () => {
+    await router.navigate("users");
 
     expect(router.getState()?.name).toBe("users");
     expect(() => {
-      cancel();
+      (router as any).cancel();
     }).not.toThrowError();
   });
 
@@ -129,10 +130,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         freshRouter.start();
 
         const callback = vi.fn();
-        const cancel = freshRouter.navigate("users", callback);
+        freshRouter.navigate("users").then(callback).catch(callback);
 
         // Cancel navigation before promise completes
-        cancel();
+        (freshRouter as any).cancel();
 
         // Now resolve the promise
         resolvePromise!();
@@ -168,10 +169,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         freshRouter.addEventListener(events.TRANSITION_ERROR, errorListener);
         freshRouter.addEventListener(events.TRANSITION_CANCEL, cancelListener);
 
-        const cancel = freshRouter.navigate("users", () => {});
+        freshRouter.navigate("users");
 
         // Cancel
-        cancel();
+        (freshRouter as any).cancel();
 
         // Now reject the promise
         rejectPromise!(new Error("Guard failed"));
@@ -187,7 +188,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     describe("done() callback after cancellation", () => {
       it("should ignore done() calls after navigation cancellation", async () => {
-        let doneFn: DoneFn;
+        let doneFn: any;
         const asyncMiddleware = vi
           .fn()
           .mockImplementation((toState, _fromState, done) => {
@@ -207,17 +208,17 @@ describe("router.navigate() - transitions and cancellation", () => {
         freshRouter.useMiddleware(() => asyncMiddleware);
         freshRouter.start();
 
-        const cancel = freshRouter.navigate("users");
+        const promise = freshRouter.navigate("users");
 
         // Cancel navigation
-        cancel();
+        (freshRouter as any).cancel();
 
         // Try to call done after cancellation
         doneFn!();
 
         // Navigation should be cancelled
         try {
-          await cancel;
+          await promise;
           expect.fail("Should have thrown error");
         } catch (err: any) {
           expect(err).toMatchObject({
@@ -229,30 +230,28 @@ describe("router.navigate() - transitions and cancellation", () => {
       });
 
       it("should not process error from done() after cancellation", async () => {
-        let doneFn: DoneFn;
+        let doneFn: any;
 
         const freshRouter = createTestRouter();
 
-        freshRouter.addActivateGuard(
-          "users",
-          () => (_toState, _fromState, done) => {
-            doneFn = done;
-          },
-        );
+        const guardFn = (_toState: any, _fromState: any, done: any): void => {
+          doneFn = done;
+        };
+        freshRouter.addActivateGuard("users", () => guardFn as any);
 
         freshRouter.start();
 
-        const cancel = freshRouter.navigate("users");
+        const promise = freshRouter.navigate("users");
 
         // Cancel navigation
-        cancel();
+        (freshRouter as any).cancel();
 
         // Try to call done with error after cancellation
         doneFn!(new RouterError(errorCodes.CANNOT_ACTIVATE));
 
         // Navigation should be cancelled
         try {
-          await cancel;
+          await promise;
           expect.fail("Should have thrown error");
         } catch (err: any) {
           expect(err).toMatchObject({
@@ -268,21 +267,26 @@ describe("router.navigate() - transitions and cancellation", () => {
       it("should handle multiple cancel() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.useMiddleware(() => async () => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        });
+        const middleware2 = (
+          _toState: any,
+          _fromState: any,
+          done: any,
+        ): void => {
+          setTimeout(() => done(), 100);
+        };
+        freshRouter.useMiddleware(() => middleware2 as any);
         freshRouter.start();
 
-        const cancel = freshRouter.navigate("users");
+        const promise = freshRouter.navigate("users");
 
-        // Call cancel multiple times
-        cancel();
-        cancel();
-        cancel();
+        // Cancel navigation
+        (freshRouter as any).cancel();
+        (freshRouter as any).cancel();
+        (freshRouter as any).cancel();
 
         // Navigation should be cancelled
         try {
-          await cancel;
+          await promise;
           expect.fail("Should have thrown error");
         } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
@@ -310,11 +314,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
         // Issue #50: With two-phase start, we need to wait for start to complete
         // before testing navigation cancellation
-        await new Promise<void>((resolve) => {
-          freshRouter.start(() => {
-            resolve();
-          });
-        });
+        await freshRouter.start();
 
         const callback1 = vi.fn().mockImplementation((err) => {
           callOrder.push(err ? `users:${err.code}` : "users:success");
@@ -324,10 +324,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         });
 
         // First navigation
-        freshRouter.navigate("users", callback1);
+        freshRouter.navigate("users").then(callback1).catch(callback1);
 
         // Immediately second navigation (should cancel the first)
-        freshRouter.navigate("orders", callback2);
+        freshRouter.navigate("orders").then(callback2).catch(callback2);
 
         // Wait for completion
         await new Promise((resolve) => setTimeout(resolve, 100));
