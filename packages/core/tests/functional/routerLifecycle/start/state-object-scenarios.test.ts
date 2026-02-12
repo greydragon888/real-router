@@ -439,11 +439,14 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath, (error, state) => {
+        try {
+          await router.start(validPath);
+          expect.fail("Should have thrown");
+        } catch (error: any) {
           // Should emit TRANSITION_ERROR for rejected promises
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-          // Check the event data (users.view), not callback data (home)
+          // Check the event data (users.view)
           const [toState, fromState, eventError] =
             transitionErrorListener.mock.calls[0];
 
@@ -451,10 +454,9 @@ describe("router.start() - state object scenarios", () => {
           expect(fromState).toBeUndefined();
           expect(eventError).toBeDefined();
 
-          // Callback shows final successful state (home)
-          expect(error).toBeUndefined();
-          expect(state?.name).toBe("home");
-        });
+          // Error should be defined
+          expect(error).toBeDefined();
+        }
       });
 
       it("should emit TRANSITION_ERROR but callback succeeds after fallback", async () => {
