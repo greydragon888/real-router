@@ -3,7 +3,6 @@
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
   ActivationFn,
-  DoneFn,
   EventsKeys,
   EventToNameMap,
   Middleware,
@@ -88,21 +87,4 @@ export interface TransitionDependencies {
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;
-}
-
-/**
- * Result of parsing polymorphic navigate() arguments.
- */
-export interface ParsedNavigateArgs {
-  params: Params;
-  opts: NavigationOptions;
-  callback: DoneFn;
-}
-
-/**
- * Result of parsing polymorphic navigateToDefault() arguments.
- */
-export interface ParsedNavigateDefaultArgs {
-  opts: NavigationOptions;
-  callback: DoneFn;
 }

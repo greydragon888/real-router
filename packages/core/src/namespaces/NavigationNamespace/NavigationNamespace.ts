@@ -2,11 +2,8 @@
 
 import { logger } from "@real-router/logger";
 
-import { noop } from "./helpers";
 import { transition } from "./transition";
 import {
-  parseNavigateArgs,
-  parseNavigateToDefaultArgs,
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
   validateNavigateToStateArgs,
@@ -16,19 +13,8 @@ import { events, errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
-import type {
-  NavigationDependencies,
-  ParsedNavigateArgs,
-  ParsedNavigateDefaultArgs,
-  TransitionDependencies,
-} from "./types";
-import type {
-  CancelFn,
-  DoneFn,
-  NavigationOptions,
-  Params,
-  State,
-} from "@real-router/types";
+import type { NavigationDependencies, TransitionDependencies } from "./types";
+import type { NavigationOptions, Params, State } from "@real-router/types";
 
 /**
  * Independent namespace for managing navigation.
@@ -48,7 +34,6 @@ export class NavigationNamespace {
   isRouterStarted!: () => boolean;
 
   #navigating = false;
-  #cancelCurrentTransition: CancelFn | null = null;
 
   // Dependencies injected via setDependencies (replaces full router reference)
   #depsStore: NavigationDependencies | undefined;
@@ -95,23 +80,13 @@ export class NavigationNamespace {
     toState: unknown,
     fromState: unknown,
     opts: unknown,
-    callback: unknown,
     emitSuccess: unknown,
   ): void {
-    validateNavigateToStateArgs(
-      toState,
-      fromState,
-      opts,
-      callback,
-      emitSuccess,
-    );
+    validateNavigateToStateArgs(toState, fromState, opts, emitSuccess);
   }
 
-  static validateNavigateToDefaultArgs(
-    optsOrDone: unknown,
-    done: unknown,
-  ): void {
-    validateNavigateToDefaultArgs(optsOrDone, done);
+  static validateNavigateToDefaultArgs(opts: unknown): void {
+    validateNavigateToDefaultArgs(opts);
   }
 
   static validateNavigationOptions(
@@ -119,21 +94,6 @@ export class NavigationNamespace {
     methodName: string,
   ): asserts opts is NavigationOptions {
     validateNavigationOptions(opts, methodName);
-  }
-
-  static parseNavigateArgs(
-    paramsOrDone?: Params | DoneFn,
-    optsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ): ParsedNavigateArgs {
-    return parseNavigateArgs(paramsOrDone, optsOrDone, done);
-  }
-
-  static parseNavigateToDefaultArgs(
-    optsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ): ParsedNavigateDefaultArgs {
-    return parseNavigateToDefaultArgs(optsOrDone, done);
   }
 
   // =========================================================================
@@ -171,11 +131,6 @@ export class NavigationNamespace {
    * Cancels the current transition if one is in progress.
    */
   cancel(): void {
-    if (this.#cancelCurrentTransition) {
-      this.#cancelCurrentTransition();
-      this.#cancelCurrentTransition = null;
-    }
-
     this.#navigating = false;
   }
 
@@ -183,13 +138,12 @@ export class NavigationNamespace {
    * Internal navigation function that accepts pre-built state.
    * Used by RouterLifecycleNamespace for start() transitions.
    */
-  navigateToState(
+  async navigateToState(
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    callback: DoneFn,
     emitSuccess: boolean,
-  ): CancelFn {
+  ): Promise<State> {
     const deps = this.#deps;
     const transitionDeps = this.#transitionDeps;
 
@@ -212,78 +166,81 @@ export class NavigationNamespace {
     // Emit TRANSITION_START (after navigating flag is set)
     deps.invokeEventListeners(events.TRANSITION_START, toState, fromState);
 
-    // Create callback for transition
-    const transitionCallback = (err: RouterError | undefined, state: State) => {
-      this.#navigating = false;
-      this.#cancelCurrentTransition = null;
+    try {
+      const finalState = await transition(
+        transitionDeps,
+        toState,
+        fromState,
+        opts,
+      );
 
-      if (!err) {
-        // Route was already validated in navigate() via buildState().
-        // Since guards can no longer redirect (Issue #55), the state.name cannot change.
-        // However, routes can be dynamically removed during async navigation,
-        // so we do a lightweight check with hasRoute() instead of full buildState().
-        // UNKNOWN_ROUTE is always valid (used for 404 handling).
-        if (
-          state.name === constants.UNKNOWN_ROUTE ||
-          deps.hasRoute(state.name)
-        ) {
-          deps.setState(state);
+      // Route was already validated in navigate() via buildState().
+      // Since guards can no longer redirect (Issue #55), the state.name cannot change.
+      // However, routes can be dynamically removed during async navigation,
+      // so we do a lightweight check with hasRoute() instead of full buildState().
+      // UNKNOWN_ROUTE is always valid (used for 404 handling).
+      if (
+        finalState.name === constants.UNKNOWN_ROUTE ||
+        deps.hasRoute(finalState.name)
+      ) {
+        deps.setState(finalState);
 
-          // Emit TRANSITION_SUCCESS only if requested
-          if (emitSuccess) {
-            deps.invokeEventListeners(
-              events.TRANSITION_SUCCESS,
-              state,
-              fromState,
-              opts,
-            );
-          }
+        // Emit TRANSITION_SUCCESS only if requested
+        if (emitSuccess) {
+          deps.invokeEventListeners(
+            events.TRANSITION_SUCCESS,
+            finalState,
+            fromState,
+            opts,
+          );
+        }
 
-          // State is already frozen from transition module
-          safeCallback(callback, undefined, state);
-        } else {
-          // Route was removed during async navigation
-          const notFoundErr = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-            routeName: state.name,
-          });
-
-          safeCallback(callback, notFoundErr);
+        // State is already frozen from transition module
+        return finalState;
+      } else {
+        // Route was removed during async navigation
+        throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: finalState.name,
+        });
+      }
+    } catch (err) {
+      // Error handling
+      if (err instanceof RouterError) {
+        if (err.code === errorCodes.TRANSITION_CANCELLED) {
+          deps.invokeEventListeners(
+            events.TRANSITION_CANCEL,
+            toState,
+            fromState,
+          );
+        } else if (err.code === errorCodes.ROUTE_NOT_FOUND) {
+          // ROUTE_NOT_FOUND after successful transition (route removed)
           deps.invokeEventListeners(
             events.TRANSITION_ERROR,
             undefined,
             deps.getState(),
-            notFoundErr,
+            err,
+          );
+        } else {
+          deps.invokeEventListeners(
+            events.TRANSITION_ERROR,
+            toState,
+            fromState,
+            err,
           );
         }
-
-        return;
-      }
-
-      // Error handling
-      if (err.code === errorCodes.TRANSITION_CANCELLED) {
-        deps.invokeEventListeners(events.TRANSITION_CANCEL, toState, fromState);
       } else {
         deps.invokeEventListeners(
           events.TRANSITION_ERROR,
           toState,
           fromState,
-          err,
+          err as RouterError,
         );
       }
 
-      safeCallback(callback, err);
-    };
-
-    // Launch transition
-    this.#cancelCurrentTransition = transition(
-      transitionDeps,
-      toState,
-      fromState,
-      opts,
-      transitionCallback,
-    );
-
-    return this.#cancelCurrentTransition;
+      throw err;
+    } finally {
+      this.#navigating = false;
+    }
   }
 
   /**
@@ -294,17 +251,13 @@ export class NavigationNamespace {
     name: string,
     params: Params,
     opts: NavigationOptions,
-    callback: DoneFn,
-  ): CancelFn {
+  ): Promise<State> {
     const deps = this.#deps;
 
     // Quick check of the state of the router
     if (!this.isRouterStarted()) {
       const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
-
-      safeCallback(callback, err);
-
-      return noop;
+      return Promise.reject(err);
     }
 
     // build route state with segments (avoids duplicate getSegmentsByName call)
@@ -313,7 +266,6 @@ export class NavigationNamespace {
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
-      safeCallback(callback, err);
       deps.invokeEventListeners(
         events.TRANSITION_ERROR,
         undefined,
@@ -321,7 +273,7 @@ export class NavigationNamespace {
         err,
       );
 
-      return noop;
+      return Promise.reject(err);
     }
 
     const { state: route } = result;
@@ -348,7 +300,6 @@ export class NavigationNamespace {
     ) {
       const err = new RouterError(errorCodes.SAME_STATES);
 
-      safeCallback(callback, err);
       deps.invokeEventListeners(
         events.TRANSITION_ERROR,
         toState,
@@ -356,40 +307,63 @@ export class NavigationNamespace {
         err,
       );
 
-      return noop;
+      return Promise.reject(err);
     }
 
     // transition execution with TRANSITION_SUCCESS emission
     // Note: Guards cannot redirect - redirects are handled in middleware only
-    return this.navigateToState(toState, fromState, opts, callback, true); // emitSuccess = true for public navigate()
+    const promise = this.navigateToState(toState, fromState, opts, true); // emitSuccess = true for public navigate()
+
+    // Unhandled rejection mitigation: suppress expected errors
+    promise.catch((err: RouterError) => {
+      if (
+        err.code === errorCodes.SAME_STATES ||
+        err.code === errorCodes.TRANSITION_CANCELLED
+      ) {
+        // Expected errors - suppress unhandled rejection warnings
+      } else {
+        // Unexpected errors - log for debugging
+        logger.error("router.navigate", "Unexpected navigation error", err);
+      }
+    });
+
+    return promise;
   }
 
   /**
    * Navigates to the default route if configured.
    * Arguments should be pre-parsed and validated by facade.
    */
-  navigateToDefault(opts: NavigationOptions, callback: DoneFn): CancelFn {
+  navigateToDefault(opts: NavigationOptions): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {
-      return noop;
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute not configured",
+        }),
+      );
     }
 
     const resolvedRoute = resolveOption(
       options.defaultRoute,
       deps.getDependency,
-    );
+    ) as string;
 
     if (!resolvedRoute) {
-      return noop;
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute resolved to empty",
+        }),
+      );
     }
 
     const resolvedParams = resolveOption(
       options.defaultParams,
       deps.getDependency,
-    );
+    ) as Params;
 
-    return this.navigate(resolvedRoute, resolvedParams, opts, callback);
+    return this.navigate(resolvedRoute, resolvedParams, opts);
   }
 }
