@@ -327,6 +327,7 @@ describe("router.navigate() - auto cleanup", () => {
 
           // Navigate to orders (will redirect to profile)
           const state = await router.navigate("orders", {}, {});
+
           expect(state.name).toBe("profile");
 
           // users should be removed (was active, now not active in final state)

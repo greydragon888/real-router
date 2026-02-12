@@ -217,6 +217,7 @@ describe("navigateToDefault", () => {
       withDefault("users");
 
       const state = await router.navigateToDefault({});
+
       expect(state.name).toBe("users");
       expect(state.path).toBe("/users");
     });
@@ -227,6 +228,7 @@ describe("navigateToDefault", () => {
       withDefault("users.view", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("users.view");
       expect(state.params).toStrictEqual(defaultParams);
     });
@@ -235,6 +237,7 @@ describe("navigateToDefault", () => {
       withDefault("orders.pending");
 
       const state = await router.navigateToDefault({});
+
       expect(state.name).toBe("orders.pending");
       expect(state.path).toBe("/orders/pending");
     });
@@ -245,6 +248,7 @@ describe("navigateToDefault", () => {
       withDefault("section.view", params);
 
       const state = await router.navigateToDefault({});
+
       expect(state.name).toBe("section.view");
       expect(state.params).toStrictEqual(params);
     });
@@ -342,6 +346,7 @@ describe("navigateToDefault", () => {
       const options = { replace: true, source: "default" };
 
       const state = await router.navigateToDefault(options);
+
       expect(state.meta?.options).toStrictEqual(
         expect.objectContaining(options),
       );
@@ -420,6 +425,7 @@ describe("navigateToDefault", () => {
       withDefault("orders.view", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("orders.view");
       expect(state.params).toStrictEqual(defaultParams);
       expect(state.path).toBe("/orders/view/123");
@@ -451,6 +457,7 @@ describe("navigateToDefault", () => {
       router.useMiddleware(() => middleware);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("settings.account");
 
       expect(canActivateGuard).toHaveBeenCalledTimes(1);
@@ -616,6 +623,7 @@ describe("navigateToDefault", () => {
       withDefault("users.view", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("users.view");
       expect(state.params).toStrictEqual(defaultParams);
       expect(state.path).toBe("/users/view/555");
@@ -627,6 +635,7 @@ describe("navigateToDefault", () => {
       withDefault("withDefaultParam", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("withDefaultParam");
       // Route has its own defaultParams, but our defaultParams should take precedence
       expect(state.params).toStrictEqual(defaultParams);
@@ -638,6 +647,7 @@ describe("navigateToDefault", () => {
       withDefault("withEncoder", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("withEncoder");
       expect(state.params).toStrictEqual(defaultParams);
       expect(state.path).toBe("/encoded/value1/value2");
@@ -649,6 +659,7 @@ describe("navigateToDefault", () => {
       withDefault("profile.user", defaultParams);
 
       const state = await router.navigateToDefault();
+
       expect(state.name).toBe("profile.user");
       expect(state.params).toStrictEqual(defaultParams);
       expect(state.path).toBe("/profile/admin");

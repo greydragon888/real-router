@@ -54,6 +54,7 @@ export const executeMiddleware = async (
       if (error instanceof RouterError) {
         throw makeError(errorCodes.TRANSITION_ERR, error);
       }
+
       throw new RouterError(errorCodes.TRANSITION_ERR, wrapSyncError(error));
     }
   }

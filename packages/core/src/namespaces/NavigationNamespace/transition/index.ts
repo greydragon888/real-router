@@ -36,6 +36,7 @@ export async function transition(
   const shouldRunMiddleware = middlewareFunctions.length > 0;
 
   let currentState = toState;
+
   if (shouldDeactivate) {
     currentState = await executeLifecycleHooks(
       canDeactivateFunctions,

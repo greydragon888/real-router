@@ -185,11 +185,12 @@ describe("router.navigate() - guards cannot redirect", () => {
         // Start router with auth-protected path - should fail with error
         try {
           const state = await router.start("/auth-protected");
+
           // If we reach here, it should have fallen back to default route
           expect(state?.name).toBe("home");
-        } catch (err: any) {
+        } catch (error: any) {
           // Or it should have returned an error
-          expect(err).toBeDefined();
+          expect(error).toBeDefined();
         }
       });
     });
@@ -202,9 +203,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("admin");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
         expect(router.getState()?.name).toBe("users");
@@ -221,9 +223,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("admin");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
       });
     });
@@ -246,10 +249,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       try {
         await router.navigate("profile");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
       expect(router.getState()?.name).toBe("users");
@@ -266,10 +270,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       try {
         await router.navigate("profile");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect(err.attemptedRedirect?.name).toBe("sign-in");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("sign-in");
       }
 
       expect(router.getState()?.name).toBe("users");
@@ -292,10 +297,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       try {
         await router.navigate("profile");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect(err.attemptedRedirect?.name).toBe("admin");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("admin");
       }
 
       expect(router.getState()?.name).toBe("users");
@@ -311,10 +317,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(err.attemptedRedirect?.name).toBe("profile");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("profile");
       }
     });
 
@@ -326,7 +333,7 @@ describe("router.navigate() - guards cannot redirect", () => {
           // Modify meta and continue - same route, should just merge
           done(undefined, {
             ...toState,
-            meta: { ...toState.meta, normalized: true } as any,
+            meta: { ...toState.meta, normalized: true },
           });
         },
       );
@@ -345,9 +352,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
       try {
         await router.navigate("admin");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       expect(router.getState()?.name).not.toBe("admin");
@@ -378,10 +386,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await freshRouter.navigate("users");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err).toBeDefined();
-          expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
         freshRouter.stop();
@@ -400,10 +409,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await freshRouter.navigate("users");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
-          expect(err.attemptedRedirect?.name).toBe("orders");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect(error.attemptedRedirect?.name).toBe("orders");
         }
 
         freshRouter.stop();
@@ -418,9 +428,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await freshRouter.navigate("admin");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
         freshRouter.stop();

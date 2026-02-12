@@ -9,7 +9,7 @@ import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
 import type { RouterLifecycleDependencies } from "./types";
-import type { NavigationOptions, Params, State } from "@real-router/types";
+import type { NavigationOptions, State } from "@real-router/types";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CYCLIC DEPENDENCIES
@@ -205,9 +205,12 @@ export class RouterLifecycleNamespace {
         const defaultParams = resolveOption(
           options.defaultParams,
           deps.getDependency,
-        ) as Params;
+        );
 
-        const defaultRoute = deps.buildState(resolvedPath, defaultParams);
+        const defaultRoute = deps.buildState(
+          resolvedPath,
+          defaultParams as any,
+        );
 
         if (!defaultRoute) {
           const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
@@ -287,11 +290,11 @@ export class RouterLifecycleNamespace {
       );
 
       return finalState;
-    } catch (err) {
+    } catch (error) {
       // Issue #50: Unset active flag on failure (router is no longer starting)
       this.#active = false;
 
-      throw err;
+      throw error;
     }
   }
 

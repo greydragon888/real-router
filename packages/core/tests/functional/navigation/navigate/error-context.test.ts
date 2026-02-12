@@ -31,10 +31,11 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.message).toBe(errorMessage);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.message).toBe(errorMessage);
       }
     });
 
@@ -45,11 +46,12 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.stack).toBeDefined();
-        expect(err?.stack).toContain("Error with stack");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.stack).toBeDefined();
+        expect(error?.stack).toContain("Error with stack");
       }
     });
 
@@ -60,10 +62,11 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.segment).toBe("users");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.segment).toBe("users");
       }
     });
 
@@ -76,10 +79,11 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.segment).toBe("users");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.segment).toBe("users");
       }
     });
 
@@ -93,10 +97,11 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.message).toBe(errorMessage);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.message).toBe(errorMessage);
       }
     });
 
@@ -108,13 +113,14 @@ describe("router.navigate() - error context", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         // Custom properties should be preserved (except reserved)
-        expect(err?.reason).toBe("auth_failed");
-        expect(err?.userId).toBe(123);
+        expect(error?.reason).toBe("auth_failed");
+        expect(error?.userId).toBe(123);
       }
     });
   });

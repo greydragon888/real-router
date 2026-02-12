@@ -26,40 +26,46 @@ describe("router.navigate() - same states", () => {
       it("should return SAME_STATES error when navigating to same state twice", async () => {
         // First navigation - should succeed
         const state1 = await router.navigate("orders.pending");
+
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation to same state - should fail
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.SAME_STATES);
         }
       });
 
       it("should handle same states with different parameter values", async () => {
         // Navigate to profile with param
         const state1 = await router.navigate("profile", { userId: "123" });
+
         expect(state1?.name).toBe("profile");
         expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with same param - should fail
         try {
           await router.navigate("profile", { userId: "123" });
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.SAME_STATES);
         }
       });
 
       it("should allow navigation to same route with different parameters", async () => {
         // Navigate to profile with param
         const state1 = await router.navigate("profile", { userId: "123" });
+
         expect(state1?.name).toBe("profile");
         expect(state1?.params).toStrictEqual({ userId: "123" });
 
         // Navigate to same route with different param - should succeed
         const state2 = await router.navigate("profile", { userId: "456" });
+
         expect(state2?.name).toBe("profile");
         expect(state2?.params).toStrictEqual({ userId: "456" });
       });
@@ -69,8 +75,11 @@ describe("router.navigate() - same states", () => {
       it("should navigate to same state if reload is set to true", async () => {
         // First navigation
         const err1 = await router.navigate("orders.pending");
+
         expect(err1).toBeUndefined();
+
         const state1 = router.getState();
+
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with reload - should succeed
@@ -79,8 +88,11 @@ describe("router.navigate() - same states", () => {
           {},
           { reload: true },
         );
+
         expect(err2).toBeUndefined();
+
         const state2 = router.getState();
+
         expect(state2?.name).toBe("orders.pending");
       });
 
@@ -93,6 +105,7 @@ describe("router.navigate() - same states", () => {
 
         // First navigation
         await router.navigate("orders.pending");
+
         expect(canActivateGuard).toHaveBeenCalledTimes(1);
 
         // Reset spies
@@ -101,6 +114,7 @@ describe("router.navigate() - same states", () => {
 
         // Second navigation with reload - should call guards again
         await router.navigate("orders.pending", {}, { reload: true });
+
         expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(canActivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -110,8 +124,11 @@ describe("router.navigate() - same states", () => {
       it("should force navigation to same state if force option is set", async () => {
         // First navigation
         const err1 = await router.navigate("orders.pending");
+
         expect(err1).toBeUndefined();
+
         const state1 = router.getState();
+
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with force - should succeed
@@ -120,8 +137,11 @@ describe("router.navigate() - same states", () => {
           {},
           { force: true },
         );
+
         expect(err2).toBeUndefined();
+
         const state2 = router.getState();
+
         expect(state2?.name).toBe("orders.pending");
       });
 
@@ -140,6 +160,7 @@ describe("router.navigate() - same states", () => {
           {},
           { force: true },
         );
+
         expect(err).toBeUndefined();
 
         // Guard should not be called with force
@@ -148,8 +169,11 @@ describe("router.navigate() - same states", () => {
 
       it("should work with both force and reload options", async () => {
         const err1 = await router.navigate("orders.pending");
+
         expect(err1).toBeUndefined();
+
         const state1 = router.getState();
+
         expect(state1?.name).toBe("orders.pending");
 
         // Both force and reload
@@ -158,8 +182,11 @@ describe("router.navigate() - same states", () => {
           {},
           { force: true, reload: true },
         );
+
         expect(err2).toBeUndefined();
+
         const state2 = router.getState();
+
         expect(state2?.name).toBe("orders.pending");
       });
     });
@@ -171,9 +198,10 @@ describe("router.navigate() - same states", () => {
         // Same nested route - should fail
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.SAME_STATES);
         }
       });
 
@@ -184,10 +212,11 @@ describe("router.navigate() - same states", () => {
         // Second navigate with different options but same route
         try {
           await router.navigate("profile", {}, { replace: false });
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
+        } catch (error: any) {
           // Should still be considered same state (options don't affect state comparison)
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
+          expect(error?.code).toBe(errorCodes.SAME_STATES);
         }
       });
     });

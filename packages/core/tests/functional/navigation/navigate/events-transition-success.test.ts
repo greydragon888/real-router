@@ -247,9 +247,10 @@ describe("router.navigate() - events transition success", () => {
 
       try {
         await router.navigate("users.view", { id: 789 });
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       expect(onSuccess).not.toHaveBeenCalled();
@@ -292,9 +293,10 @@ describe("router.navigate() - events transition success", () => {
 
       try {
         await promise;
+
         expect.fail("Should have been cancelled");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
 
       // Now assertions
@@ -323,9 +325,10 @@ describe("router.navigate() - events transition success", () => {
       // Try to navigate to same route without force
       try {
         await router.navigate("orders", {}, {});
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.SAME_STATES);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.SAME_STATES);
       }
 
       expect(onSuccess).not.toHaveBeenCalled();
@@ -344,9 +347,10 @@ describe("router.navigate() - events transition success", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
 
       // TRANSITION_SUCCESS should not be emitted when router is not started

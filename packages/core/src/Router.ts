@@ -986,6 +986,7 @@ export class Router<
 
     // 2. Validate parsed options
     const opts = options ?? {};
+
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigate");
     }
@@ -1004,6 +1005,7 @@ export class Router<
 
     // 2. Validate parsed options
     const opts = options ?? {};
+
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
     }

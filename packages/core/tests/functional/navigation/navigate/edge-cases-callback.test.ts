@@ -103,10 +103,12 @@ describe("router.navigate() - edge cases callback", () => {
         const secondCallback = vi.fn();
 
         const state1 = await router.navigate("users");
+
         firstCallback(undefined, state1);
 
         // Navigate again after first completes
         const state2 = await router.navigate("orders");
+
         secondCallback(undefined, state2);
 
         expect(firstCallback).toHaveBeenCalledWith(
@@ -171,10 +173,11 @@ describe("router.navigate() - edge cases callback", () => {
       it("should pass error to callback when route not found with undefined opts", async () => {
         try {
           await router.navigate("nonexistent", {}, undefined as any);
+
           expect.fail("Should have thrown");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
         }
       });
 
@@ -335,10 +338,11 @@ describe("router.navigate() - edge cases callback", () => {
       // Navigate to non-existent route
       try {
         await freshRouter.navigate("nonexistent", {}, undefined as any);
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
       freshRouter.stop();

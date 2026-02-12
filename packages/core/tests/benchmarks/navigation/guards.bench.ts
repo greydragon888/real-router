@@ -9,7 +9,7 @@ import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { createRouter } from "../../../src";
 
-import type { DoneFn, Route, State } from "../../../src";
+import type { Route, State } from "../../../src";
 
 // ============================================================================
 // Guard/middleware factories (moved to outer scope for lint compliance)
@@ -38,21 +38,20 @@ function createModifyingMiddleware(
   paramKey: string,
   paramValue: string | number | boolean,
 ) {
-  return () =>
-    (toState: State, _fromState: State | undefined, done: DoneFn) => {
-      const modifiedState = {
-        ...toState,
-        meta: {
-          ...toState.meta,
-          params: {
-            ...toState.meta?.params,
-            [paramKey]: paramValue,
-          },
+  return () => (toState: State, _fromState: State | undefined) => {
+    const modifiedState = {
+      ...toState,
+      meta: {
+        ...toState.meta,
+        params: {
+          ...toState.meta?.params,
+          [paramKey]: paramValue,
         },
-      } as State;
+      },
+    } as State;
 
-      done(undefined, modifiedState);
-    };
+    return modifiedState;
+  };
 }
 
 /** Guard function that returns true (no state modification) */

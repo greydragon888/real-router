@@ -25,11 +25,12 @@ export const DEFAULT_DEPENDENCIES: Partial<TestDependencies> = {
  * @param initialDeps - Optional initial dependencies (defaults to { foo: 1 })
  * @returns Started router instance with dependency management
  */
-export function createDependenciesTestRouter(
+export async function createDependenciesTestRouter(
   initialDeps: Partial<TestDependencies> = DEFAULT_DEPENDENCIES,
-): Router<TestDependencies> {
+): Promise<Router<TestDependencies>> {
   // Router now has built-in dependency management via DependenciesNamespace
   const router = createRouter<TestDependencies>([], {}, initialDeps);
 
-  return router.start();
+  await router.start();
+  return router;
 }

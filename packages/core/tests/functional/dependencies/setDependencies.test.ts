@@ -8,8 +8,8 @@ import type { Router } from "@real-router/core";
 let router: Router<TestDependencies>;
 
 describe("core/dependencies/setDependencies", () => {
-  beforeEach(() => {
-    router = createDependenciesTestRouter();
+  beforeEach(async () => {
+    router = await createDependenciesTestRouter();
   });
 
   afterEach(() => {

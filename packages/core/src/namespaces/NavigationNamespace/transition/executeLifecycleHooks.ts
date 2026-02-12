@@ -82,6 +82,7 @@ export const executeLifecycleHooks = async (
       if (error instanceof RouterError) {
         throw makeError(errorCode, error);
       }
+
       throw new RouterError(errorCode, wrapSyncError(error, segment));
     }
   }

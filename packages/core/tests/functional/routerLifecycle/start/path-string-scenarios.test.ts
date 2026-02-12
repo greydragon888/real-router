@@ -285,6 +285,7 @@ describe("router.start() - path string scenarios", () => {
       const invalidPath = "/non/existent/path";
 
       const state = await router.start(invalidPath);
+
       expect(state.name).toBe(constants.UNKNOWN_ROUTE);
     });
   });

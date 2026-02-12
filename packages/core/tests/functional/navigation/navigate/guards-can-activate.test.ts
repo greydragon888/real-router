@@ -31,6 +31,7 @@ describe("router.navigate() - guards can activate", () => {
         router.addActivateGuard("orders.pending", () => pendingActivateGuard);
 
         const state = await router.navigate("orders.pending");
+
         expect(state).toBeDefined();
 
         expect(ordersActivateGuard).toHaveBeenCalledTimes(1);
@@ -45,6 +46,7 @@ describe("router.navigate() - guards can activate", () => {
         router.addActivateGuard("settings.profile", () => profileActivateGuard);
 
         const state = await router.navigate("settings.profile");
+
         expect(state).toBeDefined();
 
         expect(settingsActivateGuard).toHaveBeenCalledTimes(1);
@@ -58,9 +60,10 @@ describe("router.navigate() - guards can activate", () => {
 
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
         }
       });
@@ -77,9 +80,10 @@ describe("router.navigate() - guards can activate", () => {
 
         try {
           await router.navigate("non.existent.route");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
           expect(nonExistentActivateGuard).not.toHaveBeenCalled();
         }
       });
@@ -96,9 +100,10 @@ describe("router.navigate() - guards can activate", () => {
 
         try {
           await router.navigate("orders.nonexistent");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
           expect(existingActivateGuard).not.toHaveBeenCalled();
           expect(nonExistentActivateGuard).not.toHaveBeenCalled();
         }
@@ -114,9 +119,10 @@ describe("router.navigate() - guards can activate", () => {
 
         try {
           await router.navigate("totally.invalid.route.name");
+
           expect.fail("Should have thrown");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
           expect(invalidActivateGuard).not.toHaveBeenCalled();
         }
       });

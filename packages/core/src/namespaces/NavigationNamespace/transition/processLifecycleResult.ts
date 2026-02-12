@@ -35,6 +35,7 @@ export const processLifecycleResult = async (
     // Optimization: single try/catch instead of .then(onFulfill, onReject)
     try {
       const resVal = await result;
+
       return await processLifecycleResult(resVal, currentState, segment);
     } catch (error_: unknown) {
       let error: {

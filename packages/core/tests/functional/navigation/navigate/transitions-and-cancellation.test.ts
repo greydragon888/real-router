@@ -96,10 +96,11 @@ describe("router.navigate() - transitions and cancellation", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown error");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
     });
   });

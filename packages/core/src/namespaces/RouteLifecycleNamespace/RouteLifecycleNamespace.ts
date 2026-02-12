@@ -409,11 +409,6 @@ export class RouteLifecycleNamespace<
         return false;
       }
 
-      // done() was called synchronously
-      if (doneResult !== undefined) {
-        return doneResult;
-      }
-
       // Guard returned void/State without calling done() synchronously — permissive default
       return true;
     } catch {

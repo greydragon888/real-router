@@ -104,10 +104,11 @@ describe("core/utils", () => {
   });
 
   describe("without strict query params mode", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       router = createTestRouter({
         queryParamsMode: "loose",
-      }).start();
+      });
+      await router.start();
     });
 
     it("should build paths with extra parameters", () => {

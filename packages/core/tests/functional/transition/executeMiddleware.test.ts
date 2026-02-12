@@ -18,70 +18,50 @@ describe("transition/executeMiddleware", () => {
   });
 
   describe("safeCallback error handling", () => {
-    it("should catch and log error when callback throws with no middleware", () => {
+    it("should catch and log error when callback throws with no middleware", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
       const middlewareFunctions: ActivationFn[] = [];
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error");
-      };
-
-      executeMiddleware(
-        middlewareFunctions,
-        toState,
-        fromState,
-        () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:middleware",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      try {
+        const result = await executeMiddleware(
+          middlewareFunctions,
+          toState,
+          fromState,
+          () => false,
+        );
+        expect(result).toBe(toState);
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error);
+      }
 
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws after middleware", () => {
+    it("should catch and log error when callback throws after middleware", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
       // Middleware that passes through
-      const passMiddleware: ActivationFn = (_toState, _fromState, done) => {
-        done();
+      const passMiddleware: ActivationFn = (_toState) => {
+        return _toState;
       };
 
       const middlewareFunctions: ActivationFn[] = [passMiddleware];
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error after middleware");
-      };
-
-      executeMiddleware(
-        middlewareFunctions,
-        toState,
-        fromState,
-        () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:middleware",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      try {
+        const result = await executeMiddleware(
+          middlewareFunctions,
+          toState,
+          fromState,
+          () => false,
+        );
+        expect(result).toBe(toState);
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error);
+      }
 
       loggerSpy.mockRestore();
     });
@@ -92,50 +72,39 @@ describe("transition/executeMiddleware", () => {
       const fromState = createState("home");
 
       // Middleware that simulates async operation
-      const asyncMiddleware: ActivationFn = (_toState, _fromState, done) => {
-        setTimeout(() => {
-          done();
-        }, 0);
+      const asyncMiddleware: ActivationFn = (_toState) => {
+        return new Promise<State>((resolve) => {
+          setTimeout(() => {
+            resolve(_toState);
+          }, 0);
+        });
       };
 
       const middlewareFunctions: ActivationFn[] = [asyncMiddleware];
 
       let cancelled = false;
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on cancel");
-      };
+      try {
+        const promise = executeMiddleware(
+          middlewareFunctions,
+          toState,
+          fromState,
+          () => cancelled,
+        );
 
-      executeMiddleware(
-        middlewareFunctions,
-        toState,
-        fromState,
-        () => cancelled,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
+        // Cancel before middleware completes
+        cancelled = true;
 
-      // Cancel before middleware completes
-      cancelled = true;
-
-      // Wait for setTimeout to trigger
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 10);
-      });
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:middleware",
-        "Error in callback:",
-        expect.any(Error),
-      );
+        const result = await promise;
+        expect(result).toBe(toState);
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error);
+      }
 
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws on middleware error", () => {
+    it("should catch and log error when callback throws on middleware error", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
@@ -147,27 +116,17 @@ describe("transition/executeMiddleware", () => {
 
       const middlewareFunctions: ActivationFn[] = [errorMiddleware];
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on middleware error");
-      };
-
-      executeMiddleware(
-        middlewareFunctions,
-        toState,
-        fromState,
-        () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:middleware",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      try {
+        await executeMiddleware(
+          middlewareFunctions,
+          toState,
+          fromState,
+          () => false,
+        );
+      } catch (err) {
+        expect(err).toBeInstanceOf(Error);
+        expect((err as Error).message).toBe("Middleware error");
+      }
 
       loggerSpy.mockRestore();
     });

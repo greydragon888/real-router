@@ -203,29 +203,29 @@ export class NavigationNamespace {
           routeName: finalState.name,
         });
       }
-    } catch (err) {
+    } catch (error) {
       // Error handling
-      if (err instanceof RouterError) {
-        if (err.code === errorCodes.TRANSITION_CANCELLED) {
+      if (error instanceof RouterError) {
+        if (error.code === errorCodes.TRANSITION_CANCELLED) {
           deps.invokeEventListeners(
             events.TRANSITION_CANCEL,
             toState,
             fromState,
           );
-        } else if (err.code === errorCodes.ROUTE_NOT_FOUND) {
+        } else if (error.code === errorCodes.ROUTE_NOT_FOUND) {
           // ROUTE_NOT_FOUND after successful transition (route removed)
           deps.invokeEventListeners(
             events.TRANSITION_ERROR,
             undefined,
             deps.getState(),
-            err,
+            error,
           );
         } else {
           deps.invokeEventListeners(
             events.TRANSITION_ERROR,
             toState,
             fromState,
-            err,
+            error,
           );
         }
       } else {
@@ -233,11 +233,11 @@ export class NavigationNamespace {
           events.TRANSITION_ERROR,
           toState,
           fromState,
-          err as RouterError,
+          error as RouterError,
         );
       }
 
-      throw err;
+      throw error;
     } finally {
       this.#navigating = false;
     }
@@ -257,6 +257,7 @@ export class NavigationNamespace {
     // Quick check of the state of the router
     if (!this.isRouterStarted()) {
       const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
+
       return Promise.reject(err);
     }
 
@@ -315,15 +316,15 @@ export class NavigationNamespace {
     const promise = this.navigateToState(toState, fromState, opts, true); // emitSuccess = true for public navigate()
 
     // Unhandled rejection mitigation: suppress expected errors
-    promise.catch((err: RouterError) => {
+    promise.catch((error: RouterError) => {
       if (
-        err.code === errorCodes.SAME_STATES ||
-        err.code === errorCodes.TRANSITION_CANCELLED
+        error.code === errorCodes.SAME_STATES ||
+        error.code === errorCodes.TRANSITION_CANCELLED
       ) {
         // Expected errors - suppress unhandled rejection warnings
       } else {
         // Unexpected errors - log for debugging
-        logger.error("router.navigate", "Unexpected navigation error", err);
+        logger.error("router.navigate", "Unexpected navigation error", error);
       }
     });
 
@@ -349,7 +350,7 @@ export class NavigationNamespace {
     const resolvedRoute = resolveOption(
       options.defaultRoute,
       deps.getDependency,
-    ) as string;
+    );
 
     if (!resolvedRoute) {
       return Promise.reject(
@@ -362,7 +363,7 @@ export class NavigationNamespace {
     const resolvedParams = resolveOption(
       options.defaultParams,
       deps.getDependency,
-    ) as Params;
+    );
 
     return this.navigate(resolvedRoute, resolvedParams, opts);
   }

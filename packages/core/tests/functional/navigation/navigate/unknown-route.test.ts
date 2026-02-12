@@ -64,6 +64,7 @@ describe("router.navigate() - unknown route", () => {
 
       // Navigate away from UNKNOWN_ROUTE
       const state = await freshRouter.navigate("profile");
+
       expect(state.name).toBe("profile");
 
       // canDeactivate SHOULD be called when leaving UNKNOWN_ROUTE (new correct behavior)
