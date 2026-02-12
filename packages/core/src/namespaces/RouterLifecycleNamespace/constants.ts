@@ -3,11 +3,6 @@
 import { errorCodes } from "../../constants";
 import { RouterError } from "../../RouterError";
 
-/**
- * No-op function for default callbacks.
- */
-export const noop = (): void => {};
-
 // =============================================================================
 // Cached Errors (Performance Optimization)
 // =============================================================================

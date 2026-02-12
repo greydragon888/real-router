@@ -1,7 +1,6 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/types.ts
 
 import type {
-  DoneFn,
   EventsKeys,
   EventToNameMap,
   NavigationOptions,
@@ -12,12 +11,6 @@ import type {
   State,
   StateMetaInput,
 } from "@real-router/types";
-
-export type StartRouterArguments =
-  | []
-  | [done: DoneFn]
-  | [startPathOrState: string | State]
-  | [startPathOrState: string | State, done: DoneFn];
 
 /**
  * Dependencies injected into RouterLifecycleNamespace.
