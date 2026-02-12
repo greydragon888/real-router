@@ -19,10 +19,13 @@ let router: Router;
  * Helper to recreate the router with specific defaultRoute/defaultParams
  * and start it. Returns the new router (also assigns to `router` for afterEach).
  */
-function withDefault(defaultRoute: string, defaultParams: Params = {}): Router {
+async function withDefault(
+  defaultRoute: string,
+  defaultParams: Params = {},
+): Promise<Router> {
   router.stop();
   router = createTestRouter({ defaultRoute, defaultParams });
-  router.start("/home");
+  await router.start("/home");
 
   return router;
 }
@@ -65,88 +68,54 @@ describe("navigateToDefault", () => {
   });
 
   describe("basic functionality", () => {
-    it("should navigate to defaultRoute when defaultRoute is set", () => {
-      const callback = vi.fn();
+    it("should navigate to defaultRoute when defaultRoute is set", async () => {
+      await withDefault("users", {});
 
-      withDefault("users", {});
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: {},
-        }),
-      );
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({});
     });
 
-    it("should use empty object as params when defaultParams is not set", () => {
-      const callback = vi.fn();
+    it("should use empty object as params when defaultParams is not set", async () => {
+      await withDefault("profile");
 
-      withDefault("profile");
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "profile",
-          params: {},
-        }),
-      );
+      expect(state.name).toBe("profile");
+      expect(state.params).toStrictEqual({});
     });
 
-    it("should pass navigation options through to state meta", () => {
-      const callback = vi.fn();
-
-      withDefault("orders", {});
+    it("should pass navigation options through to state meta", async () => {
+      await withDefault("orders", {});
 
       const options = { replace: true, source: "default" };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "orders",
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.name).toBe("orders");
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should pass callback through and invoke it on completion", () => {
-      const callback = vi.fn();
+    it("should pass callback through and invoke it on completion", async () => {
+      await withDefault("settings");
 
-      withDefault("settings");
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "settings" }),
-      );
+      expect(state.name).toBe("settings");
     });
 
-    it("should pass both options and callback correctly", () => {
-      const callback = vi.fn();
+    it("should pass both options and callback correctly", async () => {
       const options = { force: true };
 
       // defaultRoute "home" is already set by createTestRouter default
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "home",
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ force: true }),
-          }),
-        }),
+      expect(state.name).toBe("home");
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining({ force: true }),
       );
     });
 
@@ -158,56 +127,35 @@ describe("navigateToDefault", () => {
       expect(typeof result).toBe("function");
     });
 
-    it("should use defaultParams when they are set", () => {
-      const callback = vi.fn();
+    it("should use defaultParams when they are set", async () => {
       const defaultParams = { id: 123, tab: "profile" };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: defaultParams,
-        }),
-      );
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should work with nested defaultRoute", () => {
-      const callback = vi.fn();
+    it("should work with nested defaultRoute", async () => {
+      await withDefault("settings.account", { section: "privacy" });
 
-      withDefault("settings.account", { section: "privacy" });
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "settings.account",
-          params: { section: "privacy" },
-        }),
-      );
+      expect(state.name).toBe("settings.account");
+      expect(state.params).toStrictEqual({ section: "privacy" });
     });
 
-    it("should delegate all navigation logic internally", () => {
-      const callback = vi.fn();
+    it("should delegate all navigation logic internally", async () => {
+      await withDefault("admin.dashboard");
 
-      withDefault("admin.dashboard");
-
-      router.navigateToDefault({ reload: true }, callback);
+      const state = await router.navigateToDefault({ reload: true });
 
       // Should complete successfully with navigation to admin.dashboard
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "admin.dashboard",
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ reload: true }),
-          }),
-        }),
+      expect(state.name).toBe("admin.dashboard");
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining({ reload: true }),
       );
     });
   });
@@ -253,82 +201,78 @@ describe("navigateToDefault", () => {
       expect(state.params).toStrictEqual(params);
     });
 
-    it("should call callback with success when defaultRoute navigation succeeds", () => {
+    it("should call callback with success when defaultRoute navigation succeeds", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
+      await withDefault("settings");
 
-      withDefault("settings");
-
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
       // Advance timers to allow navigation to complete
       vi.advanceTimersByTime(10);
 
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined, // no error
-        expect.objectContaining({
-          name: "settings",
-          path: "/settings",
-        }),
-      );
+      expect(state.name).toBe("settings");
+      expect(state.path).toBe("/settings");
 
       vi.useRealTimers();
     });
 
-    it("should call callback with error when defaultRoute navigation fails", () => {
-      const callback = vi.fn();
-
+    it("should call callback with error when defaultRoute navigation fails", async () => {
       // Set up non-existent route as default
-      withDefault("non.existent.route");
+      await withDefault("non.existent.route");
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.ROUTE_NOT_FOUND,
+            message: "ROUTE_NOT_FOUND",
+          }),
+        );
+      }
     });
 
-    it("should handle blocked navigation to defaultRoute", () => {
-      const callback = vi.fn();
+    it("should handle blocked navigation to defaultRoute", async () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      withDefault("admin");
+      await withDefault("admin");
 
       router.addActivateGuard("admin", () => blockingGuard);
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.CANNOT_ACTIVATE,
-          message: "CANNOT_ACTIVATE",
-        }),
-      );
-      expect(blockingGuard).toHaveBeenCalledTimes(1);
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.CANNOT_ACTIVATE,
+            message: "CANNOT_ACTIVATE",
+          }),
+        );
+        expect(blockingGuard).toHaveBeenCalledTimes(1);
+      }
     });
 
-    it("should handle middleware blocking defaultRoute navigation", () => {
-      const callback = vi.fn();
+    it("should handle middleware blocking defaultRoute navigation", async () => {
       const blockingMiddleware = vi.fn().mockReturnValue(false);
 
-      withDefault("users");
+      await withDefault("users");
       router.useMiddleware(() => blockingMiddleware);
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_ERR,
-          message: "TRANSITION_ERR",
-        }),
-      );
-      expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.TRANSITION_ERR,
+            message: "TRANSITION_ERR",
+          }),
+        );
+        expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+      }
 
       router.clearMiddleware();
     });
@@ -336,7 +280,7 @@ describe("navigateToDefault", () => {
     it("should respect navigation options when navigating to defaultRoute", async () => {
       const onSuccess = vi.fn();
 
-      withDefault("profile");
+      await withDefault("profile");
 
       const unsubSuccess = router.addEventListener(
         events.TRANSITION_SUCCESS,
@@ -364,28 +308,25 @@ describe("navigateToDefault", () => {
       unsubSuccess();
     });
 
-    it("should work with force option to navigate to same route", () => {
+    it("should work with force option to navigate to same route", async () => {
       // Create router with defaultRoute "profile"
-      withDefault("profile");
+      await withDefault("profile");
 
       // Navigate to profile first
-      router.navigate("profile", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("profile", {}, {});
 
-        // Navigate to default with force (same route)
-        router.navigateToDefault({ force: true }, (err2, state) => {
-          expect(err2).toBeUndefined();
-          expect(state?.name).toBe("profile");
-          expect(state?.meta?.options.force).toBe(true);
-        });
-      });
+      // Navigate to default with force (same route)
+      const state = await router.navigateToDefault({ force: true });
+
+      expect(state.name).toBe("profile");
+      expect(state.meta?.options.force).toBe(true);
     });
 
-    it("should trigger all navigation lifecycle events for defaultRoute", () => {
+    it("should trigger all navigation lifecycle events for defaultRoute", async () => {
       const onStart = vi.fn();
       const onSuccess = vi.fn();
 
-      withDefault("settings");
+      await withDefault("settings");
 
       const unsubStart = router.addEventListener(
         events.TRANSITION_START,
@@ -396,22 +337,20 @@ describe("navigateToDefault", () => {
         onSuccess,
       );
 
-      router.navigateToDefault((err) => {
-        expect(err).toBeUndefined();
+      await router.navigateToDefault();
 
-        expect(onStart).toHaveBeenCalledTimes(1);
-        expect(onStart).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "settings" }), // toState
-          expect.any(Object), // fromState
-        );
+      expect(onStart).toHaveBeenCalledTimes(1);
+      expect(onStart).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "settings" }), // toState
+        expect.any(Object), // fromState
+      );
 
-        expect(onSuccess).toHaveBeenCalledTimes(1);
-        expect(onSuccess).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "settings" }), // newState
-          expect.any(Object), // fromState
-          {}, // options (empty in this case)
-        );
-      });
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "settings" }), // newState
+        expect.any(Object), // fromState
+        {}, // options (empty in this case)
+      );
 
       unsubStart();
       unsubSuccess();
@@ -431,21 +370,19 @@ describe("navigateToDefault", () => {
       expect(state.path).toBe("/orders/view/123");
     });
 
-    it("should work when router state changes after setting defaultRoute", () => {
-      withDefault("users");
+    it("should work when router state changes after setting defaultRoute", async () => {
+      await withDefault("users");
 
       // Navigate to different route first
-      router.navigate("profile", {}, {}, (err) => {
-        expect(err).toBeUndefined();
-        expect(router.getState()?.name).toBe("profile");
+      await router.navigate("profile", {}, {});
 
-        // Now navigate to default
-        router.navigateToDefault((err2, state) => {
-          expect(err2).toBeUndefined();
-          expect(state?.name).toBe("users");
-          expect(router.getState()?.name).toBe("users");
-        });
-      });
+      expect(router.getState()?.name).toBe("profile");
+
+      // Now navigate to default
+      const state = await router.navigateToDefault();
+
+      expect(state.name).toBe("users");
+      expect(router.getState()?.name).toBe("users");
     });
 
     it("should handle guards and middleware for defaultRoute navigation", async () => {
@@ -499,84 +436,59 @@ describe("navigateToDefault", () => {
   });
 
   describe("with defaultParams", () => {
-    it("should use defaultParams when no params provided in arguments", () => {
-      const callback = vi.fn();
+    it("should use defaultParams when no params provided in arguments", async () => {
       const defaultParams = { id: 42, category: "tech" };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: defaultParams,
-        }),
-      );
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should use defaultParams with navigation options", () => {
-      const callback = vi.fn();
+    it("should use defaultParams with navigation options", async () => {
       const defaultParams = { id: 123 };
       const options = { replace: true, source: "auto" };
 
-      withDefault("orders.view", defaultParams);
+      await withDefault("orders.view", defaultParams);
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "orders.view",
-          params: defaultParams,
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.name).toBe("orders.view");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should use defaultParams with callback", () => {
-      const callback = vi.fn();
+    it("should use defaultParams with callback", async () => {
       const defaultParams = { section: "section123", id: 456 };
 
-      withDefault("section.view", defaultParams);
+      await withDefault("section.view", defaultParams);
 
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "section.view",
-          params: defaultParams,
-        }),
-      );
+      expect(state.name).toBe("section.view");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should use defaultParams with both options and callback", () => {
-      const callback = vi.fn();
+    it("should use defaultParams with both options and callback", async () => {
       const defaultParams = { userId: "user123" };
       const options = { force: true };
 
-      withDefault("profile.user", defaultParams);
+      await withDefault("profile.user", defaultParams);
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "profile.user",
-          params: defaultParams,
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ force: true }),
-          }),
-        }),
+      expect(state.name).toBe("profile.user");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining({ force: true }),
       );
     });
 
-    it("should handle complex defaultParams object", () => {
-      const callback = vi.fn();
+    it("should handle complex defaultParams object", async () => {
       const defaultParams = {
         id: 789,
         filters: {
@@ -588,33 +500,21 @@ describe("navigateToDefault", () => {
         page: 1,
       };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: defaultParams,
-        }),
-      );
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should handle defaultParams as empty object", () => {
-      const callback = vi.fn();
+    it("should handle defaultParams as empty object", async () => {
+      await withDefault("profile", {});
 
-      withDefault("profile", {});
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "profile",
-          params: {},
-        }),
-      );
+      expect(state.name).toBe("profile");
+      expect(state.params).toStrictEqual({});
     });
 
     it("should use defaultParams for successful navigation", async () => {
@@ -665,55 +565,54 @@ describe("navigateToDefault", () => {
       expect(state.path).toBe("/profile/admin");
     });
 
-    it("should handle defaultParams when navigation fails", () => {
-      const callback = vi.fn();
+    it("should handle defaultParams when navigation fails", async () => {
+      await withDefault("non.existent.route", { id: 999 });
 
-      withDefault("non.existent.route", { id: 999 });
-
-      router.navigateToDefault(callback);
-
-      // Navigation should fail with ROUTE_NOT_FOUND
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.ROUTE_NOT_FOUND,
+            message: "ROUTE_NOT_FOUND",
+          }),
+        );
+      }
     });
 
-    it("should handle defaultParams when navigation is blocked", () => {
+    it("should handle defaultParams when navigation is blocked", async () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
       const defaultParams = { id: 777 };
 
-      withDefault("admin", defaultParams);
+      await withDefault("admin", defaultParams);
 
       router.addActivateGuard("admin", () => blockingGuard);
 
-      const callback = vi.fn();
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.CANNOT_ACTIVATE,
+            message: "CANNOT_ACTIVATE",
+          }),
+        );
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.CANNOT_ACTIVATE,
-          message: "CANNOT_ACTIVATE",
-        }),
-      );
-
-      // Guard should receive correct toState with defaultParams
-      expect(blockingGuard).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: "admin",
-          params: defaultParams,
-        }),
-        expect.any(Object), // fromState
-        expect.any(Function), // done
-      );
+        // Guard should receive correct toState with defaultParams
+        expect(blockingGuard).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "admin",
+            params: defaultParams,
+          }),
+          expect.any(Object), // fromState
+          expect.any(Function), // done
+        );
+      }
     });
 
-    it("should preserve defaultParams type and structure", () => {
-      const callback = vi.fn();
-
+    it("should preserve defaultParams type and structure", async () => {
       // Test different types of valid parameters (plain objects only)
       const testCases = [
         { id: 123 },
@@ -722,21 +621,14 @@ describe("navigateToDefault", () => {
         { stringParam: "value", numberParam: 42, boolParam: false },
       ];
 
-      testCases.forEach((defaultParams) => {
-        callback.mockClear();
+      for (const defaultParams of testCases) {
+        await withDefault("users", defaultParams);
 
-        withDefault("users", defaultParams);
+        const state = await router.navigateToDefault();
 
-        router.navigateToDefault(callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({
-            name: "users",
-            params: defaultParams,
-          }),
-        );
-      });
+        expect(state.name).toBe("users");
+        expect(state.params).toStrictEqual(defaultParams);
+      }
     });
 
     it("should freeze defaultParams at construction (immutable options)", () => {
@@ -756,8 +648,7 @@ describe("navigateToDefault", () => {
       });
     });
 
-    it("should handle defaultParams with special characters and values", () => {
-      const callback = vi.fn();
+    it("should handle defaultParams with special characters and values", async () => {
       const defaultParams = {
         special: "hello/world?param=value#hash",
         unicode: "тест 测试 🚀",
@@ -767,49 +658,30 @@ describe("navigateToDefault", () => {
         float: 3.141_59,
       };
 
-      withDefault("users", defaultParams);
+      await withDefault("users", defaultParams);
 
-      router.navigateToDefault(callback);
+      const state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: defaultParams,
-        }),
-      );
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should work with different constructor defaultParams", () => {
-      const callback = vi.fn();
-
+    it("should work with different constructor defaultParams", async () => {
       // Test with first set of params
-      withDefault("users.view", { id: 1 });
+      await withDefault("users.view", { id: 1 });
 
-      router.navigateToDefault(callback);
+      let state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenLastCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: { id: 1 },
-        }),
-      );
-
-      callback.mockClear();
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual({ id: 1 });
 
       // Create a new router with different defaultParams
-      withDefault("users.view", { id: 2, new: "param" });
+      await withDefault("users.view", { id: 2, new: "param" });
 
-      router.navigateToDefault(callback);
+      state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenLastCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users.view",
-          params: { id: 2, new: "param" },
-        }),
-      );
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual({ id: 2, new: "param" });
     });
   });
 
@@ -825,21 +697,14 @@ describe("navigateToDefault", () => {
       expect(typeof result).toBe("function");
     });
 
-    it("should parse single callback argument", () => {
-      const callback = vi.fn();
+    it("should parse single callback argument", async () => {
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: { tab: "main" },
-        }),
-      );
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({ tab: "main" });
     });
 
-    it("should parse single options object argument", () => {
+    it("should parse single options object argument", async () => {
       const onSuccess = vi.fn();
       const options = { replace: true, silent: false };
 
@@ -848,7 +713,7 @@ describe("navigateToDefault", () => {
         onSuccess,
       );
 
-      router.navigateToDefault(options);
+      await router.navigateToDefault(options);
 
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -863,40 +728,28 @@ describe("navigateToDefault", () => {
       unsubSuccess();
     });
 
-    it("should parse options and callback arguments", () => {
-      const callback = vi.fn();
+    it("should parse options and callback arguments", async () => {
       const options = { replace: true, silent: false };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: { tab: "main" },
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({ tab: "main" });
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should parse callback and options arguments (reversed order)", () => {
-      const callback = vi.fn();
+    it("should parse callback and options arguments (reversed order)", async () => {
       const options = { replace: true };
 
       // This tests the case where we have 2 args and first is treated as options
-      router.navigateToDefault(options as any, callback);
+      const state = await router.navigateToDefault(options as any);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: { tab: "main" },
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({ tab: "main" });
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
@@ -915,88 +768,63 @@ describe("navigateToDefault", () => {
       withDefault("users", { id: 123 });
     });
 
-    it("should pass replace option through to state meta", () => {
-      const callback = vi.fn();
+    it("should pass replace option through to state meta", async () => {
       const options = { replace: true };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should pass force option and allow same-state navigation", () => {
-      const callback = vi.fn();
-
+    it("should pass force option and allow same-state navigation", async () => {
       // First navigate to users
-      router.navigate("users", { id: 123 }, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("users", { id: 123 }, {});
 
-        // Then try to navigate to default (same route) without force - should fail
-        router.navigateToDefault((err2) => {
-          expect(err2).toBeDefined();
-          expect(err2?.code).toBe(errorCodes.SAME_STATES);
+      // Then try to navigate to default (same route) without force - should fail
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toBeDefined();
+        expect((err as any).code).toBe(errorCodes.SAME_STATES);
+      }
 
-          // With force option, should succeed
-          router.navigateToDefault({ force: true }, callback);
+      // With force option, should succeed
+      const state = await router.navigateToDefault({ force: true });
 
-          expect(callback).toHaveBeenCalledWith(
-            undefined,
-            expect.objectContaining({
-              name: "users",
-              meta: expect.objectContaining({
-                options: expect.objectContaining({ force: true }),
-              }),
-            }),
-          );
-        });
-      });
+      expect(state.name).toBe("users");
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining({ force: true }),
+      );
     });
 
-    it("should pass reload option through to state meta", () => {
-      const callback = vi.fn();
+    it("should pass reload option through to state meta", async () => {
       const options = { reload: true };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should pass custom options through to state meta", () => {
-      const callback = vi.fn();
+    it("should pass custom options through to state meta", async () => {
       const options = {
         source: "default-navigation",
         metadata: { trigger: "auto" },
         customFlag: true,
       };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
 
-    it("should combine provided options with internal navigation", () => {
-      const callback = vi.fn();
+    it("should combine provided options with internal navigation", async () => {
       const options = {
         replace: true,
         force: false,
@@ -1004,15 +832,10 @@ describe("navigateToDefault", () => {
         reload: false,
       };
 
-      router.navigateToDefault(options, callback);
+      const state = await router.navigateToDefault(options);
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
       );
     });
   });
@@ -1022,65 +845,68 @@ describe("navigateToDefault", () => {
       withDefault("users", { id: 123 });
     });
 
-    it("should handle navigation errors correctly", () => {
-      const callback = vi.fn();
-
+    it("should handle navigation errors correctly", async () => {
       // Set a non-existent route as default
-      withDefault("non.existent.route");
+      await withDefault("non.existent.route");
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-      );
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.ROUTE_NOT_FOUND,
+          }),
+        );
+      }
     });
 
-    it("should handle non-existent defaultRoute", () => {
-      const callback = vi.fn();
+    it("should handle non-existent defaultRoute", async () => {
+      await withDefault("non.existent.route");
 
-      withDefault("non.existent.route");
-
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.ROUTE_NOT_FOUND,
+            message: "ROUTE_NOT_FOUND",
+          }),
+        );
+      }
     });
 
-    it("should handle blocked navigation to defaultRoute", () => {
-      const callback = vi.fn();
+    it("should handle blocked navigation to defaultRoute", async () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      withDefault("admin");
+      await withDefault("admin");
       router.addActivateGuard("admin", () => blockingGuard);
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.CANNOT_ACTIVATE,
-          message: "CANNOT_ACTIVATE",
-        }),
-      );
-      expect(blockingGuard).toHaveBeenCalledTimes(1);
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.CANNOT_ACTIVATE,
+            message: "CANNOT_ACTIVATE",
+          }),
+        );
+        expect(blockingGuard).toHaveBeenCalledTimes(1);
+      }
     });
 
-    it("should handle cancelled navigation to defaultRoute", () => {
+    it("should handle cancelled navigation to defaultRoute", async () => {
       vi.useFakeTimers();
-
-      const callback = vi.fn();
 
       // Add async middleware to enable cancellation
       router.useMiddleware(() => (_toState, _fromState, done) => {
         setTimeout(done, 50);
       });
 
-      const cancel = router.navigateToDefault(callback);
+      const cancelPromise = router.navigateToDefault();
+      const cancel = (cancelPromise as any).cancel;
 
       // Cancel navigation after short delay
       setTimeout(() => {
@@ -1093,21 +919,25 @@ describe("navigateToDefault", () => {
       // Advance time to allow cancellation to be processed
       vi.advanceTimersByTime(100);
 
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_CANCELLED,
-          message: "CANCELLED",
-        }),
-      );
+      try {
+        await cancelPromise;
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.TRANSITION_CANCELLED,
+            message: "CANCELLED",
+          }),
+        );
+      }
 
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should propagate navigation errors to callback", () => {
+    it("should propagate navigation errors to callback", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
       const customError = new RouterError(errorCodes.TRANSITION_ERR, {
         message: "Custom navigation error",
       });
@@ -1119,12 +949,17 @@ describe("navigateToDefault", () => {
         }, 10);
       });
 
-      router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
 
       // Advance time to trigger error propagation
       vi.advanceTimersByTime(10);
 
-      expect(callback).toHaveBeenCalledWith(customError);
+      try {
+        await promise;
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toBe(customError);
+      }
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -1136,17 +971,16 @@ describe("navigateToDefault", () => {
       withDefault("users", { id: 123 });
     });
 
-    it("should return cancel function that cancels defaultRoute navigation", () => {
+    it("should return cancel function that cancels defaultRoute navigation", async () => {
       vi.useFakeTimers();
-
-      const callback = vi.fn();
 
       // Add async middleware to make navigation cancellable
       router.useMiddleware(() => (_toState, _fromState, done) => {
         setTimeout(done, 50);
       });
 
-      const cancel = router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       expectTypeOf(cancel).toBeFunction();
 
@@ -1161,18 +995,23 @@ describe("navigateToDefault", () => {
       // Advance time to allow cancellation to be processed
       vi.advanceTimersByTime(100);
 
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_CANCELLED,
-          message: "CANCELLED",
-        }),
-      );
+      try {
+        await promise;
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.TRANSITION_CANCELLED,
+            message: "CANCELLED",
+          }),
+        );
+      }
 
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should return different cancel functions for concurrent calls", () => {
+    it("should return different cancel functions for concurrent calls", async () => {
       vi.useFakeTimers();
 
       // Add async middleware to make navigation cancellable
@@ -1180,9 +1019,13 @@ describe("navigateToDefault", () => {
         setTimeout(done, 100);
       });
 
-      const cancel1 = router.navigateToDefault(vi.fn() as DoneFn);
-      const cancel2 = router.navigateToDefault(vi.fn() as DoneFn);
-      const cancel3 = router.navigateToDefault(vi.fn() as DoneFn);
+      const promise1 = router.navigateToDefault();
+      const promise2 = router.navigateToDefault();
+      const promise3 = router.navigateToDefault();
+
+      const cancel1 = (promise1 as any).cancel;
+      const cancel2 = (promise2 as any).cancel;
+      const cancel3 = (promise3 as any).cancel;
 
       // Each should be a function
       expectTypeOf(cancel1).toBeFunction();
@@ -1198,17 +1041,16 @@ describe("navigateToDefault", () => {
       vi.useRealTimers();
     });
 
-    it("should handle cancel function called after navigation completes", () => {
+    it("should handle cancel function called after navigation completes", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      const cancel = router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       // Advance time for navigation to complete
       vi.advanceTimersByTime(50);
 
-      expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
+      await promise;
 
       // Calling cancel after completion should be safe
       expect(() => {
@@ -1218,17 +1060,16 @@ describe("navigateToDefault", () => {
       vi.useRealTimers();
     });
 
-    it("should handle cancel function called multiple times", () => {
+    it("should handle cancel function called multiple times", async () => {
       vi.useFakeTimers();
-
-      const callback = vi.fn();
 
       // Add async middleware to make navigation cancellable
       router.useMiddleware(() => (_toState, _fromState, done) => {
         setTimeout(done, 50);
       });
 
-      const cancel = router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       // Cancel multiple times
       setTimeout(() => {
@@ -1243,14 +1084,17 @@ describe("navigateToDefault", () => {
       // Advance time to allow cancellation to be processed
       vi.advanceTimersByTime(100);
 
-      // Should be called only once even with multiple cancel calls
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_CANCELLED,
-          message: "CANCELLED",
-        }),
-      );
+      try {
+        await promise;
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.TRANSITION_CANCELLED,
+            message: "CANCELLED",
+          }),
+        );
+      }
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -1258,27 +1102,18 @@ describe("navigateToDefault", () => {
   });
 
   describe("router state integration", () => {
-    it("should work when router is started", () => {
-      const callback = vi.fn();
+    it("should work when router is started", async () => {
+      await withDefault("users", { id: 123 });
 
-      withDefault("users", { id: 123 });
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: { id: 123 },
-        }),
-      );
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({ id: 123 });
 
       expect(router.isActive()).toBe(true);
     });
 
-    it("should handle call when router is not started", () => {
-      const callback = vi.fn();
-
+    it("should handle call when router is not started", async () => {
       // Stop router if it's running
       router.stop();
       router = createTestRouter({
@@ -1286,66 +1121,47 @@ describe("navigateToDefault", () => {
         defaultParams: { id: 123 },
       });
 
-      router.navigateToDefault(callback);
-
-      // When router is not started, navigation should fail with ROUTER_NOT_STARTED
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTER_NOT_STARTED,
-        }),
-      );
+      try {
+        await router.navigateToDefault();
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.ROUTER_NOT_STARTED,
+          }),
+        );
+      }
 
       expect(router.isActive()).toBe(false);
     });
 
-    it("should use constructor options for navigation", () => {
-      const callback = vi.fn();
+    it("should use constructor options for navigation", async () => {
+      await withDefault("profile", { section: "settings" });
 
-      withDefault("profile", { section: "settings" });
+      const state = await router.navigateToDefault();
 
-      router.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "profile",
-          params: { section: "settings" },
-        }),
-      );
+      expect(state.name).toBe("profile");
+      expect(state.params).toStrictEqual({ section: "settings" });
     });
 
-    it("should work with different option combinations via separate routers", () => {
-      const callback = vi.fn();
-
+    it("should work with different option combinations via separate routers", async () => {
       // First router with settings default
-      withDefault("settings", { view: "summary" });
+      await withDefault("settings", { view: "summary" });
 
-      router.navigateToDefault(callback);
+      let state = await router.navigateToDefault();
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "settings",
-          params: { view: "summary" },
-        }),
-      );
-
-      callback.mockClear();
+      expect(state.name).toBe("settings");
+      expect(state.params).toStrictEqual({ view: "summary" });
 
       // Second router with admin.dashboard default
-      withDefault("admin.dashboard", { tab: "users", filter: "active" });
+      await withDefault("admin.dashboard", { tab: "users", filter: "active" });
 
-      router.navigateToDefault({ replace: true }, callback);
+      state = await router.navigateToDefault({ replace: true });
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "admin.dashboard",
-          params: { tab: "users", filter: "active" },
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ replace: true }),
-          }),
-        }),
+      expect(state.name).toBe("admin.dashboard");
+      expect(state.params).toStrictEqual({ tab: "users", filter: "active" });
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining({ replace: true }),
       );
     });
   });
