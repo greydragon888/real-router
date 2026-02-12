@@ -2,7 +2,7 @@
 
 import { logger } from "@real-router/logger";
 
-import { noop, safeCallback } from "./helpers";
+import { noop } from "./helpers";
 import { transition } from "./transition";
 import {
   parseNavigateArgs,
