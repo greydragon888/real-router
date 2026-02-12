@@ -37,6 +37,7 @@ describe("router.navigate() - events transition success", () => {
 
       // Navigate to different state to trigger TRANSITION_SUCCESS
       const newState = await router.navigate("users.view", { id: 42 });
+
       expect(newState).toBeDefined();
 
       // Verify TRANSITION_SUCCESS was called with correct parameters
@@ -260,6 +261,7 @@ describe("router.navigate() - events transition success", () => {
         .mockImplementation((_toState: any, _fromState: any, done: any) => {
           setTimeout(() => done(), 50);
         });
+
       router.useMiddleware(() => asyncMiddleware);
 
       const promise = router.navigate("users.view", { id: 456 });
@@ -354,6 +356,7 @@ describe("router.navigate() - events transition success", () => {
       });
 
       const finalState = await router.navigate("orders");
+
       expect(finalState?.name).toBe("profile");
 
       // TRANSITION_SUCCESS should be emitted with final redirected state

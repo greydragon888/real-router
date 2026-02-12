@@ -5,10 +5,7 @@ import { RouterError } from "@real-router/core";
 
 import { executeLifecycleHooks } from "../../../src/namespaces/NavigationNamespace/transition/executeLifecycleHooks";
 
-import type {
-  State,
-  ActivationFn,
-} from "@real-router/types";
+import type { State, ActivationFn } from "@real-router/types";
 
 describe("transition/executeLifecycleHooks", () => {
   const createState = (name: string): State => ({
@@ -48,7 +45,7 @@ describe("transition/executeLifecycleHooks", () => {
 
       // Hook that allows navigation
       const allowHook: ActivationFn = (_toState, _fromState) => {
-        return undefined;
+        return;
       };
 
       const hooks = new Map<string, ActivationFn>([["users", allowHook]]);
@@ -94,7 +91,7 @@ describe("transition/executeLifecycleHooks", () => {
           "CANNOT_ACTIVATE",
           () => cancelled,
         );
-      } catch (error) {
+      } catch {
         // Expected to throw when cancelled
       }
 
@@ -130,7 +127,7 @@ describe("transition/executeLifecycleHooks", () => {
           "CANNOT_ACTIVATE",
           () => false,
         );
-      } catch (error) {
+      } catch {
         // Expected to throw
       }
 

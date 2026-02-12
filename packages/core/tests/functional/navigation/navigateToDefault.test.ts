@@ -50,7 +50,7 @@ describe("navigateToDefault", () => {
       expect(typeof cancel).toBe("function");
 
       // Calling cancel should be safe (noop)
-      expect(() => cancel()).not.toThrow();
+      expect(() => cancel()).not.toThrowError();
 
       // Router state should remain at the route we started at
       expect(freshRouter.getState()?.name).toBe("users");
@@ -215,9 +215,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.ROUTE_NOT_FOUND,
             message: "ROUTE_NOT_FOUND",
@@ -235,9 +236,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.CANNOT_ACTIVATE,
             message: "CANNOT_ACTIVATE",
@@ -255,9 +257,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.TRANSITION_ERR,
             message: "TRANSITION_ERR",
@@ -416,9 +419,10 @@ describe("navigateToDefault", () => {
 
       try {
         await promise;
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.TRANSITION_CANCELLED,
             message: "CANCELLED",
@@ -566,9 +570,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.ROUTE_NOT_FOUND,
             message: "ROUTE_NOT_FOUND",
@@ -587,9 +592,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.CANNOT_ACTIVATE,
             message: "CANNOT_ACTIVATE",
@@ -781,10 +787,11 @@ describe("navigateToDefault", () => {
       // Then try to navigate to default (same route) without force - should fail
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toBeDefined();
-        expect((err as any).code).toBe(errorCodes.SAME_STATES);
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any).code).toBe(errorCodes.SAME_STATES);
       }
 
       // With force option, should succeed
@@ -847,9 +854,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.ROUTE_NOT_FOUND,
           }),
@@ -862,9 +870,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.ROUTE_NOT_FOUND,
             message: "ROUTE_NOT_FOUND",
@@ -881,9 +890,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.CANNOT_ACTIVATE,
             message: "CANNOT_ACTIVATE",
@@ -917,9 +927,10 @@ describe("navigateToDefault", () => {
 
       try {
         await cancelPromise;
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.TRANSITION_CANCELLED,
             message: "CANCELLED",
@@ -954,9 +965,10 @@ describe("navigateToDefault", () => {
 
       try {
         await promise;
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toBe(customError);
+      } catch (error) {
+        expect(error).toBe(customError);
       }
 
       router.clearMiddleware();
@@ -995,9 +1007,10 @@ describe("navigateToDefault", () => {
 
       try {
         await promise;
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.TRANSITION_CANCELLED,
             message: "CANCELLED",
@@ -1084,9 +1097,10 @@ describe("navigateToDefault", () => {
 
       try {
         await promise;
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.TRANSITION_CANCELLED,
             message: "CANCELLED",
@@ -1121,9 +1135,10 @@ describe("navigateToDefault", () => {
 
       try {
         await router.navigateToDefault();
+
         expect.fail("Should have thrown an error");
-      } catch (err) {
-        expect(err).toStrictEqual(
+      } catch (error) {
+        expect(error).toStrictEqual(
           expect.objectContaining({
             code: errorCodes.ROUTER_NOT_STARTED,
           }),
@@ -1180,6 +1195,7 @@ describe("navigateToDefault", () => {
 
       // Should be safe to call returned function
       const cancel = (promise as any).cancel;
+
       expect(() => {
         cancel();
       }).not.toThrowError();
@@ -1198,6 +1214,7 @@ describe("navigateToDefault", () => {
           // Simulate middleware that might trigger another default navigation
           return new Promise((resolve) => setTimeout(resolve, 10));
         }
+
         return true;
       });
 
@@ -1208,6 +1225,7 @@ describe("navigateToDefault", () => {
 
       // Should complete without infinite loops
       const state = await promise;
+
       expect(state).toBeDefined();
 
       router.clearMiddleware();

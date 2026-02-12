@@ -30,8 +30,8 @@ describe("router.navigate() - error state recovery", () => {
       router.addActivateGuard("users", () => () => false);
       try {
         await router.navigate("users");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       // State should NOT have changed
@@ -46,8 +46,8 @@ describe("router.navigate() - error state recovery", () => {
       router.addDeactivateGuard("users", () => () => false);
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
       // State should NOT have changed
@@ -64,8 +64,8 @@ describe("router.navigate() - error state recovery", () => {
       });
       try {
         await router.navigate("users");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
       }
 
       // State should NOT have changed
@@ -86,8 +86,8 @@ describe("router.navigate() - error state recovery", () => {
       // First navigation fails
       try {
         await router.navigate("users");
-      } catch (err) {
-        expect(err).toBeDefined();
+      } catch (error) {
+        expect(error).toBeDefined();
       }
 
       // Can start new navigation after error (router is not stuck)
@@ -121,10 +121,10 @@ describe("router.navigate() - error state recovery", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(err?.message).toBe("Async canActivate error");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(error?.message).toBe("Async canActivate error");
       }
     });
 
@@ -143,10 +143,10 @@ describe("router.navigate() - error state recovery", () => {
 
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        expect(err?.message).toBe("Async canDeactivate error");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(error?.message).toBe("Async canDeactivate error");
       }
     });
 
@@ -162,10 +162,10 @@ describe("router.navigate() - error state recovery", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err?.message).toBe("Async middleware error");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(error?.message).toBe("Async middleware error");
       }
     });
 
@@ -199,8 +199,8 @@ describe("router.navigate() - error state recovery", () => {
       // Navigation should have been cancelled
       try {
         await navPromise;
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
     });
   });

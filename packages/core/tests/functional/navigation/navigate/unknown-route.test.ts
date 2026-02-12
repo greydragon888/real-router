@@ -90,6 +90,7 @@ describe("router.navigate() - unknown route", () => {
 
       // Navigate to normal route
       await freshRouter.navigate("orders", {});
+
       expect(middleware).toHaveBeenCalledTimes(1);
     });
 
@@ -110,8 +111,8 @@ describe("router.navigate() - unknown route", () => {
       // Try to navigate to non-existent route
       try {
         await strictRouter.navigate("non-existent", {});
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
       // Should stay on current route

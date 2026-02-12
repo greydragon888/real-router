@@ -262,9 +262,9 @@ describe("core/noValidate option", () => {
 
         const state = router.makeState("home", {}, "/home");
 
-        expect(async () => {
-          await router.navigateToState(state, undefined, {}, true);
-        }).not.toThrowError();
+        expect(
+          router.navigateToState(state, undefined, {}, true),
+        ).not.toThrowError();
       });
     });
 

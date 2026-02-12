@@ -35,6 +35,7 @@ describe("router.navigate() - query params", () => {
       q: "a b",
       tag: "x/y",
     });
+
     expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
   });
 

@@ -64,6 +64,7 @@ describe("router.start() - path string scenarios", () => {
 
     it("should preserve path parameters in matched state", async () => {
       const state = await router.start("/users/view/456");
+
       expect(state?.params).toStrictEqual({ id: "456" });
 
       const currentState = router.getState();
@@ -83,6 +84,7 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start("/invalid/path");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(router.isActive()).toBe(false);
@@ -103,6 +105,7 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start("/nonexistent/route");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(router.isActive()).toBe(false);
@@ -128,6 +131,7 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start("/invalid/path");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(router.isActive()).toBe(false);
@@ -150,6 +154,7 @@ describe("router.start() - path string scenarios", () => {
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
+
       // Verify state is UNKNOWN_ROUTE
       const currentState = router.getState();
 
@@ -186,6 +191,7 @@ describe("router.start() - path string scenarios", () => {
     it("should prefer allowNotFound over defaultRoute when both are set", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
       const state = await router.start("/invalid/path");
+
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
     });
   });
@@ -206,9 +212,9 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start(invalidPath);
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe("TRANSITION_ERR");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error?.code).toBe("TRANSITION_ERR");
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       }
     });
@@ -227,8 +233,9 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start(invalidPath);
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
+      } catch {
         expect(middlewareCallCount).toBe(1); // only for UNKNOWN_ROUTE
       }
     });
@@ -257,10 +264,11 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ allowNotFound: false });
       try {
         await router.start("   "); // Whitespace is truthy, passed to matchPath, returns undefined
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
     });
 
@@ -268,10 +276,11 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ allowNotFound: false });
       try {
         await router.start("//users//list//"); // Double slashes are likely not matched by routes
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
     });
   });
@@ -296,10 +305,11 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ allowNotFound: false });
       try {
         await router.start("/non-existent");
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
     });
 
@@ -328,6 +338,7 @@ describe("router.start() - path string scenarios", () => {
 
       // Verify start() returns state
       const state = await router.start(validPath);
+
       // Router should be in correct state
       expect(router.getState()?.name).toBe("orders.view");
       expect(state?.name).toBe("orders.view");
@@ -341,9 +352,10 @@ describe("router.start() - path string scenarios", () => {
 
       try {
         await router.start(invalidPath);
+
         expect.fail("Should have thrown");
-      } catch (err: any) {
-        expect(err).toBeDefined();
+      } catch (error: any) {
+        expect(error).toBeDefined();
       }
     });
 

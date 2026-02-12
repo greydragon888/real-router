@@ -1,11 +1,4 @@
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  
-} from "vitest";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { errorCodes, events } from "@real-router/core";
 
@@ -40,20 +33,22 @@ describe("router.navigate() - router not started", () => {
     it("should call callback with ROUTER_NOT_STARTED error", async () => {
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
     it("should return noop function when router is not started", async () => {
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
@@ -77,7 +72,7 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
+      } catch {
         // Expected
       }
 
@@ -93,10 +88,11 @@ describe("router.navigate() - router not started", () => {
     it("should handle navigation with parameters when router not started", async () => {
       try {
         await router.navigate("users.view", { id: 123 });
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
@@ -105,10 +101,11 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("profile", {}, options);
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
@@ -117,20 +114,20 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
-        errors.push(err);
+      } catch (error: any) {
+        errors.push(error);
       }
 
       try {
         await router.navigate("profile");
-      } catch (err: any) {
-        errors.push(err);
+      } catch (error: any) {
+        errors.push(error);
       }
 
       try {
         await router.navigate("orders");
-      } catch (err: any) {
-        errors.push(err);
+      } catch (error: any) {
+        errors.push(error);
       }
 
       expect(errors).toHaveLength(3);
@@ -151,7 +148,7 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
+      } catch {
         // Expected
       }
 
@@ -164,20 +161,22 @@ describe("router.navigate() - router not started", () => {
     it("should handle invalid route names when router not started", async () => {
       try {
         await router.navigate("nonexistent.route");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
     it("should return noop function that is safe to call", async () => {
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
@@ -186,10 +185,11 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
 
       router.start();
@@ -227,7 +227,7 @@ describe("router.navigate() - router not started", () => {
 
       try {
         await router.navigate("users");
-      } catch (err: any) {
+      } catch {
         // Expected
       }
 
@@ -245,16 +245,18 @@ describe("router.navigate() - router not started", () => {
     it("should handle navigation without callback when router not started", async () => {
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
     });
 
     it("should return ROUTER_NOT_STARTED error with correct properties", async () => {
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown ROUTER_NOT_STARTED");
       } catch (error: any) {
         expect(error).toStrictEqual(

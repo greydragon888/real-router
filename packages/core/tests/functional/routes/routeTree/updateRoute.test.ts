@@ -450,6 +450,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       // Verify canActivate works by navigating
       await router.navigate("ur-secure");
+
       expect(guard).toHaveBeenCalled();
     });
 
@@ -467,9 +468,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Verify new guard is used - navigation should be blocked
       try {
         await router.navigate("ur-guarded");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(guard2).toHaveBeenCalled();
         expect(guard1).not.toHaveBeenCalled();
       }
@@ -487,9 +489,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Verify guard is active - navigation blocked
       try {
         await router.navigate("ur-locked");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       guard.mockClear();
@@ -499,6 +502,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       // Now navigation should succeed
       await router.navigate("ur-locked");
+
       expect(guard).not.toHaveBeenCalled();
     });
   });
@@ -519,9 +523,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Navigate away - should be blocked
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(guard).toHaveBeenCalled();
       }
     });
@@ -541,9 +546,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Verify guard is active - navigation blocked
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
       guard.mockClear();
@@ -553,6 +559,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       // Now navigation should succeed
       await router.navigate("home");
+
       expect(guard).not.toHaveBeenCalled();
     });
 
@@ -575,6 +582,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       // Navigate away - new guard should fire, old guard should NOT
       await router.navigate("home");
+
       expect(guard2).toHaveBeenCalled();
       expect(guard1).not.toHaveBeenCalled();
     });
@@ -890,6 +898,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       // Verify canActivate via navigation
       await router.navigate("ur-multi");
+
       expect(guard).toHaveBeenCalled();
     });
 
@@ -1181,6 +1190,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Verify canActivate works via navigation
         await router.navigate("ur-arrow-guard");
+
         expect(guard).toHaveBeenCalled();
       });
     });

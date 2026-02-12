@@ -1037,6 +1037,10 @@ export class Router<
     );
   }
 
+  cancel(): void {
+    this.#navigation.cancel();
+  }
+
   // ============================================================================
   // Subscription (backed by ObservableNamespace)
   // ============================================================================

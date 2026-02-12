@@ -27,9 +27,9 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     try {
       await router.navigate("users");
-    } catch (err: any) {
-      expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
-      expect(err?.segment).toStrictEqual("users.list");
+    } catch (error: any) {
+      expect(error?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.segment).toStrictEqual("users.list");
     }
 
     expect(omitMeta(router.getState())).toStrictEqual({
@@ -56,9 +56,9 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     try {
       await router.navigate("users");
-    } catch (err: any) {
-      expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
-      expect(err?.segment).toStrictEqual("users.list");
+    } catch (error: any) {
+      expect(error?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.segment).toStrictEqual("users.list");
     }
 
     router.addDeactivateGuard("users.list", true);
@@ -75,9 +75,9 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     try {
       await router.navigate("users");
-    } catch (err: any) {
-      expect(err).toBeDefined();
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    } catch (error: any) {
+      expect(error).toBeDefined();
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
     }
   });
 
@@ -92,10 +92,10 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     try {
       await router.navigate("users");
-    } catch (err: any) {
+    } catch (error: any) {
       // Guards cannot redirect - should return CANNOT_DEACTIVATE error
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(err?.attemptedRedirect).toStrictEqual({
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.attemptedRedirect).toStrictEqual({
         name: "index",
         params: {},
         path: "/",
@@ -261,8 +261,8 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       await router.navigate("valid");
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
       // Failed route can be re-registered (was rolled back)
@@ -306,8 +306,8 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       // Now cannot leave admin
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
       expect(router.getState()?.name).toBe("admin");

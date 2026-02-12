@@ -127,8 +127,8 @@ describe("router.navigate() - edge cases input validation", () => {
     it("should handle empty string as route name", async () => {
       try {
         await router.navigate("");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
       // Router should still be operational

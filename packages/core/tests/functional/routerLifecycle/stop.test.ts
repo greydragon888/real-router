@@ -297,6 +297,7 @@ describe("stop", () => {
 
       try {
         await router.navigate("users");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -310,6 +311,7 @@ describe("stop", () => {
 
       try {
         await router.navigateToDefault({});
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -324,6 +326,7 @@ describe("stop", () => {
       // navigate should reject
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
@@ -332,6 +335,7 @@ describe("stop", () => {
       // navigateToDefault should reject
       try {
         await router.navigateToDefault({});
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);

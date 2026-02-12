@@ -39,9 +39,10 @@ describe("router.navigate() - middleware blocking", () => {
         // Navigate away - should be blocked
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
         }
       });
@@ -60,9 +61,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           // Based on current implementation order (child first)
           expect(nextGuard).toHaveBeenCalledTimes(1);
           expect(blockingGuard).toHaveBeenCalledTimes(1);
@@ -76,9 +78,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("orders");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         }
 
         expect(router.getState()?.name).toBe("users");
@@ -93,9 +96,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
         }
       });
@@ -109,9 +113,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("settings.account");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(blockingGuard).toHaveBeenCalledTimes(1);
           // Next guard should not be called due to blocking
           expect(nextGuard).not.toHaveBeenCalled();
@@ -127,9 +132,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
         }
       });
@@ -143,9 +149,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
           // Next middleware should not be called due to blocking
           expect(nextMiddleware).not.toHaveBeenCalled();
@@ -161,9 +168,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("orders");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           // Guard should pass, but middleware blocks
           expect(passingGuard).toHaveBeenCalledTimes(1);
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
@@ -187,9 +195,10 @@ describe("router.navigate() - middleware blocking", () => {
         // Navigate away - should be blocked
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
         }
       });
@@ -208,9 +217,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           // Based on current implementation order (child first)
           expect(nextPromiseGuard).toHaveBeenCalledTimes(1);
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
@@ -226,9 +236,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
         }
       });
@@ -242,9 +253,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("settings.account");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
           // Next guard should not be called due to blocking
           expect(nextPromiseGuard).not.toHaveBeenCalled();
@@ -260,9 +272,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("orders.pending");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);
         }
       });
@@ -276,9 +289,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);
           // Next middleware should not be called due to blocking
           expect(nextPromiseMiddleware).not.toHaveBeenCalled();
@@ -294,9 +308,10 @@ describe("router.navigate() - middleware blocking", () => {
 
         try {
           await router.navigate("orders");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
           // Guard should pass, but middleware blocks
           expect(passingPromiseGuard).toHaveBeenCalledTimes(1);
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);

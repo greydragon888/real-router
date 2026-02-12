@@ -160,9 +160,10 @@ describe("core/routes/removeRoute", () => {
       // Verify guard works before removal - navigation should be blocked
       try {
         await router.navigate("protected");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(guard).toHaveBeenCalled();
       }
 
@@ -185,9 +186,10 @@ describe("core/routes/removeRoute", () => {
       // Verify guard works - leaving should be blocked
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(guard).toHaveBeenCalled();
       }
 
@@ -221,9 +223,10 @@ describe("core/routes/removeRoute", () => {
 
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(guard2).toHaveBeenCalled();
       }
     });
@@ -390,9 +393,10 @@ describe("core/routes/removeRoute", () => {
 
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(guard).toHaveBeenCalled();
       }
 
@@ -543,9 +547,10 @@ describe("core/routes/removeRoute", () => {
       // Verify canActivate guard still works
       try {
         await router.navigate("existing");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(activateGuard).toHaveBeenCalled();
       }
 
@@ -557,9 +562,10 @@ describe("core/routes/removeRoute", () => {
 
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
         expect(deactivateGuard).toHaveBeenCalled();
       }
     });

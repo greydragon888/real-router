@@ -31,13 +31,14 @@ describe("router.navigate() - transitions and cancellation", () => {
     const middleware = (_toState: any, _fromState: any, done: any): void => {
       setTimeout(() => done(), 20);
     };
+
     router.useMiddleware(() => middleware as any);
 
     const promises = Array.from({ length: 5 })
       .fill(null)
       .map(() =>
-        router.navigate("users").catch((err) => {
-          expect(err?.code).toStrictEqual(errorCodes.TRANSITION_CANCELLED);
+        router.navigate("users").catch((error) => {
+          expect(error?.code).toStrictEqual(errorCodes.TRANSITION_CANCELLED);
         }),
       );
 
@@ -130,6 +131,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         freshRouter.start();
 
         const callback = vi.fn();
+
         freshRouter.navigate("users").then(callback).catch(callback);
 
         // Cancel navigation before promise completes
@@ -219,9 +221,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Navigation should be cancelled
         try {
           await promise;
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err).toMatchObject({
+        } catch (error: any) {
+          expect(error).toMatchObject({
             code: errorCodes.TRANSITION_CANCELLED,
           });
         }
@@ -237,6 +240,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         const guardFn = (_toState: any, _fromState: any, done: any): void => {
           doneFn = done;
         };
+
         freshRouter.addActivateGuard("users", () => guardFn as any);
 
         freshRouter.start();
@@ -252,9 +256,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Navigation should be cancelled
         try {
           await promise;
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err).toMatchObject({
+        } catch (error: any) {
+          expect(error).toMatchObject({
             code: errorCodes.TRANSITION_CANCELLED,
           });
         }
@@ -274,6 +279,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         ): void => {
           setTimeout(() => done(), 100);
         };
+
         freshRouter.useMiddleware(() => middleware2 as any);
         freshRouter.start();
 
@@ -287,9 +293,10 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Navigation should be cancelled
         try {
           await promise;
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
         }
 
         freshRouter.stop();

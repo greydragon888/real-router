@@ -77,9 +77,10 @@ describe("core/routes/addRoute", () => {
     // Verify guard is registered by testing navigation behavior
     try {
       await router.navigate("secure");
+
       expect.fail("Should have thrown");
-    } catch (err) {
-      expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+    } catch (error) {
+      expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
     }
   });
 
@@ -341,9 +342,10 @@ describe("core/routes/addRoute", () => {
       // Verify guard is registered by testing navigation behavior
       try {
         await router.navigate("parent.child");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
       }
     });
 
@@ -370,17 +372,19 @@ describe("core/routes/addRoute", () => {
       // level2 guard blocks navigation to level2
       try {
         await router.navigate("level1.level2");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
       }
 
       // level2 guard also blocks navigation to level3 (parent guard runs first)
       try {
         await router.navigate("level1.level2.level3");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
       }
     });
 
@@ -1643,6 +1647,7 @@ describe("core/routes/addRoute", () => {
 
       // Navigate TO route (should succeed)
       await router.navigate("editor");
+
       expect(router.getState()?.name).toBe("editor");
 
       guard.mockClear();
@@ -1650,9 +1655,10 @@ describe("core/routes/addRoute", () => {
       // Navigate AWAY from route (should fail)
       try {
         await router.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe("CANNOT_DEACTIVATE");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_DEACTIVATE");
         expect(guard).toHaveBeenCalled();
         expect(router.getState()?.name).toBe("editor"); // Still on editor
       }
@@ -1675,6 +1681,7 @@ describe("core/routes/addRoute", () => {
 
       // Navigate AWAY from route (should succeed)
       await router.navigate("home");
+
       expect(guard).toHaveBeenCalled();
       expect(router.getState()?.name).toBe("home");
     });
@@ -1737,6 +1744,7 @@ describe("core/routes/addRoute", () => {
 
       // Navigate away - guard2 should fire, guard1 should NOT
       await router.navigate("home");
+
       expect(guard2).toHaveBeenCalled();
       expect(guard1).not.toHaveBeenCalled();
     });
@@ -1782,9 +1790,10 @@ describe("core/routes/addRoute", () => {
       // Navigate away - canDeactivate should fire (proves flush worked)
       try {
         await testRouter.navigate("home");
+
         expect.fail("Should have thrown");
-      } catch (err) {
-        expect((err as RouterError).code).toBe("CANNOT_DEACTIVATE");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_DEACTIVATE");
         expect(guard).toHaveBeenCalled();
       }
 

@@ -60,9 +60,10 @@ describe("router.navigate() - middleware execution", () => {
 
       try {
         await router.navigate("orders", {}, {});
+
         expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
       }
 
       expect(allowingMiddleware).toHaveBeenCalledTimes(1);
@@ -86,9 +87,10 @@ describe("router.navigate() - middleware execution", () => {
 
       try {
         await router.navigate("non.existent.route", {}, {});
+
         expect.fail("Should have thrown ROUTE_NOT_FOUND");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
       expect(middleware).not.toHaveBeenCalled();
@@ -178,11 +180,12 @@ describe("router.navigate() - middleware execution", () => {
 
       try {
         await freshRouter.start("/");
+
         expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (err: any) {
+      } catch (error: any) {
         expect(blockingMiddleware).toHaveBeenCalled();
-        expect(err).toBeDefined();
-        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+        expect(error).toBeDefined();
+        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
       }
 
       freshRouter.stop();
@@ -203,10 +206,11 @@ describe("router.navigate() - middleware execution", () => {
 
       try {
         await freshRouter.navigate("users");
+
         expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (err: any) {
-        expect(err).toBeDefined();
-        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
       }
 
       expect(freshRouter.getState()?.name).toBe("index");
@@ -262,12 +266,13 @@ describe("router.navigate() - middleware execution", () => {
 
       try {
         await freshRouter.start("/");
+
         expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (err: any) {
+      } catch (error: any) {
         expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-        expect(err).toBeDefined();
-        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-        expect((err as RouterError).message).toBe(errorMessage);
+        expect(error).toBeDefined();
+        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as RouterError).message).toBe(errorMessage);
       }
 
       freshRouter.stop();

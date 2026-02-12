@@ -48,6 +48,7 @@ describe("core/observable/addEventListener", () => {
       await router.start("/");
 
       await router.navigate("users");
+
       expect(cb).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users" }),
         expect.objectContaining({ name: "home" }),
@@ -61,6 +62,7 @@ describe("core/observable/addEventListener", () => {
       await router.start("/");
 
       await router.navigate("users", {}, { reload: true });
+
       expect(cb).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users" }),
         expect.objectContaining({ name: "home" }),
@@ -76,9 +78,10 @@ describe("core/observable/addEventListener", () => {
 
       try {
         await router.navigate("admin-protected");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
+
       expect(cb).toHaveBeenCalledWith(
         expect.objectContaining({ name: "admin-protected" }),
         expect.objectContaining({ name: "home" }),
@@ -92,6 +95,7 @@ describe("core/observable/addEventListener", () => {
       // Add slow middleware to allow cancellation
       router.useMiddleware(() => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
+
         return true;
       });
 
@@ -103,6 +107,7 @@ describe("core/observable/addEventListener", () => {
 
       // Cancel by starting second navigation
       await router.navigate("orders");
+
       expect(cb).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users" }),
         expect.objectContaining({ name: "home" }),
@@ -138,6 +143,7 @@ describe("core/observable/addEventListener", () => {
       await router.start("/");
 
       await router.navigate("users");
+
       // ROUTER_START + TRANSITION_START + TRANSITION_SUCCESS = 3 calls
       expect(cb).toHaveBeenCalledTimes(3);
     });

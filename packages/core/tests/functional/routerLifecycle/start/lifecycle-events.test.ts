@@ -102,7 +102,7 @@ describe("router.start() - lifecycle events", () => {
 
         try {
           await router.start("/nonexistent");
-        } catch (err) {
+        } catch {
           // Expected to fail
         }
 
@@ -123,7 +123,7 @@ describe("router.start() - lifecycle events", () => {
 
         try {
           await router.start("/nonexistent/path");
-        } catch (err) {
+        } catch {
           // Expected to fail
         }
 
@@ -173,7 +173,7 @@ describe("router.start() - lifecycle events", () => {
 
         try {
           await routerWithoutDefault.start();
-        } catch (err) {
+        } catch {
           // Expected to fail
         }
 
@@ -255,7 +255,7 @@ describe("router.start() - lifecycle events", () => {
 
         try {
           await router.start("/users/list");
-        } catch (err) {
+        } catch {
           // Expected to fail
         }
 

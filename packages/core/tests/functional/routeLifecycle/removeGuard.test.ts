@@ -45,6 +45,7 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.removeActivateGuard("admin");
 
     const state = await router.navigate("admin");
+
     expect(state.name).toBe("admin");
   });
 
@@ -56,6 +57,7 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.removeDeactivateGuard("users");
 
     const state = await router.navigate("home");
+
     expect(state.name).toBe("home");
   });
 
@@ -94,6 +96,7 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.start();
     const state = await router.navigate("admin");
+
     expect(state.name).toBe("admin");
   });
 
@@ -173,6 +176,7 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.removeActivateGuard("users");
 
     const state = await router.navigate("users");
+
     expect(state.name).toBe("users");
   });
 

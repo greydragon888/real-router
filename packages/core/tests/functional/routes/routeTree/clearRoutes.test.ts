@@ -187,8 +187,8 @@ describe("core/routes/clearRoutes", () => {
       // Verify guard is active before clear
       try {
         await router.navigate("protected");
-      } catch (err: any) {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
+      } catch (error: any) {
+        expect(error?.code).toBe("CANNOT_ACTIVATE");
       }
 
       router.clearRoutes();
@@ -211,8 +211,8 @@ describe("core/routes/clearRoutes", () => {
       // Try to leave - should be blocked
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toBe("CANNOT_DEACTIVATE");
+      } catch (error: any) {
+        expect(error?.code).toBe("CANNOT_DEACTIVATE");
       }
 
       expect(router.getState()?.name).toBe("editor");
@@ -284,6 +284,7 @@ describe("core/routes/clearRoutes", () => {
       const middlewareCalls: string[] = [];
       const middleware = () => async () => {
         middlewareCalls.push("mw");
+
         return true;
       };
 

@@ -24,8 +24,8 @@ describe("core/route-lifecycle/guard-api", () => {
 
       try {
         await router.navigate("admin");
-      } catch (err: any) {
-        expect(err?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
       }
 
       expect(router.getState()?.name).not.toBe("admin");
@@ -53,8 +53,8 @@ describe("core/route-lifecycle/guard-api", () => {
 
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
       }
 
       expect(router.getState()?.name).toBe("admin");

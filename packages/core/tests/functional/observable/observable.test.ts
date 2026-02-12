@@ -79,8 +79,8 @@ describe("core/observable", () => {
         router.addEventListener(events.TRANSITION_ERROR, cb);
         try {
           await router.navigate("admin-protected", {}, {});
-        } catch (err: any) {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
         expect(cb).toHaveBeenCalledTimes(1);

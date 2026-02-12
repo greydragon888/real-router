@@ -75,6 +75,7 @@ describe("navigateToState argument validation", () => {
     const fromState = router.getState();
 
     const result = await router.navigateToState(toState, fromState, {}, true);
+
     expect(result).toBeDefined();
   });
 
@@ -82,6 +83,7 @@ describe("navigateToState argument validation", () => {
     const toState = router.makeState("home", {}, "/");
 
     const result = await router.navigateToState(toState, undefined, {}, false);
+
     expect(result).toBeDefined();
   });
 });

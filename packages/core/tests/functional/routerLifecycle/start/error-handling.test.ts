@@ -44,15 +44,13 @@ describe("router.start() - error handling", () => {
           transitionErrorListener,
         );
 
-
         routerWithoutDefault.start();
 
         expect(transitionStartListener).not.toHaveBeenCalled();
         expect(transitionSuccessListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-          transitionErrorListener.mock.calls[0];
-
+        transitionErrorListener.mock.calls[0];
 
         routerWithoutDefault.stop();
       });
@@ -100,8 +98,6 @@ describe("router.start() - error handling", () => {
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
         expect(result).toBe(router);
 
-
-
         const currentState = router.getState();
 
         expect(currentState?.name).toBe("home");
@@ -128,8 +124,6 @@ describe("router.start() - error handling", () => {
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
         expect(result).toBe(router);
-
-
       });
     });
   });
@@ -381,7 +375,6 @@ describe("router.start() - error handling", () => {
         const routes = ["home", "users", "orders", "sign-in", "settings"];
 
         for (let i = 0; i < cycles; i++) {
-
           router.start(`/${routes[i]}`);
 
           expect(router.isActive()).toBe(true);
@@ -487,10 +480,7 @@ describe("router.start() - error handling", () => {
           return toState.name !== "users.list"; // Block users.list
         });
 
-
         router.start("/users/list");
-
-
 
         // Error should be reported to callback
       });
@@ -511,8 +501,6 @@ describe("router.start() - error handling", () => {
         router.start("/users/list");
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-
       });
 
       it("should NOT silently navigate to defaultRoute when transition fails", () => {

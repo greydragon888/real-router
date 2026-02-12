@@ -27,10 +27,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     try {
       await router.navigate("admin");
-    } catch (err: any) {
-      expect(err?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
-      expect(err?.segment).toStrictEqual("admin");
+    } catch (error: any) {
+      expect(error?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
+      expect(error?.segment).toStrictEqual("admin");
     }
+
     expect(router.isActiveRoute("home")).toBe(true);
   });
 
@@ -39,9 +40,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     try {
       await router.navigate("admin");
-    } catch (err: any) {
-      expect(err).toBe(undefined);
+    } catch (error: any) {
+      expect(error).toBe(undefined);
     }
+
     expect(router.getState()?.name).toBe("admin");
   });
 
@@ -51,9 +53,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     try {
       await router.navigate("admin");
-    } catch (err: any) {
-      expect(err).toBe(undefined);
+    } catch (error: any) {
+      expect(error).toBe(undefined);
     }
+
     expect(router.getState()?.name).toBe("admin");
   });
 
@@ -63,9 +66,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     try {
       await router.navigate("admin");
-    } catch (err: any) {
-      expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    } catch (error: any) {
+      expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
     }
+
     expect(router.isActiveRoute("admin")).toBe(false);
   });
 
@@ -77,11 +81,13 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     }));
 
     let err: any;
+
     try {
       await router.navigate("sign-in");
-    } catch (e: any) {
-      err = e;
+    } catch (error: any) {
+      err = error;
     }
+
     // Guards cannot redirect - should return CANNOT_ACTIVATE error
     expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
     expect(err?.attemptedRedirect).toStrictEqual({
@@ -113,8 +119,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       router.addActivateGuard("", false);
       try {
         await router.navigate("home");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
 
@@ -378,11 +384,13 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       // Verify new guard works
       let err: any;
+
       try {
         await router.navigate("problematic");
-      } catch (e: any) {
-        err = e;
+      } catch (error: any) {
+        err = error;
       }
+
       // Route may not exist in tree, but registration succeeded
       expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
     });
@@ -416,14 +424,15 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify valid guards still work correctly
       try {
         await router.navigate("valid1");
-      } catch (err: any) {
-        expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
       try {
         await router.navigate("valid2");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
+
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
         router.addActivateGuard("failing", true);
@@ -468,13 +477,13 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify both guards work via navigation behavior
       try {
         await router.navigate("route1");
-      } catch (err: any) {
-        expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
       try {
         await router.navigate("route2");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
 
@@ -494,9 +503,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify existing guard still works
       try {
         await router.navigate("existing");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
+
       // Verify problematic guard was rolled back (can be re-registered)
       expect(() => {
         router.addActivateGuard("problematic", true);
@@ -548,8 +558,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // First guard allows navigation
       try {
         await router.navigate("admin");
-      } catch (err: any) {
-        expect(err).toBeUndefined();
+      } catch (error: any) {
+        expect(error).toBeUndefined();
       }
       router.addActivateGuard("admin", false);
 
@@ -559,8 +569,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // New guard blocks navigation
       try {
         await router.navigate("admin");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
   });
@@ -724,8 +734,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify guard works via navigation
       try {
         await router.navigate("proxyRoute");
-      } catch (err: any) {
-        expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
 
@@ -741,8 +751,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify bound function's `this.allowed` (true) works via navigation
       try {
         await router.navigate("boundRoute");
-      } catch (err: any) {
-        expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
 
@@ -810,8 +820,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify level3 guard works via navigation
       try {
         await router.navigate("level3");
-      } catch (err: any) {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
     });
   });

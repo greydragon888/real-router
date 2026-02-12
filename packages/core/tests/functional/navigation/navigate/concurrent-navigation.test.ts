@@ -41,44 +41,35 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.restoreAllMocks();
     });
 
-    it("should return cancel function from router.navigate", async () => {
-      const cancel = router.navigate("users", noop);
+    it("should return Promise from router.navigate", async () => {
+      const result = router.navigate("users");
 
-      expectTypeOf(cancel).toBeFunction();
+      expectTypeOf(result).toEqualTypeOf<Promise<State>>();
 
-      expect(typeof cancel).toBe("function");
+      expect(result).toBeInstanceOf(Promise);
+
+      await result; // Clean up
     });
 
-    it("should cancel navigation and call callback with TRANSITION_CANCELLED error", async () => {
+    it("should cancel navigation and reject with TRANSITION_CANCELLED error", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50); // 50ms delay
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
-      const cancel = router.navigate("users", (err) => {
-        expect(err).toBeDefined();
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      const promise = router.navigate("users");
 
-        callback(err);
-      });
+      setTimeout(() => {
+        router.cancel();
+      }, 10);
 
-      // Cancel after 10ms (before middleware completes)
-      setTimeout(cancel, 10);
-
-      // Advance timers to trigger cancellation
       vi.advanceTimersByTime(10);
       vi.advanceTimersByTime(50);
 
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_CANCELLED,
-        }),
-      );
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -89,8 +80,8 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const unsubCancel = router.addEventListener(
@@ -98,22 +89,25 @@ describe("router.navigate() - concurrent navigation", () => {
         onCancel,
       );
 
-      const cancel = router.navigate("profile", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      });
+      const promise = router.navigate("profile");
 
-      setTimeout(cancel, 15);
+      setTimeout(() => {
+        router.cancel();
+      }, 15);
 
-      // Advance timers
       vi.advanceTimersByTime(15);
       vi.advanceTimersByTime(50);
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       expect(onCancel).toHaveBeenCalledTimes(1);
       expect(onCancel).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "profile",
-        }), // toState
-        expect.any(Object), // fromState
+        }),
+        expect.any(Object),
       );
 
       unsubCancel();
@@ -135,21 +129,19 @@ describe("router.navigate() - concurrent navigation", () => {
 
       router.addActivateGuard("orders", asyncGuard);
 
-      const callback = vi.fn((err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      });
+      const promise = router.navigate("orders");
 
-      const cancel = router.navigate("orders", callback);
+      setTimeout(() => {
+        router.cancel();
+      }, 20);
 
-      // Cancel while guard is executing
-      setTimeout(cancel, 20);
-
-      // Run all timers and microtasks
       await vi.runAllTimersAsync();
 
-      // Assertions
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
       expect(asyncGuard).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
 
       vi.useRealTimers();
     });
@@ -157,36 +149,30 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should cancel navigation during multiple async middleware", async () => {
       vi.useFakeTimers();
 
-      const middleware1 = vi
-        .fn()
-        .mockImplementation(
-          () => (_toState: State, _fromState: State, done: DoneFn) => {
-            setTimeout(done, 30);
-          },
-        );
+      const middleware1 = vi.fn().mockImplementation(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      });
 
-      const middleware2 = vi
-        .fn()
-        .mockImplementation(
-          () => (_toState: State, _fromState: State, done: DoneFn) => {
-            setTimeout(done, 30);
-          },
-        );
+      const middleware2 = vi.fn().mockImplementation(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+      });
 
       router.useMiddleware(middleware1);
       router.useMiddleware(middleware2);
 
-      const cancel = router.navigate("settings", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-        // First middleware should have been called
-        expect(middleware1).toHaveBeenCalledTimes(1);
+      const promise = router.navigate("settings");
+
+      setTimeout(() => {
+        router.cancel();
+      }, 25);
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      // Cancel during middleware execution
-      setTimeout(cancel, 25);
-
-      // Advance timers
-      await vi.runAllTimersAsync();
+      expect(middleware1).toHaveBeenCalledTimes(1);
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -195,7 +181,6 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should prioritize cancellation over other errors", async () => {
       vi.useFakeTimers();
 
-      // Set up failing guard
       const failingGuard = vi.fn().mockImplementation(
         () => () =>
           new Promise((_resolve, reject) => {
@@ -207,16 +192,17 @@ describe("router.navigate() - concurrent navigation", () => {
 
       router.addActivateGuard("admin", failingGuard);
 
-      const cancel = router.navigate("admin", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-        // Cancellation error should take priority over guard error
-      });
+      const promise = router.navigate("admin");
 
-      // Cancel before guard failure
-      setTimeout(cancel, 50);
+      setTimeout(() => {
+        router.cancel();
+      }, 50);
 
-      // Advance timers
       await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       vi.useRealTimers();
     });
@@ -224,64 +210,48 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should not cancel already completed navigation", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      // Fast middleware that completes quickly
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 10);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
       });
 
-      const cancel = router.navigate("users", (err) => {
-        // Navigation should succeed
-        expect(err).toBeUndefined();
+      const promise = router.navigate("users");
 
-        callback(err);
-
-        // Try to cancel after completion - should have no effect
-        cancel();
-      });
-
-      // Advance time for navigation to complete
       vi.advanceTimersByTime(10);
 
-      // Try to cancel after navigation completes
-      setTimeout(cancel, 50);
-      vi.advanceTimersByTime(50);
+      const state = await promise;
 
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(undefined);
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
+
+      router.cancel();
+
+      expect(router.getState()?.name).toBe("users");
 
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should handle cancel function called multiple times", async () => {
+    it("should handle router.cancel() called multiple times", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
-      const cancel = router.navigate("profile", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      const promise = router.navigate("profile");
 
-        callback();
-      });
-
-      // Call cancel multiple times
       setTimeout(() => {
-        cancel();
-        cancel(); // Second call should be safe
-        cancel(); // Third call should be safe
+        router.cancel();
+        router.cancel();
+        router.cancel();
       }, 20);
 
-      // Advance timers
       vi.advanceTimersByTime(20);
       vi.advanceTimersByTime(50);
 
-      expect(callback).toHaveBeenCalledTimes(1);
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -293,8 +263,8 @@ describe("router.navigate() - concurrent navigation", () => {
       const onSuccess = vi.fn();
       const onCancel = vi.fn();
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 60);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 60));
       });
 
       const unsubSuccess = router.addEventListener(
@@ -306,20 +276,21 @@ describe("router.navigate() - concurrent navigation", () => {
         onCancel,
       );
 
-      const cancel = router.navigate("orders", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      });
+      const promise = router.navigate("orders");
 
-      setTimeout(cancel, 25);
+      setTimeout(() => {
+        router.cancel();
+      }, 25);
 
-      // Advance timers
       vi.advanceTimersByTime(25);
       vi.advanceTimersByTime(60);
 
-      // TRANSITION_SUCCESS should not be emitted
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
       expect(onSuccess).not.toHaveBeenCalled();
 
-      // TRANSITION_CANCEL should be emitted
       expect(onCancel).toHaveBeenCalledTimes(1);
 
       unsubSuccess();
@@ -333,8 +304,8 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const unsubCancel = router.addEventListener(
@@ -344,28 +315,26 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const navigationOptions = { replace: true, source: "test" };
 
-      const cancel = router.navigate(
-        "profile",
-        {},
-        navigationOptions,
-        (err) => {
-          expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-        },
-      );
+      const promise = router.navigate("profile", {}, navigationOptions);
 
-      setTimeout(cancel, 20);
+      setTimeout(() => {
+        router.cancel();
+      }, 20);
 
-      // Advance timers
       vi.advanceTimersByTime(20);
       vi.advanceTimersByTime(50);
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       expect(onCancel).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "profile",
-        }), // toState
+        }),
         expect.objectContaining({
           name: "home",
-        }), // fromState
+        }),
       );
 
       unsubCancel();
@@ -376,52 +345,57 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should handle cancellation when router is stopped during navigation", async () => {
       vi.useFakeTimers();
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
-      const cancel = router.navigate("users", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      });
+      const promise = router.navigate("users");
 
       setTimeout(() => {
-        router.stop(); // Stop router during navigation
-        cancel(); // Cancel should still work
+        router.stop();
+        router.cancel();
       }, 20);
 
-      // Advance timers
       vi.advanceTimersByTime(20);
       vi.advanceTimersByTime(50);
 
-      router.start(); // Restore for other tests
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await router.start();
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should return different cancel functions for concurrent navigations", async () => {
+    it("should handle concurrent navigations where second cancels first", async () => {
       expect.hasAssertions();
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 100);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
       });
 
-      const cancel1 = router.navigate("users", noop);
-      const cancel2 = router.navigate("profile", noop); // Should cancel previous
+      const promise1 = router.navigate("users");
+      const promise2 = router.navigate("profile");
 
-      expect(cancel1).toBeInstanceOf(Function);
-      expect(cancel2).toBeInstanceOf(Function);
-      expect(cancel1).not.toBe(cancel2); // Different functions
+      expect(promise1).toBeInstanceOf(Promise);
+      expect(promise2).toBeInstanceOf(Promise);
 
-      // Clean up
-      cancel1();
-      cancel2();
+      await expect(promise1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      router.cancel();
+
+      await expect(promise2).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
     });
 
     it("should handle cancellation during redirect scenarios", async () => {
       vi.spyOn(logger, "error").mockImplementation(noop);
       vi.useFakeTimers();
 
-      // Set up redirect
       router.addActivateGuard("orders", () => () => {
         return new Promise((resolve) => {
           setTimeout(() => {
@@ -430,16 +404,18 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const cancel = router.navigate("orders", (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      const promise = router.navigate("orders");
+
+      setTimeout(() => {
+        router.cancel();
+      }, 20);
+
+      vi.advanceTimersByTime(20);
+      vi.advanceTimersByTime(40);
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
       });
-
-      // Cancel during redirect processing
-      setTimeout(cancel, 20);
-
-      // Advance timers
-      vi.advanceTimersByTime(20); // Trigger cancellation
-      vi.advanceTimersByTime(40); // Complete redirect processing
 
       vi.useRealTimers();
     });
@@ -457,19 +433,19 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      router.start("");
+      await router.start("");
 
-      const callback = vi.fn((err) => {
-        expect(err?.code).toStrictEqual(errorCodes.TRANSITION_CANCELLED);
-      });
+      const promise = router.navigate("admin");
 
-      const cancel = router.navigate("admin", callback);
-
-      setTimeout(cancel, 10);
+      setTimeout(() => {
+        router.cancel();
+      }, 10);
 
       await vi.runAllTimersAsync();
 
-      expect(callback).toHaveBeenCalledTimes(1);
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       vi.useRealTimers();
     });

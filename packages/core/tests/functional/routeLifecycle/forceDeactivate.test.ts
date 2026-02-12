@@ -20,8 +20,8 @@ describe("core/route-lifecycle/forceDeactivate", () => {
 
     try {
       await router.navigate("home");
-    } catch (err: any) {
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    } catch (error: any) {
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
     }
 
     await router.navigate("home", {}, { forceDeactivate: true });

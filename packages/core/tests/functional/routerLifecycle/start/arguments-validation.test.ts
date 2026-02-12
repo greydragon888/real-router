@@ -86,6 +86,7 @@ describe("router.start() - arguments validation", () => {
 
         try {
           await router.start();
+
           expect.fail("Should have thrown");
         } catch (error: any) {
           expect(error).toBeDefined();
@@ -158,6 +159,7 @@ describe("router.start() - arguments validation", () => {
 
         try {
           await router.start("/invalid/path");
+
           expect.fail("Should have thrown");
         } catch (error: any) {
           expect(error).toBeDefined();
@@ -234,6 +236,7 @@ describe("router.start() - arguments validation", () => {
 
         try {
           await router.start("/invalid/path");
+
           expect.fail("Should have thrown");
         } catch (error: any) {
           expect(error).toBeDefined();
@@ -300,6 +303,7 @@ describe("router.start() - arguments validation", () => {
 
         try {
           await router.start();
+
           expect.fail("Should have thrown");
         } catch (error: any) {
           expect(error).toBeDefined();
@@ -341,6 +345,7 @@ describe("router.start() - arguments validation", () => {
 
         try {
           await router.start("/orders/pending");
+
           expect.fail("Should have thrown");
         } catch (error: any) {
           expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);

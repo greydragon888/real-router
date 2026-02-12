@@ -42,6 +42,7 @@ describe("router.start() - edge cases", () => {
 
       try {
         await router.navigate("users.view", { id: "123", self: {} as any });
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -119,6 +120,7 @@ describe("router.start() - edge cases", () => {
     it("should reject state with missing path field", async () => {
       try {
         await router.navigate("invalid.route");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -131,6 +133,7 @@ describe("router.start() - edge cases", () => {
     it("should reject state with missing params field", async () => {
       try {
         await router.navigate("invalid.route");
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -144,6 +147,7 @@ describe("router.start() - edge cases", () => {
       try {
         // @ts-expect-error - testing invalid params with function
         await router.navigate("users.list", { fn: () => {} });
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();
@@ -160,6 +164,7 @@ describe("router.start() - edge cases", () => {
       try {
         // @ts-expect-error - testing invalid params with class instance
         await router.navigate("users.list", { instance: new CustomClass() });
+
         expect.fail("Should have thrown");
       } catch (error: any) {
         expect(error).toBeDefined();

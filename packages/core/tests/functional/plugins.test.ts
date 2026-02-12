@@ -112,12 +112,14 @@ describe("core/plugins", () => {
       router.usePlugin(myPlugin);
 
       await router.start("");
+
       // custom method added by plugin
       expect(
         (router as Router & { myCustomMethod?: Function }).myCustomMethod,
       ).not.toBe(undefined);
 
       await router.navigate("orders", {});
+
       expect(myPluginMethods.onTransitionStart).toHaveBeenCalled();
       expect(myPluginMethods.onTransitionSuccess).toHaveBeenCalled();
     });

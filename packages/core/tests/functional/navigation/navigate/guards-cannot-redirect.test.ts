@@ -41,10 +41,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
         }
 
         // Should remain on users
@@ -60,12 +61,13 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           expect(
-            (err?.attemptedRedirect as { name: string } | undefined)?.name,
+            (error?.attemptedRedirect as { name: string } | undefined)?.name,
           ).toBe("sign-in");
         }
 
@@ -86,10 +88,11 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("profile");
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
       });
 
@@ -106,12 +109,13 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         try {
           await router.navigate("users.view", { id: 123 });
+
           expect.fail("Should have thrown error");
-        } catch (err: any) {
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(
-            (err?.attemptedRedirect as { name: string } | undefined)?.name,
+            (error?.attemptedRedirect as { name: string } | undefined)?.name,
           ).toBe("orders.view");
         }
       });
