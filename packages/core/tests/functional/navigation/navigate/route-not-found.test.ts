@@ -14,7 +14,6 @@ import { createTestRouter } from "../../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.navigate() - route not found", () => {
   beforeEach(() => {
@@ -30,29 +29,29 @@ describe("router.navigate() - route not found", () => {
   });
 
   describe("navigation to non-existent route", () => {
-    it("should call callback with ROUTE_NOT_FOUND error", () => {
-      const callback = vi.fn();
-
-      router.navigate("nonexistent.route", callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-      );
+    it("should call callback with ROUTE_NOT_FOUND error", async () => {
+      await new Promise<void>((resolve) => {
+        router.navigate("nonexistent.route", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          resolve();
+        });
+      });
     });
 
-    it("should emit TRANSITION_ERROR event with ROUTE_NOT_FOUND error", () => {
+    it("should emit TRANSITION_ERROR event with ROUTE_NOT_FOUND error", async () => {
       const onError = vi.fn();
-      const callback = vi.fn();
 
       const unsubError = router.addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
 
-      router.navigate("invalid.route.name", callback);
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.route.name", (err) => {
+          resolve();
+        });
+      });
 
       expect(onError).toHaveBeenCalledTimes(1);
       expect(onError).toHaveBeenCalledWith(
@@ -66,10 +65,12 @@ describe("router.navigate() - route not found", () => {
       unsubError();
     });
 
-    it("should return noop function", () => {
-      const callback = vi.fn();
-
-      const result = router.navigate("nonexistent", callback);
+    it("should return noop function", async () => {
+      const result = await new Promise<any>((resolve) => {
+        const cancel = router.navigate("nonexistent", () => {
+          resolve(cancel);
+        });
+      });
 
       expectTypeOf(result).toBeFunction();
 
@@ -81,41 +82,40 @@ describe("router.navigate() - route not found", () => {
       }).not.toThrowError();
     });
 
-    it("should handle route with invalid namespace", () => {
-      const callback = vi.fn();
-
-      router.navigate("invalid.namespace.route", callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-      );
+    it("should handle route with invalid namespace", async () => {
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.namespace.route", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          resolve();
+        });
+      });
     });
 
-    it("should handle route with parameters when route not found", () => {
-      const callback = vi.fn();
-
-      router.navigate("nonexistent.route", { id: 123, name: "test" }, callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-      );
+    it("should handle route with parameters when route not found", async () => {
+      await new Promise<void>((resolve) => {
+        router.navigate(
+          "nonexistent.route",
+          { id: 123, name: "test" },
+          (err) => {
+            expect(err).toBeDefined();
+            expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+            resolve();
+          },
+        );
+      });
     });
 
-    it("should handle route with options when route not found", () => {
-      const callback = vi.fn();
+    it("should handle route with options when route not found", async () => {
       const options = { replace: true, source: "manual" };
 
-      router.navigate("invalid.route", {}, options, callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-      );
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.route", {}, options, (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          resolve();
+        });
+      });
     });
 
     it("should emit TRANSITION_ERROR with current state as fromState", async () => {
@@ -159,7 +159,7 @@ describe("router.navigate() - route not found", () => {
       unsubError();
     });
 
-    it("should not emit TRANSITION_START for invalid route", () => {
+    it("should not emit TRANSITION_START for invalid route", async () => {
       const onStart = vi.fn();
       const onError = vi.fn();
 
@@ -172,7 +172,11 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      router.navigate("invalid.route", noop);
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.route", () => {
+          resolve();
+        });
+      });
 
       expect(onStart).not.toHaveBeenCalled();
       expect(onError).toHaveBeenCalledTimes(1);
@@ -181,7 +185,7 @@ describe("router.navigate() - route not found", () => {
       unsubError();
     });
 
-    it("should not emit TRANSITION_SUCCESS for invalid route", () => {
+    it("should not emit TRANSITION_SUCCESS for invalid route", async () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
 
@@ -194,7 +198,11 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      router.navigate("invalid.route", noop);
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.route", () => {
+          resolve();
+        });
+      });
 
       expect(onSuccess).not.toHaveBeenCalled();
       expect(onError).toHaveBeenCalledTimes(1);
@@ -203,14 +211,18 @@ describe("router.navigate() - route not found", () => {
       unsubError();
     });
 
-    it("should not trigger guards or middleware for invalid route", () => {
+    it("should not trigger guards or middleware for invalid route", async () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
       router.addActivateGuard("users", () => guard);
       router.useMiddleware(() => middleware);
 
-      router.navigate("invalid.route", noop);
+      await new Promise<void>((resolve) => {
+        router.navigate("invalid.route", () => {
+          resolve();
+        });
+      });
 
       expect(guard).not.toHaveBeenCalled();
       expect(middleware).not.toHaveBeenCalled();
@@ -218,9 +230,7 @@ describe("router.navigate() - route not found", () => {
       router.clearMiddleware();
     });
 
-    it("should handle multiple invalid route navigations", () => {
-      const callback1 = vi.fn();
-      const callback2 = vi.fn();
+    it("should handle multiple invalid route navigations", async () => {
       const onError = vi.fn();
 
       const unsubError = router.addEventListener(
@@ -228,46 +238,43 @@ describe("router.navigate() - route not found", () => {
         onError,
       );
 
-      router.navigate("invalid.route1", callback1);
-      router.navigate("invalid.route2", callback2);
-
-      expect(callback1).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
-      expect(callback2).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
+      await new Promise<void>((resolve) => {
+        let count = 0;
+        router.navigate("invalid.route1", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          count++;
+          if (count === 2) resolve();
+        });
+        router.navigate("invalid.route2", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          count++;
+          if (count === 2) resolve();
+        });
+      });
 
       expect(onError).toHaveBeenCalledTimes(2);
 
       unsubError();
     });
 
-    it("should handle empty route name", () => {
-      const callback = vi.fn();
-
-      router.navigate("", callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
+    it("should handle empty route name", async () => {
+      await new Promise<void>((resolve) => {
+        router.navigate("", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          resolve();
+        });
+      });
     });
 
-    it("should return ROUTE_NOT_FOUND error with correct properties", () => {
-      const callback = vi.fn();
-
-      router.navigate("invalid.route", callback);
-
-      const error = callback.mock.calls[0][0];
+    it("should return ROUTE_NOT_FOUND error with correct properties", async () => {
+      const error = await new Promise<any>((resolve) => {
+        router.navigate("invalid.route", (err) => {
+          resolve(err);
+        });
+      });
 
       expect(error).toStrictEqual(
         expect.objectContaining({
@@ -280,13 +287,47 @@ describe("router.navigate() - route not found", () => {
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
 
-    it("should handle case-sensitive route names", () => {
-      const callback = vi.fn();
-
+    it("should handle case-sensitive route names", async () => {
       // Assuming routes are case-sensitive
-      router.navigate("Users", callback); // capital U vs "users"
+      await new Promise<void>((resolve) => {
+        router.navigate("Users", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          resolve();
+        });
+      });
+    });
 
-      expect(callback).toHaveBeenCalledWith(
+    it("should handle route name with special characters", async () => {
+      const errors: any[] = [];
+
+      await new Promise<void>((resolve) => {
+        let count = 0;
+        const callback = (err: any) => {
+          errors.push(err);
+          count++;
+          if (count === 3) resolve();
+        };
+
+        router.navigate("route-with-dashes", callback);
+        router.navigate("route_with_underscores", callback);
+        router.navigate("route@with#symbols", callback);
+      });
+
+      expect(errors).toHaveLength(3);
+      expect(errors[0]).toStrictEqual(
+        expect.objectContaining({
+          code: errorCodes.ROUTE_NOT_FOUND,
+          message: "ROUTE_NOT_FOUND",
+        }),
+      );
+      expect(errors[1]).toStrictEqual(
+        expect.objectContaining({
+          code: errorCodes.ROUTE_NOT_FOUND,
+          message: "ROUTE_NOT_FOUND",
+        }),
+      );
+      expect(errors[2]).toStrictEqual(
         expect.objectContaining({
           code: errorCodes.ROUTE_NOT_FOUND,
           message: "ROUTE_NOT_FOUND",
@@ -294,38 +335,7 @@ describe("router.navigate() - route not found", () => {
       );
     });
 
-    it("should handle route name with special characters", () => {
-      const callback = vi.fn();
-
-      router.navigate("route-with-dashes", callback);
-      router.navigate("route_with_underscores", callback);
-      router.navigate("route@with#symbols", callback);
-
-      expect(callback).toHaveBeenCalledTimes(3);
-      expect(callback).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
-      expect(callback).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
-      expect(callback).toHaveBeenNthCalledWith(
-        3,
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
-    });
-
-    it("should handle navigation without callback for invalid route", () => {
+    it("should handle navigation without callback for invalid route", async () => {
       const onError = vi.fn();
       const unsubError = router.addEventListener(
         events.TRANSITION_ERROR,
@@ -333,40 +343,40 @@ describe("router.navigate() - route not found", () => {
       );
 
       // This should not throw even without callback
-      expect(() => {
-        const cancel = router.navigate("invalid.route");
+      await new Promise<void>((resolve) => {
+        expect(() => {
+          const cancel = router.navigate("invalid.route");
 
-        expectTypeOf(cancel).toBeFunction();
-      }).not.toThrowError();
+          expectTypeOf(cancel).toBeFunction();
+        }).not.toThrowError();
+
+        // Give it a moment for the error event to fire
+        setTimeout(resolve, 0);
+      });
 
       expect(onError).toHaveBeenCalledTimes(1);
 
       unsubError();
     });
 
-    it("should work correctly after trying invalid route", () => {
-      const invalidCallback = vi.fn();
-      const validCallback = vi.fn();
+    it("should work correctly after trying invalid route", async () => {
+      await new Promise<void>((resolve) => {
+        let count = 0;
+        router.navigate("invalid.route", (err) => {
+          expect(err).toBeDefined();
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+          count++;
+          if (count === 2) resolve();
+        });
 
-      // Try invalid route first
-      router.navigate("invalid.route", invalidCallback);
-
-      expect(invalidCallback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-          message: "ROUTE_NOT_FOUND",
-        }),
-      );
-
-      // Then try valid route
-      router.navigate("users", validCallback);
-
-      expect(validCallback).toHaveBeenCalledWith(
-        undefined, // no error
-        expect.objectContaining({
-          name: "users",
-        }),
-      );
+        router.navigate("users", (err, state) => {
+          expect(err).toBeUndefined();
+          expect(state).toBeDefined();
+          expect(state?.name).toBe("users");
+          count++;
+          if (count === 2) resolve();
+        });
+      });
     });
   });
 });

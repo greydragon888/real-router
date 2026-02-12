@@ -22,22 +22,25 @@ describe("router.navigate() - middleware execution", () => {
   });
 
   describe("call middleware", () => {
-    it("should call middleware functions during navigation", () => {
+    it("should call middleware functions during navigation", async () => {
       const middleware1 = vi.fn().mockReturnValue(true);
       const middleware2 = vi.fn().mockReturnValue(true);
 
       router.useMiddleware(() => middleware1);
       router.useMiddleware(() => middleware2);
 
-      router.navigate("orders.pending", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await new Promise<void>((resolve) => {
+        router.navigate("orders.pending", {}, {}, (err) => {
+          expect(err).toBeUndefined();
 
-        expect(middleware1).toHaveBeenCalledTimes(1);
-        expect(middleware2).toHaveBeenCalledTimes(1);
+          expect(middleware1).toHaveBeenCalledTimes(1);
+          expect(middleware2).toHaveBeenCalledTimes(1);
+          resolve();
+        });
       });
     });
 
-    it("should call multiple middleware in order", () => {
+    it("should call multiple middleware in order", async () => {
       const middleware1 = vi.fn().mockReturnValue(true);
       const middleware2 = vi.fn().mockReturnValue(true);
       const middleware3 = vi.fn().mockReturnValue(true);
@@ -46,67 +49,82 @@ describe("router.navigate() - middleware execution", () => {
       router.useMiddleware(() => middleware2);
       router.useMiddleware(() => middleware3);
 
-      router.navigate("profile", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await new Promise<void>((resolve) => {
+        router.navigate("profile", {}, {}, (err) => {
+          expect(err).toBeUndefined();
 
-        expect(middleware1).toHaveBeenCalledTimes(1);
-        expect(middleware2).toHaveBeenCalledTimes(1);
-        expect(middleware3).toHaveBeenCalledTimes(1);
+          expect(middleware1).toHaveBeenCalledTimes(1);
+          expect(middleware2).toHaveBeenCalledTimes(1);
+          expect(middleware3).toHaveBeenCalledTimes(1);
+          resolve();
+        });
       });
     });
 
-    it("should respect blocking middleware", () => {
+    it("should respect blocking middleware", async () => {
       const allowingMiddleware = vi.fn().mockReturnValue(true);
       const blockingMiddleware = vi.fn().mockReturnValue(false);
 
       router.useMiddleware(() => allowingMiddleware);
       router.useMiddleware(() => blockingMiddleware);
 
-      router.navigate("orders", {}, {}, (err) => {
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+      await new Promise<void>((resolve) => {
+        router.navigate("orders", {}, {}, (err) => {
+          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
 
-        expect(allowingMiddleware).toHaveBeenCalledTimes(1);
-        expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+          expect(allowingMiddleware).toHaveBeenCalledTimes(1);
+          expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+          resolve();
+        });
       });
     });
 
-    it("should call middleware for nested routes", () => {
+    it("should call middleware for nested routes", async () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       router.useMiddleware(() => middleware);
 
-      router.navigate("settings.account", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await new Promise<void>((resolve) => {
+        router.navigate("settings.account", {}, {}, (err) => {
+          expect(err).toBeUndefined();
 
-        expect(middleware).toHaveBeenCalledTimes(1);
+          expect(middleware).toHaveBeenCalledTimes(1);
+          resolve();
+        });
       });
     });
 
-    it("should not call middleware when route does not exist", () => {
+    it("should not call middleware when route does not exist", async () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       router.useMiddleware(() => middleware);
 
-      router.navigate("non.existent.route", {}, {}, (err) => {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      await new Promise<void>((resolve) => {
+        router.navigate("non.existent.route", {}, {}, (err) => {
+          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
-        expect(middleware).not.toHaveBeenCalled();
+          expect(middleware).not.toHaveBeenCalled();
+          resolve();
+        });
       });
     });
 
-    it("should call middleware with correct parameters", () => {
+    it("should call middleware with correct parameters", async () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       router.useMiddleware(() => middleware);
 
-      router.navigate("orders.pending", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await new Promise<void>((resolve) => {
+        router.navigate("orders.pending", {}, {}, (err) => {
+          expect(err).toBeUndefined();
 
-        expect(middleware).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "orders.pending" }), // toState
-          expect.objectContaining({ name: "home" }), // fromState
-          expect.any(Function), // done callback
-        );
+          expect(middleware).toHaveBeenCalledWith(
+            expect.objectContaining({ name: "orders.pending" }), // toState
+            expect.objectContaining({ name: "home" }), // fromState
+            expect.any(Function), // done callback
+          );
+          resolve();
+        });
       });
     });
   });

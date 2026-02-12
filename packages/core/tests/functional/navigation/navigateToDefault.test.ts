@@ -11,7 +11,7 @@ import { errorCodes, events, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { DoneFn, Params, Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/core";
 
 let router: Router;
 
@@ -43,15 +43,16 @@ describe("navigateToDefault", () => {
   });
 
   describe("when defaultRoute is not set", () => {
-    it("should return noop cancel function when defaultRoute is not configured", () => {
+    it("should return noop cancel function when defaultRoute is not configured", async () => {
       // Create router WITHOUT defaultRoute (override the default)
       const freshRouter = createTestRouter({ defaultRoute: "" });
 
       // Start at a specific route since there's no defaultRoute
-      freshRouter.start("/users");
+      await freshRouter.start("/users");
 
-      // navigateToDefault should return a function even when no defaultRoute
-      const cancel = freshRouter.navigateToDefault();
+      // navigateToDefault should return a Promise even when no defaultRoute
+      const promise = freshRouter.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       expect(typeof cancel).toBe("function");
 
@@ -406,15 +407,14 @@ describe("navigateToDefault", () => {
     it("should return working cancel function for defaultRoute navigation", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      withDefault("users");
+      await withDefault("users");
 
       router.useMiddleware(() => (_toState, _fromState, done) => {
         setTimeout(done, 50);
       });
 
-      const cancel = router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       expectTypeOf(cancel).toBeFunction();
 
@@ -423,12 +423,17 @@ describe("navigateToDefault", () => {
       await vi.runAllTimersAsync();
       await Promise.resolve();
 
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.TRANSITION_CANCELLED,
-          message: "CANCELLED",
-        }),
-      );
+      try {
+        await promise;
+        expect.fail("Should have thrown an error");
+      } catch (err) {
+        expect(err).toStrictEqual(
+          expect.objectContaining({
+            code: errorCodes.TRANSITION_CANCELLED,
+            message: "CANCELLED",
+          }),
+        );
+      }
 
       router.clearMiddleware();
       vi.useRealTimers();
@@ -1171,29 +1176,28 @@ describe("navigateToDefault", () => {
       withDefault("users", { id: 123 });
     });
 
-    it("should handle router.getOptions() returning partial options", () => {
+    it("should handle router.getOptions() returning partial options", async () => {
       const getOptionsSpy = vi
         .spyOn(router, "getOptions")
         .mockReturnValue({} as any);
 
-      const result = router.navigateToDefault();
+      const promise = router.navigateToDefault();
 
-      expectTypeOf(result).toBeFunction();
+      expectTypeOf(promise).toBePromise();
 
       // Should be safe to call returned function
+      const cancel = (promise as any).cancel;
       expect(() => {
-        result();
+        cancel();
       }).not.toThrowError();
 
       getOptionsSpy.mockRestore();
     });
 
-    it("should handle circular navigation scenarios", () => {
+    it("should handle circular navigation scenarios", async () => {
       vi.useFakeTimers();
 
-      const callback = vi.fn();
-
-      withDefault("users", { redirect: "default" });
+      await withDefault("users", { redirect: "default" });
 
       // Add middleware that could potentially cause circular navigation
       router.useMiddleware(() => (toState, _fromState, done) => {
@@ -1207,49 +1211,38 @@ describe("navigateToDefault", () => {
         }
       });
 
-      router.navigateToDefault(callback);
+      const promise = router.navigateToDefault();
 
       // Advance time for navigation to complete
       vi.advanceTimersByTime(50);
 
       // Should complete without infinite loops
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
+      const state = await promise;
+      expect(state).toBeDefined();
 
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should work correctly after router restart", () => {
-      const callback = vi.fn();
-
+    it("should work correctly after router restart", async () => {
       // Stop and restart router
       router.stop();
 
       expect(router.isActive()).toBe(false);
 
-      router.start();
+      await router.start();
 
       expect(router.isActive()).toBe(true);
 
       // Should work normally after restart (with reload to avoid SAME_STATES)
-      router.navigateToDefault({ reload: true }, callback);
+      const state = await router.navigateToDefault({ reload: true });
 
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          params: { id: 123 },
-        }),
-      );
+      expect(state.name).toBe("users");
+      expect(state.params).toStrictEqual({ id: 123 });
     });
 
-    it("should handle concurrent navigateToDefault calls", () => {
+    it("should handle concurrent navigateToDefault calls", async () => {
       vi.useFakeTimers();
-
-      const callback1 = vi.fn();
-      const callback2 = vi.fn();
-      const callback3 = vi.fn();
 
       // Add async middleware to create timing conditions
       // Remove randomness for predictable testing
@@ -1258,9 +1251,13 @@ describe("navigateToDefault", () => {
       });
 
       // Make concurrent calls
-      const cancel1 = router.navigateToDefault(callback1);
-      const cancel2 = router.navigateToDefault(callback2);
-      const cancel3 = router.navigateToDefault(callback3);
+      const promise1 = router.navigateToDefault();
+      const promise2 = router.navigateToDefault();
+      const promise3 = router.navigateToDefault();
+
+      const cancel1 = (promise1 as any).cancel;
+      const cancel2 = (promise2 as any).cancel;
+      const cancel3 = (promise3 as any).cancel;
 
       // All should return cancel functions
       expectTypeOf(cancel1).toBeFunction();
@@ -1274,39 +1271,36 @@ describe("navigateToDefault", () => {
       // Advance time for all navigations to complete
       vi.advanceTimersByTime(100);
 
-      // All callbacks should eventually be called
-      expect(callback1).toHaveBeenCalledTimes(1);
-      expect(callback2).toHaveBeenCalledTimes(1);
-      expect(callback3).toHaveBeenCalledTimes(1);
+      // All promises should eventually settle
+      const results = await Promise.allSettled([promise1, promise2, promise3]);
 
       // Due to concurrent navigation, some may be cancelled and one should succeed
-      const calls = [callback1, callback2, callback3].map(
-        (cb) => cb.mock.calls[0],
-      );
-      const successfulCalls = calls.filter((call) => call[0] === undefined);
-      const cancelledCalls = calls.filter(
-        (call) => call[0]?.code === errorCodes.TRANSITION_CANCELLED,
-      );
+      const successfulResults = results.filter((r) => r.status === "fulfilled");
+      const cancelledResults = results.filter((r) => r.status === "rejected");
 
       // At least one should succeed
-      expect(successfulCalls.length).toBeGreaterThanOrEqual(1);
+      expect(successfulResults.length).toBeGreaterThanOrEqual(1);
 
-      // Successful calls should have proper state
-      successfulCalls.forEach((call) => {
-        expect(call[1]).toStrictEqual(
-          expect.objectContaining({
-            name: "users",
-          }),
-        );
+      // Successful results should have proper state
+      successfulResults.forEach((result) => {
+        if (result.status === "fulfilled") {
+          expect(result.value).toStrictEqual(
+            expect.objectContaining({
+              name: "users",
+            }),
+          );
+        }
       });
 
-      // Cancelled calls should have proper error
-      cancelledCalls.forEach((call) => {
-        expect(call[0]).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.TRANSITION_CANCELLED,
-          }),
-        );
+      // Cancelled results should have proper error
+      cancelledResults.forEach((result) => {
+        if (result.status === "rejected") {
+          expect(result.reason).toStrictEqual(
+            expect.objectContaining({
+              code: errorCodes.TRANSITION_CANCELLED,
+            }),
+          );
+        }
       });
 
       router.clearMiddleware();
