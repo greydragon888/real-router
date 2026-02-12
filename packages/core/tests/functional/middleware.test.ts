@@ -8,7 +8,7 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -1057,12 +1057,8 @@ describe("core/middleware", () => {
       it("should accept self-returning factory", async () => {
         router.clearMiddleware();
 
-        let selfReturningWasCalled = false;
-
         // Factory that returns itself (technically valid - it's a function)
         const selfReturningFactory = (): any => {
-          selfReturningWasCalled = true;
-
           return selfReturningFactory;
         };
 
@@ -1071,7 +1067,6 @@ describe("core/middleware", () => {
 
         await router.navigate("users");
 
-        selfReturningWasCalled = false;
         unsub();
 
         await router.navigate("orders");

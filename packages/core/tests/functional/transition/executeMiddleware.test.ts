@@ -3,11 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { executeMiddleware } from "../../../src/namespaces/NavigationNamespace/transition/executeMiddleware";
 
-import type {
-  State,
-  ActivationFn,
-  RouterError as RouterErrorType,
-} from "@real-router/types";
+import type { State, ActivationFn } from "@real-router/types";
 
 describe("transition/executeMiddleware", () => {
   const createState = (name: string): State => ({
