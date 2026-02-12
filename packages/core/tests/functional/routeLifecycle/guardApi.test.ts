@@ -19,22 +19,22 @@ describe("core/route-lifecycle/guard-api", () => {
   });
 
   describe("addActivateGuard", () => {
-    it("should register activation guard identical to old canActivate", () => {
+    it("should register activation guard identical to old canActivate", async () => {
       router.addActivateGuard("admin", false);
 
-      router.navigate("admin", (err) => {
+      try {
+        await router.navigate("admin");
+      } catch (err: any) {
         expect(err?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
-      });
+      }
 
       expect(router.getState()?.name).not.toBe("admin");
     });
 
-    it("should allow navigation when guard returns true", () => {
+    it("should allow navigation when guard returns true", async () => {
       router.addActivateGuard("admin", true);
 
-      router.navigate("admin", (err) => {
-        expect(err).toBe(undefined);
-      });
+      await router.navigate("admin");
 
       expect(router.getState()?.name).toBe("admin");
     });
@@ -47,24 +47,24 @@ describe("core/route-lifecycle/guard-api", () => {
   });
 
   describe("addDeactivateGuard", () => {
-    it("should register deactivation guard identical to old canDeactivate", () => {
-      router.navigate("admin");
+    it("should register deactivation guard identical to old canDeactivate", async () => {
+      await router.navigate("admin");
       router.addDeactivateGuard("admin", false);
 
-      router.navigate("home", (err) => {
+      try {
+        await router.navigate("home");
+      } catch (err: any) {
         expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
-      });
+      }
 
       expect(router.getState()?.name).toBe("admin");
     });
 
-    it("should allow navigation when guard returns true", () => {
-      router.navigate("admin");
+    it("should allow navigation when guard returns true", async () => {
+      await router.navigate("admin");
       router.addDeactivateGuard("admin", true);
 
-      router.navigate("home", (err) => {
-        expect(err).toBe(undefined);
-      });
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });
@@ -77,13 +77,11 @@ describe("core/route-lifecycle/guard-api", () => {
   });
 
   describe("removeActivateGuard", () => {
-    it("removes guard and allows navigation", () => {
+    it("removes guard and allows navigation", async () => {
       router.addActivateGuard("admin", false);
       router.removeActivateGuard("admin");
 
-      router.navigate("admin", (err) => {
-        expect(err).toBe(undefined);
-      });
+      await router.navigate("admin");
 
       expect(router.getState()?.name).toBe("admin");
     });
@@ -101,14 +99,12 @@ describe("core/route-lifecycle/guard-api", () => {
   });
 
   describe("removeDeactivateGuard", () => {
-    it("removes guard and allows navigation away", () => {
-      router.navigate("admin");
+    it("removes guard and allows navigation away", async () => {
+      await router.navigate("admin");
       router.addDeactivateGuard("admin", false);
       router.removeDeactivateGuard("admin");
 
-      router.navigate("home", (err) => {
-        expect(err).toBe(undefined);
-      });
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });

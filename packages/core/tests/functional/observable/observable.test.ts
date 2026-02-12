@@ -11,8 +11,9 @@ let router: Router;
 const noop = () => undefined;
 
 describe("core/observable", () => {
-  beforeEach(() => {
-    router = createTestRouter().start();
+  beforeEach(async () => {
+    router = createTestRouter();
+    await router.start();
   });
 
   afterEach(() => {
@@ -57,13 +58,11 @@ describe("core/observable", () => {
         );
       });
 
-      it("should trigger TRANSITION_SUCCESS listener after successful navigation", () => {
+      it("should trigger TRANSITION_SUCCESS listener after successful navigation", async () => {
         const cb = vi.fn();
 
         router.addEventListener(events.TRANSITION_SUCCESS, cb);
-        router.navigate("users", {}, {}, (err) => {
-          expect(err).toBeUndefined();
-        });
+        await router.navigate("users", {}, {});
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -73,14 +72,16 @@ describe("core/observable", () => {
         );
       });
 
-      it("should trigger TRANSITION_ERROR listener when navigation fails", () => {
+      it("should trigger TRANSITION_ERROR listener when navigation fails", async () => {
         const cb = vi.fn();
 
         router.addActivateGuard("admin-protected", () => () => false);
         router.addEventListener(events.TRANSITION_ERROR, cb);
-        router.navigate("admin-protected", {}, {}, (err) => {
+        try {
+          await router.navigate("admin-protected", {}, {});
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        });
+        }
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -95,8 +96,10 @@ describe("core/observable", () => {
         let middlewareResolve: Function | undefined;
 
         // Use middleware to delay first navigation
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          middlewareResolve = done;
+        router.useMiddleware(() => async (_toState, _fromState) => {
+          return new Promise((resolve) => {
+            middlewareResolve = resolve;
+          });
         });
 
         router.addEventListener(events.TRANSITION_CANCEL, cb);
@@ -246,14 +249,12 @@ describe("core/observable", () => {
         expect(typeof unsubscribe).toStrictEqual("function");
       });
 
-      it("should call listener on TRANSITION_SUCCESS", () => {
+      it("should call listener on TRANSITION_SUCCESS", async () => {
         const listener = vi.fn();
         const previousState = router.getState();
 
         router.subscribe(listener);
-        router.navigate("users", {}, {}, (err) => {
-          expect(err).toBeUndefined();
-        });
+        await router.navigate("users", {}, {});
 
         expect(listener).toHaveBeenCalledWith({
           route: expect.objectContaining({ name: "users" }),
