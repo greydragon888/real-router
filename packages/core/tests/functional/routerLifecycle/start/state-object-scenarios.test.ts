@@ -606,7 +606,10 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath, () => {
+        try {
+          await router.start(validPath);
+          expect.fail("Should have thrown");
+        } catch (err: any) {
           // Should emit TRANSITION_ERROR with custom error data
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -614,20 +617,20 @@ describe("router.start() - state object scenarios", () => {
 
           expect(error).toBeDefined();
           expect(error).toBeInstanceOf(Error); // RouterError
-        });
+        }
       });
     });
   });
 
   describe("router start return value", () => {
-    it("should return router instance for state object input", async () => {
+    it("should start router with path", async () => {
       const stateObject = {
         name: "settings.general",
         params: {},
         path: "/settings/general",
       };
 
-      await router.start(stateObject);
+      await router.start(stateObject.path);
       expect(router.getState()?.name).toBe("settings.general");
     });
   });
