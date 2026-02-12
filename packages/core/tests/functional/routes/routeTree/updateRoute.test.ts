@@ -873,7 +873,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   });
 
   describe("multiple updates", () => {
-    it("should update multiple properties at once", () => {
+    it("should update multiple properties at once", async () => {
       const decoder = (params: Params): Params => params;
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
@@ -889,10 +889,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(router.makeState("ur-multi").params).toStrictEqual({ page: 1 });
 
       // Verify canActivate via navigation
-      router.navigate("ur-multi", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).toHaveBeenCalled();
-      });
+      await router.navigate("ur-multi");
+      expect(guard).toHaveBeenCalled();
     });
 
     it("should chain multiple updateRoute calls", () => {
@@ -1172,7 +1170,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(path).toBe("/ur-arrow/ABC");
       });
 
-      it("should accept arrow function as canActivate factory", () => {
+      it("should accept arrow function as canActivate factory", async () => {
         const guard = vi.fn((_toState, _fromState, done) => {
           done();
         });
@@ -1184,10 +1182,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         });
 
         // Verify canActivate works via navigation
-        router.navigate("ur-arrow-guard", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard).toHaveBeenCalled();
-        });
+        await router.navigate("ur-arrow-guard");
+        expect(guard).toHaveBeenCalled();
       });
     });
 
