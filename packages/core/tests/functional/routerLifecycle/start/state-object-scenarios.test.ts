@@ -459,7 +459,7 @@ describe("router.start() - state object scenarios", () => {
         }
       });
 
-      it("should emit TRANSITION_ERROR but callback succeeds after fallback", async () => {
+      it("should emit TRANSITION_ERROR when transition is blocked", async () => {
         const validPath = "/settings/general";
 
         // Add middleware that blocks specific transition
@@ -474,8 +474,11 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath, (error, state) => {
-          // Issue #44: Error should be reported to callback (no silent fallback)
+        try {
+          await router.start(validPath);
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          // Issue #44: Error should be reported (no silent fallback)
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
           const [blockedToState, , eventError] =
@@ -484,10 +487,9 @@ describe("router.start() - state object scenarios", () => {
           expect(blockedToState.name).toBe("settings.general");
           expect(eventError).toBeDefined();
 
-          // Callback receives the error (no silent fallback)
+          // Error should be defined (no silent fallback)
           expect(error).toBeDefined();
-          expect(state).toBeUndefined();
-        });
+        }
       });
 
       // Issue #44: No silent fallback - only TRANSITION_ERROR is emitted
