@@ -940,9 +940,11 @@ describe("navigateToDefault", () => {
 
       // Add middleware that causes an error
       router.useMiddleware(() => () => {
-        setTimeout(() => {
-          done(customError);
-        }, 10);
+        return new Promise((_, reject) => {
+          setTimeout(() => {
+            reject(customError);
+          }, 10);
+        });
       });
 
       const promise = router.navigateToDefault();
@@ -1191,15 +1193,12 @@ describe("navigateToDefault", () => {
       await withDefault("users", { redirect: "default" });
 
       // Add middleware that could potentially cause circular navigation
-      router.useMiddleware(() => (toState, _fromState, done) => {
+      router.useMiddleware(() => (toState) => {
         if (toState.name === "users" && toState.params.redirect === "default") {
           // Simulate middleware that might trigger another default navigation
-          setTimeout(() => {
-            done();
-          }, 10);
-        } else {
-          done();
+          return new Promise((resolve) => setTimeout(resolve, 10));
         }
+        return true;
       });
 
       const promise = router.navigateToDefault();
@@ -1238,7 +1237,7 @@ describe("navigateToDefault", () => {
       // Add async middleware to create timing conditions
       // Remove randomness for predictable testing
       router.useMiddleware(() => () => {
-        setTimeout(done, 30); // Fixed delay instead of random
+        return new Promise((resolve) => setTimeout(resolve, 30)); // Fixed delay instead of random
       });
 
       // Make concurrent calls
