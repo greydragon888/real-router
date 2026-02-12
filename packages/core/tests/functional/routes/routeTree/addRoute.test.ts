@@ -10,6 +10,7 @@ import type {
   Params,
   Route,
   Router,
+  RouterError,
 } from "@real-router/core";
 
 let router: Router;
@@ -64,7 +65,7 @@ describe("core/routes/addRoute", () => {
     expect(router.isActiveRoute("check-route")).toBe(true);
   });
 
-  it("should register canActivate function if defined on route", () => {
+  it("should register canActivate function if defined on route", async () => {
     router.addRoute([
       {
         name: "secure",
@@ -74,9 +75,12 @@ describe("core/routes/addRoute", () => {
     ]);
 
     // Verify guard is registered by testing navigation behavior
-    router.navigate("secure", (err) => {
-      expect(err?.code).toBe("CANNOT_ACTIVATE");
-    });
+    try {
+      await router.navigate("secure");
+      expect.fail("Should have thrown");
+    } catch (err) {
+      expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+    }
   });
 
   it("should register forwardTo and redirect during navigation", () => {
@@ -321,7 +325,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("children handlers registration", () => {
-    it("should register canActivate for children routes", () => {
+    it("should register canActivate for children routes", async () => {
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -335,12 +339,15 @@ describe("core/routes/addRoute", () => {
       });
 
       // Verify guard is registered by testing navigation behavior
-      router.navigate("parent.child", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("parent.child");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
     });
 
-    it("should register canActivate for deeply nested children", () => {
+    it("should register canActivate for deeply nested children", async () => {
       router.addRoute({
         name: "level1",
         path: "/level1",
@@ -361,14 +368,20 @@ describe("core/routes/addRoute", () => {
       });
 
       // level2 guard blocks navigation to level2
-      router.navigate("level1.level2", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("level1.level2");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
 
       // level2 guard also blocks navigation to level3 (parent guard runs first)
-      router.navigate("level1.level2.level3", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("level1.level2.level3");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
     });
 
     it("should register forwardTo for children routes", () => {
@@ -1618,7 +1631,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("canDeactivate", () => {
-    it("should add canDeactivate that blocks navigation", () => {
+    it("should add canDeactivate that blocks navigation", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1629,22 +1642,23 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate TO route (should succeed)
-      router.navigate("editor", (err) => {
-        expect(err).toBeUndefined();
-        expect(router.getState()?.name).toBe("editor");
+      await router.navigate("editor");
+      expect(router.getState()?.name).toBe("editor");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate AWAY from route (should fail)
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe("CANNOT_DEACTIVATE");
-          expect(guard).toHaveBeenCalled();
-          expect(router.getState()?.name).toBe("editor"); // Still on editor
-        });
-      });
+      // Navigate AWAY from route (should fail)
+      try {
+        await router.navigate("home");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe("CANNOT_DEACTIVATE");
+        expect(guard).toHaveBeenCalled();
+        expect(router.getState()?.name).toBe("editor"); // Still on editor
+      }
     });
 
-    it("should add canDeactivate that allows navigation", () => {
+    it("should add canDeactivate that allows navigation", async () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1655,21 +1669,17 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate TO route
-      router.navigate("form", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("form");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate AWAY from route (should succeed)
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard).toHaveBeenCalled();
-          expect(router.getState()?.name).toBe("home");
-        });
-      });
+      // Navigate AWAY from route (should succeed)
+      await router.navigate("home");
+      expect(guard).toHaveBeenCalled();
+      expect(router.getState()?.name).toBe("home");
     });
 
-    it("should fire canDeactivate for all nested levels in reverse order", () => {
+    it("should fire canDeactivate for all nested levels in reverse order", async () => {
       const parentGuard = vi.fn().mockReturnValue(true);
       const childGuard = vi.fn().mockReturnValue(true);
 
@@ -1687,30 +1697,26 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate to child
-      router.navigate("dashboard.settings", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("dashboard.settings");
 
-        parentGuard.mockClear();
-        childGuard.mockClear();
+      parentGuard.mockClear();
+      childGuard.mockClear();
 
-        // Navigate away - both guards should fire, child first
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
+      // Navigate away - both guards should fire, child first
+      await router.navigate("home");
 
-          // Both guards were called
-          expect(childGuard).toHaveBeenCalled();
-          expect(parentGuard).toHaveBeenCalled();
+      // Both guards were called
+      expect(childGuard).toHaveBeenCalled();
+      expect(parentGuard).toHaveBeenCalled();
 
-          // Child guard called before parent (reverse order)
-          const childCallOrder = childGuard.mock.invocationCallOrder[0];
-          const parentCallOrder = parentGuard.mock.invocationCallOrder[0];
+      // Child guard called before parent (reverse order)
+      const childCallOrder = childGuard.mock.invocationCallOrder[0];
+      const parentCallOrder = parentGuard.mock.invocationCallOrder[0];
 
-          expect(childCallOrder).toBeLessThan(parentCallOrder);
-        });
-      });
+      expect(childCallOrder).toBeLessThan(parentCallOrder);
     });
 
-    it("should allow addDeactivateGuard to overwrite route config canDeactivate", () => {
+    it("should allow addDeactivateGuard to overwrite route config canDeactivate", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
@@ -1724,19 +1730,15 @@ describe("core/routes/addRoute", () => {
       router.addDeactivateGuard("workspace", () => guard2);
 
       // Navigate to route
-      router.navigate("workspace", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("workspace");
 
-        guard1.mockClear();
-        guard2.mockClear();
+      guard1.mockClear();
+      guard2.mockClear();
 
-        // Navigate away - guard2 should fire, guard1 should NOT
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard2).toHaveBeenCalled();
-          expect(guard1).not.toHaveBeenCalled();
-        });
-      });
+      // Navigate away - guard2 should fire, guard1 should NOT
+      await router.navigate("home");
+      expect(guard2).toHaveBeenCalled();
+      expect(guard1).not.toHaveBeenCalled();
     });
 
     it("should return canDeactivate from getRoute() after addRoute", () => {
@@ -1754,7 +1756,7 @@ describe("core/routes/addRoute", () => {
       expect(route?.canDeactivate).toBe(guardFactory);
     });
 
-    it("should register canDeactivate from constructor routes (pending flush)", () => {
+    it("should register canDeactivate from constructor routes (pending flush)", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1770,20 +1772,21 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // Start router - this flushes pendingCanDeactivate
-      testRouter.start("/");
+      await testRouter.start("/");
 
       // Navigate to document
-      testRouter.navigate("document", (err) => {
-        expect(err).toBeUndefined();
+      await testRouter.navigate("document");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate away - canDeactivate should fire (proves flush worked)
-        testRouter.navigate("home", (err) => {
-          expect(err?.code).toBe("CANNOT_DEACTIVATE");
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      // Navigate away - canDeactivate should fire (proves flush worked)
+      try {
+        await testRouter.navigate("home");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe("CANNOT_DEACTIVATE");
+        expect(guard).toHaveBeenCalled();
+      }
 
       testRouter.stop();
     });

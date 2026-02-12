@@ -4,7 +4,12 @@ import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, ActivationFnFactory, Params } from "@real-router/core";
+import type {
+  Router,
+  ActivationFnFactory,
+  Params,
+  RouterError,
+} from "@real-router/core";
 
 let router: Router;
 
@@ -436,7 +441,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   });
 
   describe("canActivate", () => {
-    it("should add canActivate", () => {
+    it("should add canActivate", async () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -444,13 +449,11 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-secure", { canActivate: guardFactory });
 
       // Verify canActivate works by navigating
-      router.navigate("ur-secure", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).toHaveBeenCalled();
-      });
+      await router.navigate("ur-secure");
+      expect(guard).toHaveBeenCalled();
     });
 
-    it("should update existing canActivate", () => {
+    it("should update existing canActivate", async () => {
       const guard1 = vi.fn().mockReturnValue(true);
       const guard2 = vi.fn().mockReturnValue(false);
 
@@ -462,14 +465,17 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-guarded", { canActivate: () => guard2 });
 
       // Verify new guard is used - navigation should be blocked
-      router.navigate("ur-guarded", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      try {
+        await router.navigate("ur-guarded");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(guard2).toHaveBeenCalled();
         expect(guard1).not.toHaveBeenCalled();
-      });
+      }
     });
 
-    it("should remove canActivate when null", () => {
+    it("should remove canActivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -479,9 +485,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify guard is active - navigation blocked
-      router.navigate("ur-locked", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      });
+      try {
+        await router.navigate("ur-locked");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
 
       guard.mockClear();
 
@@ -489,15 +498,13 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-locked", { canActivate: null });
 
       // Now navigation should succeed
-      router.navigate("ur-locked", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).not.toHaveBeenCalled();
-      });
+      await router.navigate("ur-locked");
+      expect(guard).not.toHaveBeenCalled();
     });
   });
 
   describe("canDeactivate", () => {
-    it("should add canDeactivate", () => {
+    it("should add canDeactivate", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -505,20 +512,21 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-editor", { canDeactivate: guardFactory });
 
       // Navigate to route
-      router.navigate("ur-editor", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-editor");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate away - should be blocked
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      // Navigate away - should be blocked
+      try {
+        await router.navigate("home");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(guard).toHaveBeenCalled();
+      }
     });
 
-    it("should remove canDeactivate when null", () => {
+    it("should remove canDeactivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -528,28 +536,27 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Navigate to route
-      router.navigate("ur-form", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-form");
 
-        // Verify guard is active - navigation blocked
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      // Verify guard is active - navigation blocked
+      try {
+        await router.navigate("home");
+        expect.fail("Should have thrown");
+      } catch (err) {
+        expect((err as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
 
-          guard.mockClear();
+      guard.mockClear();
 
-          // Remove canDeactivate
-          router.updateRoute("ur-form", { canDeactivate: null });
+      // Remove canDeactivate
+      router.updateRoute("ur-form", { canDeactivate: null });
 
-          // Now navigation should succeed
-          router.navigate("home", (err) => {
-            expect(err).toBeUndefined();
-            expect(guard).not.toHaveBeenCalled();
-          });
-        });
-      });
+      // Now navigation should succeed
+      await router.navigate("home");
+      expect(guard).not.toHaveBeenCalled();
     });
 
-    it("should update existing canDeactivate", () => {
+    it("should update existing canDeactivate", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
@@ -561,19 +568,15 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-page", { canDeactivate: () => guard2 });
 
       // Navigate to route
-      router.navigate("ur-page", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-page");
 
-        guard1.mockClear();
-        guard2.mockClear();
+      guard1.mockClear();
+      guard2.mockClear();
 
-        // Navigate away - new guard should fire, old guard should NOT
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard2).toHaveBeenCalled();
-          expect(guard1).not.toHaveBeenCalled();
-        });
-      });
+      // Navigate away - new guard should fire, old guard should NOT
+      await router.navigate("home");
+      expect(guard2).toHaveBeenCalled();
+      expect(guard1).not.toHaveBeenCalled();
     });
   });
 
