@@ -4,7 +4,7 @@ import { constants, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { DoneFn, Router } from "@real-router/core";
+import type { Router } from "@real-router/core";
 
 let router: Router;
 

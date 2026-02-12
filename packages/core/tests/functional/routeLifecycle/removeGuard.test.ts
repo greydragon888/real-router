@@ -37,30 +37,26 @@ describe("core/route-lifecycle/removeGuard", () => {
     expect(router.canNavigateTo("home")).toBe(true);
   });
 
-  it("should allow navigation after removing activate guard", () => {
+  it("should allow navigation after removing activate guard", async () => {
     router.addActivateGuard("admin", () => () => false);
     router.start();
-    router.navigate("home");
+    await router.navigate("home");
 
     router.removeActivateGuard("admin");
 
-    router.navigate("admin", (err) => {
-      expect(err).toBeUndefined();
-      expect(router.getState()?.name).toBe("admin");
-    });
+    const state = await router.navigate("admin");
+    expect(state.name).toBe("admin");
   });
 
-  it("should allow navigation after removing deactivate guard", () => {
+  it("should allow navigation after removing deactivate guard", async () => {
     router.addDeactivateGuard("users", () => () => false);
     router.start();
-    router.navigate("users");
+    await router.navigate("users");
 
     router.removeDeactivateGuard("users");
 
-    router.navigate("home", (err) => {
-      expect(err).toBeUndefined();
-      expect(router.getState()?.name).toBe("home");
-    });
+    const state = await router.navigate("home");
+    expect(state.name).toBe("home");
   });
 
   it("should not throw when removing non-existent activate guard", () => {
@@ -90,17 +86,15 @@ describe("core/route-lifecycle/removeGuard", () => {
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should handle removing then re-adding same guard", () => {
+  it("should handle removing then re-adding same guard", async () => {
     router.addActivateGuard("admin", () => () => false);
     router.removeActivateGuard("admin");
 
     router.addActivateGuard("admin", () => () => true);
 
     router.start();
-    router.navigate("admin", (err) => {
-      expect(err).toBeUndefined();
-      expect(router.getState()?.name).toBe("admin");
-    });
+    const state = await router.navigate("admin");
+    expect(state.name).toBe("admin");
   });
 
   it("should remove all guards for a route", () => {
@@ -174,14 +168,12 @@ describe("core/route-lifecycle/removeGuard", () => {
     expect(router.canNavigateTo("home")).toBe(true);
   });
 
-  it("should handle removing guards before navigation", () => {
+  it("should handle removing guards before navigation", async () => {
     router.addActivateGuard("users", () => () => false);
     router.removeActivateGuard("users");
 
-    router.navigate("users", (err) => {
-      expect(err).toBeUndefined();
-      expect(router.getState()?.name).toBe("users");
-    });
+    const state = await router.navigate("users");
+    expect(state.name).toBe("users");
   });
 
   it("should handle removing guards after router stops", () => {

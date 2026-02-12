@@ -184,8 +184,8 @@ describe("core/noValidate option", () => {
       it("should skip validation in useMiddleware", () => {
         // Valid middleware
         expect(() =>
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
+          router.useMiddleware(() => (_toState, _fromState) => {
+            return true;
           }),
         ).not.toThrowError();
       });
@@ -257,14 +257,14 @@ describe("core/noValidate option", () => {
         expect(() => router.navigateToDefault()).not.toThrowError();
       });
 
-      it("should skip validation in navigateToState", () => {
+      it("should skip validation in navigateToState", async () => {
         router.start();
 
         const state = router.makeState("home", {}, "/home");
 
-        expect(() =>
-          router.navigateToState(state, undefined, {}, () => {}, true),
-        ).not.toThrowError();
+        expect(async () => {
+          await router.navigateToState(state, undefined, {}, true);
+        }).not.toThrowError();
       });
     });
 
