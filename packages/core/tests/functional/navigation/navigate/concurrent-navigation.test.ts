@@ -398,7 +398,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should return different cancel functions for concurrent navigations", () => {
+    it("should return different cancel functions for concurrent navigations", async () => {
       expect.hasAssertions();
 
       router.useMiddleware(() => (_toState, _fromState, done) => {
@@ -417,7 +417,7 @@ describe("router.navigate() - concurrent navigation", () => {
       cancel2();
     });
 
-    it("should handle cancellation during redirect scenarios", () => {
+    it("should handle cancellation during redirect scenarios", async () => {
       vi.spyOn(logger, "error").mockImplementation(noop);
       vi.useFakeTimers();
 
