@@ -1,11 +1,4 @@
-import {
-  describe,
-  beforeEach,
-  afterEach,
-  it,
-  expect,
-  expectTypeOf,
-} from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes, events, RouterError } from "@real-router/core";
 
@@ -50,15 +43,14 @@ describe("navigateToDefault", () => {
       // Start at a specific route since there's no defaultRoute
       await freshRouter.start("/users");
 
-      // navigateToDefault should return a cancel function even when no defaultRoute
-      const cancel = freshRouter.navigateToDefault();
+      // navigateToDefault should return a promise with cancel function even when no defaultRoute
+      const promise = freshRouter.navigateToDefault();
+      const cancel = (promise as any).cancel;
 
       expect(typeof cancel).toBe("function");
 
       // Calling cancel should be safe (noop)
-      expect(() => {
-        cancel();
-      }).not.toThrowError();
+      expect(() => cancel()).not.toThrow();
 
       // Router state should remain at the route we started at
       expect(freshRouter.getState()?.name).toBe("users");
@@ -408,14 +400,14 @@ describe("navigateToDefault", () => {
 
       await withDefault("users");
 
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => () => {
+        return new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const promise = router.navigateToDefault();
       const cancel = (promise as any).cancel;
 
-      expectTypeOf(cancel).toBeFunction();
+      expect(typeof cancel).toBe("function");
 
       setTimeout(cancel, 10);
 
@@ -905,8 +897,8 @@ describe("navigateToDefault", () => {
       vi.useFakeTimers();
 
       // Add async middleware to enable cancellation
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => () => {
+        return new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const cancelPromise = router.navigateToDefault();
@@ -947,7 +939,7 @@ describe("navigateToDefault", () => {
       });
 
       // Add middleware that causes an error
-      router.useMiddleware(() => (_toState, _fromState, done) => {
+      router.useMiddleware(() => () => {
         setTimeout(() => {
           done(customError);
         }, 10);
@@ -979,14 +971,14 @@ describe("navigateToDefault", () => {
       vi.useFakeTimers();
 
       // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => () => {
+        return new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const promise = router.navigateToDefault();
       const cancel = (promise as any).cancel;
 
-      expectTypeOf(cancel).toBeFunction();
+      expect(typeof cancel).toBe("function");
 
       // Cancel navigation
       setTimeout(() => {
@@ -1019,8 +1011,8 @@ describe("navigateToDefault", () => {
       vi.useFakeTimers();
 
       // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 100);
+      router.useMiddleware(() => () => {
+        return new Promise((resolve) => setTimeout(resolve, 100));
       });
 
       const promise1 = router.navigateToDefault();
@@ -1032,9 +1024,9 @@ describe("navigateToDefault", () => {
       const cancel3 = (promise3 as any).cancel;
 
       // Each should be a function
-      expectTypeOf(cancel1).toBeFunction();
-      expectTypeOf(cancel2).toBeFunction();
-      expectTypeOf(cancel3).toBeFunction();
+      expect(typeof cancel1).toBe("function");
+      expect(typeof cancel2).toBe("function");
+      expect(typeof cancel3).toBe("function");
 
       // Each should be a different function
       expect(cancel1).not.toBe(cancel2);
@@ -1068,8 +1060,8 @@ describe("navigateToDefault", () => {
       vi.useFakeTimers();
 
       // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50);
+      router.useMiddleware(() => () => {
+        return new Promise((resolve) => setTimeout(resolve, 50));
       });
 
       const promise = router.navigateToDefault();
@@ -1182,7 +1174,7 @@ describe("navigateToDefault", () => {
 
       const promise = router.navigateToDefault();
 
-      expectTypeOf(promise).toBePromise();
+      expect(promise).toBeInstanceOf(Promise);
 
       // Should be safe to call returned function
       const cancel = (promise as any).cancel;
@@ -1245,7 +1237,7 @@ describe("navigateToDefault", () => {
 
       // Add async middleware to create timing conditions
       // Remove randomness for predictable testing
-      router.useMiddleware(() => (_toState, _fromState, done) => {
+      router.useMiddleware(() => () => {
         setTimeout(done, 30); // Fixed delay instead of random
       });
 
@@ -1259,9 +1251,9 @@ describe("navigateToDefault", () => {
       const cancel3 = (promise3 as any).cancel;
 
       // All should return cancel functions
-      expectTypeOf(cancel1).toBeFunction();
-      expectTypeOf(cancel2).toBeFunction();
-      expectTypeOf(cancel3).toBeFunction();
+      expect(typeof cancel1).toBe("function");
+      expect(typeof cancel2).toBe("function");
+      expect(typeof cancel3).toBe("function");
 
       // Each should be a different function
       expect(cancel1).not.toBe(cancel2);
