@@ -45,9 +45,7 @@ import type {
   RouteConfigUpdate,
 } from "./types";
 import type {
-  CancelFn,
   DefaultDependencies,
-  DoneFn,
   EventName,
   NavigationOptions,
   Options,
@@ -633,22 +631,18 @@ export class Router<
     return this.#lifecycle.isActive();
   }
 
-  start(
-    ...args:
-      | []
-      | [done: DoneFn]
-      | [startPathOrState: string | State]
-      | [startPathOrState: string | State, done: DoneFn]
-  ): this {
+  start(): Promise<State>;
+  start(startPath: string): Promise<State>;
+  start(startPath?: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
-      RouterLifecycleNamespace.validateStartArgs(args);
+      RouterLifecycleNamespace.validateStartArgs(
+        startPath === undefined ? [] : [startPath],
+      );
     }
 
     // Forward to lifecycle namespace
-    this.#lifecycle.start(...args);
-
-    return this;
+    return this.#lifecycle.start(startPath);
   }
 
   stop(): this {
@@ -973,70 +967,62 @@ export class Router<
   // Navigation
   // ============================================================================
 
+  navigate(routeName: string): Promise<State>;
+  navigate(routeName: string, routeParams: Params): Promise<State>;
   navigate(
     routeName: string,
-    routeParamsOrDone?: Params | DoneFn,
-    optionsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ): CancelFn {
+    routeParams: Params,
+    options: NavigationOptions,
+  ): Promise<State>;
+  navigate(
+    routeName: string,
+    routeParams?: Params,
+    options?: NavigationOptions,
+  ): Promise<State> {
     // 1. Validate route name
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigateArgs(routeName);
     }
 
-    // 2. Parse polymorphic arguments
-    const { params, opts, callback } = NavigationNamespace.parseNavigateArgs(
-      routeParamsOrDone,
-      optionsOrDone,
-      done,
-    );
-
-    // 3. Validate parsed options
+    // 2. Validate parsed options
+    const opts = options ?? {};
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigate");
     }
 
-    // 4. Execute navigation with parsed arguments
-    return this.#navigation.navigate(routeName, params, opts, callback);
+    // 3. Execute navigation with parsed arguments
+    return this.#navigation.navigate(routeName, routeParams ?? {}, opts);
   }
 
-  navigateToDefault(
-    optsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ): CancelFn {
-    // 1. Validate arguments (before parsing)
+  navigateToDefault(): Promise<State>;
+  navigateToDefault(options: NavigationOptions): Promise<State>;
+  navigateToDefault(options?: NavigationOptions): Promise<State> {
+    // 1. Validate arguments
     if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateToDefaultArgs(optsOrDone, done);
+      NavigationNamespace.validateNavigateToDefaultArgs(options);
     }
 
-    // 2. Parse polymorphic arguments
-    const { opts, callback } = NavigationNamespace.parseNavigateToDefaultArgs(
-      optsOrDone,
-      done,
-    );
-
-    // 3. Validate parsed options
+    // 2. Validate parsed options
+    const opts = options ?? {};
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
     }
 
-    // 4. Execute navigation with parsed arguments
-    return this.#navigation.navigateToDefault(opts, callback);
+    // 3. Execute navigation with parsed arguments
+    return this.#navigation.navigateToDefault(opts);
   }
 
   navigateToState(
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    callback: DoneFn,
     emitSuccess: boolean,
-  ): CancelFn {
+  ): Promise<State> {
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigateToStateArgs(
         toState,
         fromState,
         opts,
-        callback,
         emitSuccess,
       );
     }
@@ -1045,7 +1031,6 @@ export class Router<
       toState,
       fromState,
       opts,
-      callback,
       emitSuccess,
     );
   }
@@ -1239,16 +1224,9 @@ export class Router<
       toState: State,
       fromState: State | undefined,
       opts: NavigationOptions,
-      callback: DoneFn,
       emitSuccess: boolean,
     ) =>
-      this.#navigation.navigateToState(
-        toState,
-        fromState,
-        opts,
-        callback,
-        emitSuccess,
-      );
+      this.#navigation.navigateToState(toState, fromState, opts, emitSuccess);
 
     // CloneNamespace needs access to collect cloning data and apply config
     this.#clone.setCallbacks(
