@@ -215,17 +215,11 @@ describe("router.start() - state object scenarios", () => {
           params: { path: "/custom/unknown/path" },
           path: "/custom/unknown/path",
         };
-        const callback = vi.fn();
 
         // UNKNOWN_ROUTE has special handling in buildPath - should not throw
-        await router.start(unknownState);
+        const state = await router.start(unknownState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
         expect(router.isActive()).toBe(true);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeUndefined();
         expect(state).toBeDefined();
       });
 
@@ -235,16 +229,10 @@ describe("router.start() - state object scenarios", () => {
           params: { id: "123" },
           path: "/users/view/123",
         };
-        const callback = vi.fn();
 
         // Valid state should not throw and work normally
-        await router.start(validState);
+        const state = await router.start(validState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeUndefined();
         expect(state?.name).toBe("users.view");
         expect(state?.params).toStrictEqual({ id: "123" });
         expect(router.isActive()).toBe(true);
@@ -257,15 +245,9 @@ describe("router.start() - state object scenarios", () => {
           params: { id: "456", filter: "pending" },
           path: "/orders/view/456",
         };
-        const callback = vi.fn();
 
-        await router.start(validState);
+        const state = await router.start(validState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeUndefined();
         expect(state?.name).toBe("orders.view");
         expect(state?.params).toStrictEqual({
           id: "456",
@@ -377,9 +359,8 @@ describe("router.start() - state object scenarios", () => {
         expect(options).toStrictEqual({ replace: true });
       });
 
-      it("should emit TRANSITION_SUCCESS with callback provided", async () => {
+      it("should emit TRANSITION_SUCCESS event", async () => {
         const validPath = "/home";
-        const callback = vi.fn();
 
         const transitionSuccessListener = vi.fn();
 
@@ -388,17 +369,15 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        await router.start(validPath);
+        const state = await router.start(validPath);
 
-        // Event should be emitted even when callback is provided
+        // Event should be emitted
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-        expect(callback).toHaveBeenCalledTimes(1);
 
-        // Both should receive the same state
+        // Event state should match returned state
         const [eventToState] = transitionSuccessListener.mock.calls[0];
-        const [, callbackState] = callback.mock.calls[0];
 
-        expect(eventToState).toStrictEqual(callbackState);
+        expect(eventToState).toStrictEqual(state);
       });
     });
 
