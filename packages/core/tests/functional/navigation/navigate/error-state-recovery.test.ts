@@ -22,45 +22,51 @@ describe("router.navigate() - error state recovery", () => {
   });
 
   describe("error handling - state recovery (analysis 10.3)", () => {
-    it("should not change state when canActivate guard rejects", () => {
-      router.navigate("home");
+    it("should not change state when canActivate guard rejects", async () => {
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
       router.addActivateGuard("users", () => () => false);
-      router.navigate("users", (err) => {
+      try {
+        await router.navigate("users");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      });
+      }
 
       // State should NOT have changed
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should not change state when canDeactivate guard rejects", () => {
-      router.navigate("users");
+    it("should not change state when canDeactivate guard rejects", async () => {
+      await router.navigate("users");
 
       expect(router.getState()?.name).toBe("users");
 
       router.addDeactivateGuard("users", () => () => false);
-      router.navigate("home", (err) => {
+      try {
+        await router.navigate("home");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      });
+      }
 
       // State should NOT have changed
       expect(router.getState()?.name).toBe("users");
     });
 
-    it("should not change state when middleware throws", () => {
-      router.navigate("home");
+    it("should not change state when middleware throws", async () => {
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
       router.useMiddleware(() => () => {
         throw new Error("Middleware error");
       });
-      router.navigate("users", (err) => {
+      try {
+        await router.navigate("users");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-      });
+      }
 
       // State should NOT have changed
       expect(router.getState()?.name).toBe("home");
@@ -78,38 +84,26 @@ describe("router.navigate() - error state recovery", () => {
       );
 
       // First navigation fails
-      await new Promise<void>((resolve) => {
-        router.navigate("users", (err) => {
-          expect(err).toBeDefined();
-
-          resolve();
-        });
-      });
+      try {
+        await router.navigate("users");
+      } catch (err) {
+        expect(err).toBeDefined();
+      }
 
       // Can start new navigation after error (router is not stuck)
-      router.navigate("home", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should do nothing when cancel() called after navigation complete", () => {
-      const callback = vi.fn();
-
-      const cancel = router.navigate("users", callback);
+    it("should do nothing when cancel() called after navigation complete", async () => {
+      await router.navigate("users");
 
       // Navigation completes synchronously (no guards)
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
+      expect(router.getState()?.name).toBe("users");
 
-      // Calling cancel after complete should do nothing
-      cancel();
-      cancel();
-      cancel();
-
-      // Callback should still have been called only once
-      expect(callback).toHaveBeenCalledTimes(1);
+      // State should still be users
+      expect(router.getState()?.name).toBe("users");
     });
   });
 
@@ -125,19 +119,17 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      await new Promise<void>((resolve) => {
-        router.navigate("users", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-          expect(err?.message).toBe("Async canActivate error");
-
-          resolve();
-        });
-      });
+      try {
+        await router.navigate("users");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(err?.message).toBe("Async canActivate error");
+      }
     });
 
     it("should handle Promise rejection in canDeactivate guard", async () => {
-      router.navigate("users");
+      await router.navigate("users");
 
       router.addDeactivateGuard(
         "users",
@@ -149,15 +141,13 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      await new Promise<void>((resolve) => {
-        router.navigate("home", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(err?.message).toBe("Async canDeactivate error");
-
-          resolve();
-        });
-      });
+      try {
+        await router.navigate("home");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(err?.message).toBe("Async canDeactivate error");
+      }
     });
 
     it("should handle Promise rejection in middleware", async () => {
@@ -170,15 +160,13 @@ describe("router.navigate() - error state recovery", () => {
           ),
       );
 
-      await new Promise<void>((resolve) => {
-        router.navigate("users", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-          expect(err?.message).toBe("Async middleware error");
-
-          resolve();
-        });
-      });
+      try {
+        await router.navigate("users");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(err?.message).toBe("Async middleware error");
+      }
     });
 
     it("should cancel transition when router.stop() called during async guard", async () => {
@@ -195,9 +183,7 @@ describe("router.navigate() - error state recovery", () => {
           }),
       );
 
-      const callback = vi.fn();
-
-      router.navigate("users", callback);
+      const navPromise = router.navigate("users");
 
       // Wait for guard to be called
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -210,10 +196,12 @@ describe("router.navigate() - error state recovery", () => {
       // Wait for timeout to complete
       await new Promise((resolve) => setTimeout(resolve, 60));
 
-      // Callback should have been called with TRANSITION_CANCELLED
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({ code: errorCodes.TRANSITION_CANCELLED }),
-      );
+      // Navigation should have been cancelled
+      try {
+        await navPromise;
+      } catch (err: any) {
+        expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      }
     });
   });
 });

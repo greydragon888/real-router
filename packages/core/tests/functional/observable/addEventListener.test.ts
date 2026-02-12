@@ -20,20 +20,20 @@ describe("core/observable/addEventListener", () => {
   });
 
   describe("event triggering via router operations", () => {
-    it("should trigger ROUTER_START listener when router starts", () => {
+    it("should trigger ROUTER_START listener when router starts", async () => {
       const cb = vi.fn();
 
       router.addEventListener(events.ROUTER_START, cb);
-      router.start();
+      await router.start();
 
       expect(cb).toHaveBeenCalledTimes(1);
       expect(cb).toHaveBeenCalledWith();
     });
 
-    it("should trigger ROUTER_STOP listener when router stops", () => {
+    it("should trigger ROUTER_STOP listener when router stops", async () => {
       const cb = vi.fn();
 
-      router.start();
+      await router.start();
       router.addEventListener(events.ROUTER_STOP, cb);
       router.stop();
 
@@ -41,78 +41,72 @@ describe("core/observable/addEventListener", () => {
       expect(cb).toHaveBeenCalledWith();
     });
 
-    it("should trigger TRANSITION_START listener when navigation begins", () => {
+    it("should trigger TRANSITION_START listener when navigation begins", async () => {
       const cb = vi.fn();
 
       router.addEventListener(events.TRANSITION_START, cb);
-      router.start("/");
+      await router.start("/");
 
-      router.navigate("users", (err) => {
-        expect(err).toBeUndefined();
-        expect(cb).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "users" }),
-          expect.objectContaining({ name: "home" }),
-        );
-      });
+      await router.navigate("users");
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users" }),
+        expect.objectContaining({ name: "home" }),
+      );
     });
 
-    it("should trigger TRANSITION_SUCCESS listener on successful navigation", () => {
+    it("should trigger TRANSITION_SUCCESS listener on successful navigation", async () => {
       const cb = vi.fn();
 
       router.addEventListener(events.TRANSITION_SUCCESS, cb);
-      router.start("/");
+      await router.start("/");
 
-      router.navigate("users", {}, { reload: true }, (err) => {
-        expect(err).toBeUndefined();
-        expect(cb).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "users" }),
-          expect.objectContaining({ name: "home" }),
-          expect.objectContaining({ reload: true }),
-        );
-      });
+      await router.navigate("users", {}, { reload: true });
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users" }),
+        expect.objectContaining({ name: "home" }),
+        expect.objectContaining({ reload: true }),
+      );
     });
 
-    it("should trigger TRANSITION_ERROR listener when navigation fails", () => {
+    it("should trigger TRANSITION_ERROR listener when navigation fails", async () => {
       const cb = vi.fn();
 
       router.addEventListener(events.TRANSITION_ERROR, cb);
-      router.start("/");
+      await router.start("/");
 
-      // admin-protected has canActivate that returns false
-      router.navigate("admin-protected", (err) => {
+      try {
+        await router.navigate("admin-protected");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(cb).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "admin-protected" }),
-          expect.objectContaining({ name: "home" }),
-          expect.objectContaining({ code: errorCodes.CANNOT_ACTIVATE }),
-        );
-      });
+      }
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "admin-protected" }),
+        expect.objectContaining({ name: "home" }),
+        expect.objectContaining({ code: errorCodes.CANNOT_ACTIVATE }),
+      );
     });
 
-    it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", () => {
+    it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", async () => {
       const cb = vi.fn();
 
       // Add slow middleware to allow cancellation
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(() => {
-          done();
-        }, 50);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return true;
       });
 
       router.addEventListener(events.TRANSITION_CANCEL, cb);
-      router.start("/");
+      await router.start("/");
 
       // Start first navigation
-      router.navigate("users", () => {});
+      router.navigate("users");
 
       // Cancel by starting second navigation
-      router.navigate("orders", (err) => {
-        expect(err).toBeUndefined();
-        expect(cb).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "users" }),
-          expect.objectContaining({ name: "home" }),
-        );
-      });
+      await router.navigate("orders");
+      expect(cb).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "users" }),
+        expect.objectContaining({ name: "home" }),
+      );
     });
   });
 
@@ -131,7 +125,7 @@ describe("core/observable/addEventListener", () => {
       }).toThrowError(events.TRANSITION_START);
     });
 
-    it("should allow same callback for different events", () => {
+    it("should allow same callback for different events", async () => {
       const cb = vi.fn();
 
       expect(() => {
@@ -141,16 +135,14 @@ describe("core/observable/addEventListener", () => {
       }).not.toThrowError();
 
       // Verify all registered by triggering events
-      router.start("/");
+      await router.start("/");
 
-      router.navigate("users", (err) => {
-        expect(err).toBeUndefined();
-        // ROUTER_START + TRANSITION_START + TRANSITION_SUCCESS = 3 calls
-        expect(cb).toHaveBeenCalledTimes(3);
-      });
+      await router.navigate("users");
+      // ROUTER_START + TRANSITION_START + TRANSITION_SUCCESS = 3 calls
+      expect(cb).toHaveBeenCalledTimes(3);
     });
 
-    it("should allow different callbacks for same event", () => {
+    it("should allow different callbacks for same event", async () => {
       const cb1 = vi.fn();
       const cb2 = vi.fn();
       const cb3 = vi.fn();
@@ -161,7 +153,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, cb3);
       }).not.toThrowError();
 
-      router.start();
+      await router.start();
 
       expect(cb1).toHaveBeenCalledTimes(1);
       expect(cb2).toHaveBeenCalledTimes(1);
