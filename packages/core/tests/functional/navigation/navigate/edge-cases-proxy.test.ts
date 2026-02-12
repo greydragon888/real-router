@@ -10,7 +10,7 @@ describe("router.navigate() - edge cases proxy", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -32,7 +32,7 @@ describe("router.navigate() - edge cases proxy", () => {
         // isNavigationOptions reads each field, triggering the getter
         // This documents current behavior - exceptions are NOT caught
         expect(() => {
-          router.navigate("users", {}, evilOpts);
+          void router.navigate("users", {}, evilOpts);
         }).toThrowError("Evil getter!");
       });
 
@@ -45,7 +45,7 @@ describe("router.navigate() - edge cases proxy", () => {
 
         const state = await router.navigate("users", {}, optsWithGetter);
 
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
     });
 
@@ -63,7 +63,7 @@ describe("router.navigate() - edge cases proxy", () => {
 
         const state = await router.navigate("users", {}, customOpts);
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             meta: expect.objectContaining({
               options: expect.objectContaining({
@@ -89,7 +89,7 @@ describe("router.navigate() - edge cases proxy", () => {
         // @ts-expect-error - testing runtime behavior with Symbol in options
         const state = await router.navigate("users", {}, optsWithSymbol);
 
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
       it("should accept function values in custom fields (no structuredClone)", async () => {
@@ -104,7 +104,7 @@ describe("router.navigate() - edge cases proxy", () => {
         // @ts-expect-error - testing runtime behavior with function in options
         const state = await router.navigate("users", {}, optsWithFunction);
 
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
     });
 
@@ -134,7 +134,7 @@ describe("router.navigate() - edge cases proxy", () => {
         const state = await router.navigate("users.view", proxyParams, {});
 
         // Navigation succeeds, using the proxied value
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             params: expect.objectContaining({ id: 999 }),
           }),
@@ -157,7 +157,7 @@ describe("router.navigate() - edge cases proxy", () => {
         // and Proxy options are now accepted (no structuredClone)
         const state = await router.navigate("users", {}, proxyOpts);
 
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
       it("should handle plain objects that mimic Proxy behavior", async () => {
@@ -170,7 +170,7 @@ describe("router.navigate() - edge cases proxy", () => {
 
         const state = await router.navigate("users", {}, objectWithGetter);
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             meta: expect.objectContaining({
               options: expect.objectContaining({ replace: true }),

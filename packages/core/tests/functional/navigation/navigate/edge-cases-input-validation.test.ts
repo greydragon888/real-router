@@ -12,7 +12,7 @@ describe("router.navigate() - edge cases input validation", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -25,67 +25,71 @@ describe("router.navigate() - edge cases input validation", () => {
     it("should throw TypeError for invalid options type (string)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, "invalid");
+        void router.navigate("users", {}, "invalid");
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, "invalid");
+        void router.navigate("users", {}, "invalid");
       }).toThrowError(/Invalid options/);
     });
 
     it("should throw TypeError for invalid options type (number)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, 123);
+        void router.navigate("users", {}, 123);
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid options type (array)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, []);
+        void router.navigate("users", {}, []);
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid option field types", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, { replace: "true" });
+        void router.navigate("users", {}, { replace: "true" });
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, { reload: 1 });
+        void router.navigate("users", {}, { reload: 1 });
       }).toThrowError(TypeError);
     });
 
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        router.navigate("users", {}, { replace: true, reload: false });
+        void router.navigate("users", {}, { replace: true, reload: false });
       }).not.toThrowError();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        router.navigate("users", {}, {});
+        void router.navigate("users", {}, {});
       }).not.toThrowError();
     });
 
     it("should accept undefined options (short form)", () => {
       expect(() => {
-        router.navigate("users", {});
+        void router.navigate("users", {});
       }).not.toThrowError();
     });
 
     it("should accept options with custom fields", () => {
       expect(() => {
-        router.navigate("users", {}, { replace: true, customField: "value" });
+        void router.navigate(
+          "users",
+          {},
+          { replace: true, customField: "value" },
+        );
       }).not.toThrowError();
     });
 
     it("should include method name in error message", () => {
       const action = () => {
         // @ts-expect-error -- testing runtime validation
-        router.navigate("users", {}, { replace: "invalid" });
+        void router.navigate("users", {}, { replace: "invalid" });
       };
 
       expect(action).toThrowError(TypeError);
@@ -97,7 +101,7 @@ describe("router.navigate() - edge cases input validation", () => {
     it("should throw TypeError for number as route name", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
-        router.navigate(123);
+        void router.navigate(123);
       }).toThrowError(TypeError);
 
       // Router should still be operational
@@ -107,7 +111,7 @@ describe("router.navigate() - edge cases input validation", () => {
     it("should throw TypeError for null as route name", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
-        router.navigate(null);
+        void router.navigate(null);
       }).toThrowError(TypeError);
 
       // Router should still be operational
@@ -117,7 +121,7 @@ describe("router.navigate() - edge cases input validation", () => {
     it("should throw TypeError for undefined as route name", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
-        router.navigate(undefined);
+        void router.navigate(undefined);
       }).toThrowError(TypeError);
 
       // Router should still be operational

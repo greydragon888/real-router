@@ -12,7 +12,7 @@ describe("router.navigate() - edge cases params", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -78,7 +78,7 @@ describe("router.navigate() - edge cases params", () => {
           {},
         );
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             name: "users.view",
             params: expect.objectContaining({ id: 123 }),
@@ -95,7 +95,7 @@ describe("router.navigate() - edge cases params", () => {
           {},
         );
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             name: "users.view",
             params: expect.objectContaining({ id: 456 }),
@@ -119,7 +119,7 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users", null);
 
         // Callback SHOULD be called with success
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
@@ -130,7 +130,7 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users");
 
         // Callback SHOULD be called with success
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
@@ -141,7 +141,7 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users", {});
 
         // Callback SHOULD be called
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
       it("should call callback with 4 args when params is null", async () => {
@@ -150,14 +150,14 @@ describe("router.navigate() - edge cases params", () => {
         const state = await router.navigate("users", null, { replace: true });
 
         // Callback SHOULD be called
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
       it("should correctly handle empty object {} as params (truthy)", async () => {
         // Empty object {} is truthy, so polymorphic parsing works correctly
         const state = await router.navigate("users", {});
 
-        expect(state).toEqual(expect.objectContaining({ name: "users" }));
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
       it("should use empty params when null is passed", async () => {
@@ -178,7 +178,7 @@ describe("router.navigate() - edge cases params", () => {
         // NaN is rejected by isParams validation (not finite)
         // This ensures params can be serialized to JSON
         expect(() => {
-          router.navigate(
+          void router.navigate(
             "users.view",
             { id: Number.NaN as unknown as number },
             {},
@@ -189,7 +189,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should reject Infinity in params (not serializable)", async () => {
         // Infinity is rejected by isParams validation (not finite)
         expect(() => {
-          router.navigate(
+          void router.navigate(
             "users.view",
             { id: Infinity as unknown as number },
             {},
@@ -199,7 +199,7 @@ describe("router.navigate() - edge cases params", () => {
 
       it("should reject -Infinity in params (not serializable)", async () => {
         expect(() => {
-          router.navigate(
+          void router.navigate(
             "users.view",
             { id: -Infinity as unknown as number },
             {},
@@ -217,7 +217,7 @@ describe("router.navigate() - edge cases params", () => {
           {},
         );
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             // -0 becomes "0" via String(-0)
             path: "/users/view/0",
@@ -228,7 +228,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should accept regular finite numbers in params", async () => {
         const state = await router.navigate("users.view", { id: 123 }, {});
 
-        expect(state).toEqual(
+        expect(state).toStrictEqual(
           expect.objectContaining({
             path: "/users/view/123",
           }),

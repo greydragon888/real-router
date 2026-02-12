@@ -12,7 +12,7 @@ describe("router.navigate() - guards can deactivate", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

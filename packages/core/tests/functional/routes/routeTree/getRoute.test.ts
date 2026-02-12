@@ -14,7 +14,7 @@ let router: Router;
 describe("core/routes/routeTree/getRoute", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

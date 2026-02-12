@@ -316,10 +316,11 @@ export class NavigationNamespace {
     const promise = this.navigateToState(toState, fromState, opts, true); // emitSuccess = true for public navigate()
 
     // Unhandled rejection mitigation: suppress expected errors
-    promise.catch((error: RouterError) => {
+    promise.catch((error: unknown) => {
       if (
-        error.code === errorCodes.SAME_STATES ||
-        error.code === errorCodes.TRANSITION_CANCELLED
+        error instanceof RouterError &&
+        (error.code === errorCodes.SAME_STATES ||
+          error.code === errorCodes.TRANSITION_CANCELLED)
       ) {
         // Expected errors - suppress unhandled rejection warnings
       } else {

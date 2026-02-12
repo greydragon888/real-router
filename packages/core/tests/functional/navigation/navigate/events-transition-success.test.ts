@@ -12,7 +12,7 @@ describe("router.navigate() - events transition success", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -339,7 +339,7 @@ describe("router.navigate() - events transition success", () => {
       expect(onSuccess).not.toHaveBeenCalled();
 
       unsubSuccess();
-      router.start(); // Restore for other tests
+      void router.start(); // Restore for other tests
     });
 
     it("should emit TRANSITION_SUCCESS with correct state after redirect", async () => {

@@ -12,7 +12,7 @@ describe("router.navigate() - router not started", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("router.navigate() - router not started", () => {
     });
 
     afterEach(() => {
-      router.start();
+      void router.start();
     });
 
     it("should call callback with ROUTER_NOT_STARTED error", async () => {
@@ -192,7 +192,7 @@ describe("router.navigate() - router not started", () => {
         expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
 
-      router.start();
+      void router.start();
 
       expect(router.isActive()).toBe(true);
 

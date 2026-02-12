@@ -12,7 +12,7 @@ let router: Router;
 describe("core/routes/routeQuery/isActiveRoute", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -29,7 +29,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     });
 
     it("should respect strictEquality", () => {
-      router.navigate("sign-in");
+      void router.navigate("sign-in");
 
       expect(router.isActiveRoute("home", {}, true)).toBe(false);
     });
@@ -85,33 +85,33 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("hierarchy (strictEquality=false)", () => {
       it("should return true for parent route when child is active", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         expect(router.isActiveRoute("users")).toBe(true);
       });
 
       it("should return false for parent with strictEquality=true when child is active", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         expect(router.isActiveRoute("users", {}, true)).toBe(false);
       });
 
       it("should return false for sibling route when another sibling is active", () => {
-        router.navigate("users.list");
+        void router.navigate("users.list");
 
         // users.view requires id param, but we're checking if it's active
         expect(router.isActiveRoute("users.view", { id: "123" })).toBe(false);
       });
 
       it("should return true when parent params match child params", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Parent route check with matching param
         expect(router.isActiveRoute("users", { id: "123" })).toBe(true);
       });
 
       it("should return false when parent params do not match child params", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Parent route check with different param
         expect(router.isActiveRoute("users", { id: "456" })).toBe(false);
@@ -119,7 +119,10 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should return true for multiple levels of hierarchy", () => {
         // Using existing nested routes from testRouters
-        router.navigate("section.view", { section: "section1", id: "123" });
+        void router.navigate("section.view", {
+          section: "section1",
+          id: "123",
+        });
 
         // All ancestors should be considered active
         expect(router.isActiveRoute("section", { section: "section1" })).toBe(
@@ -136,7 +139,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("ignoreQueryParams", () => {
       it("should ignore query params by default (ignoreQueryParams=true)", () => {
-        router.navigate("section.query", {
+        void router.navigate("section.query", {
           section: "section1",
           param1: "value1",
           param2: "value2",
@@ -150,7 +153,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should consider query params when ignoreQueryParams=false", () => {
-        router.navigate("section.query", {
+        void router.navigate("section.query", {
           section: "section1",
           param1: "value1",
           param2: "value2",
@@ -184,7 +187,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should return false when query params differ and ignoreQueryParams=false", () => {
-        router.navigate("section.query", {
+        void router.navigate("section.query", {
           section: "section1",
           param1: "value1",
           param2: "value2",
@@ -216,7 +219,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should merge defaultParams with provided params", () => {
         // withDefaultParam has defaultParams: { param: "hello" }
-        router.navigate("withDefaultParam");
+        void router.navigate("withDefaultParam");
 
         // Should merge defaultParams with empty params
         expect(router.isActiveRoute("withDefaultParam")).toBe(true);
@@ -240,7 +243,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should use defaultParams when checking parent route", () => {
         // Navigate to child route with matching params
-        router.navigate("usersWithDefaults.view", {
+        void router.navigate("usersWithDefaults.view", {
           id: "123",
           filter: "active",
         });
@@ -251,7 +254,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should return false when defaultParams do not match active state", () => {
         // Navigate to child route with different params
-        router.navigate("usersWithDefaults.view", {
+        void router.navigate("usersWithDefaults.view", {
           id: "123",
           filter: "inactive",
         });
@@ -262,7 +265,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should prefer provided params over defaultParams", () => {
         // Navigate to child route with different filter
-        router.navigate("usersWithDefaults.view", {
+        void router.navigate("usersWithDefaults.view", {
           id: "123",
           filter: "inactive",
         });
@@ -279,7 +282,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("edge cases: param value types", () => {
       it("should not match when param value is undefined (undefined !== string)", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // undefined in params means "id must be undefined", not "skip this check"
         expect(
@@ -290,7 +293,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should not match when param is omitted for exact match (areStatesEqual compares URL params)", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // For exact match (same name), areStatesEqual is used
         // With ignoreQueryParams=true, only URL params are compared
@@ -302,7 +305,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should use strict equality for param comparison (number !== string)", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // 123 !== "123" with strict equality
         expect(
@@ -313,7 +316,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should not match null against string param", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // null !== "123"
         expect(
@@ -324,7 +327,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should handle undefined in hierarchical check (parent route)", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Hierarchical check uses paramsMatch
         // { id: undefined } means "id must be undefined in activeState"
@@ -355,7 +358,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         warnSpy.mockClear();
 
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         expect(router.isActiveRoute("")).toBe(false);
         expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -364,7 +367,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should throw on non-boolean strictEquality", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Truthy non-boolean values throw TypeError
         expect(() => {
@@ -407,7 +410,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should throw on non-boolean ignoreQueryParams", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         expect(() => {
           router.isActiveRoute("users", {}, false, 1 as unknown as boolean);
@@ -434,7 +437,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should accept valid boolean values", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Explicit boolean values work correctly
         expect(router.isActiveRoute("users", {}, false)).toBe(true); // hierarchical
@@ -451,7 +454,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
     describe("inherited properties", () => {
       it("should reject Object.create() params with custom prototype", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Create object with inherited property via Object.create()
         const proto = { id: "123" };
@@ -465,7 +468,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should reject Object.create() params even with own properties", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         // Own property shadows inherited, but still rejected due to prototype
         const proto = { id: "456" };
@@ -480,7 +483,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should ignore non-enumerable properties", () => {
-        router.navigate("users.view", { id: "123" });
+        void router.navigate("users.view", { id: "123" });
 
         const params: { id: string; hidden?: string } = { id: "123" };
 
@@ -507,7 +510,10 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       it("should allow undefined to override defaultParams", () => {
         // Navigate with the default filter
-        router.navigate("usersFiltered.view", { id: "123", filter: "active" });
+        void router.navigate("usersFiltered.view", {
+          id: "123",
+          filter: "active",
+        });
 
         // Passing undefined for filter overrides the default
         // effectiveParams = { ...{filter: "active"}, ...{filter: undefined} }
@@ -523,7 +529,10 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should use defaultParams when param is not provided", () => {
-        router.navigate("usersFiltered.view", { id: "123", filter: "active" });
+        void router.navigate("usersFiltered.view", {
+          id: "123",
+          filter: "active",
+        });
 
         // Empty params → effectiveParams = { filter: "active" }
         // Matches activeState.params.filter = "active"
@@ -531,7 +540,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       });
 
       it("should use provided params over defaultParams", () => {
-        router.navigate("usersFiltered.view", {
+        void router.navigate("usersFiltered.view", {
           id: "123",
           filter: "inactive",
         });

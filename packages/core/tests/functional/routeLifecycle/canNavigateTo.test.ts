@@ -14,7 +14,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return true for route with no guards", () => {
-    router.start();
+    void router.start();
 
     expect(router.canNavigateTo("home")).toBe(true);
     expect(router.canNavigateTo("users")).toBe(true);
@@ -23,32 +23,32 @@ describe("core/route-lifecycle/canNavigateTo", () => {
 
   it("should return false for route with blocking activation guard", () => {
     router.addActivateGuard("admin", () => () => false);
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
   it("should return true for route with passing activation guard", () => {
     router.addActivateGuard("admin", () => () => true);
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
   it("should return false for current route with blocking deactivation guard", () => {
     router.addDeactivateGuard("users", () => () => false);
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
   });
 
   it("should return true for current route with passing deactivation guard", () => {
     router.addDeactivateGuard("users", () => () => true);
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(true);
   });
@@ -62,8 +62,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => adminGuard);
     router.addActivateGuard("admin.users", () => usersGuard);
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     const result = router.canNavigateTo("admin.users");
 
@@ -78,14 +78,14 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.users", () => () => true);
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin.users")).toBe(false);
   });
 
   it("should return false for non-existent route", () => {
-    router.start();
+    void router.start();
 
     expect(router.canNavigateTo("nonexistent")).toBe(false);
   });
@@ -103,8 +103,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     });
     router.addActivateGuard("admin", () => () => false);
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("old-admin")).toBe(false);
   });
@@ -113,8 +113,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router.addActivateGuard("admin", () => async () => true);
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     const result = router.canNavigateTo("admin");
 
@@ -127,8 +127,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return true for navigating to the same route (no transition needed)", () => {
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("users")).toBe(true);
   });
@@ -137,8 +137,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addDeactivateGuard("users", () => () => true);
     router.addDeactivateGuard("users", () => () => false); // overwrites previous
 
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
   });
@@ -147,8 +147,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => () => true);
     router.addActivateGuard("admin", () => () => false); // overwrites previous
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
@@ -160,8 +160,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => () => true);
     router.addActivateGuard("admin.settings", () => () => true);
 
-    router.start();
-    router.navigate("users.list");
+    void router.start();
+    void router.navigate("users.list");
 
     expect(router.canNavigateTo("admin.settings")).toBe(true);
   });
@@ -173,8 +173,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
       return Number.parseInt(id, 10) > 0;
     });
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("users.view", { id: "123" })).toBe(true);
     expect(router.canNavigateTo("users.view", { id: "0" })).toBe(false);
@@ -184,8 +184,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => () => {
       throw new Error("Guard error");
     });
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     const result = router.canNavigateTo("admin");
 
@@ -201,8 +201,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addDeactivateGuard("admin", () => () => true);
     router.addActivateGuard("users", () => () => true);
 
-    router.start();
-    router.navigate("admin.settings.profile");
+    void router.start();
+    void router.navigate("admin.settings.profile");
 
     expect(router.canNavigateTo("users")).toBe(true);
   });
@@ -215,8 +215,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addDeactivateGuard("admin.settings", () => () => false);
     router.addDeactivateGuard("admin", () => () => true);
 
-    router.start();
-    router.navigate("admin.settings.profile");
+    void router.start();
+    void router.navigate("admin.settings.profile");
 
     expect(router.canNavigateTo("users")).toBe(false);
   });
@@ -225,8 +225,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return true;
     });
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
@@ -235,8 +235,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return false;
     });
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
@@ -245,14 +245,14 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => () => {
       // intentionally void — no return, no done()
     });
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
   it("should throw TypeError for non-string route name", () => {
-    router.start();
+    void router.start();
 
     // @ts-expect-error: testing invalid input
     expect(() => router.canNavigateTo(123)).toThrowError(TypeError);
@@ -263,22 +263,22 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should throw TypeError for whitespace-only route name", () => {
-    router.start();
+    void router.start();
 
     expect(() => router.canNavigateTo("   ")).toThrowError(TypeError);
   });
 
   it("should handle empty params object", () => {
     router.addActivateGuard("admin", () => () => true);
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin", {})).toBe(true);
   });
 
   it("should check guards when no current state", () => {
     router.addActivateGuard("admin", () => () => false);
-    router.start();
+    void router.start();
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
@@ -292,8 +292,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
       canDeactivate: () => guard,
     });
 
-    router.start();
-    router.navigate("editor");
+    void router.start();
+    void router.navigate("editor");
 
     expect(router.canNavigateTo("home")).toBe(false);
     expect(guard).toHaveBeenCalled();

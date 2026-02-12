@@ -12,7 +12,7 @@ describe("router.navigate() - events listeners", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const analyticsLog: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         // Side-effect listener (analytics) - should ideally fire once
         freshRouter.addEventListener(
@@ -43,7 +43,7 @@ describe("router.navigate() - events listeners", () => {
           (toState: State) => {
             if (toState.name === "admin") {
               // Redirect to login - triggers recursive TRANSITION_START
-              freshRouter.navigate("users");
+              void freshRouter.navigate("users");
             }
           },
         );
@@ -65,7 +65,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const callLog: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         // Side-effect listener
         freshRouter.addEventListener(
@@ -80,9 +80,9 @@ describe("router.navigate() - events listeners", () => {
           events.TRANSITION_START,
           (toState: State) => {
             if (toState.name === "admin") {
-              freshRouter.navigate("profile");
+              void freshRouter.navigate("profile");
             } else if (toState.name === "profile") {
-              freshRouter.navigate("users");
+              void freshRouter.navigate("users");
             }
           },
         );
@@ -106,7 +106,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const successLog: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         // Side-effect listener on success
         freshRouter.addEventListener(
@@ -134,7 +134,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const errorLog: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         // Error listener
         freshRouter.addEventListener(
@@ -151,7 +151,7 @@ describe("router.navigate() - events listeners", () => {
               error.code === errorCodes.CANNOT_ACTIVATE &&
               errorLog.length === 1
             ) {
-              freshRouter.navigate("users");
+              void freshRouter.navigate("users");
             }
           },
         );
@@ -175,7 +175,7 @@ describe("router.navigate() - events listeners", () => {
         const listener2Calls: string[] = [];
         const listener3Calls: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         // Listener 1: analytics
         freshRouter.addEventListener(
@@ -200,7 +200,7 @@ describe("router.navigate() - events listeners", () => {
             listener3Calls.push(toState.name);
 
             if (toState.name === "admin") {
-              freshRouter.navigate("users");
+              void freshRouter.navigate("users");
             }
           },
         );
@@ -221,7 +221,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const executionOrder: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         freshRouter.addEventListener(
           events.TRANSITION_START,
@@ -236,7 +236,7 @@ describe("router.navigate() - events listeners", () => {
             executionOrder.push(`second:${toState.name}`);
 
             if (toState.name === "admin") {
-              freshRouter.navigate("users");
+              void freshRouter.navigate("users");
             }
           },
         );
@@ -271,7 +271,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const redirects: string[] = [];
 
-        freshRouter.start();
+        void freshRouter.start();
 
         freshRouter.addEventListener(
           events.TRANSITION_START,
@@ -280,9 +280,9 @@ describe("router.navigate() - events listeners", () => {
 
             // Redirect chain: users -> orders -> profile
             if (toState.name === "users") {
-              freshRouter.navigate("orders");
+              void freshRouter.navigate("orders");
             } else if (toState.name === "orders") {
-              freshRouter.navigate("profile");
+              void freshRouter.navigate("profile");
             }
           },
         );

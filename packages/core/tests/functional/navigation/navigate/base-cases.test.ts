@@ -10,7 +10,7 @@ describe("router.navigate() - base cases", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -81,9 +81,10 @@ describe("router.navigate() - base cases", () => {
   it("should not throw if method is called with more than 4 args", () => {
     const done = vi.fn();
 
-    expect(() =>
-      // @ts-expect-error - Testing extra arguments are ignored
-      router.navigate("index", {}, {}, done, 123),
+    expect(
+      () =>
+        // @ts-expect-error - Testing extra arguments are ignored
+        void router.navigate("index", {}, {}, done, 123),
     ).not.toThrowError();
   });
 

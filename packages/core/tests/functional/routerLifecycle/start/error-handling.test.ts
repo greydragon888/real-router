@@ -149,7 +149,7 @@ describe("router.start() - error handling", () => {
 
         // Exception should NOT propagate (caught internally)
         expect(() => {
-          router.start("/home");
+          void router.start("/home");
         }).not.toThrowError();
 
         // Router should be started successfully
@@ -176,7 +176,7 @@ describe("router.start() - error handling", () => {
 
         // Exception should NOT propagate
         expect(() => {
-          router.start("/home");
+          void router.start("/home");
         }).not.toThrowError();
 
         // Router should be started successfully
@@ -204,7 +204,7 @@ describe("router.start() - error handling", () => {
 
         // Exception should NOT propagate when route not found
         expect(() => {
-          router.start("/nonexistent/path");
+          void router.start("/nonexistent/path");
         }).not.toThrowError();
 
         // Router should NOT be started (route not found)
@@ -232,7 +232,7 @@ describe("router.start() - error handling", () => {
         // TypeScript prevents this at compile time, but runtime catches it
         expect(() => {
           // @ts-expect-error - testing invalid callback type
-          router.start("/home", "not a function");
+          void router.start("/home", "not a function");
         }).not.toThrowError();
 
         // Router should be started (callback error doesn't break router)
@@ -249,7 +249,7 @@ describe("router.start() - error handling", () => {
 
         expect(() => {
           // @ts-expect-error - testing invalid callback type
-          router.start("/home", { callback: true });
+          void router.start("/home", { callback: true });
         }).not.toThrowError();
 
         expect(router.isActive()).toBe(true);
@@ -263,7 +263,7 @@ describe("router.start() - error handling", () => {
 
         expect(() => {
           // @ts-expect-error - testing invalid callback type
-          router.start("/home", 123);
+          void router.start("/home", 123);
         }).not.toThrowError();
 
         expect(router.isActive()).toBe(true);
@@ -276,7 +276,7 @@ describe("router.start() - error handling", () => {
         // undefined should be replaced with noop
         expect(() => {
           // @ts-expect-error - testing invalid callback type
-          router.start("/home", undefined);
+          void router.start("/home", undefined);
         }).not.toThrowError();
 
         expect(router.isActive()).toBe(true);
@@ -286,7 +286,7 @@ describe("router.start() - error handling", () => {
         // null is falsy, so noop is used
         expect(() => {
           // @ts-expect-error - testing invalid callback type
-          router.start("/home", null);
+          void router.start("/home", null);
         }).not.toThrowError();
 
         expect(router.isActive()).toBe(true);
@@ -300,11 +300,11 @@ describe("router.start() - error handling", () => {
         const callback3 = vi.fn();
 
         // First call should succeed
-        router.start("/home");
+        void router.start("/home");
 
         // Subsequent calls should fail with ROUTER_ALREADY_STARTED
-        router.start("/users");
-        router.start("/orders");
+        void router.start("/users");
+        void router.start("/orders");
 
         expect(callback1).toHaveBeenCalledTimes(1);
         expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
@@ -331,9 +331,9 @@ describe("router.start() - error handling", () => {
         });
 
         // Attempt multiple starts
-        router.start("/home");
-        router.start("/users");
-        router.start("/orders");
+        void router.start("/home");
+        void router.start("/users");
+        void router.start("/orders");
 
         // ROUTER_START should only be emitted once
         expect(startListeners).toHaveLength(1);
@@ -348,7 +348,7 @@ describe("router.start() - error handling", () => {
         const callback2 = vi.fn();
 
         // First start
-        router.start("/home");
+        void router.start("/home");
 
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
@@ -360,7 +360,7 @@ describe("router.start() - error handling", () => {
         expect(router.getState()).toBeUndefined();
 
         // Second start should work
-        router.start("/users");
+        void router.start("/users");
 
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users");
@@ -375,7 +375,7 @@ describe("router.start() - error handling", () => {
         const routes = ["home", "users", "orders", "sign-in", "settings"];
 
         for (let i = 0; i < cycles; i++) {
-          router.start(`/${routes[i]}`);
+          void router.start(`/${routes[i]}`);
 
           expect(router.isActive()).toBe(true);
 
@@ -401,14 +401,14 @@ describe("router.start() - error handling", () => {
         const callback2 = vi.fn();
 
         // Start first transition (will be pending in middleware)
-        router.start("/home");
+        void router.start("/home");
 
         // At this point: isActive()=true, isStarted()=false
         expect(router.isActive()).toBe(true);
         expect(callback1).not.toHaveBeenCalled();
 
         // Try second start() - should fail immediately with ROUTER_ALREADY_STARTED
-        router.start("/users");
+        void router.start("/users");
 
         expect(callback2).toHaveBeenCalledTimes(1);
         expect(callback2).toHaveBeenCalledWith(
@@ -439,7 +439,7 @@ describe("router.start() - error handling", () => {
         const callback1 = vi.fn();
 
         // First start fails in middleware
-        router.start("/home");
+        void router.start("/home");
 
         // Wait for async failure
         await vi.waitFor(() => {
@@ -459,7 +459,7 @@ describe("router.start() - error handling", () => {
         const callback2 = vi.fn();
 
         // Second start should now work
-        router.start("/users");
+        void router.start("/users");
 
         expect(callback2).toHaveBeenCalledWith(undefined, expect.any(Object));
         expect(router.isActive()).toBe(true);
@@ -480,7 +480,7 @@ describe("router.start() - error handling", () => {
           return toState.name !== "users.list"; // Block users.list
         });
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         // Error should be reported to callback
       });
@@ -498,7 +498,7 @@ describe("router.start() - error handling", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       });
@@ -516,7 +516,7 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         // Should NOT have transitioned to defaultRoute (no fallback)
         expect(transitionSuccessListener).not.toHaveBeenCalled();
@@ -538,7 +538,7 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
@@ -554,7 +554,7 @@ describe("router.start() - error handling", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         // Issue #50: Router is NOT started if transition fails
         // Two-phase start ensures isStarted() only returns true after successful transition

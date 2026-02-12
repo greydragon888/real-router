@@ -9,7 +9,7 @@ let router: Router;
 describe("core/routes/routePath/buildPath", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -207,7 +207,7 @@ describe("core/routes/routePath/buildPath", () => {
     it("should apply trailingSlash option correctly", () => {
       router.stop();
       router = createTestRouter({ trailingSlash: "always" });
-      router.start("/home");
+      void router.start("/home");
 
       const path = router.buildPath("home");
 
@@ -215,7 +215,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       router.stop();
       router = createTestRouter({ trailingSlash: "never" });
-      router.start("/home");
+      void router.start("/home");
     });
   });
 
@@ -263,7 +263,10 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("constraint violation", () => {
       it("should throw when param violates constraint", () => {
-        router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
+        router.addRoute({
+          name: "user",
+          path: String.raw`/user/:id<\d+>`,
+        });
 
         expect(() => router.buildPath("user", { id: "abc" })).toThrowError(
           /does not match constraint/,
@@ -271,7 +274,10 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should pass when param matches constraint", () => {
-        router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
+        router.addRoute({
+          name: "user",
+          path: String.raw`/user/:id<\d+>`,
+        });
 
         const path = router.buildPath("user", { id: "123" });
 
@@ -595,14 +601,14 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should reject emoji route names", () => {
-          expect(() =>
-            router.addRoute({ name: "🚀", path: "/launch" }),
+          expect(
+            () => void router.addRoute({ name: "🚀", path: "/launch" }),
           ).toThrowError(/Invalid route name/);
         });
 
         it("should reject route names with unicode characters", () => {
-          expect(() =>
-            router.addRoute({ name: "café", path: "/cafe" }),
+          expect(
+            () => void router.addRoute({ name: "café", path: "/cafe" }),
           ).toThrowError(/Invalid route name/);
         });
 
@@ -707,7 +713,10 @@ describe("core/routes/routePath/buildPath", () => {
           nullProtoParams.userId = "1";
           nullProtoParams.postId = "2";
 
-          router.addRoute({ name: "post", path: "/user/:userId/post/:postId" });
+          router.addRoute({
+            name: "post",
+            path: "/user/:userId/post/:postId",
+          });
 
           const path = router.buildPath("post", nullProtoParams);
 

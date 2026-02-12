@@ -9,7 +9,7 @@ let router: Router;
 describe("core/routes/routePath/matchPath", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

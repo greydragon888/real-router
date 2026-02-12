@@ -12,7 +12,7 @@ describe("router.navigate() - same states", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

@@ -12,7 +12,7 @@ describe("router.navigate() - promise reject", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -282,7 +282,7 @@ describe("router.navigate() - promise reject", () => {
         router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         rejectingGuard.mockClear();
 
@@ -308,7 +308,7 @@ describe("router.navigate() - promise reject", () => {
 
         router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
         rejectingGuard.mockClear();
 
         let err: any;
@@ -330,7 +330,7 @@ describe("router.navigate() - promise reject", () => {
 
         router.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
         rejectingGuard.mockClear();
 
         let err: any;

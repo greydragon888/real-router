@@ -47,9 +47,7 @@ export const executeLifecycleHooks = async (
 
       // Optimization: Early return for undefined newState (most common case ~90%+)
       // This avoids isState() call and subsequent checks
-      if (!newState) {
-        // Fast path: skip all checks
-      } else if (newState !== currentState && isState(newState)) {
+      if (newState !== currentState && isState(newState)) {
         // Guards cannot redirect to a different route
         if (newState.name !== currentState.name) {
           throw new RouterError(errorCode, {
@@ -80,7 +78,11 @@ export const executeLifecycleHooks = async (
       }
     } catch (error: unknown) {
       if (error instanceof RouterError) {
-        throw makeError(errorCode, error);
+        const err = makeError(errorCode, error);
+
+        if (err) {
+          throw err;
+        }
       }
 
       throw new RouterError(errorCode, wrapSyncError(error, segment));

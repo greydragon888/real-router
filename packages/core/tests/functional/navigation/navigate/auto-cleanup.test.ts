@@ -33,7 +33,7 @@ describe("router.navigate() - auto cleanup", () => {
         },
       );
 
-      router.start();
+      void router.start();
     });
 
     afterEach(() => {

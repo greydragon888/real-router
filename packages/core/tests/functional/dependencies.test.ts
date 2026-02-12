@@ -19,7 +19,7 @@ describe("core/dependencies (integration)", () => {
   beforeEach(() => {
     // Router now has built-in dependency management via DependenciesNamespace
     router = createRouter<{ foo?: number; bar?: string }>([], {}, { foo: 1 });
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

@@ -12,7 +12,7 @@ let router: Router;
 describe("core/routes/clearRoutes", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -274,7 +274,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify plugin is still active
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      void router.navigate("test");
 
       // Plugin should have been called (proving it's still registered)
       expect(pluginCalls).toContain("start");
@@ -294,7 +294,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify middleware is still active
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      void router.navigate("test");
 
       // Middleware should have been called (proving it's still registered)
       expect(middlewareCalls).toContain("mw");
@@ -334,7 +334,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Add a route and navigate to verify listener is preserved
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      void router.navigate("test");
 
       // Listener should fire after navigation
       expect(eventLog).toContain("success");
@@ -344,7 +344,7 @@ describe("core/routes/clearRoutes", () => {
   describe("state after clearRoutes - edge cases", () => {
     it("should clear state to undefined after clearRoutes", () => {
       // Navigate to a route first
-      router.navigate("home");
+      void router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -359,7 +359,7 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should have consistent state - both state and matchPath are undefined", () => {
-      router.navigate("users.list");
+      void router.navigate("users.list");
 
       const currentState = router.getState();
 
@@ -386,14 +386,14 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should transition to new route after clearRoutes + addRoute", () => {
-      router.navigate("home");
+      void router.navigate("home");
 
       router.clearRoutes();
       router.addRoute({ name: "dashboard", path: "/dashboard" });
 
       // Navigate to new route - this works because addRoute registered the route
       // Note: navigate returns synchronously when state update is immediate
-      router.navigate("dashboard");
+      void router.navigate("dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
     });
@@ -403,7 +403,7 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
       router.addRoute({ name: "newRoute", path: "/new" });
 
-      router.navigate("newRoute");
+      void router.navigate("newRoute");
 
       // Navigation should work - state is updated
       expect(router.getState()?.name).toBe("newRoute");
@@ -505,7 +505,7 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation
-      router.navigate("slowRoute");
+      void router.navigate("slowRoute");
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -582,7 +582,7 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation on router1
-      router.navigate("asyncRoute");
+      void router.navigate("asyncRoute");
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -630,7 +630,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work on stopped router", () => {
       // Navigate to a route first
-      router.navigate("home");
+      void router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -653,7 +653,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work correctly with stop-start-stop cycle", () => {
       // First cycle
-      router.navigate("home");
+      void router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -668,7 +668,7 @@ describe("core/routes/clearRoutes", () => {
       // since the old defaultRoute ("home") no longer exists and setOption is removed
       router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.start();
+      void router.start();
 
       expect(router.getState()?.name).toBe("dashboard");
 

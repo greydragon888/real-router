@@ -24,7 +24,7 @@ describe("router.start() - lifecycle events", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        router.start();
+        void router.start();
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe("router.start() - lifecycle events", () => {
           transitionSuccessListener,
         );
 
-        router.start();
+        void router.start();
 
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionStartListener).toHaveBeenCalledTimes(1);
@@ -80,7 +80,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/nonexistent/path");
+        void router.start("/nonexistent/path");
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -203,7 +203,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -225,7 +225,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/view/123");
+        void router.start("/users/view/123");
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -285,7 +285,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/nonexistent/path");
+        void router.start("/nonexistent/path");
 
         const args = transitionErrorListener.mock.calls[0];
 
@@ -338,7 +338,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         const args = transitionErrorListener.mock.calls[0];
 
@@ -371,7 +371,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/nonexistent/path");
+        void router.start("/nonexistent/path");
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -417,7 +417,7 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/list");
+        void router.start("/users/list");
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);

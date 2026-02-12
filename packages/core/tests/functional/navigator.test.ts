@@ -10,7 +10,7 @@ let router: Router;
 describe("core/getNavigator", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -53,11 +53,11 @@ describe("core/getNavigator", () => {
 
     const state = await navigator.navigate("users", {});
 
-    expect(state).toEqual(expect.objectContaining({ name: "users" }));
+    expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
   });
 
   it("getState works", () => {
-    router.navigate("users.view", { id: "123" });
+    void router.navigate("users.view", { id: "123" });
     const navigator = getNavigator(router);
     const state = navigator.getState();
 
@@ -66,7 +66,7 @@ describe("core/getNavigator", () => {
   });
 
   it("isActiveRoute works", () => {
-    router.navigate("users.view", { id: "123" });
+    void router.navigate("users.view", { id: "123" });
     const navigator = getNavigator(router);
 
     expect(navigator.isActiveRoute("users.view", { id: "123" })).toBe(true);

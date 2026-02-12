@@ -398,7 +398,7 @@ export class RoutesNamespace<
    * @param updates.decodeParams - Params decoder function (null to clear)
    * @param updates.encodeParams - Params encoder function (null to clear)
    */
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- simple config updates
+
   updateRouteConfig(
     name: string,
     updates: {

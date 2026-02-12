@@ -12,7 +12,7 @@ describe("router.navigate() - route not found", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

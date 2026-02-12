@@ -26,7 +26,7 @@ async function withDefault(
 describe("navigateToDefault", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -760,7 +760,7 @@ describe("navigateToDefault", () => {
 
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault(invalidArg);
+        void router.navigateToDefault(invalidArg);
       }).toThrowError(TypeError);
     });
   });
@@ -1320,44 +1320,44 @@ describe("navigateToDefault", () => {
     it("should throw TypeError for invalid options type (string)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault("invalid");
+        void router.navigateToDefault("invalid");
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault("invalid");
+        void router.navigateToDefault("invalid");
       }).toThrowError(/Invalid options/);
     });
 
     it("should throw TypeError for invalid options type (number)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault(123);
+        void router.navigateToDefault(123);
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid option field types", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault({ replace: "true" });
+        void router.navigateToDefault({ replace: "true" });
       }).toThrowError(TypeError);
     });
 
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        router.navigateToDefault({ replace: true, reload: false });
+        void router.navigateToDefault({ replace: true, reload: false });
       }).not.toThrowError();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        router.navigateToDefault({});
+        void router.navigateToDefault({});
       }).not.toThrowError();
     });
 
     it("should include method name in error message", () => {
       const action = () => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault({ reload: "yes" });
+        void router.navigateToDefault({ reload: "yes" });
       };
 
       expect(action).toThrowError(TypeError);
@@ -1367,11 +1367,11 @@ describe("navigateToDefault", () => {
     it("should throw TypeError for invalid callback type", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault({}, "not-a-function");
+        void router.navigateToDefault({}, "not-a-function");
       }).toThrowError(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
-        router.navigateToDefault({}, 123);
+        void router.navigateToDefault({}, 123);
       }).toThrowError(/Invalid callback/);
     });
   });

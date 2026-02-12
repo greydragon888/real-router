@@ -12,7 +12,7 @@ describe("router.navigate() - events transition start", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -345,7 +345,7 @@ describe("router.navigate() - events transition start", () => {
       }
 
       unsubStart();
-      router.start(); // Restore for other tests
+      void router.start(); // Restore for other tests
     });
   });
 });

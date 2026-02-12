@@ -33,7 +33,7 @@ describe("transition/executeLifecycleHooks", () => {
       );
 
       expect(result).toBeDefined();
-      expect(result).toEqual(toState);
+      expect(result).toStrictEqual(toState);
 
       loggerSpy.mockRestore();
     });

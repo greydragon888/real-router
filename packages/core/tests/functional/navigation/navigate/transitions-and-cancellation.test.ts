@@ -14,7 +14,7 @@ describe("router.navigate() - transitions and cancellation", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

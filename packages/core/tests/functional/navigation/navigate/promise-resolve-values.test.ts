@@ -12,7 +12,7 @@ describe("router.navigate() - promise resolve values", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -151,7 +151,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         deactivateGuard.mockClear();
 
@@ -170,7 +170,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => guard1);
         router.addDeactivateGuard("orders.pending", () => guard2);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         guard1.mockClear();
         guard2.mockClear();
@@ -284,7 +284,7 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         redirectingDeactivateGuard.mockClear();
 
@@ -313,7 +313,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => normalGuard);
         router.addDeactivateGuard("orders.pending", () => redirectingGuard);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         redirectingGuard.mockClear();
         normalGuard.mockClear();
@@ -470,7 +470,7 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         promiseDeactivateGuard.mockClear();
 
@@ -489,7 +489,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => promiseGuard1);
         router.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         promiseGuard1.mockClear();
         promiseGuard2.mockClear();
@@ -600,7 +600,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders.pending", () => promiseRedirectGuard);
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         promiseRedirectGuard.mockClear();
 
@@ -630,7 +630,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => normalPromiseGuard);
         router.addDeactivateGuard("orders.pending", () => promiseRedirectGuard);
 
-        router.navigate("orders.pending");
+        void router.navigate("orders.pending");
 
         promiseRedirectGuard.mockClear();
         normalPromiseGuard.mockClear();

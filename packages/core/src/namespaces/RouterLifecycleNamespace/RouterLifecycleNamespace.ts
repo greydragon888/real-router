@@ -191,11 +191,7 @@ export class RouterLifecycleNamespace {
           startOptions,
           false, // emitSuccess = false - we will emit below
         );
-      } else if (
-        options.defaultRoute &&
-        !startPath &&
-        resolvedPath !== undefined
-      ) {
+      } else if (options.defaultRoute && !startPath) {
         // IMPORTANT: Check !startPath (original argument), NOT !resolvedPath
         // This distinguishes between:
         //   - User called start() without path → use defaultRoute (this branch)
@@ -207,10 +203,7 @@ export class RouterLifecycleNamespace {
           deps.getDependency,
         );
 
-        const defaultRoute = deps.buildState(
-          resolvedPath,
-          defaultParams as any,
-        );
+        const defaultRoute = deps.buildState(resolvedPath, defaultParams);
 
         if (!defaultRoute) {
           const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {

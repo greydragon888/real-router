@@ -268,10 +268,10 @@ describe("core/dependencies/setDependencies", () => {
 
     router.setDependencies({
       foo: 42,
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
       bar: isDev ? "dev-logger" : undefined,
       // @ts-expect-error: testing conditional setup
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
       baz: hasCache ? "cache-service" : undefined,
     });
 

@@ -878,7 +878,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      router.start("/users/list");
+      void router.start("/users/list");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -923,7 +923,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      router.start("/unknown/path");
+      void router.start("/unknown/path");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 

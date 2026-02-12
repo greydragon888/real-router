@@ -245,7 +245,7 @@ describe("core/limits (integration via public API)", () => {
 
       // Start router - this triggers ROUTER_START event with maxEventDepth=0
       expect(() => {
-        router.start();
+        void router.start();
       }).not.toThrowError();
 
       // Verify event was actually received (confirms event path was executed)

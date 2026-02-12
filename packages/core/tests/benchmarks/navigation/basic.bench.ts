@@ -33,13 +33,13 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
+      void router.start();
 
       let i = 0;
 
       bench("navigate: simple route", () => {
         do_not_optimize(
-          router.navigate(SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length]),
+          void router.navigate(SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length]),
         );
       }).gc("inner");
     }
@@ -48,13 +48,13 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
+      void router.start();
 
       let i = 0;
 
       bench("navigate: with params", () => {
         do_not_optimize(
-          router.navigate("user", { id: USER_IDS[i++ % USER_IDS.length] }),
+          void router.navigate("user", { id: USER_IDS[i++ % USER_IDS.length] }),
         );
       }).gc("inner");
     }
@@ -70,7 +70,7 @@ boxplot(() => {
         defaultParams: { tab: "overview" },
       });
 
-      router.start();
+      void router.start();
 
       bench("navigate: to default route", () => {
         do_not_optimize(router.navigateToDefault());
@@ -93,7 +93,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      router.start();
+      void router.start();
 
       const queries = ["test", "search", "find", "lookup"];
       const categories = ["books", "movies", "music"];
@@ -101,7 +101,7 @@ boxplot(() => {
 
       bench("navigate: with query params", () => {
         do_not_optimize(
-          router.navigate("search", {
+          void router.navigate("search", {
             q: queries[i % queries.length],
             category: categories[i % categories.length],
             page: String(i++ % 10),
@@ -120,7 +120,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      router.start();
+      void router.start();
 
       const slugs = ["test-item", "another-item", "third-item"];
       const categories = ["tech", "science", "art"];
@@ -129,7 +129,7 @@ boxplot(() => {
 
       bench("navigate: with multiple params", () => {
         do_not_optimize(
-          router.navigate("complex", {
+          void router.navigate("complex", {
             id: String(100 + (i % 50)),
             slug: slugs[i % slugs.length],
             category: categories[i % categories.length],
@@ -156,7 +156,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      router.start();
+      void router.start();
 
       // Pre-create multiple param sets to alternate
       const paramSets: Record<string, string>[] = [];
@@ -175,7 +175,7 @@ boxplot(() => {
 
       bench("navigate: 100 query params", () => {
         do_not_optimize(
-          router.navigate("many", paramSets[i++ % paramSets.length]),
+          void router.navigate("many", paramSets[i++ % paramSets.length]),
         );
       }).gc("inner");
     }
@@ -192,7 +192,7 @@ boxplot(() => {
     {
       const router = createNestedRouter(5);
 
-      router.start();
+      void router.start();
 
       // Alternate between different depth levels
       const nestedRoutes = [
@@ -205,7 +205,7 @@ boxplot(() => {
 
       bench("navigate: nested 5 levels", () => {
         do_not_optimize(
-          router.navigate(nestedRoutes[i++ % nestedRoutes.length]),
+          void router.navigate(nestedRoutes[i++ % nestedRoutes.length]),
         );
       }).gc("inner");
     }
@@ -214,7 +214,7 @@ boxplot(() => {
     {
       const router = createNestedRouter(10);
 
-      router.start();
+      void router.start();
 
       // Alternate between different depth levels
       const nestedRoutes = [
@@ -227,7 +227,7 @@ boxplot(() => {
 
       bench("navigate: nested 10 levels", () => {
         do_not_optimize(
-          router.navigate(nestedRoutes[i++ % nestedRoutes.length]),
+          void router.navigate(nestedRoutes[i++ % nestedRoutes.length]),
         );
       }).gc("inner");
     }
@@ -244,7 +244,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
+      void router.start();
 
       let i = 0;
 
@@ -264,7 +264,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
+      void router.start();
 
       let i = 0;
 

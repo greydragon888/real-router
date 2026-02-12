@@ -58,8 +58,8 @@ describe("core/noValidate option", () => {
     describe("route management", () => {
       it("should skip validation in addRoute", () => {
         // Empty name would fail validation with noValidate: false
-        expect(() =>
-          router.addRoute({ name: "a", path: "/test-new" }),
+        expect(
+          () => void router.addRoute({ name: "a", path: "/test-new" }),
         ).not.toThrowError();
       });
 
@@ -82,8 +82,8 @@ describe("core/noValidate option", () => {
         router.addRoute({ name: "test", path: "/test" });
 
         // Empty forwardTo would fail validation with noValidate: false
-        expect(() =>
-          router.updateRoute("test", { forwardTo: "" }),
+        expect(
+          () => void router.updateRoute("test", { forwardTo: "" }),
         ).not.toThrowError();
       });
     });
@@ -167,7 +167,7 @@ describe("core/noValidate option", () => {
       });
 
       it("should skip validation in canNavigateTo", () => {
-        router.start();
+        void router.start();
 
         // Invalid type would throw TypeError with noValidate: false
         expect(() => router.canNavigateTo(123 as any)).not.toThrowError();
@@ -245,20 +245,20 @@ describe("core/noValidate option", () => {
     // Navigation
     describe("navigation", () => {
       it("should skip validation in navigate", () => {
-        router.start();
+        void router.start();
 
         // Empty route name would throw with noValidate: false
         expect(() => router.navigate("")).not.toThrowError();
       });
 
       it("should skip validation in navigateToDefault", () => {
-        router.start();
+        void router.start();
 
         expect(() => router.navigateToDefault()).not.toThrowError();
       });
 
       it("should skip validation in navigateToState", async () => {
-        router.start();
+        void router.start();
 
         const state = router.makeState("home", {}, "/home");
 

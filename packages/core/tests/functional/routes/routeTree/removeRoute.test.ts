@@ -11,7 +11,7 @@ let router: Router;
 describe("core/routes/removeRoute", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -137,8 +137,8 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Child doesn't exist - should not throw
-      expect(() =>
-        router.removeRoute("wrapper.nonexistent"),
+      expect(
+        () => void router.removeRoute("wrapper.nonexistent"),
       ).not.toThrowError();
 
       // Parent and existing child should remain
@@ -588,7 +588,7 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.navigate("dashboard");
+      void router.navigate("dashboard");
 
       // Verify we're on the route
       expect(router.getState()?.name).toBe("dashboard");
@@ -617,7 +617,7 @@ describe("core/routes/removeRoute", () => {
         path: "/parent-route",
         children: [{ name: "childRoute", path: "/child" }],
       });
-      router.navigate("parentRoute.childRoute");
+      void router.navigate("parentRoute.childRoute");
 
       // Verify we're on the child route
       expect(router.getState()?.name).toBe("parentRoute.childRoute");
@@ -643,7 +643,7 @@ describe("core/routes/removeRoute", () => {
     it("should allow removal of inactive route when another route is active", () => {
       router.addRoute({ name: "active", path: "/active" });
       router.addRoute({ name: "inactive", path: "/inactive" });
-      router.navigate("active");
+      void router.navigate("active");
 
       // Should work - removing inactive route
       router.removeRoute("inactive");
@@ -662,7 +662,7 @@ describe("core/routes/removeRoute", () => {
           { name: "pageB", path: "/b" },
         ],
       });
-      router.navigate("sectionTest.pageA");
+      void router.navigate("sectionTest.pageA");
 
       // Should work - removing sibling
       router.removeRoute("sectionTest.pageB");
@@ -703,7 +703,7 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "blocked", path: "/blocked" });
-      router.navigate("blocked");
+      void router.navigate("blocked");
 
       const result = router.removeRoute("blocked");
 
@@ -759,7 +759,10 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should allow navigation to source route after target removal", async () => {
-        router.addRoute({ name: "forwardTarget", path: "/forward-target" });
+        router.addRoute({
+          name: "forwardTarget",
+          path: "/forward-target",
+        });
         router.addRoute({
           name: "forwardSource",
           path: "/forward-source",
@@ -1277,8 +1280,8 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should throw TypeError for undefined name", () => {
-      expect(() =>
-        router.removeRoute(undefined as unknown as string),
+      expect(
+        () => void router.removeRoute(undefined as unknown as string),
       ).toThrowError(TypeError);
     });
 
@@ -1313,8 +1316,8 @@ describe("core/routes/removeRoute", () => {
       );
 
       // typeof Proxy === "object", so it should be rejected BEFORE any coercion
-      expect(() =>
-        router.removeRoute(maliciousProxy as unknown as string),
+      expect(
+        () => void router.removeRoute(maliciousProxy as unknown as string),
       ).toThrowError(TypeError);
 
       // Original route should remain untouched
@@ -1327,8 +1330,8 @@ describe("core/routes/removeRoute", () => {
       const stringWrapper = new String("home");
 
       // typeof stringWrapper === "object", not "string"
-      expect(() =>
-        router.removeRoute(stringWrapper as unknown as string),
+      expect(
+        () => void router.removeRoute(stringWrapper as unknown as string),
       ).toThrowError(TypeError);
 
       // Original route should remain untouched

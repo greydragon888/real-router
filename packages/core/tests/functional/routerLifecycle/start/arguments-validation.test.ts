@@ -31,7 +31,7 @@ describe("router.start() - arguments validation", () => {
           transitionSuccessListener,
         );
 
-        router.start();
+        void router.start();
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -50,7 +50,7 @@ describe("router.start() - arguments validation", () => {
           defaultParams: { id: "123" },
         });
 
-        router.start();
+        void router.start();
 
         expect(router.isActive()).toBe(true);
 
@@ -68,7 +68,7 @@ describe("router.start() - arguments validation", () => {
         router.stop();
         router = createTestRouter({ defaultRoute: "home" });
 
-        router.start();
+        void router.start();
 
         expect(router.isActive()).toBe(true);
 
@@ -96,266 +96,282 @@ describe("router.start() - arguments validation", () => {
         expect(router.isActive()).toBe(false);
       });
     });
+  });
 
-    describe("call with path string", () => {
-      it("should handle start with path when defaultRoute is present", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
+  describe("call with path string", () => {
+    it("should handle start with valid path", async () => {
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
 
-        await router.start("/home");
+      await router.start("/users/list");
 
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalledTimes(1);
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
-        const state = router.getState();
+      const currentState = router.getState();
 
-        expect(state).toBeDefined();
-        expect(state?.name).toBe("home");
-      });
-    });
-
-    describe("call with path string", () => {
-      it("should handle start with valid path", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        await router.start("/users/list");
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const currentState = router.getState();
-
-        expect(currentState).toBeDefined();
-        expect(currentState?.name).toBe("users.list");
-        expect(currentState?.path).toBe("/users/list");
-      });
-
-      it("should not handle start with invalid path when defaultRoute is present", async () => {
-        router = createTestRouter({ allowNotFound: false });
-
-        const startListener = vi.fn();
-        const transitionErrorListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await router.start("/invalid/path");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
-
-        expect(router.isActive()).toBe(false);
-        expect(startListener).not.toHaveBeenCalled();
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-        expect(router.getState()).toBeUndefined();
-      });
-
-      it("should handle start with invalid path when allowNotFound is true", async () => {
-        router = createTestRouter({ allowNotFound: true });
-
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        await router.start("/invalid/path");
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalled();
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const currentState = router.getState();
-
-        expect(currentState).toBeDefined();
-        expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
-        expect(currentState?.params.path).toBe("/invalid/path");
-      });
-    });
-
-    describe("call with path string", () => {
-      it("should handle start with valid path", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        await router.start("/users/list");
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const state = router.getState();
-
-        expect(state).toBeDefined();
-        expect(state?.name).toBe("users.list");
-        expect(state?.path).toBe("/users/list");
-      });
-
-      it("should not handle start with invalid path when defaultRoute is present", async () => {
-        router = createTestRouter({ allowNotFound: false });
-
-        const startListener = vi.fn();
-        const transitionErrorListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await router.start("/invalid/path");
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
-
-        expect(router.isActive()).toBe(false);
-        expect(startListener).not.toHaveBeenCalled();
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-        expect(router.getState()).toBeUndefined();
-      });
-
-      it("should not handle start with invalid path when allowNotFound is true", async () => {
-        router = createTestRouter({ allowNotFound: true });
-
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        await router.start("/invalid/path");
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalled();
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const state = router.getState();
-
-        expect(state).toBeDefined();
-        expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
-        expect(state?.params.path).toBe("/invalid/path");
-      });
-    });
-
-    describe("call with invalid number of arguments", () => {
-      it("should throw error when called with more than 2 arguments", () => {
-        expect(() => {
-          // @ts-expect-error - testing invalid argument count
-          router.start("path", {}, {}, noop);
-        }).toThrowError("Invalid number of arguments");
-      });
-
-      it("should throw error when called with 3 arguments", () => {
-        expect(() => {
-          // @ts-expect-error - testing invalid argument count
-          router.start("path", noop, "extra");
-        }).toThrowError("Invalid number of arguments");
-      });
+      expect(currentState).toBeDefined();
+      expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(currentState?.params.path).toBe("/invalid/path");
     });
   });
 
-  describe("router state check", () => {
-    describe("repeated start of already started router", () => {
-      it("should return error when starting already started router", async () => {
+  describe("call with path string", () => {
+    it("should handle start with valid path", async () => {
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
+
+      await router.start("/home");
+
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalledTimes(1);
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+
+      const state = router.getState();
+
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("home");
+    });
+  });
+
+  describe("call with path string", () => {
+    it("should handle start with valid path", async () => {
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
+
+      await router.start("/users/list");
+
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalledTimes(1);
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+
+      const currentState = router.getState();
+
+      expect(currentState).toBeDefined();
+      expect(currentState?.name).toBe("users.list");
+      expect(currentState?.path).toBe("/users/list");
+    });
+
+    it("should not handle start with invalid path when defaultRoute is present", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      const startListener = vi.fn();
+      const transitionErrorListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+
+      try {
+        await router.start("/invalid/path");
+
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
+
+      expect(router.isActive()).toBe(false);
+      expect(startListener).not.toHaveBeenCalled();
+      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+      expect(router.getState()).toBeUndefined();
+    });
+
+    it("should handle start with invalid path when allowNotFound is true", async () => {
+      router = createTestRouter({ allowNotFound: true });
+
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
+
+      await router.start("/invalid/path");
+
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalled();
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+
+      const currentState = router.getState();
+
+      expect(currentState).toBeDefined();
+      expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(currentState?.params.path).toBe("/invalid/path");
+    });
+  });
+
+  describe("call with path string", () => {
+    it("should handle start with valid path", async () => {
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
+
+      await router.start("/users/list");
+
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalledTimes(1);
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+
+      const state = router.getState();
+
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("users.list");
+      expect(state?.path).toBe("/users/list");
+    });
+
+    it("should not handle start with invalid path when defaultRoute is present", async () => {
+      router = createTestRouter({ allowNotFound: false });
+
+      const startListener = vi.fn();
+      const transitionErrorListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+
+      try {
+        await router.start("/invalid/path");
+
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
+
+      expect(router.isActive()).toBe(false);
+      expect(startListener).not.toHaveBeenCalled();
+      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+      expect(router.getState()).toBeUndefined();
+    });
+
+    it("should not handle start with invalid path when allowNotFound is true", async () => {
+      router = createTestRouter({ allowNotFound: true });
+
+      const startListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
+
+      await router.start("/invalid/path");
+
+      expect(router.isActive()).toBe(true);
+      expect(startListener).toHaveBeenCalled();
+      expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
+
+      const state = router.getState();
+
+      expect(state).toBeDefined();
+      expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(state?.params.path).toBe("/invalid/path");
+    });
+  });
+
+  describe("call with invalid number of arguments", () => {
+    it("should throw error when called with more than 2 arguments", () => {
+      expect(() => {
+        // @ts-expect-error - testing invalid argument count
+        void router.start("path", {}, {}, noop);
+      }).toThrowError("Invalid number of arguments");
+    });
+
+    it("should throw error when called with 3 arguments", () => {
+      expect(() => {
+        // @ts-expect-error - testing invalid argument count
+        void router.start("path", noop, "extra");
+      }).toThrowError("Invalid number of arguments");
+    });
+  });
+});
+
+describe("router state check", () => {
+  describe("repeated start of already started router", () => {
+    it("should return error when starting already started router", async () => {
+      await router.start();
+
+      const startListener = vi.fn();
+
+      router.addEventListener(events.ROUTER_START, startListener);
+
+      try {
         await router.start();
 
-        const startListener = vi.fn();
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+      }
 
-        router.addEventListener(events.ROUTER_START, startListener);
+      expect(router.isActive()).toBe(true);
+      expect(startListener).not.toHaveBeenCalled();
+    });
 
-        try {
-          await router.start();
+    it("should not execute start logic when router is already started", async () => {
+      await router.start();
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-        }
+      const transitionStartListener = vi.fn();
+      const transitionSuccessListener = vi.fn();
 
-        expect(router.isActive()).toBe(true);
-        expect(startListener).not.toHaveBeenCalled();
-      });
+      router.addEventListener(events.TRANSITION_START, transitionStartListener);
+      router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        transitionSuccessListener,
+      );
 
-      it("should not execute start logic when router is already started", async () => {
-        await router.start();
-
-        const transitionStartListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(
-          events.TRANSITION_START,
-          transitionStartListener,
-        );
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        try {
-          await router.start("/users/list");
-        } catch {
-          // Expected to throw
-        }
-
-        expect(transitionStartListener).not.toHaveBeenCalled();
-        expect(transitionSuccessListener).not.toHaveBeenCalled();
-      });
-
-      it("should maintain current state when attempting to restart", async () => {
+      try {
         await router.start("/users/list");
-        const initialState = router.getState();
+      } catch {
+        // Expected to throw
+      }
 
-        try {
-          await router.start("/orders/pending");
+      expect(transitionStartListener).not.toHaveBeenCalled();
+      expect(transitionSuccessListener).not.toHaveBeenCalled();
+    });
 
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
-        }
+    it("should maintain current state when attempting to restart", async () => {
+      await router.start("/users/list");
+      const initialState = router.getState();
 
-        const currentState = router.getState();
+      try {
+        await router.start("/orders/pending");
 
-        expect(omitMeta(currentState)).toStrictEqual(omitMeta(initialState));
-        expect(currentState?.name).toBe("users.list");
-      });
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+      }
+
+      const currentState = router.getState();
+
+      expect(omitMeta(currentState)).toStrictEqual(omitMeta(initialState));
+      expect(currentState?.name).toBe("users.list");
     });
   });
 });

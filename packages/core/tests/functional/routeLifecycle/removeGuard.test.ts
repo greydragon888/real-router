@@ -15,8 +15,8 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should remove activate guard and allow navigation", () => {
     router.addActivateGuard("admin", () => () => false);
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
 
@@ -27,8 +27,8 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should remove deactivate guard and allow navigation", () => {
     router.addDeactivateGuard("users", () => () => false);
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
 
@@ -39,7 +39,7 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should allow navigation after removing activate guard", async () => {
     router.addActivateGuard("admin", () => () => false);
-    router.start();
+    void router.start();
     await router.navigate("home");
 
     router.removeActivateGuard("admin");
@@ -51,7 +51,7 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should allow navigation after removing deactivate guard", async () => {
     router.addDeactivateGuard("users", () => () => false);
-    router.start();
+    void router.start();
     await router.navigate("users");
 
     router.removeDeactivateGuard("users");
@@ -62,7 +62,7 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should not throw when removing non-existent activate guard", () => {
-    router.start();
+    void router.start();
 
     expect(() => {
       router.removeActivateGuard("nonexistent");
@@ -70,7 +70,7 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should not throw when removing non-existent deactivate guard", () => {
-    router.start();
+    void router.start();
 
     expect(() => {
       router.removeDeactivateGuard("nonexistent");
@@ -82,8 +82,8 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.removeActivateGuard("admin");
     router.addActivateGuard("admin", () => () => true);
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
@@ -94,7 +94,7 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.addActivateGuard("admin", () => () => true);
 
-    router.start();
+    void router.start();
     const state = await router.navigate("admin");
 
     expect(state.name).toBe("admin");
@@ -104,8 +104,8 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin", () => () => false);
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
 
@@ -120,8 +120,8 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.removeActivateGuard("admin");
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
     expect(router.canNavigateTo("users")).toBe(false);
@@ -135,8 +135,8 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.removeActivateGuard("admin.settings");
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(false);
     expect(router.canNavigateTo("admin.settings")).toBe(false);
@@ -150,8 +150,8 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.removeActivateGuard("admin");
 
-    router.start();
-    router.navigate("home");
+    void router.start();
+    void router.navigate("home");
 
     expect(router.canNavigateTo("admin")).toBe(true);
     expect(router.canNavigateTo("admin.settings")).toBe(false);
@@ -164,8 +164,8 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.removeActivateGuard("admin");
     router.removeDeactivateGuard("users");
 
-    router.start();
-    router.navigate("users");
+    void router.start();
+    void router.navigate("users");
 
     expect(router.canNavigateTo("admin")).toBe(true);
     expect(router.canNavigateTo("home")).toBe(true);
@@ -182,7 +182,7 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should handle removing guards after router stops", () => {
     router.addActivateGuard("admin", () => () => false);
-    router.start();
+    void router.start();
     router.stop();
 
     expect(() => {

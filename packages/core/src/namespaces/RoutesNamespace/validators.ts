@@ -160,7 +160,7 @@ export function validateUpdateRouteBasicArgs<
  * Validates updateRoute property types using pre-cached values.
  * Called AFTER properties are cached to ensure getters are called only once.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- validation logic is naturally verbose
+
 export function validateUpdateRoutePropertyTypes(
   forwardTo: unknown,
   defaultParams: unknown,

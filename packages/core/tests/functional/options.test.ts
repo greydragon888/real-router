@@ -117,7 +117,7 @@ describe("core/options", () => {
 
     // 🟡 IMPORTANT: Works after start()
     it("should work after router.start()", () => {
-      router.start();
+      void router.start();
 
       const opts = router.getOptions();
 
@@ -728,7 +728,6 @@ describe("core/options", () => {
       }).toThrowError(ReferenceError);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf for compile-time assertions
     it("should be type-safe", () => {
       const trailingSlash = router.getOption("trailingSlash");
 
@@ -748,7 +747,7 @@ describe("core/options", () => {
 
       const state = await customRouter.navigateToDefault();
 
-      expect(state).toEqual(expect.objectContaining({ name: "home" }));
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
@@ -763,7 +762,7 @@ describe("core/options", () => {
 
       const state = await customRouter.navigateToDefault();
 
-      expect(state).toEqual(
+      expect(state).toStrictEqual(
         expect.objectContaining({
           name: "users.view",
           params: { id: "42" },
@@ -793,7 +792,7 @@ describe("core/options", () => {
 
       const state = await customRouter.navigateToDefault();
 
-      expect(state).toEqual(expect.objectContaining({ name: "home" }));
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
@@ -809,7 +808,7 @@ describe("core/options", () => {
 
       const state = await customRouter.start();
 
-      expect(state).toEqual(expect.objectContaining({ name: "home" }));
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });

@@ -81,7 +81,7 @@ describe("router.clone()", () => {
     const clonedRouter = router.clone();
 
     // Verify plugin is cloned by checking it responds to events on cloned router
-    clonedRouter.start();
+    void clonedRouter.start();
 
     expect(tracker.getCalls().onStart).toBe(1);
 
@@ -194,8 +194,8 @@ describe("router.clone()", () => {
     clonedRouter.usePlugin(tracker.factory);
 
     // Start both routers
-    router.start();
-    clonedRouter.start();
+    void router.start();
+    void clonedRouter.start();
 
     // Plugin should only respond on cloned router (2 starts: router + clonedRouter)
     // But we added plugin only to clonedRouter, so only 1 start
@@ -245,7 +245,7 @@ describe("router.clone()", () => {
   it("should not share state with original router", async () => {
     const router = createTestRouter();
 
-    router.start("/");
+    void router.start("/");
     const clonedRouter = router.clone();
 
     expect(router.isActive()).toBe(true);
@@ -261,7 +261,7 @@ describe("router.clone()", () => {
 
     const clonedRouter = router.clone();
 
-    clonedRouter.start("/");
+    void clonedRouter.start("/");
 
     // Original router's listener should not be called
     expect(listener).not.toHaveBeenCalled();
@@ -428,7 +428,7 @@ describe("router.clone()", () => {
       // Clone should work without errors
       expect(clonedRouter).toBeDefined();
 
-      clonedRouter.start("/");
+      void clonedRouter.start("/");
       clonedRouter.stop();
     });
 
@@ -550,7 +550,7 @@ describe("router.clone()", () => {
 
       const clonedRouter = router.clone();
 
-      clonedRouter.start("/");
+      void clonedRouter.start("/");
 
       // Verify order is preserved (both onStart should be called in order)
       expect(orderTracker).toContain("p1-start");

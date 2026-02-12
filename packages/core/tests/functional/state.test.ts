@@ -16,7 +16,7 @@ let router: Router;
 describe("core/state", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -31,7 +31,7 @@ describe("core/state", () => {
     });
 
     it("returns state after navigation", () => {
-      router.navigate("users.view", { id: "123" });
+      void router.navigate("users.view", { id: "123" });
 
       const state = router.getState();
 
@@ -46,7 +46,7 @@ describe("core/state", () => {
     });
 
     it("returns previous state after navigation", () => {
-      router.navigate("sign-in");
+      void router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -55,8 +55,8 @@ describe("core/state", () => {
     });
 
     it("updates previous state on subsequent navigations", () => {
-      router.navigate("sign-in");
-      router.navigate("users");
+      void router.navigate("sign-in");
+      void router.navigate("users");
 
       const previousState = router.getPreviousState();
 
@@ -64,8 +64,8 @@ describe("core/state", () => {
     });
 
     it("preserves previous state params", () => {
-      router.navigate("users.view", { id: "123" });
-      router.navigate("home");
+      void router.navigate("users.view", { id: "123" });
+      void router.navigate("home");
 
       const previousState = router.getPreviousState();
 
@@ -74,7 +74,7 @@ describe("core/state", () => {
     });
 
     it("returns frozen state (immutable)", () => {
-      router.navigate("sign-in");
+      void router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -504,7 +504,9 @@ describe("core/state", () => {
         },
         { name: "dstNoDefaults", path: "/dst-no-defaults" },
       ]);
-      router.updateRoute("srcWithDefaults", { forwardTo: "dstNoDefaults" });
+      router.updateRoute("srcWithDefaults", {
+        forwardTo: "dstNoDefaults",
+      });
 
       const state = router.forwardState("srcWithDefaults", { c: 3 });
 
@@ -522,7 +524,9 @@ describe("core/state", () => {
           defaultParams: { b: 2 },
         },
       ]);
-      router.updateRoute("srcNoDefaults", { forwardTo: "dstWithDefaults" });
+      router.updateRoute("srcNoDefaults", {
+        forwardTo: "dstWithDefaults",
+      });
 
       const state = router.forwardState("srcNoDefaults", { c: 3 });
 
@@ -705,7 +709,7 @@ describe("core/stateBuilder", () => {
       const freshRouter = createTestRouter({ allowNotFound: true });
 
       // Start at an unknown path - this triggers makeNotFoundState internally
-      freshRouter.start("/completely/unknown/path");
+      void freshRouter.start("/completely/unknown/path");
 
       const state = freshRouter.getState();
 
@@ -733,7 +737,7 @@ describe("core/stateBuilder", () => {
         { user: { isAdmin: true } },
       );
 
-      testRouter.start("");
+      void testRouter.start("");
 
       const result = testRouter.forwardState("dash", {});
 
@@ -758,7 +762,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      testRouter.start("");
+      void testRouter.start("");
 
       const result = testRouter.forwardState("item", { type: "book" });
 
@@ -777,7 +781,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      testRouter.start("");
+      void testRouter.start("");
 
       expect(() => testRouter.forwardState("cycle-a", {})).toThrowError(
         /Circular forwardTo/,
@@ -916,7 +920,7 @@ describe("core/stateBuilder", () => {
         { name: "rewrite-target", path: "/rewrite-target" },
       ]);
 
-      testRouter.start("");
+      void testRouter.start("");
 
       const state = testRouter.matchPath("/rewrite-fn");
 

@@ -189,7 +189,7 @@ describe("router.start() - edge cases", () => {
       // Note: Empty string "" is falsy in JS, so !first is true
       // in getStartRouterArguments, and the callback is replaced with noop
       // This is arguably a bug but current behavior - use explicit path instead
-      router.start("");
+      void router.start("");
 
       expect(router.isActive()).toBe(true);
       // Empty string triggers fallback to defaultRoute

@@ -23,7 +23,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     // Set up canActivate guard to block admin route
     router.addActivateGuard("admin", false);
 
-    router.navigate("home");
+    void router.navigate("home");
 
     try {
       await router.navigate("admin");
@@ -564,7 +564,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       router.addActivateGuard("admin", false);
 
       // Navigate away first to test re-entering
-      router.navigate("home");
+      void router.navigate("home");
 
       // New guard blocks navigation
       try {

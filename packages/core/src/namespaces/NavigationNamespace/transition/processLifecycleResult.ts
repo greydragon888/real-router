@@ -31,7 +31,7 @@ export const processLifecycleResult = async (
     return result;
   }
 
-  if (isPromise<State | boolean | void>(result)) {
+  if (isPromise<State | boolean | undefined>(result)) {
     // Optimization: single try/catch instead of .then(onFulfill, onReject)
     try {
       const resVal = await result;

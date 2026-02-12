@@ -49,7 +49,7 @@ describe("core/observable", () => {
         const cb = vi.fn();
 
         router.addEventListener(events.TRANSITION_START, cb);
-        router.navigate("users");
+        void router.navigate("users");
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -105,10 +105,10 @@ describe("core/observable", () => {
         router.addEventListener(events.TRANSITION_CANCEL, cb);
 
         // First navigation - will be delayed
-        router.navigate("users");
+        void router.navigate("users");
 
         // Second navigation - cancels the first
-        router.navigate("orders");
+        void router.navigate("orders");
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -267,7 +267,7 @@ describe("core/observable", () => {
         const unsubscribe = router.subscribe(spy);
 
         unsubscribe();
-        router.navigate("users");
+        void router.navigate("users");
 
         expect(spy).not.toHaveBeenCalled();
       });
@@ -278,7 +278,7 @@ describe("core/observable", () => {
         const unsub1 = router.subscribe(spy1);
         const unsub2 = router.subscribe(spy2);
 
-        router.navigate("users");
+        void router.navigate("users");
 
         expect(spy1).toHaveBeenCalled();
         expect(spy2).toHaveBeenCalled();

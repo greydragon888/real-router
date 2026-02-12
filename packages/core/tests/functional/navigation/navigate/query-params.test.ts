@@ -10,7 +10,7 @@ describe("router.navigate() - query params", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -20,7 +20,7 @@ describe("router.navigate() - query params", () => {
   });
 
   it("should append query parameters to path", () => {
-    router.navigate("users.view", { id: 123, q: "search", page: "2" });
+    void router.navigate("users.view", { id: 123, q: "search", page: "2" });
 
     expect(omitMeta(router.getState())).toMatchObject({
       name: "users.view",
@@ -40,7 +40,7 @@ describe("router.navigate() - query params", () => {
   });
 
   it("should handle empty query params correctly", () => {
-    router.navigate("users.view", { id: 42 });
+    void router.navigate("users.view", { id: 42 });
 
     expect(router.getState()?.path).toBe("/users/view/42");
   });

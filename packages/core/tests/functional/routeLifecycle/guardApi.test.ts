@@ -150,14 +150,14 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should check deactivation guards on current route", () => {
-      router.navigate("admin");
+      void router.navigate("admin");
       router.addDeactivateGuard("admin", false);
 
       expect(router.canNavigateTo("home")).toBe(false);
     });
 
     it("should not modify router state", () => {
-      router.navigate("home");
+      void router.navigate("home");
       const stateBefore = router.getState();
 
       router.canNavigateTo("admin");
@@ -166,7 +166,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should handle forwarded routes", () => {
-      router.navigate("admin");
+      void router.navigate("admin");
       router.addRoute({ name: "old", path: "/old", forwardTo: "home" });
       router.addActivateGuard("home", false);
 

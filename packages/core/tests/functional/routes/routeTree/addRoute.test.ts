@@ -18,7 +18,7 @@ let router: Router;
 describe("core/routes/addRoute", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -50,7 +50,7 @@ describe("core/routes/addRoute", () => {
     router.addRoute([{ name: "new-route", path: "/new" }]);
 
     // navigate works correctly
-    router.navigate("new-route");
+    void router.navigate("new-route");
 
     expect(router.getState()?.name).toBe("new-route");
   });
@@ -59,7 +59,7 @@ describe("core/routes/addRoute", () => {
     router.addRoute([{ name: "check-route", path: "/check" }]);
 
     // Navigate to the route first
-    router.navigate("check-route");
+    void router.navigate("check-route");
 
     // isActiveRoute works correctly
     expect(router.isActiveRoute("check-route")).toBe(true);
@@ -296,7 +296,10 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should reject batch on path conflict (pre-validation atomicity)", () => {
-    router.addRoute({ name: "path-conflict-existing", path: "/path-conflict" });
+    router.addRoute({
+      name: "path-conflict-existing",
+      path: "/path-conflict",
+    });
 
     expect(() => {
       router.addRoute([
@@ -503,7 +506,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate to inner to trigger both guards
-      router.navigate("wrapper.inner");
+      void router.navigate("wrapper.inner");
 
       expect(parentGuardCalled).toBe(true);
       expect(childGuardCalled).toBe(true);
@@ -546,7 +549,10 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should allow dot-notation when parent exists", () => {
-      router.addRoute({ name: "existing-parent", path: "/existing-parent" });
+      router.addRoute({
+        name: "existing-parent",
+        path: "/existing-parent",
+      });
 
       // Should not throw
       expect(() => {
@@ -1049,7 +1055,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
 
       // Route should be registered
-      router.start("");
+      void router.start("");
 
       expect(router.matchPath("/after-stop")?.name).toBe("after-stop");
     });
@@ -1210,8 +1216,16 @@ describe("core/routes/addRoute", () => {
 
     it("should handle forwardTo chain added in multiple batches", () => {
       router.addRoute({ name: "final", path: "/final" });
-      router.addRoute({ name: "middle", path: "/middle", forwardTo: "final" });
-      router.addRoute({ name: "start", path: "/start", forwardTo: "middle" });
+      router.addRoute({
+        name: "middle",
+        path: "/middle",
+        forwardTo: "final",
+      });
+      router.addRoute({
+        name: "start",
+        path: "/start",
+        forwardTo: "middle",
+      });
 
       // Chain resolves correctly: start → middle → final
       expect(router.forwardState("start", {}).name).toBe("final");
@@ -1611,7 +1625,7 @@ describe("core/routes/addRoute", () => {
 
     it("should reject async forwardTo callback (transpiled async with __awaiter)", () => {
       // Simulate transpiled async function with __awaiter in toString()
-      // eslint-disable-next-line @typescript-eslint/no-implied-eval
+
       const transpiledAsync = new Function(
         "return function() { return __awaiter(this, void 0, void 0, function*() { return 'target'; }); }",
       )();

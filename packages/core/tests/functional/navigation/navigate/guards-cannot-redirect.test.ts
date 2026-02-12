@@ -12,7 +12,7 @@ describe("router.navigate() - guards cannot redirect", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {
@@ -135,11 +135,11 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index");
+        void router.navigate("index");
 
         const callback = vi.fn();
 
-        router.navigate("profile", {}, {}).then(callback).catch(callback);
+        void router.navigate("profile", {}, {}).then(callback).catch(callback);
 
         await vi.runAllTimersAsync();
 
@@ -167,11 +167,11 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index");
+        void router.navigate("index");
 
         const callback = vi.fn();
 
-        router.navigate("profile", {}, {}).then(callback).catch(callback);
+        void router.navigate("profile", {}, {}).then(callback).catch(callback);
 
         await vi.runAllTimersAsync();
 

@@ -12,7 +12,7 @@ describe("router.navigate() - middleware blocking", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

@@ -12,7 +12,7 @@ describe("router.navigate() - error context", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

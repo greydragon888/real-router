@@ -10,7 +10,7 @@ let router: Router;
 describe("core/routes", () => {
   beforeEach(() => {
     router = createTestRouter();
-    router.start();
+    void router.start();
   });
 
   afterEach(() => {

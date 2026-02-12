@@ -32,9 +32,7 @@ export const executeMiddleware = async (
 
       // Optimization: Early return for undefined newState (most common case ~90%+)
       // This avoids isState() call and subsequent checks
-      if (!newState) {
-        // Fast path: skip all checks
-      } else if (newState !== currentState && isState(newState)) {
+      if (newState !== currentState && isState(newState)) {
         const hasChanged =
           newState.name !== currentState.name ||
           newState.params !== currentState.params ||
@@ -52,7 +50,11 @@ export const executeMiddleware = async (
       }
     } catch (error: unknown) {
       if (error instanceof RouterError) {
-        throw makeError(errorCodes.TRANSITION_ERR, error);
+        const err = makeError(errorCodes.TRANSITION_ERR, error);
+
+        if (err) {
+          throw err;
+        }
       }
 
       throw new RouterError(errorCodes.TRANSITION_ERR, wrapSyncError(error));

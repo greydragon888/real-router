@@ -23,9 +23,9 @@ describe("core/utils", () => {
     });
 
     it("should tell if a route is active or not", () => {
-      router.start();
+      void router.start();
 
-      router.navigate("users.view", { id: 1 });
+      void router.navigate("users.view", { id: 1 });
 
       expect(router.isActiveRoute("users.view", { id: 1 })).toStrictEqual(true);
       expect(router.isActiveRoute("users.view", { id: 2 })).toStrictEqual(
@@ -36,7 +36,7 @@ describe("core/utils", () => {
       expect(router.isActiveRoute("users")).toStrictEqual(true);
       expect(router.isActiveRoute("users", {}, true)).toStrictEqual(false);
 
-      router.navigate("section.query", { section: "section1" });
+      void router.navigate("section.query", { section: "section1" });
 
       expect(
         router.isActiveRoute("section", { section: "section1" }),
@@ -149,7 +149,7 @@ describe("core/utils", () => {
     });
 
     it("should match paths", () => {
-      router.start("");
+      void router.start("");
 
       expect(
         router.buildPath("query", { param1: true, param2: false }),
@@ -168,7 +168,7 @@ describe("core/utils", () => {
     });
 
     it("should match on start", () => {
-      router.start("/query?param1=true&param2=false");
+      void router.start("/query?param1=true&param2=false");
 
       expect(router.getState()?.params).toStrictEqual({
         param1: true,

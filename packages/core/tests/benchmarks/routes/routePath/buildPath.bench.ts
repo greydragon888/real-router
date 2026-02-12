@@ -370,7 +370,7 @@ boxplot(() => {
     // Router started - buildOptions cached after first call
     const routerWarm = createTestRouter(CORE_ROUTES);
 
-    routerWarm.start("/");
+    void routerWarm.start("/");
 
     bench("buildPath: cold (not started)", () => {
       routerCold.buildPath(ROUTE_USERS_VIEW, { id: PARAM_ID_123 });
@@ -459,11 +459,11 @@ boxplot(() => {
 
     const routerStatic = createTestRouter(DEEP_STATIC_ROUTES);
 
-    routerStatic.start("/app");
+    void routerStatic.start("/app");
 
     const routerDynamic = createTestRouter(DEEP_DYNAMIC_ROUTES);
 
-    routerDynamic.start("/org/1");
+    void routerDynamic.start("/org/1");
 
     // Single call comparison
     bench("deep static (5 levels, no params) - FAST PATH", () => {
@@ -535,14 +535,14 @@ boxplot(() => {
     // Fast path router: default options
     const router = createTestRouter(STATIC_5_LEVEL);
 
-    router.start("/a");
+    void router.start("/a");
 
     // Regular path router: trailingSlash=always forces full build
     const routerWithOptions = createTestRouter(STATIC_5_LEVEL, {
       trailingSlash: "always",
     });
 
-    routerWithOptions.start("/a");
+    void routerWithOptions.start("/a");
 
     bench("static 5-level: fast path (default options)", () => {
       router.buildPath("a.b.c.d.e");
@@ -557,13 +557,13 @@ boxplot(() => {
 
     const routerShallow = createTestRouter(STATIC_1_LEVEL);
 
-    routerShallow.start("/home");
+    void routerShallow.start("/home");
 
     const routerShallowWithOptions = createTestRouter(STATIC_1_LEVEL, {
       trailingSlash: "always",
     });
 
-    routerShallowWithOptions.start("/home");
+    void routerShallowWithOptions.start("/home");
 
     bench("static 1-level: fast path", () => {
       routerShallow.buildPath(ROUTE_HOME);

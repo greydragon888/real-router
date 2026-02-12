@@ -55,7 +55,7 @@ function createTestRouter(routes: Route[]): Router {
     defaultRoute: routes[0]?.name ?? "home",
   });
 
-  router.start();
+  void router.start();
 
   return router;
 }
@@ -129,7 +129,7 @@ boxplot(() => {
     const router = createTestRouter(CORE_ROUTES);
 
     // Navigate to users.view
-    router.navigate(ROUTE_USERS_VIEW, { id: "123" });
+    void router.navigate(ROUTE_USERS_VIEW, { id: "123" });
 
     bench("isActiveRoute: exact match (same route)", () => {
       router.isActiveRoute(ROUTE_USERS_VIEW, { id: "123" });
@@ -161,7 +161,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(CORE_ROUTES);
 
-    router.navigate("home");
+    void router.navigate("home");
 
     bench("isActiveRoute: no params", () => {
       router.isActiveRoute("home", PARAMS.none);
@@ -189,7 +189,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(QUERY_ROUTES);
 
-    router.navigate("products.list", {
+    void router.navigate("products.list", {
       category: "electronics",
       page: "1",
       sort: "price",
@@ -236,7 +236,7 @@ boxplot(() => {
     const router = createTestRouter(DEEP_ROUTES);
 
     // Navigate to deep route (10 levels)
-    router.navigate(generateDeepRoute(10).name);
+    void router.navigate(generateDeepRoute(10).name);
 
     bench("isActiveRoute: shallow (1 level)", () => {
       router.isActiveRoute("segment0");
@@ -261,7 +261,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(CORE_ROUTES);
 
-    router.navigate(ROUTE_USERS_VIEW, { id: "123" });
+    void router.navigate(ROUTE_USERS_VIEW, { id: "123" });
 
     bench("isActiveRoute: nav bar (5 items)", () => {
       router.isActiveRoute("home");
@@ -285,7 +285,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(DEEP_ROUTES);
 
-    router.navigate("users.list");
+    void router.navigate("users.list");
 
     bench("isActiveRoute: sidebar (20 unrelated links)", () => {
       for (let i = 0; i < 20; i++) {
@@ -307,7 +307,7 @@ boxplot(() => {
     const router = createTestRouter(DEEP_ROUTES);
 
     // Navigate to deep route
-    router.navigate(generateDeepRoute(10).name);
+    void router.navigate(generateDeepRoute(10).name);
 
     bench("isActiveRoute: breadcrumb (check all 10 ancestors)", () => {
       for (let i = 1; i <= 10; i++) {
@@ -322,7 +322,7 @@ boxplot(() => {
   summary(() => {
     const router = createTestRouter(CORE_ROUTES);
 
-    router.navigate(ROUTE_USERS_VIEW, { id: "123" });
+    void router.navigate(ROUTE_USERS_VIEW, { id: "123" });
 
     bench("isActiveRoute: tabs - strict equality (5 tabs)", () => {
       router.isActiveRoute("users.list", {}, true);

@@ -26,12 +26,12 @@ describe("SSR race conditions", () => {
       const routerA = baseRouter.clone();
       const routerB = baseRouter.clone();
 
-      routerA.start();
-      routerB.start();
+      void routerA.start();
+      void routerB.start();
 
       // Navigate on separate instances (synchronous navigation)
-      routerA.navigate("products", { id: "123" });
-      routerB.navigate("users", { id: "456" });
+      void routerA.navigate("products", { id: "123" });
+      void routerB.navigate("users", { id: "456" });
 
       // States are isolated - each router has its own state
       expect(routerA.getState()?.name).toBe("products");
@@ -100,12 +100,12 @@ describe("SSR race conditions", () => {
         return true;
       });
 
-      clone1.start();
-      clone2.start();
+      void clone1.start();
+      void clone2.start();
 
       // Navigate both (synchronous)
-      clone1.navigate("admin");
-      clone2.navigate("admin");
+      void clone1.navigate("admin");
+      void clone2.navigate("admin");
 
       // Each clone called its own guard
       expect(guardCallsClone1).toStrictEqual(["clone1-admin"]);
@@ -133,7 +133,7 @@ describe("SSR race conditions", () => {
       });
 
       router = createRouter(routes, defaultOptions);
-      router.start();
+      void router.start();
     });
 
     afterEach(() => {
@@ -146,7 +146,7 @@ describe("SSR race conditions", () => {
       // Add async guard to make navigation async
       router.addActivateGuard("admin", () => async () => {
         // Start another navigation while this one is in progress
-        router.navigate("public");
+        void router.navigate("public");
         // Allow time for warning to be logged
         await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -155,7 +155,7 @@ describe("SSR race conditions", () => {
 
       // Start navigation (will be async due to guard)
       await new Promise<void>((resolve) => {
-        router.navigate("admin", {}).then(() => {
+        void router.navigate("admin", {}).then(() => {
           // This callback is called when admin navigation is cancelled
           // or when it completes
           resolve();
@@ -176,11 +176,11 @@ describe("SSR race conditions", () => {
 
     it("should not warn for sequential navigations", () => {
       // First navigation (sync)
-      router.navigate("admin");
+      void router.navigate("admin");
       logCallback.mockClear();
 
       // Second navigation (sync, after first completed)
-      router.navigate("public");
+      void router.navigate("public");
 
       // No concurrent navigation warning
       const allCalls = logCallback.mock.calls as Parameters<LogCallback>[];
@@ -199,7 +199,7 @@ describe("SSR race conditions", () => {
     it("should handle navigation cancellation correctly", async () => {
       const router = createRouter(routes, defaultOptions);
 
-      router.start();
+      void router.start();
 
       let secondNavCompleted = false;
 
@@ -211,10 +211,10 @@ describe("SSR race conditions", () => {
       });
 
       // Start async navigation (first navigation will be cancelled)
-      router.navigate("admin");
+      void router.navigate("admin");
 
       // Immediately start second navigation (will cancel first)
-      router.navigate("public", {}).then(() => {
+      void router.navigate("public", {}).then(() => {
         secondNavCompleted = true;
       });
 
@@ -232,8 +232,8 @@ describe("SSR race conditions", () => {
       const baseRouter = createRouter(routes, defaultOptions);
       const clone = baseRouter.clone();
 
-      clone.start();
-      clone.navigate("admin");
+      void clone.start();
+      void clone.navigate("admin");
 
       expect(clone.getState()?.name).toBe("admin");
 

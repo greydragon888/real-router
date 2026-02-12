@@ -101,7 +101,7 @@ describe("core/middleware", () => {
 
   beforeEach(() => {
     router = createTestRouter();
-    router.start("");
+    void router.start("");
   });
 
   afterEach(() => {
@@ -155,7 +155,7 @@ describe("core/middleware", () => {
       spyOnFunctions(mware);
       router.stop();
       router.useMiddleware(() => mware.transition);
-      router.start("");
+      void router.start("");
 
       await router.navigate("users");
 
@@ -178,9 +178,9 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => redirectMiddleware(targetState));
 
-      router.start("");
+      void router.start("");
 
-      router.navigate("index");
+      void router.navigate("index");
 
       expect(router.getState()?.name).toBe(targetState.name);
       expect(router.getState()?.path).toBe(targetState.path);
@@ -212,7 +212,7 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => errMware.transitionErr);
 
-      router.start("");
+      void router.start("");
 
       await router.navigate("users");
     });
@@ -228,9 +228,9 @@ describe("core/middleware", () => {
         () => middlewareMock2,
       );
 
-      router.start("");
+      void router.start("");
 
-      router.navigate("users");
+      void router.navigate("users");
 
       expect(middlewareMock1).toHaveBeenCalled();
       expect(middlewareMock2).toHaveBeenCalled();
@@ -243,7 +243,7 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => asyncMware);
 
-      router.start();
+      void router.start();
 
       await router.navigate("users");
 
@@ -259,7 +259,7 @@ describe("core/middleware", () => {
         () => m2Middleware,
       );
 
-      router.start();
+      void router.start();
 
       await router.navigate("users");
 
@@ -276,7 +276,7 @@ describe("core/middleware", () => {
         () => m3SyncMiddleware,
       );
 
-      router.start();
+      void router.start();
 
       await router.navigate("users");
 
