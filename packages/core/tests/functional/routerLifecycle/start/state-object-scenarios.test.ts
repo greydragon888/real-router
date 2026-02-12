@@ -131,83 +131,52 @@ describe("router.start() - state object scenarios", () => {
       });
     });
 
-    describe("invalid state object initialization attempt", () => {
+    describe("invalid path initialization attempt", () => {
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
-      it("should return ROUTE_NOT_FOUND error for non-existent route name", () => {
+      it("should return ROUTE_NOT_FOUND error for non-existent route path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        const invalidState = {
-          name: "nonexistent.route",
-          params: {},
-          path: "/nonexistent",
-        };
-        const callback = vi.fn();
+        try {
+          await router.start("/nonexistent");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          // Router should not be started
+          expect(router.isActive()).toBe(false);
 
-        router.start(invalidState, callback);
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
-        // Router should not be started
-        expect(router.isActive()).toBe(false);
-
-        // Callback should be called with ROUTE_NOT_FOUND error
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        expect(state).toBeUndefined();
-
-        // Router state should remain undefined
-        expect(router.getState()).toBeUndefined();
+          // Router state should remain undefined
+          expect(router.getState()).toBeUndefined();
+        }
       });
 
       // Fix for issue #42: now returns ROUTE_NOT_FOUND error instead of throwing
-      it("should return ROUTE_NOT_FOUND error for completely invalid route name", () => {
+      it("should return ROUTE_NOT_FOUND error for completely invalid route path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        const invalidState = {
-          name: "totally.invalid.route",
-          params: {},
-          path: "/invalid",
-        };
+        try {
+          await router.start("/invalid");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(router.isActive()).toBe(false);
 
-        const callback = vi.fn();
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
-        router.start(invalidState, callback);
-
-        expect(router.isActive()).toBe(false);
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        expect(state).toBeUndefined();
-
-        expect(router.getState()).toBeUndefined();
+          expect(router.getState()).toBeUndefined();
+        }
       });
 
-      it("should handle empty route name in state object", () => {
+      it("should handle empty path string", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        const invalidState = {
-          name: "", // Empty route name
-          params: {},
-          path: "/empty",
-        };
-        const callback = vi.fn();
+        // Empty path should fallback to defaultRoute or fail
+        await router.start("");
 
-        router.start(invalidState, callback);
-
-        expect(router.isActive()).toBe(false);
-        expect(callback).toHaveBeenCalled();
-
-        const [error] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
-        expect(router.getState()).toBeUndefined();
+        // With defaultRoute="home", empty path navigates to home
+        expect(router.isActive()).toBe(true);
+        expect(router.getState()?.name).toBe("home");
       });
 
       it("should handle missing route name in state object", () => {
