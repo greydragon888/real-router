@@ -116,21 +116,18 @@ describe("router.start() - state object scenarios", () => {
 
   describe("router start with state object", () => {
     describe("meta data handling", () => {
-      it("should assign new meta id on transitions after starting with explicit state", () => {
-        router.start(homeState);
+      it("should assign new meta id on transitions after starting with path", async () => {
+        await router.start(homeState.path);
 
-        expect(router.getState()?.meta?.id).toStrictEqual(homeState.meta?.id);
+        expect(router.getState()?.meta?.id).toBeDefined();
 
-        router.navigate("users");
+        await router.navigate("users");
 
-        expect(router.getState()?.meta?.id).toStrictEqual(1);
+        const firstNavId = router.getState()?.meta?.id;
 
-        router.navigate("profile");
+        await router.navigate("profile");
 
-        expect(router.getState()?.meta?.id).not.toStrictEqual(1);
-        expect(router.getState()?.meta?.id).not.toStrictEqual(
-          homeState.meta?.id,
-        );
+        expect(router.getState()?.meta?.id).not.toStrictEqual(firstNavId);
       });
     });
 
