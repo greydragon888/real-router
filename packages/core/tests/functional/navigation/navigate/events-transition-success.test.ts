@@ -350,8 +350,7 @@ describe("router.navigate() - events transition success", () => {
       }
 
       // TRANSITION_SUCCESS should not be emitted when router is not started
-        expect(onSuccess).not.toHaveBeenCalled();
-      });
+      expect(onSuccess).not.toHaveBeenCalled();
 
       unsubSuccess();
       router.start(); // Restore for other tests
