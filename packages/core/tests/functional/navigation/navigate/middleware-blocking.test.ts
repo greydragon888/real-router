@@ -281,14 +281,14 @@ describe("router.navigate() - middleware blocking", () => {
 
       router.addActivateGuard("users", () => blockingGuard);
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("users");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       expect(blockingGuard).toHaveBeenCalledTimes(1);
     });
 
@@ -296,18 +296,18 @@ describe("router.navigate() - middleware blocking", () => {
     it("should block transition when canDeactivate returns Promise.resolve(false)", async () => {
       const blockingGuard = vi.fn().mockResolvedValue(false);
 
-      router.navigate("users");
+      await router.navigate("users");
 
       router.addDeactivateGuard("users", () => blockingGuard);
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("profile", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("profile");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       expect(blockingGuard).toHaveBeenCalledTimes(1);
     });
 
@@ -317,14 +317,14 @@ describe("router.navigate() - middleware blocking", () => {
 
       router.useMiddleware(() => blockingMiddleware);
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("users");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.TRANSITION_ERR);
+      }
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_ERR);
       expect(blockingMiddleware).toHaveBeenCalledTimes(1);
     });
 
@@ -334,14 +334,13 @@ describe("router.navigate() - middleware blocking", () => {
 
       router.addActivateGuard("users", () => blockingGuard);
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users", (err, state) => {
-          resolve({ err, state });
-        });
-      });
-
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      try {
+        await router.navigate("users");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
   });
 });

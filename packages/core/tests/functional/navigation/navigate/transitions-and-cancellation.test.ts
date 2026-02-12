@@ -94,15 +94,13 @@ describe("router.navigate() - transitions and cancellation", () => {
         return true; // Guard returns true, but router is stopped
       });
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users", (err, state) => {
-          resolve({ err, state });
-        });
-      });
-
-      // Transition should fail because router is stopped
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      try {
+        await router.navigate("users");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      }
     });
   });
 

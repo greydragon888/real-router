@@ -35,7 +35,7 @@ describe("router.navigate() - navigation meta and options", () => {
     expect(router.getState()?.meta?.options).toStrictEqual(options);
   });
 
-  it("should merge states when canActivate guard returns modified state", () => {
+  it("should merge states when canActivate guard returns modified state", async () => {
     // Set up guard that returns new state
     router.addActivateGuard("profile", () => (toState, _fromState, cb) => {
       const modifiedState = {
@@ -52,57 +52,53 @@ describe("router.navigate() - navigation meta and options", () => {
     });
 
     // Navigate to profile
-    router.navigate("profile", {}, {}, (err, state) => {
-      expect(err).toBeUndefined();
+    const state = await router.navigate("profile", {}, {});
 
-      // mergeStates logic:
-      // 1. Default meta values (id: 1, options: {}, redirected: false, params: {})
-      // 2. fromState.meta (original navigation state)
-      // 3. toState.meta (guard's modified state) - overwrites
-      // 4. Special params merge: toState.params + fromState.params
+    // mergeStates logic:
+    // 1. Default meta values (id: 1, options: {}, redirected: false, params: {})
+    // 2. fromState.meta (original navigation state)
+    // 3. toState.meta (guard's modified state) - overwrites
+    // 4. Special params merge: toState.params + fromState.params
 
-      expect(state?.meta?.id).toBe(42); // Guard's id overwrites default
-      expect(state?.meta?.options.guardFlag).toBe(true); // Guard's options
-      expect(state?.meta?.redirected).toBe(true); // Guard's redirected
-      expect(state?.meta?.params.userId).toBe("guard123"); // From guard
-      expect(state?.meta?.params.source).toBe("canActivate"); // From guard
-    });
+    expect(state.meta?.id).toBe(42); // Guard's id overwrites default
+    expect(state.meta?.options.guardFlag).toBe(true); // Guard's options
+    expect(state.meta?.redirected).toBe(true); // Guard's redirected
+    expect(state.meta?.params.userId).toBe("guard123"); // From guard
+    expect(state.meta?.params.source).toBe("canActivate"); // From guard
   });
 
-  it("should merge params from both states when guard modifies state", () => {
+  it("should merge params from both states when guard modifies state", async () => {
     // First navigate to establish fromState with meta params
-    router.navigate("home", {}, { custom: "option" }, () => {
-      // Now set up guard for next navigation
-      router.addActivateGuard("settings", () => (toState, _fromState, cb) => {
-        const modifiedState = {
-          ...toState,
-          meta: {
-            ...toState.meta!,
-            params: {
-              guardAdded: "yes",
-              timestamp: 12_345,
-            },
+    await router.navigate("home", {}, { custom: "option" });
+
+    // Now set up guard for next navigation
+    router.addActivateGuard("settings", () => (toState, _fromState, cb) => {
+      const modifiedState = {
+        ...toState,
+        meta: {
+          ...toState.meta!,
+          params: {
+            guardAdded: "yes",
+            timestamp: 12_345,
           },
-        };
+        },
+      };
 
-        cb(undefined, modifiedState);
-      });
-
-      // Navigate to settings - this will trigger mergeStates
-      router.navigate("settings", {}, {}, (err, state) => {
-        expect(err).toBeUndefined();
-
-        // Check params merge: toState.params + fromState.params
-        expect(state?.meta?.params.guardAdded).toBe("yes"); // From guard (toState)
-        expect(state?.meta?.params.timestamp).toBe(12_345); // From guard (toState)
-
-        // fromState params should also be present if any existed
-        // Note: fromState.meta.params might be empty depending on navigation
-      });
+      cb(undefined, modifiedState);
     });
+
+    // Navigate to settings - this will trigger mergeStates
+    const state = await router.navigate("settings", {}, {});
+
+    // Check params merge: toState.params + fromState.params
+    expect(state.meta?.params.guardAdded).toBe("yes"); // From guard (toState)
+    expect(state.meta?.params.timestamp).toBe(12_345); // From guard (toState)
+
+    // fromState params should also be present if any existed
+    // Note: fromState.meta.params might be empty depending on navigation
   });
 
-  it("should handle state merge when canDeactivate modifies state", () => {
+  it("should handle state merge when canDeactivate modifies state", async () => {
     // Set up canDeactivate guard that modifies the transition state
     router.addDeactivateGuard("home", () => (toState, _fromState, cb) => {
       const modifiedState = {
@@ -124,17 +120,15 @@ describe("router.navigate() - navigation meta and options", () => {
       cb(undefined, modifiedState);
     });
 
-    router.navigate("settings", {}, {}, (err, state) => {
-      expect(err).toBeUndefined();
+    const state = await router.navigate("settings", {}, {});
 
-      // Check that canDeactivate modifications are present
-      expect(state?.meta?.params.exitedFrom).toBe("home");
-      expect(state?.meta?.params.exitTime).toBeDefined();
-      expect(state?.meta?.options.deactivated).toBe(true);
-    });
+    // Check that canDeactivate modifications are present
+    expect(state.meta?.params.exitedFrom).toBe("home");
+    expect(state.meta?.params.exitTime).toBeDefined();
+    expect(state.meta?.options.deactivated).toBe(true);
   });
 
-  it("should preserve original navigation options in final state", () => {
+  it("should preserve original navigation options in final state", async () => {
     // Set up guard that adds some meta but preserves options
     router.addActivateGuard("profile", () => (toState, _fromState, cb) => {
       const modifiedState = {
@@ -154,19 +148,17 @@ describe("router.navigate() - navigation meta and options", () => {
     // Navigate with specific options
     const navOptions = { reload: true, replace: true };
 
-    router.navigate("profile", {}, navOptions, (err, state) => {
-      expect(err).toBeUndefined();
+    const state = await router.navigate("profile", {}, navOptions);
 
-      // Original navigation options should be preserved
-      expect(state?.meta?.options.reload).toBe(true);
-      expect(state?.meta?.options.replace).toBe(true);
+    // Original navigation options should be preserved
+    expect(state.meta?.options.reload).toBe(true);
+    expect(state.meta?.options.replace).toBe(true);
 
-      // Guard's param should also be present
-      expect(state?.meta?.params.guardParam).toBe("added");
-    });
+    // Guard's param should also be present
+    expect(state.meta?.params.guardParam).toBe("added");
   });
 
-  it("should handle multiple guard modifications in transition chain", () => {
+  it("should handle multiple guard modifications in transition chain", async () => {
     let deactivateCallCount = 0;
     let activateCallCount = 0;
 
@@ -206,19 +198,17 @@ describe("router.navigate() - navigation meta and options", () => {
       cb(undefined, modifiedState);
     });
 
-    router.navigate("profile", {}, {}, (err, state) => {
-      expect(err).toBeUndefined();
+    const state = await router.navigate("profile", {}, {});
 
-      // Both guards should have been called
-      expect(deactivateCallCount).toBe(1);
-      expect(activateCallCount).toBe(1);
+    // Both guards should have been called
+    expect(deactivateCallCount).toBe(1);
+    expect(activateCallCount).toBe(1);
 
-      // Final state should contain modifications from both guards
-      expect(state?.meta?.params.leftAt).toBeDefined();
-      expect(state?.meta?.params.deactivateOrder).toBe(1);
-      expect(state?.meta?.params.activatedAt).toBeDefined();
-      expect(state?.meta?.params.activateOrder).toBe(1);
-    });
+    // Final state should contain modifications from both guards
+    expect(state.meta?.params.leftAt).toBeDefined();
+    expect(state.meta?.params.deactivateOrder).toBe(1);
+    expect(state.meta?.params.activatedAt).toBeDefined();
+    expect(state.meta?.params.activateOrder).toBe(1);
   });
 
   describe("Issue #54: state.meta.redirected behavior", () => {

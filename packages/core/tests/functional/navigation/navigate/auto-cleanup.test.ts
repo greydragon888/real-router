@@ -326,16 +326,14 @@ describe("router.navigate() - auto cleanup", () => {
           expect(hasCanDeactivate("profile")).toBe(true);
 
           // Navigate to orders (will redirect to profile)
-          router.navigate("orders", {}, {}, (err, state) => {
-            expect(err).toBeUndefined();
-            expect(state?.name).toBe("profile");
+          const state = await router.navigate("orders", {}, {});
+          expect(state.name).toBe("profile");
 
-            // users should be removed (was active, now not active in final state)
-            expect(hasCanDeactivate("users")).toBe(false);
+          // users should be removed (was active, now not active in final state)
+          expect(hasCanDeactivate("users")).toBe(false);
 
-            // profile should remain (it's the final active route)
-            expect(hasCanDeactivate("profile")).toBe(true);
-          });
+          // profile should remain (it's the final active route)
+          expect(hasCanDeactivate("profile")).toBe(true);
         });
       });
 

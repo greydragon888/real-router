@@ -37,7 +37,7 @@ describe("router.navigate() - unknown route", () => {
       router.start();
     });
 
-    it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", () => {
+    it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", async () => {
       const canDeactivateGuard = vi.fn().mockReturnValue(true);
       const canActivateGuard = vi.fn().mockReturnValue(true);
 
@@ -63,16 +63,14 @@ describe("router.navigate() - unknown route", () => {
       canDeactivateGuard.mockClear();
 
       // Navigate away from UNKNOWN_ROUTE
-      freshRouter.navigate("profile", (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("profile");
+      const state = await freshRouter.navigate("profile");
+      expect(state.name).toBe("profile");
 
-        // canDeactivate SHOULD be called when leaving UNKNOWN_ROUTE (new correct behavior)
-        expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
+      // canDeactivate SHOULD be called when leaving UNKNOWN_ROUTE (new correct behavior)
+      expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
 
-        // canActivate should be called for normal route
-        expect(canActivateGuard).toHaveBeenCalledTimes(1);
-      });
+      // canActivate should be called for normal route
+      expect(canActivateGuard).toHaveBeenCalledTimes(1);
     });
 
     it("should handle middleware when transitioning TO normal route after UNKNOWN_ROUTE", () => {

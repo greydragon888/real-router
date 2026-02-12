@@ -279,15 +279,13 @@ describe("router.start() - path string scenarios", () => {
       });
     });
 
-    it("should successfully transition to UNKNOWN_ROUTE when middleware succeeds", () => {
+    it("should successfully transition to UNKNOWN_ROUTE when middleware succeeds", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
 
-      router.start(invalidPath, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
-      });
+      const state = await router.start(invalidPath);
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
     });
   });
 

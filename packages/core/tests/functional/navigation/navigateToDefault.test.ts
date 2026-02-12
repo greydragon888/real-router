@@ -213,48 +213,40 @@ describe("navigateToDefault", () => {
   });
 
   describe("when defaultRoute is set", () => {
-    it("should navigate to defaultRoute with correct route name", () => {
+    it("should navigate to defaultRoute with correct route name", async () => {
       withDefault("users");
 
-      router.navigateToDefault({}, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("users");
-        expect(state?.path).toBe("/users");
-      });
+      const state = await router.navigateToDefault({});
+      expect(state.name).toBe("users");
+      expect(state.path).toBe("/users");
     });
 
-    it("should navigate to defaultRoute with defaultParams if set", () => {
+    it("should navigate to defaultRoute with defaultParams if set", async () => {
       const defaultParams = { id: 42, tab: "profile" };
 
       withDefault("users.view", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("users.view");
-        expect(state?.params).toStrictEqual(defaultParams);
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should navigate to nested defaultRoute correctly", () => {
+    it("should navigate to nested defaultRoute correctly", async () => {
       withDefault("orders.pending");
 
-      router.navigateToDefault({}, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("orders.pending");
-        expect(state?.path).toBe("/orders/pending");
-      });
+      const state = await router.navigateToDefault({});
+      expect(state.name).toBe("orders.pending");
+      expect(state.path).toBe("/orders/pending");
     });
 
-    it("should handle defaultRoute with complex path structure", () => {
+    it("should handle defaultRoute with complex path structure", async () => {
       const params = { section: "section123", id: 456 };
 
       withDefault("section.view", params);
 
-      router.navigateToDefault({}, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("section.view");
-        expect(state?.params).toStrictEqual(params);
-      });
+      const state = await router.navigateToDefault({});
+      expect(state.name).toBe("section.view");
+      expect(state.params).toStrictEqual(params);
     });
 
     it("should call callback with success when defaultRoute navigation succeeds", () => {
@@ -337,7 +329,7 @@ describe("navigateToDefault", () => {
       router.clearMiddleware();
     });
 
-    it("should respect navigation options when navigating to defaultRoute", () => {
+    it("should respect navigation options when navigating to defaultRoute", async () => {
       const onSuccess = vi.fn();
 
       withDefault("profile");
@@ -349,12 +341,10 @@ describe("navigateToDefault", () => {
 
       const options = { replace: true, source: "default" };
 
-      router.navigateToDefault(options, (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.meta?.options).toStrictEqual(
-          expect.objectContaining(options),
-        );
-      });
+      const state = await router.navigateToDefault(options);
+      expect(state.meta?.options).toStrictEqual(
+        expect.objectContaining(options),
+      );
 
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -422,19 +412,17 @@ describe("navigateToDefault", () => {
       unsubSuccess();
     });
 
-    it("should handle defaultRoute with parameters correctly", () => {
+    it("should handle defaultRoute with parameters correctly", async () => {
       const defaultParams = {
         id: 123,
       };
 
       withDefault("orders.view", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("orders.view");
-        expect(state?.params).toStrictEqual(defaultParams);
-        expect(state?.path).toBe("/orders/view/123");
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("orders.view");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.path).toBe("/orders/view/123");
     });
 
     it("should work when router state changes after setting defaultRoute", () => {
@@ -454,7 +442,7 @@ describe("navigateToDefault", () => {
       });
     });
 
-    it("should handle guards and middleware for defaultRoute navigation", () => {
+    it("should handle guards and middleware for defaultRoute navigation", async () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn().mockReturnValue(true);
 
@@ -462,13 +450,11 @@ describe("navigateToDefault", () => {
       router.addActivateGuard("settings.account", () => canActivateGuard);
       router.useMiddleware(() => middleware);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("settings.account");
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("settings.account");
 
-        expect(canActivateGuard).toHaveBeenCalledTimes(1);
-        expect(middleware).toHaveBeenCalledTimes(1);
-      });
+      expect(canActivateGuard).toHaveBeenCalledTimes(1);
+      expect(middleware).toHaveBeenCalledTimes(1);
 
       router.clearMiddleware();
     });
@@ -624,56 +610,48 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should use defaultParams for successful navigation", () => {
+    it("should use defaultParams for successful navigation", async () => {
       const defaultParams = { id: 555 };
 
       withDefault("users.view", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("users.view");
-        expect(state?.params).toStrictEqual(defaultParams);
-        expect(state?.path).toBe("/users/view/555");
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("users.view");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.path).toBe("/users/view/555");
     });
 
-    it("should pass defaultParams through to final state", () => {
+    it("should pass defaultParams through to final state", async () => {
       const defaultParams = { param: "custom_value" };
 
       withDefault("withDefaultParam", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("withDefaultParam");
-        // Route has its own defaultParams, but our defaultParams should take precedence
-        expect(state?.params).toStrictEqual(defaultParams);
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("withDefaultParam");
+      // Route has its own defaultParams, but our defaultParams should take precedence
+      expect(state.params).toStrictEqual(defaultParams);
     });
 
-    it("should work with route that has encoded params", () => {
+    it("should work with route that has encoded params", async () => {
       const defaultParams = { one: "value1", two: "value2" };
 
       withDefault("withEncoder", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("withEncoder");
-        expect(state?.params).toStrictEqual(defaultParams);
-        expect(state?.path).toBe("/encoded/value1/value2");
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("withEncoder");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.path).toBe("/encoded/value1/value2");
     });
 
-    it("should handle defaultParams with nested route", () => {
+    it("should handle defaultParams with nested route", async () => {
       const defaultParams = { userId: "admin" };
 
       withDefault("profile.user", defaultParams);
 
-      router.navigateToDefault((err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("profile.user");
-        expect(state?.params).toStrictEqual(defaultParams);
-        expect(state?.path).toBe("/profile/admin");
-      });
+      const state = await router.navigateToDefault();
+      expect(state.name).toBe("profile.user");
+      expect(state.params).toStrictEqual(defaultParams);
+      expect(state.path).toBe("/profile/admin");
     });
 
     it("should handle defaultParams when navigation fails", () => {
