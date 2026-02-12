@@ -647,15 +647,14 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/nonexistent",
         };
-        await router.start(invalidState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        expect(state).toBeUndefined();
+        try {
+          await router.start(invalidState.path);
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
 
       it("should not start router when invalid state object is provided", async () => {
@@ -736,14 +735,14 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/deeply/nested/invalid",
         };
-        await router.start(invalidState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        try {
+          await router.start(invalidState.path);
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
     });
 
