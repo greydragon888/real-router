@@ -418,11 +418,7 @@ describe("core/routes/routeTree/getRoute", () => {
           return true;
         });
 
-        await new Promise<void>((resolve) => {
-          router.navigate("ec-slow", () => {
-            resolve();
-          });
-        });
+        await router.navigate("ec-slow", {});
 
         // getRoute should return correct data even during navigation
         expect(routeDuringNavigation!).toBeDefined();

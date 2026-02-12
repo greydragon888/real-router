@@ -155,7 +155,7 @@ describe("SSR race conditions", () => {
 
       // Start navigation (will be async due to guard)
       await new Promise<void>((resolve) => {
-        router.navigate("admin", () => {
+        router.navigate("admin", {}).then(() => {
           // This callback is called when admin navigation is cancelled
           // or when it completes
           resolve();
@@ -214,7 +214,7 @@ describe("SSR race conditions", () => {
       router.navigate("admin");
 
       // Immediately start second navigation (will cancel first)
-      router.navigate("public", () => {
+      router.navigate("public", {}).then(() => {
         secondNavCompleted = true;
       });
 

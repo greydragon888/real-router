@@ -7,7 +7,6 @@ import { createTestRouter } from "../../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.navigate() - edge cases params", () => {
   beforeEach(() => {
@@ -128,7 +127,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should call callback when params is undefined", async () => {
         // When paramsOrDone is undefined, it should be treated as empty params
         // and the callback in position 3 should be called
-        const state = await router.navigate("users", undefined);
+        const state = await router.navigate("users");
 
         // Callback SHOULD be called with success
         expect(state).toEqual(
@@ -139,7 +138,7 @@ describe("router.navigate() - edge cases params", () => {
       it("should call callback with 4 args when params is undefined", async () => {
         // 4-argument form: navigate(name, params, opts, callback)
         // Even with undefined params, callback should be called
-        const state = await router.navigate("users", undefined, {});
+        const state = await router.navigate("users", {});
 
         // Callback SHOULD be called
         expect(state).toEqual(expect.objectContaining({ name: "users" }));

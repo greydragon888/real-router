@@ -176,8 +176,8 @@ describe("router.buildNavigationState()", () => {
   });
 
   describe("no side effects (pure function)", () => {
-    it("should not change router state", () => {
-      router.navigate("users", {}, {}, () => {});
+    it("should not change router state", async () => {
+      await router.navigate("users", {});
 
       const stateBefore = router.getState();
 

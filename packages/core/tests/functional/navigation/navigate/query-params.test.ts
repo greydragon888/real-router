@@ -29,14 +29,13 @@ describe("router.navigate() - query params", () => {
     });
   });
 
-  it("should encode query parameters correctly", () => {
-    router.navigate(
-      "users.view",
-      { id: 42, q: "a b", tag: "x/y" },
-      (_, state) => {
-        expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
-      },
-    );
+  it("should encode query parameters correctly", async () => {
+    const state = await router.navigate("users.view", {
+      id: 42,
+      q: "a b",
+      tag: "x/y",
+    });
+    expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
   });
 
   it("should handle empty query params correctly", () => {

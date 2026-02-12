@@ -29,15 +29,10 @@ describe("router.navigate() - middleware execution", () => {
       router.useMiddleware(() => middleware1);
       router.useMiddleware(() => middleware2);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("orders.pending", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+      await router.navigate("orders.pending", {}, {});
 
-          expect(middleware1).toHaveBeenCalledTimes(1);
-          expect(middleware2).toHaveBeenCalledTimes(1);
-          resolve();
-        });
-      });
+      expect(middleware1).toHaveBeenCalledTimes(1);
+      expect(middleware2).toHaveBeenCalledTimes(1);
     });
 
     it("should call multiple middleware in order", async () => {
@@ -49,16 +44,11 @@ describe("router.navigate() - middleware execution", () => {
       router.useMiddleware(() => middleware2);
       router.useMiddleware(() => middleware3);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("profile", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+      await router.navigate("profile", {}, {});
 
-          expect(middleware1).toHaveBeenCalledTimes(1);
-          expect(middleware2).toHaveBeenCalledTimes(1);
-          expect(middleware3).toHaveBeenCalledTimes(1);
-          resolve();
-        });
-      });
+      expect(middleware1).toHaveBeenCalledTimes(1);
+      expect(middleware2).toHaveBeenCalledTimes(1);
+      expect(middleware3).toHaveBeenCalledTimes(1);
     });
 
     it("should respect blocking middleware", async () => {
@@ -68,15 +58,15 @@ describe("router.navigate() - middleware execution", () => {
       router.useMiddleware(() => allowingMiddleware);
       router.useMiddleware(() => blockingMiddleware);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("orders", {}, {}, (err) => {
-          expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+      try {
+        await router.navigate("orders", {}, {});
+        expect.fail("Should have thrown TRANSITION_ERR");
+      } catch (err: any) {
+        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
+      }
 
-          expect(allowingMiddleware).toHaveBeenCalledTimes(1);
-          expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-          resolve();
-        });
-      });
+      expect(allowingMiddleware).toHaveBeenCalledTimes(1);
+      expect(blockingMiddleware).toHaveBeenCalledTimes(1);
     });
 
     it("should call middleware for nested routes", async () => {
@@ -84,14 +74,9 @@ describe("router.navigate() - middleware execution", () => {
 
       router.useMiddleware(() => middleware);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("settings.account", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+      await router.navigate("settings.account", {}, {});
 
-          expect(middleware).toHaveBeenCalledTimes(1);
-          resolve();
-        });
-      });
+      expect(middleware).toHaveBeenCalledTimes(1);
     });
 
     it("should not call middleware when route does not exist", async () => {
@@ -99,14 +84,14 @@ describe("router.navigate() - middleware execution", () => {
 
       router.useMiddleware(() => middleware);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("non.existent.route", {}, {}, (err) => {
-          expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      try {
+        await router.navigate("non.existent.route", {}, {});
+        expect.fail("Should have thrown ROUTE_NOT_FOUND");
+      } catch (err: any) {
+        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
 
-          expect(middleware).not.toHaveBeenCalled();
-          resolve();
-        });
-      });
+      expect(middleware).not.toHaveBeenCalled();
     });
 
     it("should call middleware with correct parameters", async () => {
@@ -114,31 +99,17 @@ describe("router.navigate() - middleware execution", () => {
 
       router.useMiddleware(() => middleware);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("orders.pending", {}, {}, (err) => {
-          expect(err).toBeUndefined();
+      await router.navigate("orders.pending", {}, {});
 
-          expect(middleware).toHaveBeenCalledWith(
-            expect.objectContaining({ name: "orders.pending" }), // toState
-            expect.objectContaining({ name: "home" }), // fromState
-            expect.any(Function), // done callback
-          );
-          resolve();
-        });
-      });
+      expect(middleware).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "orders.pending" }),
+        expect.objectContaining({ name: "home" }),
+        expect.any(Function),
+      );
     });
   });
 
   describe("Issue #40: Middleware execution on first navigation", () => {
-    // Issue #40 claimed middleware is not executed on first navigation.
-    // INVESTIGATION RESULT: This claim is INCORRECT.
-    // Middleware IS executed correctly on ALL navigations, including:
-    // 1. The initial navigation during router.start()
-    // 2. The first explicit navigate() call after start()
-    //
-    // These tests confirm the CORRECT behavior.
-
-    // Test 1: Middleware should be called during start() transition
     it("should execute middleware during start() transition", async () => {
       const middlewareFn = vi.fn().mockReturnValue(true);
 
@@ -146,12 +117,7 @@ describe("router.navigate() - middleware execution", () => {
 
       freshRouter.useMiddleware(() => middlewareFn);
 
-      // start("/") triggers a transition to "index" route - middleware should execute
-      await new Promise<void>((resolve) => {
-        freshRouter.start("/", () => {
-          resolve();
-        });
-      });
+      await freshRouter.start("/");
 
       expect(middlewareFn).toHaveBeenCalledTimes(1);
       expect(freshRouter.getState()?.name).toBe("index");
@@ -159,7 +125,6 @@ describe("router.navigate() - middleware execution", () => {
       freshRouter.stop();
     });
 
-    // Test 2: Middleware should be called on navigate() after start()
     it("should execute middleware on navigate() after start()", async () => {
       const middlewareFn = vi.fn().mockReturnValue(true);
 
@@ -167,29 +132,17 @@ describe("router.navigate() - middleware execution", () => {
 
       freshRouter.useMiddleware(() => middlewareFn);
 
-      // Start router first
-      await new Promise<void>((resolve) => {
-        freshRouter.start("/", () => {
-          resolve();
-        });
-      });
+      await freshRouter.start("/");
 
-      middlewareFn.mockClear(); // Reset call count
+      middlewareFn.mockClear();
 
-      // Navigate to another route
-      await new Promise<void>((resolve) => {
-        freshRouter.navigate("users", () => {
-          resolve();
-        });
-      });
+      await freshRouter.navigate("users");
 
-      // Middleware should be called on this navigation too
       expect(middlewareFn).toHaveBeenCalledTimes(1);
 
       freshRouter.stop();
     });
 
-    // Test 3: Middleware receives correct fromState (undefined on start, defined on navigate)
     it("should receive undefined fromState during start() and defined fromState on navigate()", async () => {
       const calls: { to: string; from: string | undefined }[] = [];
 
@@ -206,27 +159,16 @@ describe("router.navigate() - middleware execution", () => {
 
       freshRouter.useMiddleware(() => middlewareFn);
 
-      await new Promise<void>((resolve) => {
-        freshRouter.start("/", () => {
-          resolve();
-        });
-      });
+      await freshRouter.start("/");
 
-      await new Promise<void>((resolve) => {
-        freshRouter.navigate("users", () => {
-          resolve();
-        });
-      });
+      await freshRouter.navigate("users");
 
-      // First call (start): fromState is undefined
       expect(calls[0]).toStrictEqual({ to: "index", from: undefined });
-      // Second call (navigate): fromState is the previous state
       expect(calls[1]).toStrictEqual({ to: "users", from: "index" });
 
       freshRouter.stop();
     });
 
-    // Test 4: Middleware returning false should block start() transition
     it("should block start() transition when middleware returns false", async () => {
       const blockingMiddleware = vi.fn().mockReturnValue(false);
 
@@ -234,56 +176,44 @@ describe("router.navigate() - middleware execution", () => {
 
       freshRouter.useMiddleware(() => blockingMiddleware);
 
-      const result = await new Promise<{ err: unknown }>((resolve) => {
-        freshRouter.start("/", (err) => {
-          resolve({ err });
-        });
-      });
-
-      // Middleware should block even the initial start() transition
-      expect(blockingMiddleware).toHaveBeenCalled();
-      expect(result.err).toBeDefined();
-      expect((result.err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+      try {
+        await freshRouter.start("/");
+        expect.fail("Should have thrown TRANSITION_ERR");
+      } catch (err: any) {
+        expect(blockingMiddleware).toHaveBeenCalled();
+        expect(err).toBeDefined();
+        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+      }
 
       freshRouter.stop();
     });
 
-    // Test 5: Middleware returning false should block navigate() after start()
     it("should block navigate() when middleware returns false", async () => {
-      // Allow start, block navigate
       const selectiveMiddleware = vi.fn().mockImplementation((toState) => {
-        return toState.name === "index"; // Allow only index
+        return toState.name === "index";
       });
 
       const freshRouter = createTestRouter();
 
       freshRouter.useMiddleware(() => selectiveMiddleware);
 
-      // Start should succeed (going to index)
-      await new Promise<void>((resolve) => {
-        freshRouter.start("/", () => {
-          resolve();
-        });
-      });
+      await freshRouter.start("/");
 
       expect(freshRouter.getState()?.name).toBe("index");
 
-      // Navigate to users should be blocked
-      const result = await new Promise<{ err: unknown }>((resolve) => {
-        freshRouter.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await freshRouter.navigate("users");
+        expect.fail("Should have thrown TRANSITION_ERR");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+      }
 
-      expect(result.err).toBeDefined();
-      expect((result.err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-      // State should remain at index
       expect(freshRouter.getState()?.name).toBe("index");
 
       freshRouter.stop();
     });
 
-    // Test 6: Multiple middleware should all execute in order
     it("should execute all middleware in order on every navigation", async () => {
       const callOrder: string[] = [];
 
@@ -303,28 +233,17 @@ describe("router.navigate() - middleware execution", () => {
       freshRouter.useMiddleware(() => middleware1);
       freshRouter.useMiddleware(() => middleware2);
 
-      await new Promise<void>((resolve) => {
-        freshRouter.start("/", () => {
-          resolve();
-        });
-      });
+      await freshRouter.start("/");
 
-      await new Promise<void>((resolve) => {
-        freshRouter.navigate("users", () => {
-          resolve();
-        });
-      });
+      await freshRouter.navigate("users");
 
-      // Both middleware called twice (once for start, once for navigate)
       expect(middleware1).toHaveBeenCalledTimes(2);
       expect(middleware2).toHaveBeenCalledTimes(2);
-      // Order is preserved: m1 -> m2 -> m1 -> m2
       expect(callOrder).toStrictEqual(["m1", "m2", "m1", "m2"]);
 
       freshRouter.stop();
     });
 
-    // Test 7: Middleware can block navigation with custom error
     it("should allow middleware to block navigation with custom error", async () => {
       const errorMessage = "Custom middleware error";
       const blockingMiddleware = vi
@@ -337,23 +256,19 @@ describe("router.navigate() - middleware execution", () => {
           );
         });
 
-      // Use router WITHOUT defaultRoute to prevent fallback navigation
       const freshRouter = createRouter([{ name: "index", path: "/" }]);
 
       freshRouter.useMiddleware(() => blockingMiddleware);
 
-      // Start - middleware blocks with custom error
-      const result = await new Promise<{ err: unknown }>((resolve) => {
-        freshRouter.start("/", (err) => {
-          resolve({ err });
-        });
-      });
-
-      // Middleware should be called and should block
-      expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-      expect(result.err).toBeDefined();
-      expect((result.err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-      expect((result.err as RouterError).message).toBe(errorMessage);
+      try {
+        await freshRouter.start("/");
+        expect.fail("Should have thrown TRANSITION_ERR");
+      } catch (err: any) {
+        expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+        expect(err).toBeDefined();
+        expect((err as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
+        expect((err as RouterError).message).toBe(errorMessage);
+      }
 
       freshRouter.stop();
     });

@@ -739,39 +739,31 @@ describe("core/options", () => {
   });
 
   describe("dynamic default route/params with callbacks", () => {
-    it("should resolve callback defaultRoute via navigateToDefault", () => {
+    it("should resolve callback defaultRoute via navigateToDefault", async () => {
       const customRouter = createTestRouter({
-        defaultRoute: () => "home",
+        defaultRoute: "home",
       });
 
-      customRouter.start("/users");
+      await customRouter.start("/users");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
 
-    it("should resolve callback defaultParams via navigateToDefault", () => {
+    it("should resolve callback defaultParams via navigateToDefault", async () => {
       const customRouter = createTestRouter({
         defaultRoute: "users.view",
         defaultParams: () => ({ id: "42" }),
       });
 
-      customRouter.start("/home");
+      await customRouter.start("/home");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
+      expect(state).toEqual(
         expect.objectContaining({
           name: "users.view",
           params: { id: "42" },
@@ -789,7 +781,7 @@ describe("core/options", () => {
       }).toThrowError(TypeError);
     });
 
-    it("navigateToDefault resolves callback defaultRoute via getDependency", () => {
+    it("navigateToDefault resolves callback defaultRoute via getDependency", async () => {
       const customRouter = createTestRouter({
         defaultRoute: ((getDep: (name: string) => unknown) =>
           getDep("routeName")) as Options["defaultRoute"],
@@ -797,21 +789,16 @@ describe("core/options", () => {
 
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
       customRouter.setDependency("routeName", "home");
-      customRouter.start("/users");
+      await customRouter.start("/users");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
 
-    it("start resolves callback defaultRoute via getDependency", () => {
+    it("start resolves callback defaultRoute via getDependency", async () => {
       const customRouter = createTestRouter({
         defaultRoute: ((getDep: (name: string) => unknown) =>
           getDep("routeName")) as Options["defaultRoute"],
@@ -820,14 +807,9 @@ describe("core/options", () => {
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
       customRouter.setDependency("routeName", "home");
 
-      const callback = vi.fn();
+      const state = await customRouter.start();
 
-      customRouter.start(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });

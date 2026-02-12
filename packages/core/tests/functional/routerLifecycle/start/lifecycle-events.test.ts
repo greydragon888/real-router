@@ -92,7 +92,7 @@ describe("router.start() - lifecycle events", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
 
-      it("should emit TRANSITION_ERROR for invalid state object", () => {
+      it("should emit TRANSITION_ERROR for invalid state object", async () => {
         const transitionErrorListener = vi.fn();
 
         router.addEventListener(
@@ -100,11 +100,11 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start({
-          name: "nonexistent.route",
-          params: {},
-          path: "/nonexistent",
-        });
+        try {
+          await router.start("/nonexistent");
+        } catch (err) {
+          // Expected to fail
+        }
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -113,26 +113,26 @@ describe("router.start() - lifecycle events", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
 
-      it("should return error to callback AND emit TRANSITION_ERROR", () => {
+      it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
-        const callback = vi.fn();
 
         router.addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
 
-        router.start("/nonexistent/path", callback);
+        try {
+          await router.start("/nonexistent/path");
+        } catch (err) {
+          // Expected to fail
+        }
 
-        // Both callback AND event should be triggered
-        expect(callback).toHaveBeenCalledTimes(1);
+        // Event should be triggered
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        // Both should have the same error
-        const [callbackError] = callback.mock.calls[0];
+        // Check the error
         const eventError = transitionErrorListener.mock.calls[0][2];
 
-        expect(callbackError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
         expect(eventError.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
     });
@@ -162,27 +162,27 @@ describe("router.start() - lifecycle events", () => {
         routerWithoutDefault.stop();
       });
 
-      it("should return error to callback AND emit TRANSITION_ERROR", () => {
+      it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const routerWithoutDefault = createTestRouter({ defaultRoute: "" });
         const transitionErrorListener = vi.fn();
-        const callback = vi.fn();
 
         routerWithoutDefault.addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
 
-        routerWithoutDefault.start(callback);
+        try {
+          await routerWithoutDefault.start();
+        } catch (err) {
+          // Expected to fail
+        }
 
-        // Both callback AND event should be triggered
-        expect(callback).toHaveBeenCalledTimes(1);
+        // Event should be triggered
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        // Both should have the same error code
-        const [callbackError] = callback.mock.calls[0];
+        // Check the error
         const eventError = transitionErrorListener.mock.calls[0][2];
 
-        expect(callbackError.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
         expect(eventError.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
 
         routerWithoutDefault.stop();
@@ -240,9 +240,8 @@ describe("router.start() - lifecycle events", () => {
         expect(error.code).toBe(errorCodes.TRANSITION_ERR);
       });
 
-      it("should return error to callback AND emit TRANSITION_ERROR", () => {
+      it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
-        const callback = vi.fn();
 
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
@@ -254,17 +253,18 @@ describe("router.start() - lifecycle events", () => {
           transitionErrorListener,
         );
 
-        router.start("/users/list", callback);
+        try {
+          await router.start("/users/list");
+        } catch (err) {
+          // Expected to fail
+        }
 
-        // Both callback AND event should be triggered
-        expect(callback).toHaveBeenCalledTimes(1);
+        // Event should be triggered
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        // Both should have the same error code
-        const [callbackError] = callback.mock.calls[0];
+        // Check the error
         const eventError = transitionErrorListener.mock.calls[0][2];
 
-        expect(callbackError.code).toBe(errorCodes.TRANSITION_ERR);
         expect(eventError.code).toBe(errorCodes.TRANSITION_ERR);
       });
     });

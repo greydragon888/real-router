@@ -40,10 +40,11 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
       expect(router.isActiveRoute("test", {})).toBe(false);
     });
 
-    it("should return false if router was started and default state was not defined", () => {
+    it("should return false if router was started and default state was not defined", async () => {
       router.stop();
 
-      router = createRouter().start();
+      router = createRouter();
+      await router.start();
 
       expect(router.isActiveRoute("test", {})).toBe(false);
     });

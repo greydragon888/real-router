@@ -48,16 +48,12 @@ describe("core/getNavigator", () => {
     expect(nav.navigate).toBeTypeOf("function");
   });
 
-  it("navigate works", () => {
+  it("navigate works", async () => {
     const navigator = getNavigator(router);
-    const callback = vi.fn();
 
-    navigator.navigate("users", {}, {}, callback);
+    const state = await navigator.navigate("users", {});
 
-    expect(callback).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ name: "users" }),
-    );
+    expect(state).toEqual(expect.objectContaining({ name: "users" }));
   });
 
   it("getState works", () => {

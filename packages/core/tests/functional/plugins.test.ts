@@ -84,8 +84,9 @@ function createOrderedPlugin(id: string, orderTracker: string[]) {
 }
 
 describe("core/plugins", () => {
-  beforeEach(() => {
-    router = createTestRouter().start();
+  beforeEach(async () => {
+    router = createTestRouter();
+    await router.start();
 
     myPluginMethods = {
       onTransitionStart: vi.fn(),
@@ -105,22 +106,20 @@ describe("core/plugins", () => {
   });
 
   describe("usePlugin", () => {
-    it("applies plugin factory and attaches methods to router", () => {
+    it("applies plugin factory and attaches methods to router", async () => {
       router.stop();
 
       router.usePlugin(myPlugin);
 
-      router.start("", () => {
-        // custom method added by plugin
-        expect(
-          (router as Router & { myCustomMethod?: Function }).myCustomMethod,
-        ).not.toBe(undefined);
+      await router.start("");
+      // custom method added by plugin
+      expect(
+        (router as Router & { myCustomMethod?: Function }).myCustomMethod,
+      ).not.toBe(undefined);
 
-        router.navigate("orders", () => {
-          expect(myPluginMethods.onTransitionStart).toHaveBeenCalled();
-          expect(myPluginMethods.onTransitionSuccess).toHaveBeenCalled();
-        });
-      });
+      await router.navigate("orders", {});
+      expect(myPluginMethods.onTransitionStart).toHaveBeenCalled();
+      expect(myPluginMethods.onTransitionSuccess).toHaveBeenCalled();
     });
 
     it("returns an unsubscribe function that removes plugin", () => {
