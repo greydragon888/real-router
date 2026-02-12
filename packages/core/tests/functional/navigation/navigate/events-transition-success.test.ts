@@ -245,16 +245,15 @@ describe("router.navigate() - events transition success", () => {
         onError,
       );
 
-      router.navigate("users.view", { id: 789 }, (err, state) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(state).toBeUndefined(); // No state on error
+      try {
+        await router.navigate("users.view", { id: 789 });
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
 
-        // TRANSITION_SUCCESS should not be emitted on failure
-        expect(onSuccess).not.toHaveBeenCalled();
-
-        // TRANSITION_ERROR should be emitted instead
-        expect(onError).toHaveBeenCalledTimes(1);
-      });
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledTimes(1);
 
       unsubSuccess();
       unsubError();
@@ -282,20 +281,21 @@ describe("router.navigate() - events transition success", () => {
         setTimeout(done, 50); // Delay to allow cancellation
       });
 
-      const cancel = router.navigate(
-        "users.view",
-        { id: 456 },
-        (err, state) => {
-          expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-          expect(state).toBeUndefined(); // No state on cancellation
-        },
-      );
+      const promise = router.navigate("users.view", { id: 456 });
+      const cancel = () => router.cancel();
 
       // Cancel immediately
       cancel();
 
       // Advance time to ensure middleware timer runs
       await vi.runAllTimersAsync();
+
+      try {
+        await promise;
+        expect.fail("Should have been cancelled");
+      } catch (err: any) {
+        expect(err.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      }
 
       // Now assertions
       expect(onSuccess).not.toHaveBeenCalled();
@@ -309,32 +309,31 @@ describe("router.navigate() - events transition success", () => {
       vi.useRealTimers();
     });
 
-    it("should not emit TRANSITION_SUCCESS when navigation to same state without force", () => {
+    it("should not emit TRANSITION_SUCCESS when navigation to same state without force", async () => {
       const onSuccess = vi.fn();
 
       // Navigate to route first
-      router.navigate("orders", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("orders", {}, {});
 
-        const unsubSuccess = router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          onSuccess,
-        );
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
-        // Try to navigate to same route without force
-        router.navigate("orders", {}, {}, (err, state) => {
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
-          expect(state).toBeUndefined();
+      // Try to navigate to same route without force
+      try {
+        await router.navigate("orders", {}, {});
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err.code).toBe(errorCodes.SAME_STATES);
+      }
 
-          // TRANSITION_SUCCESS should not be emitted for blocked same-state navigation
-          expect(onSuccess).not.toHaveBeenCalled();
-        });
+      expect(onSuccess).not.toHaveBeenCalled();
 
-        unsubSuccess();
-      });
+      unsubSuccess();
     });
 
-    it("should not emit TRANSITION_SUCCESS when router is not started", () => {
+    it("should not emit TRANSITION_SUCCESS when router is not started", async () => {
       router.stop();
 
       const onSuccess = vi.fn();
@@ -343,11 +342,14 @@ describe("router.navigate() - events transition success", () => {
         onSuccess,
       );
 
-      router.navigate("users", (err, state) => {
-        expect(err?.code).toBe(errorCodes.ROUTER_NOT_STARTED);
-        expect(state).toBeUndefined();
+      try {
+        await router.navigate("users");
+        expect.fail("Should have thrown error");
+      } catch (err: any) {
+        expect(err.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      }
 
-        // TRANSITION_SUCCESS should not be emitted when router is not started
+      // TRANSITION_SUCCESS should not be emitted when router is not started
         expect(onSuccess).not.toHaveBeenCalled();
       });
 
