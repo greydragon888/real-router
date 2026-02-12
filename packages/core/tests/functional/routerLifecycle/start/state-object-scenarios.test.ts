@@ -24,8 +24,7 @@ describe("router.start() - state object scenarios", () => {
   });
 
   describe("successful state transition", () => {
-    it("should start router and transition successfully", () => {
-      const callback = vi.fn();
+    it("should start router and transition successfully", async () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
@@ -35,18 +34,12 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      const result = router.start("/users/list", callback);
+      const state = await router.start("/users/list");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
 
-      // Check callback result
-      const [error, state] = callback.mock.calls[0];
-
-      expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
       expect(state?.path).toBe("/users/list");
@@ -57,7 +50,7 @@ describe("router.start() - state object scenarios", () => {
       expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
     });
 
-    it("should emit TRANSITION_SUCCESS with replace: true option", () => {
+    it("should emit TRANSITION_SUCCESS with replace: true option", async () => {
       const transitionSuccessListener = vi.fn();
 
       router.addEventListener(
@@ -65,7 +58,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      router.start("/users/view/123");
+      await router.start("/users/view/123");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -79,12 +72,10 @@ describe("router.start() - state object scenarios", () => {
       expect(options).toStrictEqual({ replace: true });
     });
 
-    it("should set router state after successful transition", () => {
-      const callback = vi.fn();
-
+    it("should set router state after successful transition", async () => {
       expect(router.getState()).toBeUndefined();
 
-      router.start("/orders/pending", callback);
+      const state = await router.start("/orders/pending");
 
       const currentState = router.getState();
 
@@ -92,34 +83,26 @@ describe("router.start() - state object scenarios", () => {
       expect(currentState?.name).toBe("orders.pending");
       expect(currentState?.path).toBe("/orders/pending");
 
-      const [error, callbackState] = callback.mock.calls[0];
-
-      expect(error).toBeUndefined();
-      expect(omitMeta(currentState)).toStrictEqual(omitMeta(callbackState));
+      expect(omitMeta(currentState)).toStrictEqual(omitMeta(state));
     });
 
-    it("should handle transition with path parameters", () => {
+    it("should handle transition with path parameters", async () => {
       const transitionSuccessListener = vi.fn();
-      const callback = vi.fn();
 
       router.addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
 
-      router.start("/users/view/456", callback);
+      const state = await router.start("/users/view/456");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
 
       const [toState] = transitionSuccessListener.mock.calls[0];
 
       expect(toState?.params).toStrictEqual({ id: "456" });
 
-      const [error, callbackState] = callback.mock.calls[0];
-
-      expect(error).toBeUndefined();
-      expect(callbackState?.params).toStrictEqual({ id: "456" });
+      expect(state?.params).toStrictEqual({ id: "456" });
 
       const currentState = router.getState();
 

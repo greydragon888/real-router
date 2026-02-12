@@ -7,7 +7,6 @@ import { createTestRouter, omitMeta } from "../../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.start() - path string scenarios", () => {
   beforeEach(() => {
@@ -29,12 +28,11 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      const result = await router.start("/users/list");
+      const state = await router.start("/users/list");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
       expect(state?.path).toBe("/users/list");
@@ -52,11 +50,10 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      await router.start("/users/list?page=2&sort=name");
+      const state = await router.start("/users/list?page=2&sort=name");
 
       expect(router.isActive()).toBe(true);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
 
@@ -66,8 +63,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should preserve path parameters in matched state", async () => {
-      await router.start("/users/view/456");
-      expect(error).toBeUndefined();
+      const state = await router.start("/users/view/456");
       expect(state?.params).toStrictEqual({ id: "456" });
 
       const currentState = router.getState();
@@ -85,13 +81,16 @@ describe("router.start() - path string scenarios", () => {
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = await router.start("/invalid/path");
-
-      expect(router.isActive()).toBe(false);
-      expect(startListener).not.toHaveBeenCalled();
-      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      try {
+        await router.start("/invalid/path");
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(router.isActive()).toBe(false);
+        expect(startListener).not.toHaveBeenCalled();
+        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
     });
 
     it("should return error for nonexistent route even with defaultRoute", async () => {
@@ -102,15 +101,17 @@ describe("router.start() - path string scenarios", () => {
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = await router.start("/nonexistent/route");
-
-      expect(router.isActive()).toBe(false);
-      expect(startListener).not.toHaveBeenCalled();
-      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      expect(state).toBeUndefined();
-      expect(router.getState()).toBeUndefined();
+      try {
+        await router.start("/nonexistent/route");
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(router.isActive()).toBe(false);
+        expect(startListener).not.toHaveBeenCalled();
+        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        expect(router.getState()).toBeUndefined();
+      }
     });
 
     it("should handle error when default route navigation fails", async () => {
@@ -125,13 +126,16 @@ describe("router.start() - path string scenarios", () => {
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = await router.start("/invalid/path");
-
-      expect(router.isActive()).toBe(false);
-      expect(startListener).not.toHaveBeenCalled();
-      expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      try {
+        await router.start("/invalid/path");
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(router.isActive()).toBe(false);
+        expect(startListener).not.toHaveBeenCalled();
+        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
     });
   });
 
@@ -142,7 +146,7 @@ describe("router.start() - path string scenarios", () => {
 
       router.addEventListener(events.ROUTER_START, startListener);
 
-      const result = await router.start("/invalid/path");
+      await router.start("/invalid/path");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
@@ -164,12 +168,11 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      const result = await router.start("/some/invalid/path");
+      const state = await router.start("/some/invalid/path");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
       expect(state?.params.path).toBe("/some/invalid/path");
@@ -182,8 +185,7 @@ describe("router.start() - path string scenarios", () => {
 
     it("should prefer allowNotFound over defaultRoute when both are set", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
-      await router.start("/invalid/path");
-      expect(error).toBeUndefined();
+      const state = await router.start("/invalid/path");
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
     });
   });
@@ -223,9 +225,12 @@ describe("router.start() - path string scenarios", () => {
         return Promise.reject({ message: "Middleware error" });
       });
 
-      router.start(invalidPath, () => {
+      try {
+        await router.start(invalidPath);
+        expect.fail("Should have thrown");
+      } catch (err: any) {
         expect(middlewareCallCount).toBe(1); // only for UNKNOWN_ROUTE
-      });
+      }
     });
 
     it("should successfully transition to UNKNOWN_ROUTE when middleware succeeds", async () => {
@@ -241,7 +246,7 @@ describe("router.start() - path string scenarios", () => {
 
   describe("path string edge cases", () => {
     it("should handle empty string as path (fallback to defaultRoute)", async () => {
-      router.start("");
+      await router.start("");
 
       expect(router.isActive()).toBe(true);
       // Empty string triggers fallback to defaultRoute
@@ -250,16 +255,24 @@ describe("router.start() - path string scenarios", () => {
 
     it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
-      await router.start("   "); // Whitespace is truthy, passed to matchPath, returns undefined
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      try {
+        await router.start("   "); // Whitespace is truthy, passed to matchPath, returns undefined
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
     });
 
     it("should handle path with double slashes", async () => {
       router = createTestRouter({ allowNotFound: false });
-      await router.start("//users//list//"); // Double slashes are likely not matched by routes
-      expect(error).toBeDefined();
-      expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      try {
+        await router.start("//users//list//"); // Double slashes are likely not matched by routes
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
     });
   });
 
@@ -281,9 +294,13 @@ describe("router.start() - path string scenarios", () => {
 
     it("should ensure callback is called exactly once on route not found error", async () => {
       router = createTestRouter({ allowNotFound: false });
-      await router.start("/non-existent");
-
-      // Verify single invocation with error
+      try {
+        await router.start("/non-existent");
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+        expect(err.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
     });
 
     it("should protect callback when using defaultRoute", async () => {
@@ -296,46 +313,47 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("return value with path strings", () => {
-    it("should return router instance for method chaining", async () => {
+    it("should return state for successful navigation", async () => {
       const validPath = "/users/list";
 
       // Call start and capture return value
-      await router.start(validPath);
+      const state = await router.start(validPath);
 
-      // Should return the same router instance      expect(result).toBeInstanceOf(Object); // Router class instance
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("users.list");
     });
 
-    it("should support method chaining with router methods that return router", async () => {
+    it("should return state after navigation completes", async () => {
       const validPath = "/orders/view/123";
 
-      // Method chaining should work for methods that return router
-      expect(() => {
-        router.start(validPath).stop();
-      }).not.toThrowError();
-
-      // Verify start() returns router for chaining
-      await router.start(validPath);
+      // Verify start() returns state
+      const state = await router.start(validPath);
       // Router should be in correct state
       expect(router.getState()?.name).toBe("orders.view");
+      expect(state?.name).toBe("orders.view");
     });
 
-    it("should return router instance even when transition fails", async () => {
+    it("should throw error when transition fails", async () => {
       const invalidPath = "/nonexistent/route";
 
       // Block all transitions to force failure
       router.useMiddleware(() => () => false);
 
-      await router.start(invalidPath);
-
-      // Should still return router instance even on failure
+      try {
+        await router.start(invalidPath);
+        expect.fail("Should have thrown");
+      } catch (err: any) {
+        expect(err).toBeDefined();
+      }
     });
 
-    it("should return router instance with callback parameter", async () => {
+    it("should return state on successful navigation", async () => {
       const validPath = "/profile/me";
 
-      const result = await router.start(validPath);
+      const state = await router.start(validPath);
 
-      // Should return router instance when using callback
+      expect(state).toBeDefined();
+      expect(state?.name).toBe("profile.me");
     });
   });
 });
