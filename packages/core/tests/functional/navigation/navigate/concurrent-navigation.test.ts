@@ -13,7 +13,7 @@ import { errorCodes, events } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, State, DoneFn } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 
 let router: Router;
 const noop = () => undefined;
@@ -41,7 +41,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.restoreAllMocks();
     });
 
-    it("should return cancel function from router.navigate", () => {
+    it("should return cancel function from router.navigate", async () => {
       const cancel = router.navigate("users", noop);
 
       expectTypeOf(cancel).toBeFunction();
@@ -49,7 +49,7 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(typeof cancel).toBe("function");
     });
 
-    it("should cancel navigation and call callback with TRANSITION_CANCELLED error", () => {
+    it("should cancel navigation and call callback with TRANSITION_CANCELLED error", async () => {
       vi.useFakeTimers();
 
       const callback = vi.fn();
@@ -84,7 +84,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should emit TRANSITION_CANCEL event when navigation is cancelled", () => {
+    it("should emit TRANSITION_CANCEL event when navigation is cancelled", async () => {
       vi.useFakeTimers();
 
       const onCancel = vi.fn();
@@ -221,7 +221,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should not cancel already completed navigation", () => {
+    it("should not cancel already completed navigation", async () => {
       vi.useFakeTimers();
 
       const callback = vi.fn();
@@ -255,7 +255,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should handle cancel function called multiple times", () => {
+    it("should handle cancel function called multiple times", async () => {
       vi.useFakeTimers();
 
       const callback = vi.fn();
@@ -287,7 +287,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should cancel navigation and not emit TRANSITION_SUCCESS", () => {
+    it("should cancel navigation and not emit TRANSITION_SUCCESS", async () => {
       vi.useFakeTimers();
 
       const onSuccess = vi.fn();
@@ -328,7 +328,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should cancel navigation with custom navigation options", () => {
+    it("should cancel navigation with custom navigation options", async () => {
       vi.useFakeTimers();
 
       const onCancel = vi.fn();
@@ -373,7 +373,7 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should handle cancellation when router is stopped during navigation", () => {
+    it("should handle cancellation when router is stopped during navigation", async () => {
       vi.useFakeTimers();
 
       router.useMiddleware(() => (_toState, _fromState, done) => {
