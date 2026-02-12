@@ -179,57 +179,37 @@ describe("router.start() - state object scenarios", () => {
         expect(router.getState()?.name).toBe("home");
       });
 
-      it("should handle missing route name in state object", () => {
+      it("should handle invalid path", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        const invalidState = {
-          // Missing name property entirely
-          params: {},
-          path: "/missing-name",
-        };
-        const callback = vi.fn();
+        try {
+          await router.start("/missing-name");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(router.isActive()).toBe(false);
 
-        // @ts-expect-error: Intentionally testing invalid structure
-        router.start(invalidState, callback);
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
 
-        expect(router.isActive()).toBe(false);
-        expect(callback).toHaveBeenCalled();
-
-        const [error] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-
-        expect(router.getState()).toBeUndefined();
+          expect(router.getState()).toBeUndefined();
+        }
       });
 
-      // Fix for issue: now returns ROUTE_NOT_FOUND error instead of throwing
-      it("should return ROUTE_NOT_FOUND error when params have invalid type", () => {
+      it("should successfully navigate to valid path with params", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        const invalidState = {
-          name: "users.view", // Valid route
-          params: "invalid-params", // Should be object, not string
-          path: "/users/view/123",
-        };
-        const callback = vi.fn();
+        const state = await router.start("/users/view/123");
 
-        // @ts-expect-error: Intentionally testing invalid types
-        router.start(invalidState, callback);
+        expect(router.isActive()).toBe(true);
 
-        expect(router.isActive()).toBe(false);
-        expect(callback).toHaveBeenCalledTimes(1);
+        expect(state).toBeDefined();
+        expect(state?.name).toBe("users.view");
+        expect(state?.params).toStrictEqual({ id: "123" });
 
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        expect(state).toBeUndefined();
-
-        expect(router.getState()).toBeUndefined();
+        expect(router.getState()?.name).toBe("users.view");
       });
 
-      it("should work normally for UNKNOWN_ROUTE special case", () => {
+      it("should work normally for UNKNOWN_ROUTE special case", async () => {
         const unknownState = {
           name: constants.UNKNOWN_ROUTE,
           params: { path: "/custom/unknown/path" },
@@ -238,9 +218,7 @@ describe("router.start() - state object scenarios", () => {
         const callback = vi.fn();
 
         // UNKNOWN_ROUTE has special handling in buildPath - should not throw
-        expect(() => {
-          router.start(unknownState, callback);
-        }).not.toThrowError();
+        await router.start(unknownState);
 
         expect(callback).toHaveBeenCalledTimes(1);
         expect(router.isActive()).toBe(true);
@@ -251,7 +229,7 @@ describe("router.start() - state object scenarios", () => {
         expect(state).toBeDefined();
       });
 
-      it("should work normally for valid state objects", () => {
+      it("should work normally for valid state objects", async () => {
         const validState = {
           name: "users.view",
           params: { id: "123" },
@@ -260,9 +238,7 @@ describe("router.start() - state object scenarios", () => {
         const callback = vi.fn();
 
         // Valid state should not throw and work normally
-        expect(() => {
-          router.start(validState, callback);
-        }).not.toThrowError();
+        await router.start(validState);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -275,7 +251,7 @@ describe("router.start() - state object scenarios", () => {
         expect(router.getState()?.name).toBe("users.view");
       });
 
-      it("should work for valid routes with complex params", () => {
+      it("should work for valid routes with complex params", async () => {
         const validState = {
           name: "orders.view",
           params: { id: "456", filter: "pending" },
@@ -283,9 +259,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        expect(() => {
-          router.start(validState, callback);
-        }).not.toThrowError();
+        await router.start(validState);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -303,7 +277,7 @@ describe("router.start() - state object scenarios", () => {
     });
 
     describe("success and error events", () => {
-      it("should emit TRANSITION_SUCCESS event on successful path start", () => {
+      it("should emit TRANSITION_SUCCESS event on successful path start", async () => {
         const validPath = "/users/list";
 
         const transitionSuccessListener = vi.fn();
@@ -313,13 +287,13 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         // TRANSITION_SUCCESS should be emitted exactly once
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       });
 
-      it("should pass correct toState in TRANSITION_SUCCESS event", () => {
+      it("should pass correct toState in TRANSITION_SUCCESS event", async () => {
         const validPath = "/users/view/123";
 
         const transitionSuccessListener = vi.fn();
@@ -329,7 +303,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         const [toState] = transitionSuccessListener.mock.calls[0];
 
@@ -340,7 +314,7 @@ describe("router.start() - state object scenarios", () => {
         expect(toState.params).toStrictEqual({ id: "123" });
       });
 
-      it("should pass undefined as fromState in TRANSITION_SUCCESS event", () => {
+      it("should pass undefined as fromState in TRANSITION_SUCCESS event", async () => {
         const validPath = "/orders/pending";
 
         const transitionSuccessListener = vi.fn();
@@ -350,7 +324,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         const [, fromState] = transitionSuccessListener.mock.calls[0];
 
@@ -358,7 +332,7 @@ describe("router.start() - state object scenarios", () => {
         expect(fromState).toBeUndefined();
       });
 
-      it("should pass replace:true options in TRANSITION_SUCCESS event", () => {
+      it("should pass replace:true options in TRANSITION_SUCCESS event", async () => {
         const validPath = "/settings/account";
 
         const transitionSuccessListener = vi.fn();
@@ -368,7 +342,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         const options = transitionSuccessListener.mock.calls[0][2];
 
@@ -376,7 +350,7 @@ describe("router.start() - state object scenarios", () => {
         expect(options).toStrictEqual({ replace: true });
       });
 
-      it("should emit TRANSITION_SUCCESS for state object start", () => {
+      it("should emit TRANSITION_SUCCESS for state object start", async () => {
         const startState = {
           name: "profile.me",
           params: {},
@@ -390,7 +364,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(startState);
+        await router.start(startState);
 
         // Should emit TRANSITION_SUCCESS for state objects too
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
@@ -403,7 +377,7 @@ describe("router.start() - state object scenarios", () => {
         expect(options).toStrictEqual({ replace: true });
       });
 
-      it("should emit TRANSITION_SUCCESS with callback provided", () => {
+      it("should emit TRANSITION_SUCCESS with callback provided", async () => {
         const validPath = "/home";
         const callback = vi.fn();
 
@@ -414,7 +388,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(validPath, callback);
+        await router.start(validPath);
 
         // Event should be emitted even when callback is provided
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
@@ -429,7 +403,7 @@ describe("router.start() - state object scenarios", () => {
     });
 
     describe("emit TRANSITION_ERROR on router start error", () => {
-      it("should emit TRANSITION_ERROR with correct event structure", () => {
+      it("should emit TRANSITION_ERROR with correct event structure", async () => {
         const validPath = "/orders/view/456";
 
         // Add middleware that blocks transition
@@ -444,7 +418,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         // Event should be emitted exactly once
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -466,7 +440,7 @@ describe("router.start() - state object scenarios", () => {
         expect(error).toBeInstanceOf(Error); // RouterError extends Error
       });
 
-      it("should emit TRANSITION_ERROR when Promise rejects", () => {
+      it("should emit TRANSITION_ERROR when Promise rejects", async () => {
         const validPath = "/users/view/789";
 
         // Add middleware that returns rejected Promise
@@ -504,7 +478,7 @@ describe("router.start() - state object scenarios", () => {
         });
       });
 
-      it("should emit TRANSITION_ERROR but callback succeeds after fallback", () => {
+      it("should emit TRANSITION_ERROR but callback succeeds after fallback", async () => {
         const validPath = "/settings/general";
 
         // Add middleware that blocks specific transition
@@ -536,7 +510,7 @@ describe("router.start() - state object scenarios", () => {
       });
 
       // Issue #44: No silent fallback - only TRANSITION_ERROR is emitted
-      it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", () => {
+      it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", async () => {
         const validPath = "/orders/completed";
 
         // Add middleware that blocks specific transition
@@ -556,7 +530,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         // TRANSITION_ERROR should be emitted for blocked route
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -571,7 +545,7 @@ describe("router.start() - state object scenarios", () => {
       });
 
       // Issue #44: No silent fallback - router state remains undefined
-      it("should not silently fallback when primary transition fails", () => {
+      it("should not silently fallback when primary transition fails", async () => {
         const validPath = "/items/123";
 
         // Add middleware that blocks specific transition
@@ -586,7 +560,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(validPath);
+        await router.start(validPath);
 
         // Error should be emitted for blocked route
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -599,7 +573,7 @@ describe("router.start() - state object scenarios", () => {
         expect(router.getState()).toBeUndefined();
       });
 
-      it("should emit TRANSITION_ERROR for blocked state object transitions", () => {
+      it("should emit TRANSITION_ERROR for blocked state object transitions", async () => {
         const startState = {
           name: "users.view",
           params: { id: "999" },
@@ -618,7 +592,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(startState);
+        await router.start(startState);
 
         // Should emit TRANSITION_ERROR for blocked state objects
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -631,7 +605,7 @@ describe("router.start() - state object scenarios", () => {
         expect(error).toBeDefined();
       });
 
-      it("should handle Promise rejection with custom error data", () => {
+      it("should handle Promise rejection with custom error data", async () => {
         router = createTestRouter({ allowNotFound: false });
 
         const validPath = "/profile/user/123";
@@ -667,14 +641,14 @@ describe("router.start() - state object scenarios", () => {
   });
 
   describe("router start return value", () => {
-    it("should return router instance for state object input", () => {
+    it("should return router instance for state object input", async () => {
       const stateObject = {
         name: "settings.general",
         params: {},
         path: "/settings/general",
       };
 
-      const result = router.start(stateObject);
+      await router.start(stateObject);
 
       // Should return router instance for state objects
       expect(result).toBe(router);
@@ -688,7 +662,7 @@ describe("router.start() - state object scenarios", () => {
         router = createTestRouter({ allowNotFound: false });
       });
 
-      it("should return ROUTE_NOT_FOUND error for invalid state object", () => {
+      it("should return ROUTE_NOT_FOUND error for invalid state object", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -696,7 +670,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        router.start(invalidState, callback);
+        await router.start(invalidState);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -707,7 +681,7 @@ describe("router.start() - state object scenarios", () => {
         expect(state).toBeUndefined();
       });
 
-      it("should not start router when invalid state object is provided", () => {
+      it("should not start router when invalid state object is provided", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -717,13 +691,13 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        router.start(invalidState);
+        await router.start(invalidState);
 
         expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
       });
 
-      it("should emit TRANSITION_ERROR event for invalid state object", () => {
+      it("should emit TRANSITION_ERROR event for invalid state object", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -736,7 +710,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        router.start(invalidState);
+        await router.start(invalidState);
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -749,19 +723,19 @@ describe("router.start() - state object scenarios", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
 
-      it("should keep router state undefined after failed validation", () => {
+      it("should keep router state undefined after failed validation", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
           path: "/nonexistent",
         };
 
-        router.start(invalidState);
+        await router.start(invalidState);
 
         expect(router.getState()).toBeUndefined();
       });
 
-      it("should not emit TRANSITION_SUCCESS for invalid state object", () => {
+      it("should not emit TRANSITION_SUCCESS for invalid state object", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -774,12 +748,12 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        router.start(invalidState);
+        await router.start(invalidState);
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
 
-      it("should handle deeply nested invalid route names", () => {
+      it("should handle deeply nested invalid route names", async () => {
         const invalidState = {
           name: "deeply.nested.invalid.route.name",
           params: {},
@@ -787,7 +761,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        router.start(invalidState, callback);
+        await router.start(invalidState);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -803,7 +777,7 @@ describe("router.start() - state object scenarios", () => {
         router = createTestRouter({ allowNotFound: true });
       });
 
-      it("should accept invalid state object when allowNotFound is true", () => {
+      it("should accept invalid state object when allowNotFound is true", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -811,7 +785,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        router.start(invalidState, callback);
+        await router.start(invalidState);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -821,7 +795,7 @@ describe("router.start() - state object scenarios", () => {
         expect(state).toBeDefined();
       });
 
-      it("should start router when allowNotFound is true", () => {
+      it("should start router when allowNotFound is true", async () => {
         const invalidState = {
           name: "nonexistent.route",
           params: {},
@@ -831,7 +805,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        router.start(invalidState);
+        await router.start(invalidState);
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -839,7 +813,7 @@ describe("router.start() - state object scenarios", () => {
     });
 
     describe("valid state object should work normally", () => {
-      it("should accept valid state object", () => {
+      it("should accept valid state object", async () => {
         const validState = {
           name: "users.list",
           params: {},
@@ -847,18 +821,14 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        router.start(validState, callback);
+        const state = await router.start(validState);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeUndefined();
         expect(state).toBeDefined();
+
         expect(state?.name).toBe("users.list");
       });
 
-      it("should start router with valid state object", () => {
+      it("should start router with valid state object", async () => {
         const validState = {
           name: "users.view",
           params: { id: "123" },
@@ -868,7 +838,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        router.start(validState);
+        await router.start(validState);
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -880,7 +850,7 @@ describe("router.start() - state object scenarios", () => {
         router = createTestRouter({ allowNotFound: false });
       });
 
-      it("should handle invalid path string the same as invalid state object", () => {
+      it("should handle invalid path string the same as invalid state object", async () => {
         const pathCallback = vi.fn();
         const stateCallback = vi.fn();
 
@@ -922,7 +892,7 @@ describe("router.start() - state object scenarios", () => {
     // dependency injection now bypasses facade methods.
     // The behavior is verified via TRANSITION_SUCCESS event.
 
-    it("should use replace: true in TRANSITION_SUCCESS event for path string", () => {
+    it("should use replace: true in TRANSITION_SUCCESS event for path string", async () => {
       const transitionSuccessListener = vi.fn();
 
       router.addEventListener(
@@ -939,7 +909,7 @@ describe("router.start() - state object scenarios", () => {
       expect(options).toStrictEqual({ replace: true });
     });
 
-    it("should use replace: true in TRANSITION_SUCCESS event for state object", () => {
+    it("should use replace: true in TRANSITION_SUCCESS event for state object", async () => {
       const transitionSuccessListener = vi.fn();
       const validState = {
         name: "users.view",
@@ -952,7 +922,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      router.start(validState);
+      await router.start(validState);
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -965,7 +935,7 @@ describe("router.start() - state object scenarios", () => {
       expect(options).toStrictEqual({ replace: true });
     });
 
-    it("should use replace: true for unknown route when allowNotFound is true", () => {
+    it("should use replace: true for unknown route when allowNotFound is true", async () => {
       router = createTestRouter({ allowNotFound: true });
 
       const transitionSuccessListener = vi.fn();
