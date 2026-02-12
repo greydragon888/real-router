@@ -286,10 +286,10 @@ describe("Browser Plugin", () => {
       unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it("updates history on start", () => {
+    it("updates history on start", async () => {
       vi.spyOn(mockedBrowser, "replaceState");
 
-      router.start();
+      await router.start();
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         router.getState(),
@@ -298,12 +298,12 @@ describe("Browser Plugin", () => {
       );
     });
 
-    it("updates history on navigation", () => {
-      router.start();
+    it("updates history on navigation", async () => {
+      await router.start();
 
       vi.spyOn(mockedBrowser, "pushState");
 
-      router.navigate("users.list");
+      await router.navigate("users.list");
 
       expect(mockedBrowser.pushState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users.list" }),
@@ -312,12 +312,12 @@ describe("Browser Plugin", () => {
       );
     });
 
-    it("uses replaceState with replace option", () => {
-      router.start();
+    it("uses replaceState with replace option", async () => {
+      await router.start();
 
       vi.spyOn(mockedBrowser, "replaceState");
 
-      router.navigate("users.list", {}, { replace: true });
+      await router.navigate("users.list", {}, { replace: true });
 
       expect(mockedBrowser.replaceState).toHaveBeenCalled();
     });
@@ -1102,20 +1102,18 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("supports navigate callback", () => {
-        const callback = vi.fn();
+      it("supports navigate callback", async () => {
+        const state = await router.navigate("users.list", {}, {});
 
-        router.navigate("users.list", {}, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
+        expect(state).toBeDefined();
+        expect(state.name).toBe("users.list");
       });
 
-      it("supports navigate with params and callback", () => {
-        const callback = vi.fn();
+      it("supports navigate with params and callback", async () => {
+        const state = await router.navigate("users.view", { id: "1" });
 
-        router.navigate("users.view", { id: "1" }, callback);
-
-        expect(callback).toHaveBeenCalledWith(undefined, expect.any(Object));
+        expect(state).toBeDefined();
+        expect(state.name).toBe("users.view");
         expect(router.getState()?.params.id).toBe("1");
       });
     });
@@ -1507,15 +1505,9 @@ describe("Browser Plugin", () => {
           browserPluginFactory({ preserveHash: true }, mockedBrowser),
         );
 
-        await new Promise<void>((resolve) => {
-          // @ts-expect-error - Testing with undefined parameter
-          router.start(undefined, (err) => {
-            expect(err).toBeUndefined();
+        const state = await router.start();
 
-            resolve();
-          });
-        });
-
+        expect(state).toBeDefined();
         expect(globalThis.location.hash).toBe("#section");
       });
 
@@ -1526,22 +1518,21 @@ describe("Browser Plugin", () => {
         router.usePlugin(
           browserPluginFactory({ forceDeactivate: false }, mockedBrowser),
         );
-        router.start();
+        await router.start();
 
-        router.navigate("home");
+        await router.navigate("home");
 
         // Add canDeactivate that returns false
         router.addDeactivateGuard("home", () => () => false);
 
         // Navigate should fail
-        await new Promise<void>((resolve) => {
-          router.navigate("users.list", {}, {}, (err) => {
-            expect(err).toBeDefined();
-            expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-
-            resolve();
-          });
-        });
+        try {
+          await router.navigate("users.list", {}, {});
+          expect.fail("Should have thrown");
+        } catch (err) {
+          expect(err).toBeDefined();
+          expect((err as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        }
 
         expect(router.getState()?.name).toBe("home");
       });

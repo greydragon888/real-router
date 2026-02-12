@@ -245,88 +245,79 @@ describe("Persistent params plugin", () => {
       router.start();
     });
 
-    it("should handle navigate(routeName) without params (line 237)", () => {
+    it("should handle navigate(routeName) without params (line 237)", async () => {
       // This tests the branch: if (param1 === undefined) return originalNavigate(routeName);
-      router.navigate("home");
+      await router.navigate("home");
 
       const state = router.getState();
 
       expect(state?.name).toBe("home");
     });
 
-    it("should handle navigate(routeName, params)", () => {
-      router.navigate("route1", { id: "1" });
+    it("should handle navigate(routeName, params)", async () => {
+      await router.navigate("route1", { id: "1" });
 
       const state = router.getState();
 
       expect(state?.path).toBe("/route1/1?mode=dev");
     });
 
-    it("should handle navigate(routeName, done) with callback", () => {
-      const done = vi.fn();
+    it("should handle navigate(routeName, done) with callback", async () => {
+      const state = await router.navigate("home");
 
-      router.navigate("home", done);
-
-      expect(done).toHaveBeenCalled();
-
-      const state = router.getState();
-
-      expect(state?.name).toBe("home");
+      expect(state).toBeDefined();
+      expect(state.name).toBe("home");
     });
 
-    it("should handle navigate(routeName, params, done)", () => {
-      const done = vi.fn();
+    it("should handle navigate(routeName, params, done)", async () => {
+      const state = await router.navigate("route1", { id: "1" });
 
-      router.navigate("route1", { id: "1" }, done);
-
-      expect(done).toHaveBeenCalled();
-
-      const state = router.getState();
-
-      expect(state?.path).toBe("/route1/1?mode=dev");
+      expect(state).toBeDefined();
+      expect(state.path).toBe("/route1/1?mode=dev");
     });
 
-    it("should handle navigate(routeName, params, options)", () => {
-      router.navigate("route1", { id: "1" }, { replace: true });
+    it("should handle navigate(routeName, params, options)", async () => {
+      await router.navigate("route1", { id: "1" }, { replace: true });
 
       const state = router.getState();
 
       expect(state?.path).toBe("/route1/1?mode=dev");
     });
 
-    it("should handle navigate(routeName, params, options, done)", () => {
-      const done = vi.fn();
+    it("should handle navigate(routeName, params, options, done)", async () => {
+      const state = await router.navigate(
+        "route1",
+        { id: "1" },
+        { replace: true },
+      );
 
-      router.navigate("route1", { id: "1" }, { replace: true }, done);
-
-      expect(done).toHaveBeenCalled();
-
-      const state = router.getState();
-
-      expect(state?.path).toBe("/route1/1?mode=dev");
+      expect(state).toBeDefined();
+      expect(state.path).toBe("/route1/1?mode=dev");
     });
 
-    it("should apply persistent params in all navigate overloads", () => {
-      router.navigate("route1", { id: "1", mode: "prod" });
+    it("should apply persistent params in all navigate overloads", async () => {
+      await router.navigate("route1", { id: "1", mode: "prod" });
 
-      router.navigate("route2", { id: "2" });
+      await router.navigate("route2", { id: "2" });
 
       expect(router.getState()?.path).toBe("/route2/2?mode=prod");
 
-      const done1 = vi.fn();
+      const state1 = await router.navigate("route1", { id: "1" });
 
-      router.navigate("route1", { id: "1" }, done1);
-
+      expect(state1).toBeDefined();
       expect(router.getState()?.path).toBe("/route1/1?mode=prod");
 
-      router.navigate("route2", { id: "2" }, { replace: false });
+      await router.navigate("route2", { id: "2" }, { replace: false });
 
       expect(router.getState()?.path).toBe("/route2/2?mode=prod");
 
-      const done2 = vi.fn();
+      const state2 = await router.navigate(
+        "route1",
+        { id: "1" },
+        { replace: false },
+      );
 
-      router.navigate("route1", { id: "1" }, { replace: false }, done2);
-
+      expect(state2).toBeDefined();
       expect(router.getState()?.path).toBe("/route1/1?mode=prod");
     });
   });
