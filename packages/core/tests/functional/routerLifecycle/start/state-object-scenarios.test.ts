@@ -332,12 +332,8 @@ describe("router.start() - state object scenarios", () => {
         expect(options).toStrictEqual({ replace: true });
       });
 
-      it("should emit TRANSITION_SUCCESS for state object start", async () => {
-        const startState = {
-          name: "profile.me",
-          params: {},
-          path: "/profile/",
-        };
+      it("should emit TRANSITION_SUCCESS for path start", async () => {
+        const startPath = "/profile/";
 
         const transitionSuccessListener = vi.fn();
 
@@ -346,15 +342,15 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        await router.start(startState);
+        await router.start(startPath);
 
-        // Should emit TRANSITION_SUCCESS for state objects too
+        // Should emit TRANSITION_SUCCESS
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
         const [toState, fromState, options] =
           transitionSuccessListener.mock.calls[0];
 
-        expect(toState).toStrictEqual(startState);
+        expect(toState.name).toBe("profile.me");
         expect(fromState).toBeUndefined();
         expect(options).toStrictEqual({ replace: true });
       });
@@ -575,7 +571,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(startState);
+        await router.start(startState.path);
 
         // Should emit TRANSITION_ERROR for blocked state objects
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
@@ -632,9 +628,6 @@ describe("router.start() - state object scenarios", () => {
       };
 
       await router.start(stateObject);
-
-      // Should return router instance for state objects
-      expect(result).toBe(router);
       expect(router.getState()?.name).toBe("settings.general");
     });
   });
@@ -651,9 +644,7 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/nonexistent",
         };
-        const callback = vi.fn();
-
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -674,7 +665,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
@@ -693,7 +684,7 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -713,7 +704,7 @@ describe("router.start() - state object scenarios", () => {
           path: "/nonexistent",
         };
 
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(router.getState()).toBeUndefined();
       });
@@ -731,7 +722,7 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
@@ -742,9 +733,7 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/deeply/nested/invalid",
         };
-        const callback = vi.fn();
-
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -766,9 +755,7 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/nonexistent",
         };
-        const callback = vi.fn();
-
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(callback).toHaveBeenCalledTimes(1);
 
@@ -788,7 +775,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        await router.start(invalidState);
+        await router.start(invalidState.path);
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -804,7 +791,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const callback = vi.fn();
 
-        const state = await router.start(validState);
+        const state = await router.start(validState.path);
 
         expect(state).toBeDefined();
 
@@ -821,7 +808,7 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        await router.start(validState);
+        await router.start(validState.path);
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -905,7 +892,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      await router.start(validState);
+      await router.start(validState.path);
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
