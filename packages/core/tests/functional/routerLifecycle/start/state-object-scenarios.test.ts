@@ -757,13 +757,8 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/nonexistent",
         };
-        await router.start(invalidState.path);
+        const state = await router.start(invalidState.path);
 
-        expect(callback).toHaveBeenCalledTimes(1);
-
-        const [error, state] = callback.mock.calls[0];
-
-        expect(error).toBeUndefined();
         expect(state).toBeDefined();
       });
 
@@ -791,12 +786,10 @@ describe("router.start() - state object scenarios", () => {
           params: {},
           path: "/users/list",
         };
-        const callback = vi.fn();
 
         const state = await router.start(validState.path);
 
         expect(state).toBeDefined();
-
         expect(state?.name).toBe("users.list");
       });
 
