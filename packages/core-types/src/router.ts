@@ -11,11 +11,9 @@
 import type {
   State,
   Params,
-  DoneFn,
   NavigationOptions,
   RouterError,
   Unsubscribe,
-  CancelFn,
 } from "./base";
 import type { LimitsConfig } from "./limits";
 import type { QueryParamsMode, QueryParamsOptions } from "./route-node-types";
@@ -160,9 +158,8 @@ export interface Options {
 export type ActivationFn = (
   toState: State,
   fromState: State | undefined,
-  done: DoneFn,
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-) => boolean | Promise<boolean | object | void> | State | void;
+) => boolean | Promise<boolean | State | void> | State | void;
 
 export type DefaultDependencies = object;
 
@@ -224,10 +221,9 @@ export interface Subscription {
 export interface Navigator {
   navigate: (
     routeName: string,
-    routeParamsOrDone?: Params | DoneFn,
-    optionsOrDone?: NavigationOptions | DoneFn,
-    done?: DoneFn,
-  ) => CancelFn;
+    routeParams?: Params,
+    options?: NavigationOptions,
+  ) => Promise<State>;
   getState: () => State | undefined;
   isActiveRoute: (
     name: string,

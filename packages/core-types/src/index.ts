@@ -15,9 +15,7 @@ export type {
   StateMetaInput,
   SimpleState,
   NavigationOptions,
-  DoneFn,
   Unsubscribe,
-  CancelFn,
   RouterError,
 } from "./base";
 

@@ -16,10 +16,8 @@ export { Router } from "./Router";
 // Types (re-exported from core-types - no Router dependency)
 export type {
   ActivationFn,
-  CancelFn,
   Config,
   DefaultDependencies,
-  DoneFn,
   Listener,
   Middleware,
   Navigator,
