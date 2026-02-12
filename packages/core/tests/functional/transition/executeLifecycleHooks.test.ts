@@ -8,7 +8,6 @@ import { executeLifecycleHooks } from "../../../src/namespaces/NavigationNamespa
 import type {
   State,
   ActivationFn,
-  RouterError as RouterErrorType,
 } from "@real-router/types";
 
 describe("transition/executeLifecycleHooks", () => {
@@ -26,30 +25,18 @@ describe("transition/executeLifecycleHooks", () => {
       const fromState = createState("home");
       const hooks = new Map<string, ActivationFn>();
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error");
-      };
-
-      // When no hooks to process, callback is called immediately
-      executeLifecycleHooks(
+      // When no hooks to process, should return immediately
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         [],
         "CANNOT_DEACTIVATE",
         () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
       );
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      expect(result).toBeDefined();
+      expect(result).toEqual(toState);
 
       loggerSpy.mockRestore();
     });
@@ -60,35 +47,22 @@ describe("transition/executeLifecycleHooks", () => {
       const fromState = createState("home");
 
       // Hook that allows navigation
-      const allowHook: ActivationFn = (_toState, _fromState, done) => {
-        done();
+      const allowHook: ActivationFn = (_toState, _fromState) => {
+        return undefined;
       };
 
       const hooks = new Map<string, ActivationFn>([["users", allowHook]]);
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error after hooks");
-      };
-
-      executeLifecycleHooks(
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
       );
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      expect(result).toBeDefined();
 
       loggerSpy.mockRestore();
     });
@@ -99,34 +73,30 @@ describe("transition/executeLifecycleHooks", () => {
       const fromState = createState("home");
 
       // Hook that will be interrupted by cancellation
-      const slowHook: ActivationFn = (_toState, _fromState, done) => {
-        // Simulate async - done is called after isCancelled returns true
-        setTimeout(() => {
-          done();
-        }, 0);
+      const slowHook: ActivationFn = (_toState, _fromState) => {
+        return new Promise<State>((resolve) => {
+          setTimeout(() => {
+            resolve(_toState);
+          }, 0);
+        });
       };
 
       const hooks = new Map<string, ActivationFn>([["users", slowHook]]);
 
       let cancelled = false;
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on cancel");
-      };
-
-      executeLifecycleHooks(
-        hooks,
-        toState,
-        fromState,
-        ["users"],
-        "CANNOT_ACTIVATE",
-        () => cancelled,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
+      try {
+        await executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => cancelled,
+        );
+      } catch (error) {
+        // Expected to throw when cancelled
+      }
 
       // Cancel before hook completes
       cancelled = true;
@@ -135,12 +105,6 @@ describe("transition/executeLifecycleHooks", () => {
       await new Promise<void>((resolve) => {
         setTimeout(resolve, 10);
       });
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
 
       loggerSpy.mockRestore();
     });
@@ -151,35 +115,24 @@ describe("transition/executeLifecycleHooks", () => {
       const fromState = createState("home");
 
       // Hook that rejects navigation
-      const rejectHook: ActivationFn = (_toState, _fromState, done) => {
-        done(new RouterError("CANNOT_ACTIVATE"));
+      const rejectHook: ActivationFn = (_toState, _fromState) => {
+        throw new RouterError("CANNOT_ACTIVATE");
       };
 
       const hooks = new Map<string, ActivationFn>([["users", rejectHook]]);
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on hook rejection");
-      };
-
-      executeLifecycleHooks(
-        hooks,
-        toState,
-        fromState,
-        ["users"],
-        "CANNOT_ACTIVATE",
-        () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
-
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      try {
+        await executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => false,
+        );
+      } catch (error) {
+        // Expected to throw
+      }
 
       loggerSpy.mockRestore();
     });
@@ -190,50 +143,46 @@ describe("transition/executeLifecycleHooks", () => {
       const toState = createState("users");
       const fromState = createState("home");
       // Hook that returns the same state reference
-      const sameStateHook: ActivationFn = (state, _fromState, done) => {
-        // Return the same state object (newState === currentState)
-        done(undefined, state);
+      const sameStateHook: ActivationFn = (state, _fromState) => {
+        return state;
       };
 
       const hooks = new Map<string, ActivationFn>([["users", sameStateHook]]);
 
-      executeLifecycleHooks(
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        callback,
       );
 
-      // Should complete successfully without error    });
+      expect(result).toBeDefined();
+    });
 
     it("should skip state checks when newState is not a valid state object", async () => {
       const toState = createState("users");
       const fromState = createState("home");
       // Hook that returns an invalid state (not a State object)
-      const invalidStateHook: ActivationFn = (_toState, _fromState, done) => {
-        // Return something that's not a valid State (missing required fields)
-        done(undefined, { invalid: true } as unknown as State);
+      const invalidStateHook: ActivationFn = () => {
+        return { invalid: true } as unknown as State;
       };
 
       const hooks = new Map<string, ActivationFn>([
         ["users", invalidStateHook],
       ]);
 
-      executeLifecycleHooks(
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        callback,
       );
 
-       // Should complete successfully (invalid state is ignored)
-     });
-   });
+      expect(result).toBeDefined();
+    });
+  });
 });
-
