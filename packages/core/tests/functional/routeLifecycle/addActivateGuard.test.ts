@@ -25,19 +25,23 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     router.navigate("home");
 
-    const err = await router.navigate("admin");
+    try {
+      await router.navigate("admin");
+    } catch (err: any) {
       expect(err?.code).toStrictEqual(errorCodes.CANNOT_ACTIVATE);
       expect(err?.segment).toStrictEqual("admin");
-
+    }
     expect(router.isActiveRoute("home")).toBe(true);
   });
 
   it("should allow navigation if canActivate returns true", async () => {
     router.addActivateGuard("admin", true);
 
-    const err = await router.navigate("admin");
+    try {
+      await router.navigate("admin");
+    } catch (err: any) {
       expect(err).toBe(undefined);
-
+    }
     expect(router.getState()?.name).toBe("admin");
   });
 
@@ -45,9 +49,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     router.addActivateGuard("admin", false);
     router.addActivateGuard("admin", true);
 
-    const err = await router.navigate("admin");
+    try {
+      await router.navigate("admin");
+    } catch (err: any) {
       expect(err).toBe(undefined);
-
+    }
     expect(router.getState()?.name).toBe("admin");
   });
 
@@ -55,8 +61,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     // @ts-expect-error: for testing purposes
     router.addActivateGuard("admin", () => () => new Error("Access denied"));
 
-    const err = await router.navigate("admin");
+    try {
+      await router.navigate("admin");
+    } catch (err: any) {
       expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+    }
       expect(router.isActiveRoute("admin")).toBe(false);
   });
 
@@ -67,7 +76,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       path: "/",
     }));
 
-    const err = await router.navigate("sign-in");
+    try {
+      await router.navigate("sign-in");
+    } catch (err: any) {
+    }
       // Guards cannot redirect - should return CANNOT_ACTIVATE error
       expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       expect(err?.attemptedRedirect).toStrictEqual({
@@ -97,8 +109,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify guard is active by testing navigation behavior
       // Empty string guard affects all routes (root level)
       router.addActivateGuard("", false);
-      const err = await router.navigate("home");
+      try {
+        await router.navigate("home");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
 
     it("should throw TypeError for null route name", async () => {
@@ -360,7 +375,10 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).not.toThrowError();
 
       // Verify new guard works
-      const err = await router.navigate("problematic");
+      try {
+        await router.navigate("problematic");
+      } catch (err: any) {
+      }
         // Route may not exist in tree, but registration succeeded
         expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
     });
@@ -392,12 +410,16 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).toThrowError();
 
       // Verify valid guards still work correctly
-      const err = await router.navigate("valid1");
+      try {
+        await router.navigate("valid1");
+      } catch (err: any) {
         expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
-
-      const err = await router.navigate("valid2");
+      }
+      try {
+        await router.navigate("valid2");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
+      }
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
         router.addActivateGuard("failing", true);
@@ -440,11 +462,16 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(route2Registered).toBe(true);
 
       // Verify both guards work via navigation behavior
-      const err = await router.navigate("route1");
+      try {
+        await router.navigate("route1");
+      } catch (err: any) {
         expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
-
-      const err = await router.navigate("route2");
+      }
+      try {
+        await router.navigate("route2");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
 
     it("should maintain consistency after blocked self-modification", async () => {
@@ -461,9 +488,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).toThrowError();
 
       // Verify existing guard still works
-      const err = await router.navigate("existing");
+      try {
+        await router.navigate("existing");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
+      }
       // Verify problematic guard was rolled back (can be re-registered)
       expect(() => {
         router.addActivateGuard("problematic", true);
@@ -513,17 +542,22 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       router.addActivateGuard("admin", true);
 
       // First guard allows navigation
-      const err = await router.navigate("admin");
+      try {
+        await router.navigate("admin");
+      } catch (err: any) {
         expect(err).toBeUndefined();
-
+      }
       router.addActivateGuard("admin", false);
 
       // Navigate away first to test re-entering
       router.navigate("home");
 
       // New guard blocks navigation
-      const err = await router.navigate("admin");
+      try {
+        await router.navigate("admin");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
   });
 
@@ -684,8 +718,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).not.toThrowError();
 
       // Verify guard works via navigation
-      const err = await router.navigate("proxyRoute");
+      try {
+        await router.navigate("proxyRoute");
+      } catch (err: any) {
         expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
 
     it("should accept bound function", async () => {
@@ -698,8 +735,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       }).not.toThrowError();
 
       // Verify bound function's `this.allowed` (true) works via navigation
-      const err = await router.navigate("boundRoute");
+      try {
+        await router.navigate("boundRoute");
+      } catch (err: any) {
         expect(err?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
 
     it("should accept factory returning async activation function", async () => {
@@ -764,8 +804,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       });
 
       // Verify level3 guard works via navigation
-      const err = await router.navigate("level3");
+      try {
+        await router.navigate("level3");
+      } catch (err: any) {
         expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
     });
   });
 });

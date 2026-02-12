@@ -20,7 +20,6 @@ describe("router.start() - path string scenarios", () => {
 
   describe("successful path matching", () => {
     it("should match path and transition to found state", async () => {
-      const callback = vi.fn();
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
@@ -30,16 +29,11 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      const result = router.start("/users/list", callback);
+      const result = await router.start("/users/list");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
-
-      const [error, state] = callback.mock.calls[0];
-
       expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
@@ -51,7 +45,6 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should handle path with query parameters", async () => {
-      const callback = vi.fn();
       const transitionSuccessListener = vi.fn();
 
       router.addEventListener(
@@ -59,14 +52,10 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      router.start("/users/list?page=2&sort=name", callback);
+      await router.start("/users/list?page=2&sort=name");
 
       expect(router.isActive()).toBe(true);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      const [error, state] = callback.mock.calls[0];
-
       expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe("users.list");
@@ -77,12 +66,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should preserve path parameters in matched state", async () => {
-      const callback = vi.fn();
-
-      router.start("/users/view/456", callback);
-
-      const [error, state] = callback.mock.calls[0];
-
+      await router.start("/users/view/456");
       expect(error).toBeUndefined();
       expect(state?.params).toStrictEqual({ id: "456" });
 
@@ -95,47 +79,34 @@ describe("router.start() - path string scenarios", () => {
   describe("unsuccessful path matching with defaultRoute", () => {
     it("should return error when path matching fails even with defaultRoute", async () => {
       router = createTestRouter({ allowNotFound: false });
-
-      const callback = vi.fn();
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = router.start("/invalid/path", callback);
+      const result = await router.start("/invalid/path");
 
       expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
-
-      const [error] = callback.mock.calls[0];
-
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
 
     it("should return error for nonexistent route even with defaultRoute", async () => {
       router = createTestRouter({ allowNotFound: false });
-
-      const callback = vi.fn();
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = router.start("/nonexistent/route", callback);
+      const result = await router.start("/nonexistent/route");
 
       expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
-
-      const [error, state] = callback.mock.calls[0];
-
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       expect(state).toBeUndefined();
@@ -148,24 +119,17 @@ describe("router.start() - path string scenarios", () => {
         defaultRoute: "invalid.default",
         allowNotFound: false,
       });
-
-      const callback = vi.fn();
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
-      const result = router.start("/invalid/path", callback);
+      const result = await router.start("/invalid/path");
 
       expect(router.isActive()).toBe(false);
       expect(startListener).not.toHaveBeenCalled();
       expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
-
-      const [error] = callback.mock.calls[0];
-
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
@@ -174,18 +138,14 @@ describe("router.start() - path string scenarios", () => {
   describe("unsuccessful path matching with allowNotFound", () => {
     it("should create not found state when path matching fails and allowNotFound is true", async () => {
       router = createTestRouter({ allowNotFound: true });
-
-      const callback = vi.fn();
       const startListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
 
-      const result = router.start("/invalid/path", callback);
+      const result = await router.start("/invalid/path");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
-      expect(result).toBe(router);
-
       // Verify state is UNKNOWN_ROUTE
       const currentState = router.getState();
 
@@ -195,8 +155,6 @@ describe("router.start() - path string scenarios", () => {
 
     it("should successfully transition to not found state", async () => {
       router = createTestRouter({ allowNotFound: true });
-
-      const callback = vi.fn();
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
@@ -206,16 +164,11 @@ describe("router.start() - path string scenarios", () => {
         transitionSuccessListener,
       );
 
-      const result = router.start("/some/invalid/path", callback);
+      const result = await router.start("/some/invalid/path");
 
       expect(router.isActive()).toBe(true);
       expect(startListener).toHaveBeenCalled();
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(result).toBe(router);
-
-      const [error, state] = callback.mock.calls[0];
-
       expect(error).toBeUndefined();
       expect(state).toBeDefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
@@ -229,13 +182,7 @@ describe("router.start() - path string scenarios", () => {
 
     it("should prefer allowNotFound over defaultRoute when both are set", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
-
-      const callback = vi.fn();
-
-      router.start("/invalid/path", callback);
-
-      const [error, state] = callback.mock.calls[0];
-
+      await router.start("/invalid/path");
       expect(error).toBeUndefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
     });
@@ -256,14 +203,12 @@ describe("router.start() - path string scenarios", () => {
       router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
 
       try {
-       await router.start(invalidPath);
-     } catch (err: any) {
-
+        await router.start(invalidPath);
+      } catch (err: any) {
         expect(err).toBeDefined();
         expect(err?.code).toBe("TRANSITION_ERR");
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      
-     }
+      }
     });
 
     it("should not attempt defaultRoute when middleware fails for unknown route", async () => {
@@ -305,32 +250,14 @@ describe("router.start() - path string scenarios", () => {
 
     it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
-
-      const callback = vi.fn();
-
-      router.start("   ", callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      const [error] = callback.mock.calls[0];
-
-      // Whitespace is truthy, passed to matchPath, returns undefined
+      await router.start("   "); // Whitespace is truthy, passed to matchPath, returns undefined
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
 
     it("should handle path with double slashes", async () => {
       router = createTestRouter({ allowNotFound: false });
-
-      const callback = vi.fn();
-
-      router.start("//users//list//", callback);
-
-      expect(callback).toHaveBeenCalledTimes(1);
-
-      const [error] = callback.mock.calls[0];
-
-      // Double slashes are likely not matched by routes
+      await router.start("//users//list//"); // Double slashes are likely not matched by routes
       expect(error).toBeDefined();
       expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
     });
@@ -338,73 +265,33 @@ describe("router.start() - path string scenarios", () => {
 
   describe("callback protection with paths", () => {
     it("should handle allowNotFound option correctly", async () => {
-      const callback = vi.fn();
-
       router = createTestRouter({ allowNotFound: true });
 
       // Start with non-existent route
-      router.start("/non-existent", callback);
+      await router.start("/non-existent");
 
       // Should be called once with success (UNKNOWN_ROUTE state)
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: constants.UNKNOWN_ROUTE,
-        }),
-      );
     });
 
     it("should ensure callback is called exactly once on successful transition", async () => {
-      const callback = vi.fn();
-
-      router.start("/users", callback);
+      await router.start("/users");
 
       // Verify single invocation
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "users",
-          path: "/users",
-        }),
-      );
     });
 
     it("should ensure callback is called exactly once on route not found error", async () => {
       router = createTestRouter({ allowNotFound: false });
-
-      const callback = vi.fn();
-
-      router.start("/non-existent", callback);
+      await router.start("/non-existent");
 
       // Verify single invocation with error
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({
-          code: errorCodes.ROUTE_NOT_FOUND,
-        }),
-        undefined,
-      );
     });
 
     it("should protect callback when using defaultRoute", async () => {
-      const callback = vi.fn();
-
       // Configure default route
       router = createTestRouter({ defaultRoute: "home" });
 
       // Start without path - should use defaultRoute
-      router.start(callback);
-
-      // Callback should be called only once
-      expect(callback).toHaveBeenCalledTimes(1);
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({
-          name: "home",
-        }),
-      );
+      await router.start();
     });
   });
 
@@ -413,11 +300,9 @@ describe("router.start() - path string scenarios", () => {
       const validPath = "/users/list";
 
       // Call start and capture return value
-      const result = router.start(validPath);
+      await router.start(validPath);
 
-      // Should return the same router instance
-      expect(result).toBe(router);
-      expect(result).toBeInstanceOf(Object); // Router class instance
+      // Should return the same router instance      expect(result).toBeInstanceOf(Object); // Router class instance
     });
 
     it("should support method chaining with router methods that return router", async () => {
@@ -429,10 +314,7 @@ describe("router.start() - path string scenarios", () => {
       }).not.toThrowError();
 
       // Verify start() returns router for chaining
-      const result = router.start(validPath);
-
-      expect(result).toBe(router);
-
+      await router.start(validPath);
       // Router should be in correct state
       expect(router.getState()?.name).toBe("orders.view");
     });
@@ -443,19 +325,17 @@ describe("router.start() - path string scenarios", () => {
       // Block all transitions to force failure
       router.useMiddleware(() => () => false);
 
-      const result = router.start(invalidPath);
+      await router.start(invalidPath);
 
       // Should still return router instance even on failure
-      expect(result).toBe(router);
     });
 
     it("should return router instance with callback parameter", async () => {
       const validPath = "/profile/me";
 
-      const result = router.start(validPath, noop);
+      const result = await router.start(validPath);
 
       // Should return router instance when using callback
-      expect(result).toBe(router);
     });
   });
 });

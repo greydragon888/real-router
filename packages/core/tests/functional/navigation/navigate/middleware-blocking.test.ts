@@ -23,7 +23,7 @@ describe("router.navigate() - middleware blocking", () => {
 
   describe("guards and middleware returning false", () => {
     describe("canDeactivate returns false", () => {
-      it("should block transition when canDeactivate returns false", () => {
+      it("should block transition when canDeactivate returns false", async () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
 
         router.addDeactivateGuard(
@@ -32,244 +32,275 @@ describe("router.navigate() - middleware blocking", () => {
         );
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         blockingDeactivateGuard.mockClear();
 
         // Navigate away - should be blocked
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-
           expect(blockingDeactivateGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first canDeactivate guard returning false", () => {
+      it("should stop on first canDeactivate guard returning false", async () => {
         const blockingGuard = vi.fn().mockReturnValue(false);
         const nextGuard = vi.fn().mockReturnValue(true);
 
         router.addDeactivateGuard("orders", () => blockingGuard);
         router.addDeactivateGuard("orders.pending", () => nextGuard);
 
-        router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         blockingGuard.mockClear();
         nextGuard.mockClear();
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-
           // Based on current implementation order (child first)
           expect(nextGuard).toHaveBeenCalledTimes(1);
           expect(blockingGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should block navigation if canDeactivate returns false", () => {
-        router.navigate("users");
+      it("should block navigation if canDeactivate returns false", async () => {
+        await router.navigate("users");
 
         router.addDeactivateGuard("users", () => () => false);
 
-        router.navigate("orders", (err) => {
+        try {
+          await router.navigate("orders");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        });
+        }
 
         expect(router.getState()?.name).toBe("users");
       });
     });
 
     describe("canActivate returns false", () => {
-      it("should block transition when canActivate returns false", () => {
+      it("should block transition when canActivate returns false", async () => {
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
         router.addActivateGuard("profile", () => blockingActivateGuard);
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
           expect(blockingActivateGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first canActivate guard returning false", () => {
+      it("should stop on first canActivate guard returning false", async () => {
         const blockingGuard = vi.fn().mockReturnValue(false);
         const nextGuard = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard("settings", () => blockingGuard);
         router.addActivateGuard("settings.account", () => nextGuard);
 
-        router.navigate("settings.account", {}, {}, (err) => {
+        try {
+          await router.navigate("settings.account");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
           expect(blockingGuard).toHaveBeenCalledTimes(1);
           // Next guard should not be called due to blocking
           expect(nextGuard).not.toHaveBeenCalled();
-        });
+        }
       });
     });
 
     describe("middleware returns false", () => {
-      it("should block transition when middleware returns false", () => {
+      it("should block transition when middleware returns false", async () => {
         const blockingMiddleware = vi.fn().mockReturnValue(false);
 
         router.useMiddleware(() => blockingMiddleware);
 
-        router.navigate("orders.pending", {}, {}, (err) => {
+        try {
+          await router.navigate("orders.pending");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first middleware returning false", () => {
+      it("should stop on first middleware returning false", async () => {
         const blockingMiddleware = vi.fn().mockReturnValue(false);
         const nextMiddleware = vi.fn().mockReturnValue(true);
 
         router.useMiddleware(() => blockingMiddleware);
         router.useMiddleware(() => nextMiddleware);
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
           // Next middleware should not be called due to blocking
           expect(nextMiddleware).not.toHaveBeenCalled();
-        });
+        }
       });
 
-      it("should block transition in middleware even with passing guards", () => {
+      it("should block transition in middleware even with passing guards", async () => {
         const passingGuard = vi.fn().mockReturnValue(true);
         const blockingMiddleware = vi.fn().mockReturnValue(false);
 
         router.addActivateGuard("orders", () => passingGuard);
         router.useMiddleware(() => blockingMiddleware);
 
-        router.navigate("orders", {}, {}, (err) => {
+        try {
+          await router.navigate("orders");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           // Guard should pass, but middleware blocks
           expect(passingGuard).toHaveBeenCalledTimes(1);
           expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-        });
+        }
       });
     });
   });
 
   describe("guards and middleware returning Promise.resolve(false)", () => {
     describe("canDeactivate returns Promise.resolve(false)", () => {
-      it("should block transition when canDeactivate returns Promise.resolve(false)", () => {
+      it("should block transition when canDeactivate returns Promise.resolve(false)", async () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
 
         router.addDeactivateGuard("orders.pending", () => blockingPromiseGuard);
 
         // Navigate to initial state
-        router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         blockingPromiseGuard.mockClear();
 
         // Navigate away - should be blocked
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first promise-based canDeactivate guard returning false", () => {
+      it("should stop on first promise-based canDeactivate guard returning false", async () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
         const nextPromiseGuard = vi.fn().mockResolvedValue(true);
 
         router.addDeactivateGuard("orders", () => blockingPromiseGuard);
         router.addDeactivateGuard("orders.pending", () => nextPromiseGuard);
 
-        router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         blockingPromiseGuard.mockClear();
         nextPromiseGuard.mockClear();
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-
           // Based on current implementation order (child first)
           expect(nextPromiseGuard).toHaveBeenCalledTimes(1);
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
     });
 
     describe("canActivate returns Promise.resolve(false)", () => {
-      it("should block transition when canActivate returns Promise.resolve(false)", () => {
+      it("should block transition when canActivate returns Promise.resolve(false)", async () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
 
         router.addActivateGuard("profile", () => blockingPromiseGuard);
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first promise-based canActivate guard returning false", () => {
+      it("should stop on first promise-based canActivate guard returning false", async () => {
         const blockingPromiseGuard = vi.fn().mockResolvedValue(false);
         const nextPromiseGuard = vi.fn().mockResolvedValue(true);
 
         router.addActivateGuard("settings", () => blockingPromiseGuard);
         router.addActivateGuard("settings.account", () => nextPromiseGuard);
 
-        router.navigate("settings.account", {}, {}, (err) => {
+        try {
+          await router.navigate("settings.account");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-
           expect(blockingPromiseGuard).toHaveBeenCalledTimes(1);
           // Next guard should not be called due to blocking
           expect(nextPromiseGuard).not.toHaveBeenCalled();
-        });
+        }
       });
     });
 
     describe("middleware returns Promise.resolve(false)", () => {
-      it("should block transition when middleware returns Promise.resolve(false)", () => {
+      it("should block transition when middleware returns Promise.resolve(false)", async () => {
         const blockingPromiseMiddleware = vi.fn().mockResolvedValue(false);
 
         router.useMiddleware(() => blockingPromiseMiddleware);
 
-        router.navigate("orders.pending", {}, {}, (err) => {
+        try {
+          await router.navigate("orders.pending");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);
-        });
+        }
       });
 
-      it("should stop on first promise-based middleware returning false", () => {
+      it("should stop on first promise-based middleware returning false", async () => {
         const blockingPromiseMiddleware = vi.fn().mockResolvedValue(false);
         const nextPromiseMiddleware = vi.fn().mockResolvedValue(true);
 
         router.useMiddleware(() => blockingPromiseMiddleware);
         router.useMiddleware(() => nextPromiseMiddleware);
 
-        router.navigate("profile", {}, {}, (err) => {
+        try {
+          await router.navigate("profile");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);
           // Next middleware should not be called due to blocking
           expect(nextPromiseMiddleware).not.toHaveBeenCalled();
-        });
+        }
       });
 
-      it("should block transition in promise middleware even with passing guards", () => {
+      it("should block transition in promise middleware even with passing guards", async () => {
         const passingPromiseGuard = vi.fn().mockResolvedValue(true);
         const blockingPromiseMiddleware = vi.fn().mockResolvedValue(false);
 
         router.addActivateGuard("orders", () => passingPromiseGuard);
         router.useMiddleware(() => blockingPromiseMiddleware);
 
-        router.navigate("orders", {}, {}, (err) => {
+        try {
+          await router.navigate("orders");
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
           expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-
           // Guard should pass, but middleware blocks
           expect(passingPromiseGuard).toHaveBeenCalledTimes(1);
           expect(blockingPromiseMiddleware).toHaveBeenCalledTimes(1);
-        });
+        }
       });
     });
   });

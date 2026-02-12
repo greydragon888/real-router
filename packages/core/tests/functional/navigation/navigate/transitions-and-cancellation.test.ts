@@ -23,27 +23,27 @@ describe("router.navigate() - transitions and cancellation", () => {
     vi.clearAllMocks();
   });
 
-  it("should be able to handle multiple cancellations", () => {
+  it("should be able to handle multiple cancellations", async () => {
     expect.hasAssertions();
 
     vi.useFakeTimers();
 
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      setTimeout(done, 20);
+    router.useMiddleware(() => async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
     });
 
-    Array.from({ length: 5 })
+    const promises = Array.from({ length: 5 })
       .fill(null)
-      .forEach(() => {
-        router.navigate("users", (err) => {
+      .map(() =>
+        router.navigate("users").catch((err) => {
           expect(err?.code).toStrictEqual(errorCodes.TRANSITION_CANCELLED);
-        });
-      });
+        }),
+      );
 
-    router.navigate("users", () => {
-      router.clearMiddleware();
-    });
+    await router.navigate("users");
+    router.clearMiddleware();
 
+    await Promise.all(promises);
     vi.runAllTimers();
     vi.useRealTimers();
   });
@@ -57,7 +57,7 @@ describe("router.navigate() - transitions and cancellation", () => {
     }).not.toThrowError();
   });
 
-  it("should call middleware, activate, and deactivate hooks during navigation", () => {
+  it("should call middleware, activate, and deactivate hooks during navigation", async () => {
     vi.spyOn(logger, "error").mockImplementation(noop);
 
     const middlewareMock1 = vi.fn().mockReturnValue(true);
@@ -72,13 +72,13 @@ describe("router.navigate() - transitions and cancellation", () => {
     router.addActivateGuard("users", () => activateMock as any);
     router.addDeactivateGuard("users", () => deactivateMock as any);
 
-    router.navigate("users");
+    await router.navigate("users");
 
     expect(middlewareMock1).toHaveBeenCalledTimes(1);
     expect(middlewareMock2).toHaveBeenCalledTimes(1);
     expect(activateMock).toHaveBeenCalledTimes(1);
 
-    router.navigate("index");
+    await router.navigate("index");
 
     expect(middlewareMock1).toHaveBeenCalledTimes(2);
     expect(middlewareMock2).toHaveBeenCalledTimes(2);
@@ -186,7 +186,7 @@ describe("router.navigate() - transitions and cancellation", () => {
     });
 
     describe("done() callback after cancellation", () => {
-      it("should ignore done() calls after navigation cancellation", () => {
+      it("should ignore done() calls after navigation cancellation", async () => {
         let doneFn: DoneFn;
         const asyncMiddleware = vi
           .fn()
@@ -207,8 +207,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         freshRouter.useMiddleware(() => asyncMiddleware);
         freshRouter.start();
 
-        const callback = vi.fn();
-        const cancel = freshRouter.navigate("users", callback);
+        const cancel = freshRouter.navigate("users");
 
         // Cancel navigation
         cancel();
@@ -216,16 +215,20 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Try to call done after cancellation
         doneFn!();
 
-        // Callback should only be called once with TRANSITION_CANCELLED
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback.mock.calls[0][0]).toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        // Navigation should be cancelled
+        try {
+          await cancel;
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
+          expect(err).toMatchObject({
+            code: errorCodes.TRANSITION_CANCELLED,
+          });
+        }
 
         freshRouter.stop();
       });
 
-      it("should not process error from done() after cancellation", () => {
+      it("should not process error from done() after cancellation", async () => {
         let doneFn: DoneFn;
 
         const freshRouter = createTestRouter();
@@ -239,8 +242,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
         freshRouter.start();
 
-        const callback = vi.fn();
-        const cancel = freshRouter.navigate("users", callback);
+        const cancel = freshRouter.navigate("users");
 
         // Cancel navigation
         cancel();
@@ -248,35 +250,43 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Try to call done with error after cancellation
         doneFn!(new RouterError(errorCodes.CANNOT_ACTIVATE));
 
-        // Callback should only be called once with TRANSITION_CANCELLED
-        expect(callback).toHaveBeenCalledTimes(1);
-        expect(callback.mock.calls[0][0]).toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        // Navigation should be cancelled
+        try {
+          await cancel;
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
+          expect(err).toMatchObject({
+            code: errorCodes.TRANSITION_CANCELLED,
+          });
+        }
 
         freshRouter.stop();
       });
     });
 
     describe("Multiple cancellations", () => {
-      it("should handle multiple cancel() calls safely", () => {
+      it("should handle multiple cancel() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.useMiddleware(() => (_toState, _fromState, done) => {
-          setTimeout(done, 100);
+        freshRouter.useMiddleware(() => async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
         });
         freshRouter.start();
 
-        const callback = vi.fn();
-        const cancel = freshRouter.navigate("users", callback);
+        const cancel = freshRouter.navigate("users");
 
         // Call cancel multiple times
         cancel();
         cancel();
         cancel();
 
-        // Callback should only be called once
-        expect(callback).toHaveBeenCalledTimes(1);
+        // Navigation should be cancelled
+        try {
+          await cancel;
+          expect.fail("Should have thrown error");
+        } catch (err: any) {
+          expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
+        }
 
         freshRouter.stop();
       });
