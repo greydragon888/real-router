@@ -10,9 +10,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/clearRoutes", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -20,7 +20,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("basic functionality", () => {
-    it("should clear all routes from tree", () => {
+    it("should clear all routes from tree", async () => {
       // createTestRouter adds default routes (home, etc.)
       expect(router.matchPath("/")).toBeDefined();
 
@@ -30,13 +30,13 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/")).toBeUndefined();
     });
 
-    it("should return router for chaining", () => {
+    it("should return router for chaining", async () => {
       const result = router.clearRoutes();
 
       expect(result).toBe(router);
     });
 
-    it("should allow adding routes after clearing", () => {
+    it("should allow adding routes after clearing", async () => {
       router.clearRoutes();
 
       router.addRoute({ name: "newHome", path: "/new-home" });
@@ -44,7 +44,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/new-home")?.name).toBe("newHome");
     });
 
-    it("should clear nested routes", () => {
+    it("should clear nested routes", async () => {
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -68,7 +68,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/parent/child/grandchild")).toBeUndefined();
     });
 
-    it("should work when called multiple times", () => {
+    it("should work when called multiple times", async () => {
       router.clearRoutes();
       router.clearRoutes();
       router.clearRoutes();
@@ -79,7 +79,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/test")?.name).toBe("test");
     });
 
-    it("should work when router has no routes", () => {
+    it("should work when router has no routes", async () => {
       router.clearRoutes();
 
       // Second clear should not throw
@@ -88,7 +88,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("config cleanup", () => {
-    it("should clear decoders", () => {
+    it("should clear decoders", async () => {
       const decodeParams = vi.fn((params) => ({
         ...params,
         id: Number(params.id),
@@ -115,7 +115,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/with-decoder/123")).toBeUndefined();
     });
 
-    it("should clear encoders", () => {
+    it("should clear encoders", async () => {
       const encodeParams = vi.fn((params) => ({
         ...params,
         id: `${params.id as number}`,
@@ -138,7 +138,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.hasRoute("decoded")).toBe(false);
     });
 
-    it("should clear defaultParams", () => {
+    it("should clear defaultParams", async () => {
       router.addRoute({
         name: "withDefaults",
         path: "/with-defaults",
@@ -157,7 +157,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.hasRoute("withDefaults")).toBe(false);
     });
 
-    it("should clear forwardMap", () => {
+    it("should clear forwardMap", async () => {
       router.addRoute({ name: "target", path: "/target" });
       router.addRoute({
         name: "redirect",
@@ -260,7 +260,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("preserves non-route state", () => {
-    it("should preserve plugins", () => {
+    it("should preserve plugins", async () => {
       const pluginCalls: string[] = [];
       const plugin = () => ({
         onTransitionStart: () => {
@@ -274,13 +274,13 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify plugin is still active
       router.addRoute({ name: "test", path: "/test" });
-      void router.navigate("test");
+      await router.navigate("test");
 
       // Plugin should have been called (proving it's still registered)
       expect(pluginCalls).toContain("start");
     });
 
-    it("should preserve middleware", () => {
+    it("should preserve middleware", async () => {
       const middlewareCalls: string[] = [];
       const middleware = () => async () => {
         middlewareCalls.push("mw");
@@ -294,13 +294,13 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify middleware is still active
       router.addRoute({ name: "test", path: "/test" });
-      void router.navigate("test");
+      await router.navigate("test");
 
       // Middleware should have been called (proving it's still registered)
       expect(middlewareCalls).toContain("mw");
     });
 
-    it("should preserve dependencies", () => {
+    it("should preserve dependencies", async () => {
       interface TestDeps {
         api: { fetch: () => void };
       }
@@ -313,7 +313,7 @@ describe("core/routes/clearRoutes", () => {
       expect(typedRouter.hasDependency("api")).toBe(true);
     });
 
-    it("should preserve options", () => {
+    it("should preserve options", async () => {
       // Options set before start are preserved
       const options = router.getOptions();
 
@@ -323,7 +323,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getOptions().trailingSlash).toBe(options.trailingSlash);
     });
 
-    it("should preserve event listeners", () => {
+    it("should preserve event listeners", async () => {
       const eventLog: string[] = [];
 
       router.addEventListener(events.TRANSITION_SUCCESS, () => {
@@ -334,7 +334,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Add a route and navigate to verify listener is preserved
       router.addRoute({ name: "test", path: "/test" });
-      void router.navigate("test");
+      await router.navigate("test");
 
       // Listener should fire after navigation
       expect(eventLog).toContain("success");
@@ -342,9 +342,9 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("state after clearRoutes - edge cases", () => {
-    it("should clear state to undefined after clearRoutes", () => {
+    it("should clear state to undefined after clearRoutes", async () => {
       // Navigate to a route first
-      void router.navigate("home");
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -358,8 +358,8 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/home")).toBeUndefined();
     });
 
-    it("should have consistent state - both state and matchPath are undefined", () => {
-      void router.navigate("users.list");
+    it("should have consistent state - both state and matchPath are undefined", async () => {
+      await router.navigate("users.list");
 
       const currentState = router.getState();
 
@@ -375,7 +375,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/users/list")).toBeUndefined();
     });
 
-    it("should return cancel function when navigating to non-existent route", () => {
+    it("should return cancel function when navigating to non-existent route", async () => {
       router.clearRoutes();
 
       // Navigation to non-existent route returns cancel function (noop)
@@ -385,25 +385,25 @@ describe("core/routes/clearRoutes", () => {
       expect(typeof result).toBe("function");
     });
 
-    it("should transition to new route after clearRoutes + addRoute", () => {
-      void router.navigate("home");
+    it("should transition to new route after clearRoutes + addRoute", async () => {
+      await router.navigate("home");
 
       router.clearRoutes();
       router.addRoute({ name: "dashboard", path: "/dashboard" });
 
       // Navigate to new route - this works because addRoute registered the route
       // Note: navigate returns synchronously when state update is immediate
-      void router.navigate("dashboard");
+      await router.navigate("dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
     });
 
-    it("should successfully navigate to new route after clearRoutes + addRoute", () => {
+    it("should successfully navigate to new route after clearRoutes + addRoute", async () => {
       // This is the intended workflow for route replacement
       router.clearRoutes();
       router.addRoute({ name: "newRoute", path: "/new" });
 
-      void router.navigate("newRoute");
+      await router.navigate("newRoute");
 
       // Navigation should work - state is updated
       expect(router.getState()?.name).toBe("newRoute");
@@ -411,7 +411,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("chaining patterns", () => {
-    it("should support clear-then-add pattern", () => {
+    it("should support clear-then-add pattern", async () => {
       router.clearRoutes().addRoute([
         { name: "home", path: "/" },
         { name: "about", path: "/about" },
@@ -423,7 +423,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/contact")?.name).toBe("contact");
     });
 
-    it("should support complete route replacement", () => {
+    it("should support complete route replacement", async () => {
       // Original routes
       router.addRoute({ name: "oldRoute", path: "/old" });
 
@@ -438,7 +438,7 @@ describe("core/routes/clearRoutes", () => {
   describe("blocking during navigation", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     });
 
@@ -505,7 +505,7 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation
-      void router.navigate("slowRoute");
+      await router.navigate("slowRoute");
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -582,7 +582,7 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation on router1
-      void router.navigate("asyncRoute");
+      await router.navigate("asyncRoute");
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -611,7 +611,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("router lifecycle states", () => {
-    it("should work on router that was never started", () => {
+    it("should work on router that was never started", async () => {
       // Create router without calling start()
       const unstartedRouter = createTestRouter();
 
@@ -628,9 +628,9 @@ describe("core/routes/clearRoutes", () => {
       expect(unstartedRouter.matchPath("/fresh")?.name).toBe("fresh");
     });
 
-    it("should work on stopped router", () => {
+    it("should work on stopped router", async () => {
       // Navigate to a route first
-      void router.navigate("home");
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -651,9 +651,9 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/new")?.name).toBe("newRoute");
     });
 
-    it("should work correctly with stop-start-stop cycle", () => {
+    it("should work correctly with stop-start-stop cycle", async () => {
       // First cycle
-      void router.navigate("home");
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -668,7 +668,7 @@ describe("core/routes/clearRoutes", () => {
       // since the old defaultRoute ("home") no longer exists and setOption is removed
       router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      void router.start();
+      await router.start();
 
       expect(router.getState()?.name).toBe("dashboard");
 
@@ -681,7 +681,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("forwardFnMap cleanup", () => {
-    it("should clear forwardFnMap entries on clearRoutes", () => {
+    it("should clear forwardFnMap entries on clearRoutes", async () => {
       router.addRoute({ name: "fn-dest", path: "/fn-dest" });
       router.addRoute({
         name: "fn-src",

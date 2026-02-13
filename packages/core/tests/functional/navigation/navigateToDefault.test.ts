@@ -24,9 +24,9 @@ async function withDefault(
 }
 
 describe("navigateToDefault", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -111,8 +111,8 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should return cancel function when defaultRoute is set", () => {
-      withDefault("users");
+    it("should return cancel function when defaultRoute is set", async () => {
+      await withDefault("users");
 
       const result = router.navigateToDefault();
 
@@ -154,7 +154,7 @@ describe("navigateToDefault", () => {
 
   describe("when defaultRoute is set", () => {
     it("should navigate to defaultRoute with correct route name", async () => {
-      withDefault("users");
+      await withDefault("users");
 
       const state = await router.navigateToDefault({});
 
@@ -165,7 +165,7 @@ describe("navigateToDefault", () => {
     it("should navigate to defaultRoute with defaultParams if set", async () => {
       const defaultParams = { id: 42, tab: "profile" };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -174,7 +174,7 @@ describe("navigateToDefault", () => {
     });
 
     it("should navigate to nested defaultRoute correctly", async () => {
-      withDefault("orders.pending");
+      await withDefault("orders.pending");
 
       const state = await router.navigateToDefault({});
 
@@ -185,7 +185,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultRoute with complex path structure", async () => {
       const params = { section: "section123", id: 456 };
 
-      withDefault("section.view", params);
+      await withDefault("section.view", params);
 
       const state = await router.navigateToDefault({});
 
@@ -356,7 +356,7 @@ describe("navigateToDefault", () => {
         id: 123,
       };
 
-      withDefault("orders.view", defaultParams);
+      await withDefault("orders.view", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -384,7 +384,7 @@ describe("navigateToDefault", () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn().mockReturnValue(true);
 
-      withDefault("settings.account");
+      await withDefault("settings.account");
       router.addActivateGuard("settings.account", () => canActivateGuard);
       router.useMiddleware(() => middleware);
 
@@ -520,7 +520,7 @@ describe("navigateToDefault", () => {
     it("should use defaultParams for successful navigation", async () => {
       const defaultParams = { id: 555 };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -532,7 +532,7 @@ describe("navigateToDefault", () => {
     it("should pass defaultParams through to final state", async () => {
       const defaultParams = { param: "custom_value" };
 
-      withDefault("withDefaultParam", defaultParams);
+      await withDefault("withDefaultParam", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -544,7 +544,7 @@ describe("navigateToDefault", () => {
     it("should work with route that has encoded params", async () => {
       const defaultParams = { one: "value1", two: "value2" };
 
-      withDefault("withEncoder", defaultParams);
+      await withDefault("withEncoder", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -556,7 +556,7 @@ describe("navigateToDefault", () => {
     it("should handle defaultParams with nested route", async () => {
       const defaultParams = { userId: "admin" };
 
-      withDefault("profile.user", defaultParams);
+      await withDefault("profile.user", defaultParams);
 
       const state = await router.navigateToDefault();
 
@@ -633,10 +633,10 @@ describe("navigateToDefault", () => {
       }
     });
 
-    it("should freeze defaultParams at construction (immutable options)", () => {
+    it("should freeze defaultParams at construction (immutable options)", async () => {
       const defaultParams = { id: 100, mutable: "original" };
 
-      withDefault("users.view", defaultParams);
+      await withDefault("users.view", defaultParams);
 
       // Options are deep-frozen, so mutation throws TypeError
       expect(() => {
@@ -688,8 +688,8 @@ describe("navigateToDefault", () => {
   });
 
   describe("argument parsing", () => {
-    beforeEach(() => {
-      withDefault("users", { tab: "main" });
+    beforeEach(async () => {
+      await withDefault("users", { tab: "main" });
     });
 
     it("should handle no arguments", () => {
@@ -766,8 +766,8 @@ describe("navigateToDefault", () => {
   });
 
   describe("navigation options", () => {
-    beforeEach(() => {
-      withDefault("users", { id: 123 });
+    beforeEach(async () => {
+      await withDefault("users", { id: 123 });
     });
 
     it("should pass replace option through to state meta", async () => {
@@ -844,8 +844,8 @@ describe("navigateToDefault", () => {
   });
 
   describe("error handling", () => {
-    beforeEach(() => {
-      withDefault("users", { id: 123 });
+    beforeEach(async () => {
+      await withDefault("users", { id: 123 });
     });
 
     it("should handle navigation errors correctly", async () => {
@@ -977,8 +977,8 @@ describe("navigateToDefault", () => {
   });
 
   describe("return value", () => {
-    beforeEach(() => {
-      withDefault("users", { id: 123 });
+    beforeEach(async () => {
+      await withDefault("users", { id: 123 });
     });
 
     it("should return cancel function that cancels defaultRoute navigation", async () => {
@@ -1180,8 +1180,8 @@ describe("navigateToDefault", () => {
   });
 
   describe("edge cases", () => {
-    beforeEach(() => {
-      withDefault("users", { id: 123 });
+    beforeEach(async () => {
+      await withDefault("users", { id: 123 });
     });
 
     it("should handle router.getOptions() returning partial options", async () => {

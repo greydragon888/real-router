@@ -19,7 +19,7 @@ const defaultOptions = { defaultRoute: "home" };
 
 describe("SSR race conditions", () => {
   describe("cloned router instance - solution", () => {
-    it("should isolate state between cloned instances", () => {
+    it("should isolate state between cloned instances", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       // Two isolated clones (simulating two SSR requests)
@@ -44,7 +44,7 @@ describe("SSR race conditions", () => {
       routerB.stop();
     });
 
-    it("should return correct route from cloned instance", () => {
+    it("should return correct route from cloned instance", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       const clone1 = baseRouter.clone();
@@ -59,7 +59,7 @@ describe("SSR race conditions", () => {
       });
     });
 
-    it("should isolate route configuration updates between clones", () => {
+    it("should isolate route configuration updates between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       const clone1 = baseRouter.clone();
@@ -79,7 +79,7 @@ describe("SSR race conditions", () => {
       });
     });
 
-    it("should isolate lifecycle handlers between clones", () => {
+    it("should isolate lifecycle handlers between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
       const guardCallsClone1: string[] = [];
       const guardCallsClone2: string[] = [];
@@ -121,7 +121,7 @@ describe("SSR race conditions", () => {
     let originalConfig: ReturnType<typeof logger.getConfig>;
     let router: Router;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       // Save original config
       originalConfig = logger.getConfig();
 
@@ -133,7 +133,7 @@ describe("SSR race conditions", () => {
       });
 
       router = createRouter(routes, defaultOptions);
-      void router.start();
+      await router.start();
     });
 
     afterEach(() => {
@@ -146,7 +146,7 @@ describe("SSR race conditions", () => {
       // Add async guard to make navigation async
       router.addActivateGuard("admin", () => async () => {
         // Start another navigation while this one is in progress
-        void router.navigate("public");
+        await router.navigate("public");
         // Allow time for warning to be logged
         await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -155,7 +155,7 @@ describe("SSR race conditions", () => {
 
       // Start navigation (will be async due to guard)
       await new Promise<void>((resolve) => {
-        void router.navigate("admin", {}).then(() => {
+        router.navigate("admin", {}).then(() => {
           // This callback is called when admin navigation is cancelled
           // or when it completes
           resolve();
@@ -174,13 +174,13 @@ describe("SSR race conditions", () => {
       expect(concurrentWarning).toBeDefined();
     });
 
-    it("should not warn for sequential navigations", () => {
+    it("should not warn for sequential navigations", async () => {
       // First navigation (sync)
-      void router.navigate("admin");
+      await router.navigate("admin");
       logCallback.mockClear();
 
       // Second navigation (sync, after first completed)
-      void router.navigate("public");
+      await router.navigate("public");
 
       // No concurrent navigation warning
       const allCalls = logCallback.mock.calls as Parameters<LogCallback>[];
@@ -199,7 +199,7 @@ describe("SSR race conditions", () => {
     it("should handle navigation cancellation correctly", async () => {
       const router = createRouter(routes, defaultOptions);
 
-      void router.start();
+      await router.start();
 
       let secondNavCompleted = false;
 
@@ -211,10 +211,10 @@ describe("SSR race conditions", () => {
       });
 
       // Start async navigation (first navigation will be cancelled)
-      void router.navigate("admin");
+      await router.navigate("admin");
 
       // Immediately start second navigation (will cancel first)
-      void router.navigate("public", {}).then(() => {
+      await router.navigate("public", {}).then(() => {
         secondNavCompleted = true;
       });
 
@@ -228,7 +228,7 @@ describe("SSR race conditions", () => {
       router.stop();
     });
 
-    it("should not leak state from clone to base router", () => {
+    it("should not leak state from clone to base router", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
       const clone = baseRouter.clone();
 
@@ -243,7 +243,7 @@ describe("SSR race conditions", () => {
       expect(baseRouter.getState()).toBeUndefined();
     });
 
-    it("should maintain route tree independence between clones", () => {
+    it("should maintain route tree independence between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       const clone1 = baseRouter.clone();
