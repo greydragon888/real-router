@@ -346,7 +346,7 @@ describe("core/routes/clearRoutes", () => {
       // Navigate to a route first
       await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       // Clear all routes
       router.clearRoutes();
@@ -382,11 +382,12 @@ describe("core/routes/clearRoutes", () => {
       // This is current behavior - navigate returns cancel function when route not found
       const result = router.navigate("home");
 
-      expect(typeof result).toBe("function");
+      expect(result).toBeInstanceOf(Promise);
+      await expect(result).rejects.toThrow();
     });
 
     it("should transition to new route after clearRoutes + addRoute", async () => {
-      await router.navigate("home");
+      await router.navigate("users.list");
 
       router.clearRoutes();
       router.addRoute({ name: "dashboard", path: "/dashboard" });
@@ -638,9 +639,9 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work on stopped router", async () => {
       // Navigate to a route first
-      await router.navigate("home");
+      await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       // Stop the router
       router.stop();
@@ -661,9 +662,9 @@ describe("core/routes/clearRoutes", () => {
 
     it("should work correctly with stop-start-stop cycle", async () => {
       // First cycle
-      await router.navigate("home");
+      await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       router.stop();
       router.clearRoutes();
