@@ -344,7 +344,7 @@ describe("core/routes/clearRoutes", () => {
   describe("state after clearRoutes - edge cases", () => {
     it("should clear state to undefined after clearRoutes", async () => {
       // Navigate to a route first
-      await router.navigate("home");
+      await router.navigate("users.list");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -566,7 +566,7 @@ describe("core/routes/clearRoutes", () => {
     it("should not affect other router instances", async () => {
       const router2 = createTestRouter();
 
-      router2.start("");
+      await router2.start();
 
       let resolveCanActivate: () => void;
 

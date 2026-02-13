@@ -155,11 +155,17 @@ describe("SSR race conditions", () => {
 
       // Start navigation (will be async due to guard)
       await new Promise<void>((resolve) => {
-        router.navigate("admin", {}).then(() => {
-          // This callback is called when admin navigation is cancelled
-          // or when it completes
-          resolve();
-        });
+        router
+          .navigate("admin", {})
+          .then(() => {
+            // This callback is called when admin navigation is cancelled
+            // or when it completes
+            resolve();
+          })
+          .catch(() => {
+            // Ignore errors
+            resolve();
+          });
       });
 
       // Check that concurrent navigation warning was logged

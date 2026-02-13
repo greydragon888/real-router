@@ -70,7 +70,7 @@ describe("Browser Plugin Integration", () => {
     vi.spyOn(console, "warn").mockImplementation(noop);
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockedBrowser = createMockedBrowser();
     globalThis.history.replaceState({}, "", "/");
 
@@ -94,7 +94,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Hook Execution Order", () => {
-    it("calls plugins in registration order", () => {
+    it("calls plugins in registration order", async () => {
       const executionOrder: string[] = [];
 
       router.usePlugin(
@@ -119,8 +119,8 @@ describe("Browser Plugin Integration", () => {
         },
       );
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       // Verify execution order - hooks fire in order per lifecycle stage
       // Note: Two-phase start (Issue #50) means TRANSITION_START fires before ROUTER_START
@@ -141,7 +141,7 @@ describe("Browser Plugin Integration", () => {
       ]);
     });
 
-    it("browser plugin updates URL in registration order", () => {
+    it("browser plugin updates URL in registration order", async () => {
       const executionOrder: string[] = [];
       const stateHistory: State[] = [];
 
@@ -168,7 +168,7 @@ describe("Browser Plugin Integration", () => {
         },
       );
 
-      router.start();
+      await router.start();
 
       // Browser updates history during its onTransitionSuccess hook
       // which fires after early plugin but before late plugin
@@ -184,7 +184,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("State Modification", () => {
-    it("handles state modifications by other plugins", () => {
+    it("handles state modifications by other plugins", async () => {
       const modifiedStates: State[] = [];
 
       // Plugin that modifies state
@@ -198,30 +198,30 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
-      router.navigate("users.view", { id: "1" });
+      await router.start();
+      await router.navigate("users.view", { id: "1" });
 
       // Browser plugin should handle modified state
       expect(currentHistoryState?.params.modified).toBe(true);
       expect(modifiedStates.length).toBeGreaterThan(0);
     });
 
-    it("persistent params work with browser plugin", () => {
+    it("persistent params work with browser plugin", async () => {
       router.usePlugin(
         createPersistentParamsPlugin({ params: ["lang", "theme"] }),
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
+      await router.start();
 
       // Set persistent params
-      router.navigate("home", { lang: "en", theme: "dark" });
+      await router.navigate("home", { lang: "en", theme: "dark" });
 
       expect(router.getState()?.params.lang).toBe("en");
       expect(router.getState()?.params.theme).toBe("dark");
 
       // Navigate to different route - params should persist
-      router.navigate("users.list");
+      await router.navigate("users.list");
 
       expect(router.getState()?.params.lang).toBe("en");
       expect(router.getState()?.params.theme).toBe("dark");
@@ -233,7 +233,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Error Handling", () => {
-    it("handles errors in other plugin hooks gracefully", () => {
+    it("handles errors in other plugin hooks gracefully", async () => {
       const executionOrder: string[] = [];
 
       router.usePlugin(
@@ -248,8 +248,8 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       // Browser plugin should still work despite error
       expect(currentHistoryState?.name).toBe("users.list");
@@ -257,7 +257,7 @@ describe("Browser Plugin Integration", () => {
       expect(executionOrder).toContain("after:onTransitionSuccess");
     });
 
-    it("browser plugin works when other plugins throw on start", () => {
+    it("browser plugin works when other plugins throw on start", async () => {
       router.usePlugin(
         createErrorPlugin({
           throwOn: "onStart",
@@ -267,7 +267,7 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
       // Should not crash
-      expect(() => router.start()).not.toThrowError();
+      await expect(router.start()).not.toThrowError();
     });
   });
 
@@ -328,7 +328,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Multiple Plugins Combinations", () => {
-    it("works with 5+ plugins simultaneously", () => {
+    it("works with 5+ plugins simultaneously", async () => {
       const logs: string[] = [];
       const executionOrder: string[] = [];
 
@@ -342,8 +342,8 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
-      router.navigate("users.view", { id: "1", sessionId: "abc" });
+      await router.start();
+      await router.navigate("users.view", { id: "1", sessionId: "abc" });
 
       // Logger logged events
       expect(logs.length).toBeGreaterThan(0);
@@ -354,7 +354,7 @@ describe("Browser Plugin Integration", () => {
       expect(executionOrder).toContain("tracker2:onTransitionSuccess");
 
       // Persistent params worked
-      router.navigate("home");
+      await router.navigate("home");
 
       expect(router.getState()?.params.sessionId).toBe("abc");
 
@@ -362,7 +362,7 @@ describe("Browser Plugin Integration", () => {
       expect(currentHistoryState?.name).toBe("home");
     });
 
-    it("maintains stability with plugin lifecycle operations", () => {
+    it("maintains stability with plugin lifecycle operations", async () => {
       const logs: string[] = [];
 
       router.usePlugin(createLoggerPlugin({ logs }));
@@ -370,8 +370,8 @@ describe("Browser Plugin Integration", () => {
         browserPluginFactory({}, mockedBrowser),
       );
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       expect(currentHistoryState?.name).toBe("users.list");
 
@@ -379,7 +379,7 @@ describe("Browser Plugin Integration", () => {
       browserUnsubscribe();
 
       // Router should still work
-      router.navigate("home");
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
 
@@ -389,7 +389,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Edge Cases", () => {
-    it("handles rapid plugin registrations", () => {
+    it("handles rapid plugin registrations", async () => {
       const executionOrder: string[] = [];
 
       // Register many plugins rapidly
@@ -404,8 +404,8 @@ describe("Browser Plugin Integration", () => {
 
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       // All plugins should execute
       for (let i = 0; i < 10; i++) {
@@ -415,7 +415,7 @@ describe("Browser Plugin Integration", () => {
       expect(currentHistoryState?.name).toBe("users.list");
     });
 
-    it("handles plugins registered after browser plugin", () => {
+    it("handles plugins registered after browser plugin", async () => {
       const executionOrder: string[] = [];
 
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
@@ -423,15 +423,15 @@ describe("Browser Plugin Integration", () => {
         createTrackingPlugin({ namespace: "late", executionOrder }),
       );
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       // Late plugin should still execute
       expect(executionOrder).toContain("late:onTransitionSuccess");
       expect(currentHistoryState?.name).toBe("users.list");
     });
 
-    it("handles state with complex nested params", () => {
+    it("handles state with complex nested params", async () => {
       router.usePlugin(
         createStateModifierPlugin({
           modifyState: (state) => {
@@ -442,8 +442,8 @@ describe("Browser Plugin Integration", () => {
       );
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
-      router.navigate("users.list");
+      await router.start();
+      await router.navigate("users.list");
 
       // Browser plugin should handle complex params
       expect(currentHistoryState?.params.nested).toStrictEqual({
@@ -454,19 +454,19 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Performance", () => {
-    it("handles many sequential transitions with multiple plugins", () => {
+    it("handles many sequential transitions with multiple plugins", async () => {
       router.usePlugin(createLoggerPlugin());
       router.usePlugin(createTrackingPlugin());
       router.usePlugin(createPersistentParamsPlugin({ params: ["lang"] }));
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      router.start();
+      await router.start();
 
       // 50 rapid transitions
       for (let i = 0; i < 50; i++) {
         const route = i % 2 === 0 ? "home" : "users.list";
 
-        router.navigate(route, { lang: "en" });
+        await router.navigate(route, { lang: "en" });
       }
 
       // Final state should be correct (49 % 2 === 1, so last route is "users.list")

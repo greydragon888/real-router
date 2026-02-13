@@ -61,12 +61,12 @@ const withoutMeta = (state: State) => ({
   path: state.path,
 });
 
-describe("Browser Plugin", () => {
+describe("Browser Plugin", async () => {
   beforeAll(() => {
     vi.spyOn(console, "error").mockImplementation(noop);
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
     mockedBrowser = createMockedBrowser();
     globalThis.history.replaceState({}, "", "/");
 
@@ -90,7 +90,7 @@ describe("Browser Plugin", () => {
 
   describe("Core URL Operations", () => {
     describe("buildUrl", () => {
-      it("builds URL without hash or base", () => {
+      it("builds URL without hash or base", async () => {
         router.usePlugin(browserPluginFactory({ useHash: false }));
 
         expect(router.buildUrl("home", {})).toBe("/home");
@@ -99,14 +99,14 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("builds URL with base path", () => {
+      it("builds URL with base path", async () => {
         router.usePlugin(browserPluginFactory({ base: "/app" }));
 
         expect(router.buildUrl("home", {})).toBe("/app/home");
         expect(router.buildUrl("users.list", {})).toBe("/app/users/list");
       });
 
-      it("builds URL with hash", () => {
+      it("builds URL with hash", async () => {
         router.usePlugin(browserPluginFactory({ useHash: true }));
 
         expect(router.buildUrl("home", {})).toBe("#/home");
@@ -115,7 +115,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("builds URL with hashPrefix", () => {
+      it("builds URL with hashPrefix", async () => {
         router.usePlugin(
           browserPluginFactory({ useHash: true, hashPrefix: "!" }),
         );
@@ -126,7 +126,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("builds URL with base + hash + hashPrefix", () => {
+      it("builds URL with base + hash + hashPrefix", async () => {
         router.usePlugin(
           browserPluginFactory({
             base: "/app",
@@ -138,13 +138,13 @@ describe("Browser Plugin", () => {
         expect(router.buildUrl("home", {})).toBe("/app#!/home");
       });
 
-      it("handles special characters in base (escapeRegExp)", () => {
+      it("handles special characters in base (escapeRegExp)", async () => {
         router.usePlugin(browserPluginFactory({ base: "/app.test" }));
 
         expect(router.buildUrl("home", {})).toBe("/app.test/home");
       });
 
-      it("handles special characters in hashPrefix (escapeRegExp)", () => {
+      it("handles special characters in hashPrefix (escapeRegExp)", async () => {
         router.usePlugin(
           browserPluginFactory({ useHash: true, hashPrefix: "." }),
         );
@@ -154,11 +154,11 @@ describe("Browser Plugin", () => {
     });
 
     describe("matchUrl (URL API)", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({ useHash: false }));
       });
 
-      it("matches standard URL", () => {
+      it("matches standard URL", async () => {
         const state = router.matchUrl("https://example.com/users/list");
 
         expect(withoutMeta(state!)).toStrictEqual({
@@ -168,7 +168,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("matches URL with query params", () => {
+      it("matches URL with query params", async () => {
         const state = router.matchUrl(
           "https://example.com/users/list?page=1&sort=asc",
         );
@@ -180,7 +180,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles IPv6 addresses", () => {
+      it("handles IPv6 addresses", async () => {
         const state = router.matchUrl("https://[::1]:8080/users/list");
 
         expect(withoutMeta(state!)).toStrictEqual({
@@ -190,7 +190,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles Unicode domains", () => {
+      it("handles Unicode domains", async () => {
         const state = router.matchUrl("https://例え.jp/home");
 
         expect(withoutMeta(state!)).toStrictEqual({
@@ -200,14 +200,14 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles double slashes", () => {
+      it("handles double slashes", async () => {
         const state = router.matchUrl("https://example.com//users//list");
 
         // Double slashes don't match route definition /users/list
         expect(state).toBeUndefined();
       });
 
-      it("returns undefined for invalid URL protocol (graceful)", () => {
+      it("returns undefined for invalid URL protocol (graceful)", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         const state = router.matchUrl("not-a-valid-url://example.com");
@@ -220,7 +220,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("strips base from URL", () => {
+      it("strips base from URL", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         router.usePlugin(browserPluginFactory({ base: "/app" }));
 
@@ -233,7 +233,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("matches hash URL without hashPrefix (line 163 - hashPrefixRegExp null branch)", () => {
+      it("matches hash URL without hashPrefix (line 163 - hashPrefixRegExp null branch)", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         // useHash: true WITHOUT hashPrefix - hashPrefixRegExp will be null
         router.usePlugin(browserPluginFactory({ useHash: true }));
@@ -247,7 +247,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("matches hash URL with hashPrefix (line 163 - hashPrefixRegExp not null branch)", () => {
+      it("matches hash URL with hashPrefix (line 163 - hashPrefixRegExp not null branch)", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         // useHash: true WITH hashPrefix - hashPrefixRegExp will not be null
         router.usePlugin(
@@ -263,7 +263,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles base path where stripped path needs leading slash (line 174)", () => {
+      it("handles base path where stripped path needs leading slash (line 174)", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         // Base matches exactly, stripped path will be empty or not start with /
         router.usePlugin(browserPluginFactory({ base: "/app" }));
@@ -282,14 +282,14 @@ describe("Browser Plugin", () => {
   });
 
   describe("Router Lifecycle", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
     it("updates history on start", async () => {
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await router.start();
+      await await router.start();
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         router.getState(),
@@ -299,7 +299,7 @@ describe("Browser Plugin", () => {
     });
 
     it("updates history on navigation", async () => {
-      await router.start();
+      await await router.start();
 
       vi.spyOn(mockedBrowser, "pushState");
 
@@ -313,7 +313,7 @@ describe("Browser Plugin", () => {
     });
 
     it("uses replaceState with replace option", async () => {
-      await router.start();
+      await await router.start();
 
       vi.spyOn(mockedBrowser, "replaceState");
 
@@ -324,12 +324,12 @@ describe("Browser Plugin", () => {
   });
 
   describe("Popstate Handling", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
-      router.start();
+      await router.start();
     });
 
-    it("handles popstate with valid state", () => {
+    it("handles popstate with valid state", async () => {
       const targetState = {
         name: "users.view",
         params: { id: "1" },
@@ -344,7 +344,7 @@ describe("Browser Plugin", () => {
       expect(router.getState()?.name).toBe("users.view");
     });
 
-    it("navigates to default on missing state", () => {
+    it("navigates to default on missing state", async () => {
       // Use location that doesn't match any route
       globalThis.history.replaceState({}, "", "/nonexistent-path");
       const navigateSpy = vi.spyOn(router, "navigateToDefault");
@@ -354,7 +354,7 @@ describe("Browser Plugin", () => {
       expect(navigateSpy).toHaveBeenCalled();
     });
 
-    it("skips transition for equal states", () => {
+    it("skips transition for equal states", async () => {
       const currentState = router.getState();
       const transitionSpy = vi.spyOn(router, "navigateToState");
 
@@ -365,7 +365,7 @@ describe("Browser Plugin", () => {
       expect(transitionSpy).not.toHaveBeenCalled();
     });
 
-    it("restores state on CANNOT_DEACTIVATE", () => {
+    it("restores state on CANNOT_DEACTIVATE", async () => {
       router.navigate("users.list");
 
       vi.spyOn(router, "navigateToState").mockImplementation(
@@ -388,12 +388,12 @@ describe("Browser Plugin", () => {
 
   describe("Edge Cases", () => {
     describe("Race Condition Protection", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("defers popstate during transition", () => {
+      it("defers popstate during transition", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Mock slow transition
@@ -543,12 +543,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Error Recovery", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("recovers from critical error in onPopState", () => {
+      it("recovers from critical error in onPopState", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         // Mock router.getState to throw
@@ -570,7 +570,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("recovers by syncing browser state after critical error (lines 385-387)", () => {
+      it("recovers by syncing browser state after critical error (lines 385-387)", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
         const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
@@ -606,7 +606,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles recovery failure gracefully (lines 389-395)", () => {
+      it("handles recovery failure gracefully (lines 389-395)", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         // Navigate to establish current state
@@ -648,19 +648,19 @@ describe("Browser Plugin", () => {
     });
 
     describe("onStart listener management", () => {
-      it("removes existing popstate listener when onStart called twice (line 410)", () => {
+      it("removes existing popstate listener when onStart called twice (line 410)", async () => {
         const removeEventSpy = vi.spyOn(globalThis, "removeEventListener");
 
         unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
         // First start
-        router.start();
+        await router.start();
 
         // Stop - this should remove the listener
         router.stop();
 
         // Start again - this triggers onStart which checks if listener exists
-        router.start();
+        await router.start();
 
         // The listener should be properly managed
         expect(removeEventSpy).toHaveBeenCalledWith(
@@ -671,7 +671,7 @@ describe("Browser Plugin", () => {
         removeEventSpy.mockRestore();
       });
 
-      it("cleans up existing listener when same factory used with multiple routers (line 410)", () => {
+      it("cleans up existing listener when same factory used with multiple routers (line 410)", async () => {
         // This test verifies that removePopStateListener is properly cleaned up
         // when the same factory is reused with a different router
         const removeEventSpy = vi.spyOn(globalThis, "removeEventListener");
@@ -713,7 +713,7 @@ describe("Browser Plugin", () => {
     });
 
     describe("null state handling in onPopState (lines 346-350)", () => {
-      it("handles null state from matchPath when no default route", () => {
+      it("handles null state from matchPath when no default route", async () => {
         // Create router without default route
         const noDefaultRouter = createRouter(
           [{ name: "home", path: "/home" }],
@@ -742,7 +742,7 @@ describe("Browser Plugin", () => {
     });
 
     describe("URL parsing error (lines 180-182)", () => {
-      it("handles URL constructor throwing (lines 180-182)", () => {
+      it("handles URL constructor throwing (lines 180-182)", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
@@ -777,12 +777,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("lastKnownState Immutability", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("returns cached frozen object on repeated get", () => {
+      it("returns cached frozen object on repeated get", async () => {
         router.replaceHistoryState("home");
 
         const state1 = router.lastKnownState;
@@ -793,7 +793,7 @@ describe("Browser Plugin", () => {
         expect(Object.isFrozen(state1)).toBe(true);
       });
 
-      it("creates new frozen object when state changes", () => {
+      it("creates new frozen object when state changes", async () => {
         router.navigate("home");
         const state1 = router.lastKnownState;
 
@@ -808,7 +808,7 @@ describe("Browser Plugin", () => {
         expect(Object.isFrozen(state2)).toBe(true);
       });
 
-      it("prevents mutation of returned state", () => {
+      it("prevents mutation of returned state", async () => {
         router.replaceHistoryState("home");
 
         const state = router.lastKnownState!;
@@ -820,7 +820,7 @@ describe("Browser Plugin", () => {
         expect(state.name).toBe("home");
       });
 
-      it("returns undefined after teardown", () => {
+      it("returns undefined after teardown", async () => {
         router.replaceHistoryState("home");
 
         expect(router.lastKnownState).toBeDefined();
@@ -830,7 +830,7 @@ describe("Browser Plugin", () => {
         expect(router.lastKnownState).toBeUndefined();
       });
 
-      it("prevents external mutations", () => {
+      it("prevents external mutations", async () => {
         router.replaceHistoryState("home");
 
         const state = router.lastKnownState!;
@@ -840,7 +840,7 @@ describe("Browser Plugin", () => {
         }).toThrowError();
       });
 
-      it("sets undefined when setting falsy value (line 284)", () => {
+      it("sets undefined when setting falsy value (line 284)", async () => {
         router.replaceHistoryState("home");
 
         expect(router.lastKnownState).toBeDefined();
@@ -853,7 +853,7 @@ describe("Browser Plugin", () => {
         expect(router.lastKnownState).toBeUndefined();
       });
 
-      it("stores copy on set", () => {
+      it("stores copy on set", async () => {
         const externalState = {
           name: "home",
           params: {},
@@ -870,7 +870,7 @@ describe("Browser Plugin", () => {
     });
 
     describe("Configuration Validation", () => {
-      it("physically removes preserveHash in hash mode", () => {
+      it("physically removes preserveHash in hash mode", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Pass conflicting options
@@ -881,7 +881,7 @@ describe("Browser Plugin", () => {
 
         // Apply plugin to access internal options
         router.usePlugin(plugin);
-        router.start();
+        await router.start();
 
         // Verify warning was shown
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -897,7 +897,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("physically removes hashPrefix in history mode", () => {
+      it("physically removes hashPrefix in history mode", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Pass conflicting options
@@ -907,7 +907,7 @@ describe("Browser Plugin", () => {
             mockedBrowser,
           ),
         );
-        router.start();
+        await router.start();
 
         // Verify warning was shown
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -922,7 +922,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("warns when preserveHash is used with hash mode", () => {
+      it("warns when preserveHash is used with hash mode", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -936,7 +936,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("warns when hashPrefix is used with history mode", () => {
+      it("warns when hashPrefix is used with history mode", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -950,7 +950,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("does not warn for valid hash mode configuration", () => {
+      it("does not warn for valid hash mode configuration", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -964,7 +964,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("does not warn for valid history mode configuration", () => {
+      it("does not warn for valid history mode configuration", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -978,7 +978,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("does not warn when only useHash is provided", () => {
+      it("does not warn when only useHash is provided", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(browserPluginFactory({ useHash: true }));
@@ -990,7 +990,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("validates option types and warns on invalid types", () => {
+      it("validates option types and warns on invalid types", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -1014,7 +1014,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("does not warn for correct option types", () => {
+      it("does not warn for correct option types", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         router.usePlugin(
@@ -1036,12 +1036,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Navigation Options", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("supports reload option to force same-state navigation", () => {
+      it("supports reload option to force same-state navigation", async () => {
         router.navigate("home");
 
         vi.spyOn(mockedBrowser, "replaceState");
@@ -1055,7 +1055,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("uses replaceState when fromState is null on first navigation", () => {
+      it("uses replaceState when fromState is null on first navigation", async () => {
         router.stop();
         unsubscribe?.();
 
@@ -1073,7 +1073,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("uses pushState for subsequent navigations", () => {
+      it("uses pushState for subsequent navigations", async () => {
         router.navigate("home");
 
         vi.spyOn(mockedBrowser, "pushState");
@@ -1087,7 +1087,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("navigates with params", () => {
+      it("navigates with params", async () => {
         vi.spyOn(mockedBrowser, "pushState");
 
         router.navigate("users.view", { id: "42" });
@@ -1119,12 +1119,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Stress Testing", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("handles rapid sequential navigations", () => {
+      it("handles rapid sequential navigations", async () => {
         const navigations = Array.from({ length: 50 }, (_, i) => ({
           name: i % 2 === 0 ? "home" : "users.list",
           params: {},
@@ -1141,7 +1141,7 @@ describe("Browser Plugin", () => {
         ).toBe(true);
       });
 
-      it("handles rapid popstate events", () => {
+      it("handles rapid popstate events", async () => {
         const routes = ["home", "users.list", "index"];
         const paths = ["/home", "/users/list", "/"];
 
@@ -1168,7 +1168,7 @@ describe("Browser Plugin", () => {
         expect(router.getState()).toBeDefined();
       });
 
-      it("handles memory cleanup on repeated plugin lifecycle", () => {
+      it("handles memory cleanup on repeated plugin lifecycle", async () => {
         // This test checks that no memory leaks occur
         // during repeated create/destroy cycles
         for (let i = 0; i < 100; i++) {
@@ -1190,11 +1190,11 @@ describe("Browser Plugin", () => {
     });
 
     describe("URL Parsing Edge Cases", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
       });
 
-      it("handles file: protocol gracefully", () => {
+      it("handles file: protocol gracefully", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         const state = router.matchUrl("file:///home/user/file.html");
@@ -1207,7 +1207,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles encoded special characters in params", () => {
+      it("handles encoded special characters in params", async () => {
         const state = router.matchUrl(
           "https://example.com/users/view/John%20Doe",
         );
@@ -1216,7 +1216,7 @@ describe("Browser Plugin", () => {
         expect(state?.params.id).toBe("John Doe");
       });
 
-      it("handles complex base + hash + prefix combination", () => {
+      it("handles complex base + hash + prefix combination", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         router.usePlugin(
           browserPluginFactory({
@@ -1241,7 +1241,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles URL with port number", () => {
+      it("handles URL with port number", async () => {
         const state = router.matchUrl("http://localhost:3000/users/list");
 
         expect(withoutMeta(state!)).toStrictEqual({
@@ -1251,7 +1251,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles URL with authentication", () => {
+      it("handles URL with authentication", async () => {
         const state = router.matchUrl("https://user:pass@example.com/home");
 
         expect(withoutMeta(state!)).toStrictEqual({
@@ -1261,7 +1261,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles relative URL resolution", () => {
+      it("handles relative URL resolution", async () => {
         // matchUrl uses window.location.origin as base
         const state = router.matchUrl("/users/list");
 
@@ -1272,7 +1272,7 @@ describe("Browser Plugin", () => {
         });
       });
 
-      it("handles malformed URL gracefully", () => {
+      it("handles malformed URL gracefully", async () => {
         const state = router.matchUrl("not a valid url at all");
 
         expect(state).toBeUndefined();
@@ -1285,7 +1285,7 @@ describe("Browser Plugin", () => {
        * According to the code analysis, base path without leading "/" might be problematic.
        */
 
-      it("handles base path with leading slash (correct format)", () => {
+      it("handles base path with leading slash (correct format)", async () => {
         router.usePlugin(browserPluginFactory({ base: "/app" }));
 
         const url = router.buildUrl("home", {});
@@ -1297,7 +1297,7 @@ describe("Browser Plugin", () => {
         expect(url2).toBe("/app/users/view/123");
       });
 
-      it("handles base path WITHOUT leading slash (auto-normalized)", () => {
+      it("handles base path WITHOUT leading slash (auto-normalized)", async () => {
         // Base path "app" is automatically normalized to "/app"
         router.usePlugin(browserPluginFactory({ base: "app" }));
 
@@ -1310,7 +1310,7 @@ describe("Browser Plugin", () => {
         // All base paths are converted to absolute format
       });
 
-      it("demonstrates normalization: both formats produce absolute URLs", () => {
+      it("demonstrates normalization: both formats produce absolute URLs", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
 
         // Test with absolute base (already correct)
@@ -1330,7 +1330,7 @@ describe("Browser Plugin", () => {
         // No more relative path issues
       });
 
-      it("shows matching behavior with normalized base path", () => {
+      it("shows matching behavior with normalized base path", async () => {
         router = createRouter(routerConfig, { defaultRoute: "home" });
         router.usePlugin(browserPluginFactory({ base: "app" }));
 
@@ -1342,7 +1342,7 @@ describe("Browser Plugin", () => {
         expect(state?.name).toBe("users.list");
       });
 
-      it("handles empty base path", () => {
+      it("handles empty base path", async () => {
         router.usePlugin(browserPluginFactory({ base: "" }));
 
         const url = router.buildUrl("home", {});
@@ -1350,7 +1350,7 @@ describe("Browser Plugin", () => {
         expect(url).toBe("/home");
       });
 
-      it("handles undefined base path (default)", () => {
+      it("handles undefined base path (default)", async () => {
         router.usePlugin(browserPluginFactory({}));
 
         const url = router.buildUrl("home", {});
@@ -1358,7 +1358,7 @@ describe("Browser Plugin", () => {
         expect(url).toBe("/home");
       });
 
-      it("handles base path with trailing slash (auto-normalized)", () => {
+      it("handles base path with trailing slash (auto-normalized)", async () => {
         router.usePlugin(browserPluginFactory({ base: "/app/" }));
 
         const url = router.buildUrl("home", {});
@@ -1369,7 +1369,7 @@ describe("Browser Plugin", () => {
     });
 
     describe("URL Security & Special Characters", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
       });
 
@@ -1381,7 +1381,7 @@ describe("Browser Plugin", () => {
        * The router's responsibility is URL encoding for browser APIs.
        */
 
-      it("encodes HTML special characters in path params", () => {
+      it("encodes HTML special characters in path params", async () => {
         // Note: matcher only validates explicit constraints (e.g., :id<\d+>)
         // Use simpler XSS attempt without parentheses
         const url = router.buildUrl("users.view", {
@@ -1396,7 +1396,7 @@ describe("Browser Plugin", () => {
         expect(url).toContain("%3E"); // >
       });
 
-      it("encodes quotes and special chars in path params", () => {
+      it("encodes quotes and special chars in path params", async () => {
         const url = router.buildUrl("users.view", {
           id: '"><test>',
         });
@@ -1407,7 +1407,7 @@ describe("Browser Plugin", () => {
         expect(url).toContain("%3C"); // <
       });
 
-      it("encodes ampersands in query params", () => {
+      it("encodes ampersands in query params", async () => {
         // Create router with query params
         router = createRouter(
           [{ name: "search", path: "/search?q&category" }],
@@ -1424,7 +1424,7 @@ describe("Browser Plugin", () => {
         expect(url).toContain("test%26debug%3Dtrue");
       });
 
-      it("prevents double encoding", () => {
+      it("prevents double encoding", async () => {
         // Test that already encoded characters don't get double-encoded
         const url = router.buildUrl("users.view", {
           id: "already%20encoded",
@@ -1435,7 +1435,7 @@ describe("Browser Plugin", () => {
         // This is correct behavior - the input is treated as literal text
       });
 
-      it("matches and decodes special characters correctly", () => {
+      it("matches and decodes special characters correctly", async () => {
         const testId = "user<test>&more";
         const url = router.buildUrl("users.view", { id: testId });
 
@@ -1451,7 +1451,7 @@ describe("Browser Plugin", () => {
       /**
        * Documentation test: Show proper usage with UI frameworks
        */
-      it("documents safe usage patterns (documentation test)", () => {
+      it("documents safe usage patterns (documentation test)", async () => {
         // ✅ SAFE: Modern frameworks automatically escape HTML
         // React: <Link to={router.buildUrl('users.view', { id: userInput })} />
         // Vue: <router-link :to="router.buildUrl('users.view', { id: userInput })" />
@@ -1469,12 +1469,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Browser State Management", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("handles mergeState option correctly", () => {
+      it("handles mergeState option correctly", async () => {
         currentHistoryState = { external: "data" } as any;
 
         // Create a NEW router
@@ -1487,7 +1487,7 @@ describe("Browser Plugin", () => {
           browserPluginFactory({ mergeState: true }, mockedBrowser),
         );
 
-        router.start();
+        await router.start();
 
         const state = mockedBrowser.getState();
 
@@ -1505,7 +1505,7 @@ describe("Browser Plugin", () => {
           browserPluginFactory({ preserveHash: true }, mockedBrowser),
         );
 
-        const state = await router.start();
+        const state = await await router.start();
 
         expect(state).toBeDefined();
         expect(globalThis.location.hash).toBe("#section");
@@ -1518,7 +1518,7 @@ describe("Browser Plugin", () => {
         router.usePlugin(
           browserPluginFactory({ forceDeactivate: false }, mockedBrowser),
         );
-        await router.start();
+        await await router.start();
 
         await router.navigate("home");
 
@@ -1539,15 +1539,15 @@ describe("Browser Plugin", () => {
     });
 
     describe("Transition Error Recovery", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
       // This is a smoke test - it verifies the plugin doesn't crash when
       // a transition error occurs during popstate handling
       // eslint-disable-next-line vitest/expect-expect, sonarjs/assertions-in-tests
-      it("recovers from transition error by restoring browser state", () => {
+      it("recovers from transition error by restoring browser state", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         router.navigate("home");
@@ -1590,10 +1590,10 @@ describe("Browser Plugin", () => {
 
   describe("Plugin Lifecycle", () => {
     describe("Listener Management", () => {
-      it("prevents repeated start", () => {
+      it("prevents repeated start", async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-        router.start();
+        await router.start();
 
         // Real Router throws error on repeated start
         const done = vi.fn();
@@ -1607,11 +1607,11 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("cleans up listeners on stop", () => {
+      it("cleans up listeners on stop", async () => {
         const removeListenerSpy = vi.spyOn(globalThis, "removeEventListener");
 
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
         router.stop();
 
         expect(removeListenerSpy).toHaveBeenCalledWith(
@@ -1620,21 +1620,21 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("cleans up listeners on unsubscribe", () => {
+      it("cleans up listeners on unsubscribe", async () => {
         const removeListenerSpy = vi.spyOn(globalThis, "removeEventListener");
 
         unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
         unsubscribe();
 
         expect(removeListenerSpy).toHaveBeenCalled();
       });
 
-      it("does not remove listeners multiple times", () => {
+      it("does not remove listeners multiple times", async () => {
         const removeListenerSpy = vi.spyOn(globalThis, "removeEventListener");
 
         unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
 
         unsubscribe();
         unsubscribe();
@@ -1644,12 +1644,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Teardown", () => {
-      it("removes lastKnownState property", () => {
+      it("removes lastKnownState property", async () => {
         const unsubscribe = router.usePlugin(
           browserPluginFactory({}, mockedBrowser),
         );
 
-        router.start();
+        await router.start();
 
         router.navigate("home");
 
@@ -1663,7 +1663,7 @@ describe("Browser Plugin", () => {
     });
 
     describe("mergeState Option", () => {
-      it("merges with existing history.state", () => {
+      it("merges with existing history.state", async () => {
         const existingState = {
           name: "legacy",
           params: { old: true },
@@ -1685,7 +1685,7 @@ describe("Browser Plugin", () => {
 
         vi.spyOn(mockedBrowser, "replaceState");
 
-        router.start();
+        await router.start();
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -1700,11 +1700,11 @@ describe("Browser Plugin", () => {
   });
 
   describe("replaceHistoryState", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
-    it("replaces history with correct state and URL", () => {
+    it("replaces history with correct state and URL", async () => {
       router.replaceHistoryState("users.view", { id: "123" }, "User View");
 
       expect(currentHistoryState).toBeDefined();
@@ -1715,7 +1715,7 @@ describe("Browser Plugin", () => {
       });
     });
 
-    it("works without optional params and title", () => {
+    it("works without optional params and title", async () => {
       router.replaceHistoryState("home");
 
       expect(withoutMeta(currentHistoryState!)).toStrictEqual({
@@ -1725,7 +1725,7 @@ describe("Browser Plugin", () => {
       });
     });
 
-    it("throws if buildState returns undefined", () => {
+    it("throws if buildState returns undefined", async () => {
       router.buildState = () => undefined;
 
       expect(() => {
@@ -1741,14 +1741,14 @@ describe("Browser Plugin", () => {
      */
 
     describe("Integration with other real-router plugins", () => {
-      it("works with loggerPlugin - basic compatibility", () => {
+      it("works with loggerPlugin - basic compatibility", async () => {
         const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
 
         // Use both plugins together (common production scenario)
         router.usePlugin(loggerPlugin());
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-        router.start();
+        await router.start();
         router.navigate("users.list");
 
         // Both plugins should work without conflicts
@@ -1761,14 +1761,14 @@ describe("Browser Plugin", () => {
         consoleLogSpy.mockRestore();
       });
 
-      it("works with persistentParamsPlugin - preserves query params", () => {
+      it("works with persistentParamsPlugin - preserves query params", async () => {
         const persistParams = ["lang", "theme"];
 
         // Use both plugins together
         router.usePlugin(persistentParamsPlugin(persistParams));
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-        router.start();
+        await router.start();
 
         // Navigate with persistent params
         router.navigate("home", { lang: "en", theme: "dark" });
@@ -1789,7 +1789,7 @@ describe("Browser Plugin", () => {
         expect(url).toContain("theme=dark");
       });
 
-      it("handles all three plugins together (real-world scenario)", () => {
+      it("handles all three plugins together (real-world scenario)", async () => {
         const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
 
         // Production-like setup with all plugins
@@ -1797,7 +1797,7 @@ describe("Browser Plugin", () => {
         router.usePlugin(persistentParamsPlugin(["sessionId"]));
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-        router.start();
+        await router.start();
 
         // Navigate with persistent params
         router.navigate("home", { sessionId: "abc123" });
@@ -1818,7 +1818,7 @@ describe("Browser Plugin", () => {
         consoleLogSpy.mockRestore();
       });
 
-      it("browser plugin does not interfere with custom plugin hooks", () => {
+      it("browser plugin does not interfere with custom plugin hooks", async () => {
         const customHookStates: string[] = [];
 
         const customPlugin = () => () => ({
@@ -1831,7 +1831,7 @@ describe("Browser Plugin", () => {
         router.usePlugin(customPlugin());
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-        router.start(); // Triggers transition to 'home' (defaultRoute)
+        await router.start(); // Triggers transition to 'home' (defaultRoute)
         router.navigate("users.list");
 
         // Custom hook should execute without interference
@@ -1842,10 +1842,10 @@ describe("Browser Plugin", () => {
     });
 
     describe("Base path migration", () => {
-      it("handles base path change between router recreations", () => {
+      it("handles base path change between router recreations", async () => {
         // Initial setup with base /v1
         router.usePlugin(browserPluginFactory({ base: "/v1" }, mockedBrowser));
-        router.start();
+        await router.start();
         router.navigate("users.list");
 
         expect(router.buildUrl("users.list", {})).toBe("/v1/users/list");
@@ -1857,7 +1857,7 @@ describe("Browser Plugin", () => {
 
         router = createRouter(routerConfig, { defaultRoute: "home" });
         router.usePlugin(browserPluginFactory({ base: "/v2" }, mockedBrowser));
-        router.start();
+        await router.start();
 
         // URL building should use new base
         expect(router.buildUrl("users.list", {})).toBe("/v2/users/list");
@@ -1870,7 +1870,7 @@ describe("Browser Plugin", () => {
         );
       });
 
-      it("matchUrl works correctly after base path change", () => {
+      it("matchUrl works correctly after base path change", async () => {
         // Start with base /app
         router.usePlugin(browserPluginFactory({ base: "/app" }, mockedBrowser));
 
@@ -1897,10 +1897,10 @@ describe("Browser Plugin", () => {
         expect(state3?.name).toBe("users.list");
       });
 
-      it("preserves navigation state during base path transition", () => {
+      it("preserves navigation state during base path transition", async () => {
         // Setup with initial base
         router.usePlugin(browserPluginFactory({ base: "/old" }, mockedBrowser));
-        router.start();
+        await router.start();
         router.navigate("users.view", { id: "42" });
 
         const oldState = router.getState();
@@ -1934,12 +1934,12 @@ describe("Browser Plugin", () => {
      */
 
     describe("Malicious popstate state handling", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("rejects popstate with invalid state structure", () => {
+      it("rejects popstate with invalid state structure", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Malicious state with wrong structure
@@ -1963,7 +1963,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles popstate with XSS attempt in state.name", () => {
+      it("handles popstate with XSS attempt in state.name", async () => {
         // Router validates state structure and rejects invalid route names
         const xssState = {
           name: '<script>alert("xss")</script>',
@@ -1982,7 +1982,7 @@ describe("Browser Plugin", () => {
         expect(router.getState()?.name).toBe("home"); // Still on default route
       });
 
-      it("sanitizes params with special characters via URL encoding", () => {
+      it("sanitizes params with special characters via URL encoding", async () => {
         // Navigate normally, which will use route-node's encoding
         router.navigate("users.view", { id: '"><script>xss</script>' });
 
@@ -2002,7 +2002,7 @@ describe("Browser Plugin", () => {
         expect(currentHistoryState?.params.id).toBe('"><script>xss</script>');
       });
 
-      it("rejects popstate with __proto__ pollution attempt", () => {
+      it("rejects popstate with __proto__ pollution attempt", async () => {
         // Attempt prototype pollution via state.params
         const pollutionState = {
           name: "users.view",
@@ -2023,7 +2023,7 @@ describe("Browser Plugin", () => {
         expect(router.getState()?.name).toBe("home"); // stays at initial state
       });
 
-      it("handles popstate with constructor pollution attempt", () => {
+      it("handles popstate with constructor pollution attempt", async () => {
         // Attempt to override constructor
         const maliciousState = {
           name: "home",
@@ -2043,7 +2043,7 @@ describe("Browser Plugin", () => {
         expect(router.getState()?.name).toBe("home");
       });
 
-      it("handles popstate with deeply nested malicious objects", () => {
+      it("handles popstate with deeply nested malicious objects", async () => {
         // Create deeply nested object to test deep validation
         const deeplyNested: any = { level: 1 };
         let current = deeplyNested;
@@ -2074,11 +2074,11 @@ describe("Browser Plugin", () => {
     });
 
     describe("URL injection prevention", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
       });
 
-      it("blocks javascript: protocol URLs in matchUrl", () => {
+      it("blocks javascript: protocol URLs in matchUrl", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // eslint-disable-next-line sonarjs/code-eval
@@ -2092,7 +2092,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("blocks data: protocol URLs", () => {
+      it("blocks data: protocol URLs", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         const state = router.matchUrl(
@@ -2107,7 +2107,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("blocks vbscript: protocol URLs (legacy IE)", () => {
+      it("blocks vbscript: protocol URLs (legacy IE)", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         const state = router.matchUrl("vbscript:msgbox('xss')");
@@ -2120,7 +2120,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("allows only http: and https: protocols", () => {
+      it("allows only http: and https: protocols", async () => {
         // Valid protocols should work
         const httpState = router.matchUrl("http://example.com/home");
 
@@ -2143,7 +2143,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles URLs with null bytes gracefully", () => {
+      it("handles URLs with null bytes gracefully", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // URL with null byte (potential for bypassing filters)
@@ -2157,7 +2157,7 @@ describe("Browser Plugin", () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles URL homograph attacks (Unicode lookalikes)", () => {
+      it("handles URL homograph attacks (Unicode lookalikes)", async () => {
         // Using Cyrillic 'а' (U+0430) instead of Latin 'a' (U+0061)
         // This is a real security concern for phishing
         const state = router.matchUrl("https://exаmple.com/users/list");
@@ -2170,7 +2170,7 @@ describe("Browser Plugin", () => {
         expect(state === undefined || state !== undefined).toBe(true); // Test that no crash occurred
       });
 
-      it("prevents URL parameter injection via specially crafted URLs", () => {
+      it("prevents URL parameter injection via specially crafted URLs", async () => {
         // Try to inject parameters via URL tricks
         const state = router.matchUrl(
           "http://example.com/users/list?fake=1&admin=true#/../../secret",
@@ -2189,7 +2189,7 @@ describe("Browser Plugin", () => {
         /* eslint-enable vitest/no-conditional-in-test, vitest/no-conditional-expect */
       });
 
-      it("handles extremely long URLs without DoS", () => {
+      it("handles extremely long URLs without DoS", async () => {
         // Create very long URL (potential DoS vector)
         const longPath = `/users/view/${"a".repeat(10_000)}`;
         const longUrl = `https://example.com${longPath}`;
@@ -2207,12 +2207,12 @@ describe("Browser Plugin", () => {
     });
 
     describe("Input validation edge cases", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        router.start();
+        await router.start();
       });
 
-      it("rejects navigation with circular reference in params", () => {
+      it("rejects navigation with circular reference in params", async () => {
         const circularParams: any = { id: "123" };
 
         circularParams.self = circularParams; // Circular reference
@@ -2229,7 +2229,7 @@ describe("Browser Plugin", () => {
         }).toThrowError("Invalid routeParams");
       });
 
-      it("handles params with function values", () => {
+      it("handles params with function values", async () => {
         const maliciousParams = {
           id: "123",
           // Test edge case: function in params (intentionally unused in URL)
@@ -2247,7 +2247,7 @@ describe("Browser Plugin", () => {
         expect(typeof result).toBe("string");
       });
 
-      it("handles params with symbol values", () => {
+      it("handles params with symbol values", async () => {
         const symbolParam = {
           id: "123",
           sym: Symbol("test"),

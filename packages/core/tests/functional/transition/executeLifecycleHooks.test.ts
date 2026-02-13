@@ -170,16 +170,16 @@ describe("transition/executeLifecycleHooks", () => {
         ["users", invalidStateHook],
       ]);
 
-      const result = await executeLifecycleHooks(
-        hooks,
-        toState,
-        fromState,
-        ["users"],
-        "CANNOT_ACTIVATE",
-        () => false,
-      );
-
-      expect(result).toBeDefined();
+      await expect(
+        executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => false,
+        ),
+      ).rejects.toThrowError("Invalid lifecycle result type");
     });
   });
 });
