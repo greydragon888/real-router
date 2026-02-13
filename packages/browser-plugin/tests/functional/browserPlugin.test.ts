@@ -341,6 +341,9 @@ describe("Browser Plugin", async () => {
         new PopStateEvent("popstate", { state: targetState }),
       );
 
+      // onPopState is async, wait for microtasks to settle
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       expect(router.getState()?.name).toBe("users.view");
     });
 
@@ -366,13 +369,13 @@ describe("Browser Plugin", async () => {
     });
 
     it("restores state on CANNOT_DEACTIVATE", async () => {
-      router.navigate("users.list");
+      await router.navigate("users.list");
 
       vi.spyOn(router, "navigateToState").mockImplementation(
-        (_to, _from, _opts, done) => {
-          done(new RouterError(errorCodes.CANNOT_DEACTIVATE, {}));
-
-          return vi.fn();
+        () => {
+          return Promise.reject(
+            new RouterError(errorCodes.CANNOT_DEACTIVATE, {}),
+          );
         },
       );
 
@@ -396,14 +399,14 @@ describe("Browser Plugin", async () => {
       it("defers popstate during transition", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-        // Mock slow transition
+        // Mock slow transition that returns a delayed Promise
         vi.spyOn(router, "navigateToState").mockImplementation(
-          (_to, _from, _opts, done) => {
-            setTimeout(() => {
-              done(undefined, _to);
-            }, 100);
-
-            return vi.fn();
+          (_to) => {
+            return new Promise<State>((resolve) => {
+              setTimeout(() => {
+                resolve(_to);
+              }, 100);
+            });
           },
         );
 
@@ -440,23 +443,17 @@ describe("Browser Plugin", async () => {
 
       it("processes deferred popstate events after transition completes", async () => {
         // This test demonstrates the solution to browser history desync
-        type TransitionCallback = (err?: RouterError, state?: State) => void;
-        let transitionCallback: TransitionCallback | null = null;
+        type TransitionResolver = (state: State) => void;
+        let resolveTransition: TransitionResolver | null = null;
 
-        // Mock slow transition
+        // Mock slow transition that returns a Promise we can resolve externally
         vi.spyOn(router, "navigateToState").mockImplementation(
           (
             _to: State,
-            _from: State | undefined,
-            _opts?: unknown,
-            done?: TransitionCallback,
           ) => {
-            // Store callback to call later
-            if (done) {
-              transitionCallback = done;
-            }
-
-            return vi.fn();
+            return new Promise<State>((resolve) => {
+              resolveTransition = resolve;
+            });
           },
         );
 
@@ -493,31 +490,31 @@ describe("Browser Plugin", async () => {
         ); // Should replace state2
 
         // First transition starts immediately
-        expect(transitionCallback).not.toBeNull();
+        expect(resolveTransition).not.toBeNull();
 
         // Complete first transition
         // eslint-disable-next-line vitest/no-conditional-in-test, @typescript-eslint/no-unnecessary-condition
-        if (transitionCallback !== null) {
-          const firstCallback = transitionCallback as TransitionCallback;
+        if (resolveTransition !== null) {
+          const firstResolver = resolveTransition as TransitionResolver;
 
-          transitionCallback = null;
-          firstCallback(undefined, state1);
+          resolveTransition = null;
+          firstResolver(state1);
         }
 
         // Small delay to allow deferred event processing
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Now the deferred event (state3 - the last one) should be processed
-        expect(transitionCallback).not.toBeNull(); // Second transition started
+        expect(resolveTransition).not.toBeNull(); // Second transition started
 
         // Complete second transition
         // eslint-disable-next-line vitest/no-conditional-in-test, @typescript-eslint/no-unnecessary-condition
-        if (transitionCallback !== null) {
-          const secondCallback = transitionCallback as TransitionCallback;
+        if (resolveTransition !== null) {
+          const secondResolver = resolveTransition as TransitionResolver;
 
           // eslint-disable-next-line no-useless-assignment
-          transitionCallback = null;
-          secondCallback(undefined, state3);
+          resolveTransition = null;
+          secondResolver(state3);
         }
 
         // Final state should be state3 (users.list), NOT state2!
@@ -575,24 +572,28 @@ describe("Browser Plugin", async () => {
         const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
         // Navigate to establish current state
-        router.navigate("home");
+        await router.navigate("users.list");
 
-        // Mock navigateToState to throw after the initial checks pass
-        vi.spyOn(router, "navigateToState").mockImplementation(() => {
-          throw new Error("Navigation error");
+        // Mock makeState to throw - this triggers the outer catch in onPopState
+        // createStateFromEvent calls router.makeState for existing history states
+        vi.spyOn(router, "makeState").mockImplementation(() => {
+          throw new Error("Critical makeState error");
         });
 
-        // Trigger popstate with a valid state to pass initial checks
+        // Trigger popstate with a valid state (will call createStateFromEvent -> makeState)
         const validState: HistoryState = {
-          name: "users.list",
+          name: "home",
           params: {},
-          path: "/users/list",
+          path: "/home",
           meta: { id: 2, params: {}, options: {}, redirected: false },
         };
 
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: validState }),
         );
+
+        // onPopState is async, wait for microtasks to settle
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Recovery should sync browser with current router state
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -610,11 +611,11 @@ describe("Browser Plugin", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         // Navigate to establish current state
-        router.navigate("home");
+        await router.navigate("users.list");
 
-        // Mock navigateToState to throw
-        vi.spyOn(router, "navigateToState").mockImplementation(() => {
-          throw new Error("Navigation error");
+        // Mock makeState to throw - this triggers the outer catch in onPopState
+        vi.spyOn(router, "makeState").mockImplementation(() => {
+          throw new Error("Critical makeState error");
         });
 
         // Mock buildUrl to throw during recovery
@@ -623,15 +624,18 @@ describe("Browser Plugin", async () => {
         });
 
         const validState: HistoryState = {
-          name: "users.list",
+          name: "home",
           params: {},
-          path: "/users/list",
+          path: "/home",
           meta: { id: 2, params: {}, options: {}, redirected: false },
         };
 
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: validState }),
         );
+
+        // onPopState is async, wait for microtasks to settle
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Should log both errors
         expect(consoleSpy).toHaveBeenCalledWith(
@@ -683,7 +687,7 @@ describe("Browser Plugin", async () => {
         const router1 = createRouter(routerConfig, { defaultRoute: "home" });
         const unsub1 = router1.usePlugin(sharedFactory);
 
-        router1.start();
+        await router1.start();
 
         // removePopStateListener is now set in the factory closure
         // DON'T stop router1 - leave the listener active
@@ -695,7 +699,7 @@ describe("Browser Plugin", async () => {
 
         // When router2.start() is called, onStart checks if removePopStateListener exists
         // Since router1's listener is still in the closure, it should be removed first
-        router2.start();
+        await router2.start();
 
         // The existing listener from router1 should have been cleaned up
         expect(removeEventSpy).toHaveBeenCalledWith(
@@ -721,10 +725,7 @@ describe("Browser Plugin", async () => {
         );
 
         noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
-        noDefaultRouter.start("/home");
-
-        // Navigate to establish a state
-        noDefaultRouter.navigate("home");
+        await noDefaultRouter.start("/home");
 
         // Mock matchPath to return undefined (simulates unknown route)
         vi.spyOn(noDefaultRouter, "matchPath").mockReturnValue(undefined);
@@ -794,16 +795,16 @@ describe("Browser Plugin", async () => {
       });
 
       it("creates new frozen object when state changes", async () => {
-        router.navigate("home");
+        await router.navigate("users.list");
         const state1 = router.lastKnownState;
 
-        router.navigate("users.list");
+        await router.navigate("home");
         const state2 = router.lastKnownState;
 
         // Different states = different objects
         expect(state1).not.toBe(state2);
-        expect(state1?.name).toBe("home");
-        expect(state2?.name).toBe("users.list");
+        expect(state1?.name).toBe("users.list");
+        expect(state2?.name).toBe("home");
         expect(Object.isFrozen(state1)).toBe(true);
         expect(Object.isFrozen(state2)).toBe(true);
       });
@@ -1042,11 +1043,10 @@ describe("Browser Plugin", async () => {
       });
 
       it("supports reload option to force same-state navigation", async () => {
-        router.navigate("home");
-
+        // Router already started on "home" (default route)
         vi.spyOn(mockedBrowser, "replaceState");
 
-        router.navigate("home", {}, { reload: true });
+        await router.navigate("home", {}, { reload: true });
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "home" }),
@@ -1064,7 +1064,7 @@ describe("Browser Plugin", async () => {
 
         vi.spyOn(mockedBrowser, "replaceState");
 
-        router.start("/users/list");
+        await router.start("/users/list");
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
@@ -1074,11 +1074,10 @@ describe("Browser Plugin", async () => {
       });
 
       it("uses pushState for subsequent navigations", async () => {
-        router.navigate("home");
-
+        // Router already started on "home" (default route)
         vi.spyOn(mockedBrowser, "pushState");
 
-        router.navigate("users.list");
+        await router.navigate("users.list");
 
         expect(mockedBrowser.pushState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
@@ -1090,7 +1089,7 @@ describe("Browser Plugin", async () => {
       it("navigates with params", async () => {
         vi.spyOn(mockedBrowser, "pushState");
 
-        router.navigate("users.view", { id: "42" });
+        await router.navigate("users.view", { id: "42" });
 
         expect(mockedBrowser.pushState).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -1130,11 +1129,15 @@ describe("Browser Plugin", async () => {
           params: {},
         }));
 
+        const promises: Promise<unknown>[] = [];
+
         for (const nav of navigations) {
-          router.navigate(nav.name, nav.params);
+          // Catch expected SAME_STATES/CANCELLED errors from rapid fire
+          promises.push(router.navigate(nav.name, nav.params).catch(noop));
         }
 
-        // Navigation is synchronous - no need to wait
+        await Promise.all(promises);
+
         expect(router.getState()).toBeDefined();
         expect(
           router.isActiveRoute("home") || router.isActiveRoute("users.list"),
@@ -1164,7 +1167,9 @@ describe("Browser Plugin", async () => {
           globalThis.dispatchEvent(new PopStateEvent("popstate", { state }));
         });
 
-        // Popstate processing is synchronous
+        // onPopState is async, wait for microtasks to settle
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
         expect(router.getState()).toBeDefined();
       });
 
@@ -1177,8 +1182,8 @@ describe("Browser Plugin", async () => {
             browserPluginFactory({}, mockedBrowser),
           );
 
-          testRouter.start();
-          testRouter.navigate("home");
+          await testRouter.start();
+          await testRouter.navigate("home").catch(noop); // may throw SAME_STATES
           testRouter.stop();
           unsubscribe();
         }
@@ -1515,13 +1520,16 @@ describe("Browser Plugin", async () => {
         router.stop();
         unsubscribe?.();
 
+        router = createRouter(routerConfig, {
+          defaultRoute: "home",
+          queryParamsMode: "default",
+        });
         router.usePlugin(
           browserPluginFactory({ forceDeactivate: false }, mockedBrowser),
         );
-        await await router.start();
+        await router.start();
 
-        await router.navigate("home");
-
+        // Router already started on "home" (default route)
         // Add canDeactivate that returns false
         router.addDeactivateGuard("home", () => () => false);
 
@@ -1550,15 +1558,12 @@ describe("Browser Plugin", async () => {
       it("recovers from transition error by restoring browser state", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-        router.navigate("home");
+        await router.navigate("users.list");
 
-        // Mock transition error
+        // Mock transition error - navigateToState returns a rejected Promise
         vi.spyOn(router, "navigateToState").mockImplementation(
-          (_to, _from, _opts, done) => {
-            // @ts-expect-error - Testing implementation detail
-            done(new Error("Transition failed"));
-
-            return vi.fn();
+          () => {
+            return Promise.reject(new Error("Transition failed"));
           },
         );
 
@@ -1581,7 +1586,8 @@ describe("Browser Plugin", async () => {
           }),
         );
 
-        // No need to wait - transition error handling is synchronous
+        // onPopState is async, wait for microtasks to settle
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         consoleSpy.mockRestore();
       });
@@ -1596,15 +1602,15 @@ describe("Browser Plugin", async () => {
         await router.start();
 
         // Real Router throws error on repeated start
-        const done = vi.fn();
-
-        router.start(done);
-
-        expect(done).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.ROUTER_ALREADY_STARTED,
-          }),
-        );
+        try {
+          await router.start();
+          expect.fail("Should have thrown");
+        } catch (err) {
+          expect(err).toBeDefined();
+          expect((err as RouterError).code).toBe(
+            errorCodes.ROUTER_ALREADY_STARTED,
+          );
+        }
       });
 
       it("cleans up listeners on stop", async () => {
@@ -1651,13 +1657,14 @@ describe("Browser Plugin", async () => {
 
         await router.start();
 
-        router.navigate("home");
+        await router.navigate("users.list");
 
         expect(router.lastKnownState).toBeDefined();
 
         unsubscribe(); // teardown
 
         expect(router.lastKnownState).toBeUndefined();
+        // After teardown, lastKnownState property is removed from router
         expect("lastKnownState" in router).toBe(false);
       });
     });
@@ -1749,7 +1756,7 @@ describe("Browser Plugin", async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
         await router.start();
-        router.navigate("users.list");
+        await router.navigate("users.list");
 
         // Both plugins should work without conflicts
         expect(router.getState()?.name).toBe("users.list");
@@ -1771,13 +1778,13 @@ describe("Browser Plugin", async () => {
         await router.start();
 
         // Navigate with persistent params
-        router.navigate("home", { lang: "en", theme: "dark" });
+        await router.navigate("home", { lang: "en", theme: "dark" });
 
         expect(router.getState()?.params.lang).toBe("en");
         expect(router.getState()?.params.theme).toBe("dark");
 
         // Navigate to different route - params should persist
-        router.navigate("users.list");
+        await router.navigate("users.list");
 
         expect(router.getState()?.params.lang).toBe("en");
         expect(router.getState()?.params.theme).toBe("dark");
@@ -1800,13 +1807,13 @@ describe("Browser Plugin", async () => {
         await router.start();
 
         // Navigate with persistent params
-        router.navigate("home", { sessionId: "abc123" });
+        await router.navigate("home", { sessionId: "abc123" });
 
         expect(router.getState()?.name).toBe("home");
         expect(router.getState()?.params.sessionId).toBe("abc123");
 
         // Navigate to different route
-        router.navigate("users.view", { id: "42" });
+        await router.navigate("users.view", { id: "42" });
 
         // All functionality should work
         expect(router.getState()?.name).toBe("users.view");
@@ -1832,7 +1839,7 @@ describe("Browser Plugin", async () => {
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
         await router.start(); // Triggers transition to 'home' (defaultRoute)
-        router.navigate("users.list");
+        await router.navigate("users.list");
 
         // Custom hook should execute without interference
         expect(customHookStates).toStrictEqual(["home", "users.list"]);
@@ -1846,7 +1853,7 @@ describe("Browser Plugin", async () => {
         // Initial setup with base /v1
         router.usePlugin(browserPluginFactory({ base: "/v1" }, mockedBrowser));
         await router.start();
-        router.navigate("users.list");
+        await router.navigate("users.list");
 
         expect(router.buildUrl("users.list", {})).toBe("/v1/users/list");
         expect(currentHistoryState?.name).toBe("users.list");
@@ -1863,7 +1870,7 @@ describe("Browser Plugin", async () => {
         expect(router.buildUrl("users.list", {})).toBe("/v2/users/list");
 
         // Navigation should work with new base
-        router.navigate("users.view", { id: "1" });
+        await router.navigate("users.view", { id: "1" });
 
         expect(router.buildUrl("users.view", { id: "1" })).toBe(
           "/v2/users/view/1",
@@ -1901,7 +1908,7 @@ describe("Browser Plugin", async () => {
         // Setup with initial base
         router.usePlugin(browserPluginFactory({ base: "/old" }, mockedBrowser));
         await router.start();
-        router.navigate("users.view", { id: "42" });
+        await router.navigate("users.view", { id: "42" });
 
         const oldState = router.getState();
 
@@ -1916,7 +1923,7 @@ describe("Browser Plugin", async () => {
         router.usePlugin(browserPluginFactory({ base: "/new" }, mockedBrowser));
 
         // Start with preserved state
-        router.start("/users/view/42");
+        await router.start("/users/view/42");
 
         expect(router.getState()?.name).toBe("users.view");
         expect(router.getState()?.params.id).toBe("42");
@@ -1984,7 +1991,7 @@ describe("Browser Plugin", async () => {
 
       it("sanitizes params with special characters via URL encoding", async () => {
         // Navigate normally, which will use route-node's encoding
-        router.navigate("users.view", { id: '"><script>xss</script>' });
+        await router.navigate("users.view", { id: '"><script>xss</script>' });
 
         const state = router.getState();
 

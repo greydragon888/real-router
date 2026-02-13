@@ -267,7 +267,7 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
       // Should not crash
-      await expect(router.start()).not.toThrowError();
+      await expect(router.start()).resolves.not.toThrowError();
     });
   });
 
@@ -276,20 +276,9 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(createAsyncPlugin({ delay: 50 }));
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      // Wait for router to fully start (two-phase start: isStarted only true after transition completes)
-      await new Promise<void>((resolve) => {
-        router.start(() => {
-          resolve();
-        });
-      });
-
-      const navigationPromise = new Promise<void>((resolve) => {
-        router.navigate("users.list", {}, {}, () => {
-          resolve();
-        });
-      });
-
-      await navigationPromise;
+      // start() and navigate() return Promises
+      await router.start();
+      await router.navigate("users.list");
 
       expect(router.getState()?.name).toBe("users.list");
       expect(currentHistoryState?.name).toBe("users.list");
@@ -305,20 +294,9 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(createAsyncPlugin({ delay: 20 }));
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
-      // Wait for router to fully start (two-phase start: isStarted only true after transition completes)
-      await new Promise<void>((resolve) => {
-        router.start(() => {
-          resolve();
-        });
-      });
-
-      const navigationPromise = new Promise<void>((resolve) => {
-        router.navigate("users.view", { id: "42" }, {}, () => {
-          resolve();
-        });
-      });
-
-      await navigationPromise;
+      // start() and navigate() return Promises
+      await router.start();
+      await router.navigate("users.view", { id: "42" });
 
       // All plugins should execute
       expect(executionOrder).toContain("tracking:onTransitionSuccess");
