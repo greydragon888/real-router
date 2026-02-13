@@ -192,7 +192,7 @@ describe("router.navigate() - router not started", () => {
         expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
       }
 
-      void router.start();
+      await router.start();
 
       expect(router.isActive()).toBe(true);
 

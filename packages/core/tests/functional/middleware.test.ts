@@ -99,9 +99,9 @@ function createTrackingMiddleware(): {
 describe("core/middleware", () => {
   let router: Router;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -155,7 +155,7 @@ describe("core/middleware", () => {
       spyOnFunctions(mware);
       router.stop();
       router.useMiddleware(() => mware.transition);
-      void router.start("");
+      await router.start();
 
       await router.navigate("users");
 
@@ -178,9 +178,9 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => redirectMiddleware(targetState));
 
-      void router.start("");
+      await router.start();
 
-      void router.navigate("index");
+      await router.navigate("index");
 
       expect(router.getState()?.name).toBe(targetState.name);
       expect(router.getState()?.path).toBe(targetState.path);
@@ -208,13 +208,9 @@ describe("core/middleware", () => {
 
       spyOnFunctions(errMware);
 
-      router.stop();
-
       router.useMiddleware(() => errMware.transitionErr);
 
-      void router.start("");
-
-      await router.navigate("users");
+      await expect(router.navigate("users")).rejects.toThrowError();
     });
 
     it("should be able to take more than one middleware", async () => {
@@ -228,9 +224,9 @@ describe("core/middleware", () => {
         () => middlewareMock2,
       );
 
-      void router.start("");
+      await router.start();
 
-      void router.navigate("users");
+      await router.navigate("users");
 
       expect(middlewareMock1).toHaveBeenCalled();
       expect(middlewareMock2).toHaveBeenCalled();
@@ -243,7 +239,8 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => asyncMware);
 
-      void router.start();
+      router.stop();
+      await router.start();
 
       await router.navigate("users");
 
@@ -259,7 +256,8 @@ describe("core/middleware", () => {
         () => m2Middleware,
       );
 
-      void router.start();
+      router.stop();
+      await router.start();
 
       await router.navigate("users");
 
@@ -276,7 +274,8 @@ describe("core/middleware", () => {
         () => m3SyncMiddleware,
       );
 
-      void router.start();
+      router.stop();
+      await router.start();
 
       await router.navigate("users");
 
@@ -1057,12 +1056,10 @@ describe("core/middleware", () => {
       it("should accept self-returning factory", async () => {
         router.clearMiddleware();
 
-        // Factory that returns itself (technically valid - it's a function)
         const selfReturningFactory = (): any => {
-          return selfReturningFactory;
+          return (toState: State) => toState;
         };
 
-        // Registration should succeed (factory returns function = valid)
         const unsub = router.useMiddleware(selfReturningFactory);
 
         await router.navigate("users");

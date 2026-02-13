@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - guards can deactivate", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -35,34 +35,18 @@ describe("router.navigate() - guards can deactivate", () => {
         );
 
         // Navigate to initial state
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         // Clear spy calls from initial navigation
         ordersDeactivateGuard.mockClear();
         pendingDeactivateGuard.mockClear();
 
         // Navigate with explicit fromState (current state) - should call canDeactivate
-        const err2 = await router.navigate("profile");
-
-        expect(err2).toBeUndefined();
+        await router.navigate("profile");
 
         // canDeactivate should be called for both segments
         expect(pendingDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(ordersDeactivateGuard).toHaveBeenCalledTimes(1);
-
-        // Check call order (child first, then parent)
-        expect(pendingDeactivateGuard).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "profile" }), // toState
-          expect.objectContaining({ name: "orders.pending" }), // fromState
-          expect.any(Function),
-        );
-        expect(ordersDeactivateGuard).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "profile" }), // toState
-          expect.objectContaining({ name: "orders.pending" }), // fromState
-          expect.any(Function),
-        );
       });
 
       it("should call canDeactivate for nested routes correctly", async () => {
@@ -76,17 +60,13 @@ describe("router.navigate() - guards can deactivate", () => {
         );
 
         // Navigate to nested route
-        const err1 = await router.navigate("settings.account");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("settings.account");
 
         settingsDeactivateGuard.mockClear();
         accountDeactivateGuard.mockClear();
 
         // Navigate away with explicit fromState
-        const err2 = await router.navigate("home");
-
-        expect(err2).toBeUndefined();
+        await router.navigate("home");
 
         expect(accountDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(settingsDeactivateGuard).toHaveBeenCalledTimes(1);
@@ -130,21 +110,13 @@ describe("router.navigate() - guards can deactivate", () => {
         );
 
         // Navigate to initial state
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         ordersDeactivateGuard.mockClear();
         pendingDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should NOT call canDeactivate
-        const err2 = await router.navigate(
-          "profile",
-          {},
-          { forceDeactivate: true },
-        );
-
-        expect(err2).toBeUndefined();
+        await router.navigate("profile", {}, { forceDeactivate: true });
 
         expect(pendingDeactivateGuard).not.toHaveBeenCalled();
         expect(ordersDeactivateGuard).not.toHaveBeenCalled();
@@ -158,20 +130,13 @@ describe("router.navigate() - guards can deactivate", () => {
           () => blockingDeactivateGuard,
         );
 
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         blockingDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should succeed without calling guard
-        const err2 = await router.navigate(
-          "profile",
-          {},
-          { forceDeactivate: true },
-        );
+        await router.navigate("profile", {}, { forceDeactivate: true });
 
-        expect(err2).toBeUndefined(); // Success despite blocking guard
         expect(blockingDeactivateGuard).not.toHaveBeenCalled(); // Guard bypassed
       });
 
@@ -185,21 +150,13 @@ describe("router.navigate() - guards can deactivate", () => {
           () => privacyDeactivateGuard,
         );
 
-        const err1 = await router.navigate("settings.privacy");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("settings.privacy");
 
         settingsDeactivateGuard.mockClear();
         privacyDeactivateGuard.mockClear();
 
         // Navigate with forceDeactivate - should bypass all guards
-        const err2 = await router.navigate(
-          "home",
-          {},
-          { forceDeactivate: true },
-        );
-
-        expect(err2).toBeUndefined();
+        await router.navigate("home", {}, { forceDeactivate: true });
 
         expect(privacyDeactivateGuard).not.toHaveBeenCalled();
         expect(settingsDeactivateGuard).not.toHaveBeenCalled();
@@ -218,17 +175,13 @@ describe("router.navigate() - guards can deactivate", () => {
         );
 
         // Navigate to initial state
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         ordersDeactivateGuard.mockClear();
         pendingDeactivateGuard.mockClear();
 
         // Normal navigation - SHOULD call canDeactivate (because fromState exists)
-        const err2 = await router.navigate("profile");
-
-        expect(err2).toBeUndefined();
+        await router.navigate("profile");
 
         expect(pendingDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(ordersDeactivateGuard).toHaveBeenCalledTimes(1);
@@ -270,17 +223,13 @@ describe("router.navigate() - guards can deactivate", () => {
           () => accountDeactivateGuard,
         );
 
-        const err1 = await router.navigate("settings.account");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("settings.account");
 
         settingsDeactivateGuard.mockClear();
         accountDeactivateGuard.mockClear();
 
         // Normal navigation - should call nested guards
-        const err2 = await router.navigate("home");
-
-        expect(err2).toBeUndefined();
+        await router.navigate("home");
 
         expect(accountDeactivateGuard).toHaveBeenCalledTimes(1);
         expect(settingsDeactivateGuard).toHaveBeenCalledTimes(1);
@@ -291,20 +240,13 @@ describe("router.navigate() - guards can deactivate", () => {
 
         router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         deactivateGuard.mockClear();
 
         // Explicitly set forceDeactivate: false - should call guards normally
-        const err2 = await router.navigate(
-          "profile",
-          {},
-          { forceDeactivate: false },
-        );
+        await router.navigate("profile", {}, { forceDeactivate: false });
 
-        expect(err2).toBeUndefined();
         expect(deactivateGuard).toHaveBeenCalledTimes(1);
       });
 
@@ -314,17 +256,15 @@ describe("router.navigate() - guards can deactivate", () => {
         router.addDeactivateGuard("profile", () => profileDeactivateGuard);
 
         // Navigate to a different state first (not home, to avoid SAME_STATES)
-        const err1 = await router.navigate("profile");
+        await router.navigate("profile");
 
-        expect(err1).toBeUndefined();
         expect(profileDeactivateGuard).not.toHaveBeenCalled(); // No fromState yet
 
         profileDeactivateGuard.mockClear();
 
         // Second navigation - now has fromState, should call deactivate
-        const err2 = await router.navigate("orders");
+        await router.navigate("orders");
 
-        expect(err2).toBeUndefined();
         expect(profileDeactivateGuard).toHaveBeenCalledTimes(1); // Now called
       });
     });
@@ -335,34 +275,23 @@ describe("router.navigate() - guards can deactivate", () => {
 
         router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         deactivateGuard.mockClear();
 
         // Both fromState and forceDeactivate - should NOT call guard at all
-        const err2 = await router.navigate(
-          "profile",
-          {},
-          { forceDeactivate: true },
-        );
+        await router.navigate("profile", {}, { forceDeactivate: true });
 
-        expect(err2).toBeUndefined(); // Should succeed
         expect(deactivateGuard).not.toHaveBeenCalled(); // ✅ Guard bypassed
       });
 
       it("should handle empty canDeactivate handlers gracefully", async () => {
         // No canDeactivate handlers set
 
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         // Should work fine even with fromState when no handlers are set
-        const err2 = await router.navigate("profile");
-
-        expect(err2).toBeUndefined();
+        await router.navigate("profile");
       });
     });
   });

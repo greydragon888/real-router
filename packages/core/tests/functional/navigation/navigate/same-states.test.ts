@@ -74,22 +74,14 @@ describe("router.navigate() - same states", () => {
     describe("same states with reload: true", () => {
       it("should navigate to same state if reload is set to true", async () => {
         // First navigation
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         const state1 = router.getState();
 
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with reload - should succeed
-        const err2 = await router.navigate(
-          "orders.pending",
-          {},
-          { reload: true },
-        );
-
-        expect(err2).toBeUndefined();
+        await router.navigate("orders.pending", {}, { reload: true });
 
         const state2 = router.getState();
 
@@ -123,22 +115,14 @@ describe("router.navigate() - same states", () => {
     describe("same states with force: true", () => {
       it("should force navigation to same state if force option is set", async () => {
         // First navigation
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         const state1 = router.getState();
 
         expect(state1?.name).toBe("orders.pending");
 
         // Second navigation with force - should succeed
-        const err2 = await router.navigate(
-          "orders.pending",
-          {},
-          { force: true },
-        );
-
-        expect(err2).toBeUndefined();
+        await router.navigate("orders.pending", {}, { force: true });
 
         const state2 = router.getState();
 
@@ -155,35 +139,25 @@ describe("router.navigate() - same states", () => {
         canDeactivateSpy.mockClear();
 
         // Second navigation with force - should bypass guard
-        const err = await router.navigate(
-          "orders.pending",
-          {},
-          { force: true },
-        );
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, { force: true });
 
         // Guard should not be called with force
         expect(canDeactivateSpy).not.toHaveBeenCalled();
       });
 
       it("should work with both force and reload options", async () => {
-        const err1 = await router.navigate("orders.pending");
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending");
 
         const state1 = router.getState();
 
         expect(state1?.name).toBe("orders.pending");
 
         // Both force and reload
-        const err2 = await router.navigate(
+        await router.navigate(
           "orders.pending",
           {},
           { force: true, reload: true },
         );
-
-        expect(err2).toBeUndefined();
 
         const state2 = router.getState();
 

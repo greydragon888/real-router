@@ -433,7 +433,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      await router.start("");
+      await router.start();
 
       const promise = router.navigate("admin");
 

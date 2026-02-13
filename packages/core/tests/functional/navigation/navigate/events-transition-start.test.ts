@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - events transition start", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -345,7 +345,7 @@ describe("router.navigate() - events transition start", () => {
       }
 
       unsubStart();
-      void router.start(); // Restore for other tests
+      await router.start();
     });
   });
 });

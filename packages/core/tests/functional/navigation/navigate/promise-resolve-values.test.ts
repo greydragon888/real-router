@@ -32,16 +32,12 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        let err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         promiseDeactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -53,16 +49,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => promiseGuard1);
         router.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
-        let err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         promiseGuard1.mockClear();
         promiseGuard2.mockClear();
 
-        err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -75,9 +67,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.addActivateGuard("profile", () => promiseActivateGuard);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -89,9 +79,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("settings", () => promiseGuard1);
         router.addActivateGuard("settings.account", () => promiseGuard2);
 
-        const err = await router.navigate("settings.account", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("settings.account", {}, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -104,9 +92,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.useMiddleware(() => promiseMiddleware);
 
-        const err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
       });
@@ -118,9 +104,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.useMiddleware(() => promiseMiddleware1);
         router.useMiddleware(() => promiseMiddleware2);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
@@ -133,9 +117,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("orders", () => syncGuard);
         router.useMiddleware(() => promiseMiddleware);
 
-        const err = await router.navigate("orders", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders", {}, {});
 
         expect(syncGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
@@ -151,14 +133,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         // Navigate to initial state
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         deactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(deactivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -170,14 +150,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => guard1);
         router.addDeactivateGuard("orders.pending", () => guard2);
 
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         guard1.mockClear();
         guard2.mockClear();
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
@@ -190,9 +168,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.addActivateGuard("profile", () => activateGuard);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(activateGuard).toHaveBeenCalledTimes(1);
       });
@@ -204,9 +180,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("settings", () => guard1);
         router.addActivateGuard("settings.account", () => guard2);
 
-        const err = await router.navigate("settings.account", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("settings.account", {}, {});
 
         expect(guard1).toHaveBeenCalledTimes(1);
         expect(guard2).toHaveBeenCalledTimes(1);
@@ -219,9 +193,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.useMiddleware(() => middleware);
 
-        const err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         expect(middleware).toHaveBeenCalledTimes(1);
       });
@@ -233,9 +205,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.useMiddleware(() => middleware1);
         router.useMiddleware(() => middleware2);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(middleware1).toHaveBeenCalledTimes(1);
         expect(middleware2).toHaveBeenCalledTimes(1);
@@ -248,9 +218,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("orders", () => guard);
         router.useMiddleware(() => middleware);
 
-        const err = await router.navigate("orders", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders", {}, {});
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(middleware).toHaveBeenCalledTimes(1);
@@ -284,14 +252,13 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         redirectingDeactivateGuard.mockClear();
 
         // Navigate away - should redirect to new state
-        const err = await router.navigate("profile", {}, {});
+        await router.navigate("profile", {}, {});
 
-        expect(err).toBeUndefined();
         expect(redirectingDeactivateGuard).toHaveBeenCalledTimes(1);
       });
 
@@ -313,14 +280,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => normalGuard);
         router.addDeactivateGuard("orders.pending", () => redirectingGuard);
 
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         redirectingGuard.mockClear();
         normalGuard.mockClear();
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(redirectingGuard).toHaveBeenCalledTimes(1);
         expect(normalGuard).toHaveBeenCalledTimes(1);
@@ -344,9 +309,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.addActivateGuard("profile", () => redirectingActivateGuard);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(redirectingActivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -369,9 +332,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("settings", () => normalGuard);
         router.addActivateGuard("settings.account", () => redirectingGuard);
 
-        const err = await router.navigate("settings.account", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("settings.account", {}, {});
 
         expect(normalGuard).toHaveBeenCalledTimes(1);
         expect(redirectingGuard).toHaveBeenCalledTimes(1);
@@ -395,9 +356,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.useMiddleware(() => redirectingMiddleware);
 
-        const err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
 
@@ -423,9 +382,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.useMiddleware(() => firstMiddleware);
         router.useMiddleware(() => redirectingMiddleware);
 
-        const err = await router.navigate("orders", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders", {}, {});
 
         expect(firstMiddleware).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
@@ -449,9 +406,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("profile", () => guard);
         router.useMiddleware(() => redirectingMiddleware);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(guard).toHaveBeenCalledTimes(1);
         expect(redirectingMiddleware).toHaveBeenCalledTimes(1);
@@ -470,14 +425,12 @@ describe("router.navigate() - promise resolve values", () => {
         );
 
         // Navigate to initial state
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         promiseDeactivateGuard.mockClear();
 
         // Navigate away - should succeed
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseDeactivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -489,14 +442,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => promiseGuard1);
         router.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         promiseGuard1.mockClear();
         promiseGuard2.mockClear();
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -509,9 +460,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.addActivateGuard("profile", () => promiseActivateGuard);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseActivateGuard).toHaveBeenCalledTimes(1);
       });
@@ -523,9 +472,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("settings", () => promiseGuard1);
         router.addActivateGuard("settings.account", () => promiseGuard2);
 
-        const err = await router.navigate("settings.account", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("settings.account", {}, {});
 
         expect(promiseGuard1).toHaveBeenCalledTimes(1);
         expect(promiseGuard2).toHaveBeenCalledTimes(1);
@@ -538,9 +485,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.useMiddleware(() => promiseMiddleware);
 
-        const err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
       });
@@ -552,9 +497,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.useMiddleware(() => promiseMiddleware1);
         router.useMiddleware(() => promiseMiddleware2);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseMiddleware1).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware2).toHaveBeenCalledTimes(1);
@@ -567,9 +510,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("orders", () => promiseGuard);
         router.useMiddleware(() => promiseMiddleware);
 
-        const err = await router.navigate("orders", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders", {}, {});
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseMiddleware).toHaveBeenCalledTimes(1);
@@ -600,14 +541,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders.pending", () => promiseRedirectGuard);
 
         // Navigate to initial state
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         promiseRedirectGuard.mockClear();
 
         // Navigate away - should redirect to new state
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseRedirectGuard).toHaveBeenCalledTimes(1);
       });
@@ -630,14 +569,12 @@ describe("router.navigate() - promise resolve values", () => {
         router.addDeactivateGuard("orders", () => normalPromiseGuard);
         router.addDeactivateGuard("orders.pending", () => promiseRedirectGuard);
 
-        void router.navigate("orders.pending");
+        await router.navigate("orders.pending");
 
         promiseRedirectGuard.mockClear();
         normalPromiseGuard.mockClear();
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseRedirectGuard).toHaveBeenCalledTimes(1);
         expect(normalPromiseGuard).toHaveBeenCalledTimes(1);
@@ -661,9 +598,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.addActivateGuard("profile", () => promiseRedirectGuard);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseRedirectGuard).toHaveBeenCalledTimes(1);
 
@@ -689,9 +624,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("settings", () => normalPromiseGuard);
         router.addActivateGuard("settings.account", () => promiseRedirectGuard);
 
-        const err = await router.navigate("settings.account", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("settings.account", {}, {});
 
         expect(normalPromiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseRedirectGuard).toHaveBeenCalledTimes(1);
@@ -717,9 +650,7 @@ describe("router.navigate() - promise resolve values", () => {
 
         router.useMiddleware(() => promiseRedirectMiddleware);
 
-        const err = await router.navigate("orders.pending", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
 
@@ -747,9 +678,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.useMiddleware(() => firstPromiseMiddleware);
         router.useMiddleware(() => promiseRedirectMiddleware);
 
-        const err = await router.navigate("orders", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("orders", {}, {});
 
         expect(firstPromiseMiddleware).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);
@@ -775,9 +704,7 @@ describe("router.navigate() - promise resolve values", () => {
         router.addActivateGuard("profile", () => promiseGuard);
         router.useMiddleware(() => promiseRedirectMiddleware);
 
-        const err = await router.navigate("profile", {}, {});
-
-        expect(err).toBeUndefined();
+        await router.navigate("profile", {}, {});
 
         expect(promiseGuard).toHaveBeenCalledTimes(1);
         expect(promiseRedirectMiddleware).toHaveBeenCalledTimes(1);

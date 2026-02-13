@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - events transition success", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -339,7 +339,7 @@ describe("router.navigate() - events transition success", () => {
       expect(onSuccess).not.toHaveBeenCalled();
 
       unsubSuccess();
-      void router.start(); // Restore for other tests
+      await router.start();
     });
 
     it("should emit TRANSITION_SUCCESS with correct state after redirect", async () => {

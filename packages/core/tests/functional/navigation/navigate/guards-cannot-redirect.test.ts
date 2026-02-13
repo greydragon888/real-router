@@ -365,7 +365,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error when canActivate attempts to redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
         freshRouter.addActivateGuard("users", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
@@ -388,7 +388,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error when canActivate returns state-based redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
         freshRouter.addActivateGuard("users", () => () => ({
           name: "orders",
@@ -411,7 +411,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should allow guards to block without redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
         freshRouter.addActivateGuard("admin", () => () => false);
 

@@ -221,29 +221,32 @@ describe("router.navigate() - auto cleanup", () => {
         expect(hasCanDeactivate("users")).toBe(true);
       });
 
-      it.skip("should not remove canDeactivate when canDeactivate blocks transition (TODO: fix guard blocking)", async () => {
-        const normalDeactivateGuard = vi.fn().mockReturnValue(true);
+      it.todo(
+        "should not remove canDeactivate when canDeactivate blocks transition (TODO: fix guard blocking)",
+        async () => {
+          const normalDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        // Navigate to users first with normal guard
-        router.addDeactivateGuard("users", () => normalDeactivateGuard);
+          // Navigate to users first with normal guard
+          router.addDeactivateGuard("users", () => normalDeactivateGuard);
 
-        await router.navigate("users");
+          await router.navigate("users");
 
-        // Replace with blocking guard that returns false
-        const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
+          // Replace with blocking guard that returns false
+          const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
 
-        router.addDeactivateGuard("users", () => blockingDeactivateGuard);
+          router.addDeactivateGuard("users", () => blockingDeactivateGuard);
 
-        expect(hasCanDeactivate("users")).toBe(true);
+          expect(hasCanDeactivate("users")).toBe(true);
 
-        // Try to navigate away (should be blocked)
-        await expect(router.navigate("orders")).rejects.toMatchObject({
-          code: errorCodes.CANNOT_DEACTIVATE,
-        });
+          // Try to navigate away (should be blocked)
+          await expect(router.navigate("orders")).rejects.toMatchObject({
+            code: errorCodes.CANNOT_DEACTIVATE,
+          });
 
-        // Guard should NOT be removed (transition failed)
-        expect(hasCanDeactivate("users")).toBe(true);
-      });
+          // Guard should NOT be removed (transition failed)
+          expect(hasCanDeactivate("users")).toBe(true);
+        },
+      );
     });
 
     describe("autoCleanUp edge cases", () => {
@@ -289,6 +292,7 @@ describe("router.navigate() - auto cleanup", () => {
           if (toState.name === "orders") {
             return { name: "profile", params: {}, path: "/profile" };
           }
+
           return; // Pass through for other routes
         });
 

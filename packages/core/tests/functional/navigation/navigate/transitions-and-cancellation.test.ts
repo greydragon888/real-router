@@ -24,15 +24,13 @@ describe("router.navigate() - transitions and cancellation", () => {
   });
 
   it("should be able to handle multiple cancellations", async () => {
-    expect.hasAssertions();
+    const middleware = async (): Promise<boolean> => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
 
-    vi.useFakeTimers();
-
-    const middleware = (_toState: any, _fromState: any, done: any): void => {
-      setTimeout(() => done(), 20);
+      return true;
     };
 
-    router.useMiddleware(() => middleware as any);
+    router.useMiddleware(() => middleware);
 
     const promises = Array.from({ length: 5 })
       .fill(null)
@@ -46,8 +44,6 @@ describe("router.navigate() - transitions and cancellation", () => {
     router.clearMiddleware();
 
     await Promise.all(promises);
-    vi.runAllTimers();
-    vi.useRealTimers();
   });
 
   it("should do nothing if cancel is called after transition finished", async () => {
@@ -113,7 +109,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     describe("Promise resolution after cancellation", () => {
       it("should ignore promise resolution after navigation cancellation", async () => {
-        let resolvePromise: () => void;
+        let resolvePromise: (() => void) | undefined;
         const asyncMiddleware = vi.fn().mockImplementation((toState) =>
           // Allow start transition to "home" to complete, block "users" navigation
           toState.name === "home"
@@ -128,7 +124,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         const freshRouter = createTestRouter();
 
         freshRouter.useMiddleware(() => asyncMiddleware);
-        freshRouter.start();
+        await freshRouter.start();
 
         const callback = vi.fn();
 
@@ -137,8 +133,12 @@ describe("router.navigate() - transitions and cancellation", () => {
         // Cancel navigation before promise completes
         (freshRouter as any).cancel();
 
-        // Now resolve the promise
-        resolvePromise!();
+        // Now resolve the promise if it was set
+        // eslint-disable-next-line vitest/no-conditional-in-test
+        if (resolvePromise) {
+          resolvePromise();
+        }
+
         await Promise.resolve(); // flush microtasks
 
         // Callback should only be called with TRANSITION_CANCELLED
@@ -163,7 +163,7 @@ describe("router.navigate() - transitions and cancellation", () => {
             }),
         );
 
-        freshRouter.start();
+        await freshRouter.start();
 
         const errorListener = vi.fn();
         const cancelListener = vi.fn();
@@ -190,33 +190,32 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     describe("done() callback after cancellation", () => {
       it("should ignore done() calls after navigation cancellation", async () => {
-        let doneFn: any;
-        const asyncMiddleware = vi
-          .fn()
-          .mockImplementation((toState, _fromState, done) => {
-            // Allow start transition to "home" to complete, block "users" navigation
-            if (toState.name === "home") {
-              done();
+        let resolvePromise: () => void;
+        const asyncMiddleware = vi.fn().mockImplementation((toState) => {
+          // Allow start transition to "home" to complete, block "users" navigation
+          if (toState.name === "home") {
+            return true;
+          }
 
-              return;
-            }
-
-            doneFn = done;
-            // Don't call done immediately - save for later invocation
+          return new Promise<boolean>((resolve) => {
+            resolvePromise = () => {
+              resolve(true);
+            };
           });
+        });
 
         const freshRouter = createTestRouter();
 
         freshRouter.useMiddleware(() => asyncMiddleware);
-        freshRouter.start();
+        await freshRouter.start();
 
         const promise = freshRouter.navigate("users");
 
         // Cancel navigation
         (freshRouter as any).cancel();
 
-        // Try to call done after cancellation
-        doneFn!();
+        // Try to resolve the promise after cancellation
+        resolvePromise!();
 
         // Navigation should be cancelled
         try {
@@ -233,25 +232,26 @@ describe("router.navigate() - transitions and cancellation", () => {
       });
 
       it("should not process error from done() after cancellation", async () => {
-        let doneFn: any;
+        let rejectPromise: (reason?: unknown) => void;
 
         const freshRouter = createTestRouter();
 
-        const guardFn = (_toState: any, _fromState: any, done: any): void => {
-          doneFn = done;
-        };
+        const guardFn = (): Promise<boolean> =>
+          new Promise((_resolve, reject) => {
+            rejectPromise = reject;
+          });
 
-        freshRouter.addActivateGuard("users", () => guardFn as any);
+        freshRouter.addActivateGuard("users", () => guardFn);
 
-        freshRouter.start();
+        await freshRouter.start();
 
         const promise = freshRouter.navigate("users");
 
         // Cancel navigation
         (freshRouter as any).cancel();
 
-        // Try to call done with error after cancellation
-        doneFn!(new RouterError(errorCodes.CANNOT_ACTIVATE));
+        // Try to reject the promise after cancellation
+        rejectPromise!(new RouterError(errorCodes.CANNOT_ACTIVATE));
 
         // Navigation should be cancelled
         try {
@@ -272,16 +272,14 @@ describe("router.navigate() - transitions and cancellation", () => {
       it("should handle multiple cancel() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        const middleware2 = (
-          _toState: any,
-          _fromState: any,
-          done: any,
-        ): void => {
-          setTimeout(() => done(), 100);
+        const middleware2 = async (): Promise<boolean> => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          return true;
         };
 
-        freshRouter.useMiddleware(() => middleware2 as any);
-        freshRouter.start();
+        freshRouter.useMiddleware(() => middleware2);
+        await freshRouter.start();
 
         const promise = freshRouter.navigate("users");
 

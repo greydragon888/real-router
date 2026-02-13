@@ -53,7 +53,7 @@ describe("router.navigate() - unknown route", () => {
       );
 
       // Start with unknown path
-      freshRouter.start("/unknown-start-path");
+      await freshRouter.start("/unknown-start-path");
 
       // UNKNOWN_ROUTE should now be set as current state
       expect(freshRouter.getState()?.name).toBe(constants.UNKNOWN_ROUTE);

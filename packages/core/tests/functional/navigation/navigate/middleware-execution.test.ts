@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter, errorCodes, RouterError } from "@real-router/core";
 
@@ -106,7 +106,6 @@ describe("router.navigate() - middleware execution", () => {
       expect(middleware).toHaveBeenCalledWith(
         expect.objectContaining({ name: "orders.pending" }),
         expect.objectContaining({ name: "home" }),
-        expect.any(Function),
       );
     });
   });
@@ -250,15 +249,11 @@ describe("router.navigate() - middleware execution", () => {
 
     it("should allow middleware to block navigation with custom error", async () => {
       const errorMessage = "Custom middleware error";
-      const blockingMiddleware = vi
-        .fn()
-        .mockImplementation((_toState, _fromState, done) => {
-          done(
-            new RouterError(errorCodes.TRANSITION_ERR, {
-              message: errorMessage,
-            }),
-          );
+      const blockingMiddleware = vi.fn().mockImplementation(() => {
+        throw new RouterError(errorCodes.TRANSITION_ERR, {
+          message: errorMessage,
         });
+      });
 
       const freshRouter = createRouter([{ name: "index", path: "/" }]);
 

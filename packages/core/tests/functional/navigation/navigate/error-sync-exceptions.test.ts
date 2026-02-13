@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - error sync exceptions", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -59,9 +59,7 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addDeactivateGuard("orders.pending", () => nextGuard); // Called first
         router.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
 
-        const err1 = await router.navigate("orders.pending", {}, {});
-
-        expect(err1).toBeUndefined();
+        await router.navigate("orders.pending", {}, {});
 
         errorGuard.mockClear();
         nextGuard.mockClear();

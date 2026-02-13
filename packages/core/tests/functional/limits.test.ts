@@ -230,7 +230,7 @@ describe("core/limits (integration via public API)", () => {
       }).not.toThrowError();
     });
 
-    it("should allow unlimited event depth when maxEventDepth = 0", () => {
+    it("should allow unlimited event depth when maxEventDepth = 0", async () => {
       const router = createRouter([{ name: "home", path: "/" }], {
         limits: { maxEventDepth: 0 },
         defaultRoute: "home",
@@ -244,9 +244,7 @@ describe("core/limits (integration via public API)", () => {
       });
 
       // Start router - this triggers ROUTER_START event with maxEventDepth=0
-      expect(() => {
-        void router.start();
-      }).not.toThrowError();
+      await router.start();
 
       // Verify event was actually received (confirms event path was executed)
       expect(startEventReceived).toBe(true);
