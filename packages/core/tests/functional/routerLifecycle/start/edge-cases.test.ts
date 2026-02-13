@@ -112,9 +112,10 @@ describe("router.start() - edge cases", () => {
   });
 
   describe("State validation with isState()", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       // Disable fallback to UNKNOWN_ROUTE to get ROUTE_NOT_FOUND errors
       router = createTestRouter({ allowNotFound: false });
+      await router.start();
     });
 
     it("should reject state with missing path field", async () => {
@@ -127,7 +128,7 @@ describe("router.start() - edge cases", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
-      expect(router.isActive()).toBe(false);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should reject state with missing params field", async () => {
@@ -140,7 +141,7 @@ describe("router.start() - edge cases", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       }
 
-      expect(router.isActive()).toBe(false);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should reject state with function in params", async () => {
@@ -153,7 +154,7 @@ describe("router.start() - edge cases", () => {
         expect(error).toBeDefined();
       }
 
-      expect(router.isActive()).toBe(false);
+      expect(router.isActive()).toBe(true);
     });
 
     it("should reject state with class instance in params", async () => {
@@ -170,7 +171,7 @@ describe("router.start() - edge cases", () => {
         expect(error).toBeDefined();
       }
 
-      expect(router.isActive()).toBe(false);
+      expect(router.isActive()).toBe(true);
     });
   });
 
@@ -185,15 +186,18 @@ describe("router.start() - edge cases", () => {
   });
 
   describe("Empty string as path", () => {
-    it('should treat empty string "" as no path (use defaultRoute)', () => {
+    it('should treat empty string "" as no path (use defaultRoute)', async () => {
       // Note: Empty string "" is falsy in JS, so !first is true
       // in getStartRouterArguments, and the callback is replaced with noop
       // This is arguably a bug but current behavior - use explicit path instead
-      void router.start("");
+      try {
+        await router.start("");
 
-      expect(router.isActive()).toBe(true);
-      // Empty string triggers fallback to defaultRoute
-      expect(router.getState()?.name).toBe("home");
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
+      }
     });
   });
 

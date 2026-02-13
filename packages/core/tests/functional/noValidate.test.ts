@@ -258,11 +258,11 @@ describe("core/noValidate option", () => {
       });
 
       it("should skip validation in navigateToState", async () => {
-        void router.start();
+        await router.start();
 
         const state = router.makeState("home", {}, "/home");
 
-        expect(
+        expect(() =>
           router.navigateToState(state, undefined, {}, true),
         ).not.toThrowError();
       });

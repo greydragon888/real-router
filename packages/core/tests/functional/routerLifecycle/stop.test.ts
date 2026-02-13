@@ -18,19 +18,19 @@ describe("stop", () => {
   });
 
   describe("basic stop functionality", () => {
-    it("should stop started router", () => {
-      void router.start();
+    it("should stop started router", async () => {
+      await router.start();
 
       expect(router.isActive()).toBe(true);
 
       const result = router.stop();
 
       expect(router.isActive()).toBe(false);
-      expect(result).toBe(router); // Method chaining
+      expect(result).toBe(router);
     });
 
-    it("should clear router state when stopped", () => {
-      void router.start("/users/list");
+    it("should clear router state when stopped", async () => {
+      await router.start("/users/list");
 
       expect(router.getState()).toBeDefined();
       expect(router.getState()?.name).toBe("users.list");
@@ -40,8 +40,8 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should return router instance for method chaining", () => {
-      void router.start();
+    it("should return router instance for method chaining", async () => {
+      await router.start();
 
       const result = router.stop();
 
@@ -85,8 +85,8 @@ describe("stop", () => {
   });
 
   describe("multiple stop calls", () => {
-    it("should handle multiple stop calls gracefully", () => {
-      void router.start("/home");
+    it("should handle multiple stop calls gracefully", async () => {
+      await router.start("/home");
 
       expect(router.isActive()).toBe(true);
 
@@ -94,34 +94,32 @@ describe("stop", () => {
 
       expect(router.isActive()).toBe(false);
 
-      // Second stop should not throw
       expect(() => {
         router.stop();
       }).not.toThrowError();
       expect(router.isActive()).toBe(false);
 
-      // Third stop should not throw
       expect(() => {
         router.stop();
       }).not.toThrowError();
       expect(router.isActive()).toBe(false);
     });
 
-    it("should emit ROUTER_STOP event only once per start/stop cycle", () => {
+    it("should emit ROUTER_STOP event only once per start/stop cycle", async () => {
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      void router.start();
+      await router.start();
       router.stop();
-      router.stop(); // Second stop
-      router.stop(); // Third stop
+      router.stop();
+      router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(1);
     });
 
-    it("should maintain state cleared after multiple stops", () => {
-      void router.start("/users/view/123");
+    it("should maintain state cleared after multiple stops", async () => {
+      await router.start("/users/view/123");
 
       expect(router.getState()?.name).toBe("users.view");
 
@@ -129,44 +127,43 @@ describe("stop", () => {
 
       expect(router.getState()).toBeUndefined();
 
-      router.stop(); // Multiple stops
+      router.stop();
 
       expect(router.getState()).toBeUndefined();
     });
   });
 
   describe("ROUTER_STOP event emission", () => {
-    it("should emit ROUTER_STOP event when stopping started router", () => {
+    it("should emit ROUTER_STOP event when stopping started router", async () => {
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      void router.start();
+      await router.start();
       router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(1);
     });
 
-    it("should emit ROUTER_STOP event with no arguments", () => {
+    it("should emit ROUTER_STOP event with no arguments", async () => {
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      void router.start("/home");
+      await router.start("/home");
       router.stop();
 
       expect(stopListener).toHaveBeenCalledExactlyOnceWith();
     });
 
-    it("should emit ROUTER_STOP event after state is cleared", () => {
+    it("should emit ROUTER_STOP event after state is cleared", async () => {
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      void router.start("/users/list");
+      await router.start("/users/list");
 
       stopListener.mockImplementation(() => {
-        // When event fires, state should already be cleared
         expect(router.getState()).toBeUndefined();
         expect(router.isActive()).toBe(false);
       });
@@ -176,23 +173,22 @@ describe("stop", () => {
       expect(stopListener).toHaveBeenCalledTimes(1);
     });
 
-    it("should emit ROUTER_STOP event for different router states", () => {
+    it("should emit ROUTER_STOP event for different router states", async () => {
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      // Test with different starting states
-      void router.start("/home");
+      await router.start("/home");
       router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(1);
 
-      void router.start("/users/view/456");
+      await router.start("/users/view/456");
       router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(2);
 
-      void router.start("/orders/pending");
+      await router.start("/orders/pending");
       router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(3);
@@ -200,8 +196,8 @@ describe("stop", () => {
   });
 
   describe("start/stop lifecycle", () => {
-    it("should allow restart after stop", () => {
-      void router.start("/home");
+    it("should allow restart after stop", async () => {
+      await router.start("/home");
 
       expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("home");
@@ -211,14 +207,13 @@ describe("stop", () => {
       expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
 
-      // Should be able to start again
-      void router.start("/users/list");
+      await router.start("/users/list");
 
       expect(router.isActive()).toBe(true);
       expect(router.getState()?.name).toBe("users.list");
     });
 
-    it("should maintain proper event sequence during start/stop cycles", () => {
+    it("should maintain proper event sequence during start/stop cycles", async () => {
       const startListener = vi.fn();
       const stopListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -230,8 +225,7 @@ describe("stop", () => {
         transitionSuccessListener,
       );
 
-      // First cycle
-      void router.start("/home");
+      await router.start("/home");
 
       expect(startListener).toHaveBeenCalledTimes(1);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
@@ -240,8 +234,7 @@ describe("stop", () => {
 
       expect(stopListener).toHaveBeenCalledTimes(1);
 
-      // Second cycle
-      void router.start("/users");
+      await router.start("/users");
 
       expect(startListener).toHaveBeenCalledTimes(2);
       expect(transitionSuccessListener).toHaveBeenCalledTimes(2);
@@ -251,16 +244,15 @@ describe("stop", () => {
       expect(stopListener).toHaveBeenCalledTimes(2);
     });
 
-    it("should handle rapid start/stop cycles", () => {
+    it("should handle rapid start/stop cycles", async () => {
       const startListener = vi.fn();
       const stopListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      // Rapid cycles
       for (let i = 0; i < 5; i++) {
-        void router.start();
+        await router.start();
         router.stop();
       }
 
@@ -270,21 +262,17 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should preserve router configuration after stop", () => {
-      // Create router with custom options
+    it("should preserve router configuration after stop", async () => {
       router = createTestRouter({
-        defaultRoute: "custom.default",
         allowNotFound: true,
         trailingSlash: "always",
       });
 
-      void router.start();
+      await router.start();
       router.stop();
 
       const options = router.getOptions();
 
-      // Options should be preserved
-      expect(options.defaultRoute).toBe("custom.default");
       expect(options.allowNotFound).toBe(true);
       expect(options.trailingSlash).toBe("always");
     });
@@ -344,14 +332,14 @@ describe("stop", () => {
   });
 
   describe("stop with middleware and plugins", () => {
-    it("should not trigger middleware on stop", () => {
+    it("should not trigger middleware on stop", async () => {
       const middlewareSpy = vi.fn();
 
       router.useMiddleware(() => (toState, fromState) => {
         middlewareSpy(toState.name, fromState?.name);
       });
 
-      void router.start("/home");
+      await router.start("/home");
 
       expect(middlewareSpy).toHaveBeenCalledTimes(1);
 
@@ -362,7 +350,7 @@ describe("stop", () => {
       expect(middlewareSpy).not.toHaveBeenCalled();
     });
 
-    it("should not trigger plugins on stop", () => {
+    it("should not trigger plugins on stop", async () => {
       const pluginSpy = vi.fn();
 
       router.usePlugin(() => ({
@@ -371,7 +359,7 @@ describe("stop", () => {
         onTransitionError: pluginSpy,
       }));
 
-      void router.start("/home");
+      await router.start("/home");
       pluginSpy.mockClear();
 
       router.stop();
@@ -379,28 +367,27 @@ describe("stop", () => {
       expect(pluginSpy).not.toHaveBeenCalled();
     });
 
-    it("should maintain middleware and plugins after stop for next start", () => {
+    it("should maintain middleware and plugins after stop for next start", async () => {
       const middlewareSpy = vi.fn();
 
       router.useMiddleware(() => (toState, _fromState) => {
         middlewareSpy(toState.name);
       });
 
-      void router.start("/home");
+      await router.start("/home");
       router.stop();
 
       middlewareSpy.mockClear();
 
-      // Restart should trigger middleware again
-      void router.start("/users");
+      await router.start("/users");
 
       expect(middlewareSpy).toHaveBeenCalledExactlyOnceWith("users");
     });
   });
 
   describe("stop with different router states", () => {
-    it("should stop router started with path string", () => {
-      void router.start("/users/list");
+    it("should stop router started with path string", async () => {
+      await router.start("/users/list");
 
       expect(router.getState()?.path).toBe("/users/list");
 
@@ -410,8 +397,8 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should stop router started with path", () => {
-      void router.start("/orders/view/123");
+    it("should stop router started with path", async () => {
+      await router.start("/orders/view/123");
 
       expect(router.getState()?.name).toBe("orders.view");
 
@@ -421,8 +408,8 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should stop router started with defaultRoute", () => {
-      void router.start(); // Uses defaultRoute
+    it("should stop router started with defaultRoute", async () => {
+      await router.start();
 
       expect(router.getState()?.name).toBe("home");
 
@@ -432,10 +419,10 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should stop router in UNKNOWN_ROUTE state", () => {
+    it("should stop router in UNKNOWN_ROUTE state", async () => {
       router = createTestRouter({ allowNotFound: true });
 
-      void router.start("/nonexistent/path");
+      await router.start("/nonexistent/path");
 
       expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
 
@@ -445,11 +432,10 @@ describe("stop", () => {
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should stop router after navigation", () => {
-      void router.start("/home");
+    it("should stop router after navigation", async () => {
+      await router.start("/home");
 
-      // Navigate to different route
-      void router.navigate("users.view", { id: "456" });
+      await router.navigate("users.view", { id: "456" });
 
       expect(router.getState()?.name).toBe("users.view");
 
@@ -461,26 +447,23 @@ describe("stop", () => {
   });
 
   describe("edge cases and error scenarios", () => {
-    it("should handle stop during transition", () => {
-      // This is a complex scenario that might need special handling
-      void router.start("/home");
+    it("should handle stop during transition", async () => {
+      await router.start("/home");
 
-      // Start a navigation
       void router.navigate("users.list");
 
-      // Stop immediately
       router.stop();
 
       expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
     });
 
-    it("should maintain proper state after stop with complex navigation history", () => {
-      void router.start("/home");
+    it("should maintain proper state after stop with complex navigation history", async () => {
+      await router.start("/home");
       void router.navigate("users");
       void router.navigate("users.list");
       void router.navigate("users.view", { id: "123" });
-      void router.navigate("profile");
+      await router.navigate("profile");
 
       expect(router.getState()?.name).toBe("profile");
 

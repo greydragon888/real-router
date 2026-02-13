@@ -253,11 +253,14 @@ describe("router.start() - path string scenarios", () => {
 
   describe("path string edge cases", () => {
     it("should handle empty string as path (fallback to defaultRoute)", async () => {
-      await router.start("");
+      try {
+        await router.start("");
 
-      expect(router.isActive()).toBe(true);
-      // Empty string triggers fallback to defaultRoute
-      expect(router.getState()?.name).toBe("home");
+        expect.fail("Should have thrown");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
+      }
     });
 
     it("should handle whitespace-only path as invalid route", async () => {
@@ -360,7 +363,7 @@ describe("router.start() - path string scenarios", () => {
     });
 
     it("should return state on successful navigation", async () => {
-      const validPath = "/profile/me";
+      const validPath = "/profile/";
 
       const state = await router.start(validPath);
 

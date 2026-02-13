@@ -250,15 +250,15 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     it("should maintain consistency after failed registration", async () => {
       // Register a valid guard first
-      router.addDeactivateGuard("valid", false);
+      router.addDeactivateGuard("admin", false);
 
       expect(() => {
         // @ts-expect-error: testing invalid handler
-        router.addDeactivateGuard("inconsistent", "not-a-function");
+        router.addDeactivateGuard("index", "not-a-function");
       }).toThrowError(TypeError);
 
       // Valid guard should still work
-      await router.navigate("valid");
+      await router.navigate("admin");
       try {
         await router.navigate("home");
       } catch (error: any) {
@@ -267,7 +267,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
       // Failed route can be re-registered (was rolled back)
       expect(() => {
-        router.addDeactivateGuard("inconsistent", true);
+        router.addDeactivateGuard("index", true);
       }).not.toThrowError();
     });
   });
@@ -295,22 +295,22 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     it("should replace old guard with new one", async () => {
       // First guard allows leaving
-      router.addDeactivateGuard("home", true);
+      router.addDeactivateGuard("admin", true);
 
-      await router.navigate("home");
       await router.navigate("admin");
+      await router.navigate("index");
 
       // Replace with blocking guard
-      router.addDeactivateGuard("admin", false);
+      router.addDeactivateGuard("index", false);
 
-      // Now cannot leave admin
+      // Now cannot leave index
       try {
-        await router.navigate("home");
+        await router.navigate("admin");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
       }
 
-      expect(router.getState()?.name).toBe("admin");
+      expect(router.getState()?.name).toBe("index");
     });
   });
 });

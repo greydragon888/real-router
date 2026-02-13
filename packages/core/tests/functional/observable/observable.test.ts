@@ -22,12 +22,12 @@ describe("core/observable", () => {
 
   describe("addEventListener", () => {
     describe("event triggering via real operations", () => {
-      it("should trigger ROUTER_START listener when router starts", () => {
+      it("should trigger ROUTER_START listener when router starts", async () => {
         const freshRouter = createTestRouter();
         const cb = vi.fn();
 
         freshRouter.addEventListener(events.ROUTER_START, cb);
-        freshRouter.start();
+        await freshRouter.start();
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith();
@@ -45,11 +45,11 @@ describe("core/observable", () => {
         expect(cb).toHaveBeenCalledWith();
       });
 
-      it("should trigger TRANSITION_START listener during navigation", () => {
+      it("should trigger TRANSITION_START listener during navigation", async () => {
         const cb = vi.fn();
 
         router.addEventListener(events.TRANSITION_START, cb);
-        void router.navigate("users");
+        await router.navigate("users");
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -91,7 +91,7 @@ describe("core/observable", () => {
         );
       });
 
-      it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", () => {
+      it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", async () => {
         const cb = vi.fn();
         let middlewareResolve: Function | undefined;
 
@@ -108,7 +108,7 @@ describe("core/observable", () => {
         void router.navigate("users");
 
         // Second navigation - cancels the first
-        void router.navigate("orders");
+        await router.navigate("orders");
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -120,7 +120,7 @@ describe("core/observable", () => {
         middlewareResolve?.();
       });
 
-      it("should not break other listeners if one throws", () => {
+      it("should not break other listeners if one throws", async () => {
         vi.spyOn(logger, "error").mockImplementation(noop);
 
         const freshRouter = createTestRouter();
@@ -132,9 +132,7 @@ describe("core/observable", () => {
         freshRouter.addEventListener(events.ROUTER_START, badCb);
         freshRouter.addEventListener(events.ROUTER_START, goodCb);
 
-        expect(() => {
-          freshRouter.start();
-        }).not.toThrowError();
+        await freshRouter.start();
 
         expect(goodCb).toHaveBeenCalled();
 
@@ -262,23 +260,23 @@ describe("core/observable", () => {
         });
       });
 
-      it("should not call subscriber after unsubscribe", () => {
+      it("should not call subscriber after unsubscribe", async () => {
         const spy = vi.fn();
         const unsubscribe = router.subscribe(spy);
 
         unsubscribe();
-        void router.navigate("users");
+        await router.navigate("users");
 
         expect(spy).not.toHaveBeenCalled();
       });
 
-      it("should notify all subscribers", () => {
+      it("should notify all subscribers", async () => {
         const spy1 = vi.fn();
         const spy2 = vi.fn();
         const unsub1 = router.subscribe(spy1);
         const unsub2 = router.subscribe(spy2);
 
-        void router.navigate("users");
+        await router.navigate("users");
 
         expect(spy1).toHaveBeenCalled();
         expect(spy2).toHaveBeenCalled();

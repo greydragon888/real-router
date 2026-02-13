@@ -14,9 +14,9 @@ import type { Router, Route } from "@real-router/core";
 let router: Router;
 
 describe("core/state", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -30,8 +30,8 @@ describe("core/state", () => {
       expect(router.getState()).toBe(undefined);
     });
 
-    it("returns state after navigation", () => {
-      void router.navigate("users.view", { id: "123" });
+    it("returns state after navigation", async () => {
+      await router.navigate("users.view", { id: "123" });
 
       const state = router.getState();
 
@@ -45,8 +45,8 @@ describe("core/state", () => {
       expect(router.getPreviousState()).toBeUndefined();
     });
 
-    it("returns previous state after navigation", () => {
-      void router.navigate("sign-in");
+    it("returns previous state after navigation", async () => {
+      await router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -54,18 +54,18 @@ describe("core/state", () => {
       expect(previousState?.name).toBe("home");
     });
 
-    it("updates previous state on subsequent navigations", () => {
-      void router.navigate("sign-in");
-      void router.navigate("users");
+    it("updates previous state on subsequent navigations", async () => {
+      await router.navigate("sign-in");
+      await router.navigate("users");
 
       const previousState = router.getPreviousState();
 
       expect(previousState?.name).toBe("sign-in");
     });
 
-    it("preserves previous state params", () => {
-      void router.navigate("users.view", { id: "123" });
-      void router.navigate("home");
+    it("preserves previous state params", async () => {
+      await router.navigate("users.view", { id: "123" });
+      await router.navigate("home");
 
       const previousState = router.getPreviousState();
 
@@ -705,11 +705,10 @@ describe("core/stateBuilder", () => {
   });
 
   describe("not found state via start with allowNotFound", () => {
-    it("creates not found state when starting at unknown path", () => {
+    it("creates not found state when starting at unknown path", async () => {
       const freshRouter = createTestRouter({ allowNotFound: true });
 
-      // Start at an unknown path - this triggers makeNotFoundState internally
-      void freshRouter.start("/completely/unknown/path");
+      await freshRouter.start("/completely/unknown/path");
 
       const state = freshRouter.getState();
 

@@ -111,7 +111,7 @@ describe("core/plugins", () => {
 
       router.usePlugin(myPlugin);
 
-      await router.start("");
+      await router.start();
 
       // custom method added by plugin
       expect(
@@ -124,7 +124,7 @@ describe("core/plugins", () => {
       expect(myPluginMethods.onTransitionSuccess).toHaveBeenCalled();
     });
 
-    it("returns an unsubscribe function that removes plugin", () => {
+    it("returns an unsubscribe function that removes plugin", async () => {
       const teardown = vi.fn();
       const onStop = vi.fn();
 
@@ -134,7 +134,7 @@ describe("core/plugins", () => {
       const unsubscribe = testRouter.usePlugin(plugin);
 
       // Start and stop to verify plugin is active
-      testRouter.start();
+      await testRouter.start();
       testRouter.stop();
 
       expect(onStop).toHaveBeenCalledTimes(1);
@@ -145,14 +145,14 @@ describe("core/plugins", () => {
       expect(teardown).toHaveBeenCalled();
 
       // Verify plugin is removed - onStop should not be called again on restart
-      testRouter.start();
+      await testRouter.start();
       testRouter.stop();
 
       // onStop should still be 1 (not called after unsubscribe)
       expect(onStop).toHaveBeenCalledTimes(1);
     });
 
-    it("removes all registered event listeners when unsubscribed", () => {
+    it("removes all registered event listeners when unsubscribed", async () => {
       const onStart = vi.fn();
       const plugin = () => ({ onStart });
 
@@ -161,14 +161,14 @@ describe("core/plugins", () => {
       unsubscribe();
 
       router.stop();
-      void router.start();
+      await router.start();
 
       expect(onStart).not.toHaveBeenCalled();
     });
 
     // 🔴 CRITICAL: Atomicity of registration on errors
     describe("atomicity on errors", () => {
-      it("should not register any plugin if factory throws error", () => {
+      it("should not register any plugin if factory throws error", async () => {
         const tracker = createTrackingPlugin();
         const validPlugin1 = tracker.factory;
         const failingPlugin = () => {
@@ -183,13 +183,13 @@ describe("core/plugins", () => {
         }).toThrowError("Factory initialization failed");
 
         // No plugins should be registered - verify by starting router
-        void router.start();
+        await router.start();
 
         // tracker's onStart should not have been called (plugin was rolled back)
         expect(tracker.getCalls().onStart).toBe(0);
       });
 
-      it("should rollback all plugins if any returns invalid structure", () => {
+      it("should rollback all plugins if any returns invalid structure", async () => {
         const tracker = createTrackingPlugin();
         const validPlugin = tracker.factory;
         const invalidPlugin = () => ({ unknownMethod: vi.fn() }) as any;
@@ -204,12 +204,12 @@ describe("core/plugins", () => {
         }).toThrowError("Unknown property");
 
         // Rollback should leave state unchanged - verify by starting router
-        void router.start();
+        await router.start();
 
         expect(tracker.getCalls().onStart).toBe(0);
       });
 
-      it("should rollback when error occurs in middle of batch", () => {
+      it("should rollback when error occurs in middle of batch", async () => {
         const tracker1 = createTrackingPlugin();
         const tracker2 = createTrackingPlugin();
         const plugin1 = tracker1.factory;
@@ -226,7 +226,7 @@ describe("core/plugins", () => {
         }).toThrowError("Error in plugin3");
 
         // All-or-nothing: no plugins registered - verify by starting router
-        void router.start();
+        await router.start();
 
         expect(tracker1.getCalls().onStart).toBe(0);
         expect(tracker2.getCalls().onStart).toBe(0);
@@ -288,7 +288,7 @@ describe("core/plugins", () => {
 
     // 🔴 CRITICAL: Duplicate protection
     describe("duplicate protection", () => {
-      it("should throw error when registering same factory twice", () => {
+      it("should throw error when registering same factory twice", async () => {
         const tracker = createTrackingPlugin();
         const factory = tracker.factory;
 
@@ -300,12 +300,12 @@ describe("core/plugins", () => {
         }).toThrowError("Plugin factory already registered");
 
         // Original plugin should remain registered - verify by starting router
-        void router.start();
+        await router.start();
 
         expect(tracker.getCalls().onStart).toBe(1);
       });
 
-      it("should allow different factory references even with same plugin structure", () => {
+      it("should allow different factory references even with same plugin structure", async () => {
         const tracker1 = createTrackingPlugin();
         const tracker2 = createTrackingPlugin();
 
@@ -317,13 +317,13 @@ describe("core/plugins", () => {
         }).not.toThrowError();
 
         // Both plugins should be registered - verify by starting router
-        void router.start();
+        await router.start();
 
         expect(tracker1.getCalls().onStart).toBe(1);
         expect(tracker2.getCalls().onStart).toBe(1);
       });
 
-      it("should warn and deduplicate factory in same batch", () => {
+      it("should warn and deduplicate factory in same batch", async () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         const tracker = createTrackingPlugin();
@@ -342,7 +342,7 @@ describe("core/plugins", () => {
         );
 
         // Only one factory registered - verify by starting router
-        void router.start();
+        await router.start();
 
         // onStart should be called exactly once (not twice)
         expect(tracker.getCalls().onStart).toBe(1);
@@ -367,7 +367,7 @@ describe("core/plugins", () => {
 
     // 🔴 CRITICAL: Unsubscribe isolation
     describe("unsubscribe isolation", () => {
-      it("should only remove plugins from its own call", () => {
+      it("should only remove plugins from its own call", async () => {
         const tracker1 = createTrackingPlugin();
         const tracker2 = createTrackingPlugin();
         const tracker3 = createTrackingPlugin();
@@ -378,7 +378,7 @@ describe("core/plugins", () => {
         const unsub2 = router.usePlugin(tracker2.factory, tracker3.factory);
 
         // All three should be registered - verify by starting router
-        void router.start();
+        await router.start();
 
         expect(tracker1.getCalls().onStart).toBe(1);
         expect(tracker2.getCalls().onStart).toBe(1);
@@ -391,7 +391,7 @@ describe("core/plugins", () => {
         unsub1();
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // tracker1 should not respond (unsubscribed)
         expect(tracker1.getCalls().onStart).toBe(0);
@@ -405,7 +405,7 @@ describe("core/plugins", () => {
         unsub2();
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // None should respond
         expect(tracker1.getCalls().onStart).toBe(0);
@@ -413,7 +413,7 @@ describe("core/plugins", () => {
         expect(tracker3.getCalls().onStart).toBe(0);
       });
 
-      it("should handle unsubscribe in reverse order", () => {
+      it("should handle unsubscribe in reverse order", async () => {
         const orderTracker: string[] = [];
         const plugin1 = createOrderedPlugin("p1", orderTracker);
         const plugin2 = createOrderedPlugin("p2", orderTracker);
@@ -426,7 +426,7 @@ describe("core/plugins", () => {
         // Unsubscribe in reverse order
         unsub2();
 
-        void router.start();
+        await router.start();
 
         // Only p1 should have onStart called
         expect(orderTracker).toContain("p1");
@@ -436,14 +436,14 @@ describe("core/plugins", () => {
         unsub1();
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // Neither should respond
         expect(orderTracker).not.toContain("p1");
         expect(orderTracker).not.toContain("p2");
       });
 
-      it("should maintain correct state after partial unsubscribe", () => {
+      it("should maintain correct state after partial unsubscribe", async () => {
         const orderTracker: string[] = [];
         const p1 = createOrderedPlugin("p1", orderTracker);
         const p2 = createOrderedPlugin("p2", orderTracker);
@@ -458,7 +458,7 @@ describe("core/plugins", () => {
         // Unsubscribe middle one
         u2();
 
-        void router.start();
+        await router.start();
 
         // p1 and p3 should respond, p2 should not
         expect(orderTracker).toContain("p1");
@@ -472,7 +472,7 @@ describe("core/plugins", () => {
         orderTracker.length = 0;
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // None should respond (only onStart events, no teardowns)
         expect(
@@ -591,7 +591,7 @@ describe("core/plugins", () => {
         );
       });
 
-      it("should allow all valid plugin methods", () => {
+      it("should allow all valid plugin methods", async () => {
         const tracker = createTrackingPlugin();
 
         expect(() => {
@@ -600,7 +600,7 @@ describe("core/plugins", () => {
 
         // Verify plugin is registered by checking it responds to events
         router.stop();
-        void router.start();
+        await router.start();
 
         expect(tracker.getCalls().onStart).toBe(1);
       });
@@ -608,7 +608,7 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Graceful cleanup on errors
     describe("graceful cleanup on errors", () => {
-      it("should continue cleanup even if teardown throws", () => {
+      it("should continue cleanup even if teardown throws", async () => {
         const teardown1 = vi.fn();
         const teardown2 = vi.fn(() => {
           throw new Error("Teardown2 error");
@@ -637,7 +637,7 @@ describe("core/plugins", () => {
         router.usePlugin(tracker.factory);
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // Only the new tracker should respond
         expect(tracker.getCalls().onStart).toBe(1);
@@ -698,7 +698,7 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Immutability protection
     describe("immutability protection", () => {
-      it("should freeze plugin object to prevent modifications", () => {
+      it("should freeze plugin object to prevent modifications", async () => {
         const onStart = vi.fn();
         const factory = () => ({ onStart });
 
@@ -708,7 +708,7 @@ describe("core/plugins", () => {
         // We test the behavior by ensuring the original function reference is used
 
         router.stop();
-        void router.start();
+        await router.start();
 
         // onStart should have been called with original reference
         expect(onStart).toHaveBeenCalled();
@@ -729,7 +729,7 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Non-function plugin methods (warning + skip)
     describe("non-function plugin methods", () => {
-      it("should warn and skip non-function onStart property", () => {
+      it("should warn and skip non-function onStart property", async () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         const factory = () => ({ onStart: "not a function" }) as any;
@@ -748,7 +748,7 @@ describe("core/plugins", () => {
         warnSpy.mockRestore();
       });
 
-      it("should warn for each non-function method", () => {
+      it("should warn for each non-function method", async () => {
         router.stop();
 
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
@@ -786,7 +786,7 @@ describe("core/plugins", () => {
         warnSpy.mockRestore();
       });
 
-      it("should subscribe only function methods and warn for non-functions", () => {
+      it("should subscribe only function methods and warn for non-functions", async () => {
         router.stop();
 
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
@@ -799,7 +799,7 @@ describe("core/plugins", () => {
           }) as any;
 
         router.usePlugin(factory);
-        void router.start();
+        await router.start();
 
         // onStart function should be called
         expect(onStartFn).toHaveBeenCalled();
@@ -952,7 +952,7 @@ describe("core/plugins", () => {
         expect(teardown).toHaveBeenCalled();
       });
 
-      it("should handle empty plugin object", () => {
+      it("should handle empty plugin object", async () => {
         const factory = () => ({});
 
         expect(() => {

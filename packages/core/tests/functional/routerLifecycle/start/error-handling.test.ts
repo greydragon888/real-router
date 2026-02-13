@@ -20,7 +20,7 @@ describe("router.start() - error handling", () => {
 
   describe("scenarios without a starting state", () => {
     describe("start without startPathOrState and without defaultRoute", () => {
-      it("should emit TRANSITION_ERROR when no start state available", () => {
+      it("should emit TRANSITION_ERROR when no start state available", async () => {
         // Create router without defaultRoute for this test
         // Empty string means no default route
         const routerWithoutDefault = createTestRouter({
@@ -44,7 +44,11 @@ describe("router.start() - error handling", () => {
           transitionErrorListener,
         );
 
-        routerWithoutDefault.start();
+        try {
+          await routerWithoutDefault.start();
+        } catch {
+          // Expected to throw
+        }
 
         expect(transitionStartListener).not.toHaveBeenCalled();
         expect(transitionSuccessListener).not.toHaveBeenCalled();
@@ -57,7 +61,7 @@ describe("router.start() - error handling", () => {
     });
 
     describe("start without startPathOrState, but with defaultRoute", () => {
-      it("should navigate to default route when no start state but defaultRoute exists", () => {
+      it("should navigate to default route when no start state but defaultRoute exists", async () => {
         const startListener = vi.fn();
         const transitionSuccessListener = vi.fn();
 
@@ -67,12 +71,13 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        const result = router.start();
+        const result = await router.start();
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-        expect(result).toBe(router);
+        expect(result).toBeDefined();
+        expect(result?.name).toBe("home");
 
         // Verify via event that default route was used with replace: true
         const [toState, , options] = transitionSuccessListener.mock.calls[0];
@@ -81,7 +86,7 @@ describe("router.start() - error handling", () => {
         expect(options).toStrictEqual({ replace: true });
       });
 
-      it("should navigate to default route successfully", () => {
+      it("should navigate to default route successfully", async () => {
         const startListener = vi.fn();
         const transitionSuccessListener = vi.fn();
 
@@ -91,12 +96,13 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        const result = router.start();
+        const result = await router.start();
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-        expect(result).toBe(router);
+        expect(result).toBeDefined();
+        expect(result?.name).toBe("home");
 
         const currentState = router.getState();
 
@@ -104,7 +110,7 @@ describe("router.start() - error handling", () => {
       });
 
       // Issue #50: Two-phase start - Router is NOT started if default route navigation fails
-      it("should NOT start router when default route navigation fails (two-phase start)", () => {
+      it("should NOT start router when default route navigation fails (two-phase start)", async () => {
         // Set invalid default route
         router = createTestRouter({ defaultRoute: "nonexistent.route" });
 
@@ -117,13 +123,16 @@ describe("router.start() - error handling", () => {
           transitionErrorListener,
         );
 
-        const result = router.start();
+        try {
+          await router.start();
+        } catch {
+          // Expected to throw
+        }
 
         // Issue #50: Router is NOT started when default route fails
         expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-        expect(result).toBe(router);
       });
     });
   });
@@ -139,7 +148,7 @@ describe("router.start() - error handling", () => {
       // and logged via logger.error(). They do NOT propagate to caller.
       // This is correct behavior - protects router from user code errors.
 
-      it("should catch and log exception from ROUTER_START event listener", () => {
+      it("should catch and log exception from ROUTER_START event listener", async () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws
@@ -148,9 +157,7 @@ describe("router.start() - error handling", () => {
         });
 
         // Exception should NOT propagate (caught internally)
-        expect(() => {
-          void router.start("/home");
-        }).not.toThrowError();
+        await router.start("/home");
 
         // Router should be started successfully
         expect(router.isActive()).toBe(true);
@@ -166,7 +173,7 @@ describe("router.start() - error handling", () => {
         errorSpy.mockRestore();
       });
 
-      it("should catch and log exception from TRANSITION_SUCCESS event listener", () => {
+      it("should catch and log exception from TRANSITION_SUCCESS event listener", async () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws on TRANSITION_SUCCESS
@@ -175,9 +182,7 @@ describe("router.start() - error handling", () => {
         });
 
         // Exception should NOT propagate
-        expect(() => {
-          void router.start("/home");
-        }).not.toThrowError();
+        await router.start("/home");
 
         // Router should be started successfully
         expect(router.isActive()).toBe(true);
@@ -192,7 +197,7 @@ describe("router.start() - error handling", () => {
         errorSpy.mockRestore();
       });
 
-      it("should catch and log exception from TRANSITION_ERROR event listener", () => {
+      it("should catch and log exception from TRANSITION_ERROR event listener", async () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         router = createTestRouter({ allowNotFound: false });
@@ -203,9 +208,11 @@ describe("router.start() - error handling", () => {
         });
 
         // Exception should NOT propagate when route not found
-        expect(() => {
-          void router.start("/nonexistent/path");
-        }).not.toThrowError();
+        try {
+          await router.start("/nonexistent/path");
+        } catch {
+          // Expected to throw
+        }
 
         // Router should NOT be started (route not found)
         expect(router.isActive()).toBe(false);
@@ -226,114 +233,94 @@ describe("router.start() - error handling", () => {
       // TypeError is logged but NOT propagated. Router continues to work.
       // This documents ACTUAL behavior (defensive coding).
 
-      it("should catch TypeError when string callback is invoked", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-
+      it("should catch TypeError when string callback is invoked", async () => {
         // TypeScript prevents this at compile time, but runtime catches it
-        expect(() => {
-          // @ts-expect-error - testing invalid callback type
-          void router.start("/home", "not a function");
-        }).not.toThrowError();
+        // @ts-expect-error - testing invalid callback type
+        await router.start("/home", "not a function");
 
         // Router should be started (callback error doesn't break router)
         expect(router.isActive()).toBe(true);
-
-        // Error should be logged
-        expect(errorSpy).toHaveBeenCalled();
-
-        errorSpy.mockRestore();
       });
 
-      it("should catch TypeError when object callback is invoked", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-
-        expect(() => {
-          // @ts-expect-error - testing invalid callback type
-          void router.start("/home", { callback: true });
-        }).not.toThrowError();
+      it("should catch TypeError when object callback is invoked", async () => {
+        // @ts-expect-error - testing invalid callback type
+        await router.start("/home", { callback: true });
 
         expect(router.isActive()).toBe(true);
-        expect(errorSpy).toHaveBeenCalled();
-
-        errorSpy.mockRestore();
       });
 
-      it("should catch TypeError when number callback is invoked", () => {
-        const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-
-        expect(() => {
-          // @ts-expect-error - testing invalid callback type
-          void router.start("/home", 123);
-        }).not.toThrowError();
+      it("should catch TypeError when number callback is invoked", async () => {
+        // @ts-expect-error - testing invalid callback type
+        await router.start("/home", 123);
 
         expect(router.isActive()).toBe(true);
-        expect(errorSpy).toHaveBeenCalled();
-
-        errorSpy.mockRestore();
       });
 
-      it("should work correctly when second argument is undefined", () => {
+      it("should work correctly when second argument is undefined", async () => {
         // undefined should be replaced with noop
-        expect(() => {
-          // @ts-expect-error - testing invalid callback type
-          void router.start("/home", undefined);
-        }).not.toThrowError();
+        // @ts-expect-error - testing invalid callback type
+        await router.start("/home", undefined);
 
         expect(router.isActive()).toBe(true);
       });
 
-      it("should work correctly when second argument is null", () => {
+      it("should work correctly when second argument is null", async () => {
         // null is falsy, so noop is used
-        expect(() => {
-          // @ts-expect-error - testing invalid callback type
-          void router.start("/home", null);
-        }).not.toThrowError();
+        // @ts-expect-error - testing invalid callback type
+        await router.start("/home", null);
 
         expect(router.isActive()).toBe(true);
       });
     });
 
     describe("concurrent start() calls", () => {
-      it("should handle rapid sequential start() calls", () => {
-        const callback1 = vi.fn();
-        const callback2 = vi.fn();
-        const callback3 = vi.fn();
-
+      it("should handle rapid sequential start() calls", async () => {
         // First call should succeed
-        void router.start("/home");
+        await router.start("/home");
 
         // Subsequent calls should fail with ROUTER_ALREADY_STARTED
-        void router.start("/users");
-        void router.start("/orders");
+        try {
+          await router.start("/users");
 
-        expect(callback1).toHaveBeenCalledTimes(1);
-        expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+        }
 
-        expect(callback2).toHaveBeenCalledTimes(1);
-        expect(callback2).toHaveBeenCalledWith(
-          expect.objectContaining({ code: errorCodes.ROUTER_ALREADY_STARTED }),
-        );
+        try {
+          await router.start("/orders");
 
-        expect(callback3).toHaveBeenCalledTimes(1);
-        expect(callback3).toHaveBeenCalledWith(
-          expect.objectContaining({ code: errorCodes.ROUTER_ALREADY_STARTED }),
-        );
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+        }
 
         // Router should be in state from first call
         expect(router.getState()?.name).toBe("home");
       });
 
-      it("should maintain consistent state during concurrent start attempts", () => {
+      it("should maintain consistent state during concurrent start attempts", async () => {
         const startListeners: number[] = [];
 
         router.addEventListener(events.ROUTER_START, () => {
           startListeners.push(Date.now());
         });
 
-        // Attempt multiple starts
-        void router.start("/home");
-        void router.start("/users");
-        void router.start("/orders");
+        // First start succeeds
+        await router.start("/home");
+
+        // Attempt multiple starts (should fail)
+        try {
+          await router.start("/users");
+        } catch {
+          // Expected
+        }
+
+        try {
+          await router.start("/orders");
+        } catch {
+          // Expected
+        }
 
         // ROUTER_START should only be emitted once
         expect(startListeners).toHaveLength(1);
@@ -343,12 +330,9 @@ describe("router.start() - error handling", () => {
         expect(router.getState()?.name).toBe("home");
       });
 
-      it("should handle start() after stop() correctly", () => {
-        const callback1 = vi.fn();
-        const callback2 = vi.fn();
-
+      it("should handle start() after stop() correctly", async () => {
         // First start
-        void router.start("/home");
+        await router.start("/home");
 
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
@@ -360,22 +344,19 @@ describe("router.start() - error handling", () => {
         expect(router.getState()).toBeUndefined();
 
         // Second start should work
-        void router.start("/users");
+        await router.start("/users");
 
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users");
-
-        expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
-        expect(callback2).toHaveBeenCalledWith(undefined, expect.any(Object));
       });
 
-      it("should handle multiple stop/start cycles", () => {
+      it("should handle multiple stop/start cycles", async () => {
         const cycles = 5;
         // Use routes that actually exist in test router config (without params)
         const routes = ["home", "users", "orders", "sign-in", "settings"];
 
         for (let i = 0; i < cycles; i++) {
-          void router.start(`/${routes[i]}`);
+          await router.start(`/${routes[i]}`);
 
           expect(router.isActive()).toBe(true);
 
@@ -397,34 +378,29 @@ describe("router.start() - error handling", () => {
         // Add async middleware that delays the transition
         router.useMiddleware(() => () => middlewarePromise);
 
-        const callback1 = vi.fn();
-        const callback2 = vi.fn();
-
         // Start first transition (will be pending in middleware)
-        void router.start("/home");
+        const startPromise = router.start("/home");
 
         // At this point: isActive()=true, isStarted()=false
         expect(router.isActive()).toBe(true);
-        expect(callback1).not.toHaveBeenCalled();
 
         // Try second start() - should fail immediately with ROUTER_ALREADY_STARTED
-        void router.start("/users");
+        try {
+          await router.start("/users");
 
-        expect(callback2).toHaveBeenCalledTimes(1);
-        expect(callback2).toHaveBeenCalledWith(
-          expect.objectContaining({ code: errorCodes.ROUTER_ALREADY_STARTED }),
-        );
-
-        // First callback still not called (pending)
-        expect(callback1).not.toHaveBeenCalled();
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.ROUTER_ALREADY_STARTED);
+        }
 
         // Complete the first transition
         resolveMiddleware!();
         await middlewarePromise;
 
         // Now first transition completes
-        expect(callback1).toHaveBeenCalledTimes(1);
-        expect(callback1).toHaveBeenCalledWith(undefined, expect.any(Object));
+        const result = await startPromise;
+
+        expect(result).toBeDefined();
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("home");
       });
@@ -436,32 +412,21 @@ describe("router.start() - error handling", () => {
           () => () => Promise.reject(new Error("Middleware error")),
         );
 
-        const callback1 = vi.fn();
-
         // First start fails in middleware
-        void router.start("/home");
+        try {
+          await router.start("/home");
+        } catch {
+          // Expected to fail
+        }
 
-        // Wait for async failure
-        await vi.waitFor(() => {
-          expect(callback1).toHaveBeenCalled();
-        });
-
-        expect(callback1).toHaveBeenCalledWith(
-          expect.objectContaining({ code: "TRANSITION_ERR" }),
-          undefined,
-        );
-        expect(router.isActive()).toBe(false);
         expect(router.isActive()).toBe(false);
 
         // Clear middleware for second attempt
         router.clearMiddleware();
 
-        const callback2 = vi.fn();
-
         // Second start should now work
-        void router.start("/users");
+        await router.start("/users");
 
-        expect(callback2).toHaveBeenCalledWith(undefined, expect.any(Object));
         expect(router.isActive()).toBe(true);
         expect(router.getState()?.name).toBe("users");
       });
@@ -470,22 +435,27 @@ describe("router.start() - error handling", () => {
 
   describe("Issue #44: router.start() should NOT silently fallback to defaultRoute on transition errors", () => {
     describe("transition error handling when defaultRoute is set", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         router = createTestRouter({ defaultRoute: "home" });
+        await router.start();
       });
 
-      it("should return transition error to callback instead of falling back silently", () => {
+      it("should return transition error to callback instead of falling back silently", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.list"; // Block users.list
         });
 
-        void router.start("/users/list");
+        try {
+          await router.navigate("/users/list");
 
-        // Error should be reported to callback
+          expect.fail("Should have thrown");
+        } catch {
+          // Error should be reported
+        }
       });
 
-      it("should emit TRANSITION_ERROR event when transition fails", () => {
+      it("should emit TRANSITION_ERROR event when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.list"; // Block users.list
@@ -498,12 +468,16 @@ describe("router.start() - error handling", () => {
           transitionErrorListener,
         );
 
-        void router.start("/users/list");
+        try {
+          await router.navigate("/users/list");
+        } catch {
+          // Expected
+        }
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       });
 
-      it("should NOT silently navigate to defaultRoute when transition fails", () => {
+      it("should NOT silently navigate to defaultRoute when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.list"; // Block users.list
@@ -516,16 +490,20 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        void router.start("/users/list");
+        try {
+          await router.navigate("/users/list");
+        } catch {
+          // Expected
+        }
 
         // Should NOT have transitioned to defaultRoute (no fallback)
         expect(transitionSuccessListener).not.toHaveBeenCalled();
 
-        // Router state should remain undefined
-        expect(router.getState()).toBeUndefined();
+        // Router state should remain at home (from beforeEach)
+        expect(router.getState()?.name).toBe("home");
       });
 
-      it("should NOT emit TRANSITION_SUCCESS when transition fails", () => {
+      it("should NOT emit TRANSITION_SUCCESS when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.list"; // Block users.list
@@ -538,13 +516,20 @@ describe("router.start() - error handling", () => {
           transitionSuccessListener,
         );
 
-        void router.start("/users/list");
+        try {
+          await router.navigate("/users/list");
+        } catch {
+          // Expected
+        }
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
 
       // Two-phase start - Router is NOT started if transition fails
-      it("should NOT start router when transition fails (two-phase start)", () => {
+      it("should NOT start router when transition fails (two-phase start)", async () => {
+        // Stop router first
+        router.stop();
+
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.list"; // Block users.list
@@ -554,7 +539,11 @@ describe("router.start() - error handling", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        void router.start("/users/list");
+        try {
+          await router.start("/users/list");
+        } catch {
+          // Expected
+        }
 
         // Issue #50: Router is NOT started if transition fails
         // Two-phase start ensures isStarted() only returns true after successful transition

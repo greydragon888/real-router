@@ -116,8 +116,8 @@ describe("core/options", () => {
     });
 
     // 🟡 IMPORTANT: Works after start()
-    it("should work after router.start()", () => {
-      void router.start();
+    it("should work after router.start()", async () => {
+      await router.start();
 
       const opts = router.getOptions();
 

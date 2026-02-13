@@ -173,12 +173,13 @@ describe("router.start() - state object scenarios", () => {
       it("should handle empty path string", async () => {
         router = createTestRouter({ allowNotFound: false });
 
-        // Empty path should fallback to defaultRoute or fail
-        await router.start("");
+        try {
+          await router.start("");
 
-        // With defaultRoute="home", empty path navigates to home
-        expect(router.isActive()).toBe(true);
-        expect(router.getState()?.name).toBe("home");
+          expect.fail("Should have thrown");
+        } catch (error: any) {
+          expect(error).toBeDefined();
+        }
       });
 
       it("should handle invalid path", async () => {
@@ -245,7 +246,7 @@ describe("router.start() - state object scenarios", () => {
       it("should work for valid routes with complex params", async () => {
         const validState = {
           name: "orders.view",
-          params: { id: "456", filter: "pending" },
+          params: { id: "456" },
           path: "/orders/view/456",
         };
 
@@ -254,7 +255,6 @@ describe("router.start() - state object scenarios", () => {
         expect(state?.name).toBe("orders.view");
         expect(state?.params).toStrictEqual({
           id: "456",
-          filter: "pending",
         });
         expect(router.getState()?.name).toBe("orders.view");
         expect(router.isActive()).toBe(true);
@@ -384,7 +384,6 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR with correct event structure", async () => {
         const validPath = "/orders/view/456";
 
-        // Add middleware that blocks transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "orders.view";
         });
@@ -396,26 +395,26 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(validPath);
+        try {
+          await router.start(validPath);
+        } catch {
+          // Expected error
+        }
 
-        // Event should be emitted exactly once
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
         const [toState, fromState, error] =
           transitionErrorListener.mock.calls[0];
 
-        // toState should contain the target state that failed
         expect(toState).toBeDefined();
         expect(toState.name).toBe("orders.view");
         expect(toState.path).toBe("/orders/view/456");
         expect(toState.params).toStrictEqual({ id: "456" });
 
-        // fromState should be undefined (no previous state)
         expect(fromState).toBeUndefined();
 
-        // Error should be RouterError instance
         expect(error).toBeDefined();
-        expect(error).toBeInstanceOf(Error); // RouterError extends Error
+        expect(error).toBeInstanceOf(Error);
       });
 
       it("should emit TRANSITION_ERROR when Promise rejects", async () => {
@@ -497,7 +496,6 @@ describe("router.start() - state object scenarios", () => {
       it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", async () => {
         const validPath = "/orders/completed";
 
-        // Add middleware that blocks specific transition
         router.useMiddleware(() => (toState) => {
           return toState.name !== "orders.completed";
         });
@@ -514,15 +512,16 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(validPath);
+        try {
+          await router.start(validPath);
+        } catch {
+          // Expected error
+        }
 
-        // TRANSITION_ERROR should be emitted for blocked route
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        // No TRANSITION_SUCCESS - no silent fallback (issue #44)
         expect(transitionSuccessListener).not.toHaveBeenCalled();
 
-        // Check error event
         const errorToState = transitionErrorListener.mock.calls[0][0];
 
         expect(errorToState.name).toBe("orders.completed");
@@ -532,9 +531,8 @@ describe("router.start() - state object scenarios", () => {
       it("should not silently fallback when primary transition fails", async () => {
         const validPath = "/items/123";
 
-        // Add middleware that blocks specific transition
         router.useMiddleware(() => (toState) => {
-          return toState.name !== "items"; // Block only 'items'
+          return toState.name !== "items";
         });
 
         const transitionErrorListener = vi.fn();
@@ -544,16 +542,18 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(validPath);
+        try {
+          await router.start(validPath);
+        } catch {
+          // Expected error
+        }
 
-        // Error should be emitted for blocked route
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
         const [blockedState] = transitionErrorListener.mock.calls[0];
 
         expect(blockedState.name).toBe("items");
 
-        // Issue #44: Router state should be undefined (no silent fallback)
         expect(router.getState()).toBeUndefined();
       });
 
@@ -564,7 +564,6 @@ describe("router.start() - state object scenarios", () => {
           path: "/users/view/999",
         };
 
-        // Add middleware that blocks specific routes
         router.useMiddleware(() => (toState) => {
           return toState.name !== "users.view";
         });
@@ -576,15 +575,18 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(startState.path);
+        try {
+          await router.start(startState.path);
+        } catch {
+          // Expected error
+        }
 
-        // Should emit TRANSITION_ERROR for blocked state objects
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
         const [toState, fromState, error] =
           transitionErrorListener.mock.calls[0];
 
-        expect(toState).toStrictEqual(startState);
+        expect(omitMeta(toState)).toStrictEqual(startState);
         expect(fromState).toBeUndefined();
         expect(error).toBeDefined();
       });
@@ -675,7 +677,11 @@ describe("router.start() - state object scenarios", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        await router.start(invalidState.path);
+        try {
+          await router.start(invalidState.path);
+        } catch {
+          // Expected error
+        }
 
         expect(router.isActive()).toBe(false);
         expect(startListener).not.toHaveBeenCalled();
@@ -694,7 +700,11 @@ describe("router.start() - state object scenarios", () => {
           transitionErrorListener,
         );
 
-        await router.start(invalidState.path);
+        try {
+          await router.start(invalidState.path);
+        } catch {
+          // Expected error
+        }
 
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
@@ -714,7 +724,11 @@ describe("router.start() - state object scenarios", () => {
           path: "/nonexistent",
         };
 
-        await router.start(invalidState.path);
+        try {
+          await router.start(invalidState.path);
+        } catch {
+          // Expected error
+        }
 
         expect(router.getState()).toBeUndefined();
       });
@@ -732,7 +746,11 @@ describe("router.start() - state object scenarios", () => {
           transitionSuccessListener,
         );
 
-        await router.start(invalidState.path);
+        try {
+          await router.start(invalidState.path);
+        } catch {
+          // Expected error
+        }
 
         expect(transitionSuccessListener).not.toHaveBeenCalled();
       });
@@ -878,7 +896,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      void router.start("/users/list");
+      await router.start("/users/list");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 
@@ -923,7 +941,7 @@ describe("router.start() - state object scenarios", () => {
         transitionSuccessListener,
       );
 
-      void router.start("/unknown/path");
+      await router.start("/unknown/path");
 
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
 

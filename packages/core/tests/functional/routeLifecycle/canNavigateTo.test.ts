@@ -14,46 +14,40 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return true for route with no guards", () => {
-    void router.start();
-
     expect(router.canNavigateTo("home")).toBe(true);
     expect(router.canNavigateTo("users")).toBe(true);
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should return false for route with blocking activation guard", () => {
+  it("should return false for route with blocking activation guard", async () => {
     router.addActivateGuard("admin", () => () => false);
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should return true for route with passing activation guard", () => {
+  it("should return true for route with passing activation guard", async () => {
     router.addActivateGuard("admin", () => () => true);
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should return false for current route with blocking deactivation guard", () => {
+  it("should return false for current route with blocking deactivation guard", async () => {
     router.addDeactivateGuard("users", () => () => false);
-    void router.start();
-    void router.navigate("users");
+    await router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
   });
 
-  it("should return true for current route with passing deactivation guard", () => {
+  it("should return true for current route with passing deactivation guard", async () => {
     router.addDeactivateGuard("users", () => () => true);
-    void router.start();
-    void router.navigate("users");
+    await router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(true);
   });
 
-  it("should check nested route guards in correct order", () => {
+  it("should check nested route guards in correct order", async () => {
     router.addRoute({ name: "admin.users", path: "/users" });
 
     const adminGuard = vi.fn(() => true);
@@ -62,8 +56,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addActivateGuard("admin", () => adminGuard);
     router.addActivateGuard("admin.users", () => usersGuard);
 
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     const result = router.canNavigateTo("admin.users");
 
@@ -72,21 +65,18 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(usersGuard).toHaveBeenCalled();
   });
 
-  it("should return false if any nested parent guard blocks", () => {
+  it("should return false if any nested parent guard blocks", async () => {
     router.addRoute({ name: "admin.users", path: "/users" });
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.users", () => () => true);
 
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin.users")).toBe(false);
   });
 
   it("should return false for non-existent route", () => {
-    void router.start();
-
     expect(router.canNavigateTo("nonexistent")).toBe(false);
   });
 
@@ -95,7 +85,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should resolve forwarded route and check guards on target", () => {
+  it("should resolve forwarded route and check guards on target", async () => {
     router.addRoute({
       name: "old-admin",
       path: "/old-admin",
@@ -103,18 +93,16 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     });
     router.addActivateGuard("admin", () => () => false);
 
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("old-admin")).toBe(false);
   });
 
-  it("should return false if target route has async guard (sync check cannot validate)", () => {
+  it("should return false if target route has async guard (sync check cannot validate)", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     router.addActivateGuard("admin", () => async () => true);
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     const result = router.canNavigateTo("admin");
 
@@ -126,73 +114,67 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     warnSpy.mockRestore();
   });
 
-  it("should return true for navigating to the same route (no transition needed)", () => {
-    void router.start();
-    void router.navigate("users");
+  it("should return true for navigating to the same route (no transition needed)", async () => {
+    await router.navigate("users");
 
     expect(router.canNavigateTo("users")).toBe(true);
   });
 
-  it("should return false when overwritten deactivate guard blocks", () => {
+  it("should return false when overwritten deactivate guard blocks", async () => {
     router.addDeactivateGuard("users", () => () => true);
     router.addDeactivateGuard("users", () => () => false); // overwrites previous
 
-    void router.start();
-    void router.navigate("users");
+    await router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
   });
 
-  it("should return false when overwritten activate guard blocks", () => {
+  it("should return false when overwritten activate guard blocks", async () => {
     router.addActivateGuard("admin", () => () => true);
     router.addActivateGuard("admin", () => () => false); // overwrites previous
 
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should handle complex nested transitions with mixed guards", () => {
+  it("should handle complex nested transitions with mixed guards", async () => {
     router.addRoute({ name: "admin.settings", path: "/settings" });
 
     router.addDeactivateGuard("users.list", () => () => true);
     router.addActivateGuard("admin", () => () => true);
     router.addActivateGuard("admin.settings", () => () => true);
 
-    void router.start();
-    void router.navigate("users.list");
+    await router.navigate("users.list");
 
     expect(router.canNavigateTo("admin.settings")).toBe(true);
   });
 
-  it("should check guards with params", () => {
+  it("should check guards with params", async () => {
     router.addActivateGuard("users.view", () => (toState) => {
       const id = toState.params.id as string;
 
       return Number.parseInt(id, 10) > 0;
     });
 
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("users.view", { id: "123" })).toBe(true);
     expect(router.canNavigateTo("users.view", { id: "0" })).toBe(false);
   });
 
-  it("should return false if guard throws", () => {
+  it("should return false if guard throws", async () => {
     router.addActivateGuard("admin", () => () => {
       throw new Error("Guard error");
     });
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     const result = router.canNavigateTo("admin");
 
     expect(result).toBe(false);
   });
 
-  it("should handle transition from deeply nested route", () => {
+  it("should handle transition from deeply nested route", async () => {
     router.addRoute({ name: "admin.settings", path: "/settings" });
     router.addRoute({ name: "admin.settings.profile", path: "/profile" });
 
@@ -201,13 +183,12 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addDeactivateGuard("admin", () => () => true);
     router.addActivateGuard("users", () => () => true);
 
-    void router.start();
-    void router.navigate("admin.settings.profile");
+    await router.navigate("admin.settings.profile");
 
     expect(router.canNavigateTo("users")).toBe(true);
   });
 
-  it("should return false if any guard in deeply nested path blocks", () => {
+  it("should return false if any guard in deeply nested path blocks", async () => {
     router.addRoute({ name: "admin.settings", path: "/settings" });
     router.addRoute({ name: "admin.settings.profile", path: "/profile" });
 
@@ -215,45 +196,39 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     router.addDeactivateGuard("admin.settings", () => () => false);
     router.addDeactivateGuard("admin", () => () => true);
 
-    void router.start();
-    void router.navigate("admin.settings.profile");
+    await router.navigate("admin.settings.profile");
 
     expect(router.canNavigateTo("users")).toBe(false);
   });
 
-  it("should return true when guard calls done() without error", () => {
+  it("should return true when guard calls done() without error", async () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return true;
     });
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should return false when guard calls done() with error", () => {
+  it("should return false when guard calls done() with error", async () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return false;
     });
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should return true when guard returns void without calling done()", () => {
+  it("should return true when guard returns void without calling done()", async () => {
     router.addActivateGuard("admin", () => () => {
       // intentionally void — no return, no done()
     });
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
   it("should throw TypeError for non-string route name", () => {
-    void router.start();
-
     // @ts-expect-error: testing invalid input
     expect(() => router.canNavigateTo(123)).toThrowError(TypeError);
     // @ts-expect-error: testing invalid input
@@ -263,27 +238,23 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should throw TypeError for whitespace-only route name", () => {
-    void router.start();
-
     expect(() => router.canNavigateTo("   ")).toThrowError(TypeError);
   });
 
-  it("should handle empty params object", () => {
+  it("should handle empty params object", async () => {
     router.addActivateGuard("admin", () => () => true);
-    void router.start();
-    void router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin", {})).toBe(true);
   });
 
   it("should check guards when no current state", () => {
     router.addActivateGuard("admin", () => () => false);
-    void router.start();
 
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should respect canDeactivate from route config", () => {
+  it("should respect canDeactivate from route config", async () => {
     const guard = vi.fn().mockReturnValue(false);
 
     router.addRoute({
@@ -292,8 +263,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
       canDeactivate: () => guard,
     });
 
-    void router.start();
-    void router.navigate("editor");
+    await router.navigate("editor");
 
     expect(router.canNavigateTo("home")).toBe(false);
     expect(guard).toHaveBeenCalled();

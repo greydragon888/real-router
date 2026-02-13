@@ -23,8 +23,6 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     // Set up canActivate guard to block admin route
     router.addActivateGuard("admin", false);
 
-    void router.navigate("home");
-
     try {
       await router.navigate("admin");
     } catch (error: any) {
@@ -118,7 +116,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Empty string guard affects all routes (root level)
       router.addActivateGuard("", false);
       try {
-        await router.navigate("home");
+        await router.navigate("admin");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
@@ -413,29 +411,29 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       };
 
       // Register some valid guards first
-      router.addActivateGuard("valid1", true);
-      router.addActivateGuard("valid2", false);
+      router.addActivateGuard("admin", true);
+      router.addActivateGuard("index", false);
 
       // Try to register failing guard
       expect(() => {
-        router.addActivateGuard("failing", factoryThatThrows);
+        router.addActivateGuard("items", factoryThatThrows);
       }).toThrowError();
 
       // Verify valid guards still work correctly
       try {
-        await router.navigate("valid1");
+        await router.navigate("admin");
       } catch (error: any) {
         expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
       try {
-        await router.navigate("valid2");
+        await router.navigate("index");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
-        router.addActivateGuard("failing", true);
+        router.addActivateGuard("items", true);
       }).not.toThrowError();
     });
   });
@@ -464,9 +462,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     it("should allow factory to register OTHER routes during compilation", async () => {
       let route2Registered = false;
 
-      router.addActivateGuard("route1", (r) => {
+      router.addActivateGuard("admin", (r) => {
         // Registering a DIFFERENT route is allowed
-        r.addActivateGuard("route2", false); // blocking guard
+        r.addActivateGuard("index", false); // blocking guard
         route2Registered = true;
 
         return () => true;
@@ -476,12 +474,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       // Verify both guards work via navigation behavior
       try {
-        await router.navigate("route1");
+        await router.navigate("admin");
       } catch (error: any) {
         expect(error?.code).not.toBe(errorCodes.CANNOT_ACTIVATE);
       }
       try {
-        await router.navigate("route2");
+        await router.navigate("index");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
@@ -489,12 +487,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
     it("should maintain consistency after blocked self-modification", async () => {
       // First, register a valid guard
-      router.addActivateGuard("existing", false);
+      router.addActivateGuard("admin", false);
 
       // Try to register a guard that attempts self-modification
       expect(() => {
-        router.addActivateGuard("problematic", (r) => {
-          r.addActivateGuard("problematic", false);
+        router.addActivateGuard("index", (r) => {
+          r.addActivateGuard("index", false);
 
           return () => true;
         });
@@ -502,14 +500,14 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       // Verify existing guard still works
       try {
-        await router.navigate("existing");
+        await router.navigate("admin");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       // Verify problematic guard was rolled back (can be re-registered)
       expect(() => {
-        router.addActivateGuard("problematic", true);
+        router.addActivateGuard("index", true);
       }).not.toThrowError();
     });
 
@@ -564,7 +562,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       router.addActivateGuard("admin", false);
 
       // Navigate away first to test re-entering
-      void router.navigate("home");
+      await router.navigate("index");
 
       // New guard blocks navigation
       try {
@@ -807,9 +805,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     });
 
     it("should allow nested factory registration (factory within factory)", async () => {
-      router.addActivateGuard("level1", (r) => {
-        r.addActivateGuard("level2", (r2) => {
-          r2.addActivateGuard("level3", false); // blocking guard
+      router.addActivateGuard("admin", (r) => {
+        r.addActivateGuard("index", (r2) => {
+          r2.addActivateGuard("home", false); // blocking guard
 
           return () => true;
         });
@@ -817,9 +815,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         return () => true;
       });
 
-      // Verify level3 guard works via navigation
+      // Verify home guard works via navigation
       try {
-        await router.navigate("level3");
+        await router.navigate("index");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }

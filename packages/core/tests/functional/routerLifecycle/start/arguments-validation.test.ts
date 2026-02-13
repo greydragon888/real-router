@@ -21,7 +21,7 @@ describe("router.start() - arguments validation", () => {
 
   describe("arguments validation", () => {
     describe("call without arguments", () => {
-      it("should handle start without arguments when defaultRoute is present", () => {
+      it("should handle start without arguments when defaultRoute is present", async () => {
         const startListener = vi.fn();
         const transitionSuccessListener = vi.fn();
 
@@ -31,7 +31,7 @@ describe("router.start() - arguments validation", () => {
           transitionSuccessListener,
         );
 
-        void router.start();
+        await router.start();
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -43,14 +43,14 @@ describe("router.start() - arguments validation", () => {
         expect(currentState?.name).toBe("home"); // defaultRoute from createTestRouter
       });
 
-      it("should handle start with defaultParams", () => {
+      it("should handle start with defaultParams", async () => {
         // Test the defaultParams ?? {} branch when defaultParams is defined
         router = createTestRouter({
           defaultRoute: "items",
           defaultParams: { id: "123" },
         });
 
-        void router.start();
+        await router.start();
 
         expect(router.isActive()).toBe(true);
 
@@ -62,13 +62,13 @@ describe("router.start() - arguments validation", () => {
         expect(currentState?.path).toBe("/items/123");
       });
 
-      it("should handle start without defaultParams (undefined)", () => {
+      it("should handle start without defaultParams (undefined)", async () => {
         // Test navigateToDefault with undefined defaultParams
         // Reset router and only set defaultRoute without defaultParams
         router.stop();
         router = createTestRouter({ defaultRoute: "home" });
 
-        void router.start();
+        await router.start();
 
         expect(router.isActive()).toBe(true);
 
@@ -313,6 +313,14 @@ describe("router.start() - arguments validation", () => {
 });
 
 describe("router state check", () => {
+  beforeEach(() => {
+    router = createTestRouter();
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
   describe("repeated start of already started router", () => {
     it("should return error when starting already started router", async () => {
       await router.start();

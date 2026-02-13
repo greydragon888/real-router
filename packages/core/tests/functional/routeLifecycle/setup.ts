@@ -25,7 +25,7 @@ export { createTestRouter, omitMeta } from "../../helpers";
 export function createLifecycleTestRouter(): Router {
   const router = createTestRouterHelper();
 
-  router.start("");
+  void router.start();
 
   return router;
 }
