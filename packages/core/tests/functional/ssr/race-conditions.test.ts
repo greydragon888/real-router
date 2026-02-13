@@ -26,12 +26,12 @@ describe("SSR race conditions", () => {
       const routerA = baseRouter.clone();
       const routerB = baseRouter.clone();
 
-      void routerA.start();
-      void routerB.start();
+      await routerA.start();
+      await routerB.start();
 
       // Navigate on separate instances (synchronous navigation)
-      void routerA.navigate("products", { id: "123" });
-      void routerB.navigate("users", { id: "456" });
+      await routerA.navigate("products", { id: "123" });
+      await routerB.navigate("users", { id: "456" });
 
       // States are isolated - each router has its own state
       expect(routerA.getState()?.name).toBe("products");
@@ -100,12 +100,12 @@ describe("SSR race conditions", () => {
         return true;
       });
 
-      void clone1.start();
-      void clone2.start();
+      await clone1.start();
+      await clone2.start();
 
       // Navigate both (synchronous)
-      void clone1.navigate("admin");
-      void clone2.navigate("admin");
+      await clone1.navigate("admin");
+      await clone2.navigate("admin");
 
       // Each clone called its own guard
       expect(guardCallsClone1).toStrictEqual(["clone1-admin"]);
@@ -238,8 +238,8 @@ describe("SSR race conditions", () => {
       const baseRouter = createRouter(routes, defaultOptions);
       const clone = baseRouter.clone();
 
-      void clone.start();
-      void clone.navigate("admin");
+      await clone.start();
+      await clone.navigate("admin");
 
       expect(clone.getState()?.name).toBe("admin");
 

@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -110,8 +110,6 @@ describe("router.navigate() - transitions and cancellation", () => {
     // Issue #51: When navigation is cancelled, Promise handlers continue executing
     // and call done() after cancellation, leading to race conditions.
 
-
-
     describe("Multiple cancellations", () => {
       it("should handle multiple stop() calls safely", async () => {
         const freshRouter = createTestRouter();
@@ -143,7 +141,6 @@ describe("router.navigate() - transitions and cancellation", () => {
           expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
         }
       });
-
     });
   });
 });

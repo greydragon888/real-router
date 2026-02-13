@@ -232,7 +232,6 @@ describe("router.navigate() - promise resolve values", () => {
     });
 
     describe("canDeactivate returns valid State", () => {
-
       it("should update toState when middleware returns new state", async () => {
         const redirectState = {
           name: "settings",
