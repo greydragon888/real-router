@@ -7,7 +7,7 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -813,16 +813,17 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
-    it("navigateToDefault returns noop when callback resolves to empty string", () => {
+    it("navigateToDefault returns noop when callback resolves to empty string", async () => {
       const customRouter = createTestRouter({
         defaultRoute: () => "",
       });
 
       customRouter.start("/home");
 
-      const cancel = customRouter.navigateToDefault();
-
-      expect(typeof cancel).toBe("function");
+      // navigateToDefault now returns a Promise that rejects when defaultRoute returns empty string
+      await expect(customRouter.navigateToDefault()).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       // State should not change (noop)
       expect(customRouter.getState()?.name).toBe("home");

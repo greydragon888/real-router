@@ -46,13 +46,16 @@ describe("router.navigate() - transitions and cancellation", () => {
     await Promise.all(promises);
   });
 
-  it("should do nothing if cancel is called after transition finished", async () => {
+  it("should do nothing if stop is called after transition finished", async () => {
     await router.navigate("users");
 
     expect(router.getState()?.name).toBe("users");
     expect(() => {
-      (router as any).cancel();
+      router.stop();
     }).not.toThrowError();
+
+    // Restart for afterEach cleanup
+    await router.start();
   });
 
   it("should call middleware, activate, and deactivate hooks during navigation", async () => {
@@ -269,7 +272,7 @@ describe("router.navigate() - transitions and cancellation", () => {
     });
 
     describe("Multiple cancellations", () => {
-      it("should handle multiple cancel() calls safely", async () => {
+      it("should handle multiple stop() calls safely", async () => {
         const freshRouter = createTestRouter();
 
         const middleware2 = async (): Promise<boolean> => {
@@ -283,10 +286,12 @@ describe("router.navigate() - transitions and cancellation", () => {
 
         const promise = freshRouter.navigate("users");
 
-        // Cancel navigation
-        (freshRouter as any).cancel();
-        (freshRouter as any).cancel();
-        (freshRouter as any).cancel();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
+        // Stop navigation multiple times
+        freshRouter.stop();
+        freshRouter.stop();
+        freshRouter.stop();
 
         // Navigation should be cancelled
         try {
@@ -296,8 +301,6 @@ describe("router.navigate() - transitions and cancellation", () => {
         } catch (error: any) {
           expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
         }
-
-        freshRouter.stop();
       });
 
       it("should cancel previous navigation when new navigation starts", async () => {

@@ -302,7 +302,7 @@ describe("router.navigate() - edge cases callback", () => {
     it("should call callback when opts is undefined", async () => {
       const freshRouter = createTestRouter();
 
-      void freshRouter.start();
+      await freshRouter.start();
 
       // This form: navigate(name, params, undefined)
       const state = await freshRouter.navigate(
@@ -320,7 +320,7 @@ describe("router.navigate() - edge cases callback", () => {
     it("should call callback when opts is null", async () => {
       const freshRouter = createTestRouter();
 
-      void freshRouter.start();
+      await freshRouter.start();
 
       // @ts-expect-error - testing null opts
       const state = await freshRouter.navigate("users", {}, null);
@@ -333,7 +333,7 @@ describe("router.navigate() - edge cases callback", () => {
     it("should call callback with error when navigation fails", async () => {
       const freshRouter = createTestRouter();
 
-      void freshRouter.start();
+      await freshRouter.start();
 
       // Navigate to non-existent route
       try {
@@ -351,14 +351,14 @@ describe("router.navigate() - edge cases callback", () => {
     it("should handle all argument forms correctly", async () => {
       const freshRouter = createTestRouter();
 
-      void freshRouter.start();
+      await freshRouter.start();
 
       // Form 1: navigate(name)
       await freshRouter.navigate("users");
       // No callback to verify, just shouldn't throw
 
       // Form 2: navigate(name, callback) - callback pattern removed, just navigate
-      await freshRouter.navigate("users");
+      await freshRouter.navigate("users.view", { id: "0" });
 
       // Form 3: navigate(name, params)
       await freshRouter.navigate("users.view", { id: "1" });

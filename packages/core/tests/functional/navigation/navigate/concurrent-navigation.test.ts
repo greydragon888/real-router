@@ -33,7 +33,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
   describe("navigation cancellation", () => {
     beforeEach(() => {
-      vi.useRealTimers(); // Use real timers for async operations
+      vi.useRealTimers(); // Ensure real timers between tests
     });
 
     afterEach(() => {
@@ -51,7 +51,7 @@ describe("router.navigate() - concurrent navigation", () => {
       await result; // Clean up
     });
 
-    it("should cancel navigation and reject with TRANSITION_CANCELLED error", async () => {
+    it("should cancel navigation via router.stop() and reject with TRANSITION_CANCELLED error", async () => {
       vi.useFakeTimers();
 
       router.useMiddleware(() => async () => {
@@ -61,17 +61,17 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("users");
 
       setTimeout(() => {
-        router.cancel();
+        router.stop();
       }, 10);
 
-      vi.advanceTimersByTime(10);
-      vi.advanceTimersByTime(50);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -92,11 +92,10 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("profile");
 
       setTimeout(() => {
-        router.cancel();
-      }, 15);
+        router.stop();
+      }, 10);
 
-      vi.advanceTimersByTime(15);
-      vi.advanceTimersByTime(50);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
@@ -112,6 +111,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubCancel();
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -132,7 +132,7 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("orders");
 
       setTimeout(() => {
-        router.cancel();
+        router.stop();
       }, 20);
 
       await vi.runAllTimersAsync();
@@ -143,6 +143,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       expect(asyncGuard).toHaveBeenCalledTimes(1);
 
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -163,8 +164,8 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("settings");
 
       setTimeout(() => {
-        router.cancel();
-      }, 25);
+        router.stop();
+      }, 10);
 
       await vi.runAllTimersAsync();
 
@@ -175,6 +176,7 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(middleware1).toHaveBeenCalledTimes(1);
 
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -195,7 +197,7 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("admin");
 
       setTimeout(() => {
-        router.cancel();
+        router.stop();
       }, 50);
 
       await vi.runAllTimersAsync();
@@ -204,10 +206,11 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
+      await router.start();
       vi.useRealTimers();
     });
 
-    it("should not cancel already completed navigation", async () => {
+    it("should not affect already completed navigation when router stops", async () => {
       vi.useFakeTimers();
 
       router.useMiddleware(() => async () => {
@@ -216,22 +219,21 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const promise = router.navigate("users");
 
-      vi.advanceTimersByTime(10);
+      await vi.runAllTimersAsync();
 
       const state = await promise;
 
       expect(state).toBeDefined();
       expect(state.name).toBe("users");
 
-      router.cancel();
-
+      // State was set before stop
       expect(router.getState()?.name).toBe("users");
 
       router.clearMiddleware();
       vi.useRealTimers();
     });
 
-    it("should handle router.cancel() called multiple times", async () => {
+    it("should handle router.stop() called multiple times", async () => {
       vi.useFakeTimers();
 
       router.useMiddleware(() => async () => {
@@ -241,19 +243,19 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("profile");
 
       setTimeout(() => {
-        router.cancel();
-        router.cancel();
-        router.cancel();
-      }, 20);
+        router.stop();
+        router.stop();
+        router.stop();
+      }, 10);
 
-      vi.advanceTimersByTime(20);
-      vi.advanceTimersByTime(50);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -279,11 +281,10 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("orders");
 
       setTimeout(() => {
-        router.cancel();
-      }, 25);
+        router.stop();
+      }, 10);
 
-      vi.advanceTimersByTime(25);
-      vi.advanceTimersByTime(60);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
@@ -296,6 +297,7 @@ describe("router.navigate() - concurrent navigation", () => {
       unsubSuccess();
       unsubCancel();
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -318,11 +320,10 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("profile", {}, navigationOptions);
 
       setTimeout(() => {
-        router.cancel();
-      }, 20);
+        router.stop();
+      }, 10);
 
-      vi.advanceTimersByTime(20);
-      vi.advanceTimersByTime(50);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
@@ -339,6 +340,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubCancel();
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -353,23 +355,23 @@ describe("router.navigate() - concurrent navigation", () => {
 
       setTimeout(() => {
         router.stop();
-        router.cancel();
-      }, 20);
+      }, 10);
 
-      vi.advanceTimersByTime(20);
-      vi.advanceTimersByTime(50);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      await router.start();
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
     it("should handle concurrent navigations where second cancels first", async () => {
       expect.hasAssertions();
+
+      vi.useFakeTimers();
 
       router.useMiddleware(() => async () => {
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -381,15 +383,23 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(promise1).toBeInstanceOf(Promise);
       expect(promise2).toBeInstanceOf(Promise);
 
+      setTimeout(() => {
+        router.stop();
+      }, 50);
+
+      await vi.runAllTimersAsync();
+
       await expect(promise1).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      router.cancel();
-
       await expect(promise2).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
+
+      router.clearMiddleware();
+      await router.start();
+      vi.useRealTimers();
     });
 
     it("should handle cancellation during redirect scenarios", async () => {
@@ -407,16 +417,16 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("orders");
 
       setTimeout(() => {
-        router.cancel();
+        router.stop();
       }, 20);
 
-      vi.advanceTimersByTime(20);
-      vi.advanceTimersByTime(40);
+      await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
+      await router.start();
       vi.useRealTimers();
     });
 
@@ -438,7 +448,7 @@ describe("router.navigate() - concurrent navigation", () => {
       const promise = router.navigate("admin");
 
       setTimeout(() => {
-        router.cancel();
+        router.stop();
       }, 10);
 
       await vi.runAllTimersAsync();
@@ -447,6 +457,7 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
+      await router.start();
       vi.useRealTimers();
     });
   });

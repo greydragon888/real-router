@@ -504,8 +504,11 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation
-      await router.navigate("slowRoute");
+      // Start navigation (fire-and-forget — guard holds it in progress)
+      const navigationPromise = router
+        .navigate("slowRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -515,8 +518,9 @@ describe("core/routes/clearRoutes", () => {
 
       expect(result).toBe(router);
 
-      // Cleanup
+      // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
+      await navigationPromise;
     });
 
     it("should allow clearRoutes after navigation completes", async () => {
@@ -581,8 +585,11 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation on router1
-      await router.navigate("asyncRoute");
+      // Start navigation on router1 (fire-and-forget — guard holds it in progress)
+      const navigationPromise = router
+        .navigate("asyncRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -604,8 +611,9 @@ describe("core/routes/clearRoutes", () => {
       // router1 routes should NOT be cleared
       expect(router.matchPath("/home")).toBeDefined();
 
-      // Cleanup
+      // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
+      await navigationPromise;
       router2.stop();
     });
   });

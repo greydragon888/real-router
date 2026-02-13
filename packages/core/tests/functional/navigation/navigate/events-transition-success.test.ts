@@ -256,21 +256,16 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Set up async middleware to allow cancellation
-      const asyncMiddleware = vi
-        .fn()
-        .mockImplementation((_toState: any, _fromState: any, done: any) => {
-          setTimeout(() => done(), 50);
-        });
-
-      router.useMiddleware(() => asyncMiddleware);
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
 
       const promise = router.navigate("users.view", { id: 456 });
-      const cancel = () => (router as any).cancel();
 
-      // Cancel immediately
-      cancel();
+      setTimeout(() => {
+        router.stop();
+      }, 10);
 
-      // Advance time to ensure middleware timer runs
       await vi.runAllTimersAsync();
 
       try {
@@ -290,6 +285,7 @@ describe("router.navigate() - events transition success", () => {
       unsubCancel();
 
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 

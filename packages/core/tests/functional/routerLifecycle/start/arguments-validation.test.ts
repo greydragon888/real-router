@@ -8,8 +8,6 @@ import type { Router } from "@real-router/core";
 
 let router: Router;
 
-const noop = () => undefined;
-
 describe("router.start() - arguments validation", () => {
   beforeEach(() => {
     router = createTestRouter();
@@ -118,8 +116,8 @@ describe("router.start() - arguments validation", () => {
       const currentState = router.getState();
 
       expect(currentState).toBeDefined();
-      expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(currentState?.params.path).toBe("/invalid/path");
+      expect(currentState?.name).toBe("users.list");
+      expect(currentState?.params).toStrictEqual({});
     });
   });
 
@@ -292,22 +290,6 @@ describe("router.start() - arguments validation", () => {
       expect(state).toBeDefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
       expect(state?.params.path).toBe("/invalid/path");
-    });
-  });
-
-  describe("call with invalid number of arguments", () => {
-    it("should throw error when called with more than 2 arguments", () => {
-      expect(() => {
-        // @ts-expect-error - testing invalid argument count
-        void router.start("path", {}, {}, noop);
-      }).toThrowError("Invalid number of arguments");
-    });
-
-    it("should throw error when called with 3 arguments", () => {
-      expect(() => {
-        // @ts-expect-error - testing invalid argument count
-        void router.start("path", noop, "extra");
-      }).toThrowError("Invalid number of arguments");
     });
   });
 });

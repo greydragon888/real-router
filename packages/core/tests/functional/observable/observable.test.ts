@@ -92,23 +92,34 @@ describe("core/observable", () => {
       });
 
       it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", async () => {
-        const cb = vi.fn();
-        let middlewareResolve: Function | undefined;
+        vi.useFakeTimers();
 
-        // Use middleware to delay first navigation
-        router.useMiddleware(() => async (_toState, _fromState) => {
-          return new Promise((resolve) => {
-            middlewareResolve = resolve;
-          });
+        const cb = vi.fn();
+
+        // Use middleware to delay only "users" navigation
+        router.useMiddleware(() => (toState) => {
+          if (toState.name === "users") {
+            return new Promise((resolve) => setTimeout(resolve, 50));
+          }
+
+          return true;
         });
 
         router.addEventListener(events.TRANSITION_CANCEL, cb);
 
-        // First navigation - will be delayed
-        void router.navigate("users");
+        // First navigation - will be delayed by middleware
+        const first = router.navigate("users");
 
-        // Second navigation - cancels the first
-        await router.navigate("orders");
+        // Second navigation - cancels the first (not delayed)
+        const second = router.navigate("orders");
+
+        await vi.runAllTimersAsync();
+
+        await expect(first).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
+
+        await second;
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith(
@@ -116,8 +127,8 @@ describe("core/observable", () => {
           expect.objectContaining({ name: "home" }),
         );
 
-        // Clean up - let pending navigation complete
-        middlewareResolve?.();
+        router.clearMiddleware();
+        vi.useRealTimers();
       });
 
       it("should not break other listeners if one throws", async () => {

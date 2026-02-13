@@ -35,29 +35,7 @@ describe("navigateToDefault", () => {
     vi.clearAllMocks();
   });
 
-  describe("when defaultRoute is not set", () => {
-    it("should return noop cancel function when defaultRoute is not configured", async () => {
-      // Create router WITHOUT defaultRoute (override the default)
-      const freshRouter = createTestRouter({ defaultRoute: "" });
 
-      // Start at a specific route since there's no defaultRoute
-      await freshRouter.start("/users");
-
-      // navigateToDefault should return a promise with cancel function even when no defaultRoute
-      const promise = freshRouter.navigateToDefault();
-      const cancel = (promise as any).cancel;
-
-      expect(typeof cancel).toBe("function");
-
-      // Calling cancel should be safe (noop)
-      expect(() => cancel()).not.toThrowError();
-
-      // Router state should remain at the route we started at
-      expect(freshRouter.getState()?.name).toBe("users");
-
-      freshRouter.stop();
-    });
-  });
 
   describe("basic functionality", () => {
     it("should navigate to defaultRoute when defaultRoute is set", async () => {
@@ -111,13 +89,7 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should return cancel function when defaultRoute is set", async () => {
-      await withDefault("users");
 
-      const result = router.navigateToDefault();
-
-      expect(typeof result).toBe("function");
-    });
 
     it("should use defaultParams when they are set", async () => {
       const defaultParams = { id: 123, tab: "profile" };
@@ -398,41 +370,7 @@ describe("navigateToDefault", () => {
       router.clearMiddleware();
     });
 
-    it("should return working cancel function for defaultRoute navigation", async () => {
-      vi.useFakeTimers();
 
-      await withDefault("users");
-
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const promise = router.navigateToDefault();
-      const cancel = (promise as any).cancel;
-
-      expect(typeof cancel).toBe("function");
-
-      setTimeout(cancel, 10);
-
-      await vi.runAllTimersAsync();
-      await Promise.resolve();
-
-      try {
-        await promise;
-
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.TRANSITION_CANCELLED,
-            message: "CANCELLED",
-          }),
-        );
-      }
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
   });
 
   describe("with defaultParams", () => {
@@ -609,7 +547,6 @@ describe("navigateToDefault", () => {
             params: defaultParams,
           }),
           expect.any(Object), // fromState
-          expect.any(Function), // done
         );
       }
     });
@@ -692,12 +629,7 @@ describe("navigateToDefault", () => {
       await withDefault("users", { tab: "main" });
     });
 
-    it("should handle no arguments", () => {
-      // Should not throw and return a cancel function
-      const result = router.navigateToDefault();
 
-      expect(typeof result).toBe("function");
-    });
 
     it("should parse single callback argument", async () => {
       const state = await router.navigateToDefault();
@@ -903,44 +835,7 @@ describe("navigateToDefault", () => {
       }
     });
 
-    it("should handle cancelled navigation to defaultRoute", async () => {
-      vi.useFakeTimers();
 
-      // Add async middleware to enable cancellation
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const cancelPromise = router.navigateToDefault();
-      const cancel = (cancelPromise as any).cancel;
-
-      // Cancel navigation after short delay
-      setTimeout(() => {
-        cancel();
-      }, 10);
-
-      // Advance time to trigger cancellation
-      vi.advanceTimersByTime(10);
-
-      // Advance time to allow cancellation to be processed
-      vi.advanceTimersByTime(100);
-
-      try {
-        await cancelPromise;
-
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.TRANSITION_CANCELLED,
-            message: "CANCELLED",
-          }),
-        );
-      }
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
 
     it("should propagate navigation errors to callback", async () => {
       vi.useFakeTimers();
@@ -961,14 +856,14 @@ describe("navigateToDefault", () => {
       const promise = router.navigateToDefault();
 
       // Advance time to trigger error propagation
-      vi.advanceTimersByTime(10);
+      await vi.advanceTimersByTimeAsync(10);
 
       try {
         await promise;
 
         expect.fail("Should have thrown an error");
       } catch (error) {
-        expect(error).toBe(customError);
+        expect(error).toStrictEqual(customError);
       }
 
       router.clearMiddleware();
@@ -976,142 +871,7 @@ describe("navigateToDefault", () => {
     });
   });
 
-  describe("return value", () => {
-    beforeEach(async () => {
-      await withDefault("users", { id: 123 });
-    });
 
-    it("should return cancel function that cancels defaultRoute navigation", async () => {
-      vi.useFakeTimers();
-
-      // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const promise = router.navigateToDefault();
-      const cancel = (promise as any).cancel;
-
-      expect(typeof cancel).toBe("function");
-
-      // Cancel navigation
-      setTimeout(() => {
-        cancel();
-      }, 10);
-
-      // Advance time to trigger cancellation
-      vi.advanceTimersByTime(10);
-
-      // Advance time to allow cancellation to be processed
-      vi.advanceTimersByTime(100);
-
-      try {
-        await promise;
-
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.TRANSITION_CANCELLED,
-            message: "CANCELLED",
-          }),
-        );
-      }
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
-
-    it("should return different cancel functions for concurrent calls", async () => {
-      vi.useFakeTimers();
-
-      // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 100));
-      });
-
-      const promise1 = router.navigateToDefault();
-      const promise2 = router.navigateToDefault();
-      const promise3 = router.navigateToDefault();
-
-      const cancel1 = (promise1 as any).cancel;
-      const cancel2 = (promise2 as any).cancel;
-      const cancel3 = (promise3 as any).cancel;
-
-      // Each should be a function
-      expect(typeof cancel1).toBe("function");
-      expect(typeof cancel2).toBe("function");
-      expect(typeof cancel3).toBe("function");
-
-      // Each should be a different function
-      expect(cancel1).not.toBe(cancel2);
-      expect(cancel2).not.toBe(cancel3);
-      expect(cancel1).not.toBe(cancel3);
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
-
-    it("should handle cancel function called after navigation completes", async () => {
-      vi.useFakeTimers();
-
-      const promise = router.navigateToDefault();
-      const cancel = (promise as any).cancel;
-
-      // Advance time for navigation to complete
-      vi.advanceTimersByTime(50);
-
-      await promise;
-
-      // Calling cancel after completion should be safe
-      expect(() => {
-        cancel();
-      }).not.toThrowError();
-
-      vi.useRealTimers();
-    });
-
-    it("should handle cancel function called multiple times", async () => {
-      vi.useFakeTimers();
-
-      // Add async middleware to make navigation cancellable
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
-      const promise = router.navigateToDefault();
-      const cancel = (promise as any).cancel;
-
-      // Cancel multiple times
-      setTimeout(() => {
-        cancel();
-        cancel();
-        cancel();
-      }, 10);
-
-      // Advance time to trigger multiple cancellations
-      vi.advanceTimersByTime(10);
-
-      // Advance time to allow cancellation to be processed
-      vi.advanceTimersByTime(100);
-
-      try {
-        await promise;
-
-        expect.fail("Should have thrown an error");
-      } catch (error) {
-        expect(error).toStrictEqual(
-          expect.objectContaining({
-            code: errorCodes.TRANSITION_CANCELLED,
-            message: "CANCELLED",
-          }),
-        );
-      }
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
-  });
 
   describe("router state integration", () => {
     it("should work when router is started", async () => {
@@ -1184,24 +944,7 @@ describe("navigateToDefault", () => {
       await withDefault("users", { id: 123 });
     });
 
-    it("should handle router.getOptions() returning partial options", async () => {
-      const getOptionsSpy = vi
-        .spyOn(router, "getOptions")
-        .mockReturnValue({} as any);
 
-      const promise = router.navigateToDefault();
-
-      expect(promise).toBeInstanceOf(Promise);
-
-      // Should be safe to call returned function
-      const cancel = (promise as any).cancel;
-
-      expect(() => {
-        cancel();
-      }).not.toThrowError();
-
-      getOptionsSpy.mockRestore();
-    });
 
     it("should handle circular navigation scenarios", async () => {
       vi.useFakeTimers();
@@ -1221,7 +964,7 @@ describe("navigateToDefault", () => {
       const promise = router.navigateToDefault();
 
       // Advance time for navigation to complete
-      vi.advanceTimersByTime(50);
+      await vi.advanceTimersByTimeAsync(50);
 
       // Should complete without infinite loops
       const state = await promise;
@@ -1249,71 +992,7 @@ describe("navigateToDefault", () => {
       expect(state.params).toStrictEqual({ id: 123 });
     });
 
-    it("should handle concurrent navigateToDefault calls", async () => {
-      vi.useFakeTimers();
 
-      // Add async middleware to create timing conditions
-      // Remove randomness for predictable testing
-      router.useMiddleware(() => () => {
-        return new Promise((resolve) => setTimeout(resolve, 30)); // Fixed delay instead of random
-      });
-
-      // Make concurrent calls
-      const promise1 = router.navigateToDefault();
-      const promise2 = router.navigateToDefault();
-      const promise3 = router.navigateToDefault();
-
-      const cancel1 = (promise1 as any).cancel;
-      const cancel2 = (promise2 as any).cancel;
-      const cancel3 = (promise3 as any).cancel;
-
-      // All should return cancel functions
-      expect(typeof cancel1).toBe("function");
-      expect(typeof cancel2).toBe("function");
-      expect(typeof cancel3).toBe("function");
-
-      // Each should be a different function
-      expect(cancel1).not.toBe(cancel2);
-      expect(cancel2).not.toBe(cancel3);
-
-      // Advance time for all navigations to complete
-      vi.advanceTimersByTime(100);
-
-      // All promises should eventually settle
-      const results = await Promise.allSettled([promise1, promise2, promise3]);
-
-      // Due to concurrent navigation, some may be cancelled and one should succeed
-      const successfulResults = results.filter((r) => r.status === "fulfilled");
-      const cancelledResults = results.filter((r) => r.status === "rejected");
-
-      // At least one should succeed
-      expect(successfulResults.length).toBeGreaterThanOrEqual(1);
-
-      // Successful results should have proper state
-      successfulResults.forEach((result) => {
-        if (result.status === "fulfilled") {
-          expect(result.value).toStrictEqual(
-            expect.objectContaining({
-              name: "users",
-            }),
-          );
-        }
-      });
-
-      // Cancelled results should have proper error
-      cancelledResults.forEach((result) => {
-        if (result.status === "rejected") {
-          expect(result.reason).toStrictEqual(
-            expect.objectContaining({
-              code: errorCodes.TRANSITION_CANCELLED,
-            }),
-          );
-        }
-      });
-
-      router.clearMiddleware();
-      vi.useRealTimers();
-    });
   });
 
   describe("Issue #60: navigateToDefault() options validation", () => {
@@ -1364,15 +1043,6 @@ describe("navigateToDefault", () => {
       expect(action).toThrowError(/\[router\.navigateToDefault\]/);
     });
 
-    it("should throw TypeError for invalid callback type", () => {
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault({}, "not-a-function");
-      }).toThrowError(TypeError);
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault({}, 123);
-      }).toThrowError(/Invalid callback/);
-    });
+
   });
 });

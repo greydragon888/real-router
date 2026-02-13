@@ -130,11 +130,15 @@ describe("router.navigate() - events transition start", () => {
         onCancel,
       );
 
-      // Set up async middleware
-      router.useMiddleware(() => (_toState, _fromState) => {
-        return new Promise((resolve) => {
-          setTimeout(resolve, 50);
-        });
+      // Set up async middleware that only delays specific route
+      router.useMiddleware(() => (toState) => {
+        if (toState.name === "users.view") {
+          return new Promise((resolve) => {
+            setTimeout(resolve, 50);
+          });
+        }
+
+        return true;
       });
 
       const cancelPromise = router.navigate("users.view", { id: 456 });
@@ -143,18 +147,19 @@ describe("router.navigate() - events transition start", () => {
       expect(onStart).toHaveBeenCalledTimes(1);
       expect(onCancel).toHaveBeenCalledTimes(0);
 
-      // Cancel the transition by awaiting and catching
-      try {
-        await cancelPromise;
-      } catch (error) {
-        expect((error as any)?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-      }
+      // Cancel the transition by starting a new navigation
+      const secondNav = router.navigate("orders");
+
+      await vi.runAllTimersAsync();
+
+      await expect(cancelPromise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await secondNav;
 
       // TRANSITION_CANCEL should be emitted
       expect(onCancel).toHaveBeenCalledTimes(1);
-
-      // Advance timers to complete any pending operations
-      vi.advanceTimersByTime(100);
 
       // Cleanup
       unsubStart();
