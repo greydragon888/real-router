@@ -203,7 +203,7 @@ describe("router.navigate() - concurrent navigation", () => {
       await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+        code: errorCodes.CANNOT_ACTIVATE,
       });
 
       await router.start();
@@ -423,7 +423,7 @@ describe("router.navigate() - concurrent navigation", () => {
       await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+        code: errorCodes.CANNOT_ACTIVATE,
       });
 
       await router.start();
@@ -454,7 +454,7 @@ describe("router.navigate() - concurrent navigation", () => {
       await vi.runAllTimersAsync();
 
       await expect(promise).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
+        code: errorCodes.CANNOT_ACTIVATE,
       });
 
       await router.start();
