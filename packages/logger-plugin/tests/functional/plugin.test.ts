@@ -108,7 +108,7 @@ describe("@real-router/logger-plugin", () => {
         return true;
       });
 
-      await await router.start();
+      await router.start();
       await new Promise((resolve) => setTimeout(resolve, 50)); // Wait for start to complete
       warnSpy.mockClear();
 
@@ -150,7 +150,7 @@ describe("@real-router/logger-plugin", () => {
   describe("Console Groups", () => {
     it("should open group on transition start", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await router.navigate("users");
 
@@ -159,7 +159,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should close group on transition success", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await router.navigate("users");
 
@@ -200,7 +200,7 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(loggerPlugin);
 
       // Wait for router to fully start
-      await await router.start();
+      await router.start();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Start navigation but don't wait for it to complete
@@ -236,7 +236,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should auto-detect console.group support", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await router.navigate("users");
 
@@ -249,11 +249,10 @@ describe("@real-router/logger-plugin", () => {
     it("should handle missing console.group gracefully", async () => {
       const originalGroup = console.group;
 
-      // @ts-expect-error - testing edge case
       delete (console as any).group;
 
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await router.navigate("users");
 
@@ -263,11 +262,10 @@ describe("@real-router/logger-plugin", () => {
     it("should handle missing console.groupEnd gracefully", async () => {
       const originalGroupEnd = console.groupEnd;
 
-      // @ts-expect-error - testing edge case
       delete (console as any).groupEnd;
 
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await router.navigate("users", {}, {});
       expect(loggerSpy).toHaveBeenCalled();
@@ -278,7 +276,6 @@ describe("@real-router/logger-plugin", () => {
     it("should handle missing console object gracefully", () => {
       const originalConsole = globalThis.console;
 
-      // @ts-expect-error - testing edge case
       delete (globalThis as any).console;
 
       router.usePlugin(loggerPlugin);
@@ -300,7 +297,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should handle rapid transitions correctly", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
       await Promise.all([
         router.navigate("users", {}, {}),
@@ -318,7 +315,7 @@ describe("@real-router/logger-plugin", () => {
 
       const unsubscribe = router.usePlugin(loggerPlugin);
 
-      await await router.start();
+      await router.start();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Start navigation but don't wait for it to complete
@@ -343,7 +340,7 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(customPlugin());
       router.usePlugin(loggerPlugin);
 
-      router.start();
+      await router.start();
 
       await router.navigate("users");
 
@@ -432,7 +429,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should not show diff when params are identical", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
 
@@ -521,7 +518,7 @@ describe("@real-router/logger-plugin", () => {
           return true;
         });
         router.usePlugin(loggerPluginFactory({ level: "none" }));
-        await await router.start();
+        await router.start();
       await new Promise((resolve) => setTimeout(resolve, 50));
         warnSpy.mockClear();
 
@@ -543,7 +540,7 @@ describe("@real-router/logger-plugin", () => {
           return true;
         });
         router.usePlugin(loggerPluginFactory({ level: "errors" }));
-        await await router.start();
+        await router.start();
       await new Promise((resolve) => setTimeout(resolve, 50));
         warnSpy.mockClear();
 
@@ -593,12 +590,12 @@ describe("@real-router/logger-plugin", () => {
     });
 
     describe("showTiming option", () => {
-      it("should not show timing when showTiming is false", () => {
+      it("should not show timing when showTiming is false", async () => {
         router.usePlugin(loggerPluginFactory({ showTiming: false }));
         await router.start();
-      loggerSpy.mockClear();
+        loggerSpy.mockClear();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         const successCall = loggerSpy.mock.calls.find((call: unknown[]) =>
           (call[0] as string).includes("Transition success"),
@@ -607,12 +604,12 @@ describe("@real-router/logger-plugin", () => {
         expect(successCall?.[0]).not.toMatch(/\(\d+/);
       });
 
-      it("should show timing when showTiming is true (default)", () => {
+      it("should show timing when showTiming is true (default)", async () => {
         router.usePlugin(loggerPluginFactory({ showTiming: true }));
         await router.start();
-      loggerSpy.mockClear();
+        loggerSpy.mockClear();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         const successCall = loggerSpy.mock.calls.find((call: unknown[]) =>
           (call[0] as string).includes("Transition success"),
@@ -625,7 +622,7 @@ describe("@real-router/logger-plugin", () => {
     describe("showParamsDiff option", () => {
       it("should not show params diff when showParamsDiff is false", async () => {
         router.usePlugin(loggerPluginFactory({ showParamsDiff: false }));
-        router.start();
+        await router.start();
         await router.navigate("users.view", { id: "123" });
         loggerSpy.mockClear();
 
