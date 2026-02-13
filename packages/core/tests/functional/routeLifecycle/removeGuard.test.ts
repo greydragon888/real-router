@@ -85,7 +85,6 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     router.addActivateGuard("admin", () => () => true);
 
-    await router.start();
     const state = await router.navigate("admin");
 
     expect(state.name).toBe("admin");
@@ -95,8 +94,7 @@ describe("core/route-lifecycle/removeGuard", () => {
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin", () => () => false);
 
-    await router.start();
-    await router.navigate("home");
+    await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
 
