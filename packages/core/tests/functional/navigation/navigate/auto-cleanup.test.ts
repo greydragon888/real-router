@@ -289,6 +289,7 @@ describe("router.navigate() - auto cleanup", () => {
           if (toState.name === "orders") {
             return { name: "profile", params: {}, path: "/profile" };
           }
+          return; // Pass through for other routes
         });
 
         expect(hasCanDeactivate("users")).toBe(true);
