@@ -20,10 +20,10 @@ describe("RouterProvider component", () => {
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
 
-    router.start("");
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -58,15 +58,15 @@ describe("RouterProvider component", () => {
     expect(result.current?.route?.name).toStrictEqual("test");
   });
 
-  it("should updates context on router state change", () => {
+  it("should updates context on router state change", async () => {
     const { result } = renderHook(() => useContext(RouteContext), {
       wrapper,
     });
 
     expect(result.current?.route?.name).toStrictEqual("test");
 
-    act(() => {
-      router.navigate("one-more-test");
+    await act(async () => {
+      await router.navigate("one-more-test");
     });
 
     expect(result.current?.route?.name).toStrictEqual("one-more-test");

@@ -17,9 +17,9 @@ const wrapper: FC<PropsWithChildren<{ router: Router }>> = ({
 describe("useRouterSubscription", () => {
   let router: Router;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -168,7 +168,7 @@ describe("useRouterSubscription", () => {
       expect(states.at(-1)).toBe("home");
     });
 
-    it("should handle unsubscribe during navigation without errors", () => {
+    it("should handle unsubscribe during navigation without errors", async () => {
       const { result, unmount } = renderHook(
         () => useRouterSubscription(router, (sub) => sub?.route.name ?? "none"),
         { wrapper: (props) => wrapper({ ...props, router }) },
@@ -180,8 +180,8 @@ describe("useRouterSubscription", () => {
       expect(initialState).toBeTruthy();
 
       // Start navigation and unmount immediately
-      act(() => {
-        router.navigate("users");
+      await act(async () => {
+        await router.navigate("users");
         unmount();
       });
 
