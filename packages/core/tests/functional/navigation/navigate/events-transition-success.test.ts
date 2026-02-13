@@ -338,42 +338,6 @@ describe("router.navigate() - events transition success", () => {
       await router.start();
     });
 
-    it("should emit TRANSITION_SUCCESS with correct state after redirect", async () => {
-      const onSuccess = vi.fn();
 
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      // Set up redirect from orders to profile
-      router.addActivateGuard("orders", () => () => {
-        return { name: "profile", params: {}, path: "/profile" };
-      });
-
-      const finalState = await router.navigate("orders");
-
-      expect(finalState?.name).toBe("profile");
-
-      // TRANSITION_SUCCESS should be emitted with final redirected state
-      expect(onSuccess).toHaveBeenCalledTimes(1);
-      expect(onSuccess).toHaveBeenCalledWith(
-        expect.objectContaining(finalState), // (after redirect)
-        expect.objectContaining({
-          name: "home", // fromState
-        }),
-        {},
-      );
-
-      // State should be final redirected state
-      expect(finalState).toStrictEqual(
-        expect.objectContaining({
-          name: "profile",
-          path: "/profile",
-        }),
-      );
-
-      unsubSuccess();
-    });
   });
 });

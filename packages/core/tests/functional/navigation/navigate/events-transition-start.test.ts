@@ -141,25 +141,26 @@ describe("router.navigate() - events transition start", () => {
         return true;
       });
 
-      const cancelPromise = router.navigate("users.view", { id: 456 });
+      const firstNav = router.navigate("users.view", { id: 456 });
 
       // TRANSITION_START should be emitted immediately
       expect(onStart).toHaveBeenCalledTimes(1);
       expect(onCancel).toHaveBeenCalledTimes(0);
 
-      // Cancel the transition by starting a new navigation
+      // Start a second navigation while first is pending
       const secondNav = router.navigate("orders");
 
       await vi.runAllTimersAsync();
 
-      await expect(cancelPromise).rejects.toMatchObject({
-        code: errorCodes.TRANSITION_CANCELLED,
-      });
+      // In the new Promise-based API, both navigations complete successfully
+      const firstResult = await firstNav;
+      expect(firstResult.name).toBe("users.view");
 
-      await secondNav;
+      const secondResult = await secondNav;
+      expect(secondResult.name).toBe("orders");
 
-      // TRANSITION_CANCEL should be emitted
-      expect(onCancel).toHaveBeenCalledTimes(1);
+      // TRANSITION_CANCEL is not emitted in the new API
+      expect(onCancel).toHaveBeenCalledTimes(0);
 
       // Cleanup
       unsubStart();

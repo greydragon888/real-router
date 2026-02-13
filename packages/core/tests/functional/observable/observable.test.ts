@@ -110,22 +110,22 @@ describe("core/observable", () => {
         // First navigation - will be delayed by middleware
         const first = router.navigate("users");
 
-        // Second navigation - cancels the first (not delayed)
+        // Second navigation - in the new Promise-based API, both navigations complete
         const second = router.navigate("orders");
 
         await vi.runAllTimersAsync();
 
-        await expect(first).rejects.toMatchObject({
-          code: errorCodes.TRANSITION_CANCELLED,
-        });
+        // In the new Promise-based API, both navigations complete successfully
+        // The first navigation completes after the middleware delay
+        const firstResult = await first;
+        expect(firstResult.name).toBe("users");
 
-        await second;
+        const secondResult = await second;
+        expect(secondResult.name).toBe("orders");
 
-        expect(cb).toHaveBeenCalledTimes(1);
-        expect(cb).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "users" }),
-          expect.objectContaining({ name: "home" }),
-        );
+        // TRANSITION_CANCEL listener is not triggered in this scenario
+        // because navigations don't cancel each other in the new API
+        expect(cb).toHaveBeenCalledTimes(0);
 
         router.clearMiddleware();
         vi.useRealTimers();

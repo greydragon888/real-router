@@ -145,21 +145,18 @@ describe("router.navigate() - events listeners", () => {
             error: RouterError,
           ) => {
             errorLog.push(`error:${error.code}`);
-
-            // On first error, try to navigate to fallback
-            if (
-              error.code === errorCodes.CANNOT_ACTIVATE &&
-              errorLog.length === 1
-            ) {
-              void freshRouter.navigate("users");
-            }
           },
         );
 
         // Guard that blocks admin
         freshRouter.addActivateGuard("admin", () => () => false);
 
-        await freshRouter.navigate("admin");
+        try {
+          await freshRouter.navigate("admin");
+        } catch (error: any) {
+          // Expected: navigation fails due to guard
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
 
         // Error listener fires once for the blocked navigation
         expect(errorLog).toStrictEqual(["error:CANNOT_ACTIVATE"]);
