@@ -132,8 +132,8 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 
-  it("should return true when guard returns void (done not called synchronously)", () => {
-    // Guard returns void and calls done asynchronously — sync check assumes true
+  it("should return false when guard returns a Promise (async guard)", () => {
+    // Guard returns a Promise — sync check cannot resolve async guards
     const factory: ActivationFnFactory = () => (_toState) => {
       return new Promise<State>((resolve) => {
         setTimeout(() => {
@@ -147,8 +147,8 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     const toState = createState("admin");
     const fromState = createState("home");
 
-    // done() was not called synchronously, so the result is true (permissive default)
-    expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(true);
+    // Promise returned, so sync check returns false with warning
+    expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(false);
   });
 
   it("should pass fromState as undefined when not provided", () => {

@@ -868,9 +868,12 @@ describe("core/routes/removeRoute", () => {
         resolveCanActivate!();
 
         // Navigation should fail because route was removed
-        const result = await navigationPromise;
-
-        expect(result).toBe(false);
+        try {
+          await navigationPromise;
+          expect.fail("Should have thrown ROUTE_NOT_FOUND");
+        } catch (error) {
+          expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
 
         warnSpy.mockRestore();
       });
@@ -950,7 +953,7 @@ describe("core/routes/removeRoute", () => {
         resolveCanActivate!();
         const result = await navigationPromise;
 
-        expect(result).toBe(true);
+        expect(result.name).toBe("navigatingTo");
         expect(router.getState()?.name).toBe("navigatingTo");
 
         warnSpy.mockRestore();

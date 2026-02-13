@@ -440,13 +440,13 @@ describe("router.clone()", () => {
       await clonedRouter.start("/");
 
       // Verify lifecycle handlers are cloned by testing navigation behavior
-      // The "admin" route has canActivate that blocks navigation
+      // The "admin-protected" route has canActivate that blocks navigation
       try {
-        await clonedRouter.navigate("admin");
+        await clonedRouter.navigate("admin-protected");
 
         expect.fail("Should have thrown");
       } catch (error) {
-        // If lifecycle handlers are cloned, admin should be blocked
+        // If lifecycle handlers are cloned, admin-protected should be blocked
         expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
@@ -530,6 +530,9 @@ describe("router.clone()", () => {
       const clonedRouter = router.clone();
 
       await clonedRouter.start("/");
+
+      // Clear tracker after start to only track navigate calls
+      orderTracker.length = 0;
 
       const state = await clonedRouter.navigate("users");
 
