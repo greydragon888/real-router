@@ -25,8 +25,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Initial Render", () => {
-    it("should render exactly once on initial mount", () => {
-      router.start("/users/list");
+    it("should render exactly once on initial mount", async () => {
+      await router.start("/users/list");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -36,8 +36,8 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook).toHaveMountedOnce();
     });
 
-    it("should return correct RouteContext on mount", () => {
-      router.start("/users/list");
+    it("should return correct RouteContext on mount", async () => {
+      await router.start("/users/list");
 
       const { result } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -47,8 +47,8 @@ describe("useRoute - Performance Tests", () => {
       expect(result.current.route?.name).toBe("users.list");
     });
 
-    it("should have undefined previousRoute on initial mount", () => {
-      router.start("/users/list");
+    it("should have undefined previousRoute on initial mount", async () => {
+      await router.start("/users/list");
 
       const { result } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -59,8 +59,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Route Changes - All Trigger Re-render", () => {
-    it("should re-render when navigating to a different route", () => {
-      router.start("/users/list");
+    it("should re-render when navigating to a different route", async () => {
+      await router.start("/users/list");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -69,16 +69,16 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook).toHaveRenderedTimes(1);
       expect(ProfiledHook).toHaveMountedOnce();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
       expect(ProfiledHook).toHaveLastRenderedWithPhase("update");
     });
 
-    it("should re-render on each sequential navigation", () => {
-      router.start("/users/list");
+    it("should re-render on each sequential navigation", async () => {
+      await router.start("/users/list");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -86,27 +86,27 @@ describe("useRoute - Performance Tests", () => {
 
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(3);
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(4);
     });
 
-    it("should re-render when navigating within the same parent node", () => {
-      router.start("/users/list");
+    it("should re-render when navigating within the same parent node", async () => {
+      await router.start("/users/list");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -114,14 +114,14 @@ describe("useRoute - Performance Tests", () => {
 
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
 
-      act(() => {
-        router.navigate("users.edit", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.edit", { id: "1" });
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(3);
@@ -129,8 +129,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Route Context Values", () => {
-    it("should maintain stable router reference across re-renders", () => {
-      router.start("/users/list");
+    it("should maintain stable router reference across re-renders", async () => {
+      await router.start("/users/list");
 
       const { result, ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -138,16 +138,16 @@ describe("useRoute - Performance Tests", () => {
 
       const initialNavigator = result.current.navigator;
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
       expect(result.current.navigator).toBe(initialNavigator);
     });
 
-    it("should update route on navigation", () => {
-      router.start("/users/list");
+    it("should update route on navigation", async () => {
+      await router.start("/users/list");
 
       const { result } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -155,15 +155,15 @@ describe("useRoute - Performance Tests", () => {
 
       expect(result.current.route?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(result.current.route?.name).toBe("about");
     });
 
-    it("should track previousRoute correctly", () => {
-      router.start("/users/list");
+    it("should track previousRoute correctly", async () => {
+      await router.start("/users/list");
 
       const { result } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -171,30 +171,30 @@ describe("useRoute - Performance Tests", () => {
 
       expect(result.current.previousRoute).toBeUndefined();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(result.current.previousRoute?.name).toBe("users.list");
       expect(result.current.route?.name).toBe("about");
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(result.current.previousRoute?.name).toBe("about");
       expect(result.current.route?.name).toBe("home");
     });
 
-    it("should include route params in route object", () => {
-      router.start("/users/list");
+    it("should include route params in route object", async () => {
+      await router.start("/users/list");
 
       const { result } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "123" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" });
       });
 
       expect(result.current.route?.name).toBe("users.view");
@@ -203,8 +203,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Comparison with useRouteNode - No Optimization", () => {
-    it("should re-render on ANY navigation (unlike useRouteNode)", () => {
-      router.start("/about");
+    it("should re-render on ANY navigation (unlike useRouteNode)", async () => {
+      await router.start("/about");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -215,27 +215,27 @@ describe("useRoute - Performance Tests", () => {
       // Navigate between completely unrelated routes
       // useRouteNode("users") would NOT re-render here
       // but useRoute ALWAYS re-renders
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
 
-      act(() => {
-        router.navigate("items");
+      await act(async () => {
+        await router.navigate("items");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(3);
 
-      act(() => {
-        router.navigate("test");
+      await act(async () => {
+        await router.navigate("test");
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(4);
     });
 
-    it("should re-render when sibling nodes change (unlike useRouteNode)", () => {
-      router.start("/items");
+    it("should re-render when sibling nodes change (unlike useRouteNode)", async () => {
+      await router.start("/items");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -245,8 +245,8 @@ describe("useRoute - Performance Tests", () => {
 
       // Navigate within items - useRouteNode("users") would NOT re-render
       // but useRoute ALWAYS re-renders
-      act(() => {
-        router.navigate("items.item", { id: "1" });
+      await act(async () => {
+        await router.navigate("items.item", { id: "1" });
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(2);
@@ -254,8 +254,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Performance with Multiple Navigations", () => {
-    it("should handle sequential navigations with linear render count", () => {
-      router.start("/");
+    it("should handle sequential navigations with linear render count", async () => {
+      await router.start("/");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -265,8 +265,8 @@ describe("useRoute - Performance Tests", () => {
 
       // Each navigation = 1 re-render
       for (let i = 0; i < 5; i++) {
-        act(() => {
-          router.navigate("users.view", { id: String(i) });
+        await act(async () => {
+          await router.navigate("users.view", { id: String(i) });
         });
       }
 
@@ -280,8 +280,8 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook).toHaveLastRenderedWithPhase("update");
     });
 
-    it("should batch synchronous navigations in single act()", () => {
-      router.start("/");
+    it("should batch synchronous navigations in single act()", async () => {
+      await router.start("/");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -290,10 +290,10 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
       // Multiple synchronous navigations in single act() - only last one matters
-      act(() => {
-        router.navigate("users.list");
-        router.navigate("about");
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("users.list");
+        await router.navigate("about");
+        await router.navigate("home");
       });
 
       // React batches updates - only final state triggers re-render
@@ -302,8 +302,8 @@ describe("useRoute - Performance Tests", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle navigation to same route (no re-render expected)", () => {
-      router.start("/users/list");
+    it("should handle navigation to same route (no re-render expected)", async () => {
+      await router.start("/users/list");
 
       const { ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
@@ -312,8 +312,8 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
       // Navigate to the same route - router may not emit event
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       // Behavior depends on router implementation
@@ -321,24 +321,24 @@ describe("useRoute - Performance Tests", () => {
       expect(ProfiledHook.getRenderCount()).toBeGreaterThanOrEqual(1);
     });
 
-    it("should handle rapid route changes correctly", () => {
-      router.start("/");
+    it("should handle rapid route changes correctly", async () => {
+      await router.start("/");
 
       const { result, ProfiledHook } = profileHook(() => useRoute(), {
         renderOptions: { wrapper },
       });
 
       // Rapid sequential navigations
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
-      act(() => {
-        router.navigate("users.edit", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.edit", { id: "1" });
       });
 
       expect(ProfiledHook).toHaveRenderedTimes(4);

@@ -33,9 +33,9 @@ describe("BaseLink - Performance Tests", () => {
     );
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start("/");
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -321,8 +321,8 @@ describe("BaseLink - Performance Tests", () => {
       ProfiledBaseLink.snapshot();
 
       // Navigate to make link-50 active
-      act(() => {
-        router.navigate("one-more-test", { id: "50" });
+      await act(async () => {
+        await router.navigate("one-more-test", { id: "50" });
       });
 
       // Verify there were updates after snapshot (at least 1 rerender)
@@ -469,7 +469,7 @@ describe("BaseLink - Performance Tests", () => {
   });
 
   describe("Route Filtering Optimization", () => {
-    it("should not rerender when navigating to unrelated route", () => {
+    it("should not rerender when navigating to unrelated route", async () => {
       const { component } = renderProfiledLink({
         routeName: "home",
         "data-testid": "link",
@@ -482,8 +482,8 @@ describe("BaseLink - Performance Tests", () => {
       component.snapshot();
 
       // Navigate to completely unrelated route
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // BaseLink pointing to "home" should NOT rerender
@@ -491,7 +491,7 @@ describe("BaseLink - Performance Tests", () => {
       expect(component).toNotHaveRerendered();
     });
 
-    it("should rerender when navigating to child route", () => {
+    it("should rerender when navigating to child route", async () => {
       const { component } = renderProfiledLink({
         routeName: "users",
         activeClassName: "active",
@@ -502,20 +502,20 @@ describe("BaseLink - Performance Tests", () => {
       expect(component).toHaveRenderedTimes(1);
 
       // Navigate to child route - parent link may become active
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       // Should have rendered (at least mount)
       expect(component).toHaveRendered();
     });
 
-    it("should rerender when navigating to parent route", () => {
+    it("should rerender when navigating to parent route", async () => {
       const ProfiledBaseLink = withProfiler(BaseLink);
 
       // First navigate to child route
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       render(
@@ -535,8 +535,8 @@ describe("BaseLink - Performance Tests", () => {
       ProfiledBaseLink.snapshot();
 
       // Navigate to parent route
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       // Should rerender because navigation affects this link
@@ -564,8 +564,8 @@ describe("BaseLink - Performance Tests", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       // Navigate to make link active
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       // Should be exactly 2 renders: mount + active state change
@@ -576,8 +576,8 @@ describe("BaseLink - Performance Tests", () => {
 
     it("should rerender exactly once when becoming inactive", async () => {
       // Start with link on active route
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       const ProfiledBaseLink = withProfiler(BaseLink);
@@ -598,8 +598,8 @@ describe("BaseLink - Performance Tests", () => {
       expect(screen.getByTestId("link")).toHaveClass("active");
 
       // Navigate away to make link inactive
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // Should be exactly 2 renders: mount + inactive state change
@@ -628,8 +628,8 @@ describe("BaseLink - Performance Tests", () => {
       expect(ProfiledBaseLink.getRenderHistory()).toStrictEqual(["mount"]);
 
       // Navigate to trigger update
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       // Should have mount + update
@@ -840,8 +840,8 @@ describe("BaseLink - Performance Tests", () => {
       expect(screen.getByTestId("link-3")).not.toHaveClass("active");
 
       // Navigate to about
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       await waitFor(() => {
@@ -856,8 +856,8 @@ describe("BaseLink - Performance Tests", () => {
 
     it("should handle navigation between two links correctly", async () => {
       // Start at home
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       render(
@@ -886,8 +886,8 @@ describe("BaseLink - Performance Tests", () => {
       expect(screen.getByTestId("about-link")).not.toHaveClass("active");
 
       // Navigate to about
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       await waitFor(() => {
@@ -932,8 +932,8 @@ describe("BaseLink - Performance Tests", () => {
       ProfiledBaseLink.snapshot();
 
       // Navigate to home - should trigger update for home link
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       await waitFor(() => {
