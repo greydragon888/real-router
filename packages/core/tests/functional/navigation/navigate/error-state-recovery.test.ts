@@ -23,19 +23,19 @@ describe("router.navigate() - error state recovery", () => {
 
   describe("error handling - state recovery (analysis 10.3)", () => {
     it("should not change state when canActivate guard rejects", async () => {
-      await router.navigate("home");
+      await router.navigate("users");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users");
 
-      router.addActivateGuard("users", () => () => false);
+      router.addActivateGuard("home", () => () => false);
       try {
-        await router.navigate("users");
+        await router.navigate("home");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       // State should NOT have changed
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users");
     });
 
     it("should not change state when canDeactivate guard rejects", async () => {
@@ -55,26 +55,28 @@ describe("router.navigate() - error state recovery", () => {
     });
 
     it("should not change state when middleware throws", async () => {
-      await router.navigate("home");
+      await router.navigate("users");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users");
 
       router.useMiddleware(() => () => {
         throw new Error("Middleware error");
       });
       try {
-        await router.navigate("users");
+        await router.navigate("home");
       } catch (error: any) {
         expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
       }
 
       // State should NOT have changed
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users");
     });
 
     it("should allow new navigation after guard error", async () => {
+      await router.navigate("users");
+
       router.addActivateGuard(
-        "users",
+        "home",
         () => () =>
           new Promise((_resolve, reject) =>
             setTimeout(() => {
@@ -85,15 +87,16 @@ describe("router.navigate() - error state recovery", () => {
 
       // First navigation fails
       try {
-        await router.navigate("users");
+        await router.navigate("home");
       } catch (error) {
         expect(error).toBeDefined();
       }
 
       // Can start new navigation after error (router is not stuck)
-      await router.navigate("home");
+      // Navigate to a different route without guards
+      await router.navigate("orders");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("orders");
     });
 
     it("should do nothing when cancel() called after navigation complete", async () => {
