@@ -491,8 +491,7 @@ describe("@real-router/logger-plugin", () => {
       it("should not log anything when level is 'none'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "none" }));
         await router.start();
-      expect(loggerSpy).not.toHaveBeenCalled();
-
+        expect(loggerSpy).not.toHaveBeenCalled();
         await router.navigate("users");
 
         expect(loggerSpy).not.toHaveBeenCalled();
@@ -502,8 +501,7 @@ describe("@real-router/logger-plugin", () => {
       it("should not log errors when level is 'none'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "none" }));
         await router.start();
-      errorSpy.mockClear();
-
+        errorSpy.mockClear();
         try {
           await router.navigate("nonexistent");
         } catch (err) {
@@ -519,7 +517,7 @@ describe("@real-router/logger-plugin", () => {
         });
         router.usePlugin(loggerPluginFactory({ level: "none" }));
         await router.start();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         warnSpy.mockClear();
 
         const navPromise = router.navigate("users");
@@ -541,7 +539,7 @@ describe("@real-router/logger-plugin", () => {
         });
         router.usePlugin(loggerPluginFactory({ level: "errors" }));
         await router.start();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
         warnSpy.mockClear();
 
         const navPromise = router.navigate("users");
@@ -560,10 +558,9 @@ describe("@real-router/logger-plugin", () => {
       it("should log only errors when level is 'errors'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "errors" }));
         await router.start();
-      expect(loggerSpy).not.toHaveBeenCalled();
+        expect(loggerSpy).not.toHaveBeenCalled();
 
         await router.navigate("users");
-
         expect(loggerSpy).not.toHaveBeenCalled();
 
         try {

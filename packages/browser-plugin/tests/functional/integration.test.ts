@@ -267,7 +267,7 @@ describe("Browser Plugin Integration", () => {
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
       // Should not crash
-      await expect(router.start()).resolves.not.toThrowError();
+      await router.start();
     });
   });
 
