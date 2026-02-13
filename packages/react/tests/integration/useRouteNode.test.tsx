@@ -32,8 +32,8 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Basic Integration", () => {
-    it("should work with RouterProvider", () => {
-      router.start("/users/list");
+    it("should work with RouterProvider", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
@@ -41,8 +41,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current.route?.name).toBe("users.list");
     });
 
-    it("should return correct RouteContext structure", () => {
-      router.start("/users/list");
+    it("should return correct RouteContext structure", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
@@ -51,8 +51,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current).toHaveProperty("previousRoute");
     });
 
-    it("should throw error without RouterProvider", () => {
-      router.start("/users/list");
+    it("should throw error without RouterProvider", async () => {
+      await router.start("/users/list");
 
       // Suppress console.error for this test
       const consoleSpy = vi
@@ -66,8 +66,8 @@ describe("useRouteNode - Integration Tests", () => {
       consoleSpy.mockRestore();
     });
 
-    it("should return undefined previousRoute on initial render", () => {
-      router.start("/users/list");
+    it("should return undefined previousRoute on initial render", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
@@ -76,51 +76,51 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Node Subscription", () => {
-    it("should subscribe to root node and receive all routes", () => {
-      router.start("/");
+    it("should subscribe to root node and receive all routes", async () => {
+      await router.start("/");
 
       const { result } = renderHook(() => useRouteNode(""), { wrapper });
 
       expect(result.current.route?.name).toBe("test");
 
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       expect(result.current.route?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(result.current.route?.name).toBe("about");
     });
 
-    it("should subscribe to parent node and receive child routes", () => {
-      router.start("/users/list");
+    it("should subscribe to parent node and receive child routes", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("users.view", { id: "123" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" });
       });
 
       expect(result.current.route?.name).toBe("users.view");
       expect(result.current.route?.params).toStrictEqual({ id: "123" });
     });
 
-    it("should return undefined route when subscribed node is not active", () => {
-      router.start("/about");
+    it("should return undefined route when subscribed node is not active", async () => {
+      await router.start("/about");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route).toBeUndefined();
     });
 
-    it("should subscribe to exact child node", () => {
-      router.start("/users/list");
+    it("should subscribe to exact child node", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users.list"), {
         wrapper,
@@ -129,8 +129,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current.route?.name).toBe("users.list");
 
       // Navigate to sibling - should become undefined
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(result.current.route).toBeUndefined();
@@ -138,69 +138,69 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Navigation Integration", () => {
-    it("should update when navigating within subscribed node", () => {
-      router.start("/users/list");
+    it("should update when navigating within subscribed node", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(result.current.route?.name).toBe("users.view");
       expect(result.current.previousRoute?.name).toBe("users.list");
     });
 
-    it("should track previousRoute correctly through multiple navigations", () => {
-      router.start("/users/list");
+    it("should track previousRoute correctly through multiple navigations", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(result.current.previousRoute?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("users.edit", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.edit", { id: "1" });
       });
 
       expect(result.current.previousRoute?.name).toBe("users.view");
     });
 
-    it("should handle node becoming active", () => {
-      router.start("/about");
+    it("should handle node becoming active", async () => {
+      await router.start("/about");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route).toBeUndefined();
 
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       expect(result.current.route?.name).toBe("users.list");
     });
 
-    it("should handle node becoming inactive", () => {
-      router.start("/users/list");
+    it("should handle node becoming inactive", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route?.name).toBe("users.list");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(result.current.route).toBeUndefined();
     });
 
-    it("should not update for navigation outside subscribed node", () => {
-      router.start("/about");
+    it("should not update for navigation outside subscribed node", async () => {
+      await router.start("/about");
 
       let renderCount = 0;
       const { result } = renderHook(
@@ -218,8 +218,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current.route).toBeUndefined();
 
       // Navigate to another route outside users node
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       // Should not have re-rendered (route is still undefined)
@@ -229,8 +229,8 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Multiple Hooks", () => {
-    it("should support multiple hooks with different nodes", () => {
-      router.start("/users/list");
+    it("should support multiple hooks with different nodes", async () => {
+      await router.start("/users/list");
 
       const { result: usersResult } = renderHook(() => useRouteNode("users"), {
         wrapper,
@@ -243,8 +243,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(itemsResult.current.route).toBeUndefined();
     });
 
-    it("should update only relevant hooks on navigation", () => {
-      router.start("/users/list");
+    it("should update only relevant hooks on navigation", async () => {
+      await router.start("/users/list");
 
       let usersRenderCount = 0;
       let itemsRenderCount = 0;
@@ -281,8 +281,8 @@ describe("useRouteNode - Integration Tests", () => {
       });
 
       // Navigate within users node
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(usersResult.current.route?.name).toBe("users.view");
@@ -293,8 +293,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(itemsRenderCount).toBe(initialItemsCount);
     });
 
-    it("should handle root and child subscriptions independently", () => {
-      router.start("/users/list");
+    it("should handle root and child subscriptions independently", async () => {
+      await router.start("/users/list");
 
       const { result: rootResult } = renderHook(() => useRouteNode(""), {
         wrapper,
@@ -308,8 +308,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(usersResult.current.route?.name).toBe("users.list");
 
       // Navigate to about
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // Root sees the route, users node doesn't
@@ -319,8 +319,8 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Component Integration", () => {
-    it("should work in a real component", () => {
-      router.start("/users/list");
+    it("should work in a real component", async () => {
+      await router.start("/users/list");
 
       const UsersList: FC = () => {
         const { route } = useRouteNode("users");
@@ -337,8 +337,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(screen.getByTestId("route-name")).toHaveTextContent("users.list");
     });
 
-    it("should support conditional rendering based on node activity", () => {
-      router.start("/about");
+    it("should support conditional rendering based on node activity", async () => {
+      await router.start("/about");
 
       const UsersSection: FC = () => {
         const { route } = useRouteNode("users");
@@ -354,8 +354,8 @@ describe("useRouteNode - Integration Tests", () => {
 
       expect(screen.getByTestId("inactive")).toBeInTheDocument();
 
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       expect(screen.getByTestId("active")).toHaveTextContent(
@@ -364,7 +364,7 @@ describe("useRouteNode - Integration Tests", () => {
     });
 
     it("should update component when route params change", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const UserView: FC = () => {
         const { route } = useRouteNode("users");
@@ -383,16 +383,16 @@ describe("useRouteNode - Integration Tests", () => {
 
       expect(screen.getByTestId("user-id")).toHaveTextContent("no-id");
 
-      act(() => {
-        router.navigate("users.view", { id: "123" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" });
       });
 
       await waitFor(() => {
         expect(screen.getByTestId("user-id")).toHaveTextContent("123");
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "456" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "456" });
       });
 
       await waitFor(() => {
@@ -401,7 +401,7 @@ describe("useRouteNode - Integration Tests", () => {
     });
 
     it("should provide router for programmatic navigation", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const NavigationComponent: FC = () => {
         const { navigator: contextNavigator, route } = useRouteNode("users");
@@ -438,8 +438,8 @@ describe("useRouteNode - Integration Tests", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle dynamic nodeName changes", () => {
-      router.start("/users/list");
+    it("should handle dynamic nodeName changes", async () => {
+      await router.start("/users/list");
 
       const { result, rerender } = renderHook(
         ({ nodeName }) => useRouteNode(nodeName),
@@ -455,22 +455,22 @@ describe("useRouteNode - Integration Tests", () => {
       rerender({ nodeName: "items" });
 
       // Navigate to items route - now the hook should return the route
-      act(() => {
-        router.navigate("items");
+      await act(async () => {
+        await router.navigate("items");
       });
 
       expect(result.current.route?.name).toBe("items");
 
       // Navigate back to users - should be undefined since we're subscribed to items
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       expect(result.current.route).toBeUndefined();
     });
 
-    it("should handle non-existent node subscription", () => {
-      router.start("/users/list");
+    it("should handle non-existent node subscription", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(
         () => useRouteNode("nonexistent.node.path"),
@@ -482,17 +482,17 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current.navigator).toBeDefined();
     });
 
-    it("should handle router restart", () => {
-      router.start("/users/list");
+    it("should handle router restart", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       expect(result.current.route?.name).toBe("users.list");
 
       // Stop and restart router
-      act(() => {
+      await act(async () => {
         router.stop();
-        router.start("/about");
+        await router.start("/about");
       });
 
       // After restart, the component should still work
@@ -501,21 +501,21 @@ describe("useRouteNode - Integration Tests", () => {
     });
 
     it("should handle rapid navigation", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       // Rapid sequential navigations
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
-      act(() => {
-        router.navigate("users.edit", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.edit", { id: "1" });
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "2" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "2" });
       });
 
       await waitFor(() => {
@@ -525,15 +525,15 @@ describe("useRouteNode - Integration Tests", () => {
       expect(result.current.route?.params).toStrictEqual({ id: "2" });
     });
 
-    it("should maintain reference equality for unchanged values", () => {
-      router.start("/users/list");
+    it("should maintain reference equality for unchanged values", async () => {
+      await router.start("/users/list");
 
       const { result } = renderHook(() => useRouteNode("users"), { wrapper });
 
       const initialNavigator = result.current.navigator;
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       // Navigator reference should be stable
@@ -543,7 +543,7 @@ describe("useRouteNode - Integration Tests", () => {
 
   describe("State Component Integration", () => {
     it("should work with component local state", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const StatefulComponent: FC = () => {
         const { route } = useRouteNode("users");
@@ -576,8 +576,8 @@ describe("useRouteNode - Integration Tests", () => {
       expect(screen.getByTestId("count")).toHaveTextContent("1");
 
       // Navigate
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       await waitFor(() => {
@@ -588,14 +588,14 @@ describe("useRouteNode - Integration Tests", () => {
       expect(screen.getByTestId("count")).toHaveTextContent("1");
     });
 
-    it("should handle unmount during navigation", () => {
-      router.start("/users/list");
+    it("should handle unmount during navigation", async () => {
+      await router.start("/users/list");
 
       const { unmount } = renderHook(() => useRouteNode("users"), { wrapper });
 
       // Start navigation
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       // Unmount during/after navigation
