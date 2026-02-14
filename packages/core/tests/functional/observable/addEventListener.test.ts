@@ -108,6 +108,8 @@ describe("core/observable/addEventListener", () => {
       // Cancel by starting second navigation
       await router.navigate("orders");
 
+      expect(router.getState()?.name).toBe("orders");
+
       // TODO: Fix TRANSITION_CANCEL event triggering
       // expect(cb).toHaveBeenCalledWith(
       //   expect.objectContaining({ name: "users" }),

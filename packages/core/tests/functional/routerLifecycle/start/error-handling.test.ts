@@ -54,8 +54,6 @@ describe("router.start() - error handling", () => {
         expect(transitionSuccessListener).not.toHaveBeenCalled();
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        transitionErrorListener.mock.calls[0];
-
         routerWithoutDefault.stop();
       });
     });

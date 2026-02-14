@@ -161,6 +161,8 @@ describe("SSR race conditions", () => {
             // This callback is called when admin navigation is cancelled
             // or when it completes
             resolve();
+
+            return;
           })
           .catch(() => {
             // Ignore errors
@@ -222,6 +224,8 @@ describe("SSR race conditions", () => {
       // Immediately start second navigation (will cancel first)
       await router.navigate("public", {}).then(() => {
         secondNavCompleted = true;
+
+        return;
       });
 
       // Wait for everything to settle

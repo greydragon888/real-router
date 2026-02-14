@@ -112,6 +112,7 @@ export class RouterLifecycleNamespace {
   /**
    * Starts the router with an optional path.
    */
+  // eslint-disable-next-line sonarjs/cognitive-complexity -- start() is an inherently complex state machine
   async start(startPath?: string): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();

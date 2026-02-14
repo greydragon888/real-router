@@ -293,15 +293,17 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ allowNotFound: true });
 
       // Start with non-existent route
-      await router.start("/non-existent");
+      const state = await router.start("/non-existent");
 
       // Should be called once with success (UNKNOWN_ROUTE state)
+      expect(state.name).toBe("@@router/UNKNOWN_ROUTE");
     });
 
     it("should ensure callback is called exactly once on successful transition", async () => {
-      await router.start("/users");
+      const state = await router.start("/users");
 
       // Verify single invocation
+      expect(state.name).toBe("users");
     });
 
     it("should ensure callback is called exactly once on route not found error", async () => {
@@ -321,7 +323,9 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ defaultRoute: "home" });
 
       // Start without path - should use defaultRoute
-      await router.start();
+      const state = await router.start();
+
+      expect(state.name).toBe("home");
     });
   });
 

@@ -35,8 +35,10 @@ describe("router.navigate() - transitions and cancellation", () => {
     const promises = Array.from({ length: 5 })
       .fill(null)
       .map(() =>
-        router.navigate("users").catch((error) => {
-          expect(error?.code).toStrictEqual(errorCodes.TRANSITION_CANCELLED);
+        router.navigate("users").catch((error: unknown) => {
+          expect((error as Record<string, unknown>)?.code).toStrictEqual(
+            errorCodes.TRANSITION_CANCELLED,
+          );
         }),
       );
 

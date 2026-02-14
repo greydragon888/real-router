@@ -442,6 +442,10 @@ describe("core/middleware", () => {
         // All three should execute
         await router.navigate("users");
 
+        expect(tracker1.wasCalled()).toBe(true);
+        expect(tracker2.wasCalled()).toBe(true);
+        expect(tracker3.wasCalled()).toBe(true);
+
         tracker1.reset();
         tracker2.reset();
         tracker3.reset();
@@ -451,6 +455,10 @@ describe("core/middleware", () => {
 
         await router.navigate("orders");
 
+        expect(tracker1.wasCalled()).toBe(false);
+        expect(tracker2.wasCalled()).toBe(true);
+        expect(tracker3.wasCalled()).toBe(true);
+
         tracker2.reset();
         tracker3.reset();
 
@@ -458,6 +466,9 @@ describe("core/middleware", () => {
         unsub2();
 
         await router.navigate("users");
+
+        expect(tracker2.wasCalled()).toBe(false);
+        expect(tracker3.wasCalled()).toBe(false);
       });
 
       it("should handle unsubscribe in reverse order", async () => {
@@ -476,10 +487,15 @@ describe("core/middleware", () => {
 
         await router.navigate("users");
 
+        expect(tracker1.wasCalled()).toBe(true);
+        expect(tracker2.wasCalled()).toBe(false);
+
         tracker1.reset();
         unsub1();
 
         await router.navigate("orders");
+
+        expect(tracker1.wasCalled()).toBe(false);
       });
 
       it("should maintain correct state after partial unsubscribe", async () => {
@@ -501,6 +517,10 @@ describe("core/middleware", () => {
 
         await router.navigate("users");
 
+        expect(tracker1.wasCalled()).toBe(true);
+        expect(tracker2.wasCalled()).toBe(false);
+        expect(tracker3.wasCalled()).toBe(true);
+
         tracker1.reset();
         tracker3.reset();
 
@@ -508,6 +528,9 @@ describe("core/middleware", () => {
         u3();
 
         await router.navigate("orders");
+
+        expect(tracker1.wasCalled()).toBe(false);
+        expect(tracker3.wasCalled()).toBe(false);
       });
     });
 
@@ -811,6 +834,9 @@ describe("core/middleware", () => {
         // Both should execute
         await router.navigate("users");
 
+        expect(nestedTracker.wasCalled()).toBe(true);
+        expect(reentrantTracker.wasCalled()).toBe(true);
+
         nestedTracker.reset();
         reentrantTracker.reset();
 
@@ -819,10 +845,15 @@ describe("core/middleware", () => {
 
         await router.navigate("orders");
 
+        expect(nestedTracker.wasCalled()).toBe(false);
+        expect(reentrantTracker.wasCalled()).toBe(true);
+
         reentrantTracker.reset();
         unsub();
 
         await router.navigate("users");
+
+        expect(reentrantTracker.wasCalled()).toBe(false);
       });
 
       it("should handle factory calling unsubscribe of another middleware", async () => {
@@ -846,6 +877,9 @@ describe("core/middleware", () => {
 
         // factory1 should not execute (unsubscribed), factory2 should execute
         await router.navigate("users");
+
+        expect(tracker1.wasCalled()).toBe(false);
+        expect(tracker2.wasCalled()).toBe(true);
       });
 
       it("should handle factory calling clearMiddleware during batch", async () => {
@@ -866,6 +900,8 @@ describe("core/middleware", () => {
 
         // Both should be registered (commit phase adds initialized back)
         await router.navigate("users");
+
+        expect(router.getState()?.name).toBe("users");
       });
     });
 
@@ -1064,9 +1100,13 @@ describe("core/middleware", () => {
 
         await router.navigate("users");
 
+        expect(router.getState()?.name).toBe("users");
+
         unsub();
 
         await router.navigate("orders");
+
+        expect(router.getState()?.name).toBe("orders");
       });
 
       it("should handle factory with very long name in error messages", async () => {

@@ -539,7 +539,9 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation
-      const navigationPromise = router.navigate("tempRoute").then(() => {});
+      const navigationPromise = router
+        .navigate("tempRoute")
+        .then(() => undefined);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));

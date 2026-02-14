@@ -5,7 +5,34 @@ import { isPromise, isState } from "type-guards";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
+import type { SyncErrorMetadata } from "./wrapSyncError";
 import type { State, ActivationFn } from "@real-router/types";
+
+/**
+ * Builds error metadata from a caught promise rejection.
+ * Extracts message, stack, and cause from Error instances.
+ */
+function buildErrorMetadata(
+  error_: unknown,
+  errorData: SyncErrorMetadata,
+): SyncErrorMetadata {
+  if (error_ instanceof Error) {
+    return {
+      ...errorData,
+      message: error_.message,
+      stack: error_.stack,
+      // Error.cause requires ES2022+ - safely access it if present
+      ...("cause" in error_ &&
+        error_.cause !== undefined && { cause: error_.cause }),
+    };
+  }
+
+  if (error_ && typeof error_ === "object") {
+    return { ...errorData, ...error_ };
+  }
+
+  return errorData;
+}
 
 // Helper: Lifecycle results Processing Function
 export const processLifecycleResult = async (
@@ -38,28 +65,10 @@ export const processLifecycleResult = async (
 
       return await processLifecycleResult(resVal, currentState, segment);
     } catch (error_: unknown) {
-      let error: {
-        [key: string]: unknown;
-        message?: string | undefined;
-        segment?: string | undefined;
-      } = errorData;
-
-      if (error_ instanceof Error) {
-        error = {
-          ...errorData,
-          message: error_.message,
-          stack: error_.stack,
-        };
-
-        // Error.cause requires ES2022+ - safely access it if present
-        if ("cause" in error_ && error_.cause !== undefined) {
-          error.cause = error_.cause;
-        }
-      } else if (error_ && typeof error_ === "object") {
-        error = { ...errorData, ...error_ };
-      }
-
-      throw new RouterError(errorCodes.TRANSITION_ERR, error);
+      throw new RouterError(
+        errorCodes.TRANSITION_ERR,
+        buildErrorMetadata(error_, errorData),
+      );
     }
   }
 

@@ -1626,6 +1626,7 @@ describe("core/routes/addRoute", () => {
     it("should reject async forwardTo callback (transpiled async with __awaiter)", async () => {
       // Simulate transpiled async function with __awaiter in toString()
 
+      // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const transpiledAsync = new Function(
         "return function() { return __awaiter(this, void 0, void 0, function*() { return 'target'; }); }",
       )();

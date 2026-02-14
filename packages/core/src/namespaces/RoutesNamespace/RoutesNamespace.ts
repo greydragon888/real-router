@@ -410,18 +410,7 @@ export class RoutesNamespace<
   ): void {
     // Update forwardTo
     if (updates.forwardTo !== undefined) {
-      if (updates.forwardTo === null) {
-        delete this.#config.forwardMap[name];
-        delete this.#config.forwardFnMap[name];
-      } else if (typeof updates.forwardTo === "string") {
-        delete this.#config.forwardFnMap[name];
-        this.#config.forwardMap[name] = updates.forwardTo;
-      } else {
-        delete this.#config.forwardMap[name];
-        this.#config.forwardFnMap[name] = updates.forwardTo;
-      }
-
-      this.#refreshForwardMap();
+      this.#updateForwardTo(name, updates.forwardTo);
     }
 
     // Update defaultParams
@@ -1021,6 +1010,24 @@ export class RoutesNamespace<
   // =========================================================================
   // Private methods
   // =========================================================================
+
+  #updateForwardTo(
+    name: string,
+    forwardTo: string | ForwardToCallback<Dependencies> | null,
+  ): void {
+    if (forwardTo === null) {
+      delete this.#config.forwardMap[name];
+      delete this.#config.forwardFnMap[name];
+    } else if (typeof forwardTo === "string") {
+      delete this.#config.forwardFnMap[name];
+      this.#config.forwardMap[name] = forwardTo;
+    } else {
+      delete this.#config.forwardMap[name];
+      this.#config.forwardFnMap[name] = forwardTo;
+    }
+
+    this.#refreshForwardMap();
+  }
 
   /**
    * Merges route's defaultParams with provided params.

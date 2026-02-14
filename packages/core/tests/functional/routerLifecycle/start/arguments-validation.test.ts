@@ -121,7 +121,7 @@ describe("router.start() - arguments validation", () => {
     });
   });
 
-  describe("call with path string", () => {
+  describe("call with path string (simple route)", () => {
     it("should handle start with valid path", async () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -145,7 +145,7 @@ describe("router.start() - arguments validation", () => {
     });
   });
 
-  describe("call with path string", () => {
+  describe("call with path string (error handling)", () => {
     it("should handle start with valid path", async () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
@@ -219,7 +219,7 @@ describe("router.start() - arguments validation", () => {
     });
   });
 
-  describe("call with path string", () => {
+  describe("call with path string (allowNotFound)", () => {
     it("should handle start with valid path", async () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();

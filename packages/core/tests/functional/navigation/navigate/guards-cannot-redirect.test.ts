@@ -135,19 +135,15 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index").catch(() => {});
+        void router.navigate("index");
 
-        const callback = vi.fn();
-
-        void router.navigate("profile", {}, {}).then(callback).catch(callback);
+        const promise = router.navigate("profile", {}, {});
 
         await vi.runAllTimersAsync();
 
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.CANNOT_ACTIVATE,
-          }),
-        );
+        await expect(promise).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
         vi.useRealTimers();
       });
@@ -167,19 +163,15 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index").catch(() => {});
+        void router.navigate("index");
 
-        const callback = vi.fn();
-
-        void router.navigate("profile", {}, {}).then(callback).catch(callback);
+        const promise = router.navigate("profile", {}, {});
 
         await vi.runAllTimersAsync();
 
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.CANNOT_ACTIVATE,
-          }),
-        );
+        await expect(promise).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
         vi.useRealTimers();
       });

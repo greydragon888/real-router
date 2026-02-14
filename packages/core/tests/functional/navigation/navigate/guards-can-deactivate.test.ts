@@ -292,6 +292,8 @@ describe("router.navigate() - guards can deactivate", () => {
 
         // Should work fine even with fromState when no handlers are set
         await router.navigate("profile");
+
+        expect(router.getState()?.name).toBe("profile");
       });
     });
   });

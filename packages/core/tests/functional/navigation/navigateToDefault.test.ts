@@ -836,7 +836,7 @@ describe("navigateToDefault", () => {
 
       // Add middleware that causes an error
       router.useMiddleware(() => () => {
-        return new Promise((_, reject) => {
+        return new Promise((_resolve, reject) => {
           setTimeout(() => {
             reject(customError);
           }, 10);

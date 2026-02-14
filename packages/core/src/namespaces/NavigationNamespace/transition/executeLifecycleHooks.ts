@@ -5,10 +5,9 @@ import { isState } from "type-guards";
 
 import { RouterError, errorCodes } from "@real-router/core";
 
-import { makeError } from "./makeError";
+import { rethrowAsRouterError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
-import { wrapSyncError } from "./wrapSyncError";
 
 import type { State, ActivationFn } from "@real-router/types";
 
@@ -77,16 +76,7 @@ export const executeLifecycleHooks = async (
         currentState = mergeStates(newState, currentState);
       }
     } catch (error: unknown) {
-      if (error instanceof RouterError) {
-        const err = makeError(errorCode, error);
-
-        /* v8 ignore next 3 -- @preserve: makeError always returns when err is RouterError */
-        if (err) {
-          throw err;
-        }
-      }
-
-      throw new RouterError(errorCode, wrapSyncError(error, segment));
+      rethrowAsRouterError(error, errorCode, segment);
     }
   }
 

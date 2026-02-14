@@ -377,6 +377,8 @@ describe("router.navigate() - edge cases callback", () => {
       // Form 7: navigate(name, params, undefined, callback) - the bug case - callback pattern removed
       await freshRouter.navigate("users.view", { id: "3" }, undefined as any);
 
+      expect(freshRouter.getState()?.name).toBe("users.view");
+
       freshRouter.stop();
     });
   });

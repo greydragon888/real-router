@@ -103,6 +103,9 @@ describe("transition/executeLifecycleHooks", () => {
         setTimeout(resolve, 10);
       });
 
+      // Verify no unhandled errors were logged
+      expect(loggerSpy).not.toHaveBeenCalled();
+
       loggerSpy.mockRestore();
     });
 
@@ -118,18 +121,16 @@ describe("transition/executeLifecycleHooks", () => {
 
       const hooks = new Map<string, ActivationFn>([["users", rejectHook]]);
 
-      try {
-        await executeLifecycleHooks(
+      await expect(
+        executeLifecycleHooks(
           hooks,
           toState,
           fromState,
           ["users"],
           "CANNOT_ACTIVATE",
           () => false,
-        );
-      } catch {
-        // Expected to throw
-      }
+        ),
+      ).rejects.toThrowError("CANNOT_ACTIVATE");
 
       loggerSpy.mockRestore();
     });

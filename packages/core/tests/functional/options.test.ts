@@ -728,6 +728,7 @@ describe("core/options", () => {
       }).toThrowError(ReferenceError);
     });
 
+    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf
     it("should be type-safe", () => {
       const trailingSlash = router.getOption("trailingSlash");
 

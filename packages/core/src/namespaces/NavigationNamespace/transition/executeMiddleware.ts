@@ -3,10 +3,9 @@
 import { logger } from "logger";
 import { isState } from "type-guards";
 
-import { makeError } from "./makeError";
+import { rethrowAsRouterError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
-import { wrapSyncError } from "./wrapSyncError";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
@@ -49,16 +48,7 @@ export const executeMiddleware = async (
         currentState = mergeStates(newState, currentState);
       }
     } catch (error: unknown) {
-      if (error instanceof RouterError) {
-        const err = makeError(errorCodes.TRANSITION_ERR, error);
-
-        /* v8 ignore next 3 -- @preserve: makeError always returns when err is RouterError */
-        if (err) {
-          throw err;
-        }
-      }
-
-      throw new RouterError(errorCodes.TRANSITION_ERR, wrapSyncError(error));
+      rethrowAsRouterError(error, errorCodes.TRANSITION_ERR);
     }
   }
 
