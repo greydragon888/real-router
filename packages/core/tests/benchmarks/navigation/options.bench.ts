@@ -27,14 +27,14 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
-      router.navigate("about");
+      void router.start();
+      void router.navigate("about");
 
       let i = 0;
 
       bench("navigate: reload flag", () => {
         do_not_optimize(
-          router.navigate(
+          void router.navigate(
             SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length],
             {},
             { reload: true },
@@ -47,14 +47,14 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
-      router.navigate("about");
+      void router.start();
+      void router.navigate("about");
 
       let i = 0;
 
       bench("navigate: force flag", () => {
         do_not_optimize(
-          router.navigate(
+          void router.navigate(
             SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length],
             {},
             { force: true },
@@ -67,14 +67,14 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      router.start();
-      router.navigate("about");
+      void router.start();
+      void router.navigate("about");
 
       let i = 0;
 
       bench("navigate: replace flag", () => {
         do_not_optimize(
-          router.navigate(
+          void router.navigate(
             SIMPLE_ROUTES[i++ % SIMPLE_ROUTES.length],
             {},
             { replace: true },
@@ -101,7 +101,7 @@ boxplot(() => {
         urlParamsEncoding: "uriComponent",
       });
 
-      router.start();
+      void router.start();
 
       const names = [
         "Hello World & Special/Chars",
@@ -112,7 +112,7 @@ boxplot(() => {
 
       bench("navigate: uriComponent encoding", () => {
         do_not_optimize(
-          router.navigate("item", { name: names[i++ % names.length] }),
+          void router.navigate("item", { name: names[i++ % names.length] }),
         );
       }).gc("inner");
     }
@@ -127,7 +127,7 @@ boxplot(() => {
         urlParamsEncoding: "uriComponent",
       });
 
-      router.start();
+      void router.start();
 
       const specialStrings = [
         "Hello/World & Special?Chars=Test#Fragment 🚀 Ω ü",
@@ -138,7 +138,7 @@ boxplot(() => {
 
       bench("navigate: special chars (unicode)", () => {
         do_not_optimize(
-          router.navigate("item", {
+          void router.navigate("item", {
             name: specialStrings[i++ % specialStrings.length],
           }),
         );
@@ -168,14 +168,14 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      router.start();
+      void router.start();
 
       const userIds = [123, 456, 789, 101];
       let i = 0;
 
       bench("navigate: with decodeParams", () => {
         do_not_optimize(
-          router.navigate("user", { id: userIds[i++ % userIds.length] }),
+          void router.navigate("user", { id: userIds[i++ % userIds.length] }),
         );
       }).gc("inner");
     }
@@ -196,14 +196,16 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      router.start();
+      void router.start();
 
       const userIds = ["123", "456", "789", "101"];
       let i = 0;
 
       bench("navigate: with encodeParams", () => {
         do_not_optimize(
-          router.navigate("profile", { userId: userIds[i++ % userIds.length] }),
+          void router.navigate("profile", {
+            userId: userIds[i++ % userIds.length],
+          }),
         );
       }).gc("inner");
     }
@@ -225,7 +227,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { trailingSlash: "always" });
 
-      router.start();
+      void router.start();
 
       const routeNames = ["about", "contact", "home"];
       let i = 0;
@@ -244,7 +246,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      router.start();
+      void router.start();
 
       const routeNames = ["about", "contact", "home"];
       let i = 0;
@@ -258,7 +260,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter({ allowNotFound: true });
 
-      router.start();
+      void router.start();
 
       const nonexistentRoutes = [
         "nonexistent-route-1",
@@ -269,7 +271,9 @@ boxplot(() => {
 
       bench("navigate: allowNotFound (nonexistent)", () => {
         do_not_optimize(
-          router.navigate(nonexistentRoutes[i++ % nonexistentRoutes.length]),
+          void router.navigate(
+            nonexistentRoutes[i++ % nonexistentRoutes.length],
+          ),
         );
       }).gc("inner");
     }
@@ -290,7 +294,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      router.start();
+      void router.start();
 
       // Pre-create different long strings to alternate
       const longStrings = [
@@ -302,7 +306,7 @@ boxplot(() => {
 
       bench("navigate: 10K char param", () => {
         do_not_optimize(
-          router.navigate("item", {
+          void router.navigate("item", {
             data: longStrings[i++ % longStrings.length],
           }),
         );
@@ -317,7 +321,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      router.start();
+      void router.start();
 
       const paramSets = [
         { str: "text", num: 42, bool: true, arr: ["a", "b", "c"] },
@@ -328,7 +332,7 @@ boxplot(() => {
 
       bench("navigate: mixed param types", () => {
         do_not_optimize(
-          router.navigate("mixed", paramSets[i++ % paramSets.length]),
+          void router.navigate("mixed", paramSets[i++ % paramSets.length]),
         );
       }).gc("inner");
     }
@@ -341,7 +345,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      router.start();
+      void router.start();
 
       const nestedParams = [
         { data: { level1: { level2: { level3: { value: "deep" } } } } },
@@ -352,7 +356,10 @@ boxplot(() => {
 
       bench("navigate: nested object params", () => {
         do_not_optimize(
-          router.navigate("nested", nestedParams[i++ % nestedParams.length]),
+          void router.navigate(
+            "nested",
+            nestedParams[i++ % nestedParams.length],
+          ),
         );
       }).gc("inner");
     }

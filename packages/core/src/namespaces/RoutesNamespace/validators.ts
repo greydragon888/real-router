@@ -157,10 +157,44 @@ export function validateUpdateRouteBasicArgs<
 }
 
 /**
+ * Asserts that a function is not async (native or transpiled).
+ * Checks both constructor name and toString() for __awaiter pattern.
+ */
+/* v8 ignore next 12 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- needs constructor.name access
+function assertNotAsync(value: Function, paramName: string): void {
+  if (
+    (value as { constructor: { name: string } }).constructor.name ===
+      "AsyncFunction" ||
+    (value as { toString: () => string }).toString().includes("__awaiter")
+  ) {
+    throw new TypeError(
+      `[real-router] updateRoute: ${paramName} cannot be an async function`,
+    );
+  }
+}
+
+/**
+ * Validates that a value is a non-async function, if provided.
+ */
+function validateFunctionParam(value: unknown, paramName: string): void {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (typeof value !== "function") {
+    throw new TypeError(
+      `[real-router] updateRoute: ${paramName} must be a function or null, got ${typeof value}`,
+    );
+  }
+
+  assertNotAsync(value, paramName);
+}
+
+/**
  * Validates updateRoute property types using pre-cached values.
  * Called AFTER properties are cached to ensure getters are called only once.
  */
-// eslint-disable-next-line sonarjs/cognitive-complexity -- validation logic is naturally verbose
 export function validateUpdateRoutePropertyTypes(
   forwardTo: unknown,
   defaultParams: unknown,
@@ -175,19 +209,8 @@ export function validateUpdateRoutePropertyTypes(
       );
     }
 
-    // Async check for function forwardTo (both native and transpiled)
-    /* v8 ignore next 9 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
-    if (
-      typeof forwardTo === "function" &&
-      ((forwardTo as { constructor: { name: string } }).constructor.name ===
-        "AsyncFunction" ||
-        (forwardTo as { toString: () => string })
-          .toString()
-          .includes("__awaiter"))
-    ) {
-      throw new TypeError(
-        `[real-router] updateRoute: forwardTo callback cannot be async`,
-      );
+    if (typeof forwardTo === "function") {
+      assertNotAsync(forwardTo, "forwardTo callback");
     }
   }
 
@@ -202,49 +225,8 @@ export function validateUpdateRoutePropertyTypes(
     );
   }
 
-  // Validate decodeParams
-  if (decodeParams !== undefined && decodeParams !== null) {
-    if (typeof decodeParams !== "function") {
-      throw new TypeError(
-        `[real-router] updateRoute: decodeParams must be a function or null, got ${typeof decodeParams}`,
-      );
-    }
-
-    // Check for async function
-    if (
-      (decodeParams as { constructor: { name: string } }).constructor.name ===
-        "AsyncFunction" ||
-      (decodeParams as { toString: () => string })
-        .toString()
-        .includes("__awaiter")
-    ) {
-      throw new TypeError(
-        `[real-router] updateRoute: decodeParams cannot be an async function`,
-      );
-    }
-  }
-
-  // Validate encodeParams
-  if (encodeParams !== undefined && encodeParams !== null) {
-    if (typeof encodeParams !== "function") {
-      throw new TypeError(
-        `[real-router] updateRoute: encodeParams must be a function or null, got ${typeof encodeParams}`,
-      );
-    }
-
-    // Check for async function
-    if (
-      (encodeParams as { constructor: { name: string } }).constructor.name ===
-        "AsyncFunction" ||
-      (encodeParams as { toString: () => string })
-        .toString()
-        .includes("__awaiter")
-    ) {
-      throw new TypeError(
-        `[real-router] updateRoute: encodeParams cannot be an async function`,
-      );
-    }
-  }
+  validateFunctionParam(decodeParams, "decodeParams");
+  validateFunctionParam(encodeParams, "encodeParams");
 }
 
 /**

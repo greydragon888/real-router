@@ -5,11 +5,7 @@ import { RouterError } from "@real-router/core";
 
 import { executeLifecycleHooks } from "../../../src/namespaces/NavigationNamespace/transition/executeLifecycleHooks";
 
-import type {
-  State,
-  ActivationFn,
-  RouterError as RouterErrorType,
-} from "@real-router/types";
+import type { State, ActivationFn } from "@real-router/types";
 
 describe("transition/executeLifecycleHooks", () => {
   const createState = (name: string): State => ({
@@ -20,75 +16,50 @@ describe("transition/executeLifecycleHooks", () => {
   });
 
   describe("safeCallback error handling", () => {
-    it("should catch and log error when callback throws", () => {
+    it("should catch and log error when callback throws", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
       const hooks = new Map<string, ActivationFn>();
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error");
-      };
-
-      // When no hooks to process, callback is called immediately
-      executeLifecycleHooks(
+      // When no hooks to process, should return immediately
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         [],
         "CANNOT_DEACTIVATE",
         () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
       );
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      expect(result).toBeDefined();
+      expect(result).toStrictEqual(toState);
 
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws after processing hooks", () => {
+    it("should catch and log error when callback throws after processing hooks", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
       // Hook that allows navigation
-      const allowHook: ActivationFn = (_toState, _fromState, done) => {
-        done();
+      const allowHook: ActivationFn = (_toState, _fromState) => {
+        return;
       };
 
       const hooks = new Map<string, ActivationFn>([["users", allowHook]]);
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error after hooks");
-      };
-
-      executeLifecycleHooks(
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
       );
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      expect(result).toBeDefined();
 
       loggerSpy.mockRestore();
     });
@@ -99,34 +70,30 @@ describe("transition/executeLifecycleHooks", () => {
       const fromState = createState("home");
 
       // Hook that will be interrupted by cancellation
-      const slowHook: ActivationFn = (_toState, _fromState, done) => {
-        // Simulate async - done is called after isCancelled returns true
-        setTimeout(() => {
-          done();
-        }, 0);
+      const slowHook: ActivationFn = (_toState, _fromState) => {
+        return new Promise<State>((resolve) => {
+          setTimeout(() => {
+            resolve(_toState);
+          }, 0);
+        });
       };
 
       const hooks = new Map<string, ActivationFn>([["users", slowHook]]);
 
       let cancelled = false;
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on cancel");
-      };
-
-      executeLifecycleHooks(
-        hooks,
-        toState,
-        fromState,
-        ["users"],
-        "CANNOT_ACTIVATE",
-        () => cancelled,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
-      );
+      try {
+        await executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => cancelled,
+        );
+      } catch {
+        // Expected to throw when cancelled
+      }
 
       // Cancel before hook completes
       cancelled = true;
@@ -136,49 +103,100 @@ describe("transition/executeLifecycleHooks", () => {
         setTimeout(resolve, 10);
       });
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
-      );
+      // Verify no unhandled errors were logged
+      expect(loggerSpy).not.toHaveBeenCalled();
 
       loggerSpy.mockRestore();
     });
 
-    it("should catch and log error when callback throws on hook error", () => {
+    it("should catch and log error when callback throws on hook error", async () => {
       const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
       const toState = createState("users");
       const fromState = createState("home");
 
       // Hook that rejects navigation
-      const rejectHook: ActivationFn = (_toState, _fromState, done) => {
-        done(new RouterError("CANNOT_ACTIVATE"));
+      const rejectHook: ActivationFn = (_toState, _fromState) => {
+        throw new RouterError("CANNOT_ACTIVATE");
       };
 
       const hooks = new Map<string, ActivationFn>([["users", rejectHook]]);
 
-      // Callback that throws
-      const throwingCallback = () => {
-        throw new Error("Callback error on hook rejection");
+      await expect(
+        executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => false,
+        ),
+      ).rejects.toThrowError("CANNOT_ACTIVATE");
+
+      loggerSpy.mockRestore();
+    });
+  });
+
+  describe("cancellation between segments", () => {
+    it("should throw TRANSITION_CANCELLED when cancelled between hook executions", async () => {
+      const toState = createState("users.list");
+      const fromState = createState("home");
+
+      let cancelled = false;
+
+      // First hook completes, then cancellation flag is set before second hook
+      const firstHook: ActivationFn = () => {
+        cancelled = true; // cancel after this hook
       };
 
-      executeLifecycleHooks(
+      const secondHook: ActivationFn = () => {
+        // Should never be called
+      };
+
+      const hooks = new Map<string, ActivationFn>([
+        ["users", firstHook],
+        ["users.list", secondHook],
+      ]);
+
+      await expect(
+        executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users", "users.list"],
+          "CANNOT_ACTIVATE",
+          () => cancelled,
+        ),
+      ).rejects.toThrowError("CANCELLED");
+    });
+  });
+
+  describe("state mutation warning", () => {
+    it("should log warning when guard returns state with modified params", async () => {
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const toState = createState("users");
+      const fromState = createState("home");
+
+      // Hook returns state with same name but different params
+      const mutatingHook: ActivationFn = (state) => ({
+        ...state,
+        params: { modified: true },
+      });
+
+      const hooks = new Map<string, ActivationFn>([["users", mutatingHook]]);
+
+      await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        throwingCallback as unknown as (
-          error: RouterErrorType | undefined,
-          state: State,
-        ) => void,
       );
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        "core:lifecycle",
-        "Error in callback:",
-        expect.any(Error),
+        "core:transition",
+        "Warning: State mutated during transition",
+        expect.any(Object),
       );
 
       loggerSpy.mockRestore();
@@ -186,60 +204,50 @@ describe("transition/executeLifecycleHooks", () => {
   });
 
   describe("newState handling (line 107)", () => {
-    it("should skip state checks when newState equals currentState (same reference)", () => {
+    it("should skip state checks when newState equals currentState (same reference)", async () => {
       const toState = createState("users");
       const fromState = createState("home");
-      const callback = vi.fn();
-
       // Hook that returns the same state reference
-      const sameStateHook: ActivationFn = (state, _fromState, done) => {
-        // Return the same state object (newState === currentState)
-        done(undefined, state);
+      const sameStateHook: ActivationFn = (state, _fromState) => {
+        return state;
       };
 
       const hooks = new Map<string, ActivationFn>([["users", sameStateHook]]);
 
-      executeLifecycleHooks(
+      const result = await executeLifecycleHooks(
         hooks,
         toState,
         fromState,
         ["users"],
         "CANNOT_ACTIVATE",
         () => false,
-        callback,
       );
 
-      // Should complete successfully without error
-      expect(callback).toHaveBeenCalledWith(undefined, toState);
+      expect(result).toBeDefined();
     });
 
-    it("should skip state checks when newState is not a valid state object", () => {
+    it("should skip state checks when newState is not a valid state object", async () => {
       const toState = createState("users");
       const fromState = createState("home");
-      const callback = vi.fn();
-
       // Hook that returns an invalid state (not a State object)
-      const invalidStateHook: ActivationFn = (_toState, _fromState, done) => {
-        // Return something that's not a valid State (missing required fields)
-        done(undefined, { invalid: true } as unknown as State);
+      const invalidStateHook: ActivationFn = () => {
+        return { invalid: true } as unknown as State;
       };
 
       const hooks = new Map<string, ActivationFn>([
         ["users", invalidStateHook],
       ]);
 
-      executeLifecycleHooks(
-        hooks,
-        toState,
-        fromState,
-        ["users"],
-        "CANNOT_ACTIVATE",
-        () => false,
-        callback,
-      );
-
-      // Should complete successfully (invalid state is ignored)
-      expect(callback).toHaveBeenCalledWith(undefined, toState);
+      await expect(
+        executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users"],
+          "CANNOT_ACTIVATE",
+          () => false,
+        ),
+      ).rejects.toThrowError("Invalid lifecycle result type");
     });
   });
 });

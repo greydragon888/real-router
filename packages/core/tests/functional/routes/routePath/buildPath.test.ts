@@ -7,9 +7,9 @@ import type { Route, Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/routePath/buildPath", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -181,10 +181,10 @@ describe("core/routes/routePath/buildPath", () => {
       expect(path2).toBe("/home");
     });
 
-    it("should invalidate cache and use new options after stop/start cycle", () => {
+    it("should invalidate cache and use new options after stop/start cycle", async () => {
       const cycleRouter = createTestRouter();
 
-      cycleRouter.start("/home");
+      await cycleRouter.start("/home");
 
       // First cycle — default trailingSlash
       const path1 = cycleRouter.buildPath("home");
@@ -196,7 +196,7 @@ describe("core/routes/routePath/buildPath", () => {
       // Second cycle — create router with new trailingSlash option
       const cycleRouter2 = createTestRouter({ trailingSlash: "always" });
 
-      cycleRouter2.start("/home");
+      await cycleRouter2.start("/home");
       const path2 = cycleRouter2.buildPath("home");
 
       expect(path2).toBe("/home/");
@@ -204,10 +204,10 @@ describe("core/routes/routePath/buildPath", () => {
       cycleRouter2.stop();
     });
 
-    it("should apply trailingSlash option correctly", () => {
+    it("should apply trailingSlash option correctly", async () => {
       router.stop();
       router = createTestRouter({ trailingSlash: "always" });
-      router.start("/home");
+      await router.start("/home");
 
       const path = router.buildPath("home");
 
@@ -215,7 +215,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       router.stop();
       router = createTestRouter({ trailingSlash: "never" });
-      router.start("/home");
+      await router.start("/home");
     });
   });
 
@@ -263,7 +263,10 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("constraint violation", () => {
       it("should throw when param violates constraint", () => {
-        router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
+        router.addRoute({
+          name: "user",
+          path: String.raw`/user/:id<\d+>`,
+        });
 
         expect(() => router.buildPath("user", { id: "abc" })).toThrowError(
           /does not match constraint/,
@@ -271,7 +274,10 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should pass when param matches constraint", () => {
-        router.addRoute({ name: "user", path: String.raw`/user/:id<\d+>` });
+        router.addRoute({
+          name: "user",
+          path: String.raw`/user/:id<\d+>`,
+        });
 
         const path = router.buildPath("user", { id: "123" });
 
@@ -595,14 +601,14 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should reject emoji route names", () => {
-          expect(() =>
-            router.addRoute({ name: "🚀", path: "/launch" }),
+          expect(
+            () => void router.addRoute({ name: "🚀", path: "/launch" }),
           ).toThrowError(/Invalid route name/);
         });
 
         it("should reject route names with unicode characters", () => {
-          expect(() =>
-            router.addRoute({ name: "café", path: "/cafe" }),
+          expect(
+            () => void router.addRoute({ name: "café", path: "/cafe" }),
           ).toThrowError(/Invalid route name/);
         });
 
@@ -707,7 +713,10 @@ describe("core/routes/routePath/buildPath", () => {
           nullProtoParams.userId = "1";
           nullProtoParams.postId = "2";
 
-          router.addRoute({ name: "post", path: "/user/:userId/post/:postId" });
+          router.addRoute({
+            name: "post",
+            path: "/user/:userId/post/:postId",
+          });
 
           const path = router.buildPath("post", nullProtoParams);
 

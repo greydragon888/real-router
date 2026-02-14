@@ -4,14 +4,14 @@ import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 
 let router: Router;
 
 describe("core/routes/removeRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -19,7 +19,7 @@ describe("core/routes/removeRoute", () => {
   });
 
   describe("full route removal", () => {
-    it("should remove route from tree (matchPath returns undefined)", () => {
+    it("should remove route from tree (matchPath returns undefined)", async () => {
       router.addRoute({ name: "temporary", path: "/temporary" });
 
       // Route exists before removal
@@ -31,7 +31,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/temporary")).toBeUndefined();
     });
 
-    it("should remove route so buildPath throws", () => {
+    it("should remove route so buildPath throws", async () => {
       router.addRoute({ name: "removable", path: "/removable" });
 
       // Route exists before removal
@@ -43,7 +43,7 @@ describe("core/routes/removeRoute", () => {
       expect(() => router.buildPath("removable")).toThrowError(/not defined/);
     });
 
-    it("should allow re-adding route with same name after removal", () => {
+    it("should allow re-adding route with same name after removal", async () => {
       router.addRoute({ name: "reusable", path: "/old-path" });
       router.removeRoute("reusable");
 
@@ -56,7 +56,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/old-path")).toBeUndefined();
     });
 
-    it("should remove route with children", () => {
+    it("should remove route with children", async () => {
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -75,7 +75,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/parent/child2")).toBeUndefined();
     });
 
-    it("should remove only specified child route", () => {
+    it("should remove only specified child route", async () => {
       router.addRoute({
         name: "category",
         path: "/category",
@@ -95,7 +95,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/category/remove")).toBeUndefined();
     });
 
-    it("should handle removal of non-existent route gracefully", () => {
+    it("should handle removal of non-existent route gracefully", async () => {
       // Route doesn't exist - removeRoute should not throw
       expect(() => router.removeRoute("nonexistent")).not.toThrowError();
 
@@ -103,7 +103,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/")).toBeDefined();
     });
 
-    it("should handle multiple removals of the same route gracefully (12.13)", () => {
+    it("should handle multiple removals of the same route gracefully (12.13)", async () => {
       // Add a route
       router.addRoute({ name: "temporary", path: "/temporary" });
 
@@ -129,7 +129,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/")).toBeDefined();
     });
 
-    it("should handle removal of non-existent child route gracefully", () => {
+    it("should handle removal of non-existent child route gracefully", async () => {
       router.addRoute({
         name: "wrapper",
         path: "/wrapper",
@@ -137,8 +137,8 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Child doesn't exist - should not throw
-      expect(() =>
-        router.removeRoute("wrapper.nonexistent"),
+      expect(
+        () => void router.removeRoute("wrapper.nonexistent"),
       ).not.toThrowError();
 
       // Parent and existing child should remain
@@ -148,7 +148,7 @@ describe("core/routes/removeRoute", () => {
   });
 
   describe("lifecycle cleanup", () => {
-    it("should clear canActivate handler on removeRoute", () => {
+    it("should clear canActivate handler on removeRoute", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -158,10 +158,14 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify guard works before removal - navigation should be blocked
-      router.navigate("protected", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      try {
+        await router.navigate("protected");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(guard).toHaveBeenCalled();
-      });
+      }
 
       router.removeRoute("protected");
 
@@ -170,26 +174,28 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/protected")).toBeUndefined();
     });
 
-    it("should clear canDeactivate handler on removeRoute", () => {
+    it("should clear canDeactivate handler on removeRoute", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({ name: "editor", path: "/editor" });
       router.addDeactivateGuard("editor", () => guard);
 
       // Navigate to editor first
-      router.navigate("editor", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("editor");
 
-        // Verify guard works - leaving should be blocked
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      // Verify guard works - leaving should be blocked
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(guard).toHaveBeenCalled();
+      }
 
       // Navigate back to home for clean state
       guard.mockReturnValue(true);
-      router.navigate("home", () => {});
+      await router.navigate("home");
       guard.mockClear();
 
       router.removeRoute("editor");
@@ -198,7 +204,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("editor")).toBe(false);
     });
 
-    it("should only clear canDeactivate for removed route", () => {
+    it("should only clear canDeactivate for removed route", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(false);
 
@@ -213,15 +219,19 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("form1")).toBe(false);
 
       // form2 guard should still work - verify by navigation
-      router.navigate("form2", () => {
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(guard2).toHaveBeenCalled();
-        });
-      });
+      await router.navigate("form2");
+
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(guard2).toHaveBeenCalled();
+      }
     });
 
-    it("should clear both canActivate and canDeactivate handlers", () => {
+    it("should clear both canActivate and canDeactivate handlers", async () => {
       router.addRoute({
         name: "dashboard",
         path: "/dashboard",
@@ -236,13 +246,13 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/dashboard")).toBeUndefined();
     });
 
-    it("should not throw when route has no lifecycle handlers", () => {
+    it("should not throw when route has no lifecycle handlers", async () => {
       router.addRoute({ name: "simple", path: "/simple" });
 
       expect(() => router.removeRoute("simple")).not.toThrowError();
     });
 
-    it("should not emit warning when clearing non-existent lifecycle handlers", () => {
+    it("should not emit warning when clearing non-existent lifecycle handlers", async () => {
       router.addRoute({ name: "nohandlers", path: "/nohandlers" });
 
       // The silent parameter should suppress warnings
@@ -254,7 +264,7 @@ describe("core/routes/removeRoute", () => {
   });
 
   describe("config cleanup", () => {
-    it("should clear decoders on removeRoute", () => {
+    it("should clear decoders on removeRoute", async () => {
       const decodeParams = vi.fn((params) => ({
         ...params,
         id: Number(params.id),
@@ -276,7 +286,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/with-decoder/123")).toBeUndefined();
     });
 
-    it("should clear encoders on removeRoute", () => {
+    it("should clear encoders on removeRoute", async () => {
       const encodeParams = vi.fn((params) => ({
         ...params,
         id: `${params.id as number}`,
@@ -299,7 +309,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("decoded")).toBe(false);
     });
 
-    it("should clear defaultParams on removeRoute", () => {
+    it("should clear defaultParams on removeRoute", async () => {
       router.addRoute({
         name: "withdefaults",
         path: "/withdefaults",
@@ -317,7 +327,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("withdefaults")).toBe(false);
     });
 
-    it("should clear forwardMap on removeRoute", () => {
+    it("should clear forwardMap on removeRoute", async () => {
       router.addRoute({ name: "target", path: "/target" });
       router.addRoute({
         name: "redirect",
@@ -334,7 +344,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("redirect")).toBe(false);
     });
 
-    it("should only clear forwardMap for removed route", () => {
+    it("should only clear forwardMap for removed route", async () => {
       router.addRoute({ name: "dest", path: "/dest" });
       router.addRoute({ name: "fwd1", path: "/fwd1", forwardTo: "dest" });
       router.addRoute({ name: "fwd2", path: "/fwd2", forwardTo: "dest" });
@@ -350,7 +360,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.forwardState("fwd2", {}).name).toBe("dest");
     });
 
-    it("should clear child route forwardMap when parent removed", () => {
+    it("should clear child route forwardMap when parent removed", async () => {
       router.addRoute({ name: "dest", path: "/dest" });
       router.addRoute({
         name: "container",
@@ -368,7 +378,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("container.fwd")).toBe(false);
     });
 
-    it("should clear child route handlers when parent removed", () => {
+    it("should clear child route handlers when parent removed", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -379,16 +389,20 @@ describe("core/routes/removeRoute", () => {
       router.addDeactivateGuard("area.page", () => guard);
 
       // Verify guard works before removal
-      router.navigate("area.page", () => {
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      await router.navigate("area.page");
+
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(guard).toHaveBeenCalled();
+      }
 
       // Navigate back to home
       guard.mockReturnValue(true);
-      router.navigate("home", () => {});
+      await router.navigate("home");
 
       router.removeRoute("area");
 
@@ -397,7 +411,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("area.page")).toBe(false);
     });
 
-    it("should remove route with dynamic forwardTo", () => {
+    it("should remove route with dynamic forwardTo", async () => {
       router.addRoute({ name: "fn-target", path: "/fn-target" });
       router.addRoute({
         name: "fn-forward",
@@ -416,7 +430,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.hasRoute("fn-forward")).toBe(false);
     });
 
-    it("should not leak forwardFnMap entry after removeRoute and re-add", () => {
+    it("should not leak forwardFnMap entry after removeRoute and re-add", async () => {
       router.addRoute({ name: "re-target", path: "/re-target" });
       router.addRoute({
         name: "re-forward",
@@ -434,7 +448,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.forwardState("re-forward", {}).name).toBe("re-forward");
     });
 
-    it("should clear child forwardFnMap when parent removed", () => {
+    it("should clear child forwardFnMap when parent removed", async () => {
       router.addRoute({ name: "fn-dest", path: "/fn-dest" });
       router.addRoute({
         name: "fn-parent",
@@ -505,7 +519,7 @@ describe("core/routes/removeRoute", () => {
       warnSpy.mockRestore();
     });
 
-    it("should NOT modify existing routes when removing non-existent route", () => {
+    it("should NOT modify existing routes when removing non-existent route", async () => {
       const activateGuard = vi.fn().mockReturnValue(false);
       const deactivateGuard = vi.fn().mockReturnValue(false);
 
@@ -531,24 +545,32 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify canActivate guard still works
-      router.navigate("existing", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      try {
+        await router.navigate("existing");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(activateGuard).toHaveBeenCalled();
-      });
+      }
 
       activateGuard.mockClear();
       activateGuard.mockReturnValue(true);
 
       // Verify canDeactivate guard still works
-      router.navigate("existing", () => {
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(deactivateGuard).toHaveBeenCalled();
-        });
-      });
+      await router.navigate("existing");
+
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(deactivateGuard).toHaveBeenCalled();
+      }
     });
 
-    it("should return router for chaining even when route not found", () => {
+    it("should return router for chaining even when route not found", async () => {
       const result = router.removeRoute("nonexistent");
 
       expect(result).toBe(router);
@@ -566,7 +588,7 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.navigate("dashboard");
+      await router.navigate("dashboard");
 
       // Verify we're on the route
       expect(router.getState()?.name).toBe("dashboard");
@@ -595,7 +617,7 @@ describe("core/routes/removeRoute", () => {
         path: "/parent-route",
         children: [{ name: "childRoute", path: "/child" }],
       });
-      router.navigate("parentRoute.childRoute");
+      await router.navigate("parentRoute.childRoute");
 
       // Verify we're on the child route
       expect(router.getState()?.name).toBe("parentRoute.childRoute");
@@ -618,10 +640,10 @@ describe("core/routes/removeRoute", () => {
       warnSpy.mockRestore();
     });
 
-    it("should allow removal of inactive route when another route is active", () => {
+    it("should allow removal of inactive route when another route is active", async () => {
       router.addRoute({ name: "active", path: "/active" });
       router.addRoute({ name: "inactive", path: "/inactive" });
-      router.navigate("active");
+      await router.navigate("active");
 
       // Should work - removing inactive route
       router.removeRoute("inactive");
@@ -631,7 +653,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/inactive")).toBeUndefined();
     });
 
-    it("should allow removal of sibling route when on different branch", () => {
+    it("should allow removal of sibling route when on different branch", async () => {
       router.addRoute({
         name: "sectionTest",
         path: "/section-test",
@@ -640,7 +662,7 @@ describe("core/routes/removeRoute", () => {
           { name: "pageB", path: "/b" },
         ],
       });
-      router.navigate("sectionTest.pageA");
+      await router.navigate("sectionTest.pageA");
 
       // Should work - removing sibling
       router.removeRoute("sectionTest.pageB");
@@ -652,7 +674,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/section-test/b")).toBeUndefined();
     });
 
-    it("should allow removal when router has no active state", () => {
+    it("should allow removal when router has no active state", async () => {
       // Stop router to clear state
       router.stop();
 
@@ -664,7 +686,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/test")).toBeUndefined();
     });
 
-    it("should allow removal when router not started", () => {
+    it("should allow removal when router not started", async () => {
       // Create fresh router without starting
       const freshRouter = createTestRouter();
 
@@ -681,7 +703,7 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "blocked", path: "/blocked" });
-      router.navigate("blocked");
+      await router.navigate("blocked");
 
       const result = router.removeRoute("blocked");
 
@@ -700,7 +722,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.2: Removing forwardTo target route
     describe("forwardTo target removal (12.2)", () => {
-      it("should clear forwardMap entry when target route is removed", () => {
+      it("should clear forwardMap entry when target route is removed", async () => {
         router.addRoute({ name: "newDashboard", path: "/new-dashboard" });
         router.addRoute({
           name: "oldDashboard",
@@ -722,7 +744,7 @@ describe("core/routes/removeRoute", () => {
         );
       });
 
-      it("should keep source route functional after target removal", () => {
+      it("should keep source route functional after target removal", async () => {
         router.addRoute({ name: "targetRoute", path: "/target" });
         router.addRoute({
           name: "sourceRoute",
@@ -737,7 +759,10 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should allow navigation to source route after target removal", async () => {
-        router.addRoute({ name: "forwardTarget", path: "/forward-target" });
+        router.addRoute({
+          name: "forwardTarget",
+          path: "/forward-target",
+        });
         router.addRoute({
           name: "forwardSource",
           path: "/forward-source",
@@ -747,17 +772,12 @@ describe("core/routes/removeRoute", () => {
         router.removeRoute("forwardTarget");
 
         // Navigation to source should work (no forward happens)
-        const result = await new Promise<boolean>((resolve) => {
-          router.navigate("forwardSource", {}, {}, (err) => {
-            resolve(!err);
-          });
-        });
+        await router.navigate("forwardSource");
 
-        expect(result).toBe(true);
         expect(router.getState()?.name).toBe("forwardSource");
       });
 
-      it("should handle chain of forwardTo when middle target is removed", () => {
+      it("should handle chain of forwardTo when middle target is removed", async () => {
         router.addRoute({ name: "final", path: "/final" });
         router.addRoute({
           name: "middle",
@@ -785,7 +805,7 @@ describe("core/routes/removeRoute", () => {
         expect(router.matchPath("/final")?.name).toBe("final");
       });
 
-      it("should clear forwardMap when source route is removed", () => {
+      it("should clear forwardMap when source route is removed", async () => {
         router.addRoute({ name: "keepTarget", path: "/keep-target" });
         router.addRoute({
           name: "removeSource",
@@ -828,11 +848,7 @@ describe("core/routes/removeRoute", () => {
         });
 
         // Start async navigation
-        const navigationPromise = new Promise<boolean>((resolve) => {
-          router.navigate("asyncRoute", {}, {}, (err) => {
-            resolve(!err);
-          });
-        });
+        const navigationPromise = router.navigate("asyncRoute");
 
         // Give time for navigation to start
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -852,9 +868,13 @@ describe("core/routes/removeRoute", () => {
         resolveCanActivate!();
 
         // Navigation should fail because route was removed
-        const result = await navigationPromise;
+        try {
+          await navigationPromise;
 
-        expect(result).toBe(false);
+          expect.fail("Should have thrown ROUTE_NOT_FOUND");
+        } catch (error) {
+          expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
 
         warnSpy.mockRestore();
       });
@@ -874,11 +894,7 @@ describe("core/routes/removeRoute", () => {
         });
 
         // Complete navigation first
-        await new Promise<void>((resolve) => {
-          router.navigate("asyncComplete", {}, {}, () => {
-            resolve();
-          });
-        });
+        await router.navigate("asyncComplete");
 
         // Now route is active
         expect(router.getState()?.name).toBe("asyncComplete");
@@ -918,11 +934,7 @@ describe("core/routes/removeRoute", () => {
         router.addRoute({ name: "unrelated", path: "/unrelated" });
 
         // Start async navigation to navigatingTo
-        const navigationPromise = new Promise<boolean>((resolve) => {
-          router.navigate("navigatingTo", {}, {}, (err) => {
-            resolve(!err);
-          });
-        });
+        const navigationPromise = router.navigate("navigatingTo");
 
         // Give time for navigation to start
         await new Promise((resolve) => setTimeout(resolve, 10));
@@ -942,7 +954,7 @@ describe("core/routes/removeRoute", () => {
         resolveCanActivate!();
         const result = await navigationPromise;
 
-        expect(result).toBe(true);
+        expect(result.name).toBe("navigatingTo");
         expect(router.getState()?.name).toBe("navigatingTo");
 
         warnSpy.mockRestore();
@@ -954,11 +966,7 @@ describe("core/routes/removeRoute", () => {
         router.addRoute({ name: "rapid3", path: "/rapid3" });
 
         // Navigate to rapid1
-        await new Promise<void>((resolve) => {
-          router.navigate("rapid1", {}, {}, () => {
-            resolve();
-          });
-        });
+        await router.navigate("rapid1");
 
         // Remove rapid2 (not current) - should work
         router.removeRoute("rapid2");
@@ -966,11 +974,7 @@ describe("core/routes/removeRoute", () => {
         expect(router.matchPath("/rapid2")).toBeUndefined();
 
         // Navigate to rapid3
-        await new Promise<void>((resolve) => {
-          router.navigate("rapid3", {}, {}, () => {
-            resolve();
-          });
-        });
+        await router.navigate("rapid3");
 
         // Now rapid1 can be removed (not current anymore)
         router.removeRoute("rapid1");
@@ -1005,7 +1009,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.5: Very long name (> 10000 characters)
     // MAX_ROUTE_NAME_LENGTH is 10,000 in type-guards package
-    it("should throw TypeError for name exceeding 10000 characters", () => {
+    it("should throw TypeError for name exceeding 10000 characters", async () => {
       const longName = "a".repeat(10_001);
 
       expect(() => router.removeRoute(longName)).toThrowError(TypeError);
@@ -1034,15 +1038,15 @@ describe("core/routes/removeRoute", () => {
     });
 
     // 12.7: Unicode characters in name
-    it("should throw TypeError for Cyrillic characters in name", () => {
+    it("should throw TypeError for Cyrillic characters in name", async () => {
       expect(() => router.removeRoute("маршрут")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for emoji in name", () => {
+    it("should throw TypeError for emoji in name", async () => {
       expect(() => router.removeRoute("route_🚀")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for CJK characters in name", () => {
+    it("should throw TypeError for CJK characters in name", async () => {
       expect(() => router.removeRoute("route.日本語")).toThrowError(TypeError);
     });
 
@@ -1063,7 +1067,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     // 12.9: Deep nesting (10+ levels)
-    it("should handle deeply nested route removal (15 levels)", () => {
+    it("should handle deeply nested route removal (15 levels)", async () => {
       // Build deeply nested route structure using Route type
       interface NestedRoute {
         name: string;
@@ -1106,7 +1110,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath(parentPath)).toBeDefined();
     });
 
-    it("should remove entire deep tree when removing root", () => {
+    it("should remove entire deep tree when removing root", async () => {
       interface NestedRoute {
         name: string;
         path: string;
@@ -1148,7 +1152,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     // 12.10: Sequential removal of all routes
-    it("should handle sequential removal of multiple routes", () => {
+    it("should handle sequential removal of multiple routes", async () => {
       router.addRoute([
         { name: "routeA", path: "/route-a" },
         { name: "routeB", path: "/route-b" },
@@ -1178,7 +1182,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.matchPath("/route-c")).toBeUndefined();
     });
 
-    it("should allow adding routes after removing all custom routes", () => {
+    it("should allow adding routes after removing all custom routes", async () => {
       router.addRoute({ name: "temp1", path: "/temp1" });
       router.addRoute({ name: "temp2", path: "/temp2" });
 
@@ -1245,7 +1249,7 @@ describe("core/routes/removeRoute", () => {
       warnSpy.mockRestore();
     });
 
-    it("should not affect Object.prototype when removing __proto__", () => {
+    it("should not affect Object.prototype when removing __proto__", async () => {
       const originalKeys = Object.keys(Object.prototype);
 
       router.removeRoute("__proto__");
@@ -1273,31 +1277,31 @@ describe("core/routes/removeRoute", () => {
   });
 
   describe("input validation", () => {
-    it("should throw TypeError for null name", () => {
+    it("should throw TypeError for null name", async () => {
       expect(() => router.removeRoute(null as unknown as string)).toThrowError(
         TypeError,
       );
     });
 
-    it("should throw TypeError for undefined name", () => {
-      expect(() =>
-        router.removeRoute(undefined as unknown as string),
+    it("should throw TypeError for undefined name", async () => {
+      expect(
+        () => void router.removeRoute(undefined as unknown as string),
       ).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for number name", () => {
+    it("should throw TypeError for number name", async () => {
       expect(() => router.removeRoute(123 as unknown as string)).toThrowError(
         TypeError,
       );
     });
 
-    it("should throw TypeError for object name", () => {
+    it("should throw TypeError for object name", async () => {
       expect(() => router.removeRoute({} as unknown as string)).toThrowError(
         TypeError,
       );
     });
 
-    it("should throw TypeError for Proxy with overridden toString (12.14)", () => {
+    it("should throw TypeError for Proxy with overridden toString (12.14)", async () => {
       // Proxy that tries to masquerade as a string via toString/valueOf
       const maliciousProxy = new Proxy(
         { value: "realRoute" },
@@ -1316,45 +1320,45 @@ describe("core/routes/removeRoute", () => {
       );
 
       // typeof Proxy === "object", so it should be rejected BEFORE any coercion
-      expect(() =>
-        router.removeRoute(maliciousProxy as unknown as string),
+      expect(
+        () => void router.removeRoute(maliciousProxy as unknown as string),
       ).toThrowError(TypeError);
 
       // Original route should remain untouched
       expect(router.matchPath("/")).toBeDefined();
     });
 
-    it("should throw TypeError for String wrapper object (12.16)", () => {
+    it("should throw TypeError for String wrapper object (12.16)", async () => {
       // new String() creates an object, not a primitive string
       // eslint-disable-next-line unicorn/new-for-builtins, sonarjs/no-primitive-wrappers
       const stringWrapper = new String("home");
 
       // typeof stringWrapper === "object", not "string"
-      expect(() =>
-        router.removeRoute(stringWrapper as unknown as string),
+      expect(
+        () => void router.removeRoute(stringWrapper as unknown as string),
       ).toThrowError(TypeError);
 
       // Original route should remain untouched
       expect(router.matchPath("/")).toBeDefined();
     });
 
-    it("should throw TypeError for whitespace-only name", () => {
+    it("should throw TypeError for whitespace-only name", async () => {
       expect(() => router.removeRoute("   ")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for name with leading dot", () => {
+    it("should throw TypeError for name with leading dot", async () => {
       expect(() => router.removeRoute(".invalid")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for name with trailing dot", () => {
+    it("should throw TypeError for name with trailing dot", async () => {
       expect(() => router.removeRoute("invalid.")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for name starting with number", () => {
+    it("should throw TypeError for name starting with number", async () => {
       expect(() => router.removeRoute("123invalid")).toThrowError(TypeError);
     });
 
-    it("should throw TypeError for name with consecutive dots", () => {
+    it("should throw TypeError for name with consecutive dots", async () => {
       expect(() => router.removeRoute("invalid..name")).toThrowError(TypeError);
     });
   });

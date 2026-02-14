@@ -39,7 +39,7 @@ const reservedRouterErrorProps = new Set([
  *   hookFn();
  * } catch (error) {
  *   const metadata = wrapSyncError(error, "users.profile");
- *   done(new RouterError(errorCodes.TRANSITION_ERR, metadata));
+ *   throw new RouterError(errorCodes.TRANSITION_ERR, metadata);
  * }
  * ```
  */

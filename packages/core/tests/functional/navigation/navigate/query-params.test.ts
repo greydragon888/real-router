@@ -7,10 +7,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - query params", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -19,8 +19,8 @@ describe("router.navigate() - query params", () => {
     vi.clearAllMocks();
   });
 
-  it("should append query parameters to path", () => {
-    router.navigate("users.view", { id: 123, q: "search", page: "2" });
+  it("should append query parameters to path", async () => {
+    await router.navigate("users.view", { id: 123, q: "search", page: "2" });
 
     expect(omitMeta(router.getState())).toMatchObject({
       name: "users.view",
@@ -29,18 +29,18 @@ describe("router.navigate() - query params", () => {
     });
   });
 
-  it("should encode query parameters correctly", () => {
-    router.navigate(
-      "users.view",
-      { id: 42, q: "a b", tag: "x/y" },
-      (_, state) => {
-        expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
-      },
-    );
+  it("should encode query parameters correctly", async () => {
+    const state = await router.navigate("users.view", {
+      id: 42,
+      q: "a b",
+      tag: "x/y",
+    });
+
+    expect(state?.path).toBe("/users/view/42?q=a%20b&tag=x%2Fy");
   });
 
-  it("should handle empty query params correctly", () => {
-    router.navigate("users.view", { id: 42 });
+  it("should handle empty query params correctly", async () => {
+    await router.navigate("users.view", { id: 42 });
 
     expect(router.getState()?.path).toBe("/users/view/42");
   });

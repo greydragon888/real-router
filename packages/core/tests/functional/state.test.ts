@@ -14,9 +14,9 @@ import type { Router, Route } from "@real-router/core";
 let router: Router;
 
 describe("core/state", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -30,8 +30,8 @@ describe("core/state", () => {
       expect(router.getState()).toBe(undefined);
     });
 
-    it("returns state after navigation", () => {
-      router.navigate("users.view", { id: "123" });
+    it("returns state after navigation", async () => {
+      await router.navigate("users.view", { id: "123" });
 
       const state = router.getState();
 
@@ -45,8 +45,8 @@ describe("core/state", () => {
       expect(router.getPreviousState()).toBeUndefined();
     });
 
-    it("returns previous state after navigation", () => {
-      router.navigate("sign-in");
+    it("returns previous state after navigation", async () => {
+      await router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -54,18 +54,18 @@ describe("core/state", () => {
       expect(previousState?.name).toBe("home");
     });
 
-    it("updates previous state on subsequent navigations", () => {
-      router.navigate("sign-in");
-      router.navigate("users");
+    it("updates previous state on subsequent navigations", async () => {
+      await router.navigate("sign-in");
+      await router.navigate("users");
 
       const previousState = router.getPreviousState();
 
       expect(previousState?.name).toBe("sign-in");
     });
 
-    it("preserves previous state params", () => {
-      router.navigate("users.view", { id: "123" });
-      router.navigate("home");
+    it("preserves previous state params", async () => {
+      await router.navigate("users.view", { id: "123" });
+      await router.navigate("home");
 
       const previousState = router.getPreviousState();
 
@@ -73,8 +73,8 @@ describe("core/state", () => {
       expect(previousState?.params).toStrictEqual({ id: "123" });
     });
 
-    it("returns frozen state (immutable)", () => {
-      router.navigate("sign-in");
+    it("returns frozen state (immutable)", async () => {
+      await router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -504,7 +504,9 @@ describe("core/state", () => {
         },
         { name: "dstNoDefaults", path: "/dst-no-defaults" },
       ]);
-      router.updateRoute("srcWithDefaults", { forwardTo: "dstNoDefaults" });
+      router.updateRoute("srcWithDefaults", {
+        forwardTo: "dstNoDefaults",
+      });
 
       const state = router.forwardState("srcWithDefaults", { c: 3 });
 
@@ -522,7 +524,9 @@ describe("core/state", () => {
           defaultParams: { b: 2 },
         },
       ]);
-      router.updateRoute("srcNoDefaults", { forwardTo: "dstWithDefaults" });
+      router.updateRoute("srcNoDefaults", {
+        forwardTo: "dstWithDefaults",
+      });
 
       const state = router.forwardState("srcNoDefaults", { c: 3 });
 
@@ -701,11 +705,10 @@ describe("core/stateBuilder", () => {
   });
 
   describe("not found state via start with allowNotFound", () => {
-    it("creates not found state when starting at unknown path", () => {
+    it("creates not found state when starting at unknown path", async () => {
       const freshRouter = createTestRouter({ allowNotFound: true });
 
-      // Start at an unknown path - this triggers makeNotFoundState internally
-      freshRouter.start("/completely/unknown/path");
+      await freshRouter.start("/completely/unknown/path");
 
       const state = freshRouter.getState();
 
@@ -718,7 +721,7 @@ describe("core/stateBuilder", () => {
   });
 
   describe("forwardTo function", () => {
-    it("should resolve basic dynamic forwardTo with dependency", () => {
+    it("should resolve basic dynamic forwardTo with dependency", async () => {
       const testRouter = createRouter(
         [
           {
@@ -733,7 +736,7 @@ describe("core/stateBuilder", () => {
         { user: { isAdmin: true } },
       );
 
-      testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const result = testRouter.forwardState("dash", {});
 
@@ -742,7 +745,7 @@ describe("core/stateBuilder", () => {
       testRouter.stop();
     });
 
-    it("should pass params to forwardTo callback", () => {
+    it("should pass params to forwardTo callback", async () => {
       const testRouter = createRouter(
         [
           {
@@ -758,7 +761,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const result = testRouter.forwardState("item", { type: "book" });
 
@@ -777,7 +780,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      testRouter.start("");
+      testRouter.start("").catch(() => {});
 
       expect(() => testRouter.forwardState("cycle-a", {})).toThrowError(
         /Circular forwardTo/,
@@ -904,7 +907,7 @@ describe("core/stateBuilder", () => {
       expect(state?.name).toBe("build-dest");
     });
 
-    it("should work with rewritePathOnMatch and dynamic forwardTo", () => {
+    it("should work with rewritePathOnMatch and dynamic forwardTo", async () => {
       const testRouter = createTestRouter({ rewritePathOnMatch: true });
 
       testRouter.addRoute([
@@ -916,7 +919,7 @@ describe("core/stateBuilder", () => {
         { name: "rewrite-target", path: "/rewrite-target" },
       ]);
 
-      testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const state = testRouter.matchPath("/rewrite-fn");
 

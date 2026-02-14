@@ -6,8 +6,6 @@
 
 export type Unsubscribe = () => void;
 
-export type CancelFn = () => void;
-
 export interface SimpleState<P extends Params = Params> {
   name: string;
   params: P;
@@ -56,8 +54,6 @@ export interface RouterError extends Error {
   getField: (key: string) => unknown;
   toJSON: () => Record<string, unknown>;
 }
-
-export type DoneFn = (error?: RouterError, state?: State) => void;
 
 /**
  * Configuration options that control navigation transition behavior.

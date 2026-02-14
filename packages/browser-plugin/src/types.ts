@@ -1,6 +1,6 @@
 // packages/browser-plugin/modules/types.ts
 
-import type { DoneFn, State } from "@real-router/core";
+import type { State } from "@real-router/core";
 
 /**
  * Common options shared between hash and history modes
@@ -221,8 +221,4 @@ export interface Browser {
  */
 export type HistoryState = State & Record<string, unknown>;
 
-export type StartRouterArguments =
-  | []
-  | [done: DoneFn]
-  | [startPathOrState: string | State]
-  | [startPathOrState: string | State, done: DoneFn];
+export type StartRouterArguments = [] | [startPath: string];

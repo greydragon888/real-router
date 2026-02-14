@@ -10,21 +10,22 @@ import type {
   Params,
   Route,
   Router,
+  RouterError,
 } from "@real-router/core";
 
 let router: Router;
 
 describe("core/routes/addRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start("");
+    await router.start();
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should sort routes correctly on add", () => {
+  it("should sort routes correctly on add", async () => {
     router.addRoute([{ name: "setting", path: "/setting" }]);
 
     const path = router.buildPath("setting");
@@ -32,7 +33,7 @@ describe("core/routes/addRoute", () => {
     expect(path).toBe("/setting");
   });
 
-  it("should sort routes correctly for batch add", () => {
+  it("should sort routes correctly for batch add", async () => {
     router.addRoute([
       { name: "c", path: "/c" },
       { name: "a", path: "/a" },
@@ -45,26 +46,26 @@ describe("core/routes/addRoute", () => {
     expect(router.matchPath("/c")?.name).toBe("c");
   });
 
-  it("should match routes after add and navigate", () => {
+  it("should match routes after add and navigate", async () => {
     router.addRoute([{ name: "new-route", path: "/new" }]);
 
     // navigate works correctly
-    router.navigate("new-route");
+    await router.navigate("new-route");
 
     expect(router.getState()?.name).toBe("new-route");
   });
 
-  it("should check isActiveRoute after add", () => {
+  it("should check isActiveRoute after add", async () => {
     router.addRoute([{ name: "check-route", path: "/check" }]);
 
     // Navigate to the route first
-    router.navigate("check-route");
+    await router.navigate("check-route");
 
     // isActiveRoute works correctly
     expect(router.isActiveRoute("check-route")).toBe(true);
   });
 
-  it("should register canActivate function if defined on route", () => {
+  it("should register canActivate function if defined on route", async () => {
     router.addRoute([
       {
         name: "secure",
@@ -74,12 +75,16 @@ describe("core/routes/addRoute", () => {
     ]);
 
     // Verify guard is registered by testing navigation behavior
-    router.navigate("secure", (err) => {
-      expect(err?.code).toBe("CANNOT_ACTIVATE");
-    });
+    try {
+      await router.navigate("secure");
+
+      expect.fail("Should have thrown");
+    } catch (error) {
+      expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
+    }
   });
 
-  it("should register forwardTo and redirect during navigation", () => {
+  it("should register forwardTo and redirect during navigation", async () => {
     router.addRoute([
       {
         name: "old-route",
@@ -98,7 +103,7 @@ describe("core/routes/addRoute", () => {
     expect(state.name).toBe("new-route"); // Redirect happened
   });
 
-  it("should register decodeParams and call it during matchPath", () => {
+  it("should register decodeParams and call it during matchPath", async () => {
     const decodeParams = vi.fn((params) => ({ ...params, decoded: true }));
 
     router.addRoute([
@@ -116,7 +121,7 @@ describe("core/routes/addRoute", () => {
     expect(state?.params).toStrictEqual({ id: "123", decoded: true });
   });
 
-  it("should register encodeParams and call it during buildPath", () => {
+  it("should register encodeParams and call it during buildPath", async () => {
     const encodeParams = vi.fn((params) => ({ ...params, encoded: true }));
 
     router.addRoute([
@@ -133,7 +138,7 @@ describe("core/routes/addRoute", () => {
     expect(encodeParams).toHaveBeenCalledWith({ id: "123" });
   });
 
-  it("should use fallback params when decodeParams returns undefined (line 100)", () => {
+  it("should use fallback params when decodeParams returns undefined (line 100)", async () => {
     const decodeParams = vi.fn(() => undefined as any);
 
     router.addRoute([
@@ -151,7 +156,7 @@ describe("core/routes/addRoute", () => {
     expect(state?.params).toStrictEqual({ id: "123" });
   });
 
-  it("should use fallback params when encodeParams returns undefined (line 105)", () => {
+  it("should use fallback params when encodeParams returns undefined (line 105)", async () => {
     const encodeParams = vi.fn(() => undefined as any);
 
     router.addRoute([
@@ -169,7 +174,7 @@ describe("core/routes/addRoute", () => {
     expect(path).toBe("/encode-fallback/456");
   });
 
-  it("should validate nested children before adding (invalid name type)", () => {
+  it("should validate nested children before adding (invalid name type)", async () => {
     expect(() => {
       router.addRoute({
         name: "parent-test-1",
@@ -179,7 +184,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError("[router.addRoute] Route name must be a string");
   });
 
-  it("should throw when route name is empty string", () => {
+  it("should throw when route name is empty string", async () => {
     expect(() => {
       router.addRoute({
         name: "",
@@ -188,7 +193,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError(/Route name cannot be empty/i);
   });
 
-  it("should validate deeply nested children", () => {
+  it("should validate deeply nested children", async () => {
     expect(() => {
       router.addRoute({
         name: "deep-a",
@@ -204,7 +209,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError(TypeError);
   });
 
-  it("should throw if route is not an object", () => {
+  it("should throw if route is not an object", async () => {
     expect(() => {
       router.addRoute(null as unknown as []);
     }).toThrowError("[router.addRoute] Route must be an object, got null");
@@ -214,7 +219,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError("[router.addRoute] Route must be an object, got string");
   });
 
-  it("should throw if children is not an array", () => {
+  it("should throw if children is not an array", async () => {
     expect(() => {
       router.addRoute({
         name: "parent-test-2",
@@ -226,7 +231,7 @@ describe("core/routes/addRoute", () => {
     );
   });
 
-  it("should add route with valid children successfully", () => {
+  it("should add route with valid children successfully", async () => {
     router.addRoute({
       name: "valid-section",
       path: "/valid-section",
@@ -241,7 +246,7 @@ describe("core/routes/addRoute", () => {
     expect(path).toBe("/valid-section/page");
   });
 
-  it("should throw on duplicate route name", () => {
+  it("should throw on duplicate route name", async () => {
     router.addRoute({ name: "dup-test", path: "/dup-test" });
 
     expect(() => {
@@ -249,7 +254,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('[router.addRoute] Route "dup-test" already exists');
   });
 
-  it("should throw on duplicate name within same batch (cross-batch detection)", () => {
+  it("should throw on duplicate name within same batch (cross-batch detection)", async () => {
     expect(() => {
       router.addRoute([
         { name: "batch-dup", path: "/batch-dup-1" },
@@ -258,7 +263,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('[router.addRoute] Duplicate route "batch-dup" in batch');
   });
 
-  it("should throw on duplicate before modifying config (atomicity)", () => {
+  it("should throw on duplicate before modifying config (atomicity)", async () => {
     router.addRoute({ name: "first-dup", path: "/first-dup" });
 
     expect(() => {
@@ -276,7 +281,7 @@ describe("core/routes/addRoute", () => {
     expect(router.hasRoute("new-before-dup")).toBe(false);
   });
 
-  it("should throw on duplicate nested child route", () => {
+  it("should throw on duplicate nested child route", async () => {
     router.addRoute({
       name: "dup-parent",
       path: "/dup-parent",
@@ -290,8 +295,11 @@ describe("core/routes/addRoute", () => {
     );
   });
 
-  it("should reject batch on path conflict (pre-validation atomicity)", () => {
-    router.addRoute({ name: "path-conflict-existing", path: "/path-conflict" });
+  it("should reject batch on path conflict (pre-validation atomicity)", async () => {
+    router.addRoute({
+      name: "path-conflict-existing",
+      path: "/path-conflict",
+    });
 
     expect(() => {
       router.addRoute([
@@ -311,7 +319,7 @@ describe("core/routes/addRoute", () => {
     expect(router.hasRoute("pre-validation-test")).toBe(false);
   });
 
-  it("should throw on duplicate path within same batch", () => {
+  it("should throw on duplicate path within same batch", async () => {
     expect(() => {
       router.addRoute([
         { name: "batch-path-a", path: "/same-path" },
@@ -321,7 +329,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("children handlers registration", () => {
-    it("should register canActivate for children routes", () => {
+    it("should register canActivate for children routes", async () => {
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -335,12 +343,16 @@ describe("core/routes/addRoute", () => {
       });
 
       // Verify guard is registered by testing navigation behavior
-      router.navigate("parent.child", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("parent.child");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
     });
 
-    it("should register canActivate for deeply nested children", () => {
+    it("should register canActivate for deeply nested children", async () => {
       router.addRoute({
         name: "level1",
         path: "/level1",
@@ -361,17 +373,25 @@ describe("core/routes/addRoute", () => {
       });
 
       // level2 guard blocks navigation to level2
-      router.navigate("level1.level2", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("level1.level2");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
 
       // level2 guard also blocks navigation to level3 (parent guard runs first)
-      router.navigate("level1.level2.level3", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("level1.level2.level3");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_ACTIVATE");
+      }
     });
 
-    it("should register forwardTo for children routes", () => {
+    it("should register forwardTo for children routes", async () => {
       router.addRoute({ name: "target", path: "/target" });
 
       router.addRoute({
@@ -392,7 +412,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("target");
     });
 
-    it("should register decodeParams for children routes", () => {
+    it("should register decodeParams for children routes", async () => {
       const childDecoder = vi.fn((params) => ({
         ...params,
         childDecoded: true,
@@ -416,7 +436,7 @@ describe("core/routes/addRoute", () => {
       expect(state?.params).toStrictEqual({ id: "123", childDecoded: true });
     });
 
-    it("should register encodeParams for children routes", () => {
+    it("should register encodeParams for children routes", async () => {
       const childEncoder = vi.fn((params) => ({
         ...params,
         childEncoded: true,
@@ -439,7 +459,7 @@ describe("core/routes/addRoute", () => {
       expect(childEncoder).toHaveBeenCalledWith({ id: "456" });
     });
 
-    it("should register defaultParams for children routes", () => {
+    it("should register defaultParams for children routes", async () => {
       router.addRoute({
         name: "search",
         path: "/search",
@@ -458,7 +478,7 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ page: 1, limit: 10 });
     });
 
-    it("should register all handlers for parent and children in same call", () => {
+    it("should register all handlers for parent and children in same call", async () => {
       let parentGuardCalled = false;
       let childGuardCalled = false;
 
@@ -486,7 +506,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate to inner to trigger both guards
-      router.navigate("wrapper.inner");
+      await router.navigate("wrapper.inner");
 
       expect(parentGuardCalled).toBe(true);
       expect(childGuardCalled).toBe(true);
@@ -502,14 +522,14 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("dot-notation parent validation", () => {
-    it("should throw when adding route with dot-notation but parent does not exist", () => {
+    it("should throw when adding route with dot-notation but parent does not exist", async () => {
       // Parent "nonexistent" does not exist in router
       expect(() => {
         router.addRoute({ name: "nonexistent.child", path: "/child" });
       }).toThrowError(/parent route "nonexistent" does not exist/i);
     });
 
-    it("should throw when adding deeply nested route with missing parent", () => {
+    it("should throw when adding deeply nested route with missing parent", async () => {
       // "a" exists but "a.b" does not exist
       router.addRoute({ name: "a", path: "/a" });
 
@@ -518,7 +538,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/parent route "a\.b" does not exist/i);
     });
 
-    it("should throw when batch contains dot-notation route with missing parent", () => {
+    it("should throw when batch contains dot-notation route with missing parent", async () => {
       expect(() => {
         router.addRoute([
           { name: "batch-parent", path: "/batch-parent" },
@@ -528,8 +548,11 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/parent route "other" does not exist/i);
     });
 
-    it("should allow dot-notation when parent exists", () => {
-      router.addRoute({ name: "existing-parent", path: "/existing-parent" });
+    it("should allow dot-notation when parent exists", async () => {
+      router.addRoute({
+        name: "existing-parent",
+        path: "/existing-parent",
+      });
 
       // Should not throw
       expect(() => {
@@ -541,7 +564,7 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should allow dot-notation when parent added in same batch", () => {
+    it("should allow dot-notation when parent added in same batch", async () => {
       // Parent added before child in same batch - should work
       expect(() => {
         router.addRoute([
@@ -555,7 +578,7 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should throw when parent added after child in same batch", () => {
+    it("should throw when parent added after child in same batch", async () => {
       // Child added before parent in same batch - should fail
       expect(() => {
         router.addRoute([
@@ -567,7 +590,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("encodeParams/decodeParams validation", () => {
-    it("should throw when decodeParams is not a function", () => {
+    it("should throw when decodeParams is not a function", async () => {
       expect(() => {
         router.addRoute({
           name: "bad-decoder",
@@ -578,7 +601,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/decodeparams must be a function/i);
     });
 
-    it("should throw when encodeParams is not a function", () => {
+    it("should throw when encodeParams is not a function", async () => {
       expect(() => {
         router.addRoute({
           name: "bad-encoder",
@@ -589,7 +612,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/encodeparams must be a function/i);
     });
 
-    it("should throw when decodeParams is null", () => {
+    it("should throw when decodeParams is null", async () => {
       expect(() => {
         router.addRoute({
           name: "null-decoder",
@@ -600,7 +623,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/decodeparams must be a function/i);
     });
 
-    it("should accept valid function for decodeParams", () => {
+    it("should accept valid function for decodeParams", async () => {
       expect(() => {
         router.addRoute({
           name: "valid-decoder",
@@ -610,7 +633,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
     });
 
-    it("should accept valid function for encodeParams", () => {
+    it("should accept valid function for encodeParams", async () => {
       expect(() => {
         router.addRoute({
           name: "valid-encoder",
@@ -620,7 +643,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
     });
 
-    it("should validate encodeParams/decodeParams in children", () => {
+    it("should validate encodeParams/decodeParams in children", async () => {
       expect(() => {
         router.addRoute({
           name: "parent-with-bad-child",
@@ -637,7 +660,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/decodeparams must be a function/i);
     });
 
-    it("should throw when decodeParams is an async function", () => {
+    it("should throw when decodeParams is an async function", async () => {
       expect(() => {
         router.addRoute({
           name: "async-decoder",
@@ -647,7 +670,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/decodeparams cannot be async/i);
     });
 
-    it("should throw when encodeParams is an async function", () => {
+    it("should throw when encodeParams is an async function", async () => {
       expect(() => {
         router.addRoute({
           name: "async-encoder",
@@ -659,7 +682,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("empty children handling", () => {
-    it("should preserve empty children array in route object", () => {
+    it("should preserve empty children array in route object", async () => {
       const route = {
         name: "parent-with-empty-children",
         path: "/parent",
@@ -675,7 +698,7 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/parent")).toBeDefined();
     });
 
-    it("should preserve empty children in nested routes", () => {
+    it("should preserve empty children in nested routes", async () => {
       const nestedRoute = {
         name: "nested",
         path: "/nested",
@@ -697,7 +720,7 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/root/nested")).toBeDefined();
     });
 
-    it("should preserve undefined children in route object", () => {
+    it("should preserve undefined children in route object", async () => {
       const route = {
         name: "no-children",
         path: "/no-children",
@@ -712,7 +735,7 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/no-children")).toBeDefined();
     });
 
-    it("should work with frozen routes with empty children", () => {
+    it("should work with frozen routes with empty children", async () => {
       const frozenRoute = Object.freeze({
         name: "frozen",
         path: "/frozen",
@@ -730,7 +753,7 @@ describe("core/routes/addRoute", () => {
       expect(frozenRoute.children).toStrictEqual([]);
     });
 
-    it("should keep non-empty children", () => {
+    it("should keep non-empty children", async () => {
       const route = {
         name: "parent-ok",
         path: "/parent-ok",
@@ -746,7 +769,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("forwardTo chain resolution", () => {
-    it("should resolve simple forwardTo chain (A → B → C)", () => {
+    it("should resolve simple forwardTo chain (A → B → C)", async () => {
       router.addRoute([
         { name: "A", path: "/a", forwardTo: "B" },
         { name: "B", path: "/b", forwardTo: "C" },
@@ -759,7 +782,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("C");
     });
 
-    it("should handle route without forwardTo", () => {
+    it("should handle route without forwardTo", async () => {
       router.addRoute({ name: "no-forward", path: "/no-forward" });
 
       const state = router.forwardState("no-forward", {});
@@ -767,7 +790,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("no-forward");
     });
 
-    it("should detect circular forwardTo (A → B → A)", () => {
+    it("should detect circular forwardTo (A → B → A)", async () => {
       expect(() => {
         router.addRoute([
           { name: "A", path: "/a", forwardTo: "B" },
@@ -776,7 +799,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/Circular forwardTo: A → B → A/);
     });
 
-    it("should detect circular forwardTo (A → B → C → B)", () => {
+    it("should detect circular forwardTo (A → B → C → B)", async () => {
       expect(() => {
         router.addRoute([
           { name: "A", path: "/a", forwardTo: "B" },
@@ -786,13 +809,13 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/Circular forwardTo: B → C → B/);
     });
 
-    it("should detect self-referencing forwardTo (A → A)", () => {
+    it("should detect self-referencing forwardTo (A → A)", async () => {
       expect(() => {
         router.addRoute({ name: "A", path: "/a", forwardTo: "A" });
       }).toThrowError(/Circular forwardTo: A → A/);
     });
 
-    it("should allow forwardTo if target exists in same batch", () => {
+    it("should allow forwardTo if target exists in same batch", async () => {
       router.addRoute([
         { name: "redirect", path: "/redirect", forwardTo: "target" },
         { name: "target", path: "/target" },
@@ -803,7 +826,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("target");
     });
 
-    it("should allow forwardTo if target already exists", () => {
+    it("should allow forwardTo if target already exists", async () => {
       router.addRoute({ name: "existing", path: "/existing" });
 
       router.addRoute({
@@ -817,7 +840,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("existing");
     });
 
-    it("should handle forwardTo after removeRoute target", () => {
+    it("should handle forwardTo after removeRoute target", async () => {
       router.addRoute([
         { name: "A", path: "/a", forwardTo: "B" },
         { name: "B", path: "/b" },
@@ -833,7 +856,7 @@ describe("core/routes/addRoute", () => {
       expect(router.forwardState("A", {}).name).toBe("A");
     });
 
-    it("should resolve forwardTo chains correctly", () => {
+    it("should resolve forwardTo chains correctly", async () => {
       router.addRoute([
         { name: "level1", path: "/1", forwardTo: "level2" },
         { name: "level2", path: "/2", forwardTo: "level3" },
@@ -849,7 +872,7 @@ describe("core/routes/addRoute", () => {
       expect(router.forwardState("level4", {}).name).toBe("final");
     });
 
-    it("should handle very long chains without stack overflow", () => {
+    it("should handle very long chains without stack overflow", async () => {
       // Create a chain of 50 routes
       const routes: Route[] = [];
 
@@ -875,7 +898,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("route50");
     });
 
-    it("should reject chain exceeding maximum depth", () => {
+    it("should reject chain exceeding maximum depth", async () => {
       // Create a chain exceeding default maxDepth (100)
       const routes: Route[] = [];
 
@@ -898,7 +921,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/forwardTo chain exceeds maximum depth/);
     });
 
-    it("should handle forwardTo with nested routes", () => {
+    it("should handle forwardTo with nested routes", async () => {
       router.addRoute([
         { name: "old", path: "/old", forwardTo: "new.page" },
         {
@@ -913,7 +936,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("new.page");
     });
 
-    it("should preserve params when forwarding", () => {
+    it("should preserve params when forwarding", async () => {
       router.addRoute([
         { name: "redirect", path: "/redirect/:id", forwardTo: "target" },
         { name: "target", path: "/target/:id" },
@@ -925,7 +948,7 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ id: "123" });
     });
 
-    it("should preserve splat params when forwarding", () => {
+    it("should preserve splat params when forwarding", async () => {
       // First add target route with splat param to tree
       router.addRoute({ name: "newfiles", path: "/newfiles/*filepath" });
 
@@ -944,7 +967,7 @@ describe("core/routes/addRoute", () => {
       expect(state.params).toStrictEqual({ filepath: "docs/readme.md" });
     });
 
-    it("should throw if forwardTo target is missing required params", () => {
+    it("should throw if forwardTo target is missing required params", async () => {
       // Target route requires :id param, but source has no params
       expect(() => {
         router.addRoute([
@@ -956,7 +979,7 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should allow adding forwards dynamically via updateRoute()", () => {
+    it("should allow adding forwards dynamically via updateRoute()", async () => {
       router.addRoute([
         { name: "oldRoute", path: "/old" },
         { name: "newRoute", path: "/new" },
@@ -971,7 +994,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("newRoute");
     });
 
-    it("should warn when route has both forwardTo and canActivate", () => {
+    it("should warn when route has both forwardTo and canActivate", async () => {
       // Spy on console.warn
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
@@ -1001,7 +1024,7 @@ describe("core/routes/addRoute", () => {
       warnSpy.mockRestore();
     });
 
-    it("should not warn when route has only forwardTo without canActivate", () => {
+    it("should not warn when route has only forwardTo without canActivate", async () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute([
@@ -1016,14 +1039,14 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("Edge cases", () => {
-    it("should handle empty batch addRoute([])", () => {
+    it("should handle empty batch addRoute([])", async () => {
       // Should not throw when adding empty array
       expect(() => {
         router.addRoute([]);
       }).not.toThrowError();
     });
 
-    it("should allow addRoute on stopped router", () => {
+    it("should allow addRoute on stopped router", async () => {
       router.stop();
 
       // Should not throw
@@ -1032,12 +1055,12 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
 
       // Route should be registered
-      router.start("");
+      await router.start();
 
       expect(router.matchPath("/after-stop")?.name).toBe("after-stop");
     });
 
-    it("should handle child route with forwardTo to sibling", () => {
+    it("should handle child route with forwardTo to sibling", async () => {
       router.addRoute({
         name: "container",
         path: "/container",
@@ -1056,7 +1079,7 @@ describe("core/routes/addRoute", () => {
       expect(state.name).toBe("container.sibling2");
     });
 
-    it("should handle route with query parameters in path", () => {
+    it("should handle route with query parameters in path", async () => {
       router.addRoute({
         name: "search",
         path: "/search?q&page&sort",
@@ -1070,7 +1093,7 @@ describe("core/routes/addRoute", () => {
       expect(state?.params.sort).toBe("asc");
     });
 
-    it("should handle route with all options combined", () => {
+    it("should handle route with all options combined", async () => {
       const canActivate = vi.fn(() => () => true);
       const nestedCanActivate = vi.fn(() => () => true);
       const decodeParams = vi.fn((p) => ({ ...p, decoded: true }));
@@ -1122,7 +1145,7 @@ describe("core/routes/addRoute", () => {
       expect(forwardedState.name).toBe("target");
     });
 
-    it("should handle adding route to deeply nested parent via dot-notation", () => {
+    it("should handle adding route to deeply nested parent via dot-notation", async () => {
       router.addRoute({
         name: "level1",
         path: "/level1",
@@ -1151,7 +1174,7 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should handle route path with optional query params", () => {
+    it("should handle route path with optional query params", async () => {
       router.addRoute({
         name: "docs",
         path: "/docs?section",
@@ -1167,7 +1190,7 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/docs")?.name).toBe("docs");
     });
 
-    it("should handle route path with splat/wildcard", () => {
+    it("should handle route path with splat/wildcard", async () => {
       router.addRoute({
         name: "files",
         path: "/files/*path",
@@ -1179,7 +1202,7 @@ describe("core/routes/addRoute", () => {
       expect(state?.params.path).toBe("docs/readme.md");
     });
 
-    it("should handle multiple routes with same prefix", () => {
+    it("should handle multiple routes with same prefix", async () => {
       router.addRoute([
         { name: "products", path: "/products" },
         { name: "products-list", path: "/products/list" },
@@ -1191,10 +1214,18 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/products/123")?.name).toBe("products-detail");
     });
 
-    it("should handle forwardTo chain added in multiple batches", () => {
+    it("should handle forwardTo chain added in multiple batches", async () => {
       router.addRoute({ name: "final", path: "/final" });
-      router.addRoute({ name: "middle", path: "/middle", forwardTo: "final" });
-      router.addRoute({ name: "start", path: "/start", forwardTo: "middle" });
+      router.addRoute({
+        name: "middle",
+        path: "/middle",
+        forwardTo: "final",
+      });
+      router.addRoute({
+        name: "start",
+        path: "/start",
+        forwardTo: "middle",
+      });
 
       // Chain resolves correctly: start → middle → final
       expect(router.forwardState("start", {}).name).toBe("final");
@@ -1204,7 +1235,7 @@ describe("core/routes/addRoute", () => {
 
   describe("Error handling validation gaps", () => {
     describe("Problem 1: forwardTo target validation", () => {
-      it("should throw if forwardTo target does not exist", () => {
+      it("should throw if forwardTo target does not exist", async () => {
         // Current behavior: route is added but forwardTo is invalid
         // Expected behavior: should throw during addRoute
         expect(() => {
@@ -1216,7 +1247,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/forwardto target .* does not exist/i);
       });
 
-      it("should throw if forwardTo target does not exist in batch", () => {
+      it("should throw if forwardTo target does not exist in batch", async () => {
         expect(() => {
           router.addRoute([
             { name: "a", path: "/a", forwardTo: "ghost" },
@@ -1227,7 +1258,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("Problem 2: canActivate type validation", () => {
-      it("should throw if canActivate is not a function", () => {
+      it("should throw if canActivate is not a function", async () => {
         expect(() => {
           router.addRoute({
             name: "bad-guard",
@@ -1237,7 +1268,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/canactivate must be a function/i);
       });
 
-      it("should throw if canActivate is null", () => {
+      it("should throw if canActivate is null", async () => {
         expect(() => {
           router.addRoute({
             name: "null-guard",
@@ -1247,7 +1278,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/canactivate must be a function/i);
       });
 
-      it("should throw if canActivate is an object", () => {
+      it("should throw if canActivate is an object", async () => {
         expect(() => {
           router.addRoute({
             name: "object-guard",
@@ -1259,7 +1290,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("canDeactivate type validation", () => {
-      it("should throw if canDeactivate is not a function", () => {
+      it("should throw if canDeactivate is not a function", async () => {
         expect(() => {
           router.addRoute({
             name: "bad-deactivate-guard",
@@ -1269,7 +1300,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/candeactivate must be a function/i);
       });
 
-      it("should throw if canDeactivate is null", () => {
+      it("should throw if canDeactivate is null", async () => {
         expect(() => {
           router.addRoute({
             name: "null-deactivate-guard",
@@ -1279,7 +1310,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/candeactivate must be a function/i);
       });
 
-      it("should throw if canDeactivate is an object", () => {
+      it("should throw if canDeactivate is an object", async () => {
         expect(() => {
           router.addRoute({
             name: "object-deactivate-guard",
@@ -1291,7 +1322,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("Problem 3: defaultParams type validation", () => {
-      it("should throw if defaultParams is not an object", () => {
+      it("should throw if defaultParams is not an object", async () => {
         expect(() => {
           router.addRoute({
             name: "bad-defaults",
@@ -1301,7 +1332,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/defaultparams must be an object/i);
       });
 
-      it("should throw if defaultParams is null", () => {
+      it("should throw if defaultParams is null", async () => {
         expect(() => {
           router.addRoute({
             name: "null-defaults",
@@ -1311,7 +1342,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/defaultparams must be an object/i);
       });
 
-      it("should throw if defaultParams is an array", () => {
+      it("should throw if defaultParams is an array", async () => {
         expect(() => {
           router.addRoute({
             name: "array-defaults",
@@ -1323,7 +1354,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("Problem 5: invalid path type", () => {
-      it("should throw if path is not a string (number)", () => {
+      it("should throw if path is not a string (number)", async () => {
         expect(() => {
           router.addRoute({
             name: "bad-path",
@@ -1332,7 +1363,7 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/path must be a string/i);
       });
 
-      it("should throw if path is null", () => {
+      it("should throw if path is null", async () => {
         expect(() => {
           router.addRoute({
             name: "null-path",
@@ -1343,7 +1374,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("Problem 6: forwardTo to self", () => {
-      it("should detect self-referencing forwardTo as cycle", () => {
+      it("should detect self-referencing forwardTo as cycle", async () => {
         expect(() => {
           router.addRoute({
             name: "self-ref",
@@ -1355,7 +1386,7 @@ describe("core/routes/addRoute", () => {
     });
 
     describe("Problem 4: atomicity on Phase 4 errors", () => {
-      it("should not add routes to definitions if forwardTo cycle is detected", () => {
+      it("should not add routes to definitions if forwardTo cycle is detected", async () => {
         expect(() => {
           router.addRoute([
             { name: "cycle-a", path: "/cycle-a", forwardTo: "cycle-b" },
@@ -1368,7 +1399,7 @@ describe("core/routes/addRoute", () => {
         expect(router.hasRoute("cycle-b")).toBe(false);
       });
 
-      it("should not register handlers if forwardTo cycle is detected", () => {
+      it("should not register handlers if forwardTo cycle is detected", async () => {
         expect(() => {
           router.addRoute([
             {
@@ -1393,25 +1424,25 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("path validation", () => {
-    it("should throw on path with spaces", () => {
+    it("should throw on path with spaces", async () => {
       expect(() => {
         router.addRoute({ name: "spacey", path: "/with space" });
       }).toThrowError(/whitespace not allowed/);
     });
 
-    it("should throw on path with tabs", () => {
+    it("should throw on path with tabs", async () => {
       expect(() => {
         router.addRoute({ name: "tabby", path: "/with\ttab" });
       }).toThrowError(/whitespace not allowed/);
     });
 
-    it("should throw on path with newlines", () => {
+    it("should throw on path with newlines", async () => {
       expect(() => {
         router.addRoute({ name: "newline", path: "/with\nnewline" });
       }).toThrowError(/whitespace not allowed/);
     });
 
-    it("should allow path without whitespace", () => {
+    it("should allow path without whitespace", async () => {
       expect(() => {
         router.addRoute({ name: "clean", path: "/clean-path" });
       }).not.toThrowError();
@@ -1419,7 +1450,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("plain object validation", () => {
-    it("should throw on route with getter", () => {
+    it("should throw on route with getter", async () => {
       const routeWithGetter = {
         get name(): string {
           return "getter-route";
@@ -1432,7 +1463,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/must not have getters or setters/);
     });
 
-    it("should throw on route with setter", () => {
+    it("should throw on route with setter", async () => {
       let _name = "setter-route";
       const routeWithSetter = {
         get name(): string {
@@ -1449,7 +1480,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/must not have getters or setters/);
     });
 
-    it("should throw on class instance route", () => {
+    it("should throw on class instance route", async () => {
       class RouteClass {
         name = "class-route";
         path = "/class";
@@ -1460,7 +1491,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/must be a plain object/);
     });
 
-    it("should allow Object.create(null) route", () => {
+    it("should allow Object.create(null) route", async () => {
       const nullProtoRoute = Object.create(null) as Route;
 
       nullProtoRoute.name = "null-proto";
@@ -1471,7 +1502,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
     });
 
-    it("should allow plain object route", () => {
+    it("should allow plain object route", async () => {
       expect(() => {
         router.addRoute({ name: "plain", path: "/plain" });
       }).not.toThrowError();
@@ -1479,7 +1510,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("array mutation protection", () => {
-    it("should handle array copy for Proxy protection", () => {
+    it("should handle array copy for Proxy protection", async () => {
       const routes = [
         { name: "proxy-a", path: "/proxy-a" },
         { name: "proxy-b", path: "/proxy-b" },
@@ -1495,7 +1526,7 @@ describe("core/routes/addRoute", () => {
       expect(router.matchPath("/proxy-c")).toBeUndefined();
     });
 
-    it("should protect against mutations between validation and registration", () => {
+    it("should protect against mutations between validation and registration", async () => {
       // Attack scenario: External code mutates original array between
       // validation phase and registration phase of addRoute
       //
@@ -1530,7 +1561,7 @@ describe("core/routes/addRoute", () => {
       expect(routes).toHaveLength(3);
     });
 
-    it("should isolate from array-like object mutations", () => {
+    it("should isolate from array-like object mutations", async () => {
       // Verify that spread operator creates independent copy
       const routes = [{ name: "original", path: "/original" }];
 
@@ -1549,7 +1580,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("forwardTo function", () => {
-    it("should register forwardTo callback and resolve dynamically", () => {
+    it("should register forwardTo callback and resolve dynamically", async () => {
       const routerWithDeps = createRouter(
         [
           {
@@ -1565,7 +1596,7 @@ describe("core/routes/addRoute", () => {
         { user: { isAdmin: true } },
       );
 
-      routerWithDeps.start("");
+      await routerWithDeps.start("").catch(() => {});
 
       const result = routerWithDeps.forwardState("dashboard", {});
 
@@ -1574,7 +1605,7 @@ describe("core/routes/addRoute", () => {
       routerWithDeps.stop();
     });
 
-    it("should reject async forwardTo callback (native async)", () => {
+    it("should reject async forwardTo callback (native async)", async () => {
       expect(() => {
         router.addRoute({
           name: "async-forward",
@@ -1592,8 +1623,9 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(/cannot be async/);
     });
 
-    it("should reject async forwardTo callback (transpiled async with __awaiter)", () => {
+    it("should reject async forwardTo callback (transpiled async with __awaiter)", async () => {
       // Simulate transpiled async function with __awaiter in toString()
+
       // eslint-disable-next-line @typescript-eslint/no-implied-eval
       const transpiledAsync = new Function(
         "return function() { return __awaiter(this, void 0, void 0, function*() { return 'target'; }); }",
@@ -1618,7 +1650,7 @@ describe("core/routes/addRoute", () => {
   });
 
   describe("canDeactivate", () => {
-    it("should add canDeactivate that blocks navigation", () => {
+    it("should add canDeactivate that blocks navigation", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1629,22 +1661,25 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate TO route (should succeed)
-      router.navigate("editor", (err) => {
-        expect(err).toBeUndefined();
-        expect(router.getState()?.name).toBe("editor");
+      await router.navigate("editor");
 
-        guard.mockClear();
+      expect(router.getState()?.name).toBe("editor");
 
-        // Navigate AWAY from route (should fail)
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe("CANNOT_DEACTIVATE");
-          expect(guard).toHaveBeenCalled();
-          expect(router.getState()?.name).toBe("editor"); // Still on editor
-        });
-      });
+      guard.mockClear();
+
+      // Navigate AWAY from route (should fail)
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_DEACTIVATE");
+        expect(guard).toHaveBeenCalled();
+        expect(router.getState()?.name).toBe("editor"); // Still on editor
+      }
     });
 
-    it("should add canDeactivate that allows navigation", () => {
+    it("should add canDeactivate that allows navigation", async () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1655,21 +1690,18 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate TO route
-      router.navigate("form", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("form");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate AWAY from route (should succeed)
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard).toHaveBeenCalled();
-          expect(router.getState()?.name).toBe("home");
-        });
-      });
+      // Navigate AWAY from route (should succeed)
+      await router.navigate("home");
+
+      expect(guard).toHaveBeenCalled();
+      expect(router.getState()?.name).toBe("home");
     });
 
-    it("should fire canDeactivate for all nested levels in reverse order", () => {
+    it("should fire canDeactivate for all nested levels in reverse order", async () => {
       const parentGuard = vi.fn().mockReturnValue(true);
       const childGuard = vi.fn().mockReturnValue(true);
 
@@ -1687,30 +1719,26 @@ describe("core/routes/addRoute", () => {
       });
 
       // Navigate to child
-      router.navigate("dashboard.settings", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("dashboard.settings");
 
-        parentGuard.mockClear();
-        childGuard.mockClear();
+      parentGuard.mockClear();
+      childGuard.mockClear();
 
-        // Navigate away - both guards should fire, child first
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
+      // Navigate away - both guards should fire, child first
+      await router.navigate("home");
 
-          // Both guards were called
-          expect(childGuard).toHaveBeenCalled();
-          expect(parentGuard).toHaveBeenCalled();
+      // Both guards were called
+      expect(childGuard).toHaveBeenCalled();
+      expect(parentGuard).toHaveBeenCalled();
 
-          // Child guard called before parent (reverse order)
-          const childCallOrder = childGuard.mock.invocationCallOrder[0];
-          const parentCallOrder = parentGuard.mock.invocationCallOrder[0];
+      // Child guard called before parent (reverse order)
+      const childCallOrder = childGuard.mock.invocationCallOrder[0];
+      const parentCallOrder = parentGuard.mock.invocationCallOrder[0];
 
-          expect(childCallOrder).toBeLessThan(parentCallOrder);
-        });
-      });
+      expect(childCallOrder).toBeLessThan(parentCallOrder);
     });
 
-    it("should allow addDeactivateGuard to overwrite route config canDeactivate", () => {
+    it("should allow addDeactivateGuard to overwrite route config canDeactivate", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
@@ -1724,22 +1752,19 @@ describe("core/routes/addRoute", () => {
       router.addDeactivateGuard("workspace", () => guard2);
 
       // Navigate to route
-      router.navigate("workspace", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("workspace");
 
-        guard1.mockClear();
-        guard2.mockClear();
+      guard1.mockClear();
+      guard2.mockClear();
 
-        // Navigate away - guard2 should fire, guard1 should NOT
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard2).toHaveBeenCalled();
-          expect(guard1).not.toHaveBeenCalled();
-        });
-      });
+      // Navigate away - guard2 should fire, guard1 should NOT
+      await router.navigate("home");
+
+      expect(guard2).toHaveBeenCalled();
+      expect(guard1).not.toHaveBeenCalled();
     });
 
-    it("should return canDeactivate from getRoute() after addRoute", () => {
+    it("should return canDeactivate from getRoute() after addRoute", async () => {
       const guardFactory: ActivationFnFactory = () => () => true;
 
       router.addRoute({
@@ -1754,7 +1779,7 @@ describe("core/routes/addRoute", () => {
       expect(route?.canDeactivate).toBe(guardFactory);
     });
 
-    it("should register canDeactivate from constructor routes (pending flush)", () => {
+    it("should register canDeactivate from constructor routes (pending flush)", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -1770,25 +1795,27 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // Start router - this flushes pendingCanDeactivate
-      testRouter.start("/");
+      await testRouter.start("/");
 
       // Navigate to document
-      testRouter.navigate("document", (err) => {
-        expect(err).toBeUndefined();
+      await testRouter.navigate("document");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate away - canDeactivate should fire (proves flush worked)
-        testRouter.navigate("home", (err) => {
-          expect(err?.code).toBe("CANNOT_DEACTIVATE");
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      // Navigate away - canDeactivate should fire (proves flush worked)
+      try {
+        await testRouter.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe("CANNOT_DEACTIVATE");
+        expect(guard).toHaveBeenCalled();
+      }
 
       testRouter.stop();
     });
 
-    it("should warn when route has both forwardTo and canDeactivate", () => {
+    it("should warn when route has both forwardTo and canDeactivate", async () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute([

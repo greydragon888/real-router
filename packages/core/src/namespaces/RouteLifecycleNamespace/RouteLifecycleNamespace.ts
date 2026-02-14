@@ -393,12 +393,8 @@ export class RouteLifecycleNamespace<
       return true;
     }
 
-    let doneResult: boolean | undefined;
-
     try {
-      const result = guardFn(toState, fromState, (err) => {
-        doneResult = !err;
-      });
+      const result = guardFn(toState, fromState);
 
       if (typeof result === "boolean") {
         return result;
@@ -413,12 +409,7 @@ export class RouteLifecycleNamespace<
         return false;
       }
 
-      // done() was called synchronously
-      if (doneResult !== undefined) {
-        return doneResult;
-      }
-
-      // Guard returned void/State without calling done() synchronously — permissive default
+      // Guard returned void/State — permissive default
       return true;
     } catch {
       return false;

@@ -26,8 +26,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Initial Render", () => {
-    it("should render exactly once on initial mount", () => {
-      router.start("/users/list");
+    it("should render exactly once on initial mount", async () => {
+      await router.start("/users/list");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -41,8 +41,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(ProfiledProvider).toHaveMountedOnce();
     });
 
-    it("should render children on mount", () => {
-      router.start("/users/list");
+    it("should render children on mount", async () => {
+      await router.start("/users/list");
 
       const ChildComponent: FC = () => <div data-testid="child">Child</div>;
       const ProfiledChild = withProfiler(ChildComponent);
@@ -59,8 +59,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Route Navigation - Provider Re-renders", () => {
-    it("should re-render on route navigation", () => {
-      router.start("/users/list");
+    it("should re-render on route navigation", async () => {
+      await router.start("/users/list");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -73,16 +73,16 @@ describe("RouterProvider - Performance Tests", () => {
       expect(ProfiledProvider).toHaveRenderedTimes(1);
       expect(ProfiledProvider).toHaveMountedOnce();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledProvider).toHaveRenderedTimes(2);
       expect(ProfiledProvider).toHaveLastRenderedWithPhase("update");
     });
 
-    it("should re-render on each navigation", () => {
-      router.start("/");
+    it("should re-render on each navigation", async () => {
+      await router.start("/");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -94,20 +94,20 @@ describe("RouterProvider - Performance Tests", () => {
 
       expect(ProfiledProvider).toHaveRenderedTimes(1);
 
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
       expect(ProfiledProvider).toHaveRenderedTimes(2);
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledProvider).toHaveRenderedTimes(3);
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(ProfiledProvider).toHaveRenderedTimes(4);
@@ -115,8 +115,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Children Re-render Behavior", () => {
-    it("should NOT re-render memoized children that don't use context", () => {
-      router.start("/users/list");
+    it("should NOT re-render memoized children that don't use context", async () => {
+      await router.start("/users/list");
 
       const PureChild: FC = memo(() => <div>Pure Child</div>);
       const ProfiledPureChild = withProfiler(PureChild);
@@ -133,16 +133,16 @@ describe("RouterProvider - Performance Tests", () => {
       ProfiledPureChild.snapshot();
 
       // Navigate - Provider re-renders but memoized child without context should NOT
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // Memoized component without context dependency should NOT re-render
       expect(ProfiledPureChild).toNotHaveRerendered();
     });
 
-    it("should re-render children that consume RouteContext", () => {
-      router.start("/users/list");
+    it("should re-render children that consume RouteContext", async () => {
+      await router.start("/users/list");
 
       const RouteConsumer: FC = () => {
         const context = useContext(RouteContext);
@@ -159,16 +159,16 @@ describe("RouterProvider - Performance Tests", () => {
 
       expect(ProfiledConsumer).toHaveRenderedTimes(1);
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // Component consuming RouteContext SHOULD re-render
       expect(ProfiledConsumer).toHaveRenderedTimes(2);
     });
 
-    it("should NOT re-render children that only consume RouterContext", () => {
-      router.start("/users/list");
+    it("should NOT re-render children that only consume RouterContext", async () => {
+      await router.start("/users/list");
 
       // RouterContext only provides router instance which is stable
       const RouterConsumer: FC = memo(() => {
@@ -189,8 +189,8 @@ describe("RouterProvider - Performance Tests", () => {
       // Snapshot before navigation
       ProfiledRouterConsumer.snapshot();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // RouterContext value (router instance) is stable - memoized component should NOT re-render
@@ -199,8 +199,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Context Values", () => {
-    it("should provide stable router reference via RouterContext", () => {
-      router.start("/users/list");
+    it("should provide stable router reference via RouterContext", async () => {
+      await router.start("/users/list");
 
       let capturedRouter: Router | null = null;
 
@@ -220,8 +220,8 @@ describe("RouterProvider - Performance Tests", () => {
 
       const initialRouter = capturedRouter;
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       // Router reference should be stable (same instance)
@@ -229,8 +229,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(capturedRouter).toBe(router);
     });
 
-    it("should update RouteContext on navigation", () => {
-      router.start("/users/list");
+    it("should update RouteContext on navigation", async () => {
+      await router.start("/users/list");
 
       let currentRoute: string | undefined;
       let previousRoute: string | undefined;
@@ -253,8 +253,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(currentRoute).toBe("users.list");
       expect(previousRoute).toBeUndefined();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(currentRoute).toBe("about");
@@ -263,8 +263,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Multiple Navigations Performance", () => {
-    it("should handle sequential navigations efficiently", () => {
-      router.start("/");
+    it("should handle sequential navigations efficiently", async () => {
+      await router.start("/");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -278,8 +278,8 @@ describe("RouterProvider - Performance Tests", () => {
 
       // 5 sequential navigations
       for (let i = 0; i < 5; i++) {
-        act(() => {
-          router.navigate("users.view", { id: String(i) });
+        await act(async () => {
+          await router.navigate("users.view", { id: String(i) });
         });
       }
 
@@ -293,8 +293,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(ProfiledProvider).toHaveLastRenderedWithPhase("update");
     });
 
-    it("should batch synchronous navigations", () => {
-      router.start("/");
+    it("should batch synchronous navigations", async () => {
+      await router.start("/");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -306,21 +306,21 @@ describe("RouterProvider - Performance Tests", () => {
 
       expect(ProfiledProvider).toHaveRenderedTimes(1);
 
-      // Multiple navigations in single act() - only last state matters
-      act(() => {
-        router.navigate("users.list");
-        router.navigate("about");
-        router.navigate("home");
+      // Multiple navigations in single act() - each await yields to React
+      await act(async () => {
+        await router.navigate("users.list");
+        await router.navigate("about");
+        await router.navigate("home");
       });
 
-      // React batches - only final state triggers one re-render
-      expect(ProfiledProvider).toHaveRenderedTimes(2);
+      // Each awaited navigate triggers a separate React update: 1 mount + 3 updates = 4
+      expect(ProfiledProvider).toHaveRenderedTimes(4);
     });
   });
 
   describe("Store Stability (useMemo)", () => {
-    it("should not recreate store on re-render with same router", () => {
-      router.start("/users/list");
+    it("should not recreate store on re-render with same router", async () => {
+      await router.start("/users/list");
 
       const ProfiledProvider = withProfiler(RouterProvider);
 
@@ -343,8 +343,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(ProfiledProvider).toHaveRenderedTimes(2);
 
       // Navigate should still work (store subscription intact)
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledProvider).toHaveRenderedTimes(3);
@@ -352,12 +352,12 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Nested Providers (Edge Case)", () => {
-    it("should support nested RouterProviders with different routers", () => {
+    it("should support nested RouterProviders with different routers", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let innerRoute: string | undefined;
       let outerRoute: string | undefined;
@@ -391,8 +391,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(innerRoute).toBe("about");
 
       // Navigate outer router
-      act(() => {
-        router1.navigate("home");
+      await act(async () => {
+        await router1.navigate("home");
       });
 
       // Outer captures outer router's route
@@ -401,8 +401,8 @@ describe("RouterProvider - Performance Tests", () => {
       expect(innerRoute).toBe("about");
 
       // Navigate inner router
-      act(() => {
-        router2.navigate("home");
+      await act(async () => {
+        await router2.navigate("home");
       });
 
       // Outer unchanged
@@ -414,12 +414,12 @@ describe("RouterProvider - Performance Tests", () => {
       router2.stop();
     });
 
-    it("should provide correct context values to each level", () => {
+    it("should provide correct context values to each level", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let outerRouter: Router | null = null;
       let innerRouter: Router | null = null;
@@ -459,8 +459,8 @@ describe("RouterProvider - Performance Tests", () => {
   });
 
   describe("Wrapper Pattern (Common Usage)", () => {
-    it("should work correctly as wrapper for child components", () => {
-      router.start("/users/list");
+    it("should work correctly as wrapper for child components", async () => {
+      await router.start("/users/list");
 
       const ChildComponent: FC<{ label: string }> = ({ label }) => {
         const context = useContext(RouteContext);
@@ -482,14 +482,14 @@ describe("RouterProvider - Performance Tests", () => {
 
       expect(ProfiledChild).toHaveRenderedTimes(1);
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(ProfiledChild).toHaveRenderedTimes(2);
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(ProfiledChild).toHaveRenderedTimes(3);

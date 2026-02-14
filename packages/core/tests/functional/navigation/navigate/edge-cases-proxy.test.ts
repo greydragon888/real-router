@@ -5,13 +5,12 @@ import { createTestRouter } from "../../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.navigate() - edge cases proxy", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -33,24 +32,20 @@ describe("router.navigate() - edge cases proxy", () => {
         // isNavigationOptions reads each field, triggering the getter
         // This documents current behavior - exceptions are NOT caught
         expect(() => {
-          router.navigate("users", {}, evilOpts, noop);
+          void router.navigate("users", {}, evilOpts);
         }).toThrowError("Evil getter!");
       });
 
-      it("should handle opts with non-throwing getters", () => {
-        const callback = vi.fn();
+      it("should handle opts with non-throwing getters", async () => {
         const optsWithGetter = {
           get replace(): boolean {
             return true;
           },
         };
 
-        router.navigate("users", {}, optsWithGetter, callback);
+        const state = await router.navigate("users", {}, optsWithGetter);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
     });
 
@@ -59,18 +54,16 @@ describe("router.navigate() - edge cases proxy", () => {
     // -------------------------------------------------------------------------
 
     describe("NavigationOptions with custom fields", () => {
-      it("should preserve custom fields in state.meta.options", () => {
-        const callback = vi.fn();
+      it("should preserve custom fields in state.meta.options", async () => {
         const customOpts = {
           replace: true,
           customData: { foo: "bar", nested: { value: 123 } },
           myFlag: true,
         };
 
-        router.navigate("users", {}, customOpts, callback);
+        const state = await router.navigate("users", {}, customOpts);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             meta: expect.objectContaining({
               options: expect.objectContaining({
@@ -83,7 +76,7 @@ describe("router.navigate() - edge cases proxy", () => {
         );
       });
 
-      it("should accept Symbol values in custom fields (no structuredClone)", () => {
+      it("should accept Symbol values in custom fields (no structuredClone)", async () => {
         // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
         // Symbol values are now accepted in NavigationOptions
         const testSymbol = Symbol("test");
@@ -91,35 +84,27 @@ describe("router.navigate() - edge cases proxy", () => {
           reload: true,
           symbolField: testSymbol,
         };
-        const callback = vi.fn();
 
         // Symbol values now work - no structuredClone is called on options
         // @ts-expect-error - testing runtime behavior with Symbol in options
-        router.navigate("users", {}, optsWithSymbol, callback);
+        const state = await router.navigate("users", {}, optsWithSymbol);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should accept function values in custom fields (no structuredClone)", () => {
+      it("should accept function values in custom fields (no structuredClone)", async () => {
         // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
         // function values are now accepted in NavigationOptions
         const optsWithFunction = {
           reload: true,
           customCallback: () => "test",
         };
-        const callback = vi.fn();
 
         // Function values now work - no structuredClone is called on options
         // @ts-expect-error - testing runtime behavior with function in options
-        router.navigate("users", {}, optsWithFunction, callback);
+        const state = await router.navigate("users", {}, optsWithFunction);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
     });
 
@@ -128,8 +113,7 @@ describe("router.navigate() - edge cases proxy", () => {
     // -------------------------------------------------------------------------
 
     describe("Proxy objects handling", () => {
-      it("should accept Proxy as params (passes isParams if returns valid values)", () => {
-        const callback = vi.fn();
+      it("should accept Proxy as params (passes isParams if returns valid values)", async () => {
         // Proxy with object target passes isParams validation because:
         // - typeof proxy === "object" (true)
         // - Object.getPrototypeOf(proxy) === Object.prototype (true for plain object target)
@@ -147,18 +131,17 @@ describe("router.navigate() - edge cases proxy", () => {
           },
         );
 
-        router.navigate("users.view", proxyParams, {}, callback);
+        const state = await router.navigate("users.view", proxyParams, {});
 
         // Navigation succeeds, using the proxied value
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             params: expect.objectContaining({ id: 999 }),
           }),
         );
       });
 
-      it("should accept Proxy as opts (no structuredClone)", () => {
+      it("should accept Proxy as opts (no structuredClone)", async () => {
         // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
         // Proxy objects in navigation options now work
         const proxyOpts = new Proxy(
@@ -169,31 +152,25 @@ describe("router.navigate() - edge cases proxy", () => {
             },
           },
         );
-        const callback = vi.fn();
 
         // The navigation passes isNavigationOptions validation (Proxy returns correct values)
         // and Proxy options are now accepted (no structuredClone)
-        router.navigate("users", {}, proxyOpts, callback);
+        const state = await router.navigate("users", {}, proxyOpts);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should handle plain objects that mimic Proxy behavior", () => {
+      it("should handle plain objects that mimic Proxy behavior", async () => {
         // Plain objects with getters work fine (unlike Proxy)
-        const callback = vi.fn();
         const objectWithGetter = {
           get replace(): boolean {
             return true;
           },
         };
 
-        router.navigate("users", {}, objectWithGetter, callback);
+        const state = await router.navigate("users", {}, objectWithGetter);
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             meta: expect.objectContaining({
               options: expect.objectContaining({ replace: true }),

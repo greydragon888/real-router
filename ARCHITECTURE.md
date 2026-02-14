@@ -37,29 +37,29 @@ real-router/
       │  @real-router/  │    │   route-tree    │    │  type-guards    │
       │     logger      │    │   (internal)    │    │   (internal)    │
       └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-               │              ┌───────┼───────┐              │
-               │              ▼       │       ▼              │
-               │   ┌──────────────┐   │  ┌──────────────┐   │
-               │   │ path-matcher │   │  │search-params │   │
-               │   │  (internal)  │   │  │  (internal)  │   │
-               │   └──────────────┘   │  └──────────────┘   │
+               │           ┌──────────┼─────────┐            │
+               │           ▼          │         ▼            │
+               │   ┌──────────────┐   │  ┌──────────────┐    │
+               │   │ path-matcher │   │  │search-params │    │
+               │   │  (internal)  │   │  │  (internal)  │    │
+               │   └──────────────┘   │  └──────────────┘    │
                │                      │                      │
                ▼                      ▼                      ▼
              ┌─────────────────────────────────────────────────┐
              │              @real-router/core                  │
-             │  ┌─────────────────────────────────────────┐   │
-             │  │  Bundles: route-tree, path-matcher,     │   │
-             │  │  search-params, type-guards             │   │
-             │  └─────────────────────────────────────────┘   │
+             │  ┌─────────────────────────────────────────┐    │
+             │  │  Bundles: route-tree, path-matcher,     │    │
+             │  │  search-params, type-guards             │    │
+             │  └─────────────────────────────────────────┘    │
              └──────────────────────┬──────────────────────────┘
                                     │
           ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
           │             │           │           │             │             │
           ▼             ▼           ▼           ▼             ▼             ▼
-  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent│
-  │              │ │          │ │          │ │          │ │plugin    │ │-params   │
-  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐
+  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent-│
+  │              │ │          │ │          │ │          │ │plugin    │ │params     │
+  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └───────────┘
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
@@ -94,8 +94,10 @@ Router.ts (facade) ────────────────────�
 
 ### Navigation Pipeline
 
+All navigation methods return `Promise<State>` (async/await):
+
 ```
-router.navigate(name, params, options, done)
+const state = await router.navigate(name, params, options)
                     │
                     ▼
             ┌───────────────┐
@@ -134,7 +136,56 @@ router.navigate(name, params, options, done)
             └───────┬───────┘
                     │
                     ▼
-              done(null, state)
+              Promise resolves with state
+              (or rejects with RouterError)
+```
+
+On error at any step: `TRANSITION_ERROR` event emitted, Promise rejects with `RouterError`.
+
+### Navigation API
+
+All navigation methods use Promise-based async/await:
+
+```typescript
+// Navigate to a route
+const state = await router.navigate("users", { id: "123" });
+
+// Navigate to default route
+const state = await router.navigateToDefault();
+
+// Start the router
+const state = await router.start("/users/123");
+
+// Error handling
+try {
+  await router.navigate("admin");
+} catch (err) {
+  if (err instanceof RouterError) {
+    // ROUTE_NOT_FOUND, CANNOT_ACTIVATE, CANNOT_DEACTIVATE,
+    // TRANSITION_CANCELLED, SAME_STATES
+  }
+}
+
+// Cancel current navigation
+router.navigate("slow-route");
+router.cancel(); // Previous promise rejects with TRANSITION_CANCELLED
+```
+
+**Guards** return `boolean | Promise<boolean> | State | void` (no callbacks):
+
+```typescript
+router.addActivateGuard("admin", () => (toState, fromState) => {
+  return isAuthenticated; // true = allow, false = block
+});
+```
+
+**Middleware** returns the same way:
+
+```typescript
+router.useMiddleware(() => (toState, fromState) => {
+  if (!auth) return router.makeState("login"); // redirect
+  return true; // allow
+});
 ```
 
 ### Plugin Interception
@@ -190,7 +241,7 @@ interface State {
 
 ### Guard vs Middleware Decision
 
-- Need to **block** a specific route? → Guard (`canActivate`/`canDeactivate`)
+- Need to **block** a specific route? → Guard (`addActivateGuard`/`addDeactivateGuard`)
 - Need to **redirect** or **transform** state? → Middleware
 - Need to **observe** without modifying? → Plugin
 
@@ -256,10 +307,10 @@ Full paths:
 ```typescript
 // Server: clone router per request
 const serverRouter = router.clone({ request: req });
-serverRouter.start(req.url);
+await serverRouter.start(req.url);
 
 // Client: hydrate with same state
-router.start(window.location.pathname);
+await router.start(window.location.pathname);
 ```
 
 `clone()` shares immutable route tree (O(1)), copies mutable state.

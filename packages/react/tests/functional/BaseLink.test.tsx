@@ -1,4 +1,4 @@
-import { createRouter, RouterError } from "@real-router/core";
+import { createRouter } from "@real-router/core";
 import { screen, render, act, fireEvent } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -18,9 +18,9 @@ describe("BaseLink component", () => {
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start("/");
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -133,7 +133,7 @@ describe("BaseLink component", () => {
       expect(screen.getByTestId("link")).toHaveClass("active");
     });
 
-    it("should toggle active class based on ignoreQueryParams", () => {
+    it("should toggle active class based on ignoreQueryParams", async () => {
       const baseLinkRouteName = "items.item";
       const baseLinkRouteParams = { id: 6 };
 
@@ -153,13 +153,13 @@ describe("BaseLink component", () => {
 
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
-      act(() => {
+      await act(() =>
         router.navigate(baseLinkRouteName, {
           ...baseLinkRouteParams,
           a: "b",
           c: "d",
-        });
-      });
+        }),
+      );
 
       expect(screen.getByTestId("link")).toHaveClass("active");
 
@@ -176,13 +176,13 @@ describe("BaseLink component", () => {
         </BaseLink>,
       );
 
-      act(() => {
+      await act(() =>
         router.navigate(baseLinkRouteName, {
           ...baseLinkRouteParams,
           e: "f",
           g: "h",
-        });
-      });
+        }),
+      );
 
       expect(screen.getByTestId("link")).not.toHaveClass("active");
     });
@@ -193,9 +193,7 @@ describe("BaseLink component", () => {
       const childRouteName = "items.item";
       const childRouteParams = { id: 6 };
 
-      act(() => {
-        router.navigate(childRouteName, childRouteParams);
-      });
+      await act(() => router.navigate(childRouteName, childRouteParams));
 
       const { rerender } = render(
         <BaseLink
@@ -229,9 +227,7 @@ describe("BaseLink component", () => {
         </BaseLink>,
       );
 
-      act(() => {
-        router.navigate(childRouteName, childRouteParams);
-      });
+      await act(() => router.navigate(childRouteName, childRouteParams));
 
       expect(screen.getByTestId("link")).not.toHaveClass(activeClassName);
     });
@@ -351,102 +347,15 @@ describe("BaseLink component", () => {
     });
   });
 
-  describe("callbacks", () => {
-    it("should invoke successCallback", async () => {
-      vi.spyOn(router, "navigate");
-      const successCallbackMock = vi.fn();
-      const newRouteName = "one-more-test";
-
-      render(
-        <BaseLink
-          router={router}
-          routeName={newRouteName}
-          successCallback={successCallbackMock}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
-      expect(router.navigate).toHaveBeenCalled();
-      expect(router.getState()?.name).toStrictEqual(newRouteName);
-      expect(successCallbackMock).toHaveBeenCalled();
-    });
-
-    it("should invoke errorCallback on navigation error", async () => {
-      const error = new RouterError("Test error");
-
-      vi.spyOn(router, "navigate").mockImplementation((_, __, ___, cb): any => {
-        cb?.(error);
-      });
-
-      const errorCallbackMock = vi.fn();
-      const defRouteName = router.getState()?.name;
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          errorCallback={errorCallbackMock}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      expect(router.getState()?.name).toStrictEqual(defRouteName);
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
-      expect(router.navigate).toHaveBeenCalled();
-      expect(errorCallbackMock).toHaveBeenCalledWith(error);
-    });
-
-    it("should invoke only errorCallback when both provided and navigation fails", async () => {
-      const error = new RouterError("Another error");
-      const successCallbackMock = vi.fn();
-      const errorCallbackMock = vi.fn();
-
-      vi.spyOn(router, "navigate").mockImplementation((_, __, ___, cb): any => {
-        cb?.(error);
-      });
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          successCallback={successCallbackMock}
-          errorCallback={errorCallbackMock}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      expect(errorCallbackMock).toHaveBeenCalledWith(error);
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
-      expect(router.navigate).toHaveBeenCalled();
-      expect(successCallbackMock).not.toHaveBeenCalled();
-    });
-  });
-
   describe("URL Building", () => {
-    it("should use buildPath when router has no buildUrl", () => {
+    it("should use buildPath when router has no buildUrl", async () => {
       // Create router without browser plugin (no buildUrl method)
       const routerWithoutBuildUrl = createRouter([
         { name: "test", path: "/" },
         { name: "users", path: "/users" },
       ]);
 
-      routerWithoutBuildUrl.start("/");
+      await routerWithoutBuildUrl.start("/");
 
       const wrapperWithoutBuildUrl = ({
         children,

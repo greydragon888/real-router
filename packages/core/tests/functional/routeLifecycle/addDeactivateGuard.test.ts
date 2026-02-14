@@ -12,8 +12,8 @@ import {
 let router: Router;
 
 describe("core/route-lifecycle/addDeactivateGuard", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {
@@ -23,16 +23,14 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   it("should block navigation if a component refuses deactivation", async () => {
     router.addDeactivateGuard("users.list", () => () => Promise.reject());
 
-    router.navigate("users.list");
+    await router.navigate("users.list");
 
-    await new Promise<void>((resolve) => {
-      router.navigate("users", (err) => {
-        expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
-        expect(err?.segment).toStrictEqual("users.list");
-
-        resolve();
-      });
-    });
+    try {
+      await router.navigate("users");
+    } catch (error: any) {
+      expect(error?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.segment).toStrictEqual("users.list");
+    }
 
     expect(omitMeta(router.getState())).toStrictEqual({
       name: "users.list",
@@ -42,7 +40,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     router.addDeactivateGuard("users.list", true);
 
-    router.navigate("users");
+    await router.navigate("users");
 
     expect(omitMeta(router.getState())).toStrictEqual({
       name: "users",
@@ -51,54 +49,58 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
     });
   });
 
-  it("should register and override canDeactivate handlers", () => {
+  it("should register and override canDeactivate handlers", async () => {
     router.addDeactivateGuard("users.list", false);
 
-    router.navigate("users.list");
+    await router.navigate("users.list");
 
-    router.navigate("users", (err) => {
-      expect(err?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
-      expect(err?.segment).toStrictEqual("users.list");
-    });
+    try {
+      await router.navigate("users");
+    } catch (error: any) {
+      expect(error?.code).toStrictEqual(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.segment).toStrictEqual("users.list");
+    }
 
     router.addDeactivateGuard("users.list", true);
 
-    router.navigate("users", (err) => {
-      expect(err).toBe(undefined);
-    });
+    await router.navigate("users");
   });
 
-  it("should block navigation if canDeactivate returns an Error", () => {
+  it("should block navigation if canDeactivate returns an Error", async () => {
     router.addDeactivateGuard("users.list", () => () => {
       throw new Error("blocked");
     });
 
-    router.navigate("users.list");
+    await router.navigate("users.list");
 
-    router.navigate("users", (err) => {
-      expect(err).toBeDefined();
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-    });
+    try {
+      await router.navigate("users");
+    } catch (error: any) {
+      expect(error).toBeDefined();
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    }
   });
 
-  it("should return error when canDeactivate returns a different route (guards cannot redirect)", () => {
+  it("should return error when canDeactivate returns a different route (guards cannot redirect)", async () => {
     router.addDeactivateGuard("sign-in", () => () => ({
       name: "index",
       params: {},
       path: "/",
     }));
 
-    router.navigate("sign-in");
+    await router.navigate("sign-in");
 
-    router.navigate("users", (err) => {
+    try {
+      await router.navigate("users");
+    } catch (error: any) {
       // Guards cannot redirect - should return CANNOT_DEACTIVATE error
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(err?.attemptedRedirect).toStrictEqual({
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      expect(error?.attemptedRedirect).toStrictEqual({
         name: "index",
         params: {},
         path: "/",
       });
-    });
+    }
 
     // Should remain on sign-in, not redirect to index
     expect(router.getState()?.name).toBe("sign-in");
@@ -246,24 +248,26 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       }).not.toThrowError();
     });
 
-    it("should maintain consistency after failed registration", () => {
+    it("should maintain consistency after failed registration", async () => {
       // Register a valid guard first
-      router.addDeactivateGuard("valid", false);
+      router.addDeactivateGuard("admin", false);
 
       expect(() => {
         // @ts-expect-error: testing invalid handler
-        router.addDeactivateGuard("inconsistent", "not-a-function");
+        router.addDeactivateGuard("index", "not-a-function");
       }).toThrowError(TypeError);
 
       // Valid guard should still work
-      router.navigate("valid");
-      router.navigate("home", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      });
+      await router.navigate("admin");
+      try {
+        await router.navigate("home");
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
 
       // Failed route can be re-registered (was rolled back)
       expect(() => {
-        router.addDeactivateGuard("inconsistent", true);
+        router.addDeactivateGuard("index", true);
       }).not.toThrowError();
     });
   });
@@ -289,24 +293,24 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       warnSpy.mockRestore();
     });
 
-    it("should replace old guard with new one", () => {
+    it("should replace old guard with new one", async () => {
       // First guard allows leaving
-      router.addDeactivateGuard("home", true);
+      router.addDeactivateGuard("admin", true);
 
-      router.navigate("home");
-      router.navigate("admin", (err) => {
-        expect(err).toBeUndefined(); // can leave
-      });
+      await router.navigate("admin");
+      await router.navigate("index");
 
       // Replace with blocking guard
-      router.addDeactivateGuard("admin", false);
+      router.addDeactivateGuard("index", false);
 
-      // Now cannot leave admin
-      router.navigate("home", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      });
+      // Now cannot leave index
+      try {
+        await router.navigate("admin");
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
 
-      expect(router.getState()?.name).toBe("admin");
+      expect(router.getState()?.name).toBe("index");
     });
   });
 });

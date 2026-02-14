@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - events transition success", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -22,7 +22,7 @@ describe("router.navigate() - events transition success", () => {
   });
 
   describe("TRANSITION_SUCCESS event emission", () => {
-    it("should emit TRANSITION_SUCCESS with correct newState and fromState parameters", () => {
+    it("should emit TRANSITION_SUCCESS with correct newState and fromState parameters", async () => {
       const onSuccess = vi.fn();
 
       const unsubSuccess = router.addEventListener(
@@ -31,72 +31,61 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Navigate to initial state to establish fromState
-      router.navigate("users", {}, {}, (err, fromState) => {
-        expect(err).toBeUndefined();
+      const fromState = await router.navigate("users");
 
-        onSuccess.mockClear();
+      onSuccess.mockClear();
 
-        // Navigate to different state to trigger TRANSITION_SUCCESS
-        router.navigate("users.view", { id: 42 }, (err, newState) => {
-          expect(err).toBeUndefined();
-          expect(newState).toBeDefined();
+      // Navigate to different state to trigger TRANSITION_SUCCESS
+      const newState = await router.navigate("users.view", { id: 42 });
 
-          // Verify TRANSITION_SUCCESS was called with correct parameters
-          expect(onSuccess).toHaveBeenCalledTimes(1);
-          expect(onSuccess).toHaveBeenCalledWith(newState, fromState, {});
-        });
-      });
+      expect(newState).toBeDefined();
+
+      // Verify TRANSITION_SUCCESS was called with correct parameters
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(newState, fromState, {});
 
       unsubSuccess();
     });
 
-    it("should call navigation callback with done(undefined, newState)", () => {
+    it("should resolve with new state on successful navigation", async () => {
       vi.useFakeTimers();
 
-      const navigationCallback = vi.fn();
-
-      router.navigate("settings", {}, {}, navigationCallback);
+      const newState = await router.navigate("settings");
 
       // Advance time to complete navigation
       vi.advanceTimersByTime(0);
 
-      expect(navigationCallback).toHaveBeenCalledTimes(1);
-      expect(navigationCallback).toHaveBeenCalledWith(
-        undefined, // error should be undefined
+      expect(newState).toStrictEqual(
         expect.objectContaining({
           name: "settings",
           path: "/settings",
-        }), // newState
+        }),
       );
 
       vi.useRealTimers();
     });
 
-    it("should emit TRANSITION_SUCCESS for nested route navigation", () => {
+    it("should emit TRANSITION_SUCCESS for nested route navigation", async () => {
       const onSuccess = vi.fn();
 
       // Navigate to parent route first
-      router.navigate("orders", {}, {}, (err, fromState) => {
-        expect(err).toBeUndefined();
+      const fromState = await router.navigate("orders");
 
-        const unsubSuccess = router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          onSuccess,
-        );
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
-        // Navigate to nested route
-        router.navigate("orders.pending", {}, (err, newState) => {
-          expect(err).toBeUndefined();
+      // Navigate to nested route
+      const newState = await router.navigate("orders.pending");
 
-          expect(onSuccess).toHaveBeenCalledTimes(1);
-          expect(onSuccess).toHaveBeenCalledWith(newState, fromState, {});
-        });
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(newState, fromState, {});
 
-        unsubSuccess();
-      });
+      unsubSuccess();
     });
 
-    it("should emit TRANSITION_SUCCESS with navigation options in newState meta", () => {
+    it("should emit TRANSITION_SUCCESS with navigation options in newState meta", async () => {
       const onSuccess = vi.fn();
 
       const unsubSuccess = router.addEventListener(
@@ -106,74 +95,68 @@ describe("router.navigate() - events transition success", () => {
 
       const navigationOptions = { replace: true, source: "test" };
 
-      router.navigate("profile", {}, navigationOptions, (err, newState) => {
-        expect(err).toBeUndefined();
+      const newState = await router.navigate("profile", {}, navigationOptions);
 
-        expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledTimes(1);
 
-        const [successNewState] = onSuccess.mock.calls[0];
+      const [successNewState] = onSuccess.mock.calls[0];
 
-        expect(successNewState).toStrictEqual(
-          expect.objectContaining({
-            name: "profile",
-            meta: expect.objectContaining({
-              options: expect.objectContaining(navigationOptions),
-            }),
+      expect(successNewState).toStrictEqual(
+        expect.objectContaining({
+          name: "profile",
+          meta: expect.objectContaining({
+            options: expect.objectContaining(navigationOptions),
           }),
-        );
+        }),
+      );
 
-        // Verify callback also receives state with options
-        expect(newState).toStrictEqual(
-          expect.objectContaining({
-            name: "profile",
-            meta: expect.objectContaining({
-              options: expect.objectContaining(navigationOptions),
-            }),
+      // Verify state also has options
+      expect(newState).toStrictEqual(
+        expect.objectContaining({
+          name: "profile",
+          meta: expect.objectContaining({
+            options: expect.objectContaining(navigationOptions),
           }),
-        );
-      });
+        }),
+      );
 
       unsubSuccess();
     });
 
-    it("should emit TRANSITION_SUCCESS for same route navigation with force option", () => {
+    it("should emit TRANSITION_SUCCESS for same route navigation with force option", async () => {
       // Navigate to route first
-      router.navigate("profile", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("profile");
 
-        const onSuccess = vi.fn();
-        const unsubSuccess = router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          onSuccess,
-        );
+      const onSuccess = vi.fn();
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
-        // Navigate to same route with force
-        router.navigate("profile", {}, { force: true }, (err, newState) => {
-          expect(err).toBeUndefined();
+      // Navigate to same route with force
+      const newState = await router.navigate("profile", {}, { force: true });
 
-          expect(onSuccess).toHaveBeenCalledTimes(1);
-          expect(onSuccess).toHaveBeenCalledWith(
-            expect.objectContaining({
-              name: "profile",
-              meta: expect.objectContaining({
-                options: expect.objectContaining({ force: true }),
-              }),
-            }), // newState
-            expect.objectContaining({
-              name: "profile",
-            }), // fromState (same route),
-            { force: true },
-          );
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "profile",
+          meta: expect.objectContaining({
+            options: expect.objectContaining({ force: true }),
+          }),
+        }), // newState
+        expect.objectContaining({
+          name: "profile",
+        }), // fromState (same route),
+        { force: true },
+      );
 
-          // Verify callback receives correct state
-          expect(newState?.name).toBe("profile");
-        });
+      // Verify state is correct
+      expect(newState?.name).toBe("profile");
 
-        unsubSuccess();
-      });
+      unsubSuccess();
     });
 
-    it("should emit TRANSITION_SUCCESS after all guards and middleware pass", () => {
+    it("should emit TRANSITION_SUCCESS after all guards and middleware pass", async () => {
       const onSuccess = vi.fn();
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const canDeactivateGuard = vi.fn().mockReturnValue(true);
@@ -185,51 +168,46 @@ describe("router.navigate() - events transition success", () => {
       router.useMiddleware(() => middleware);
 
       // Navigate to users first
-      router.navigate("users", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("users");
 
-        const unsubSuccess = router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          onSuccess,
-        );
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
-        // Reset mocks
-        canActivateGuard.mockClear();
-        canDeactivateGuard.mockClear();
-        middleware.mockClear();
-        onSuccess.mockClear();
+      // Reset mocks
+      canActivateGuard.mockClear();
+      canDeactivateGuard.mockClear();
+      middleware.mockClear();
+      onSuccess.mockClear();
 
-        // Navigate to profile (different route, not child of users)
-        router.navigate("profile", {}, (err) => {
-          expect(err).toBeUndefined();
+      // Navigate to profile (different route, not child of users)
+      await router.navigate("profile");
 
-          // All guards/middleware should have been called
-          expect(canDeactivateGuard).toHaveBeenCalledTimes(1); // Called when leaving "users"
-          expect(canActivateGuard).toHaveBeenCalledTimes(1); // Called when entering "profile"
-          expect(middleware).toHaveBeenCalledTimes(1);
+      // All guards/middleware should have been called
+      expect(canDeactivateGuard).toHaveBeenCalledTimes(1); // Called when leaving "users"
+      expect(canActivateGuard).toHaveBeenCalledTimes(1); // Called when entering "profile"
+      expect(middleware).toHaveBeenCalledTimes(1);
 
-          // TRANSITION_SUCCESS should be called after guards/middleware
-          expect(onSuccess).toHaveBeenCalledTimes(1);
+      // TRANSITION_SUCCESS should be called after guards/middleware
+      expect(onSuccess).toHaveBeenCalledTimes(1);
 
-          // Verify call order: guards/middleware before TRANSITION_SUCCESS
-          const deactivateCallTime =
-            canDeactivateGuard.mock.invocationCallOrder[0];
-          const activateCallTime = canActivateGuard.mock.invocationCallOrder[0];
-          const middlewareCallTime = middleware.mock.invocationCallOrder[0];
-          const successCallTime = onSuccess.mock.invocationCallOrder[0];
+      // Verify call order: guards/middleware before TRANSITION_SUCCESS
+      const deactivateCallTime = canDeactivateGuard.mock.invocationCallOrder[0];
+      const activateCallTime = canActivateGuard.mock.invocationCallOrder[0];
+      const middlewareCallTime = middleware.mock.invocationCallOrder[0];
+      const successCallTime = onSuccess.mock.invocationCallOrder[0];
 
-          expect(deactivateCallTime).toBeLessThan(successCallTime);
-          expect(activateCallTime).toBeLessThan(successCallTime);
-          expect(middlewareCallTime).toBeLessThan(successCallTime);
-        });
+      expect(deactivateCallTime).toBeLessThan(successCallTime);
+      expect(activateCallTime).toBeLessThan(successCallTime);
+      expect(middlewareCallTime).toBeLessThan(successCallTime);
 
-        unsubSuccess();
-      });
+      unsubSuccess();
 
       router.clearMiddleware();
     });
 
-    it("should not emit TRANSITION_SUCCESS when transition fails", () => {
+    it("should not emit TRANSITION_SUCCESS when transition fails", async () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
@@ -245,16 +223,16 @@ describe("router.navigate() - events transition success", () => {
         onError,
       );
 
-      router.navigate("users.view", { id: 789 }, (err, state) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(state).toBeUndefined(); // No state on error
+      try {
+        await router.navigate("users.view", { id: 789 });
 
-        // TRANSITION_SUCCESS should not be emitted on failure
-        expect(onSuccess).not.toHaveBeenCalled();
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
 
-        // TRANSITION_ERROR should be emitted instead
-        expect(onError).toHaveBeenCalledTimes(1);
-      });
+      expect(onSuccess).not.toHaveBeenCalled();
+      expect(onError).toHaveBeenCalledTimes(1);
 
       unsubSuccess();
       unsubError();
@@ -278,24 +256,25 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Set up async middleware to allow cancellation
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 50); // Delay to allow cancellation
+      router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
-      const cancel = router.navigate(
-        "users.view",
-        { id: 456 },
-        (err, state) => {
-          expect(err?.code).toBe(errorCodes.TRANSITION_CANCELLED);
-          expect(state).toBeUndefined(); // No state on cancellation
-        },
-      );
+      const promise = router.navigate("users.view", { id: 456 });
 
-      // Cancel immediately
-      cancel();
+      setTimeout(() => {
+        router.stop();
+      }, 10);
 
-      // Advance time to ensure middleware timer runs
       await vi.runAllTimersAsync();
+
+      try {
+        await promise;
+
+        expect.fail("Should have been cancelled");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
+      }
 
       // Now assertions
       expect(onSuccess).not.toHaveBeenCalled();
@@ -306,35 +285,36 @@ describe("router.navigate() - events transition success", () => {
       unsubCancel();
 
       router.clearMiddleware();
+      await router.start();
       vi.useRealTimers();
     });
 
-    it("should not emit TRANSITION_SUCCESS when navigation to same state without force", () => {
+    it("should not emit TRANSITION_SUCCESS when navigation to same state without force", async () => {
       const onSuccess = vi.fn();
 
       // Navigate to route first
-      router.navigate("orders", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("orders", {}, {});
 
-        const unsubSuccess = router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          onSuccess,
-        );
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
 
-        // Try to navigate to same route without force
-        router.navigate("orders", {}, {}, (err, state) => {
-          expect(err?.code).toBe(errorCodes.SAME_STATES);
-          expect(state).toBeUndefined();
+      // Try to navigate to same route without force
+      try {
+        await router.navigate("orders", {}, {});
 
-          // TRANSITION_SUCCESS should not be emitted for blocked same-state navigation
-          expect(onSuccess).not.toHaveBeenCalled();
-        });
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.SAME_STATES);
+      }
 
-        unsubSuccess();
-      });
+      expect(onSuccess).not.toHaveBeenCalled();
+
+      unsubSuccess();
     });
 
-    it("should not emit TRANSITION_SUCCESS when router is not started", () => {
+    it("should not emit TRANSITION_SUCCESS when router is not started", async () => {
       router.stop();
 
       const onSuccess = vi.fn();
@@ -343,55 +323,19 @@ describe("router.navigate() - events transition success", () => {
         onSuccess,
       );
 
-      router.navigate("users", (err, state) => {
-        expect(err?.code).toBe(errorCodes.ROUTER_NOT_STARTED);
-        expect(state).toBeUndefined();
+      try {
+        await router.navigate("users");
 
-        // TRANSITION_SUCCESS should not be emitted when router is not started
-        expect(onSuccess).not.toHaveBeenCalled();
-      });
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.ROUTER_NOT_STARTED);
+      }
 
-      unsubSuccess();
-      router.start(); // Restore for other tests
-    });
-
-    it("should emit TRANSITION_SUCCESS with correct state after redirect", () => {
-      const onSuccess = vi.fn();
-
-      const unsubSuccess = router.addEventListener(
-        events.TRANSITION_SUCCESS,
-        onSuccess,
-      );
-
-      // Set up redirect from orders to profile
-      router.addActivateGuard("orders", () => () => {
-        return { name: "profile", params: {}, path: "/profile" };
-      });
-
-      router.navigate("orders", {}, {}, (err, finalState) => {
-        expect(err).toBeUndefined();
-        expect(finalState?.name).toBe("profile");
-
-        // TRANSITION_SUCCESS should be emitted with final redirected state
-        expect(onSuccess).toHaveBeenCalledTimes(1);
-        expect(onSuccess).toHaveBeenCalledWith(
-          expect.objectContaining(finalState), // (after redirect)
-          expect.objectContaining({
-            name: "home", // fromState
-          }),
-          {},
-        );
-
-        // Callback should receive final state
-        expect(finalState).toStrictEqual(
-          expect.objectContaining({
-            name: "profile",
-            path: "/profile",
-          }),
-        );
-      });
+      // TRANSITION_SUCCESS should not be emitted when router is not started
+      expect(onSuccess).not.toHaveBeenCalled();
 
       unsubSuccess();
+      await router.start();
     });
   });
 });

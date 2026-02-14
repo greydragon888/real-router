@@ -199,16 +199,14 @@ export function browserPluginFactory(
      * Overrides router.start to integrate with browser location.
      * If no start path is provided, uses current browser URL.
      */
-    router.start = (...args: StartRouterArguments) => {
-      const [startPath, done] = getStartRouterArguments(args, browser, options);
+    router.start = async (...args: StartRouterArguments) => {
+      const startPath = getStartRouterArguments(args, browser, options);
 
-      if (startPath) {
-        routerStart(startPath, done);
-      } else {
-        routerStart(done);
+      if (startPath !== undefined) {
+        return routerStart(startPath);
       }
 
-      return router;
+      return routerStart();
     };
 
     /**
@@ -304,7 +302,7 @@ export function browserPluginFactory(
 
         deferredPopstateEvent = null; // Clear before processing
         console.warn(`[${LOGGER_CONTEXT}] Processing deferred popstate event`);
-        onPopState(event);
+        void onPopState(event);
       }
     }
 
@@ -313,7 +311,7 @@ export function browserPluginFactory(
      * Protected against concurrent transitions and handles errors gracefully.
      * Defers events during transitions to prevent browser history desync.
      */
-    function onPopState(evt: PopStateEvent) {
+    async function onPopState(evt: PopStateEvent) {
       // Race condition protection: defer event if transition in progress
       if (isTransitioning) {
         console.warn(
@@ -348,35 +346,52 @@ export function browserPluginFactory(
         }
 
         // Execute transition with race protection
-        // Note: state is guaranteed to be defined here because:
-        // 1. handleMissingState handles !state case (line 332)
-        // 2. shouldSkipTransition returns true when !state (utils.ts:136)
+        // state is guaranteed to be defined here because:
+        // 1. handleMissingState handles !state case (line 339)
+        // 2. shouldSkipTransition returns true when !state (utils.ts:129)
+        /* v8 ignore start: defensive guard - state guaranteed defined by control flow above */
+        if (!state) {
+          return;
+        }
+        /* v8 ignore stop */
+
         isTransitioning = true;
 
-        // Use internal navigateToState with emitSuccess = true
-        // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
-        router.navigateToState(
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by shouldSkipTransition
-          state!,
-          routerState,
-          transitionOptions,
-          (err: RouterError | undefined, toState: State | undefined) => {
-            isTransitioning = false;
-            handleTransitionResult(
-              err,
-              toState,
-              routerState,
-              isNewState,
-              router,
-              browser,
-              options,
-            );
+        try {
+          // Use internal navigateToState with emitSuccess = true
+          // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
 
-            // Process any deferred popstate events after transition completes
-            processDeferredEvent();
-          },
-          true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
-        );
+          const toState = await router.navigateToState(
+            state,
+            routerState,
+            transitionOptions,
+            true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
+          );
+
+          handleTransitionResult(
+            undefined,
+            toState,
+            routerState,
+            isNewState,
+            router,
+            browser,
+            options,
+          );
+        } catch (error) {
+          handleTransitionResult(
+            error as RouterError,
+            undefined,
+            routerState,
+            isNewState,
+            router,
+            browser,
+            options,
+          );
+        } finally {
+          isTransitioning = false;
+          // Process any deferred popstate events after transition completes
+          processDeferredEvent();
+        }
       } catch (error) {
         isTransitioning = false;
         console.error(
@@ -417,7 +432,7 @@ export function browserPluginFactory(
         }
 
         removePopStateListener = browser.addPopstateListener(
-          onPopState,
+          (evt: PopStateEvent) => void onPopState(evt),
           options,
         );
       },

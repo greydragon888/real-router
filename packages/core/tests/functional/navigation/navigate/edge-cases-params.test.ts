@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { errorCodes } from "@real-router/core";
 
@@ -7,13 +7,12 @@ import { createTestRouter } from "../../../helpers";
 import type { Router } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.navigate() - edge cases params", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -24,52 +23,44 @@ describe("router.navigate() - edge cases params", () => {
 
   describe("edge cases - section 12 analysis", () => {
     describe("dot-notation edge cases", () => {
-      it("should return ROUTE_NOT_FOUND for consecutive dots (users..view)", () => {
-        const callback = vi.fn();
+      it("should return ROUTE_NOT_FOUND for consecutive dots (users..view)", async () => {
+        try {
+          await router.navigate("users..view", {}, {});
 
-        router.navigate("users..view", {}, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.ROUTE_NOT_FOUND,
-          }),
-        );
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
 
-      it("should return ROUTE_NOT_FOUND for leading dot (.users)", () => {
-        const callback = vi.fn();
+      it("should return ROUTE_NOT_FOUND for leading dot (.users)", async () => {
+        try {
+          await router.navigate(".users", {}, {});
 
-        router.navigate(".users", {}, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.ROUTE_NOT_FOUND,
-          }),
-        );
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
 
-      it("should return ROUTE_NOT_FOUND for trailing dot (users.)", () => {
-        const callback = vi.fn();
+      it("should return ROUTE_NOT_FOUND for trailing dot (users.)", async () => {
+        try {
+          await router.navigate("users.", {}, {});
 
-        router.navigate("users.", {}, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.ROUTE_NOT_FOUND,
-          }),
-        );
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
 
-      it("should return ROUTE_NOT_FOUND for only dots (..)", () => {
-        const callback = vi.fn();
+      it("should return ROUTE_NOT_FOUND for only dots (..)", async () => {
+        try {
+          await router.navigate("..", {}, {});
 
-        router.navigate("..", {}, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.ROUTE_NOT_FOUND,
-          }),
-        );
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect((error as any)?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+        }
       });
     });
 
@@ -78,19 +69,16 @@ describe("router.navigate() - edge cases params", () => {
     // -------------------------------------------------------------------------
 
     describe("array-like objects as params", () => {
-      it("should accept array-like object as params", () => {
-        const callback = vi.fn();
+      it("should accept array-like object as params", async () => {
         const arrayLikeParams = { length: 2, 0: "a", 1: "b", id: 123 };
 
-        router.navigate(
+        const state = await router.navigate(
           "users.view",
           arrayLikeParams as unknown as { id: number },
           {},
-          callback,
         );
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             name: "users.view",
             params: expect.objectContaining({ id: 123 }),
@@ -98,19 +86,16 @@ describe("router.navigate() - edge cases params", () => {
         );
       });
 
-      it("should handle object with numeric keys", () => {
-        const callback = vi.fn();
+      it("should handle object with numeric keys", async () => {
         const numericKeyParams = { 0: "first", 1: "second", id: 456 };
 
-        router.navigate(
+        const state = await router.navigate(
           "users.view",
           numericKeyParams as unknown as { id: number },
           {},
-          callback,
         );
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             name: "users.view",
             params: expect.objectContaining({ id: 456 }),
@@ -127,89 +112,59 @@ describe("router.navigate() - edge cases params", () => {
       // TDD tests: These test the CORRECT expected behavior after the fix
       // The polymorphic logic should correctly handle falsy params values
 
-      it("should call callback when params is null", () => {
-        const callback = vi.fn();
-
+      it("should call callback when params is null", async () => {
         // When paramsOrDone is null, it should be treated as empty params
         // and the callback in position 3 should be called
         // @ts-expect-error - testing runtime behavior with null
-        router.navigate("users", null, callback);
+        const state = await router.navigate("users", null);
 
         // Callback SHOULD be called with success
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
 
-      it("should call callback when params is undefined", () => {
-        const callback = vi.fn();
-
+      it("should call callback when params is undefined", async () => {
         // When paramsOrDone is undefined, it should be treated as empty params
         // and the callback in position 3 should be called
-        router.navigate("users", undefined, callback);
+        const state = await router.navigate("users");
 
         // Callback SHOULD be called with success
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({ name: "users", params: {} }),
         );
       });
 
-      it("should call callback with 4 args when params is undefined", () => {
-        const callback = vi.fn();
-
+      it("should call callback with 4 args when params is undefined", async () => {
         // 4-argument form: navigate(name, params, opts, callback)
         // Even with undefined params, callback should be called
-        router.navigate("users", undefined, {}, callback);
+        const state = await router.navigate("users", {});
 
         // Callback SHOULD be called
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should call callback with 4 args when params is null", () => {
-        const callback = vi.fn();
-
+      it("should call callback with 4 args when params is null", async () => {
         // 4-argument form with null params
         // @ts-expect-error - testing runtime behavior with null
-        router.navigate("users", null, { replace: true }, callback);
+        const state = await router.navigate("users", null, { replace: true });
 
         // Callback SHOULD be called
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should correctly handle empty object {} as params (truthy)", () => {
-        const callback = vi.fn();
-
+      it("should correctly handle empty object {} as params (truthy)", async () => {
         // Empty object {} is truthy, so polymorphic parsing works correctly
-        router.navigate("users", {}, callback);
+        const state = await router.navigate("users", {});
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
-          expect.objectContaining({ name: "users" }),
-        );
+        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
       });
 
-      it("should use empty params when null is passed", () => {
-        const callback = vi.fn();
-
+      it("should use empty params when null is passed", async () => {
         // @ts-expect-error - testing runtime behavior with null
-        router.navigate("users", null, callback);
+        const state = await router.navigate("users", null);
 
         // The resulting state should have empty params
-        expect(callback).toHaveBeenCalled();
-
-        const [, state] = callback.mock.calls[0] as [
-          unknown,
-          { params: unknown },
-        ];
-
         expect(state.params).toStrictEqual({});
       });
     });
@@ -219,56 +174,50 @@ describe("router.navigate() - edge cases params", () => {
     // -------------------------------------------------------------------------
 
     describe("special numeric values in params", () => {
-      it("should reject NaN in params (not serializable)", () => {
+      it("should reject NaN in params (not serializable)", async () => {
         // NaN is rejected by isParams validation (not finite)
         // This ensures params can be serialized to JSON
-        expect(() => {
+        await expect(
           router.navigate(
             "users.view",
             { id: Number.NaN as unknown as number },
             {},
-            noop,
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
-      it("should reject Infinity in params (not serializable)", () => {
+      it("should reject Infinity in params (not serializable)", async () => {
         // Infinity is rejected by isParams validation (not finite)
-        expect(() => {
+        await expect(
           router.navigate(
             "users.view",
             { id: Infinity as unknown as number },
             {},
-            noop,
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
-      it("should reject -Infinity in params (not serializable)", () => {
-        expect(() => {
+      it("should reject -Infinity in params (not serializable)", async () => {
+        await expect(
           router.navigate(
             "users.view",
             { id: -Infinity as unknown as number },
             {},
-            noop,
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
-      it("should handle -0 in params (finite, converts to '0')", () => {
-        const callback = vi.fn();
+      it("should handle -0 in params (finite, converts to '0')", async () => {
         const negativeZero = -0;
 
         // -0 is finite and accepted by isParams
-        router.navigate(
+        const state = await router.navigate(
           "users.view",
           { id: negativeZero as unknown as number },
           {},
-          callback,
         );
 
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             // -0 becomes "0" via String(-0)
             path: "/users/view/0",
@@ -276,13 +225,10 @@ describe("router.navigate() - edge cases params", () => {
         );
       });
 
-      it("should accept regular finite numbers in params", () => {
-        const callback = vi.fn();
+      it("should accept regular finite numbers in params", async () => {
+        const state = await router.navigate("users.view", { id: 123 }, {});
 
-        router.navigate("users.view", { id: 123 }, {}, callback);
-
-        expect(callback).toHaveBeenCalledWith(
-          undefined,
+        expect(state).toStrictEqual(
           expect.objectContaining({
             path: "/users/view/123",
           }),

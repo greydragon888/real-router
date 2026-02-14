@@ -35,8 +35,8 @@ describe("Utils", () => {
   });
 
   describe("createStateFromEvent", () => {
-    it("uses fallback for missing meta.id (line 112)", () => {
-      router.start();
+    it("uses fallback for missing meta.id (line 112)", async () => {
+      await router.start();
 
       // Create event with state that has meta WITHOUT id property (not present at all)
       // isMetaFields allows missing properties - only validates if present
@@ -63,8 +63,8 @@ describe("Utils", () => {
       expect(state?.meta?.id).toBeGreaterThanOrEqual(1);
     });
 
-    it("uses fallback for missing meta.params (line 113)", () => {
-      router.start();
+    it("uses fallback for missing meta.params (line 113)", async () => {
+      await router.start();
 
       // Create event with state that has meta WITHOUT params property
       const evt = {
@@ -87,8 +87,8 @@ describe("Utils", () => {
       expect(state?.meta?.params).toStrictEqual({});
     });
 
-    it("uses fallback for missing meta.options (line 114)", () => {
-      router.start();
+    it("uses fallback for missing meta.options (line 114)", async () => {
+      await router.start();
 
       // Create event with state that has meta WITHOUT options property
       const evt = {
@@ -111,8 +111,8 @@ describe("Utils", () => {
       expect(state?.meta?.options).toStrictEqual({});
     });
 
-    it("uses all fallbacks when meta has only redirected (lines 112-114)", () => {
-      router.start();
+    it("uses all fallbacks when meta has only redirected (lines 112-114)", async () => {
+      await router.start();
 
       // Create event with state that has minimal meta - only redirected
       // All other properties are missing (NOT included, not undefined)
@@ -139,8 +139,8 @@ describe("Utils", () => {
       expect(state?.meta?.redirected).toBe(false);
     });
 
-    it("matches path when event has no state (new navigation)", () => {
-      router.start();
+    it("matches path when event has no state (new navigation)", async () => {
+      await router.start();
       globalThis.history.replaceState({}, "", "/home");
 
       const evt = {
@@ -204,8 +204,8 @@ describe("Utils", () => {
       expect(result).toBe(false);
     });
 
-    it("returns true and navigates to default route when configured", () => {
-      router.start();
+    it("returns true and navigates to default route when configured", async () => {
+      await router.start();
       const navigateSpy = vi.spyOn(router, "navigateToDefault");
 
       const result = handleMissingState(router, { replace: true });
@@ -235,10 +235,10 @@ describe("Utils", () => {
       meta: { id: 2, params: {}, options: {}, redirected: false },
     };
 
-    beforeEach(() => {
+    beforeEach(async () => {
       // Need browser plugin for buildUrl
       router.usePlugin(browserPluginFactory({}, browser));
-      router.start();
+      await router.start();
     });
 
     it("returns early when no error", () => {

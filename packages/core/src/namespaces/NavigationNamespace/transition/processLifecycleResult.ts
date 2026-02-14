@@ -1,97 +1,81 @@
 // packages/real-router/modules/transition/processLifecycleResult.ts
 
-/* eslint-disable promise/always-return, promise/no-callback-in-promise */
 import { isPromise, isState } from "type-guards";
 
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
-import type { DoneFn, State, ActivationFn } from "@real-router/types";
+import type { SyncErrorMetadata } from "./wrapSyncError";
+import type { State, ActivationFn } from "@real-router/types";
+
+/**
+ * Builds error metadata from a caught promise rejection.
+ * Extracts message, stack, and cause from Error instances.
+ */
+function buildErrorMetadata(
+  error_: unknown,
+  errorData: SyncErrorMetadata,
+): SyncErrorMetadata {
+  if (error_ instanceof Error) {
+    return {
+      ...errorData,
+      message: error_.message,
+      stack: error_.stack,
+      // Error.cause requires ES2022+ - safely access it if present
+      ...("cause" in error_ &&
+        error_.cause !== undefined && { cause: error_.cause }),
+    };
+  }
+
+  if (error_ && typeof error_ === "object") {
+    return { ...errorData, ...error_ };
+  }
+
+  return errorData;
+}
 
 // Helper: Lifecycle results Processing Function
-export const processLifecycleResult = (
+export const processLifecycleResult = async (
   result: ReturnType<ActivationFn>,
-  done: DoneFn,
+  currentState: State,
   segment?: string,
-): void => {
+): Promise<State> => {
   const errorData = segment ? { segment } : {};
 
   if (result === undefined) {
-    // We expect a Done call
-    return;
+    return currentState;
   }
 
   if (typeof result === "boolean") {
     if (result) {
-      done();
+      return currentState;
     } else {
-      done(new RouterError(errorCodes.TRANSITION_ERR, errorData));
+      throw new RouterError(errorCodes.TRANSITION_ERR, errorData);
     }
-
-    return;
   }
 
   if (isState(result)) {
-    // Type guard should narrow, but TypeScript needs help
-    done(undefined, result);
-
-    return;
+    return result;
   }
 
   if (isPromise<State | boolean | undefined>(result)) {
-    // Callback-based API: promise handled internally, not returned
-    // Mixing promises with callbacks is intentional for backward compatibility
-    // Type assertion needed due to complex union type narrowing
-    // Optimization: .then(onFulfill, onReject) instead of .then().catch()
-    // This saves 1 Promise allocation per async middleware call
-    void result.then(
-      (resVal) => {
-        // Issue #38: Handle Promise<boolean> same as sync boolean
-        if (typeof resVal === "boolean") {
-          if (resVal) {
-            done();
-          } else {
-            done(new RouterError(errorCodes.TRANSITION_ERR, errorData));
-          }
-        } else {
-          done(undefined, resVal);
-        }
-      },
-      (error_: unknown) => {
-        let error: {
-          [key: string]: unknown;
-          message?: string | undefined;
-          segment?: string | undefined;
-        } = errorData;
+    // Optimization: single try/catch instead of .then(onFulfill, onReject)
+    try {
+      const resVal = await result;
 
-        if (error_ instanceof Error) {
-          error = {
-            ...errorData,
-            message: error_.message,
-            stack: error_.stack,
-          };
-
-          // Error.cause requires ES2022+ - safely access it if present
-          if ("cause" in error_ && error_.cause !== undefined) {
-            error.cause = error_.cause;
-          }
-        } else if (error_ && typeof error_ === "object") {
-          error = { ...errorData, ...error_ };
-        }
-
-        done(new RouterError(errorCodes.TRANSITION_ERR, error));
-      },
-    );
-
-    return;
+      return await processLifecycleResult(resVal, currentState, segment);
+    } catch (error_: unknown) {
+      throw new RouterError(
+        errorCodes.TRANSITION_ERR,
+        buildErrorMetadata(error_, errorData),
+      );
+    }
   }
 
   // This should never be reached - all valid ActivationFn return types are handled above
   // If we get here, it means the activation function returned an unexpected type
-  done(
-    new RouterError(errorCodes.TRANSITION_ERR, {
-      ...errorData,
-      message: `Invalid lifecycle result type: ${typeof result}`,
-    }),
-  );
+  throw new RouterError(errorCodes.TRANSITION_ERR, {
+    ...errorData,
+    message: `Invalid lifecycle result type: ${typeof result}`,
+  });
 };

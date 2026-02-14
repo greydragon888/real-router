@@ -4,7 +4,6 @@ import type {
   NavigationOptions,
   Params,
   Router,
-  RouterError,
   State,
 } from "@real-router/core";
 import type { HTMLAttributes, MouseEventHandler } from "react";
@@ -26,6 +25,4 @@ export interface BaseLinkProps<
   target?: string;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
   onMouseOver?: MouseEventHandler<HTMLAnchorElement>;
-  successCallback?: (state?: State<P, MP>) => void;
-  errorCallback?: (error?: RouterError) => void;
 }

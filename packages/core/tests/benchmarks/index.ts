@@ -116,6 +116,6 @@ run()
       console.error("Error processing results:", error);
     }
   })
-  .catch((error) => {
+  .catch((error: unknown) => {
     console.error("Run error:", error);
   });

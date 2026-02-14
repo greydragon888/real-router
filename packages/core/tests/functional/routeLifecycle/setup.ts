@@ -22,10 +22,10 @@ export { createTestRouter, omitMeta } from "../../helpers";
  *
  * @returns Started router instance
  */
-export function createLifecycleTestRouter(): Router {
+export async function createLifecycleTestRouter(): Promise<Router> {
   const router = createTestRouterHelper();
 
-  router.start("");
+  await router.start();
 
   return router;
 }

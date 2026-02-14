@@ -7,9 +7,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/routeTree/hasRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -149,7 +149,10 @@ describe("core/routes/routeTree/hasRoute", () => {
 
   describe("edge cases", () => {
     it("should be case-sensitive", () => {
-      router.addRoute({ name: "CaseSensitive", path: "/hr-case-sensitive" });
+      router.addRoute({
+        name: "CaseSensitive",
+        path: "/hr-case-sensitive",
+      });
 
       expect(router.hasRoute("CaseSensitive")).toBe(true);
       expect(router.hasRoute("casesensitive")).toBe(false);
@@ -229,7 +232,10 @@ describe("core/routes/routeTree/hasRoute", () => {
     it("should allow numbers in middle of route name", () => {
       router.addRoute({ name: "user123", path: "/hr-user123" });
       router.addRoute({ name: "routeV2", path: "/hr-routeV2" });
-      router.addRoute({ name: "page2section3", path: "/hr-page2section3" });
+      router.addRoute({
+        name: "page2section3",
+        path: "/hr-page2section3",
+      });
 
       expect(router.hasRoute("user123")).toBe(true);
       expect(router.hasRoute("routeV2")).toBe(true);

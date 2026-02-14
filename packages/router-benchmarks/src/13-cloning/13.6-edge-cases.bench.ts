@@ -72,11 +72,9 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
+  router.useMiddleware(() => () => {
     // Clone during middleware execution
     do_not_optimize(cloneRouter(router));
-
-    done();
   });
   router.start();
 
@@ -88,11 +86,9 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
+  router.useMiddleware(() => () => {
     // Clone during middleware execution
     do_not_optimize(router.clone());
-
-    done();
   });
   router.start();
 

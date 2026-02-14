@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - unknown route", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -34,10 +34,10 @@ describe("router.navigate() - unknown route", () => {
         allowNotFound: true, // Enable UNKNOWN_ROUTE behavior
       });
 
-      router.start();
+      router.start().catch(() => {});
     });
 
-    it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", () => {
+    it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", async () => {
       const canDeactivateGuard = vi.fn().mockReturnValue(true);
       const canActivateGuard = vi.fn().mockReturnValue(true);
 
@@ -53,7 +53,7 @@ describe("router.navigate() - unknown route", () => {
       );
 
       // Start with unknown path
-      freshRouter.start("/unknown-start-path");
+      await freshRouter.start("/unknown-start-path");
 
       // UNKNOWN_ROUTE should now be set as current state
       expect(freshRouter.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
@@ -63,19 +63,18 @@ describe("router.navigate() - unknown route", () => {
       canDeactivateGuard.mockClear();
 
       // Navigate away from UNKNOWN_ROUTE
-      freshRouter.navigate("profile", (err, state) => {
-        expect(err).toBeUndefined();
-        expect(state?.name).toBe("profile");
+      const state = await freshRouter.navigate("profile");
 
-        // canDeactivate SHOULD be called when leaving UNKNOWN_ROUTE (new correct behavior)
-        expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
+      expect(state.name).toBe("profile");
 
-        // canActivate should be called for normal route
-        expect(canActivateGuard).toHaveBeenCalledTimes(1);
-      });
+      // canDeactivate SHOULD be called when leaving UNKNOWN_ROUTE (new correct behavior)
+      expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
+
+      // canActivate should be called for normal route
+      expect(canActivateGuard).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle middleware when transitioning TO normal route after UNKNOWN_ROUTE", () => {
+    it("should handle middleware when transitioning TO normal route after UNKNOWN_ROUTE", async () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       const freshRouter = createRouter([{ name: "orders", path: "/orders" }], {
@@ -85,20 +84,17 @@ describe("router.navigate() - unknown route", () => {
       freshRouter.useMiddleware(() => middleware);
 
       // Start with UNKNOWN_ROUTE
-      freshRouter.start("/unknown-middleware-test");
+      await freshRouter.start("/unknown-middleware-test");
 
       middleware.mockClear();
 
       // Navigate to normal route
-      freshRouter.navigate("orders", {}, {}, (err) => {
-        expect(err).toBeUndefined();
+      await freshRouter.navigate("orders", {});
 
-        // Middleware should be called for normal navigation
-        expect(middleware).toHaveBeenCalledTimes(1);
-      });
+      expect(middleware).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle blocked transitions from existing route when allowNotFound disabled", () => {
+    it("should handle blocked transitions from existing route when allowNotFound disabled", async () => {
       // Test without allowNotFound to see normal ROUTE_NOT_FOUND behavior
       const strictRouter = createRouter(
         [
@@ -108,14 +104,16 @@ describe("router.navigate() - unknown route", () => {
         { allowNotFound: false },
       );
 
-      strictRouter.start("/settings");
+      await strictRouter.start("/settings");
 
-      strictRouter.navigate("profile");
+      await strictRouter.navigate("profile");
 
       // Try to navigate to non-existent route
-      strictRouter.navigate("non-existent", {}, {}, (err) => {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      });
+      try {
+        await strictRouter.navigate("non-existent", {});
+      } catch (error: any) {
+        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
+      }
 
       // Should stay on current route
       expect(strictRouter.getState()?.name).toBe("profile");

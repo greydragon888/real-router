@@ -13,7 +13,7 @@ import { BaseLink, RouterProvider } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
-import type { Router, DoneFn, State } from "@real-router/core";
+import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
 describe("BaseLink - Integration Tests", () => {
@@ -24,9 +24,9 @@ describe("BaseLink - Integration Tests", () => {
     <RouterProvider router={router}>{children}</RouterProvider>
   );
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start("/");
+    await router.start("/");
   });
 
   afterEach(() => {
@@ -37,15 +37,11 @@ describe("BaseLink - Integration Tests", () => {
     it("should handle navigation interruption correctly", async () => {
       let resolveMiddleware: (() => void) | null = null;
 
-      const slowMiddleware =
-        () => (_toState: State, _fromState?: State, done?: DoneFn) => {
-          if (!done) {
-            return;
-          }
-
-          // Store the done callback to be called later
-          resolveMiddleware = done;
-        };
+      const slowMiddleware = () => () => {
+        return new Promise<void>((resolve) => {
+          resolveMiddleware = resolve;
+        });
+      };
 
       router.useMiddleware(slowMiddleware);
 
@@ -75,15 +71,12 @@ describe("BaseLink - Integration Tests", () => {
 
       expect(resolveMiddleware).not.toBeNull();
 
-      // Save reference to first navigation's done callback
-      const firstNavigationDone = resolveMiddleware!;
-
       // Start second navigation before first completes
       await user.click(screen.getByTestId("link2"));
 
-      // Resolve first navigation (should be cancelled by second navigation)
-      act(() => {
-        firstNavigationDone();
+      // Wait for second middleware to be set up
+      await new Promise((resolve) => {
+        setTimeout(resolve, 10);
       });
 
       // The second navigation's middleware should be pending
@@ -100,18 +93,8 @@ describe("BaseLink - Integration Tests", () => {
     });
 
     it("should handle multiple rapid clicks correctly", async () => {
-      let navigationCount = 0;
-      const successCallback = vi.fn(() => {
-        navigationCount++;
-      });
-
       render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          successCallback={successCallback}
-          data-testid="link"
-        >
+        <BaseLink router={router} routeName="one-more-test" data-testid="link">
           Test Link
         </BaseLink>,
         { wrapper },
@@ -124,12 +107,10 @@ describe("BaseLink - Integration Tests", () => {
         await user.click(link);
       }
 
-      await waitFor(() => {
-        expect(navigationCount).toBeGreaterThan(0);
-      });
-
       // Should navigate successfully without race conditions
-      expect(router.getState()?.name).toBe("one-more-test");
+      await waitFor(() => {
+        expect(router.getState()?.name).toBe("one-more-test");
+      });
     });
 
     it("should recover from navigation error", async () => {
@@ -143,36 +124,26 @@ describe("BaseLink - Integration Tests", () => {
         return true;
       });
 
-      const errorCallback = vi.fn();
-      const successCallback = vi.fn();
-
       render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          errorCallback={errorCallback}
-          successCallback={successCallback}
-          data-testid="link"
-        >
+        <BaseLink router={router} routeName="one-more-test" data-testid="link">
           Test Link
         </BaseLink>,
         { wrapper },
       );
 
-      // First click should fail
+      // First click should fail (guard blocks it)
       await user.click(screen.getByTestId("link"));
-      await waitFor(() => {
-        expect(errorCallback).toHaveBeenCalled();
-      });
 
-      expect(successCallback).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(router.getState()?.name).not.toBe("one-more-test");
+      });
 
       // Second click should succeed
       shouldFail = false;
       await user.click(screen.getByTestId("link"));
 
       await waitFor(() => {
-        expect(successCallback).toHaveBeenCalled();
+        expect(router.getState()?.name).toBe("one-more-test");
       });
     });
 
@@ -345,8 +316,8 @@ describe("BaseLink - Integration Tests", () => {
   });
 
   describe("ActiveClassName Edge Cases", () => {
-    it("should handle empty activeClassName", () => {
-      router.navigate("one-more-test");
+    it("should handle empty activeClassName", async () => {
+      await router.navigate("one-more-test");
 
       render(
         <BaseLink
@@ -367,8 +338,8 @@ describe("BaseLink - Integration Tests", () => {
       expect(link.className).toBe("base-class");
     });
 
-    it("should handle multiple classes correctly", () => {
-      router.navigate("one-more-test");
+    it("should handle multiple classes correctly", async () => {
+      await router.navigate("one-more-test");
 
       render(
         <BaseLink
@@ -389,7 +360,7 @@ describe("BaseLink - Integration Tests", () => {
     });
 
     it("should update activeClassName dynamically", async () => {
-      router.navigate("one-more-test");
+      await router.navigate("one-more-test");
 
       const TestComponent = () => {
         const [activeClass, setActiveClass] = useState("active1");
@@ -426,8 +397,8 @@ describe("BaseLink - Integration Tests", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active1");
     });
 
-    it("should handle className changes while active", () => {
-      router.navigate("one-more-test");
+    it("should handle className changes while active", async () => {
+      await router.navigate("one-more-test");
 
       const { rerender } = render(
         <BaseLink
@@ -503,174 +474,6 @@ describe("BaseLink - Integration Tests", () => {
     });
   });
 
-  describe("Callbacks and Error Handling", () => {
-    it("should call successCallback after successful navigation", async () => {
-      const successCallback = vi.fn();
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          successCallback={successCallback}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      await waitFor(() => {
-        expect(successCallback).toHaveBeenCalled();
-      });
-
-      // Navigation should complete
-      expect(router.getState()?.name).toBe("one-more-test");
-    });
-
-    it("should handle async callbacks", async () => {
-      const results: string[] = [];
-
-      const successCallback = vi.fn(async () => {
-        await new Promise((resolve) => {
-          setTimeout(resolve, 10);
-        });
-        results.push("success");
-      });
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
-          successCallback={successCallback}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      await waitFor(() => {
-        expect(results).toContain("success");
-      });
-    });
-
-    it("should use callbacks from current render during navigation", async () => {
-      const calls: string[] = [];
-
-      const TestComponent = () => {
-        const [route, setRoute] = useState<"one-more-test" | "users">(
-          "one-more-test",
-        );
-
-        return (
-          <>
-            <BaseLink
-              router={router}
-              routeName={route}
-              successCallback={() => {
-                calls.push(route);
-              }}
-              data-testid="link"
-            >
-              Test
-            </BaseLink>
-            <button
-              onClick={() => {
-                setRoute("users");
-              }}
-              data-testid="change-route"
-            >
-              Change Route
-            </button>
-          </>
-        );
-      };
-
-      render(<TestComponent />, { wrapper });
-
-      // First navigation to one-more-test
-      await user.click(screen.getByTestId("link"));
-      await waitFor(() => {
-        expect(calls).toContain("one-more-test");
-      });
-
-      // Change the route prop
-      await user.click(screen.getByTestId("change-route"));
-
-      // Wait for re-render
-      await waitFor(() => {
-        expect(screen.getByTestId("link")).toBeInTheDocument();
-      });
-
-      // Second navigation should use the new callback
-      await user.click(screen.getByTestId("link"));
-
-      await waitFor(() => {
-        expect(calls).toContain("users");
-      });
-
-      // Verify both callbacks were called
-      expect(calls).toStrictEqual(["one-more-test", "users"]);
-    });
-
-    it("should handle callback that returns a value", async () => {
-      const successCallback = vi.fn(() => {
-        return "callback-result";
-      });
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          successCallback={successCallback}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      await waitFor(() => {
-        expect(successCallback).toHaveBeenCalled();
-      });
-
-      expect(successCallback).toHaveReturnedWith("callback-result");
-    });
-
-    it("should handle both callbacks with navigation success", async () => {
-      const successCallback = vi.fn();
-      const errorCallback = vi.fn();
-
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          successCallback={successCallback}
-          errorCallback={errorCallback}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      await user.click(screen.getByTestId("link"));
-
-      await waitFor(() => {
-        expect(successCallback).toHaveBeenCalled();
-      });
-
-      expect(errorCallback).not.toHaveBeenCalled();
-    });
-  });
-
   describe("Accessibility and Semantics", () => {
     it("should preserve all passed props", () => {
       render(
@@ -722,8 +525,8 @@ describe("BaseLink - Integration Tests", () => {
       expect(link).toHaveAttribute("data-active", "false");
 
       // Navigate to route
-      act(() => {
-        router.navigate("one-more-test");
+      await act(async () => {
+        await router.navigate("one-more-test");
       });
 
       await waitFor(() => {
@@ -899,8 +702,8 @@ describe("BaseLink - Integration Tests", () => {
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
       // Programmatic navigation
-      act(() => {
-        router.navigate("one-more-test");
+      await act(async () => {
+        await router.navigate("one-more-test");
       });
 
       await waitFor(() => {
@@ -924,7 +727,7 @@ describe("BaseLink - Integration Tests", () => {
 
       // Stop and restart router
       router.stop();
-      router.start("/");
+      await router.start("/");
 
       rerender(
         <BaseLink router={router} routeName="users" data-testid="link">

@@ -7,7 +7,7 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -116,8 +116,8 @@ describe("core/options", () => {
     });
 
     // 🟡 IMPORTANT: Works after start()
-    it("should work after router.start()", () => {
-      router.start();
+    it("should work after router.start()", async () => {
+      await router.start();
 
       const opts = router.getOptions();
 
@@ -634,10 +634,10 @@ describe("core/options", () => {
 
   // 🟡 IMPORTANT: Integration - effect on buildPath
   describe("integration with buildPath", () => {
-    it("should apply trailingSlash option to buildPath", () => {
+    it("should apply trailingSlash option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "always" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -646,10 +646,10 @@ describe("core/options", () => {
       r.stop();
     });
 
-    it("should apply trailingSlash 'never' option to buildPath", () => {
+    it("should apply trailingSlash 'never' option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "never" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -658,10 +658,10 @@ describe("core/options", () => {
       r.stop();
     });
 
-    it("should apply urlParamsEncoding option to buildPath", () => {
+    it("should apply urlParamsEncoding option to buildPath", async () => {
       const r = createTestRouter({ urlParamsEncoding: "uriComponent" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "hello world" });
 
@@ -673,10 +673,10 @@ describe("core/options", () => {
 
   // 🟡 IMPORTANT: Integration - effect on matchPath
   describe("integration with matchPath", () => {
-    it("should apply trailingSlash option to matchPath", () => {
+    it("should apply trailingSlash option to matchPath", async () => {
       const r = createTestRouter({ trailingSlash: "strict" });
 
-      r.start();
+      await r.start();
 
       // Route 'users.list' is defined as '/users/list' without trailing slash
       const withoutSlash = r.matchPath("/users/list");
@@ -728,7 +728,7 @@ describe("core/options", () => {
       }).toThrowError(ReferenceError);
     });
 
-    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf for compile-time assertions
+    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf
     it("should be type-safe", () => {
       const trailingSlash = router.getOption("trailingSlash");
 
@@ -739,39 +739,31 @@ describe("core/options", () => {
   });
 
   describe("dynamic default route/params with callbacks", () => {
-    it("should resolve callback defaultRoute via navigateToDefault", () => {
+    it("should resolve callback defaultRoute via navigateToDefault", async () => {
       const customRouter = createTestRouter({
-        defaultRoute: () => "home",
+        defaultRoute: "home",
       });
 
-      customRouter.start("/users");
+      await customRouter.start("/users");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
 
-    it("should resolve callback defaultParams via navigateToDefault", () => {
+    it("should resolve callback defaultParams via navigateToDefault", async () => {
       const customRouter = createTestRouter({
         defaultRoute: "users.view",
         defaultParams: () => ({ id: "42" }),
       });
 
-      customRouter.start("/home");
+      await customRouter.start("/home");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
+      expect(state).toStrictEqual(
         expect.objectContaining({
           name: "users.view",
           params: { id: "42" },
@@ -789,7 +781,7 @@ describe("core/options", () => {
       }).toThrowError(TypeError);
     });
 
-    it("navigateToDefault resolves callback defaultRoute via getDependency", () => {
+    it("navigateToDefault resolves callback defaultRoute via getDependency", async () => {
       const customRouter = createTestRouter({
         defaultRoute: ((getDep: (name: string) => unknown) =>
           getDep("routeName")) as Options["defaultRoute"],
@@ -797,21 +789,16 @@ describe("core/options", () => {
 
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
       customRouter.setDependency("routeName", "home");
-      customRouter.start("/users");
+      await customRouter.start("/users");
 
-      const callback = vi.fn();
+      const state = await customRouter.navigateToDefault();
 
-      customRouter.navigateToDefault(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
 
-    it("start resolves callback defaultRoute via getDependency", () => {
+    it("start resolves callback defaultRoute via getDependency", async () => {
       const customRouter = createTestRouter({
         defaultRoute: ((getDep: (name: string) => unknown) =>
           getDep("routeName")) as Options["defaultRoute"],
@@ -820,28 +807,24 @@ describe("core/options", () => {
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
       customRouter.setDependency("routeName", "home");
 
-      const callback = vi.fn();
+      const state = await customRouter.start();
 
-      customRouter.start(callback);
-
-      expect(callback).toHaveBeenCalledWith(
-        undefined,
-        expect.objectContaining({ name: "home" }),
-      );
+      expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 
       customRouter.stop();
     });
 
-    it("navigateToDefault returns noop when callback resolves to empty string", () => {
+    it("navigateToDefault returns noop when callback resolves to empty string", async () => {
       const customRouter = createTestRouter({
         defaultRoute: () => "",
       });
 
-      customRouter.start("/home");
+      await customRouter.start("/home");
 
-      const cancel = customRouter.navigateToDefault();
-
-      expect(typeof cancel).toBe("function");
+      // navigateToDefault now returns a Promise that rejects when defaultRoute returns empty string
+      await expect(customRouter.navigateToDefault()).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
 
       // State should not change (noop)
       expect(customRouter.getState()?.name).toBe("home");

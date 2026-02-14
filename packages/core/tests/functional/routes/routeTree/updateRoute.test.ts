@@ -4,14 +4,19 @@ import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, ActivationFnFactory, Params } from "@real-router/core";
+import type {
+  Router,
+  ActivationFnFactory,
+  Params,
+  RouterError,
+} from "@real-router/core";
 
 let router: Router;
 
 describe("core/routes/routeTree/updateRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -58,8 +63,8 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should throw if target does not exist", () => {
       router.addRoute({ name: "ur-from", path: "/ur-from" });
 
-      expect(() =>
-        router.updateRoute("ur-from", { forwardTo: "nonexistent" }),
+      expect(
+        () => void router.updateRoute("ur-from", { forwardTo: "nonexistent" }),
       ).toThrowError(
         '[real-router] updateRoute: forwardTo target "nonexistent" does not exist',
       );
@@ -68,8 +73,8 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should throw if creates direct cycle", () => {
       router.addRoute({ name: "ur-self", path: "/ur-self" });
 
-      expect(() =>
-        router.updateRoute("ur-self", { forwardTo: "ur-self" }),
+      expect(
+        () => void router.updateRoute("ur-self", { forwardTo: "ur-self" }),
       ).toThrowError(/Circular forwardTo/);
     });
 
@@ -77,8 +82,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.addRoute({ name: "ur-static", path: "/ur-static" });
       router.addRoute({ name: "ur-param", path: "/ur-param/:id" });
 
-      expect(() =>
-        router.updateRoute("ur-static", { forwardTo: "ur-param" }),
+      expect(
+        () => void router.updateRoute("ur-static", { forwardTo: "ur-param" }),
       ).toThrowError(
         '[real-router] forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
       );
@@ -88,8 +93,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.addRoute({ name: "ur-old", path: "/ur-old/:id" });
       router.addRoute({ name: "ur-new", path: "/ur-new/:id" });
 
-      expect(() =>
-        router.updateRoute("ur-old", { forwardTo: "ur-new" }),
+      expect(
+        () => void router.updateRoute("ur-old", { forwardTo: "ur-new" }),
       ).not.toThrowError();
 
       // Verify forward works via behavior
@@ -117,8 +122,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-b", { forwardTo: "ur-c" });
 
         // Should throw error AND NOT corrupt forwardMap
-        expect(() =>
-          router.updateRoute("ur-c", { forwardTo: "ur-a" }),
+        expect(
+          () => void router.updateRoute("ur-c", { forwardTo: "ur-a" }),
         ).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain clean (without ur-c) - verify via behavior
@@ -137,8 +142,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-y", { forwardTo: "ur-z" });
         router.updateRoute("ur-z", { forwardTo: "ur-w" });
 
-        expect(() =>
-          router.updateRoute("ur-w", { forwardTo: "ur-x" }),
+        expect(
+          () => void router.updateRoute("ur-w", { forwardTo: "ur-x" }),
         ).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain without ur-w → ur-x - verify via behavior
@@ -154,8 +159,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-q", { forwardTo: "ur-r" });
 
         // Attempt to create cycle
-        expect(() =>
-          router.updateRoute("ur-r", { forwardTo: "ur-p" }),
+        expect(
+          () => void router.updateRoute("ur-r", { forwardTo: "ur-p" }),
         ).toThrowError();
 
         // matchPath should work correctly with existing redirects
@@ -185,7 +190,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Adding the 100th link (chain-99 → chain-100) would make chain of 101 items
         // This should exceed max depth of 100
         expect(() =>
-          router.updateRoute("ur-chain-99", { forwardTo: "ur-chain-100" }),
+          router.updateRoute("ur-chain-99", {
+            forwardTo: "ur-chain-100",
+          }),
         ).toThrowError(/exceeds maximum depth/);
       });
     });
@@ -311,7 +318,10 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should use updated decoder in matchPath", () => {
-      router.addRoute({ name: "ur-decode-test", path: "/ur-decode-test/:id" });
+      router.addRoute({
+        name: "ur-decode-test",
+        path: "/ur-decode-test/:id",
+      });
       router.updateRoute("ur-decode-test", {
         decodeParams: (params) => ({ ...params, id: Number(params.id) }),
       });
@@ -404,7 +414,10 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should use updated encoder in buildPath", () => {
-      router.addRoute({ name: "ur-encode-test", path: "/ur-encode-test/:id" });
+      router.addRoute({
+        name: "ur-encode-test",
+        path: "/ur-encode-test/:id",
+      });
       router.updateRoute("ur-encode-test", {
         encodeParams: (params) => {
           const idValue = params.id as string;
@@ -436,7 +449,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   });
 
   describe("canActivate", () => {
-    it("should add canActivate", () => {
+    it("should add canActivate", async () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -444,13 +457,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-secure", { canActivate: guardFactory });
 
       // Verify canActivate works by navigating
-      router.navigate("ur-secure", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).toHaveBeenCalled();
-      });
+      await router.navigate("ur-secure");
+
+      expect(guard).toHaveBeenCalled();
     });
 
-    it("should update existing canActivate", () => {
+    it("should update existing canActivate", async () => {
       const guard1 = vi.fn().mockReturnValue(true);
       const guard2 = vi.fn().mockReturnValue(false);
 
@@ -462,14 +474,18 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-guarded", { canActivate: () => guard2 });
 
       // Verify new guard is used - navigation should be blocked
-      router.navigate("ur-guarded", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      try {
+        await router.navigate("ur-guarded");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(guard2).toHaveBeenCalled();
         expect(guard1).not.toHaveBeenCalled();
-      });
+      }
     });
 
-    it("should remove canActivate when null", () => {
+    it("should remove canActivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -479,9 +495,13 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify guard is active - navigation blocked
-      router.navigate("ur-locked", (err) => {
-        expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      });
+      try {
+        await router.navigate("ur-locked");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
 
       guard.mockClear();
 
@@ -489,15 +509,14 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-locked", { canActivate: null });
 
       // Now navigation should succeed
-      router.navigate("ur-locked", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).not.toHaveBeenCalled();
-      });
+      await router.navigate("ur-locked");
+
+      expect(guard).not.toHaveBeenCalled();
     });
   });
 
   describe("canDeactivate", () => {
-    it("should add canDeactivate", () => {
+    it("should add canDeactivate", async () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: ActivationFnFactory = () => guard;
 
@@ -505,20 +524,22 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-editor", { canDeactivate: guardFactory });
 
       // Navigate to route
-      router.navigate("ur-editor", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-editor");
 
-        guard.mockClear();
+      guard.mockClear();
 
-        // Navigate away - should be blocked
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-          expect(guard).toHaveBeenCalled();
-        });
-      });
+      // Navigate away - should be blocked
+      try {
+        await router.navigate("home");
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(guard).toHaveBeenCalled();
+      }
     });
 
-    it("should remove canDeactivate when null", () => {
+    it("should remove canDeactivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
       router.addRoute({
@@ -528,28 +549,29 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Navigate to route
-      router.navigate("ur-form", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-form");
 
-        // Verify guard is active - navigation blocked
-        router.navigate("home", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      // Verify guard is active - navigation blocked
+      try {
+        await router.navigate("home");
 
-          guard.mockClear();
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect((error as RouterError).code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
 
-          // Remove canDeactivate
-          router.updateRoute("ur-form", { canDeactivate: null });
+      guard.mockClear();
 
-          // Now navigation should succeed
-          router.navigate("home", (err) => {
-            expect(err).toBeUndefined();
-            expect(guard).not.toHaveBeenCalled();
-          });
-        });
-      });
+      // Remove canDeactivate
+      router.updateRoute("ur-form", { canDeactivate: null });
+
+      // Now navigation should succeed
+      await router.navigate("home");
+
+      expect(guard).not.toHaveBeenCalled();
     });
 
-    it("should update existing canDeactivate", () => {
+    it("should update existing canDeactivate", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
@@ -561,19 +583,16 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-page", { canDeactivate: () => guard2 });
 
       // Navigate to route
-      router.navigate("ur-page", (err) => {
-        expect(err).toBeUndefined();
+      await router.navigate("ur-page");
 
-        guard1.mockClear();
-        guard2.mockClear();
+      guard1.mockClear();
+      guard2.mockClear();
 
-        // Navigate away - new guard should fire, old guard should NOT
-        router.navigate("home", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard2).toHaveBeenCalled();
-          expect(guard1).not.toHaveBeenCalled();
-        });
-      });
+      // Navigate away - new guard should fire, old guard should NOT
+      await router.navigate("home");
+
+      expect(guard2).toHaveBeenCalled();
+      expect(guard1).not.toHaveBeenCalled();
     });
   });
 
@@ -592,14 +611,14 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     it("should throw ReferenceError for empty string (root node)", () => {
       // Empty string represents the root node, which is not a named route
-      expect(() =>
-        router.updateRoute("", { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute("", { defaultParams: { x: 1 } }),
       ).toThrowError(ReferenceError);
     });
 
     it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() =>
-        router.updateRoute(".invalid", { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute(".invalid", { defaultParams: { x: 1 } }),
       ).toThrowError(TypeError);
     });
 
@@ -634,24 +653,24 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should throw TypeError for whitespace-only name", () => {
-      expect(() =>
-        router.updateRoute("   ", { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute("   ", { defaultParams: { x: 1 } }),
       ).toThrowError(TypeError);
 
-      expect(() =>
-        router.updateRoute("\t\n", { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute("\t\n", { defaultParams: { x: 1 } }),
       ).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name exceeding 10000 characters", () => {
       const longName = "a".repeat(10_001);
 
-      expect(() =>
-        router.updateRoute(longName, { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute(longName, { defaultParams: { x: 1 } }),
       ).toThrowError(TypeError);
 
-      expect(() =>
-        router.updateRoute(longName, { defaultParams: { x: 1 } }),
+      expect(
+        () => void router.updateRoute(longName, { defaultParams: { x: 1 } }),
       ).toThrowError(/exceeds maximum length/);
     });
 
@@ -678,8 +697,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         "[real-router] updateRoute: updates must be an object, got string",
       );
 
-      expect(() =>
-        router.updateRoute("ur-prim-test", 123 as unknown as object),
+      expect(
+        () => void router.updateRoute("ur-prim-test", 123 as unknown as object),
       ).toThrowError(
         "[real-router] updateRoute: updates must be an object, got number",
       );
@@ -688,8 +707,8 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should throw TypeError for array updates", () => {
       router.addRoute({ name: "ur-arr-test", path: "/ur-arr-test" });
 
-      expect(() =>
-        router.updateRoute("ur-arr-test", [] as unknown as object),
+      expect(
+        () => void router.updateRoute("ur-arr-test", [] as unknown as object),
       ).toThrowError(
         "[real-router] updateRoute: updates must be an object, got array",
       );
@@ -829,8 +848,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       ).not.toThrowError();
 
       // null is valid for defaultParams (remove)
-      expect(() =>
-        router.updateRoute("ur-valid-test", { defaultParams: null }),
+      expect(
+        () => void router.updateRoute("ur-valid-test", { defaultParams: null }),
       ).not.toThrowError();
 
       // Valid function for decodeParams
@@ -841,8 +860,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       ).not.toThrowError();
 
       // null is valid for decodeParams (remove)
-      expect(() =>
-        router.updateRoute("ur-valid-test", { decodeParams: null }),
+      expect(
+        () => void router.updateRoute("ur-valid-test", { decodeParams: null }),
       ).not.toThrowError();
 
       // Valid function for encodeParams
@@ -853,8 +872,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       ).not.toThrowError();
 
       // null is valid for encodeParams (remove)
-      expect(() =>
-        router.updateRoute("ur-valid-test", { encodeParams: null }),
+      expect(
+        () => void router.updateRoute("ur-valid-test", { encodeParams: null }),
       ).not.toThrowError();
     });
 
@@ -870,7 +889,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   });
 
   describe("multiple updates", () => {
-    it("should update multiple properties at once", () => {
+    it("should update multiple properties at once", async () => {
       const decoder = (params: Params): Params => params;
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: ActivationFnFactory = () => guard;
@@ -886,10 +905,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       expect(router.makeState("ur-multi").params).toStrictEqual({ page: 1 });
 
       // Verify canActivate via navigation
-      router.navigate("ur-multi", (err) => {
-        expect(err).toBeUndefined();
-        expect(guard).toHaveBeenCalled();
-      });
+      await router.navigate("ur-multi");
+
+      expect(guard).toHaveBeenCalled();
     });
 
     it("should chain multiple updateRoute calls", () => {
@@ -915,7 +933,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         children: [{ name: "child", path: "/child" }],
       });
 
-      router.updateRoute("ur-parent.child", { defaultParams: { tab: "info" } });
+      router.updateRoute("ur-parent.child", {
+        defaultParams: { tab: "info" },
+      });
 
       // Verify via behavior
       expect(router.makeState("ur-parent.child").params).toStrictEqual({
@@ -927,7 +947,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.addRoute({ name: "ur-solo", path: "/ur-solo" });
 
       expect(() =>
-        router.updateRoute("ur-solo.missing", { defaultParams: { x: 1 } }),
+        router.updateRoute("ur-solo.missing", {
+          defaultParams: { x: 1 },
+        }),
       ).toThrowError(
         '[real-router] updateRoute: route "ur-solo.missing" does not exist',
       );
@@ -955,7 +977,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Start async navigation
-      router.navigate("ur-async", {}, {}, () => {});
+      router.navigate("ur-async").catch(() => {});
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1059,8 +1081,8 @@ describe("core/routes/routeTree/updateRoute", () => {
           defaultParams: Object.freeze({ page: 1 }),
         });
 
-        expect(() =>
-          router.updateRoute("ur-frozen", frozenUpdates),
+        expect(
+          () => void router.updateRoute("ur-frozen", frozenUpdates),
         ).not.toThrowError();
         expect(router.makeState("ur-frozen").params).toStrictEqual({
           page: 1,
@@ -1074,7 +1096,9 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         nullProtoParams.page = 1;
 
-        router.updateRoute("ur-nullproto", { defaultParams: nullProtoParams });
+        router.updateRoute("ur-nullproto", {
+          defaultParams: nullProtoParams,
+        });
 
         // Verify behavior - params should work
         const state = router.makeState("ur-nullproto");
@@ -1169,22 +1193,22 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(path).toBe("/ur-arrow/ABC");
       });
 
-      it("should accept arrow function as canActivate factory", () => {
-        const guard = vi.fn((_toState, _fromState, done) => {
-          done();
-        });
+      it("should accept arrow function as canActivate factory", async () => {
+        const guard = vi.fn().mockReturnValue(true);
 
-        router.addRoute({ name: "ur-arrow-guard", path: "/ur-arrow-guard" });
+        router.addRoute({
+          name: "ur-arrow-guard",
+          path: "/ur-arrow-guard",
+        });
 
         router.updateRoute("ur-arrow-guard", {
           canActivate: () => guard,
         });
 
         // Verify canActivate works via navigation
-        router.navigate("ur-arrow-guard", (err) => {
-          expect(err).toBeUndefined();
-          expect(guard).toHaveBeenCalled();
-        });
+        await router.navigate("ur-arrow-guard");
+
+        expect(guard).toHaveBeenCalled();
       });
     });
 
@@ -1192,24 +1216,29 @@ describe("core/routes/routeTree/updateRoute", () => {
       it("should reject forwardTo empty string", () => {
         router.addRoute({ name: "ur-fwd-empty", path: "/ur-fwd-empty" });
 
-        expect(() =>
-          router.updateRoute("ur-fwd-empty", { forwardTo: "" }),
+        expect(
+          () => void router.updateRoute("ur-fwd-empty", { forwardTo: "" }),
         ).toThrowError();
       });
 
       it("should reject forwardTo to self (direct cycle)", () => {
         router.addRoute({ name: "ur-self", path: "/ur-self" });
 
-        expect(() =>
-          router.updateRoute("ur-self", { forwardTo: "ur-self" }),
+        expect(
+          () => void router.updateRoute("ur-self", { forwardTo: "ur-self" }),
         ).toThrowError(/Circular forwardTo/);
       });
 
       it("should reject forwardTo with invalid type (not string or null)", () => {
-        router.addRoute({ name: "ur-invalid-fwd", path: "/ur-invalid-fwd" });
+        router.addRoute({
+          name: "ur-invalid-fwd",
+          path: "/ur-invalid-fwd",
+        });
 
         expect(() =>
-          router.updateRoute("ur-invalid-fwd", { forwardTo: 123 as any }),
+          router.updateRoute("ur-invalid-fwd", {
+            forwardTo: 123 as any,
+          }),
         ).toThrowError(/forwardTo must be a string, function, or null/);
 
         expect(() =>
@@ -1327,8 +1356,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         };
 
         // Exception propagates to caller
-        expect(() =>
-          router.updateRoute("ur-throwing", throwingUpdates),
+        expect(
+          () => void router.updateRoute("ur-throwing", throwingUpdates),
         ).toThrowError("Getter explosion!");
 
         // Config remains unchanged - exception happens during destructuring,
@@ -1352,8 +1381,8 @@ describe("core/routes/routeTree/updateRoute", () => {
           },
         );
 
-        expect(() =>
-          router.updateRoute("ur-proxy", updates),
+        expect(
+          () => void router.updateRoute("ur-proxy", updates),
         ).not.toThrowError();
         expect(router.makeState("ur-proxy").params).toStrictEqual({
           page: 1,

@@ -57,7 +57,7 @@ function createTestRouter(routes: Route[]): Router {
     defaultRoute: routes[0]?.name ?? "home",
   });
 
-  router.start();
+  void router.start();
 
   return router;
 }

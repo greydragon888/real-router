@@ -22,21 +22,20 @@ describe("core/utils", () => {
       expect(router.buildPath("users.list")).toStrictEqual("/users/list");
     });
 
-    it("should tell if a route is active or not", () => {
-      router.start();
+    it("should tell if a route is active or not", async () => {
+      await router.start();
 
-      router.navigate("users.view", { id: 1 });
+      await router.navigate("users.view", { id: 1 });
 
       expect(router.isActiveRoute("users.view", { id: 1 })).toStrictEqual(true);
       expect(router.isActiveRoute("users.view", { id: 2 })).toStrictEqual(
         false,
       );
-      // Missing required param returns false (not throws) - optimized behavior
       expect(router.isActiveRoute("users.view")).toStrictEqual(false);
       expect(router.isActiveRoute("users")).toStrictEqual(true);
       expect(router.isActiveRoute("users", {}, true)).toStrictEqual(false);
 
-      router.navigate("section.query", { section: "section1" });
+      await router.navigate("section.query", { section: "section1" });
 
       expect(
         router.isActiveRoute("section", { section: "section1" }),
@@ -104,10 +103,11 @@ describe("core/utils", () => {
   });
 
   describe("without strict query params mode", () => {
-    beforeEach(() => {
+    beforeEach(async () => {
       router = createTestRouter({
         queryParamsMode: "loose",
-      }).start();
+      });
+      await router.start();
     });
 
     it("should build paths with extra parameters", () => {
@@ -147,8 +147,12 @@ describe("core/utils", () => {
       ).toStrictEqual("/query?param1=true&param2=false");
     });
 
-    it("should match paths", () => {
-      router.start("");
+    it("should match paths", async () => {
+      try {
+        await router.start("");
+      } catch {
+        // Expected error
+      }
 
       expect(
         router.buildPath("query", { param1: true, param2: false }),
@@ -166,8 +170,8 @@ describe("core/utils", () => {
       router.stop();
     });
 
-    it("should match on start", () => {
-      router.start("/query?param1=true&param2=false");
+    it("should match on start", async () => {
+      await router.start("/query?param1=true&param2=false");
 
       expect(router.getState()?.params).toStrictEqual({
         param1: true,

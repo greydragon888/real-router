@@ -13,13 +13,13 @@ const TEST_TEXT = "Test text";
 const user = userEvent.setup();
 
 describe("ConnectedLink component", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
     router.addRoute({
       name: "home",
       path: "/home",
     });
-    router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

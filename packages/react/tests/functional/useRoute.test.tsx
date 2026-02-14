@@ -17,10 +17,10 @@ const wrapper =
 describe("useRoute hook", () => {
   let router: Router;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -39,7 +39,7 @@ describe("useRoute hook", () => {
     expect(result.current.navigator.subscribe).toBeDefined();
   });
 
-  it("should return current route", () => {
+  it("should return current route", async () => {
     vi.spyOn(router, "subscribe");
 
     const { result } = renderHook(() => useRoute(), {
@@ -48,8 +48,8 @@ describe("useRoute hook", () => {
 
     expect(result.current.route?.name).toStrictEqual("test");
 
-    act(() => {
-      router.navigate("items");
+    await act(async () => {
+      await router.navigate("items");
     });
 
     expect(result.current.route?.name).toStrictEqual("items");

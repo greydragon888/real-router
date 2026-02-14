@@ -1,4 +1,4 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouterError, errorCodes } from "@real-router/core";
 
@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - guards cannot redirect", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -26,47 +26,50 @@ describe("router.navigate() - guards cannot redirect", () => {
     // This section tests that behavior.
 
     describe("canDeactivate returns error when attempting redirect", () => {
-      it("should return error when canDeactivate calls done with redirect error", () => {
-        router.addDeactivateGuard(
-          "users",
-          () => (_toState, _fromState, doneFn) => {
-            const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
-              redirect: {
-                name: "orders.pending",
-                params: {},
-                path: "/orders/pending",
-              },
-            });
-
-            doneFn(error);
-          },
-        );
-
-        router.navigate("users");
-
-        router.navigate("profile", (err) => {
-          // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      it("should return error when canDeactivate throws redirect error", async () => {
+        router.addDeactivateGuard("users", () => () => {
+          throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
+            redirect: {
+              name: "orders.pending",
+              params: {},
+              path: "/orders/pending",
+            },
+          });
         });
+
+        await router.navigate("users");
+
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          // Guards cannot redirect - should return error
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        }
 
         // Should remain on users
         expect(router.getState()?.name).toBe("users");
       });
 
-      it("should return error when canDeactivate returns different route state", () => {
+      it("should return error when canDeactivate returns different route state", async () => {
         router.addDeactivateGuard("users", () => () => {
           return { name: "sign-in", params: {}, path: "/sign-in" };
         });
 
-        router.navigate("users");
+        await router.navigate("users");
 
-        router.navigate("profile", (err) => {
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
           expect(
-            (err?.attemptedRedirect as { name: string } | undefined)?.name,
+            (error?.attemptedRedirect as { name: string } | undefined)?.name,
           ).toBe("sign-in");
-        });
+        }
 
         // Should remain on users
         expect(router.getState()?.name).toBe("users");
@@ -74,27 +77,26 @@ describe("router.navigate() - guards cannot redirect", () => {
     });
 
     describe("canActivate returns error when attempting redirect", () => {
-      it("should return error when canActivate calls done with redirect error", () => {
-        router.addActivateGuard(
-          "profile",
-          () => (_toState, _fromState, doneFn) => {
-            const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
-              redirect: { name: "sign-in", params: {}, path: "/sign-in" },
-            });
-
-            doneFn(error);
-          },
-        );
-
-        router.navigate("users");
-
-        router.navigate("profile", (err) => {
-          // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      it("should return error when canActivate throws redirect error", async () => {
+        router.addActivateGuard("profile", () => () => {
+          throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
+            redirect: { name: "sign-in", params: {}, path: "/sign-in" },
+          });
         });
+
+        await router.navigate("users");
+
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          // Guards cannot redirect - should return error
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
       });
 
-      it("should return error when canActivate returns different route state", () => {
+      it("should return error when canActivate returns different route state", async () => {
         router.addActivateGuard("users.view", () => () => {
           return {
             name: "orders.view",
@@ -103,15 +105,19 @@ describe("router.navigate() - guards cannot redirect", () => {
           };
         });
 
-        router.navigate("index");
+        await router.navigate("index");
 
-        router.navigate("users.view", { id: 123 }, (err) => {
+        try {
+          await router.navigate("users.view", { id: 123 });
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
           // Guards cannot redirect - should return error
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
           expect(
-            (err?.attemptedRedirect as { name: string } | undefined)?.name,
+            (error?.attemptedRedirect as { name: string } | undefined)?.name,
           ).toBe("orders.view");
-        });
+        }
       });
 
       it("should return error for Promise-based canActivate redirect via rejection", async () => {
@@ -129,19 +135,15 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index");
+        void router.navigate("index");
 
-        const callback = vi.fn();
-
-        router.navigate("profile", callback);
+        const promise = router.navigate("profile", {}, {});
 
         await vi.runAllTimersAsync();
 
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.CANNOT_ACTIVATE,
-          }),
-        );
+        await expect(promise).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
         vi.useRealTimers();
       });
@@ -161,20 +163,15 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        router.navigate("index");
+        void router.navigate("index");
 
-        const callback = vi.fn();
-
-        router.navigate("profile", callback);
+        const promise = router.navigate("profile", {}, {});
 
         await vi.runAllTimersAsync();
 
-        // Guards cannot redirect - should return error
-        expect(callback).toHaveBeenCalledWith(
-          expect.objectContaining({
-            code: errorCodes.CANNOT_ACTIVATE,
-          }),
-        );
+        await expect(promise).rejects.toMatchObject({
+          code: errorCodes.CANNOT_ACTIVATE,
+        });
 
         vi.useRealTimers();
       });
@@ -183,47 +180,51 @@ describe("router.navigate() - guards cannot redirect", () => {
         router.stop();
 
         // Start router with auth-protected path - should fail with error
-        const result = await new Promise<{ err: any; state: any }>(
-          (resolve) => {
-            router.start("/auth-protected", (err, state) => {
-              resolve({ err, state });
-            });
-          },
-        );
+        try {
+          const state = await router.start("/auth-protected");
 
-        // The auth-protected route guard returns redirect, but guards cannot redirect
-        // So it should return error or fallback to default route
-        expect(result.err !== undefined || result.state?.name === "home").toBe(
-          true,
-        );
+          // If we reach here, it should have fallen back to default route
+          expect(state?.name).toBe("home");
+        } catch (error: any) {
+          // Or it should have returned an error
+          expect(error).toBeDefined();
+        }
       });
     });
 
     describe("guards blocking (not redirecting)", () => {
-      it("should block with false return", () => {
+      it("should block with false return", async () => {
         router.addActivateGuard("admin", () => () => false);
 
-        router.navigate("users");
+        await router.navigate("users");
 
-        router.navigate("admin", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        });
+        try {
+          await router.navigate("admin");
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
 
         expect(router.getState()?.name).toBe("users");
       });
 
-      it("should block with error throw", () => {
+      it("should block with error throw", async () => {
         router.addActivateGuard("admin", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             message: "Access denied",
           });
         });
 
-        router.navigate("users");
+        await router.navigate("users");
 
-        router.navigate("admin", (err) => {
-          expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        });
+        try {
+          await router.navigate("admin");
+
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
       });
     });
   });
@@ -233,31 +234,28 @@ describe("router.navigate() - guards cannot redirect", () => {
     // The solution: Guards cannot redirect at all. They return errors instead.
 
     it("should return error when canDeactivate returns redirect (guards cannot redirect)", async () => {
-      router.navigate("users");
+      await router.navigate("users");
 
-      router.addDeactivateGuard("users", () => (_toState, _fromState, done) => {
-        const error = new RouterError(errorCodes.CANNOT_DEACTIVATE, {
+      router.addDeactivateGuard("users", () => () => {
+        throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
           redirect: { name: "sign-in", params: {}, path: "/sign-in" },
         });
-
-        done(error);
       });
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("profile", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("profile");
 
-      // Guards cannot redirect - error should be returned
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      // State should remain on users
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error).toBeDefined();
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+      }
+
       expect(router.getState()?.name).toBe("users");
     });
 
     it("should remain on current route when canDeactivate blocks with redirect", async () => {
-      router.navigate("users");
+      await router.navigate("users");
 
       router.addDeactivateGuard("users", () => () => ({
         name: "sign-in",
@@ -265,16 +263,15 @@ describe("router.navigate() - guards cannot redirect", () => {
         path: "/sign-in",
       }));
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("profile", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("profile");
 
-      // Guards cannot redirect - should return error
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(result.err?.attemptedRedirect?.name).toBe("sign-in");
-      // Should remain on users
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("sign-in");
+      }
+
       expect(router.getState()?.name).toBe("users");
     });
   });
@@ -291,18 +288,17 @@ describe("router.navigate() - guards cannot redirect", () => {
         path: "/admin",
       }));
 
-      router.navigate("users");
+      await router.navigate("users");
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("profile", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("profile");
 
-      // Guards cannot redirect - should return error
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(result.err?.attemptedRedirect?.name).toBe("admin");
-      // Should remain on users
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("admin");
+      }
+
       expect(router.getState()?.name).toBe("users");
     });
 
@@ -314,55 +310,40 @@ describe("router.navigate() - guards cannot redirect", () => {
         path: "/profile",
       }));
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      // Guards cannot redirect - should return error
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      expect(result.err?.attemptedRedirect?.name).toBe("profile");
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect(error.attemptedRedirect?.name).toBe("profile");
+      }
     });
 
-    // Test 3: Same route state modification should NOT trigger re-navigation
-    it("should allow guards to modify meta without re-navigation", async () => {
-      router.addActivateGuard(
-        "users.view",
-        () => (toState, _fromState, done) => {
-          // Modify meta and continue - same route, should just merge
-          done(undefined, {
-            ...toState,
-            meta: { ...toState.meta, normalized: true } as any,
-          });
-        },
-      );
-
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("users.view", { id: "123" }, (err, state) => {
-          resolve({ err, state });
-        });
+    it("should allow navigation when guard returns true", async () => {
+      router.addActivateGuard("users.view", () => () => {
+        return true;
       });
 
-      expect(result.err).toBeUndefined();
-      expect(result.state?.meta?.normalized).toBe(true);
-      expect(result.state?.name).toBe("users.view");
+      const state = await router.navigate("users.view", { id: "123" });
+
+      expect(state?.name).toBe("users.view");
     });
 
     // Test 4: Protected route blocks access
     it("should block access to protected route", async () => {
       router.addActivateGuard("admin", () => () => false);
 
-      router.navigate("users");
+      await router.navigate("users");
 
-      const result = await new Promise<{ err: any; state: any }>((resolve) => {
-        router.navigate("admin", (err, state) => {
-          resolve({ err, state });
-        });
-      });
+      try {
+        await router.navigate("admin");
 
-      // Should be blocked
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect.fail("Should have thrown error");
+      } catch (error: any) {
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+      }
+
       expect(router.getState()?.name).not.toBe("admin");
     });
   });
@@ -376,30 +357,22 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error when canActivate attempts to redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
-        freshRouter.addActivateGuard(
-          "users",
-          () => (_toState, _fromState, done) => {
-            done(
-              new RouterError(errorCodes.CANNOT_ACTIVATE, {
-                redirect: { name: "orders", params: {}, path: "/orders" },
-              }),
-            );
-          },
-        );
+        freshRouter.addActivateGuard("users", () => () => {
+          throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
+            redirect: { name: "orders", params: {}, path: "/orders" },
+          });
+        });
 
-        const result = await new Promise<{ err: any; state: any }>(
-          (resolve) => {
-            freshRouter.navigate("users", (err, state) => {
-              resolve({ err, state });
-            });
-          },
-        );
+        try {
+          await freshRouter.navigate("users");
 
-        // Guard cannot redirect - should return error
-        expect(result.err).toBeDefined();
-        expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          expect(error).toBeDefined();
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
 
         freshRouter.stop();
       });
@@ -407,7 +380,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error when canActivate returns state-based redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
         freshRouter.addActivateGuard("users", () => () => ({
           name: "orders",
@@ -415,17 +388,14 @@ describe("router.navigate() - guards cannot redirect", () => {
           path: "/orders",
         }));
 
-        const result = await new Promise<{ err: any; state: any }>(
-          (resolve) => {
-            freshRouter.navigate("users", (err, state) => {
-              resolve({ err, state });
-            });
-          },
-        );
+        try {
+          await freshRouter.navigate("users");
 
-        // Guard cannot redirect - should return error with attemptedRedirect info
-        expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-        expect(result.err?.attemptedRedirect?.name).toBe("orders");
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect(error.attemptedRedirect?.name).toBe("orders");
+        }
 
         freshRouter.stop();
       });
@@ -433,19 +403,17 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should allow guards to block without redirect", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.start();
+        await freshRouter.start();
 
         freshRouter.addActivateGuard("admin", () => () => false);
 
-        const result = await new Promise<{ err: any; state: any }>(
-          (resolve) => {
-            freshRouter.navigate("admin", (err, state) => {
-              resolve({ err, state });
-            });
-          },
-        );
+        try {
+          await freshRouter.navigate("admin");
 
-        expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+          expect.fail("Should have thrown error");
+        } catch (error: any) {
+          expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        }
 
         freshRouter.stop();
       });

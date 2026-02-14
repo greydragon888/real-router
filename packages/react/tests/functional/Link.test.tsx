@@ -37,8 +37,8 @@ describe("Link component", () => {
     expect(linkElement).not.toHaveClass("active");
   });
 
-  it("should have active class if associated route is active", () => {
-    router.start("/home");
+  it("should have active class if associated route is active", async () => {
+    await router.start("/home");
 
     render(
       <RouterProvider router={router}>
@@ -51,10 +51,10 @@ describe("Link component", () => {
     expect(linkElement).toHaveClass("active");
   });
 
-  it("should have active class if default route is active", () => {
+  it("should have active class if default route is active", async () => {
     router = createTestRouter();
     router.addRoute({ name: "home", path: "/home" });
-    router.start("/home");
+    await router.start("/home");
 
     render(
       <RouterProvider router={router}>

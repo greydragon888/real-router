@@ -126,15 +126,15 @@ describe("core/limits (integration via public API)", () => {
 
       // Register 1 middleware - should succeed
       expect(() => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          done();
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return;
         });
       }).not.toThrowError();
 
       // 2nd middleware should throw
       expect(() => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          done();
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return;
         });
       }).toThrowError("Middleware limit exceeded");
     });
@@ -189,8 +189,8 @@ describe("core/limits (integration via public API)", () => {
       // Register many middleware - should not throw
       expect(() => {
         for (let i = 0; i < 10; i++) {
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
+          router.useMiddleware(() => (_toState, _fromState) => {
+            return;
           });
         }
       }).not.toThrowError();
@@ -230,7 +230,7 @@ describe("core/limits (integration via public API)", () => {
       }).not.toThrowError();
     });
 
-    it("should allow unlimited event depth when maxEventDepth = 0", () => {
+    it("should allow unlimited event depth when maxEventDepth = 0", async () => {
       const router = createRouter([{ name: "home", path: "/" }], {
         limits: { maxEventDepth: 0 },
         defaultRoute: "home",
@@ -244,9 +244,7 @@ describe("core/limits (integration via public API)", () => {
       });
 
       // Start router - this triggers ROUTER_START event with maxEventDepth=0
-      expect(() => {
-        router.start();
-      }).not.toThrowError();
+      await router.start();
 
       // Verify event was actually received (confirms event path was executed)
       expect(startEventReceived).toBe(true);
@@ -289,16 +287,16 @@ describe("core/limits (integration via public API)", () => {
       // Register 50 middleware - should succeed
       expect(() => {
         for (let i = 0; i < 50; i++) {
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
+          router.useMiddleware(() => (_toState, _fromState) => {
+            return;
           });
         }
       }).not.toThrowError();
 
       // 51st middleware should throw
       expect(() => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          done();
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return;
         });
       }).toThrowError("Middleware limit exceeded");
     });
@@ -522,15 +520,15 @@ describe("core/limits (integration via public API)", () => {
       // Default limit still enforced for middleware
       expect(() => {
         for (let i = 0; i < 50; i++) {
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
+          router.useMiddleware(() => (_toState, _fromState) => {
+            return;
           });
         }
       }).not.toThrowError();
 
       expect(() => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          done();
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return;
         });
       }).toThrowError("Middleware limit exceeded");
     });
@@ -593,8 +591,8 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         for (let i = 0; i < 20; i++) {
           router.usePlugin(() => ({}));
-          router.useMiddleware(() => (_toState, _fromState, done) => {
-            done();
+          router.useMiddleware(() => (_toState, _fromState) => {
+            return;
           });
         }
       }).not.toThrowError();

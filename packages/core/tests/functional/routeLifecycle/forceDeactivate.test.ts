@@ -5,24 +5,26 @@ import { createLifecycleTestRouter, errorCodes, type Router } from "./setup";
 let router: Router;
 
 describe("core/route-lifecycle/forceDeactivate", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {
     router.stop();
   });
 
-  it("should force deactivation if transition option is set", () => {
+  it("should force deactivation if transition option is set", async () => {
     router.addDeactivateGuard("orders.view", false);
 
-    router.navigate("orders.view", { id: "1" });
+    await router.navigate("orders.view", { id: "1" });
 
-    router.navigate("home", (err) => {
-      expect(err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-    });
+    try {
+      await router.navigate("home");
+    } catch (error: any) {
+      expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+    }
 
-    router.navigate("home", {}, { forceDeactivate: true });
+    await router.navigate("home", {}, { forceDeactivate: true });
 
     expect(router.getState()?.name).toStrictEqual("home");
   });

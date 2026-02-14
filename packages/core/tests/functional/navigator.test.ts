@@ -8,9 +8,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("core/getNavigator", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -48,20 +48,16 @@ describe("core/getNavigator", () => {
     expect(nav.navigate).toBeTypeOf("function");
   });
 
-  it("navigate works", () => {
+  it("navigate works", async () => {
     const navigator = getNavigator(router);
-    const callback = vi.fn();
 
-    navigator.navigate("users", {}, {}, callback);
+    const state = await navigator.navigate("users", {});
 
-    expect(callback).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ name: "users" }),
-    );
+    expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
   });
 
-  it("getState works", () => {
-    router.navigate("users.view", { id: "123" });
+  it("getState works", async () => {
+    await router.navigate("users.view", { id: "123" });
     const navigator = getNavigator(router);
     const state = navigator.getState();
 
@@ -69,8 +65,8 @@ describe("core/getNavigator", () => {
     expect(state?.params).toStrictEqual({ id: "123" });
   });
 
-  it("isActiveRoute works", () => {
-    router.navigate("users.view", { id: "123" });
+  it("isActiveRoute works", async () => {
+    await router.navigate("users.view", { id: "123" });
     const navigator = getNavigator(router);
 
     expect(navigator.isActiveRoute("users.view", { id: "123" })).toBe(true);
@@ -80,17 +76,17 @@ describe("core/getNavigator", () => {
     );
   });
 
-  it("subscribe works", () => {
+  it("subscribe works", async () => {
     const navigator = getNavigator(router);
     const callback = vi.fn();
     const unsubscribe = navigator.subscribe(callback);
 
-    navigator.navigate("users");
+    await navigator.navigate("users");
 
     expect(callback).toHaveBeenCalled();
 
     unsubscribe();
-    navigator.navigate("home");
+    await navigator.navigate("home");
 
     expect(callback).toHaveBeenCalledTimes(1);
   });
@@ -104,15 +100,15 @@ describe("core/getNavigator", () => {
     expect(navigator.canNavigateTo("nonexistent")).toBe(false);
   });
 
-  it("all methods are bound (work when destructured)", () => {
+  it("all methods are bound (work when destructured)", async () => {
     const { navigate, getState, isActiveRoute, canNavigateTo, subscribe } =
       getNavigator(router);
 
-    navigate("home");
+    await navigate("users");
 
-    expect(getState()?.name).toBe("home");
-    expect(isActiveRoute("home")).toBe(true);
-    expect(canNavigateTo("users")).toBe(true);
+    expect(getState()?.name).toBe("users");
+    expect(isActiveRoute("users")).toBe(true);
+    expect(canNavigateTo("home")).toBe(true);
 
     const unsubscribe = subscribe(() => {});
 

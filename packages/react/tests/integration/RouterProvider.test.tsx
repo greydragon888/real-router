@@ -40,8 +40,8 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Basic Integration", () => {
-    it("should provide router instance via RouterContext", () => {
-      router.start("/users/list");
+    it("should provide router instance via RouterContext", async () => {
+      await router.start("/users/list");
 
       let capturedRouter: Router | null = null;
 
@@ -63,8 +63,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("has-router")).toHaveTextContent("yes");
     });
 
-    it("should provide route state via RouteContext", () => {
-      router.start("/users/list");
+    it("should provide route state via RouteContext", async () => {
+      await router.start("/users/list");
 
       let capturedRoute: string | undefined;
       let capturedPreviousRoute: string | undefined;
@@ -89,8 +89,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("route")).toHaveTextContent("users.list");
     });
 
-    it("should render children correctly", () => {
-      router.start("/");
+    it("should render children correctly", async () => {
+      await router.start("/");
 
       render(
         <RouterProvider router={router}>
@@ -123,8 +123,8 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Context Values", () => {
-    it("should provide navigator in RouteContext", () => {
-      router.start("/users/list");
+    it("should provide navigator in RouteContext", async () => {
+      await router.start("/users/list");
 
       let navigatorFromRouteContext: any;
 
@@ -149,8 +149,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(navigatorFromRouteContext.subscribe).toBeDefined();
     });
 
-    it("should have undefined previousRoute on initial render", () => {
-      router.start("/users/list");
+    it("should have undefined previousRoute on initial render", async () => {
+      await router.start("/users/list");
 
       let previousRoute: string | undefined = "not-set";
 
@@ -171,8 +171,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(previousRoute).toBeUndefined();
     });
 
-    it("should include route params in route object", () => {
-      router.start("/users/list");
+    it("should include route params in route object", async () => {
+      await router.start("/users/list");
 
       let routeParams: Record<string, string> | undefined;
 
@@ -193,8 +193,8 @@ describe("RouterProvider - Integration Tests", () => {
       );
 
       // Navigate to route with params
-      act(() => {
-        router.navigate("users.view", { id: "123" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" });
       });
 
       expect(routeParams).toStrictEqual({ id: "123" });
@@ -203,8 +203,8 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Navigation Updates", () => {
-    it("should update RouteContext on navigation", () => {
-      router.start("/users/list");
+    it("should update RouteContext on navigation", async () => {
+      await router.start("/users/list");
 
       const RouteDisplay: FC = () => {
         const context = useContext(RouteContext);
@@ -228,16 +228,16 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("current")).toHaveTextContent("users.list");
       expect(screen.getByTestId("previous")).toHaveTextContent("none");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(screen.getByTestId("current")).toHaveTextContent("about");
       expect(screen.getByTestId("previous")).toHaveTextContent("users.list");
     });
 
-    it("should track previousRoute through multiple navigations", () => {
-      router.start("/users/list");
+    it("should track previousRoute through multiple navigations", async () => {
+      await router.start("/users/list");
 
       const RouteTracker: FC = () => {
         const context = useContext(RouteContext);
@@ -257,27 +257,27 @@ describe("RouterProvider - Integration Tests", () => {
 
       expect(screen.getByTestId("previous")).toHaveTextContent("none");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(screen.getByTestId("previous")).toHaveTextContent("users.list");
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(screen.getByTestId("previous")).toHaveTextContent("about");
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       expect(screen.getByTestId("previous")).toHaveTextContent("home");
     });
 
     it("should update route params on navigation", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const ParamsDisplay: FC = () => {
         const context = useContext(RouteContext);
@@ -296,24 +296,24 @@ describe("RouterProvider - Integration Tests", () => {
 
       expect(screen.getByTestId("id")).toHaveTextContent("no-id");
 
-      act(() => {
-        router.navigate("users.view", { id: "1" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
       });
 
       await waitFor(() => {
         expect(screen.getByTestId("id")).toHaveTextContent("1");
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "42" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "42" });
       });
 
       await waitFor(() => {
         expect(screen.getByTestId("id")).toHaveTextContent("42");
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "999" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "999" });
       });
 
       await waitFor(() => {
@@ -323,8 +323,8 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Hook Integration", () => {
-    it("should work with useRouter hook", () => {
-      router.start("/users/list");
+    it("should work with useRouter hook", async () => {
+      await router.start("/users/list");
 
       const UseRouterComponent: FC = () => {
         useRouter();
@@ -341,8 +341,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("router-exists")).toHaveTextContent("yes");
     });
 
-    it("should work with useRoute hook", () => {
-      router.start("/users/list");
+    it("should work with useRoute hook", async () => {
+      await router.start("/users/list");
 
       const UseRouteComponent: FC = () => {
         const { route, previousRoute } = useRoute();
@@ -368,7 +368,7 @@ describe("RouterProvider - Integration Tests", () => {
     });
 
     it("should allow programmatic navigation via useRouter", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const NavigationComponent: FC = () => {
         const routerFromHook = useRouter();
@@ -380,7 +380,7 @@ describe("RouterProvider - Integration Tests", () => {
             <button
               data-testid="navigate-btn"
               onClick={() => {
-                routerFromHook.navigate("about");
+                void routerFromHook.navigate("about");
               }}
             >
               Go to About
@@ -406,12 +406,12 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Nested Providers", () => {
-    it("should support nested RouterProviders with different routers", () => {
+    it("should support nested RouterProviders with different routers", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       const OuterRouteDisplay: FC = () => {
         const context = useContext(RouteContext);
@@ -438,16 +438,16 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("inner")).toHaveTextContent("about");
 
       // Navigate outer router
-      act(() => {
-        router1.navigate("home");
+      await act(async () => {
+        await router1.navigate("home");
       });
 
       expect(screen.getByTestId("outer")).toHaveTextContent("home");
       expect(screen.getByTestId("inner")).toHaveTextContent("about");
 
       // Navigate inner router
-      act(() => {
-        router2.navigate("home");
+      await act(async () => {
+        await router2.navigate("home");
       });
 
       expect(screen.getByTestId("outer")).toHaveTextContent("home");
@@ -457,12 +457,12 @@ describe("RouterProvider - Integration Tests", () => {
       router2.stop();
     });
 
-    it("should isolate router instances in nested providers", () => {
+    it("should isolate router instances in nested providers", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let outerRouter: Router | null = null;
       let innerRouter: Router | null = null;
@@ -503,7 +503,7 @@ describe("RouterProvider - Integration Tests", () => {
 
   describe("Component Integration", () => {
     it("should work with component local state", async () => {
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const StatefulComponent: FC = () => {
         const { route } = useRoute();
@@ -540,8 +540,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("count")).toHaveTextContent("1");
 
       // Navigate
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       await waitFor(() => {
@@ -552,8 +552,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("count")).toHaveTextContent("1");
     });
 
-    it("should support conditional rendering based on route", () => {
-      router.start("/users/list");
+    it("should support conditional rendering based on route", async () => {
+      await router.start("/users/list");
 
       const ConditionalComponent: FC = () => {
         const { route } = useRoute();
@@ -573,15 +573,15 @@ describe("RouterProvider - Integration Tests", () => {
 
       expect(screen.getByTestId("users-section")).toBeInTheDocument();
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(screen.getByTestId("other-section")).toBeInTheDocument();
     });
 
-    it("should support multiple consumers", () => {
-      router.start("/users/list");
+    it("should support multiple consumers", async () => {
+      await router.start("/users/list");
 
       const Consumer1: FC = () => {
         const { route } = useRoute();
@@ -613,8 +613,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("consumer-2")).toHaveTextContent("users.list");
       expect(screen.getByTestId("consumer-3")).toHaveTextContent("users.list");
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(screen.getByTestId("consumer-1")).toHaveTextContent("about");
@@ -646,8 +646,8 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("route")).toHaveTextContent("no-route");
     });
 
-    it("should handle router restart", () => {
-      router.start("/users/list");
+    it("should handle router restart", async () => {
+      await router.start("/users/list");
 
       const RouteDisplay: FC = () => {
         const { route } = useRoute();
@@ -664,9 +664,9 @@ describe("RouterProvider - Integration Tests", () => {
       expect(screen.getByTestId("route")).toHaveTextContent("users.list");
 
       // Stop and restart router
-      act(() => {
+      await act(async () => {
         router.stop();
-        router.start("/about");
+        await router.start("/about");
       });
 
       // After restart, component should still work
@@ -674,7 +674,7 @@ describe("RouterProvider - Integration Tests", () => {
     });
 
     it("should handle rapid navigation", async () => {
-      router.start("/");
+      await router.start("/");
 
       render(
         <RouterProvider router={router}>
@@ -683,20 +683,20 @@ describe("RouterProvider - Integration Tests", () => {
       );
 
       // Rapid sequential navigations
-      act(() => {
-        router.navigate("users.list");
+      await act(async () => {
+        await router.navigate("users.list");
       });
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
-      act(() => {
-        router.navigate("users.view", { id: "42" });
+      await act(async () => {
+        await router.navigate("users.view", { id: "42" });
       });
 
       await waitFor(() => {
@@ -704,8 +704,8 @@ describe("RouterProvider - Integration Tests", () => {
       });
     });
 
-    it("should handle unmount correctly", () => {
-      router.start("/users/list");
+    it("should handle unmount correctly", async () => {
+      await router.start("/users/list");
 
       const { unmount } = render(
         <RouterProvider router={router}>
@@ -719,15 +719,15 @@ describe("RouterProvider - Integration Tests", () => {
       unmount();
 
       // Navigation after unmount should not cause errors
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(router.getState()?.name).toBe("about");
     });
 
-    it("should handle effect cleanup during navigation", () => {
-      router.start("/users/list");
+    it("should handle effect cleanup during navigation", async () => {
+      await router.start("/users/list");
 
       const cleanupCalls: string[] = [];
 
@@ -749,14 +749,14 @@ describe("RouterProvider - Integration Tests", () => {
         </RouterProvider>,
       );
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
       expect(cleanupCalls).toContain("users.list");
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       expect(cleanupCalls).toContain("about");
@@ -764,8 +764,8 @@ describe("RouterProvider - Integration Tests", () => {
   });
 
   describe("Store Behavior", () => {
-    it("should maintain stable router reference across navigations", () => {
-      router.start("/users/list");
+    it("should maintain stable router reference across navigations", async () => {
+      await router.start("/users/list");
 
       const routerReferences: Router[] = [];
 
@@ -790,12 +790,12 @@ describe("RouterProvider - Integration Tests", () => {
         </RouterProvider>,
       );
 
-      act(() => {
-        router.navigate("about");
+      await act(async () => {
+        await router.navigate("about");
       });
 
-      act(() => {
-        router.navigate("home");
+      await act(async () => {
+        await router.navigate("home");
       });
 
       // All captured router references should be the same instance
@@ -807,12 +807,12 @@ describe("RouterProvider - Integration Tests", () => {
       });
     });
 
-    it("should create new store when router prop changes", () => {
+    it("should create new store when router prop changes", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       const Wrapper: FC<{ routerInstance: Router; children: ReactNode }> = ({
         routerInstance,

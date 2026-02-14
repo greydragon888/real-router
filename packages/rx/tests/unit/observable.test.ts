@@ -50,8 +50,8 @@ describe("observable()", () => {
       next: (state) => states.push(state),
     });
 
-    router.start();
-    router.navigate("about");
+    await router.start();
+    await router.navigate("about");
 
     expect(states.length).toBeGreaterThanOrEqual(2);
     expect(states[0].route.name).toBe("home");
@@ -65,8 +65,8 @@ describe("observable()", () => {
       next: (state) => states.push(state),
     });
 
-    router.start();
-    router.navigate("about");
+    await router.start();
+    await router.navigate("about");
 
     expect(states[1].previousRoute.name).toBe("home");
     expect(states[1].route.name).toBe("about");
@@ -83,8 +83,8 @@ describe("observable()", () => {
       next: (state) => states.push(state),
     });
 
-    router.start();
-    router.navigate("about");
+    await router.start();
+    await router.navigate("about");
 
     expect(states.length).toBeGreaterThanOrEqual(2);
   });
@@ -96,20 +96,20 @@ describe("observable()", () => {
       next: (state) => states.push(state),
     });
 
-    router.start();
-    router.navigate("about");
+    await router.start();
+    await router.navigate("about");
 
     const countAfterFirst = states.length;
 
     subscription.unsubscribe();
 
-    router.navigate("home");
+    await router.navigate("home");
 
     expect(states).toHaveLength(countAfterFirst);
   });
 
   it("should emit initial state on subscription", async () => {
-    router.start();
+    await router.start();
 
     const states: any[] = [];
 
@@ -136,8 +136,8 @@ describe("observable()", () => {
       next: (state) => states2.push(state),
     });
 
-    router.start();
-    router.navigate("about");
+    await router.start();
+    await router.navigate("about");
 
     expect(states1.length).toBeGreaterThanOrEqual(2);
     expect(states2.length).toBeGreaterThanOrEqual(2);

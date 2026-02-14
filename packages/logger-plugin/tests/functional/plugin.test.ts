@@ -45,14 +45,14 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(loggerPlugin);
     });
 
-    it("should log router start event", () => {
-      router.start();
+    it("should log router start event", async () => {
+      await router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith("[logger-plugin] Router started");
     });
 
-    it("should log router stop event", () => {
-      router.start();
+    it("should log router stop event", async () => {
+      await router.start();
       loggerSpy.mockClear();
 
       router.stop();
@@ -60,11 +60,11 @@ describe("@real-router/logger-plugin", () => {
       expect(loggerSpy).toHaveBeenCalledWith("[logger-plugin] Router stopped");
     });
 
-    it("should log transition start with route names", () => {
-      router.start();
+    it("should log transition start with route names", async () => {
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
         "[logger-plugin] Transition: home → users",
@@ -75,11 +75,11 @@ describe("@real-router/logger-plugin", () => {
       );
     });
 
-    it("should log transition success", () => {
-      router.start();
+    it("should log transition success", async () => {
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin] Transition success"),
@@ -87,13 +87,13 @@ describe("@real-router/logger-plugin", () => {
       );
     });
 
-    it("should log transition error when route not found", () => {
-      router.start();
+    it("should log transition error when route not found", async () => {
+      await router.start();
       errorSpy.mockClear();
 
-      router.navigate("nonexistent", {}, {}, (err) => {
-        expect(err?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      });
+      await expect(
+        router.navigate("nonexistent", {}, {}),
+      ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin] Transition error"),
@@ -102,34 +102,51 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should log transition cancel", async () => {
-      // Add async middleware to allow cancellation
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 10);
-      });
+      vi.useFakeTimers();
 
-      router.start();
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Wait for start to complete
+      await router.start();
       warnSpy.mockClear();
 
-      // Cancel the navigation by calling the cancel function
-      const cancel = router.navigate("users");
+      // Add async middleware to keep transition in-progress (after start)
+      router.useMiddleware(() => (_toState, _fromState) => {
+        return new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 200),
+        );
+      });
 
-      cancel();
+      // Start navigation (middleware keeps it pending)
+      const navPromise = router.navigate("users");
 
-      // Wait a bit for cancel to process
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      // Stop router after transition starts
+      setTimeout(() => {
+        router.stop();
+      }, 10);
+
+      await vi.runAllTimersAsync();
+
+      // Wait for the promise to reject
+      try {
+        await navPromise;
+      } catch {
+        // Expected TRANSITION_CANCELLED error
+      }
 
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin] Transition cancelled"),
         expect.any(Object),
       );
+
+      router.clearMiddleware();
+      vi.useRealTimers();
     });
 
-    it("should format route name as (none) when undefined", () => {
-      router.start();
+    it("should format route name as (none) when undefined", async () => {
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin] Transition: home → users"),
@@ -139,87 +156,105 @@ describe("@real-router/logger-plugin", () => {
   });
 
   describe("Console Groups", () => {
-    it("should open group on transition start", () => {
+    it("should open group on transition start", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(consoleGroupSpy).toHaveBeenCalledWith("Router transition");
     });
 
-    it("should close group on transition success", () => {
+    it("should close group on transition success", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(consoleGroupEndSpy).toHaveBeenCalled();
     });
 
-    it("should close group on transition error", () => {
+    it("should close group on transition error", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
-
-      router.navigate("nonexistent");
+      await router.start();
+      try {
+        await router.navigate("nonexistent");
+      } catch {
+        // Expected error
+      }
 
       expect(consoleGroupEndSpy).toHaveBeenCalled();
     });
 
-    it("should close group on transition cancel", () => {
+    it("should close group on transition cancel", async () => {
       router.addDeactivateGuard("home", () => () => false);
       router.usePlugin(loggerPlugin);
-      router.start();
-
-      router.navigate("users");
+      await router.start();
+      try {
+        await router.navigate("users");
+      } catch {
+        // Expected error
+      }
 
       expect(consoleGroupEndSpy).toHaveBeenCalled();
     });
 
     it("should close any open group on router stop", async () => {
-      // Use middleware that delays completion to keep group open
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 100);
-      });
+      vi.useFakeTimers();
 
       router.usePlugin(loggerPlugin);
 
-      // Wait for router to fully start (two-phase start: isStarted only true after transition completes)
-      await new Promise<void>((resolve) => {
-        router.start(() => {
-          resolve();
-        });
+      await router.start();
+
+      // Use async middleware to keep transition in-progress (group stays open, after start)
+      router.useMiddleware(() => (_toState, _fromState) => {
+        return new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 200),
+        );
       });
 
       // Start navigation but don't wait for it to complete
-      router.navigate("users");
+      const navPromise = router.navigate("users");
 
-      // Wait just enough for transition to start (group opened)
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      // Stop after transition starts (group opened)
+      setTimeout(() => {
+        consoleGroupEndSpy.mockClear();
+        router.stop();
+      }, 10);
 
-      consoleGroupEndSpy.mockClear();
-
-      router.stop();
+      await vi.runAllTimersAsync();
 
       expect(consoleGroupEndSpy).toHaveBeenCalled();
+
+      // Clean up the pending promise
+      try {
+        await navPromise;
+      } catch {
+        // Expected error
+      }
+
+      router.clearMiddleware();
+      vi.useRealTimers();
     });
 
-    it("should not open multiple groups for same transition", () => {
+    it("should not open multiple groups for same transition", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       consoleGroupSpy.mockClear(); // Clear calls from start
 
-      router.navigate("users");
+      await router.navigate("users");
 
       // Group should be opened once for this navigation
       expect(consoleGroupSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("should auto-detect console.group support", () => {
+    it("should auto-detect console.group support", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       // Should use groups if available
       expect(consoleGroupSpy).toHaveBeenCalled();
@@ -227,41 +262,40 @@ describe("@real-router/logger-plugin", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle missing console.group gracefully", () => {
+    it("should handle missing console.group gracefully", async () => {
       const originalGroup = console.group;
 
-      // @ts-expect-error - testing edge case
-      console.group = undefined;
+      delete (console as any).group;
 
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      expect(() => router.navigate("users")).not.toThrowError();
+      await router.navigate("users");
+
+      expect(loggerSpy).toHaveBeenCalled();
 
       console.group = originalGroup;
     });
 
-    it("should handle missing console.groupEnd gracefully", () => {
+    it("should handle missing console.groupEnd gracefully", async () => {
       const originalGroupEnd = console.groupEnd;
 
-      // @ts-expect-error - testing edge case
-      console.groupEnd = undefined;
+      delete (console as any).groupEnd;
 
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      router.navigate("users", {}, {}, () => {
-        expect(loggerSpy).toHaveBeenCalled();
+      await router.navigate("users", {}, {});
 
-        console.groupEnd = originalGroupEnd;
-      });
+      expect(loggerSpy).toHaveBeenCalled();
+
+      console.groupEnd = originalGroupEnd;
     });
 
     it("should handle missing console object gracefully", () => {
       const originalConsole = globalThis.console;
 
-      // @ts-expect-error - testing edge case
-      globalThis.console = undefined;
+      delete (globalThis as any).console;
 
       router.usePlugin(loggerPlugin);
 
@@ -270,59 +304,69 @@ describe("@real-router/logger-plugin", () => {
       globalThis.console = originalConsole;
     });
 
-    it("should not open group twice for same transition", () => {
+    it("should not open group twice for same transition", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       consoleGroupSpy.mockClear();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(consoleGroupSpy).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle rapid transitions correctly", () => {
+    it("should handle rapid transitions correctly", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
 
-      let callbackCount = 0;
-      const checkDone = () => {
-        callbackCount++;
-        if (callbackCount !== 2) {
-          return;
-        }
+      await router.navigate("users", {}, {});
+      await router.navigate("admin", {}, {});
 
-        expect(consoleGroupEndSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
-      };
-
-      router.navigate("users", {}, {}, checkDone);
-      router.navigate("admin", {}, {}, checkDone);
+      expect(consoleGroupEndSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should cleanup on teardown", async () => {
-      // Use middleware that delays completion to keep group open
-      router.useMiddleware(() => (_toState, _fromState, done) => {
-        setTimeout(done, 100);
-      });
+      vi.useFakeTimers();
 
       const unsubscribe = router.usePlugin(loggerPlugin);
 
-      router.start();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await router.start();
+
+      // Use async middleware to keep transition in-progress (group stays open, after start)
+      router.useMiddleware(() => (_toState, _fromState) => {
+        return new Promise((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 200),
+        );
+      });
 
       // Start navigation but don't wait for it to complete
-      router.navigate("users");
-      await new Promise((resolve) => setTimeout(resolve, 10));
+      const navPromise = router.navigate("users");
 
-      consoleGroupEndSpy.mockClear();
+      // Teardown after transition starts (group opened)
+      setTimeout(() => {
+        consoleGroupEndSpy.mockClear();
+        unsubscribe();
+      }, 10);
 
-      unsubscribe();
+      await vi.runAllTimersAsync();
 
       expect(consoleGroupEndSpy).toHaveBeenCalled();
+
+      // Clean up the pending promise
+      try {
+        await navPromise;
+      } catch {
+        // Expected error
+      }
+
+      router.clearMiddleware();
+      vi.useRealTimers();
     });
   });
 
   describe("Integration with Router", () => {
-    it("should work with multiple plugins", () => {
+    it("should work with multiple plugins", async () => {
       const customPlugin = () => () => ({
         onStart: vi.fn(),
         onTransitionSuccess: vi.fn(),
@@ -331,19 +375,19 @@ describe("@real-router/logger-plugin", () => {
       router.usePlugin(customPlugin());
       router.usePlugin(loggerPlugin);
 
-      router.start();
+      await router.start();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalled();
     });
 
-    it("should log nested route transitions", () => {
+    it("should log nested route transitions", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "123" });
+      await router.navigate("users.view", { id: "123" });
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin]"),
@@ -351,12 +395,12 @@ describe("@real-router/logger-plugin", () => {
       );
     });
 
-    it("should log transitions with parameters", () => {
+    it("should log transitions with parameters", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "42" });
+      await router.navigate("users.view", { id: "42" });
 
       const calls = loggerSpy.mock.calls;
       const transitionCall = calls.find((call: unknown[]) =>
@@ -371,28 +415,28 @@ describe("@real-router/logger-plugin", () => {
       });
     });
 
-    it("should handle router restart", () => {
+    it("should handle router restart", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       router.stop();
       loggerSpy.mockClear();
 
-      router.start();
+      await router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith("[logger-plugin] Router started");
     });
   });
 
   describe("Params Diff Feature", () => {
-    it("should show params diff when navigating within same route (default behavior)", () => {
+    it("should show params diff when navigating within same route (default behavior)", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "123" });
+      await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "456" });
+      await router.navigate("users.view", { id: "456" });
 
       expect(loggerSpy).toHaveBeenCalledWith(
         expect.stringContaining(
@@ -401,15 +445,15 @@ describe("@real-router/logger-plugin", () => {
       );
     });
 
-    it("should not show diff when navigating to different route", () => {
+    it("should not show diff when navigating to different route", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "123" });
+      await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
 
-      router.navigate("admin");
+      await router.navigate("admin");
 
       const calls = loggerSpy.mock.calls.map(
         (call: unknown[]) => call[0] as string,
@@ -419,13 +463,13 @@ describe("@real-router/logger-plugin", () => {
       expect(hasDiff).toBe(false);
     });
 
-    it("should not show diff when params are identical", () => {
+    it("should not show diff when params are identical", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
-      router.navigate("users.view", { id: "123" });
+      await router.start();
+      await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
 
-      router.navigate("users.view", { id: "123" }, { reload: true });
+      await router.navigate("users.view", { id: "123" }, { reload: true });
 
       const calls = loggerSpy.mock.calls.map(
         (call: unknown[]) => call[0] as string,
@@ -442,22 +486,21 @@ describe("@real-router/logger-plugin", () => {
   });
 
   describe("Backward Compatibility", () => {
-    it("should work with default loggerPlugin export", () => {
+    it("should work with default loggerPlugin export", async () => {
       router.usePlugin(loggerPlugin);
 
-      router.start();
+      await router.start();
 
       expect(loggerSpy).toHaveBeenCalledWith("[logger-plugin] Router started");
     });
 
-    it("should maintain behavior for default usage", () => {
+    it("should maintain behavior for default usage", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
-
+      await router.start();
       loggerSpy.mockClear();
       consoleGroupSpy.mockClear();
 
-      router.navigate("users");
+      await router.navigate("users");
 
       // Should log transition
       expect(loggerSpy).toHaveBeenCalled();
@@ -469,11 +512,11 @@ describe("@real-router/logger-plugin", () => {
   });
 
   describe("Stress Testing", () => {
-    it("should handle 100 transitions without errors", () => {
+    it("should handle 100 transitions without errors", async () => {
       router.usePlugin(loggerPlugin);
-      router.start();
+      await router.start();
       for (let i = 0; i < 100; i++) {
-        router.navigate(i % 2 ? "users" : "admin");
+        await router.navigate(i % 2 ? "users" : "admin");
       }
 
       expect(() => router.getState()).not.toThrowError();
@@ -482,83 +525,128 @@ describe("@real-router/logger-plugin", () => {
 
   describe("Configuration Options", () => {
     describe("level option", () => {
-      it("should not log anything when level is 'none'", () => {
+      it("should not log anything when level is 'none'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "none" }));
-        router.start();
+        await router.start();
 
         expect(loggerSpy).not.toHaveBeenCalled();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         expect(loggerSpy).not.toHaveBeenCalled();
         expect(warnSpy).not.toHaveBeenCalled();
       });
 
-      it("should not log errors when level is 'none'", () => {
+      it("should not log errors when level is 'none'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "none" }));
-        router.start();
+        await router.start();
         errorSpy.mockClear();
-
-        router.navigate("nonexistent");
+        try {
+          await router.navigate("nonexistent");
+        } catch {
+          // Expected error
+        }
 
         expect(errorSpy).not.toHaveBeenCalled();
       });
 
       it("should not log cancel when level is 'none'", async () => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          setTimeout(done, 10);
-        });
+        vi.useFakeTimers();
+
         router.usePlugin(loggerPluginFactory({ level: "none" }));
-        router.start();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await router.start();
         warnSpy.mockClear();
 
-        const cancel = router.navigate("users");
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return new Promise((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 200),
+          );
+        });
 
-        cancel();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        const navPromise = router.navigate("users");
+
+        setTimeout(() => {
+          router.stop();
+        }, 10);
+
+        await vi.runAllTimersAsync();
+
+        try {
+          await navPromise;
+        } catch {
+          // Expected TRANSITION_CANCELLED error
+        }
 
         expect(warnSpy).not.toHaveBeenCalled();
+
+        router.clearMiddleware();
+        await router.start();
+        vi.useRealTimers();
       });
 
       it("should not log cancel when level is 'errors'", async () => {
-        router.useMiddleware(() => (_toState, _fromState, done) => {
-          setTimeout(done, 10);
-        });
+        vi.useFakeTimers();
+
         router.usePlugin(loggerPluginFactory({ level: "errors" }));
-        router.start();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        await router.start();
         warnSpy.mockClear();
 
-        const cancel = router.navigate("users");
+        router.useMiddleware(() => (_toState, _fromState) => {
+          return new Promise((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 200),
+          );
+        });
 
-        cancel();
-        await new Promise((resolve) => setTimeout(resolve, 50));
+        const navPromise = router.navigate("users");
+
+        setTimeout(() => {
+          router.stop();
+        }, 10);
+
+        await vi.runAllTimersAsync();
+
+        try {
+          await navPromise;
+        } catch {
+          // Expected TRANSITION_CANCELLED error
+        }
 
         expect(warnSpy).not.toHaveBeenCalled();
+
+        router.clearMiddleware();
+        await router.start();
+        vi.useRealTimers();
       });
 
-      it("should log only errors when level is 'errors'", () => {
+      it("should log only errors when level is 'errors'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "errors" }));
-        router.start();
+        await router.start();
 
         expect(loggerSpy).not.toHaveBeenCalled();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         expect(loggerSpy).not.toHaveBeenCalled();
 
-        router.navigate("nonexistent");
+        try {
+          await router.navigate("nonexistent");
+        } catch {
+          // Expected error
+        }
 
         expect(errorSpy).toHaveBeenCalled();
       });
 
-      it("should log transitions but not lifecycle when level is 'transitions'", () => {
+      it("should log transitions but not lifecycle when level is 'transitions'", async () => {
         router.usePlugin(loggerPluginFactory({ level: "transitions" }));
-        router.start();
+        await router.start();
         loggerSpy.mockClear();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         expect(loggerSpy).toHaveBeenCalledWith(
           expect.stringContaining("[logger-plugin] Transition:"),
@@ -568,12 +656,12 @@ describe("@real-router/logger-plugin", () => {
     });
 
     describe("showTiming option", () => {
-      it("should not show timing when showTiming is false", () => {
+      it("should not show timing when showTiming is false", async () => {
         router.usePlugin(loggerPluginFactory({ showTiming: false }));
-        router.start();
+        await router.start();
         loggerSpy.mockClear();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         const successCall = loggerSpy.mock.calls.find((call: unknown[]) =>
           (call[0] as string).includes("Transition success"),
@@ -582,12 +670,12 @@ describe("@real-router/logger-plugin", () => {
         expect(successCall?.[0]).not.toMatch(/\(\d+/);
       });
 
-      it("should show timing when showTiming is true (default)", () => {
+      it("should show timing when showTiming is true (default)", async () => {
         router.usePlugin(loggerPluginFactory({ showTiming: true }));
-        router.start();
+        await router.start();
         loggerSpy.mockClear();
 
-        router.navigate("users");
+        await router.navigate("users");
 
         const successCall = loggerSpy.mock.calls.find((call: unknown[]) =>
           (call[0] as string).includes("Transition success"),
@@ -598,13 +686,13 @@ describe("@real-router/logger-plugin", () => {
     });
 
     describe("showParamsDiff option", () => {
-      it("should not show params diff when showParamsDiff is false", () => {
+      it("should not show params diff when showParamsDiff is false", async () => {
         router.usePlugin(loggerPluginFactory({ showParamsDiff: false }));
-        router.start();
-        router.navigate("users.view", { id: "123" });
+        await router.start();
+        await router.navigate("users.view", { id: "123" });
         loggerSpy.mockClear();
 
-        router.navigate("users.view", { id: "456" });
+        await router.navigate("users.view", { id: "456" });
 
         const calls = loggerSpy.mock.calls.map(
           (call: unknown[]) => call[0] as string,
@@ -616,9 +704,9 @@ describe("@real-router/logger-plugin", () => {
     });
 
     describe("context option", () => {
-      it("should use custom context", () => {
+      it("should use custom context", async () => {
         router.usePlugin(loggerPluginFactory({ context: "my-router" }));
-        router.start();
+        await router.start();
 
         expect(loggerSpy).toHaveBeenCalledWith("[my-router] Router started");
       });

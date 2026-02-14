@@ -71,7 +71,7 @@ describe("core/dependencies/setDependency", () => {
     const isDev = false;
 
     // @ts-expect-error: testing conditional setup
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
     router.setDependency("devLogger", isDev ? console : undefined);
 
     expect(router.hasDependency("devLogger" as "foo")).toBe(false);

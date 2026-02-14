@@ -7,30 +7,14 @@ import { RouterError } from "../../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../../transitionPath";
 
 import type { TransitionDependencies } from "../types";
-import type {
-  NavigationOptions,
-  CancelFn,
-  State,
-  RouterError as RouterErrorType,
-} from "@real-router/types";
+import type { NavigationOptions, State } from "@real-router/types";
 
-/**
- * Strict callback type where state is always provided.
- * Used internally in transition chain where state is guaranteed.
- */
-type StrictDoneFn = (error: RouterErrorType | undefined, state: State) => void;
-
-export function transition(
+export async function transition(
   deps: TransitionDependencies,
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
-  transitionCallback: (err: RouterErrorType | undefined, state: State) => void,
-): CancelFn {
-  // The state of transaction
-  let cancelled = false;
-  let completed = false;
-
+): Promise<State> {
   // We're caching the necessary data
   const [canDeactivateFunctions, canActivateFunctions] =
     deps.getLifecycleFunctions();
@@ -41,143 +25,73 @@ export function transition(
   // Issue #36: Check both explicit cancellation AND router shutdown
   // Issue #50: Use isActive() instead of isStarted() for two-phase start support
   // isActive() is true during initial start transition, isStarted() is false
-  const isCancelled = () => cancelled || !deps.isActive();
+  const isCancelled = () => !deps.isActive();
 
-  const cancel = () => {
-    if (!cancelled && !completed) {
-      cancelled = true;
-      complete(new RouterError(errorCodes.TRANSITION_CANCELLED));
+  const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
+
+  // determine the necessary steps
+  const shouldDeactivate =
+    fromState && !opts.forceDeactivate && toDeactivate.length > 0;
+  const shouldActivate = !isUnknownRoute && toActivate.length > 0;
+  const shouldRunMiddleware = middlewareFunctions.length > 0;
+
+  let currentState = toState;
+
+  if (shouldDeactivate) {
+    currentState = await executeLifecycleHooks(
+      canDeactivateFunctions,
+      toState,
+      fromState,
+      toDeactivate,
+      errorCodes.CANNOT_DEACTIVATE,
+      isCancelled,
+    );
+  }
+
+  if (isCancelled()) {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
+
+  if (shouldActivate) {
+    currentState = await executeLifecycleHooks(
+      canActivateFunctions,
+      currentState,
+      fromState,
+      toActivate,
+      errorCodes.CANNOT_ACTIVATE,
+      isCancelled,
+    );
+  }
+
+  if (isCancelled()) {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
+
+  if (shouldRunMiddleware) {
+    currentState = await executeMiddleware(
+      middlewareFunctions,
+      currentState,
+      fromState,
+      isCancelled,
+    );
+  }
+
+  if (isCancelled()) {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
+
+  // Automatic cleaning of inactive segments
+  if (fromState) {
+    const activeSegments = nameToIDs(toState.name);
+    const previousActiveSegments = nameToIDs(fromState.name);
+    const activeSet = new Set(activeSegments);
+
+    for (const name of previousActiveSegments) {
+      if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
+        deps.clearCanDeactivate(name);
+      }
     }
-  };
+  }
 
-  const complete = (err: RouterErrorType | undefined, state?: State) => {
-    if (completed) {
-      return;
-    }
-
-    completed = true;
-    transitionCallback(err, state ?? toState);
-  };
-
-  // The main transaction logic
-  const runTransition = (): void => {
-    const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
-
-    // determine the necessary steps
-    const shouldDeactivate =
-      fromState && !opts.forceDeactivate && toDeactivate.length > 0;
-    const shouldActivate = !isUnknownRoute && toActivate.length > 0;
-    const shouldRunMiddleware = middlewareFunctions.length > 0;
-
-    // The chain of execution
-    const runDeactivation = (callback: StrictDoneFn) => {
-      if (shouldDeactivate) {
-        executeLifecycleHooks(
-          canDeactivateFunctions,
-          toState,
-          fromState,
-          toDeactivate,
-          errorCodes.CANNOT_DEACTIVATE,
-          isCancelled,
-          callback,
-        );
-      } else {
-        callback(undefined, toState);
-      }
-    };
-
-    const runActivation = (state: State, callback: StrictDoneFn) => {
-      if (shouldActivate) {
-        executeLifecycleHooks(
-          canActivateFunctions,
-          state,
-          fromState,
-          toActivate,
-          errorCodes.CANNOT_ACTIVATE,
-          isCancelled,
-          (err, newState) => {
-            callback(err, newState);
-          },
-        );
-      } else {
-        // State is already frozen from makeState()
-        callback(undefined, state);
-      }
-    };
-
-    const runMiddleware = (state: State, callback: StrictDoneFn) => {
-      if (shouldRunMiddleware) {
-        executeMiddleware(
-          middlewareFunctions,
-          state,
-          fromState,
-          isCancelled,
-          (err, newState) => {
-            callback(err, newState);
-          },
-        );
-      } else {
-        // State is already frozen from makeState()
-        callback(undefined, state);
-      }
-    };
-
-    // Callback handlers extracted to reduce nesting depth
-    const handleMiddlewareComplete: StrictDoneFn = (
-      runMiddlewareErr,
-      runMiddlewareState,
-    ) => {
-      if (runMiddlewareErr) {
-        complete(runMiddlewareErr, runMiddlewareState);
-
-        return;
-      }
-
-      // Automatic cleaning of inactive segments
-      if (fromState) {
-        const activeSegments = nameToIDs(toState.name);
-        const previousActiveSegments = nameToIDs(fromState.name);
-        const activeSet = new Set(activeSegments);
-
-        for (const name of previousActiveSegments) {
-          if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
-            deps.clearCanDeactivate(name);
-          }
-        }
-      }
-
-      complete(undefined, runMiddlewareState);
-    };
-
-    const handleActivationComplete: StrictDoneFn = (
-      runActivationErr,
-      runActivationState,
-    ) => {
-      if (runActivationErr) {
-        complete(runActivationErr, runActivationState);
-
-        return;
-      }
-
-      runMiddleware(runActivationState, handleMiddlewareComplete);
-    };
-
-    const handleDeactivationComplete: StrictDoneFn = (err, state) => {
-      if (err) {
-        complete(err, state);
-
-        return;
-      }
-
-      runActivation(state, handleActivationComplete);
-    };
-
-    // perform a chain
-    runDeactivation(handleDeactivationComplete);
-  };
-
-  // Launch transition
-  runTransition();
-
-  return cancel;
+  return currentState;
 }

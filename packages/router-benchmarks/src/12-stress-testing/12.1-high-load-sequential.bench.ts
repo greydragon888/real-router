@@ -81,9 +81,9 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
   bench("12.1.6 Thousand navigate -> cancel -> navigate cycles", () => {
     for (let i = 0; i < 1000; i++) {
-      const cancel = router.navigate("about");
+      void router.navigate("about");
 
-      cancel();
+      router.cancel();
       router.navigate("users");
     }
   }).gc("inner");

@@ -12,9 +12,9 @@ import type {
 let router: Router;
 
 describe("core/routes/routeTree/getRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -418,11 +418,7 @@ describe("core/routes/routeTree/getRoute", () => {
           return true;
         });
 
-        await new Promise<void>((resolve) => {
-          router.navigate("ec-slow", () => {
-            resolve();
-          });
-        });
+        await router.navigate("ec-slow", {});
 
         // getRoute should return correct data even during navigation
         expect(routeDuringNavigation!).toBeDefined();

@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - error sync exceptions", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -23,7 +23,7 @@ describe("router.navigate() - error sync exceptions", () => {
 
   describe("error handling in guards and middleware", () => {
     describe("error in canDeactivate", () => {
-      it("should handle synchronous error in canDeactivate guard", () => {
+      it("should handle synchronous error in canDeactivate guard", async () => {
         const errorMessage = "Deactivate guard error";
         const errorDeactivateGuard = vi.fn().mockImplementation(() => {
           throw new Error(errorMessage);
@@ -32,22 +32,24 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addDeactivateGuard("orders.pending", () => errorDeactivateGuard);
 
         // Navigate to initial state
-        router.navigate("orders.pending", {}, {}, (err) => {
-          expect(err).toBeUndefined();
-        });
+        await router.navigate("orders.pending", {}, {});
 
         errorDeactivateGuard.mockClear();
 
         // Navigate away - should fail with error
-        router.navigate("profile", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe(errorMessage);
-        });
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
+        }
 
         expect(errorDeactivateGuard).toHaveBeenCalledTimes(1);
       });
 
-      it("should stop transition on canDeactivate error", () => {
+      it("should stop transition on canDeactivate error", async () => {
         const errorGuard = vi.fn().mockImplementation(() => {
           throw new Error("First guard error");
         });
@@ -57,17 +59,19 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addDeactivateGuard("orders.pending", () => nextGuard); // Called first
         router.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
 
-        router.navigate("orders.pending", {}, {}, (err) => {
-          expect(err).toBeUndefined();
-        });
+        await router.navigate("orders.pending", {}, {});
 
         errorGuard.mockClear();
         nextGuard.mockClear();
 
-        router.navigate("profile", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe("First guard error");
-        });
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe("First guard error");
+        }
 
         // Both guards should be called, but error stops transition
         expect(nextGuard).toHaveBeenCalledTimes(1); // Child guard called first
@@ -76,7 +80,7 @@ describe("router.navigate() - error sync exceptions", () => {
     });
 
     describe("error in canActivate", () => {
-      it("should handle synchronous error in canActivate guard", () => {
+      it("should handle synchronous error in canActivate guard", async () => {
         const errorMessage = "Activate guard error";
         const errorActivateGuard = vi.fn().mockImplementation(() => {
           throw new Error(errorMessage);
@@ -84,15 +88,19 @@ describe("router.navigate() - error sync exceptions", () => {
 
         router.addActivateGuard("profile", () => errorActivateGuard);
 
-        router.navigate("profile", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe(errorMessage);
-        });
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
+        }
 
         expect(errorActivateGuard).toHaveBeenCalledTimes(1);
       });
 
-      it("should stop activation on canActivate error", () => {
+      it("should stop activation on canActivate error", async () => {
         const errorGuard = vi.fn().mockImplementation(() => {
           throw new Error("Activation error");
         });
@@ -101,10 +109,14 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addActivateGuard("settings", () => errorGuard);
         router.addActivateGuard("settings.account", () => nextGuard);
 
-        router.navigate("settings.account", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe("Activation error");
-        });
+        try {
+          await router.navigate("settings.account");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe("Activation error");
+        }
 
         expect(errorGuard).toHaveBeenCalledTimes(1);
         // Next guard should not be called due to error
@@ -113,7 +125,7 @@ describe("router.navigate() - error sync exceptions", () => {
     });
 
     describe("error in middleware", () => {
-      it("should handle synchronous error in middleware", () => {
+      it("should handle synchronous error in middleware", async () => {
         const errorMessage = "Middleware error";
         const errorMiddleware = vi.fn().mockImplementation(() => {
           throw new Error(errorMessage);
@@ -121,13 +133,17 @@ describe("router.navigate() - error sync exceptions", () => {
 
         router.useMiddleware(() => errorMiddleware);
 
-        router.navigate("orders.pending", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe(errorMessage);
-        });
+        try {
+          await router.navigate("orders.pending");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
+        }
       });
 
-      it("should stop middleware chain on error", () => {
+      it("should stop middleware chain on error", async () => {
         const errorMessage = "First middleware error";
 
         const errorMiddleware = vi.fn().mockImplementation(() => {
@@ -138,17 +154,21 @@ describe("router.navigate() - error sync exceptions", () => {
         router.useMiddleware(() => errorMiddleware);
         router.useMiddleware(() => nextMiddleware);
 
-        router.navigate("profile", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe(errorMessage);
-        });
+        try {
+          await router.navigate("profile");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
+        }
 
         expect(errorMiddleware).toHaveBeenCalledTimes(1);
         // Next middleware should not be called due to error
         expect(nextMiddleware).not.toHaveBeenCalled();
       });
 
-      it("should handle middleware error even with guards present", () => {
+      it("should handle middleware error even with guards present", async () => {
         const errorMessage = "Middleware failed";
 
         const activateGuard = vi.fn().mockReturnValue(true);
@@ -159,10 +179,14 @@ describe("router.navigate() - error sync exceptions", () => {
         router.addActivateGuard("orders", () => activateGuard);
         router.useMiddleware(() => errorMiddleware);
 
-        router.navigate("orders", (err) => {
-          expect(err).toBeDefined();
-          expect(err?.message).toBe(errorMessage);
-        });
+        try {
+          await router.navigate("orders");
+
+          expect.fail("Should have thrown error");
+        } catch (error) {
+          expect(error).toBeDefined();
+          expect((error as any)?.message).toBe(errorMessage);
+        }
       });
     });
   });
@@ -177,21 +201,23 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addActivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      expect(result.err?.message).toBe("canActivate failed synchronously");
-      expect(result.err?.stack).toBeDefined();
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect((error as any)?.message).toBe(
+          "canActivate failed synchronously",
+        );
+        expect((error as any)?.stack).toBeDefined();
+      }
     });
 
     // Test 2: canDeactivate throws synchronous exception
     it("should catch synchronous exception from canDeactivate", async () => {
-      router.navigate("users");
+      await router.navigate("users");
 
       // Factory returns function that throws
       const throwingHookFactory = () => () => {
@@ -200,15 +226,17 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addDeactivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("index", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("index");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(result.err?.message).toBe("canDeactivate failed synchronously");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect((error as any)?.message).toBe(
+          "canDeactivate failed synchronously",
+        );
+      }
     });
 
     // Test 3: Middleware throws synchronous exception
@@ -220,15 +248,15 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.useMiddleware(throwingMiddlewareFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_ERR);
-      expect(result.err?.message).toBe("Middleware failed synchronously");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any)?.message).toBe("Middleware failed synchronously");
+      }
     });
 
     // Test 4: Segment name is preserved in error metadata for lifecycle hooks
@@ -239,14 +267,14 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addActivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err.segment).toBe("users");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any).segment).toBe("users");
+      }
     });
 
     // Test 5: Error.cause is preserved (ES2022+)
@@ -262,15 +290,15 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addActivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err.cause).toBe(rootCause);
-      expect(result.err.message).toBe("Hook error with cause");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any).cause).toBe(rootCause);
+        expect((error as any).message).toBe("Hook error with cause");
+      }
     });
 
     // Test 6: Navigation stops on error
@@ -283,15 +311,15 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addActivateGuard("users", throwingHookFactory);
 
-      await new Promise<void>((resolve) => {
-        router.navigate("users", (err) => {
-          expect(err).toBeDefined();
-          // Router state should not change
-          expect(router.getState()).toStrictEqual(initialState);
+      try {
+        await router.navigate("users");
 
-          resolve();
-        });
-      });
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        // Router state should not change
+        expect(router.getState()).toStrictEqual(initialState);
+      }
     });
 
     // Test 7: Handling plain object instead of Error (canActivate)
@@ -303,16 +331,16 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addActivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-      expect(result.err.custom).toBe("error");
-      expect(result.err.segment).toBe("users");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
+        expect((error as any).custom).toBe("error");
+        expect((error as any).segment).toBe("users");
+      }
     });
 
     // Test 8: Handling plain object instead of Error (middleware)
@@ -324,21 +352,21 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.useMiddleware(throwingMiddlewareFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_ERR);
-      expect(result.err.custom).toBe("middleware error");
-      expect(result.err.data).toBe(123);
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any).custom).toBe("middleware error");
+        expect((error as any).data).toBe(123);
+      }
     });
 
     // Test 9: Handling string instead of Error (canDeactivate)
     it("should handle string thrown from canDeactivate", async () => {
-      router.navigate("users");
+      await router.navigate("users");
 
       const throwingHookFactory = () => () => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
@@ -347,15 +375,15 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.addDeactivateGuard("users", throwingHookFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("index", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("index");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(result.err.segment).toBe("users");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
+        expect((error as any).segment).toBe("users");
+      }
     });
 
     // Test 10: Handling number instead of Error (middleware)
@@ -367,14 +395,14 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.useMiddleware(throwingMiddlewareFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+      }
     });
 
     // Test 11: Error.cause is preserved for middleware
@@ -390,16 +418,16 @@ describe("router.navigate() - error sync exceptions", () => {
 
       router.useMiddleware(throwingMiddlewareFactory);
 
-      const result = await new Promise<{ err: any }>((resolve) => {
-        router.navigate("users", (err) => {
-          resolve({ err });
-        });
-      });
+      try {
+        await router.navigate("users");
 
-      expect(result.err).toBeDefined();
-      expect(result.err?.code).toBe(errorCodes.TRANSITION_ERR);
-      expect(result.err.cause).toBe(rootCause);
-      expect(result.err.message).toBe("Middleware error with cause");
+        expect.fail("Should have thrown error");
+      } catch (error) {
+        expect(error).toBeDefined();
+        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+        expect((error as any).cause).toBe(rootCause);
+        expect((error as any).message).toBe("Middleware error with cause");
+      }
     });
   });
 });

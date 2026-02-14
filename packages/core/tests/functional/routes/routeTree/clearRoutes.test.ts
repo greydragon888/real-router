@@ -10,9 +10,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/clearRoutes", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    router.start("");
+    await router.start();
   });
 
   afterEach(() => {
@@ -20,7 +20,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("basic functionality", () => {
-    it("should clear all routes from tree", () => {
+    it("should clear all routes from tree", async () => {
       // createTestRouter adds default routes (home, etc.)
       expect(router.matchPath("/")).toBeDefined();
 
@@ -30,13 +30,13 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/")).toBeUndefined();
     });
 
-    it("should return router for chaining", () => {
+    it("should return router for chaining", async () => {
       const result = router.clearRoutes();
 
       expect(result).toBe(router);
     });
 
-    it("should allow adding routes after clearing", () => {
+    it("should allow adding routes after clearing", async () => {
       router.clearRoutes();
 
       router.addRoute({ name: "newHome", path: "/new-home" });
@@ -44,7 +44,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/new-home")?.name).toBe("newHome");
     });
 
-    it("should clear nested routes", () => {
+    it("should clear nested routes", async () => {
       router.addRoute({
         name: "parent",
         path: "/parent",
@@ -68,7 +68,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/parent/child/grandchild")).toBeUndefined();
     });
 
-    it("should work when called multiple times", () => {
+    it("should work when called multiple times", async () => {
       router.clearRoutes();
       router.clearRoutes();
       router.clearRoutes();
@@ -79,7 +79,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/test")?.name).toBe("test");
     });
 
-    it("should work when router has no routes", () => {
+    it("should work when router has no routes", async () => {
       router.clearRoutes();
 
       // Second clear should not throw
@@ -88,7 +88,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("config cleanup", () => {
-    it("should clear decoders", () => {
+    it("should clear decoders", async () => {
       const decodeParams = vi.fn((params) => ({
         ...params,
         id: Number(params.id),
@@ -115,7 +115,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/with-decoder/123")).toBeUndefined();
     });
 
-    it("should clear encoders", () => {
+    it("should clear encoders", async () => {
       const encodeParams = vi.fn((params) => ({
         ...params,
         id: `${params.id as number}`,
@@ -138,7 +138,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.hasRoute("decoded")).toBe(false);
     });
 
-    it("should clear defaultParams", () => {
+    it("should clear defaultParams", async () => {
       router.addRoute({
         name: "withDefaults",
         path: "/with-defaults",
@@ -157,7 +157,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.hasRoute("withDefaults")).toBe(false);
     });
 
-    it("should clear forwardMap", () => {
+    it("should clear forwardMap", async () => {
       router.addRoute({ name: "target", path: "/target" });
       router.addRoute({
         name: "redirect",
@@ -177,7 +177,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("lifecycle cleanup", () => {
-    it("should clear canActivate handlers", () => {
+    it("should clear canActivate handlers", async () => {
       router.addRoute({
         name: "protected",
         path: "/protected",
@@ -185,9 +185,11 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Verify guard is active before clear
-      router.navigate("protected", (err) => {
-        expect(err?.code).toBe("CANNOT_ACTIVATE");
-      });
+      try {
+        await router.navigate("protected");
+      } catch (error: any) {
+        expect(error?.code).toBe("CANNOT_ACTIVATE");
+      }
 
       router.clearRoutes();
 
@@ -195,23 +197,23 @@ describe("core/routes/clearRoutes", () => {
       router.addRoute({ name: "protected", path: "/protected" });
 
       // Navigation should succeed (no guard after clear)
-      router.navigate("protected", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("protected");
 
       expect(router.getState()?.name).toBe("protected");
     });
 
-    it("should clear canDeactivate handlers", () => {
+    it("should clear canDeactivate handlers", async () => {
       router.addRoute({ name: "editor", path: "/editor" });
       router.addDeactivateGuard("editor", () => () => false); // blocking guard
 
-      router.navigate("editor");
+      await router.navigate("editor");
 
       // Try to leave - should be blocked
-      router.navigate("home", (err) => {
-        expect(err?.code).toBe("CANNOT_DEACTIVATE");
-      });
+      try {
+        await router.navigate("home");
+      } catch (error: any) {
+        expect(error?.code).toBe("CANNOT_DEACTIVATE");
+      }
 
       expect(router.getState()?.name).toBe("editor");
 
@@ -220,17 +222,15 @@ describe("core/routes/clearRoutes", () => {
       // Re-add routes without guards
       router.addRoute({ name: "editor", path: "/editor" });
       router.addRoute({ name: "home", path: "/home" });
-      router.navigate("editor");
+      await router.navigate("editor");
 
       // Now leaving should work (guard was cleared)
-      router.navigate("home", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should clear all lifecycle handlers for all routes", () => {
+    it("should clear all lifecycle handlers for all routes", async () => {
       router.addRoute({
         name: "route1",
         path: "/route1",
@@ -251,20 +251,16 @@ describe("core/routes/clearRoutes", () => {
       router.addRoute({ name: "route2", path: "/route2" });
 
       // All navigations should work (all guards were cleared)
-      router.navigate("home");
-      router.navigate("route1", (err) => {
-        expect(err).toBeUndefined();
-      });
-      router.navigate("route2", (err) => {
-        expect(err).toBeUndefined();
-      });
+      await router.navigate("home");
+      await router.navigate("route1");
+      await router.navigate("route2");
 
       expect(router.getState()?.name).toBe("route2");
     });
   });
 
   describe("preserves non-route state", () => {
-    it("should preserve plugins", () => {
+    it("should preserve plugins", async () => {
       const pluginCalls: string[] = [];
       const plugin = () => ({
         onTransitionStart: () => {
@@ -278,19 +274,19 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify plugin is still active
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      await router.navigate("test");
 
       // Plugin should have been called (proving it's still registered)
       expect(pluginCalls).toContain("start");
     });
 
-    it("should preserve middleware", () => {
+    it("should preserve middleware", async () => {
       const middlewareCalls: string[] = [];
-      const middleware =
-        () => (_toState: unknown, _fromState: unknown, done: () => void) => {
-          middlewareCalls.push("mw");
-          done();
-        };
+      const middleware = () => async () => {
+        middlewareCalls.push("mw");
+
+        return true;
+      };
 
       router.useMiddleware(middleware);
 
@@ -298,13 +294,13 @@ describe("core/routes/clearRoutes", () => {
 
       // Add route and navigate to verify middleware is still active
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      await router.navigate("test");
 
       // Middleware should have been called (proving it's still registered)
       expect(middlewareCalls).toContain("mw");
     });
 
-    it("should preserve dependencies", () => {
+    it("should preserve dependencies", async () => {
       interface TestDeps {
         api: { fetch: () => void };
       }
@@ -317,7 +313,7 @@ describe("core/routes/clearRoutes", () => {
       expect(typedRouter.hasDependency("api")).toBe(true);
     });
 
-    it("should preserve options", () => {
+    it("should preserve options", async () => {
       // Options set before start are preserved
       const options = router.getOptions();
 
@@ -327,7 +323,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getOptions().trailingSlash).toBe(options.trailingSlash);
     });
 
-    it("should preserve event listeners", () => {
+    it("should preserve event listeners", async () => {
       const eventLog: string[] = [];
 
       router.addEventListener(events.TRANSITION_SUCCESS, () => {
@@ -338,7 +334,7 @@ describe("core/routes/clearRoutes", () => {
 
       // Add a route and navigate to verify listener is preserved
       router.addRoute({ name: "test", path: "/test" });
-      router.navigate("test");
+      await router.navigate("test");
 
       // Listener should fire after navigation
       expect(eventLog).toContain("success");
@@ -346,11 +342,11 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("state after clearRoutes - edge cases", () => {
-    it("should clear state to undefined after clearRoutes", () => {
+    it("should clear state to undefined after clearRoutes", async () => {
       // Navigate to a route first
-      router.navigate("home");
+      await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       // Clear all routes
       router.clearRoutes();
@@ -362,8 +358,8 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/home")).toBeUndefined();
     });
 
-    it("should have consistent state - both state and matchPath are undefined", () => {
-      router.navigate("users.list");
+    it("should have consistent state - both state and matchPath are undefined", async () => {
+      await router.navigate("users.list");
 
       const currentState = router.getState();
 
@@ -379,35 +375,36 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/users/list")).toBeUndefined();
     });
 
-    it("should return cancel function when navigating to non-existent route", () => {
+    it("should return cancel function when navigating to non-existent route", async () => {
       router.clearRoutes();
 
       // Navigation to non-existent route returns cancel function (noop)
       // This is current behavior - navigate returns cancel function when route not found
       const result = router.navigate("home");
 
-      expect(typeof result).toBe("function");
+      expect(result).toBeInstanceOf(Promise);
+      await expect(result).rejects.toThrowError();
     });
 
-    it("should transition to new route after clearRoutes + addRoute", () => {
-      router.navigate("home");
+    it("should transition to new route after clearRoutes + addRoute", async () => {
+      await router.navigate("users.list");
 
       router.clearRoutes();
       router.addRoute({ name: "dashboard", path: "/dashboard" });
 
       // Navigate to new route - this works because addRoute registered the route
       // Note: navigate returns synchronously when state update is immediate
-      router.navigate("dashboard");
+      await router.navigate("dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
     });
 
-    it("should successfully navigate to new route after clearRoutes + addRoute", () => {
+    it("should successfully navigate to new route after clearRoutes + addRoute", async () => {
       // This is the intended workflow for route replacement
       router.clearRoutes();
       router.addRoute({ name: "newRoute", path: "/new" });
 
-      router.navigate("newRoute");
+      await router.navigate("newRoute");
 
       // Navigation should work - state is updated
       expect(router.getState()?.name).toBe("newRoute");
@@ -415,7 +412,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("chaining patterns", () => {
-    it("should support clear-then-add pattern", () => {
+    it("should support clear-then-add pattern", async () => {
       router.clearRoutes().addRoute([
         { name: "home", path: "/" },
         { name: "about", path: "/about" },
@@ -427,7 +424,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/contact")?.name).toBe("contact");
     });
 
-    it("should support complete route replacement", () => {
+    it("should support complete route replacement", async () => {
       // Original routes
       router.addRoute({ name: "oldRoute", path: "/old" });
 
@@ -442,7 +439,7 @@ describe("core/routes/clearRoutes", () => {
   describe("blocking during navigation", () => {
     let errorSpy: ReturnType<typeof vi.spyOn>;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
     });
 
@@ -465,11 +462,10 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation (async)
-      const navigationPromise = new Promise<boolean>((resolve) => {
-        router.navigate("asyncRoute", {}, {}, (err) => {
-          resolve(!err);
-        });
-      });
+      const navigationPromise = router
+        .navigate("asyncRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -509,8 +505,11 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation
-      router.navigate("slowRoute");
+      // Start navigation (fire-and-forget — guard holds it in progress)
+      const navigationPromise = router
+        .navigate("slowRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -520,8 +519,9 @@ describe("core/routes/clearRoutes", () => {
 
       expect(result).toBe(router);
 
-      // Cleanup
+      // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
+      await navigationPromise;
     });
 
     it("should allow clearRoutes after navigation completes", async () => {
@@ -539,11 +539,9 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Start navigation
-      const navigationPromise = new Promise<void>((resolve) => {
-        router.navigate("tempRoute", {}, {}, () => {
-          resolve();
-        });
-      });
+      const navigationPromise = router
+        .navigate("tempRoute")
+        .then(() => undefined);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -575,7 +573,7 @@ describe("core/routes/clearRoutes", () => {
     it("should not affect other router instances", async () => {
       const router2 = createTestRouter();
 
-      router2.start("");
+      await router2.start();
 
       let resolveCanActivate: () => void;
 
@@ -590,8 +588,11 @@ describe("core/routes/clearRoutes", () => {
           }),
       });
 
-      // Start navigation on router1
-      router.navigate("asyncRoute");
+      // Start navigation on router1 (fire-and-forget — guard holds it in progress)
+      const navigationPromise = router
+        .navigate("asyncRoute")
+        .then(() => true)
+        .catch(() => false);
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -613,14 +614,15 @@ describe("core/routes/clearRoutes", () => {
       // router1 routes should NOT be cleared
       expect(router.matchPath("/home")).toBeDefined();
 
-      // Cleanup
+      // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
+      await navigationPromise;
       router2.stop();
     });
   });
 
   describe("router lifecycle states", () => {
-    it("should work on router that was never started", () => {
+    it("should work on router that was never started", async () => {
       // Create router without calling start()
       const unstartedRouter = createTestRouter();
 
@@ -637,11 +639,11 @@ describe("core/routes/clearRoutes", () => {
       expect(unstartedRouter.matchPath("/fresh")?.name).toBe("fresh");
     });
 
-    it("should work on stopped router", () => {
+    it("should work on stopped router", async () => {
       // Navigate to a route first
-      router.navigate("home");
+      await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       // Stop the router
       router.stop();
@@ -660,11 +662,11 @@ describe("core/routes/clearRoutes", () => {
       expect(router.matchPath("/new")?.name).toBe("newRoute");
     });
 
-    it("should work correctly with stop-start-stop cycle", () => {
+    it("should work correctly with stop-start-stop cycle", async () => {
       // First cycle
-      router.navigate("home");
+      await router.navigate("users.list");
 
-      expect(router.getState()?.name).toBe("home");
+      expect(router.getState()?.name).toBe("users.list");
 
       router.stop();
       router.clearRoutes();
@@ -677,7 +679,7 @@ describe("core/routes/clearRoutes", () => {
       // since the old defaultRoute ("home") no longer exists and setOption is removed
       router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      router.start();
+      await router.start();
 
       expect(router.getState()?.name).toBe("dashboard");
 
@@ -690,7 +692,7 @@ describe("core/routes/clearRoutes", () => {
   });
 
   describe("forwardFnMap cleanup", () => {
-    it("should clear forwardFnMap entries on clearRoutes", () => {
+    it("should clear forwardFnMap entries on clearRoutes", async () => {
       router.addRoute({ name: "fn-dest", path: "/fn-dest" });
       router.addRoute({
         name: "fn-src",

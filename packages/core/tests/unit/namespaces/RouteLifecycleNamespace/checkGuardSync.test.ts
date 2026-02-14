@@ -63,9 +63,9 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(false);
   });
 
-  it("should return true when guard calls done() with no error", () => {
-    const factory: ActivationFnFactory = () => (_toState, _fromState, done) => {
-      done();
+  it("should return true when guard returns a state", () => {
+    const factory: ActivationFnFactory = () => (_toState) => {
+      return _toState;
     };
 
     ns.registerCanActivate("admin", factory, false);
@@ -76,9 +76,9 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(true);
   });
 
-  it("should return false when guard calls done() with error", () => {
-    const factory: ActivationFnFactory = () => (_toState, _fromState, done) => {
-      done({ code: "CANNOT_ACTIVATE" } as never);
+  it("should return false when guard throws an error", () => {
+    const factory: ActivationFnFactory = () => () => {
+      throw new Error("CANNOT_ACTIVATE");
     };
 
     ns.registerCanActivate("admin", factory, false);
@@ -119,7 +119,7 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
 
   it("should return true when guard returns a State object (redirect attempt — permissive default)", () => {
     // Guards cannot redirect in canNavigateTo context.
-    // A State return is treated as non-boolean, non-Promise, done-not-called → permissive true.
+    // A State return is treated as non-boolean, non-Promise → permissive true.
     const factory: ActivationFnFactory = () => (toState) => toState;
 
     ns.registerCanActivate("admin", factory, false);
@@ -132,27 +132,28 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
     expect(loggerWarnSpy).not.toHaveBeenCalled();
   });
 
-  it("should return true when guard returns void (done not called synchronously)", () => {
-    // Guard returns void and calls done asynchronously — sync check assumes true
-    const factory: ActivationFnFactory =
-      () => (_toState, _fromState, _done) => {
+  it("should return false when guard returns a Promise (async guard)", () => {
+    // Guard returns a Promise — sync check cannot resolve async guards
+    const factory: ActivationFnFactory = () => (_toState) => {
+      return new Promise<State>((resolve) => {
         setTimeout(() => {
-          _done();
+          resolve(_toState);
         }, 100);
-      };
+      });
+    };
 
     ns.registerCanActivate("admin", factory, false);
 
     const toState = createState("admin");
     const fromState = createState("home");
 
-    // done() was not called synchronously, so the result is true (permissive default)
-    expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(true);
+    // Promise returned, so sync check returns false with warning
+    expect(ns.checkActivateGuardSync("admin", toState, fromState)).toBe(false);
   });
 
   it("should pass fromState as undefined when not provided", () => {
-    const guardSpy = vi.fn<ActivationFn>((_toState, _fromState, done) => {
-      done();
+    const guardSpy = vi.fn<ActivationFn>((_toState) => {
+      return _toState;
     });
     const factory: ActivationFnFactory = () => guardSpy;
 
@@ -162,11 +163,7 @@ describe("RouteLifecycleNamespace/checkActivateGuardSync", () => {
 
     ns.checkActivateGuardSync("admin", toState, undefined);
 
-    expect(guardSpy).toHaveBeenCalledWith(
-      toState,
-      undefined,
-      expect.any(Function),
-    );
+    expect(guardSpy).toHaveBeenCalledWith(toState, undefined);
   });
 });
 
@@ -210,9 +207,9 @@ describe("RouteLifecycleNamespace/checkDeactivateGuardSync", () => {
     );
   });
 
-  it("should return true when guard calls done() with no error", () => {
-    const factory: ActivationFnFactory = () => (_toState, _fromState, done) => {
-      done();
+  it("should return true when guard returns a state", () => {
+    const factory: ActivationFnFactory = () => (_toState) => {
+      return _toState;
     };
 
     ns.registerCanDeactivate("admin", factory, false);
@@ -223,9 +220,9 @@ describe("RouteLifecycleNamespace/checkDeactivateGuardSync", () => {
     expect(ns.checkDeactivateGuardSync("admin", toState, fromState)).toBe(true);
   });
 
-  it("should return false when guard calls done() with error", () => {
-    const factory: ActivationFnFactory = () => (_toState, _fromState, done) => {
-      done({ code: "CANNOT_DEACTIVATE" } as never);
+  it("should return false when guard throws an error", () => {
+    const factory: ActivationFnFactory = () => () => {
+      throw new Error("CANNOT_DEACTIVATE");
     };
 
     ns.registerCanDeactivate("admin", factory, false);
