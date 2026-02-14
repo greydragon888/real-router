@@ -1,5 +1,33 @@
 # @real-router/core
 
+## 0.17.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(core)!: Promise-based navigation API (#45)
+
+  **Breaking Change:** `navigate()`, `navigateToDefault()`, `start()` now return `Promise<State>` instead of `CancelFn`/`this`.
+
+  ```typescript
+  // Before (callback-based)
+  router.navigate("users", { id: "123" }, {}, (err, state) => {
+    if (err) console.error(err);
+    else console.log(state);
+  });
+
+  // After (Promise-based)
+  const state = await router.navigate("users", { id: "123" });
+  ```
+
+  - `start()` no longer accepts `State` parameter (only `string` path)
+  - `parseNavigateArgs()`, `safeCallback()` removed
+  - Guards no longer receive `done` callback — return values directly
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/types@0.11.0
+
 ## 0.16.0
 
 ### Minor Changes

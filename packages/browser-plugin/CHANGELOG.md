@@ -1,5 +1,28 @@
 # @real-router/browser-plugin
 
+## 0.2.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(browser-plugin)!: adapt to Promise-based navigation API (#45)
+
+  **Breaking Change:** `router.start()` with browser plugin now returns `Promise<State>`.
+
+  ```typescript
+  // Before
+  router.start("/users", (err, state) => {
+    if (err) console.error(err);
+  });
+
+  // After
+  const state = await router.start("/users");
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
 ## 0.1.19
 
 ### Patch Changes
