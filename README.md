@@ -46,7 +46,7 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 - **Framework-agnostic**: Works with React, Vue, Angular, or vanilla JS
 - **Universal**: Client-side and server-side rendering
 - **Nested routes**: Full support for hierarchical route structures
-- **Lifecycle guards**: `canActivate` / `canDeactivate` for navigation control
+- **Lifecycle guards**: `addActivateGuard` / `addDeactivateGuard` for navigation control
 - **Observable state**: Compatible with RxJS and other observable libraries
 - **Middleware support**: Extensible navigation pipeline
 - **Plugin architecture**: Modular functionality
@@ -79,10 +79,10 @@ const router = createRouter(routes);
 
 router.usePlugin(browserPluginFactory());
 
-router.start();
+await router.start();
 
 // Navigate programmatically
-router.navigate("users.profile", { id: "123" });
+await router.navigate("users.profile", { id: "123" });
 ```
 
 ### With React
@@ -112,8 +112,9 @@ createRoot(document.getElementById("root")).render(
 
 ```typescript
 import { from } from "rxjs";
+import { observable } from "@real-router/rx";
 
-from(router).subscribe(({ route, previousRoute }) => {
+from(observable(router)).subscribe(({ route, previousRoute }) => {
   console.log("Navigation:", previousRoute?.name, "→", route.name);
 });
 ```
