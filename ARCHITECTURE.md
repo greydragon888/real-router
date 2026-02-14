@@ -37,29 +37,29 @@ real-router/
       │  @real-router/  │    │   route-tree    │    │  type-guards    │
       │     logger      │    │   (internal)    │    │   (internal)    │
       └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-               │              ┌───────┼───────┐              │
-               │              ▼       │       ▼              │
-               │   ┌──────────────┐   │  ┌──────────────┐   │
-               │   │ path-matcher │   │  │search-params │   │
-               │   │  (internal)  │   │  │  (internal)  │   │
-               │   └──────────────┘   │  └──────────────┘   │
+               │           ┌──────────┼─────────┐            │
+               │           ▼          │         ▼            │
+               │   ┌──────────────┐   │  ┌──────────────┐    │
+               │   │ path-matcher │   │  │search-params │    │
+               │   │  (internal)  │   │  │  (internal)  │    │
+               │   └──────────────┘   │  └──────────────┘    │
                │                      │                      │
                ▼                      ▼                      ▼
              ┌─────────────────────────────────────────────────┐
              │              @real-router/core                  │
-             │  ┌─────────────────────────────────────────┐   │
-             │  │  Bundles: route-tree, path-matcher,     │   │
-             │  │  search-params, type-guards             │   │
-             │  └─────────────────────────────────────────┘   │
+             │  ┌─────────────────────────────────────────┐    │
+             │  │  Bundles: route-tree, path-matcher,     │    │
+             │  │  search-params, type-guards             │    │
+             │  └─────────────────────────────────────────┘    │
              └──────────────────────┬──────────────────────────┘
                                     │
           ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
           │             │           │           │             │             │
           ▼             ▼           ▼           ▼             ▼             ▼
-  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
-  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent│
-  │              │ │          │ │          │ │          │ │plugin    │ │-params   │
-  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘
+  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐
+  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent-│
+  │              │ │          │ │          │ │          │ │plugin    │ │params     │
+  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └───────────┘
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
