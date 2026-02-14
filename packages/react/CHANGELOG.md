@@ -1,5 +1,30 @@
 # @real-router/react
 
+## 1.0.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(react)!: remove callback props from BaseLink (#45)
+
+  **Breaking Change:** `successCallback` and `errorCallback` props removed from `BaseLink`/`Link`/`ConnectedLink`.
+
+  ```typescript
+  // Before
+  <Link routeName="users" successCallback={(state) => ...} errorCallback={(err) => ...} />
+
+  // After
+  <Link routeName="users" />
+  ```
+
+  Use `router.addEventListener(events.TRANSITION_SUCCESS, ...)` for navigation tracking.
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5), [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/browser-plugin@0.2.0
+  - @real-router/core@0.17.0
+  - @real-router/helpers@0.1.20
+
 ## 0.3.1
 
 ### Patch Changes

@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-14]
+
+### @real-router/browser-plugin@0.2.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(browser-plugin)!: adapt to Promise-based navigation API (#45)
+
+  **Breaking Change:** `router.start()` with browser plugin now returns `Promise<State>`.
+
+  ```typescript
+  // Before
+  router.start("/users", (err, state) => {
+    if (err) console.error(err);
+  });
+
+  // After
+  const state = await router.start("/users");
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
+### @real-router/core@0.17.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(core)!: Promise-based navigation API (#45)
+
+  **Breaking Change:** `navigate()`, `navigateToDefault()`, `start()` now return `Promise<State>` instead of `CancelFn`/`this`.
+
+  ```typescript
+  // Before (callback-based)
+  router.navigate("users", { id: "123" }, {}, (err, state) => {
+    if (err) console.error(err);
+    else console.log(state);
+  });
+
+  // After (Promise-based)
+  const state = await router.navigate("users", { id: "123" });
+  ```
+
+  - `start()` no longer accepts `State` parameter (only `string` path)
+  - `parseNavigateArgs()`, `safeCallback()` removed
+  - Guards no longer receive `done` callback — return values directly
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/types@0.11.0
+
+### @real-router/types@0.11.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(types)!: remove callback types, simplify navigation signatures (#45)
+
+  **Breaking Change:**
+  - `DoneFn` type removed
+  - `CancelFn` type removed
+  - `ActivationFn` simplified — `done` callback parameter removed
+  - `Navigator.navigate()` returns `Promise<State>` (was `CancelFn`)
+
+  ```typescript
+  // Before
+  type ActivationFn = (toState, fromState, done: DoneFn) => ...;
+
+  // After
+  type ActivationFn = (toState, fromState) => boolean | Promise<boolean | State | void> | State | void;
+  ```
+
+### @real-router/helpers@0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
+### @real-router/logger-plugin@0.2.20
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
+### @real-router/persistent-params-plugin@0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
+### @real-router/rx@0.1.9
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/core@0.17.0
+
 ## [2026-02-11]
 
 ### @real-router/core@0.16.0
