@@ -7,10 +7,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - query params", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {

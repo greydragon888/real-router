@@ -60,6 +60,30 @@ describe("router.start() - error handling", () => {
       });
     });
 
+    describe("start without path when defaultRoute function resolves to empty", () => {
+      it("should emit TRANSITION_ERROR and throw NO_START_PATH_OR_STATE", async () => {
+        // defaultRoute is a function that returns empty string
+        const routerWithFuncDefault = createTestRouter({
+          defaultRoute: () => "",
+        });
+
+        const transitionErrorListener = vi.fn();
+
+        routerWithFuncDefault.addEventListener(
+          events.TRANSITION_ERROR,
+          transitionErrorListener,
+        );
+
+        await expect(routerWithFuncDefault.start()).rejects.toMatchObject({
+          code: errorCodes.NO_START_PATH_OR_STATE,
+        });
+
+        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
+
+        routerWithFuncDefault.stop();
+      });
+    });
+
     describe("start without startPathOrState, but with defaultRoute", () => {
       it("should navigate to default route when no start state but defaultRoute exists", async () => {
         const startListener = vi.fn();

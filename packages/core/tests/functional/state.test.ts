@@ -73,8 +73,8 @@ describe("core/state", () => {
       expect(previousState?.params).toStrictEqual({ id: "123" });
     });
 
-    it("returns frozen state (immutable)", () => {
-      void router.navigate("sign-in");
+    it("returns frozen state (immutable)", async () => {
+      await router.navigate("sign-in");
 
       const previousState = router.getPreviousState();
 
@@ -721,7 +721,7 @@ describe("core/stateBuilder", () => {
   });
 
   describe("forwardTo function", () => {
-    it("should resolve basic dynamic forwardTo with dependency", () => {
+    it("should resolve basic dynamic forwardTo with dependency", async () => {
       const testRouter = createRouter(
         [
           {
@@ -736,7 +736,7 @@ describe("core/stateBuilder", () => {
         { user: { isAdmin: true } },
       );
 
-      void testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const result = testRouter.forwardState("dash", {});
 
@@ -745,7 +745,7 @@ describe("core/stateBuilder", () => {
       testRouter.stop();
     });
 
-    it("should pass params to forwardTo callback", () => {
+    it("should pass params to forwardTo callback", async () => {
       const testRouter = createRouter(
         [
           {
@@ -761,7 +761,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      void testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const result = testRouter.forwardState("item", { type: "book" });
 
@@ -780,7 +780,7 @@ describe("core/stateBuilder", () => {
         {},
       );
 
-      void testRouter.start("");
+      testRouter.start("").catch(() => {});
 
       expect(() => testRouter.forwardState("cycle-a", {})).toThrowError(
         /Circular forwardTo/,
@@ -907,7 +907,7 @@ describe("core/stateBuilder", () => {
       expect(state?.name).toBe("build-dest");
     });
 
-    it("should work with rewritePathOnMatch and dynamic forwardTo", () => {
+    it("should work with rewritePathOnMatch and dynamic forwardTo", async () => {
       const testRouter = createTestRouter({ rewritePathOnMatch: true });
 
       testRouter.addRoute([
@@ -919,7 +919,7 @@ describe("core/stateBuilder", () => {
         { name: "rewrite-target", path: "/rewrite-target" },
       ]);
 
-      void testRouter.start("");
+      await testRouter.start("").catch(() => {});
 
       const state = testRouter.matchPath("/rewrite-fn");
 

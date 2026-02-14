@@ -14,9 +14,9 @@ import type {
 let router: Router;
 
 describe("core/routes/routeTree/updateRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -977,7 +977,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Start async navigation
-      void router.navigate("ur-async");
+      router.navigate("ur-async").catch(() => {});
 
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));

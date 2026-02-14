@@ -4,21 +4,21 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
+import type { State } from "@real-router/core";
+
+// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+type RedirectResult = State | void;
+
 // 9.1.1 Simple redirect from middleware
 {
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState, done) => {
+  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
 
-      done(
-        undefined,
-        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
-      );
-    } else {
-      done();
+      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
   router.start();
@@ -33,16 +33,11 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState, done) => {
+  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
     if (toState.name === "user") {
       const target = fromState?.name === "home" ? "about" : "home";
 
-      done(
-        undefined,
-        _router.makeState(target, {}, target === "home" ? "/" : "/about"),
-      );
-    } else {
-      done();
+      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
   router.start();
@@ -57,7 +52,7 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState, done) => {
+  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
       const redirectState = _router.makeState(
@@ -66,9 +61,7 @@ import { createSimpleRouter } from "../helpers";
         target === "home" ? "/" : "/users",
       );
 
-      done(undefined, redirectState);
-    } else {
-      done();
+      return redirectState;
     }
   });
   router.start();
@@ -84,28 +77,21 @@ import { createSimpleRouter } from "../helpers";
   // Track redirect count to alternate final destination
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  router.useMiddleware((_router) => (toState): RedirectResult => {
     if (toState.name === "about") {
-      done(undefined, _router.makeState("users", {}, "/users"));
-    } else {
-      done();
+      return _router.makeState("users", {}, "/users");
     }
   });
-  router.useMiddleware((_router) => (toState, _fromState, done) => {
+  router.useMiddleware((_router) => (toState): RedirectResult => {
     if (toState.name === "users") {
       // Alternate final destination to avoid SAME_STATES
       const target = redirectCount++ % 2 === 0 ? "home" : "user";
 
-      done(
-        undefined,
-        _router.makeState(
-          target,
-          target === "user" ? { id: "1" } : {},
-          target === "home" ? "/" : "/users/1",
-        ),
+      return _router.makeState(
+        target,
+        target === "user" ? { id: "1" } : {},
+        target === "home" ? "/" : "/users/1",
       );
-    } else {
-      done();
     }
   });
   router.start();
@@ -120,16 +106,11 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState, done) => {
+  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
     if (toState.name === "user" && toState.params.id === "admin") {
       const target = fromState?.name === "home" ? "about" : "home";
 
-      done(
-        undefined,
-        _router.makeState(target, {}, target === "home" ? "/" : "/about"),
-      );
-    } else {
-      done();
+      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
   router.start();
@@ -144,16 +125,11 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState, done) => {
+  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
 
-      done(
-        undefined,
-        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
-      );
-    } else {
-      done();
+      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
   router.start();
@@ -168,26 +144,24 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => async (toState, fromState, done) => {
-    if (toState.name === "about") {
-      await Promise.resolve();
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.useMiddleware(
+    (_router) =>
+      async (toState, fromState): Promise<RedirectResult> => {
+        if (toState.name === "about") {
+          await Promise.resolve();
+          const target = fromState?.name === "home" ? "users" : "home";
 
-      done(
-        undefined,
-        _router.makeState(target, {}, target === "home" ? "/" : "/users"),
-      );
-    } else {
-      done();
-    }
-  });
+          return _router.makeState(
+            target,
+            {},
+            target === "home" ? "/" : "/users",
+          );
+        }
+      },
+  );
   router.start();
 
   bench("9.1.7 Async redirect", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate("about", {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate("about");
   }).gc("inner");
 }

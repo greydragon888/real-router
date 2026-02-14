@@ -5,8 +5,8 @@ import { createLifecycleTestRouter, type Router } from "./setup";
 let router: Router;
 
 describe("core/route-lifecycle/canNavigateTo", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {
@@ -201,7 +201,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("users")).toBe(false);
   });
 
-  it("should return true when guard calls done() without error", async () => {
+  it("should return true when guard returns true", async () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return true;
     });
@@ -210,7 +210,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should return false when guard calls done() with error", async () => {
+  it("should return false when guard returns false", async () => {
     router.addActivateGuard("admin", () => (_toState, _fromState) => {
       return false;
     });
@@ -219,9 +219,9 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should return true when guard returns void without calling done()", async () => {
+  it("should return true when guard returns void", async () => {
     router.addActivateGuard("admin", () => () => {
-      // intentionally void — no return, no done()
+      // intentionally void — no return
     });
     await router.navigate("index");
 

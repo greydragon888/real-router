@@ -7,9 +7,9 @@ import type { Route, Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/routePath/buildPath", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -181,10 +181,10 @@ describe("core/routes/routePath/buildPath", () => {
       expect(path2).toBe("/home");
     });
 
-    it("should invalidate cache and use new options after stop/start cycle", () => {
+    it("should invalidate cache and use new options after stop/start cycle", async () => {
       const cycleRouter = createTestRouter();
 
-      cycleRouter.start("/home");
+      await cycleRouter.start("/home");
 
       // First cycle — default trailingSlash
       const path1 = cycleRouter.buildPath("home");
@@ -196,7 +196,7 @@ describe("core/routes/routePath/buildPath", () => {
       // Second cycle — create router with new trailingSlash option
       const cycleRouter2 = createTestRouter({ trailingSlash: "always" });
 
-      cycleRouter2.start("/home");
+      await cycleRouter2.start("/home");
       const path2 = cycleRouter2.buildPath("home");
 
       expect(path2).toBe("/home/");
@@ -204,10 +204,10 @@ describe("core/routes/routePath/buildPath", () => {
       cycleRouter2.stop();
     });
 
-    it("should apply trailingSlash option correctly", () => {
+    it("should apply trailingSlash option correctly", async () => {
       router.stop();
       router = createTestRouter({ trailingSlash: "always" });
-      void router.start("/home");
+      await router.start("/home");
 
       const path = router.buildPath("home");
 
@@ -215,7 +215,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       router.stop();
       router = createTestRouter({ trailingSlash: "never" });
-      void router.start("/home");
+      await router.start("/home");
     });
   });
 

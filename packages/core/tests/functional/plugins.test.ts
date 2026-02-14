@@ -778,10 +778,8 @@ describe("core/plugins", () => {
         );
 
         // Should not throw when events are emitted
-        expect(() => {
-          void router.start();
-          router.stop();
-        }).not.toThrowError();
+        router.start().catch(() => {});
+        router.stop();
 
         warnSpy.mockRestore();
       });
@@ -960,10 +958,8 @@ describe("core/plugins", () => {
         }).not.toThrowError();
 
         // Verify plugin was registered - should not throw on restart
-        expect(() => {
-          router.stop();
-          void router.start();
-        }).not.toThrowError();
+        router.stop();
+        await router.start();
       });
 
       it("should provide getDependency function to plugin factory", () => {

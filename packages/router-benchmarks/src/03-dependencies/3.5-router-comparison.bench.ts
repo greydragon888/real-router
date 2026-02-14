@@ -93,15 +93,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-      do_not_optimize(getDep("authService"));
-      done();
-    },
-  );
+    do_not_optimize(getDep("authService"));
+  });
   router.start("/");
 
   bench(
@@ -119,17 +115,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-      do_not_optimize(getDep("authService"));
-      do_not_optimize(getDep("logger"));
-      do_not_optimize(getDep("config"));
-      done();
-    },
-  );
+    do_not_optimize(getDep("authService"));
+    do_not_optimize(getDep("logger"));
+    do_not_optimize(getDep("config"));
+  });
   router.start("/");
 
   bench(
@@ -199,15 +191,12 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   for (let i = 0; i < 5; i++) {
-    router.useMiddleware(
-      (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-        const getDep =
-          normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+    router.useMiddleware((_router, depsOrGetDep) => () => {
+      const getDep =
+        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-        do_not_optimize(getDep("authService"));
-        done();
-      },
-    );
+      do_not_optimize(getDep("authService"));
+    });
   }
 
   router.start("/");
@@ -237,15 +226,12 @@ const alternatingRoutes = ["about", "home"];
   for (let i = 0; i < 5; i++) {
     const depKey = depKeys[i];
 
-    router.useMiddleware(
-      (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-        const getDep =
-          normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+    router.useMiddleware((_router, depsOrGetDep) => () => {
+      const getDep =
+        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-        do_not_optimize(getDep(depKey));
-        done();
-      },
-    );
+      do_not_optimize(getDep(depKey));
+    });
   }
 
   router.start("/");
@@ -265,15 +251,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-      do_not_optimize(getDep("logger"));
-      done();
-    },
-  );
+    do_not_optimize(getDep("logger"));
+  });
 
   router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
@@ -306,15 +288,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
-      do_not_optimize(getDep("logger"));
-      done();
-    },
-  );
+    do_not_optimize(getDep("logger"));
+  });
 
   router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
@@ -359,42 +337,30 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   // Auth middleware
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-      const auth = getDep("authService");
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+    const auth = getDep("authService");
 
-      do_not_optimize(auth.isAuthenticated());
-      do_not_optimize(auth.getUser());
-      done();
-    },
-  );
+    do_not_optimize(auth.isAuthenticated());
+    do_not_optimize(auth.getUser());
+  });
 
   // Logging middleware
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-      const logger = getDep("logger");
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+    const logger = getDep("logger");
 
-      do_not_optimize(logger.log);
-      done();
-    },
-  );
+    do_not_optimize(logger.log);
+  });
 
   // Config middleware
-  router.useMiddleware(
-    (_router, depsOrGetDep) => (_toState, _fromState, done) => {
-      const getDep =
-        normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
-      const config = getDep("config");
+  router.useMiddleware((_router, depsOrGetDep) => () => {
+    const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
+    const config = getDep("config");
 
-      do_not_optimize(config.apiUrl);
-      do_not_optimize(config.timeout);
-      done();
-    },
-  );
+    do_not_optimize(config.apiUrl);
+    do_not_optimize(config.timeout);
+  });
 
   // Auth guard
   router.addActivateGuard("about", (_router, depsOrGetDep) => () => {

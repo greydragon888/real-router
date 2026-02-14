@@ -153,7 +153,7 @@ export function handleMissingState(
     return false;
   }
 
-  router.navigateToDefault({
+  void router.navigateToDefault({
     ...transitionOptions,
     reload: true,
     replace: true,

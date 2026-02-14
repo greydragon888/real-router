@@ -380,7 +380,7 @@ describe("RouterProvider - Integration Tests", () => {
             <button
               data-testid="navigate-btn"
               onClick={() => {
-                routerFromHook.navigate("about");
+                void routerFromHook.navigate("about");
               }}
             >
               Go to About
@@ -410,8 +410,8 @@ describe("RouterProvider - Integration Tests", () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       const OuterRouteDisplay: FC = () => {
         const context = useContext(RouteContext);
@@ -439,7 +439,7 @@ describe("RouterProvider - Integration Tests", () => {
 
       // Navigate outer router
       await act(async () => {
-        router1.navigate("home");
+        await router1.navigate("home");
       });
 
       expect(screen.getByTestId("outer")).toHaveTextContent("home");
@@ -447,7 +447,7 @@ describe("RouterProvider - Integration Tests", () => {
 
       // Navigate inner router
       await act(async () => {
-        router2.navigate("home");
+        await router2.navigate("home");
       });
 
       expect(screen.getByTestId("outer")).toHaveTextContent("home");
@@ -457,12 +457,12 @@ describe("RouterProvider - Integration Tests", () => {
       router2.stop();
     });
 
-    it("should isolate router instances in nested providers", () => {
+    it("should isolate router instances in nested providers", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let outerRouter: Router | null = null;
       let innerRouter: Router | null = null;
@@ -807,12 +807,12 @@ describe("RouterProvider - Integration Tests", () => {
       });
     });
 
-    it("should create new store when router prop changes", () => {
+    it("should create new store when router prop changes", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       const Wrapper: FC<{ routerInstance: Router; children: ReactNode }> = ({
         routerInstance,

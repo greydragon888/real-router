@@ -299,7 +299,9 @@ describe("useRouteNode", () => {
         await router.start();
       });
 
-      await act(() => router.navigate("users.list"));
+      await act(async () => {
+        await router.navigate("users.list").catch(() => {});
+      });
 
       // Root node should show users.list
       expect(result.current.route?.name).toBe("users.list");
@@ -360,7 +362,9 @@ describe("useRouteNode", () => {
       });
 
       // Navigate to users
-      await act(() => router.navigate("users.list"));
+      await act(async () => {
+        await router.navigate("users.list").catch(() => {});
+      });
 
       expect(usersResult.current.route?.name).toBe("users.list");
       expect(itemsResult.current.route).toBeUndefined();

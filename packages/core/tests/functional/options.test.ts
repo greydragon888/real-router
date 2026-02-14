@@ -634,10 +634,10 @@ describe("core/options", () => {
 
   // 🟡 IMPORTANT: Integration - effect on buildPath
   describe("integration with buildPath", () => {
-    it("should apply trailingSlash option to buildPath", () => {
+    it("should apply trailingSlash option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "always" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -646,10 +646,10 @@ describe("core/options", () => {
       r.stop();
     });
 
-    it("should apply trailingSlash 'never' option to buildPath", () => {
+    it("should apply trailingSlash 'never' option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "never" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -658,10 +658,10 @@ describe("core/options", () => {
       r.stop();
     });
 
-    it("should apply urlParamsEncoding option to buildPath", () => {
+    it("should apply urlParamsEncoding option to buildPath", async () => {
       const r = createTestRouter({ urlParamsEncoding: "uriComponent" });
 
-      r.start();
+      await r.start();
 
       const path = r.buildPath("users.view", { id: "hello world" });
 
@@ -673,10 +673,10 @@ describe("core/options", () => {
 
   // 🟡 IMPORTANT: Integration - effect on matchPath
   describe("integration with matchPath", () => {
-    it("should apply trailingSlash option to matchPath", () => {
+    it("should apply trailingSlash option to matchPath", async () => {
       const r = createTestRouter({ trailingSlash: "strict" });
 
-      r.start();
+      await r.start();
 
       // Route 'users.list' is defined as '/users/list' without trailing slash
       const withoutSlash = r.matchPath("/users/list");
@@ -818,7 +818,7 @@ describe("core/options", () => {
         defaultRoute: () => "",
       });
 
-      customRouter.start("/home");
+      await customRouter.start("/home");
 
       // navigateToDefault now returns a Promise that rejects when defaultRoute returns empty string
       await expect(customRouter.navigateToDefault()).rejects.toMatchObject({

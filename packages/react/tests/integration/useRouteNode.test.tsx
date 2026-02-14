@@ -412,7 +412,7 @@ describe("useRouteNode - Integration Tests", () => {
             <button
               data-testid="navigate-btn"
               onClick={() => {
-                contextNavigator.navigate("users.view", { id: "1" });
+                void contextNavigator.navigate("users.view", { id: "1" });
               }}
             >
               Navigate

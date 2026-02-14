@@ -1,6 +1,8 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi } from "vitest";
 
+import { RouterError } from "@real-router/core";
+
 import { executeMiddleware } from "../../../src/namespaces/NavigationNamespace/transition/executeMiddleware";
 
 import type { State, ActivationFn } from "@real-router/types";
@@ -101,6 +103,32 @@ describe("transition/executeMiddleware", () => {
       }
 
       loggerSpy.mockRestore();
+    });
+
+    it("should re-throw RouterError with TRANSITION_ERR code when middleware throws RouterError", async () => {
+      const toState = createState("users");
+      const fromState = createState("home");
+
+      // Middleware that throws a RouterError directly
+      const routerErrorMiddleware: ActivationFn = () => {
+        throw new RouterError("CANNOT_ACTIVATE");
+      };
+
+      const middlewareFunctions: ActivationFn[] = [routerErrorMiddleware];
+
+      try {
+        await executeMiddleware(
+          middlewareFunctions,
+          toState,
+          fromState,
+          () => false,
+        );
+
+        expect.fail("Should have thrown");
+      } catch (error) {
+        expect(error).toBeInstanceOf(RouterError);
+        expect((error as RouterError).code).toBe("TRANSITION_ERR");
+      }
     });
 
     it("should catch and log error when callback throws on middleware error", async () => {

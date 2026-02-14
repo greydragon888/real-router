@@ -91,11 +91,9 @@ describe("@real-router/logger-plugin", () => {
       await router.start();
       errorSpy.mockClear();
 
-      try {
-        await router.navigate("nonexistent", {}, {});
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-      }
+      await expect(
+        router.navigate("nonexistent", {}, {}),
+      ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
 
       expect(errorSpy).toHaveBeenCalledWith(
         expect.stringContaining("[logger-plugin] Transition error"),
@@ -273,6 +271,8 @@ describe("@real-router/logger-plugin", () => {
       await router.start();
 
       await router.navigate("users");
+
+      expect(loggerSpy).toHaveBeenCalled();
 
       console.group = originalGroup;
     });

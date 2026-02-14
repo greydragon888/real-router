@@ -205,6 +205,7 @@ export class NavigationNamespace {
       }
     } catch (error) {
       // Error handling
+      /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
       if (error instanceof RouterError) {
         if (error.code === errorCodes.TRANSITION_CANCELLED) {
           deps.invokeEventListeners(
@@ -229,6 +230,7 @@ export class NavigationNamespace {
           );
         }
       } else {
+        /* v8 ignore next 7 -- @preserve: transition pipeline always wraps errors into RouterError */
         deps.invokeEventListeners(
           events.TRANSITION_ERROR,
           toState,
@@ -262,7 +264,13 @@ export class NavigationNamespace {
     }
 
     // build route state with segments (avoids duplicate getSegmentsByName call)
-    const result = deps.buildStateWithSegments(name, params);
+    let result;
+
+    try {
+      result = deps.buildStateWithSegments(name, params);
+    } catch (error) {
+      return Promise.reject(error as Error);
+    }
 
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
@@ -308,7 +316,12 @@ export class NavigationNamespace {
         err,
       );
 
-      return Promise.reject(err);
+      const rejection = Promise.reject(err);
+
+      // Suppress unhandled rejection for expected SAME_STATES error
+      rejection.catch(() => {});
+
+      return rejection;
     }
 
     // transition execution with TRANSITION_SUCCESS emission

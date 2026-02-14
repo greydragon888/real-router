@@ -135,6 +135,73 @@ describe("transition/executeLifecycleHooks", () => {
     });
   });
 
+  describe("cancellation between segments", () => {
+    it("should throw TRANSITION_CANCELLED when cancelled between hook executions", async () => {
+      const toState = createState("users.list");
+      const fromState = createState("home");
+
+      let cancelled = false;
+
+      // First hook completes, then cancellation flag is set before second hook
+      const firstHook: ActivationFn = () => {
+        cancelled = true; // cancel after this hook
+      };
+
+      const secondHook: ActivationFn = () => {
+        // Should never be called
+      };
+
+      const hooks = new Map<string, ActivationFn>([
+        ["users", firstHook],
+        ["users.list", secondHook],
+      ]);
+
+      await expect(
+        executeLifecycleHooks(
+          hooks,
+          toState,
+          fromState,
+          ["users", "users.list"],
+          "CANNOT_ACTIVATE",
+          () => cancelled,
+        ),
+      ).rejects.toThrowError("CANCELLED");
+    });
+  });
+
+  describe("state mutation warning", () => {
+    it("should log warning when guard returns state with modified params", async () => {
+      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+      const toState = createState("users");
+      const fromState = createState("home");
+
+      // Hook returns state with same name but different params
+      const mutatingHook: ActivationFn = (state) => ({
+        ...state,
+        params: { modified: true },
+      });
+
+      const hooks = new Map<string, ActivationFn>([["users", mutatingHook]]);
+
+      await executeLifecycleHooks(
+        hooks,
+        toState,
+        fromState,
+        ["users"],
+        "CANNOT_ACTIVATE",
+        () => false,
+      );
+
+      expect(loggerSpy).toHaveBeenCalledWith(
+        "core:transition",
+        "Warning: State mutated during transition",
+        expect.any(Object),
+      );
+
+      loggerSpy.mockRestore();
+    });
+  });
+
   describe("newState handling (line 107)", () => {
     it("should skip state checks when newState equals currentState (same reference)", async () => {
       const toState = createState("users");

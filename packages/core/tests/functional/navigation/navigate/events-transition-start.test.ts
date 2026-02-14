@@ -154,9 +154,11 @@ describe("router.navigate() - events transition start", () => {
 
       // In the new Promise-based API, both navigations complete successfully
       const firstResult = await firstNav;
+
       expect(firstResult.name).toBe("users.view");
 
       const secondResult = await secondNav;
+
       expect(secondResult.name).toBe("orders");
 
       // TRANSITION_CANCEL is not emitted in the new API

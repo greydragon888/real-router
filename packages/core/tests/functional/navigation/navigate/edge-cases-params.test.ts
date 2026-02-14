@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - edge cases params", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -177,34 +177,34 @@ describe("router.navigate() - edge cases params", () => {
       it("should reject NaN in params (not serializable)", async () => {
         // NaN is rejected by isParams validation (not finite)
         // This ensures params can be serialized to JSON
-        expect(() => {
-          void router.navigate(
+        await expect(
+          router.navigate(
             "users.view",
             { id: Number.NaN as unknown as number },
             {},
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
       it("should reject Infinity in params (not serializable)", async () => {
         // Infinity is rejected by isParams validation (not finite)
-        expect(() => {
-          void router.navigate(
+        await expect(
+          router.navigate(
             "users.view",
             { id: Infinity as unknown as number },
             {},
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
       it("should reject -Infinity in params (not serializable)", async () => {
-        expect(() => {
-          void router.navigate(
+        await expect(
+          router.navigate(
             "users.view",
             { id: -Infinity as unknown as number },
             {},
-          );
-        }).toThrowError(TypeError);
+          ),
+        ).rejects.toThrowError(TypeError);
       });
 
       it("should handle -0 in params (finite, converts to '0')", async () => {

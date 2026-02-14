@@ -280,7 +280,7 @@ describe("stop", () => {
 
   describe("stop behavior with navigation prevention", () => {
     it("should prevent navigation after stop", async () => {
-      void router.start("/home");
+      router.start("/home").catch(() => {});
       router.stop();
 
       try {
@@ -294,7 +294,7 @@ describe("stop", () => {
     });
 
     it("should prevent navigateToDefault after stop", async () => {
-      void router.start("/home");
+      router.start("/home").catch(() => {});
       router.stop();
 
       try {
@@ -308,7 +308,7 @@ describe("stop", () => {
     });
 
     it("should prevent all navigation methods after stop", async () => {
-      void router.start("/users/view/123");
+      router.start("/users/view/123").catch(() => {});
       router.stop();
 
       // navigate should reject
@@ -450,7 +450,7 @@ describe("stop", () => {
     it("should handle stop during transition", async () => {
       await router.start("/home");
 
-      void router.navigate("users.list");
+      router.navigate("users.list").catch(() => {});
 
       router.stop();
 
@@ -460,9 +460,9 @@ describe("stop", () => {
 
     it("should maintain proper state after stop with complex navigation history", async () => {
       await router.start("/home");
-      void router.navigate("users");
-      void router.navigate("users.list");
-      void router.navigate("users.view", { id: "123" });
+      router.navigate("users").catch(() => {});
+      router.navigate("users.list").catch(() => {});
+      router.navigate("users.view", { id: "123" }).catch(() => {});
       await router.navigate("profile");
 
       expect(router.getState()?.name).toBe("profile");

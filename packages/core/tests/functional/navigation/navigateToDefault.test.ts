@@ -979,6 +979,18 @@ describe("navigateToDefault", () => {
     });
   });
 
+  describe("when defaultRoute is not configured", () => {
+    it("should reject with ROUTE_NOT_FOUND when defaultRoute is not set", async () => {
+      router.stop();
+      router = createTestRouter({ defaultRoute: "" });
+      await router.start("/home");
+
+      await expect(router.navigateToDefault()).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+    });
+  });
+
   describe("Issue #60: navigateToDefault() options validation", () => {
     it("should throw TypeError for invalid options type (string)", () => {
       expect(() => {
@@ -1007,13 +1019,15 @@ describe("navigateToDefault", () => {
 
     it("should accept valid NavigationOptions", () => {
       expect(() => {
-        void router.navigateToDefault({ replace: true, reload: false });
+        router
+          .navigateToDefault({ replace: true, reload: false })
+          .catch(() => {});
       }).not.toThrowError();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
-        void router.navigateToDefault({});
+        router.navigateToDefault({}).catch(() => {});
       }).not.toThrowError();
     });
 

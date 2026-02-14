@@ -12,9 +12,9 @@ import type {
 let router: Router;
 
 describe("core/routes/routeTree/getRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {

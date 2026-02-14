@@ -7,10 +7,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - base cases", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -79,16 +79,16 @@ describe("router.navigate() - base cases", () => {
   });
 
   it("should not throw if method is called with more than 4 args", () => {
-    const done = vi.fn();
+    const extraFn = vi.fn();
 
     expect(
       () =>
         // @ts-expect-error - Testing extra arguments are ignored
-        void router.navigate("index", {}, {}, done, 123),
+        void router.navigate("index", {}, {}, extraFn, 123),
     ).not.toThrowError();
   });
 
-  it("should be able to call navigate with 3 args without done cb", async () => {
+  it("should be able to call navigate with 3 args without callback", async () => {
     await router.navigate("orders.pending", {}, { force: true });
 
     expect(router.getState()?.name).toBe("orders.pending");

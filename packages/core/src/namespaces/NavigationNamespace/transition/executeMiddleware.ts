@@ -52,6 +52,7 @@ export const executeMiddleware = async (
       if (error instanceof RouterError) {
         const err = makeError(errorCodes.TRANSITION_ERR, error);
 
+        /* v8 ignore next 3 -- @preserve: makeError always returns when err is RouterError */
         if (err) {
           throw err;
         }

@@ -15,9 +15,7 @@ const alternatingRoutes = ["about", "home"];
 
   // Add 50 middleware (max limit)
   for (let i = 0; i < 50; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   router.start("/");
@@ -66,14 +64,12 @@ const alternatingRoutes = ["about", "home"];
   }).gc("inner");
 }
 
-// 2.3.4 Empty middleware (calling done without logic)
+// 2.3.4 Empty middleware (pass-through without logic)
 {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
+  router.useMiddleware(() => () => {});
   router.start("/");
 
   bench("2.3.4 Empty middleware (calling done without logic)", () => {
@@ -95,14 +91,12 @@ const alternatingRoutes = ["about", "home"];
   }).gc("inner");
 }
 
-// 2.3.6 Middleware with immediate done call
+// 2.3.6 Middleware with immediate pass-through
 {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
+  router.useMiddleware(() => () => {});
   router.start("/");
 
   bench("2.3.6 Middleware with immediate done call", () => {
@@ -135,10 +129,8 @@ const alternatingRoutes = ["about", "home"];
   const targets = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware((router) => (_toState, _fromState, done) => {
-    const modifiedState = router.makeState("users", {});
-
-    done(undefined, modifiedState);
+  router.useMiddleware((router) => () => {
+    return router.makeState("users", {});
   });
   router.start("/");
 
@@ -149,22 +141,20 @@ const alternatingRoutes = ["about", "home"];
 
 // 2.3.11 Cancelling navigation during middleware execution
 // router5: navigate() does not reliably return a cancel function
-// real-router: navigate() always returns a cancel function
+// real-router: use router.cancel() to cancel in-flight navigation
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    setTimeout(() => {
-      done();
-    }, 10);
+  router.useMiddleware(() => async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
   });
   router.start("/");
 
   bench("2.3.11 Cancelling navigation during middleware execution", () => {
-    const cancel = router.navigate(alternatingRoutes[index++ % 2]);
+    void router.navigate(alternatingRoutes[index++ % 2]);
 
-    cancel();
+    router.cancel();
   }).gc("inner");
 }
 
@@ -186,7 +176,7 @@ if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
+  router.useMiddleware(() => () => {
     // Heavy computation
     let sum = 0;
 
@@ -195,7 +185,6 @@ if (!IS_ROUTER5) {
     }
 
     void sum;
-    done();
   });
   router.start("/");
 

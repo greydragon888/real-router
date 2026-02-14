@@ -12,18 +12,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async (_toState, _fromState, done) => {
+  router.useMiddleware(() => async () => {
     await Promise.resolve();
-    done();
   });
   router.start("/");
 
   bench("2.2.1 Navigation with single asynchronous middleware", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -33,20 +28,15 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   for (let i = 0; i < 5; i++) {
-    router.useMiddleware(() => async (_toState, _fromState, done) => {
+    router.useMiddleware(() => async () => {
       await Promise.resolve();
-      done();
     });
   }
 
   router.start("/");
 
   bench("2.2.2 Navigation with chain of asynchronous middleware", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -68,11 +58,7 @@ const alternatingRoutes = ["about", "home"];
   router.start("/");
 
   bench("2.2.3 Navigation with asynchronous canActivate guard", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -94,11 +80,7 @@ const alternatingRoutes = ["about", "home"];
   router.start("/");
 
   bench("2.2.4 Navigation with asynchronous canDeactivate guard", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -107,26 +89,17 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
-  router.useMiddleware(() => async (_toState, _fromState, done) => {
+  router.useMiddleware(() => () => {});
+  router.useMiddleware(() => async () => {
     await Promise.resolve();
-    done();
   });
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
+  router.useMiddleware(() => () => {});
   router.start("/");
 
   bench(
     "2.2.5 Navigation with mixed synchronous and asynchronous middleware",
     async () => {
-      await new Promise<void>((resolve) => {
-        router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-          resolve();
-        });
-      });
+      await router.navigate(alternatingRoutes[index++ % 2]);
     },
   ).gc("inner");
 }
@@ -136,20 +109,15 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async (_toState, _fromState, done) => {
+  router.useMiddleware(() => async () => {
     await Promise.all([Promise.resolve(), Promise.resolve()]);
-    done();
   });
   router.start("/");
 
   bench(
     "2.2.6 Navigation with parallel async operations in middleware",
     async () => {
-      await new Promise<void>((resolve) => {
-        router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-          resolve();
-        });
-      });
+      await router.navigate(alternatingRoutes[index++ % 2]);
     },
   ).gc("inner");
 }
@@ -159,18 +127,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async (_toState, _fromState, done) => {
+  router.useMiddleware(() => async () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
-    done();
   });
   router.start("/");
 
   bench("2.2.7 Navigation with long-running async operations", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -190,11 +153,7 @@ const alternatingRoutes = ["about", "home"];
   router.start("/");
 
   bench("2.2.8 Navigation with async plugin", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -203,19 +162,14 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async (_toState, _fromState, done) => {
+  router.useMiddleware(() => async () => {
     // Simulate data fetching
     await Promise.resolve({ user: "test" });
-    done();
   });
   router.start("/");
 
   bench("2.2.9 Navigation with async data loading in middleware", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -238,10 +192,6 @@ const alternatingRoutes = ["about", "home"];
   router.start("/");
 
   bench("2.2.10 Navigation with deferred validation in guards", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(alternatingRoutes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(alternatingRoutes[index++ % 2]);
   }).gc("inner");
 }

@@ -91,7 +91,10 @@ describe("Persistent params plugin", () => {
     it("should accept number values", async () => {
       await router.start();
 
-      await router.navigate("route1", { id: "1", mode: 42 as unknown as string });
+      await router.navigate("route1", {
+        id: "1",
+        mode: 42 as unknown as string,
+      });
 
       const state = router.getState();
 
@@ -101,7 +104,10 @@ describe("Persistent params plugin", () => {
     it("should accept boolean values", async () => {
       await router.start();
 
-      await router.navigate("route1", { id: "1", mode: true as unknown as string });
+      await router.navigate("route1", {
+        id: "1",
+        mode: true as unknown as string,
+      });
 
       const state = router.getState();
 
@@ -714,41 +720,41 @@ describe("Persistent params plugin", () => {
       });
 
       it("should reject objects as parameter values", async () => {
-        await expect(async () => {
-          await router.navigate("route1", {
+        await expect(
+          router.navigate("route1", {
             id: "1",
             mode: { nested: "object" } as unknown as string,
-          });
-        }).rejects.toThrowError(/must be a primitive value/);
+          }),
+        ).rejects.toThrowError(/must be a primitive value/);
       });
 
       it("should reject arrays as parameter values", async () => {
-        await expect(async () => {
-          await router.navigate("route1", {
+        await expect(
+          router.navigate("route1", {
             id: "1",
             mode: [1, 2, 3] as unknown as string,
-          });
-        }).rejects.toThrowError(/must be a primitive value/);
+          }),
+        ).rejects.toThrowError(/must be a primitive value/);
       });
 
       it("should reject functions as parameter values", async () => {
         // Note: real-router core validates params in buildStateWithSegments before
         // plugin's forwardState interception, so error message comes from real-router
-        await expect(async () => {
-          await router.navigate("route1", {
+        await expect(
+          router.navigate("route1", {
             id: "1",
             mode: (() => "dev") as unknown as string,
-          });
-        }).rejects.toThrowError(/Invalid routeParams/);
+          }),
+        ).rejects.toThrowError(/Invalid routeParams/);
       });
 
       it("should reject null as parameter value", async () => {
-        await expect(async () => {
-          await router.navigate("route1", {
+        await expect(
+          router.navigate("route1", {
             id: "1",
             mode: null as unknown as string,
-          });
-        }).rejects.toThrowError(/cannot be null/);
+          }),
+        ).rejects.toThrowError(/cannot be null/);
       });
     });
   });
@@ -775,12 +781,12 @@ describe("Persistent params plugin", () => {
       });
 
       it("should prevent constructor pollution", async () => {
-        await expect(async () => {
-          await router.navigate("route1", {
+        await expect(
+          router.navigate("route1", {
             id: "1",
             constructor: { prototype: { polluted: true } },
-          } as unknown as Record<string, string>);
-        }).rejects.toThrowError();
+          } as unknown as Record<string, string>),
+        ).rejects.toThrowError();
       });
 
       it("should only process own properties", async () => {
@@ -793,9 +799,9 @@ describe("Persistent params plugin", () => {
         params.mode = "dev";
         params.id = "1";
 
-        await expect(async () => {
-          await router.navigate("route1", params);
-        }).rejects.toThrowError(/Invalid routeParams/);
+        await expect(router.navigate("route1", params)).rejects.toThrowError(
+          /Invalid routeParams/,
+        );
       });
     });
   });
@@ -1034,9 +1040,9 @@ describe("Persistent params plugin", () => {
         },
       };
 
-      await expect(async () => {
-        await router.navigate("route1", maliciousParams);
-      }).rejects.toThrowError(/Generic error during iteration/);
+      await expect(
+        router.navigate("route1", maliciousParams),
+      ).rejects.toThrowError(/Generic error during iteration/);
     });
 
     it("should propagate non-Error thrown values from params getters", async () => {
@@ -1054,9 +1060,9 @@ describe("Persistent params plugin", () => {
         },
       };
 
-      await expect(async () => {
-        await router.navigate("route1", maliciousParams);
-      }).rejects.toThrowError(/String error thrown/);
+      await expect(
+        router.navigate("route1", maliciousParams),
+      ).rejects.toThrowError(/String error thrown/);
     });
   });
 
@@ -1086,6 +1092,8 @@ describe("Persistent params plugin", () => {
       await router.start();
 
       unsubscribe1();
+
+      expect(router.getState()).not.toBeNull();
     });
   });
 

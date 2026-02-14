@@ -29,12 +29,8 @@ import { createSimpleRouter } from "./helpers";
 const JIT_WARMUP_ITERATIONS = 300;
 
 // Warmup helper functions (defined outside to satisfy eslint consistent-function-scoping)
-function warmupMiddlewareHandler(
-  _to: unknown,
-  _from: unknown,
-  done: () => void,
-): void {
-  done();
+function warmupMiddlewareHandler(): void {
+  // pass-through middleware
 }
 const warmupMiddleware = () => warmupMiddlewareHandler;
 
@@ -42,11 +38,6 @@ function warmupGuardHandler(): boolean {
   return true;
 }
 const warmupGuard = () => warmupGuardHandler;
-
-// Warmup callback for start() variants
-function warmupStartCallback(): void {
-  // Empty callback for start(callback) warmup
-}
 
 /**
  * Global JIT warmup that exercises all major router code paths.
@@ -69,36 +60,25 @@ function warmupJIT(): void {
     router.useMiddleware(warmupMiddleware);
     router.addActivateGuard("home", warmupGuard);
 
-    // Pre-create states for start(state) warmup
-    const warmupState = router.makeState("about", {}, "/about");
-
     // Warm up ALL start() variants (critical for sections 10-11)
     // Variant 1: start() without args
-    router.start();
+    void router.start();
     router.stop();
 
     // Variant 2: start(path)
-    router.start("/about");
+    void router.start("/about");
     router.stop();
 
-    // Variant 3: start(state)
-    router.start(warmupState);
-    router.stop();
-
-    // Variant 4: start(callback)
-    router.start(warmupStartCallback);
-    router.stop();
-
-    // Variant 5: start(path, callback)
-    router.start("/", warmupStartCallback);
+    // Variant 3: start(another path)
+    void router.start("/");
     router.stop();
 
     // Now do navigation warmup
-    router.start();
+    void router.start();
 
     // Warm up navigation paths
-    router.navigate("about");
-    router.navigate("home");
+    void router.navigate("about");
+    void router.navigate("home");
 
     // Warm up state operations
     router.getState();

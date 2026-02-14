@@ -17,9 +17,9 @@ const wrapper: FC<PropsWithChildren<{ router: Router }>> = ({
 describe("useIsActiveRoute", () => {
   let router: Router;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start("/users/123");
+    await router.start("/users/123");
   });
 
   afterEach(() => {
@@ -73,7 +73,7 @@ describe("useIsActiveRoute", () => {
     const initialCheckCount = checkCount;
 
     await act(async () => {
-      router.navigate("home");
+      await router.navigate("home");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -192,9 +192,9 @@ describe("useIsActiveRoute", () => {
   });
 
   describe("Edge cases with parameters", () => {
-    it("should handle empty and undefined parameters", () => {
+    it("should handle empty and undefined parameters", async () => {
       router.stop();
-      router.start("/users/list");
+      await router.start("/users/list");
 
       const { result: emptyParams } = renderHook(
         () => useIsActiveRoute(router, "users.list", {}),
@@ -246,7 +246,9 @@ describe("useIsActiveRoute", () => {
       expect(stringParam.current).toBe(true);
 
       // Navigate to ensure we have a fresh state, then check with string again
-      await act(() => router.navigate("users.view", { id: "123" }));
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" }).catch(() => {});
+      });
 
       expect(stringParam.current).toBe(true);
     });
@@ -380,7 +382,9 @@ describe("useIsActiveRoute", () => {
         { name: "user-settings", path: "/user-settings" },
       ]);
 
-      await act(() => router.navigate("users.view", { id: "123" }));
+      await act(async () => {
+        await router.navigate("users.view", { id: "123" }).catch(() => {});
+      });
 
       // Check "user" is not active when "users.view" is
       const { result: userRoute } = renderHook(
@@ -424,7 +428,7 @@ describe("useIsActiveRoute", () => {
   });
 
   describe("Router synchronization", () => {
-    it("should handle check before router start", () => {
+    it("should handle check before router start", async () => {
       const newRouter = createTestRouterWithADefaultRouter();
 
       // Don't start router yet
@@ -441,9 +445,7 @@ describe("useIsActiveRoute", () => {
       expect(result.current).toBe(false);
 
       // Start router
-      act(() => {
-        newRouter.start("/users/123");
-      });
+      await act(() => newRouter.start("/users/123"));
 
       // Should update to true
       expect(result.current).toBe(true);
@@ -453,9 +455,9 @@ describe("useIsActiveRoute", () => {
 
     it("should handle router stop and restart during operation", async () => {
       // Stop and restart the router
-      act(() => {
+      await act(async () => {
         router.stop();
-        router.start("/home");
+        await router.start("/home");
       });
 
       // Now create hook after restart
@@ -484,8 +486,8 @@ describe("useIsActiveRoute", () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/123");
-      router2.start("/home");
+      await router1.start("/users/123");
+      await router2.start("/home");
 
       // Test with router1
       const { result: result1 } = renderHook(

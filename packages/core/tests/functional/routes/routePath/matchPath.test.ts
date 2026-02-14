@@ -7,9 +7,9 @@ import type { Route, Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/routePath/matchPath", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -268,10 +268,10 @@ describe("core/routes/routePath/matchPath", () => {
       expect(withoutSlash?.path).toBe("/page/");
     });
 
-    it("should strictly enforce trailing slash when trailingSlash is strict", () => {
+    it("should strictly enforce trailing slash when trailingSlash is strict", async () => {
       const customRouter = createTestRouter({ trailingSlash: "strict" });
 
-      customRouter.start("");
+      await customRouter.start("").catch(() => {});
 
       customRouter.addRoute({ name: "withSlash", path: "/with/" });
       customRouter.addRoute({ name: "withoutSlash", path: "/without" });
@@ -469,10 +469,10 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.params.limit).toBe("10");
     });
 
-    it("should NOT match path with undeclared query params in strict mode", () => {
+    it("should NOT match path with undeclared query params in strict mode", async () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.start("");
+      await customRouter.start("").catch(() => {});
 
       customRouter.addRoute({ name: "search", path: "/search" });
 
@@ -503,10 +503,10 @@ describe("core/routes/routePath/matchPath", () => {
       expect(state?.params.q).toBe("test");
     });
 
-    it("should NOT match with extra undeclared params in strict mode", () => {
+    it("should NOT match with extra undeclared params in strict mode", async () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.start("");
+      await customRouter.start("").catch(() => {});
 
       customRouter.addRoute({ name: "search", path: "/search?q" });
 

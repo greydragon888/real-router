@@ -111,9 +111,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 20; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   for (let i = 0; i < 30; i++) {
@@ -134,9 +132,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 20; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   for (let i = 0; i < 30; i++) {

@@ -80,6 +80,7 @@ export const executeLifecycleHooks = async (
       if (error instanceof RouterError) {
         const err = makeError(errorCode, error);
 
+        /* v8 ignore next 3 -- @preserve: makeError always returns when err is RouterError */
         if (err) {
           throw err;
         }

@@ -157,9 +157,9 @@ if (!IS_ROUTER5) {
   router.start();
 
   bench("11.4.11 Invoking events on navigation cancel", () => {
-    const cancel = router.navigate("about");
+    void router.navigate("about");
 
-    cancel();
+    router.cancel();
     // events should be ["START", "CANCEL"]
   }).gc("inner");
 }

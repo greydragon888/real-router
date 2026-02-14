@@ -118,9 +118,11 @@ describe("core/observable", () => {
         // In the new Promise-based API, both navigations complete successfully
         // The first navigation completes after the middleware delay
         const firstResult = await first;
+
         expect(firstResult.name).toBe("users");
 
         const secondResult = await second;
+
         expect(secondResult.name).toBe("orders");
 
         // TRANSITION_CANCEL listener is not triggered in this scenario

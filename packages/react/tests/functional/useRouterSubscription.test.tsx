@@ -45,7 +45,7 @@ describe("useRouterSubscription", () => {
     expect(result.current).toBe("test");
 
     await act(async () => {
-      router.navigate("users");
+      await router.navigate("users");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -72,14 +72,14 @@ describe("useRouterSubscription", () => {
     expect(result.current).toBe(1); // Initial call
 
     await act(async () => {
-      router.navigate("home");
+      await router.navigate("home");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
     expect(result.current).toBe(1); // No update
 
     await act(async () => {
-      router.navigate("users");
+      await router.navigate("users");
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -101,7 +101,7 @@ describe("useRouterSubscription", () => {
     const firstValue = result.current;
 
     await act(async () => {
-      router.navigate("users");
+      await router.navigate("users").catch(() => {});
       await new Promise((resolve) => setTimeout(resolve, 0));
     });
 
@@ -134,28 +134,28 @@ describe("useRouterSubscription", () => {
 
       // Rapid navigation: home → users → users.view → home
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(result.current).toBe("home");
 
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(result.current).toBe("users");
 
       await act(async () => {
-        router.navigate("users.view", { id: "123" });
+        await router.navigate("users.view", { id: "123" });
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(result.current).toBe("users.view");
 
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -244,7 +244,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to route that doesn't match any filter first
       await act(async () => {
-        router.navigate("about");
+        await router.navigate("about");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -255,7 +255,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'users' - only subscriber1 should update
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -265,7 +265,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'home' - only subscriber2 should update
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -275,7 +275,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'items.item' - only subscriber3 should update
       await act(async () => {
-        router.navigate("items.item", { id: "1" });
+        await router.navigate("items.item", { id: "1" });
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -294,7 +294,7 @@ describe("useRouterSubscription", () => {
     it("should get current state when subscribing after navigation", async () => {
       // Navigate BEFORE creating subscription
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -311,7 +311,7 @@ describe("useRouterSubscription", () => {
     it("should handle subscription with shouldUpdate and initial state", async () => {
       // Navigate to users.view before creating subscription
       await act(async () => {
-        router.navigate("users.view", { id: "123" });
+        await router.navigate("users.view", { id: "123" });
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -331,7 +331,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'home' - should NOT update (shouldUpdate returns false)
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -339,7 +339,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'items.item' - SHOULD update (shouldUpdate returns true)
       await act(async () => {
-        router.navigate("items.item", { id: "1" });
+        await router.navigate("items.item", { id: "1" });
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -378,7 +378,7 @@ describe("useRouterSubscription", () => {
       // Selector change doesn't trigger recomputation until next navigation
       // So we need to navigate to see the new selector in action
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -387,7 +387,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate again to verify new selector is still used
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -399,7 +399,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to trigger selector recomputation with new value
       await act(async () => {
-        router.navigate("about");
+        await router.navigate("about");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -431,21 +431,21 @@ describe("useRouterSubscription", () => {
 
       // Try multiple navigations
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(result.current).toBe(initialCallCount);
 
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
       expect(result.current).toBe(initialCallCount);
 
       await act(async () => {
-        router.navigate("about");
+        await router.navigate("about");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -483,7 +483,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate normally first
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -494,7 +494,7 @@ describe("useRouterSubscription", () => {
 
       // Navigation should still work (error is caught)
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -526,7 +526,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'home' - should NOT update (shouldUpdate checks for 'users')
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home").catch(() => {});
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -534,7 +534,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'users' - SHOULD update
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users").catch(() => {});
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -546,7 +546,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'about' - should NOT update (new shouldUpdate checks for 'home')
       await act(async () => {
-        router.navigate("about");
+        await router.navigate("about").catch(() => {});
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -554,7 +554,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to 'home' - SHOULD update with new logic
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home").catch(() => {});
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -582,7 +582,7 @@ describe("useRouterSubscription", () => {
       const firstValue = result.current;
 
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -594,7 +594,7 @@ describe("useRouterSubscription", () => {
       const secondValue = result.current;
 
       await act(async () => {
-        router.navigate("home");
+        await router.navigate("home");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 
@@ -631,7 +631,7 @@ describe("useRouterSubscription", () => {
         const targetRoute = routes[i % routes.length];
 
         await act(async () => {
-          router.navigate(targetRoute);
+          await router.navigate(targetRoute).catch(() => {});
           await new Promise((resolve) => setTimeout(resolve, 0));
         });
       }
@@ -677,7 +677,7 @@ describe("useRouterSubscription", () => {
 
       // Navigate to ensure no zombie subscriptions are triggered
       await act(async () => {
-        router.navigate("users");
+        await router.navigate("users");
         await new Promise((resolve) => setTimeout(resolve, 0));
       });
 

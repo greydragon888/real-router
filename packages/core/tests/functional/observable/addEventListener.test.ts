@@ -103,7 +103,7 @@ describe("core/observable/addEventListener", () => {
       await router.start("/");
 
       // Start first navigation
-      void router.navigate("users");
+      router.navigate("users").catch(() => {});
 
       // Cancel by starting second navigation
       await router.navigate("orders");
@@ -479,9 +479,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, emptyFn);
       }).not.toThrowError();
 
-      expect(() => {
-        void router.start();
-      }).not.toThrowError();
+      router.start().catch(() => {});
     });
 
     it("should work before router.start()", async () => {

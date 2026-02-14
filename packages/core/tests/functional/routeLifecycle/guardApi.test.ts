@@ -10,8 +10,8 @@ import {
 let router: Router;
 
 describe("core/route-lifecycle/guard-api", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {
@@ -86,10 +86,10 @@ describe("core/route-lifecycle/guard-api", () => {
       expect(router.getState()?.name).toBe("admin");
     });
 
-    it("skips validation when noValidate is true", () => {
+    it("skips validation when noValidate is true", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      noValidateRouter.start();
+      await noValidateRouter.start();
       noValidateRouter.addActivateGuard("admin", false);
 
       expect(() => {
@@ -109,10 +109,10 @@ describe("core/route-lifecycle/guard-api", () => {
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("skips validation when noValidate is true", () => {
+    it("skips validation when noValidate is true", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      noValidateRouter.start();
+      await noValidateRouter.start();
       noValidateRouter.addDeactivateGuard("admin", false);
 
       expect(() => {
@@ -157,7 +157,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should not modify router state", () => {
-      void router.navigate("home");
+      router.navigate("home").catch(() => {});
       const stateBefore = router.getState();
 
       router.canNavigateTo("admin");

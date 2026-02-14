@@ -12,9 +12,7 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
+  router.useMiddleware(() => () => {});
   router.start("/");
 
   bench("2.1.1 Navigation with single synchronous middleware", () => {
@@ -28,9 +26,7 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   for (let i = 0; i < 5; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   router.start("/");
@@ -108,9 +104,7 @@ const alternatingRoutes = ["about", "home"];
 
   router // @ts-expect-error - test dependency
     .setDependency("service", { check: () => true });
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    done();
-  });
+  router.useMiddleware(() => () => {});
   router.start("/");
 
   bench("2.1.7 Navigation with middleware using dependencies", () => {

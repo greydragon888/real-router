@@ -70,6 +70,7 @@ export class RouterLifecycleNamespace {
    * Validates start() arguments.
    */
   static validateStartArgs(args: unknown[]): void {
+    /* v8 ignore next 4 -- @preserve: facade limits to 0-1 args via TypeScript overloads */
     if (args.length > 1) {
       throw new Error(
         "[router.start] Invalid number of arguments. Expected 0-1 arguments.",

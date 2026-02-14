@@ -409,7 +409,7 @@ export class RouteLifecycleNamespace<
         return false;
       }
 
-      // Guard returned void/State without calling done() synchronously — permissive default
+      // Guard returned void/State — permissive default
       return true;
     } catch {
       return false;

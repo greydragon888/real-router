@@ -9,10 +9,10 @@ let router: Router;
 const noop = () => undefined;
 
 describe("router.navigate() - promise resolve values", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {

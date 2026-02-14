@@ -73,7 +73,7 @@ export const BaseLink: FC<BaseLinkProps> = memo(
         evt.preventDefault();
 
         // Perform navigation (fire-and-forget)
-        router.navigate(routeName, stableParams, stableOptions);
+        void router.navigate(routeName, stableParams, stableOptions);
       },
       [onClick, target, router, routeName, stableParams, stableOptions],
     );

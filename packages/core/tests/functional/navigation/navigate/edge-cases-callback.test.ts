@@ -128,7 +128,7 @@ describe("router.navigate() - edge cases callback", () => {
     // Issue #53: When navigate() is called with the form:
     //   router.navigate('route', { id: 1 }, undefined, callback)
     // The callback was being ignored because the argument parsing logic
-    // only checked `done` inside the `if (optsOrDone)` block, which doesn't
+    // only checked the callback inside the `if (optsOrDone)` block, which doesn't
     // execute when optsOrDone is undefined/falsy.
 
     describe("Callback should be called in all argument forms", () => {
@@ -295,8 +295,8 @@ describe("router.navigate() - edge cases callback", () => {
      * Issue #58 / 12.1: Verify callback is not lost when navigate is called as:
      * navigate(name, params, undefined, callback)
      *
-     * Previously, if optsOrDone was undefined/falsy, the done parameter was ignored.
-     * The fix changed `else if (optsOrDone)` to just `else` to capture done properly.
+     * Previously, if optsOrDone was undefined/falsy, the callback parameter was ignored.
+     * The fix changed `else if (optsOrDone)` to just `else` to capture the callback properly.
      */
 
     it("should call callback when opts is undefined", async () => {

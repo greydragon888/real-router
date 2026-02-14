@@ -11,7 +11,7 @@ describe("router.navigate() - auto cleanup", () => {
   describe("navigation with options.autoCleanUp === true", () => {
     let router: Router;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       vi.spyOn(logger, "error").mockImplementation(noop);
 
       router = createRouter(
@@ -33,7 +33,7 @@ describe("router.navigate() - auto cleanup", () => {
         },
       );
 
-      void router.start();
+      await router.start();
     });
 
     afterEach(() => {

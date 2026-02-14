@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - guards cannot redirect", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -26,7 +26,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     // This section tests that behavior.
 
     describe("canDeactivate returns error when attempting redirect", () => {
-      it("should return error when canDeactivate calls done with redirect error", async () => {
+      it("should return error when canDeactivate throws redirect error", async () => {
         router.addDeactivateGuard("users", () => () => {
           throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
             redirect: {
@@ -77,7 +77,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     });
 
     describe("canActivate returns error when attempting redirect", () => {
-      it("should return error when canActivate calls done with redirect error", async () => {
+      it("should return error when canActivate throws redirect error", async () => {
         router.addActivateGuard("profile", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             redirect: { name: "sign-in", params: {}, path: "/sign-in" },
@@ -135,7 +135,7 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        void router.navigate("index");
+        router.navigate("index").catch(() => {});
 
         const callback = vi.fn();
 
@@ -167,7 +167,7 @@ describe("router.navigate() - guards cannot redirect", () => {
           });
         });
 
-        void router.navigate("index");
+        router.navigate("index").catch(() => {});
 
         const callback = vi.fn();
 

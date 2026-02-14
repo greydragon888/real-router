@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - unknown route", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -34,7 +34,7 @@ describe("router.navigate() - unknown route", () => {
         allowNotFound: true, // Enable UNKNOWN_ROUTE behavior
       });
 
-      void router.start();
+      router.start().catch(() => {});
     });
 
     it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", async () => {

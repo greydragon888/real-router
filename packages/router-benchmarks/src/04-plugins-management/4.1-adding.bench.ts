@@ -54,11 +54,7 @@ const BATCH = 50;
 
   bench(`4.1.4 Adding single middleware with cleanup (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      const unsubscribe = router.useMiddleware(
-        () => (_toState, _fromState, done) => {
-          done();
-        },
-      );
+      const unsubscribe = router.useMiddleware(() => () => {});
 
       unsubscribe();
     }
@@ -74,15 +70,9 @@ const BATCH = 50;
     () => {
       for (let i = 0; i < BATCH; i++) {
         const unsubscribe = router.useMiddleware(
-          () => (_toState, _fromState, done) => {
-            done();
-          },
-          () => (_toState, _fromState, done) => {
-            done();
-          },
-          () => (_toState, _fromState, done) => {
-            done();
-          },
+          () => () => {},
+          () => () => {},
+          () => () => {},
         );
 
         unsubscribe();

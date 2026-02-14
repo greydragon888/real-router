@@ -21,7 +21,7 @@ describe("router.navigate() - navigation meta and options", () => {
     vi.clearAllMocks();
   });
 
-  it("should be able to call navigate with 3 args without done cb", async () => {
+  it("should be able to call navigate with 3 args without callback", async () => {
     await router.navigate("orders.pending", {}, { force: true });
 
     expect(router.getState()?.name).toBe("orders.pending");

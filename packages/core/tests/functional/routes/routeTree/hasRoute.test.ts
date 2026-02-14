@@ -7,9 +7,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("core/routes/routeTree/hasRoute", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {

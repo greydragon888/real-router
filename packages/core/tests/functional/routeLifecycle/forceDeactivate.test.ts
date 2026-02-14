@@ -5,8 +5,8 @@ import { createLifecycleTestRouter, errorCodes, type Router } from "./setup";
 let router: Router;
 
 describe("core/route-lifecycle/forceDeactivate", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {

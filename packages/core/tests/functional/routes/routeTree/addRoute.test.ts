@@ -1596,7 +1596,7 @@ describe("core/routes/addRoute", () => {
         { user: { isAdmin: true } },
       );
 
-      routerWithDeps.start("");
+      await routerWithDeps.start("").catch(() => {});
 
       const result = routerWithDeps.forwardState("dashboard", {});
 

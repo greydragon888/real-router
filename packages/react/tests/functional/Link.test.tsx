@@ -11,7 +11,7 @@ let router: Router;
 const TEST_TEXT = "Test text";
 
 describe("Link component", () => {
-  beforeEach(async () => {
+  beforeEach(() => {
     router = createTestRouter();
 
     router.addRoute({

@@ -44,12 +44,12 @@ describe("@real-router/rx - Integration Tests", () => {
         )
         .subscribe({ next: (v) => values.push(v) });
 
-      router.start();
-      router.navigate("about");
-      router.navigate("about");
-      router.navigate("contact");
-      router.navigate("contact");
-      router.navigate("about");
+      await router.start();
+      await router.navigate("about");
+      await router.navigate("about").catch(() => {}); // SAME_STATES
+      await router.navigate("contact");
+      await router.navigate("contact").catch(() => {}); // SAME_STATES
+      await router.navigate("about");
 
       expect(values).toStrictEqual(["about", "contact", "about"]);
     });
@@ -64,9 +64,9 @@ describe("@real-router/rx - Integration Tests", () => {
         )
         .subscribe({ next: (v) => values.push(v) });
 
-      router.start();
-      router.navigate("about");
-      router.navigate("contact");
+      await router.start();
+      await router.navigate("about");
+      await router.navigate("contact");
 
       expect(values).toStrictEqual(["/about", "/contact"]);
     });
@@ -81,17 +81,17 @@ describe("@real-router/rx - Integration Tests", () => {
         )
         .subscribe({ next: (v) => values.push(v) });
 
-      router.start();
-      router.navigate("about");
+      await router.start();
+      await router.navigate("about");
 
       subscription.unsubscribe();
 
-      router.navigate("contact");
+      await router.navigate("contact");
 
       expect(values).toStrictEqual(["about"]);
     });
 
-    it("should isolate errors in operator functions", () => {
+    it("should isolate errors in operator functions", async () => {
       const errors: unknown[] = [];
       const values: string[] = [];
 
@@ -110,9 +110,9 @@ describe("@real-router/rx - Integration Tests", () => {
           error: (err) => errors.push(err),
         });
 
-      router.start();
-      router.navigate("about");
-      router.navigate("contact");
+      await router.start();
+      await router.navigate("about");
+      await router.navigate("contact");
 
       expect(values).toStrictEqual(["home", "about"]);
       expect(errors).toHaveLength(1);
@@ -130,14 +130,14 @@ describe("@real-router/rx - Integration Tests", () => {
         .pipe(filter((e) => e.type === "TRANSITION_ERROR"))
         .subscribe({ next: (e) => errors.push(e) });
 
-      router.start();
-      router.navigate("about");
+      await router.start();
+      await router.navigate("about");
 
-      await new Promise<void>((resolve) => {
-        router.navigate("admin", {}, {}, () => {
-          resolve();
-        });
-      });
+      try {
+        await router.navigate("admin");
+      } catch {
+        // Expected: admin route blocked by guard
+      }
 
       expect(errors).toHaveLength(1);
       expect(errors[0].type).toBe("TRANSITION_ERROR");
@@ -151,9 +151,9 @@ describe("@real-router/rx - Integration Tests", () => {
         .pipe(filter((e) => e.type === "TRANSITION_SUCCESS"))
         .subscribe({ next: (e) => successes.push(e) });
 
-      router.start();
-      router.navigate("about");
-      router.navigate("contact");
+      await router.start();
+      await router.navigate("about");
+      await router.navigate("contact");
 
       expect(successes).toHaveLength(3);
       expect(successes[0].toState.name).toBe("home");
@@ -171,7 +171,7 @@ describe("@real-router/rx - Integration Tests", () => {
         )
         .subscribe({ next: (type) => events.push(type) });
 
-      router.start();
+      await router.start();
       router.stop();
 
       expect(events).toStrictEqual(["ROUTER_START", "ROUTER_STOP"]);
@@ -194,16 +194,16 @@ describe("@real-router/rx - Integration Tests", () => {
         .pipe(filter((e) => e.type === "TRANSITION_CANCEL"))
         .subscribe({ next: (e) => cancelEvents.push(e) });
 
-      router.start();
+      await router.start();
 
-      // Start navigation to about (will be slow)
-      router.navigate("about");
+      // Start navigation to about (will be slow, don't await)
+      router.navigate("about").catch(() => {});
 
-      // Wait a bit then navigate to contact, cancelling the about navigation
+      // Wait a bit then stop the router, cancelling the about navigation
       await new Promise((resolve) => setTimeout(resolve, 10));
-      router.navigate("contact");
+      router.stop();
 
-      // Resolve the delay to complete the cancelled navigation
+      // Resolve the delay so the guard completes and detects cancellation
       resolveDelay?.();
       await new Promise((resolve) => setTimeout(resolve, 50));
 
@@ -226,9 +226,9 @@ describe("@real-router/rx - Integration Tests", () => {
         }
       })();
 
-      router.start();
+      await router.start();
       await new Promise((resolve) => setTimeout(resolve, 10));
-      router.navigate("about");
+      await router.navigate("about");
 
       await iteratorPromise;
 
@@ -251,9 +251,9 @@ describe("@real-router/rx - Integration Tests", () => {
         }
       })();
 
-      router.start();
+      await router.start();
       await new Promise((resolve) => setTimeout(resolve, 10));
-      router.navigate("about");
+      await router.navigate("about");
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       await iteratorPromise;
@@ -288,7 +288,7 @@ describe("@real-router/rx - Integration Tests", () => {
         }
       })();
 
-      router.start();
+      await router.start();
       await iteratorPromise;
 
       expect(teardownCalled).toBe(true);
@@ -299,7 +299,7 @@ describe("@real-router/rx - Integration Tests", () => {
     it("should not emit initial state when replay: false", async () => {
       const values: string[] = [];
 
-      router.start();
+      await router.start();
 
       state$(router, { replay: false })
         .pipe(map(({ route }) => route.name))
@@ -310,7 +310,7 @@ describe("@real-router/rx - Integration Tests", () => {
 
       expect(values).toStrictEqual([]);
 
-      router.navigate("about");
+      await router.navigate("about");
 
       expect(values).toStrictEqual(["about"]);
     });
@@ -318,7 +318,7 @@ describe("@real-router/rx - Integration Tests", () => {
     it("should emit initial state when replay: true (default)", async () => {
       const values: string[] = [];
 
-      router.start();
+      await router.start();
 
       state$(router)
         .pipe(map(({ route }) => route.name))
@@ -342,12 +342,12 @@ describe("@real-router/rx - Integration Tests", () => {
           { signal: controller.signal },
         );
 
-      router.start();
-      router.navigate("about");
+      await router.start();
+      await router.navigate("about");
 
       controller.abort();
 
-      router.navigate("contact");
+      await router.navigate("contact");
 
       expect(values).toStrictEqual(["home", "about"]);
     });
@@ -367,13 +367,13 @@ describe("@real-router/rx - Integration Tests", () => {
           { signal: controller.signal },
         );
 
-      router.start();
-      router.navigate("about");
-      router.navigate("contact");
+      await router.start();
+      await router.navigate("about");
+      await router.navigate("contact");
 
       controller.abort();
 
-      router.navigate("about");
+      await router.navigate("about");
 
       expect(values).toStrictEqual(["about", "contact"]);
     });
@@ -390,7 +390,7 @@ describe("@real-router/rx - Integration Tests", () => {
 
       expect(subscription.closed).toBe(true);
 
-      router.start();
+      await router.start();
     });
 
     it("should handle AbortSignal with events$", async () => {
@@ -404,12 +404,12 @@ describe("@real-router/rx - Integration Tests", () => {
           { signal: controller.signal },
         );
 
-      router.start();
-      router.navigate("about");
+      await router.start();
+      await router.navigate("about");
 
       controller.abort();
 
-      router.navigate("contact");
+      await router.navigate("contact");
 
       expect(events).toContain("ROUTER_START");
       expect(events).toContain("TRANSITION_SUCCESS");

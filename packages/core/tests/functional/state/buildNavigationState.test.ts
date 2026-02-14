@@ -9,9 +9,9 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.buildNavigationState()", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -225,10 +225,10 @@ describe("router.buildNavigationState()", () => {
   });
 
   describe("noValidate mode", () => {
-    it("should skip validation and return undefined for invalid input", () => {
+    it("should skip validation and return undefined for invalid input", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      void noValidateRouter.start();
+      await noValidateRouter.start();
 
       const result = noValidateRouter.buildNavigationState(
         123 as unknown as string,

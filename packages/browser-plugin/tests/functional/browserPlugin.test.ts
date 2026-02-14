@@ -289,7 +289,7 @@ describe("Browser Plugin", async () => {
     it("updates history on start", async () => {
       vi.spyOn(mockedBrowser, "replaceState");
 
-      await await router.start();
+      await router.start();
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         router.getState(),
@@ -299,7 +299,7 @@ describe("Browser Plugin", async () => {
     });
 
     it("updates history on navigation", async () => {
-      await await router.start();
+      await router.start();
 
       vi.spyOn(mockedBrowser, "pushState");
 
@@ -313,7 +313,7 @@ describe("Browser Plugin", async () => {
     });
 
     it("uses replaceState with replace option", async () => {
-      await await router.start();
+      await router.start();
 
       vi.spyOn(mockedBrowser, "replaceState");
 
@@ -371,12 +371,8 @@ describe("Browser Plugin", async () => {
     it("restores state on CANNOT_DEACTIVATE", async () => {
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigateToState").mockImplementation(
-        () => {
-          return Promise.reject(
-            new RouterError(errorCodes.CANNOT_DEACTIVATE, {}),
-          );
-        },
+      vi.spyOn(router, "navigateToState").mockRejectedValue(
+        new RouterError(errorCodes.CANNOT_DEACTIVATE, {}),
       );
 
       vi.spyOn(mockedBrowser, "replaceState");
@@ -400,15 +396,13 @@ describe("Browser Plugin", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Mock slow transition that returns a delayed Promise
-        vi.spyOn(router, "navigateToState").mockImplementation(
-          (_to) => {
-            return new Promise<State>((resolve) => {
-              setTimeout(() => {
-                resolve(_to);
-              }, 100);
-            });
-          },
-        );
+        vi.spyOn(router, "navigateToState").mockImplementation((_to) => {
+          return new Promise<State>((resolve) => {
+            setTimeout(() => {
+              resolve(_to);
+            }, 100);
+          });
+        });
 
         const state1 = {
           name: "users.view",
@@ -447,15 +441,11 @@ describe("Browser Plugin", async () => {
         let resolveTransition: TransitionResolver | null = null;
 
         // Mock slow transition that returns a Promise we can resolve externally
-        vi.spyOn(router, "navigateToState").mockImplementation(
-          (
-            _to: State,
-          ) => {
-            return new Promise<State>((resolve) => {
-              resolveTransition = resolve;
-            });
-          },
-        );
+        vi.spyOn(router, "navigateToState").mockImplementation((_to: State) => {
+          return new Promise<State>((resolve) => {
+            resolveTransition = resolve;
+          });
+        });
 
         const state1: State = {
           name: "users.view",
@@ -1510,7 +1500,7 @@ describe("Browser Plugin", async () => {
           browserPluginFactory({ preserveHash: true }, mockedBrowser),
         );
 
-        const state = await await router.start();
+        const state = await router.start();
 
         expect(state).toBeDefined();
         expect(globalThis.location.hash).toBe("#section");
@@ -1534,13 +1524,11 @@ describe("Browser Plugin", async () => {
         router.addDeactivateGuard("home", () => () => false);
 
         // Navigate should fail
-        try {
-          await router.navigate("users.list", {}, {});
-          expect.fail("Should have thrown");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as any)?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-        }
+        await expect(
+          router.navigate("users.list", {}, {}),
+        ).rejects.toMatchObject({
+          code: errorCodes.CANNOT_DEACTIVATE,
+        });
 
         expect(router.getState()?.name).toBe("home");
       });
@@ -1561,10 +1549,8 @@ describe("Browser Plugin", async () => {
         await router.navigate("users.list");
 
         // Mock transition error - navigateToState returns a rejected Promise
-        vi.spyOn(router, "navigateToState").mockImplementation(
-          () => {
-            return Promise.reject(new Error("Transition failed"));
-          },
+        vi.spyOn(router, "navigateToState").mockRejectedValue(
+          new Error("Transition failed"),
         );
 
         vi.spyOn(mockedBrowser, "replaceState");
@@ -1602,15 +1588,9 @@ describe("Browser Plugin", async () => {
         await router.start();
 
         // Real Router throws error on repeated start
-        try {
-          await router.start();
-          expect.fail("Should have thrown");
-        } catch (err) {
-          expect(err).toBeDefined();
-          expect((err as RouterError).code).toBe(
-            errorCodes.ROUTER_ALREADY_STARTED,
-          );
-        }
+        await expect(router.start()).rejects.toMatchObject({
+          code: errorCodes.ROUTER_ALREADY_STARTED,
+        });
       });
 
       it("cleans up listeners on stop", async () => {
@@ -2227,13 +2207,13 @@ describe("Browser Plugin", async () => {
         // real-router now validates params structure and rejects circular references
         // to prevent DataCloneError during history.pushState/replaceState in browsers.
         // Circular references are not serializable and should be caught early.
-        expect(() => {
-          router.navigate("users.view", circularParams);
-        }).toThrowError(TypeError);
+        await expect(
+          router.navigate("users.view", circularParams),
+        ).rejects.toThrowError(TypeError);
 
-        expect(() => {
-          router.navigate("users.view", circularParams);
-        }).toThrowError("Invalid routeParams");
+        await expect(
+          router.navigate("users.view", circularParams),
+        ).rejects.toThrowError("Invalid routeParams");
       });
 
       it("handles params with function values", async () => {

@@ -9,10 +9,10 @@ import type { Router } from "@real-router/core";
 let router: Router;
 
 describe("router.navigate() - router not started", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -26,8 +26,8 @@ describe("router.navigate() - router not started", () => {
       router.stop();
     });
 
-    afterEach(() => {
-      void router.start();
+    afterEach(async () => {
+      await router.start().catch(() => {});
     });
 
     it("should call callback with ROUTER_NOT_STARTED error", async () => {

@@ -306,15 +306,15 @@ describe("RouterProvider - Performance Tests", () => {
 
       expect(ProfiledProvider).toHaveRenderedTimes(1);
 
-      // Multiple navigations in single act() - only last state matters
+      // Multiple navigations in single act() - each await yields to React
       await act(async () => {
         await router.navigate("users.list");
         await router.navigate("about");
         await router.navigate("home");
       });
 
-      // React batches - only final state triggers one re-render
-      expect(ProfiledProvider).toHaveRenderedTimes(2);
+      // Each awaited navigate triggers a separate React update: 1 mount + 3 updates = 4
+      expect(ProfiledProvider).toHaveRenderedTimes(4);
     });
   });
 
@@ -356,8 +356,8 @@ describe("RouterProvider - Performance Tests", () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let innerRoute: string | undefined;
       let outerRoute: string | undefined;
@@ -392,7 +392,7 @@ describe("RouterProvider - Performance Tests", () => {
 
       // Navigate outer router
       await act(async () => {
-        router1.navigate("home");
+        await router1.navigate("home");
       });
 
       // Outer captures outer router's route
@@ -402,7 +402,7 @@ describe("RouterProvider - Performance Tests", () => {
 
       // Navigate inner router
       await act(async () => {
-        router2.navigate("home");
+        await router2.navigate("home");
       });
 
       // Outer unchanged
@@ -414,12 +414,12 @@ describe("RouterProvider - Performance Tests", () => {
       router2.stop();
     });
 
-    it("should provide correct context values to each level", () => {
+    it("should provide correct context values to each level", async () => {
       const router1 = createTestRouterWithADefaultRouter();
       const router2 = createTestRouterWithADefaultRouter();
 
-      router1.start("/users/list");
-      router2.start("/about");
+      await router1.start("/users/list");
+      await router2.start("/about");
 
       let outerRouter: Router | null = null;
       let innerRouter: Router | null = null;

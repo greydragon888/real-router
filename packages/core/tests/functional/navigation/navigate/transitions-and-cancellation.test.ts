@@ -11,10 +11,10 @@ let router: Router;
 const noop = () => undefined;
 
 describe("router.navigate() - transitions and cancellation", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouter();
 
-    void router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -108,7 +108,7 @@ describe("router.navigate() - transitions and cancellation", () => {
 
   describe("Issue #51: Concurrent Navigation Handling", () => {
     // Issue #51: When navigation is cancelled, Promise handlers continue executing
-    // and call done() after cancellation, leading to race conditions.
+    // and resolve after cancellation, leading to race conditions.
 
     describe("Multiple cancellations", () => {
       it("should handle multiple stop() calls safely", async () => {
@@ -141,6 +141,15 @@ describe("router.navigate() - transitions and cancellation", () => {
           expect(error?.code).toBe(errorCodes.TRANSITION_CANCELLED);
         }
       });
+    });
+  });
+
+  describe("router.cancel()", () => {
+    it("should be callable and not throw", () => {
+      // cancel() resets navigating flag, exposing public API
+      expect(() => {
+        router.cancel();
+      }).not.toThrowError();
     });
   });
 });

@@ -12,9 +12,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 
   // Add 50 middleware (max limit)
   for (let i = 0; i < 50; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   router.start("/");
@@ -29,9 +27,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   const router = createSimpleRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.useMiddleware(() => (_toState, _fromState, done) => {
-      done();
-    });
+    router.useMiddleware(() => () => {});
   }
 
   router.start();

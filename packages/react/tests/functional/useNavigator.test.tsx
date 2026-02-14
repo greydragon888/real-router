@@ -26,9 +26,9 @@ const wrapper =
 describe("useNavigator hook", () => {
   let router: Router;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     router = createTestRouterWithADefaultRouter();
-    router.start();
+    await router.start();
   });
 
   afterEach(() => {
@@ -47,18 +47,14 @@ describe("useNavigator hook", () => {
     expect(result.current.subscribe).toBeDefined();
   });
 
-  it("should have working navigate method", () => {
+  it("should have working navigate method", async () => {
     const { result } = renderHook(() => useNavigator(), {
       wrapper: wrapper(router),
     });
-    const callback = vi.fn();
 
-    result.current.navigate("items", {}, {}, callback);
+    const state = await result.current.navigate("items");
 
-    expect(callback).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ name: "items" }),
-    );
+    expect(state).toStrictEqual(expect.objectContaining({ name: "items" }));
   });
 
   it("should have working getState method", () => {

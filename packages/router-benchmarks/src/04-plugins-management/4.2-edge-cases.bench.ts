@@ -117,27 +117,18 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware(() => (_toState, _fromState, done) => {
-    const unsubscribe = router.useMiddleware(
-      () => (_toState2, _fromState2, done2) => {
-        done2();
-      },
-    );
+  router.useMiddleware(() => () => {
+    const unsubscribe = router.useMiddleware(() => () => {});
 
     // Cleanup to prevent accumulation
     unsubscribe();
-    done();
   });
   router.start();
   const routes = ["about", "home"];
   let index = 0;
 
   bench("4.2.10 Adding middleware during navigation", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(routes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -147,25 +138,15 @@ const BATCH = 50;
   let unsubscribeMiddleware: (() => void) | null = null;
 
   // First middleware that will be removed during navigation
-  unsubscribeMiddleware = router.useMiddleware(
-    () => (_toState, _fromState, done) => {
-      done();
-    },
-  );
+  unsubscribeMiddleware = router.useMiddleware(() => () => {});
 
   // Second middleware that removes the first
-  router.useMiddleware(() => (_toState, _fromState, done) => {
+  router.useMiddleware(() => () => {
     if (unsubscribeMiddleware) {
       unsubscribeMiddleware();
       // Re-add to prevent "removing nothing" after first run
-      unsubscribeMiddleware = router.useMiddleware(
-        () => (_toState2, _fromState2, done2) => {
-          done2();
-        },
-      );
+      unsubscribeMiddleware = router.useMiddleware(() => () => {});
     }
-
-    done();
   });
 
   router.start();
@@ -173,11 +154,7 @@ const BATCH = 50;
   let index = 0;
 
   bench("4.2.11 Removing middleware during navigation", async () => {
-    await new Promise<void>((resolve) => {
-      router.navigate(routes[index++ % 2], {}, {}, () => {
-        resolve();
-      });
-    });
+    await router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
 
@@ -209,11 +186,7 @@ const BATCH_MIDDLEWARE = 200;
     `4.2.13 Multiple middleware removal (idempotent) (×${BATCH_MIDDLEWARE})`,
     () => {
       for (let b = 0; b < BATCH_MIDDLEWARE; b++) {
-        const unsubscribe = router.useMiddleware(
-          () => (_toState, _fromState, done) => {
-            done();
-          },
-        );
+        const unsubscribe = router.useMiddleware(() => () => {});
 
         unsubscribe();
         unsubscribe();

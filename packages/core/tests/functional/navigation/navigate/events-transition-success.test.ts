@@ -47,7 +47,7 @@ describe("router.navigate() - events transition success", () => {
       unsubSuccess();
     });
 
-    it("should call navigation callback with done(undefined, newState)", async () => {
+    it("should resolve with new state on successful navigation", async () => {
       vi.useFakeTimers();
 
       const newState = await router.navigate("settings");
@@ -337,7 +337,5 @@ describe("router.navigate() - events transition success", () => {
       unsubSuccess();
       await router.start();
     });
-
-
   });
 });

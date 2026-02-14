@@ -289,15 +289,15 @@ describe("useRoute - Performance Tests", () => {
 
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
-      // Multiple synchronous navigations in single act() - only last one matters
+      // Multiple navigations in single act() - each await yields to React
       await act(async () => {
         await router.navigate("users.list");
         await router.navigate("about");
         await router.navigate("home");
       });
 
-      // React batches updates - only final state triggers re-render
-      expect(ProfiledHook).toHaveRenderedTimes(2);
+      // Each awaited navigate triggers a separate React update: 1 mount + 3 updates = 4
+      expect(ProfiledHook).toHaveRenderedTimes(4);
     });
   });
 
@@ -311,9 +311,9 @@ describe("useRoute - Performance Tests", () => {
 
       expect(ProfiledHook).toHaveRenderedTimes(1);
 
-      // Navigate to the same route - router may not emit event
+      // Navigate to the same route - router rejects with SAME_STATES
       await act(async () => {
-        await router.navigate("users.list");
+        await router.navigate("users.list").catch(() => {});
       });
 
       // Behavior depends on router implementation

@@ -11,8 +11,8 @@ import {
 let router: Router;
 
 describe("core/route-lifecycle/addActivateGuard", () => {
-  beforeEach(() => {
-    router = createLifecycleTestRouter();
+  beforeEach(async () => {
+    router = await createLifecycleTestRouter();
   });
 
   afterEach(() => {

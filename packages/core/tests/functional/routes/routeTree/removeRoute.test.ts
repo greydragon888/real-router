@@ -870,6 +870,7 @@ describe("core/routes/removeRoute", () => {
         // Navigation should fail because route was removed
         try {
           await navigationPromise;
+
           expect.fail("Should have thrown ROUTE_NOT_FOUND");
         } catch (error) {
           expect((error as RouterError).code).toBe(errorCodes.ROUTE_NOT_FOUND);
