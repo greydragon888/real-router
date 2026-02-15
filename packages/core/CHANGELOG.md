@@ -1,5 +1,29 @@
 # @real-router/core
 
+## 0.20.0
+
+### Minor Changes
+
+- [#100](https://github.com/greydragon888/real-router/pull/100) [`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57) Thanks [@greydragon888](https://github.com/greydragon888)! - feat!: remove `clearMiddleware()` method (#91)
+
+  BREAKING CHANGE: `clearMiddleware()` has been removed. Use the `Unsubscribe` function returned by `useMiddleware()` instead.
+
+  Before:
+
+  ```ts
+  router.useMiddleware(myMiddleware);
+  // later...
+  router.clearMiddleware();
+  ```
+
+  After:
+
+  ```ts
+  const unsub = router.useMiddleware(myMiddleware);
+  // later...
+  unsub();
+  ```
+
 ## 0.19.0
 
 ### Minor Changes
