@@ -203,12 +203,6 @@ router.useMiddleware((router) => (toState, fromState, done) => {
 });
 ```
 
-#### `router.clearMiddleware()`
-
-Clear all middleware.\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/clearMiddleware)
-
 ---
 
 ## Advanced API

@@ -208,8 +208,6 @@ describe("router.navigate() - route not found", () => {
 
       expect(guard).not.toHaveBeenCalled();
       expect(middleware).not.toHaveBeenCalled();
-
-      router.clearMiddleware();
     });
 
     it("should handle multiple invalid route navigations", async () => {

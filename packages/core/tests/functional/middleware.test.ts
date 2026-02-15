@@ -108,46 +108,6 @@ describe("core/middleware", () => {
     router.stop();
   });
 
-  describe("clearMiddleware", () => {
-    it("should clear all middleware", async () => {
-      const tracker = createTrackingMiddleware();
-
-      router.useMiddleware(() => tracker.middleware);
-
-      // Verify middleware is registered by checking it executes
-      await router.navigate("users");
-
-      expect(tracker.wasCalled()).toBe(true);
-
-      tracker.reset();
-      router.clearMiddleware();
-
-      // After clear, middleware should not execute
-      await router.navigate("orders");
-
-      expect(tracker.wasCalled()).toBe(false);
-    });
-
-    it("should unsubscribe middleware when returned function is called", async () => {
-      const tracker = createTrackingMiddleware();
-
-      const unsub = router.useMiddleware(() => tracker.middleware);
-
-      // Verify middleware is registered
-      await router.navigate("users");
-
-      expect(tracker.wasCalled()).toBe(true);
-
-      tracker.reset();
-      unsub();
-
-      // After unsubscribe, middleware should not execute
-      await router.navigate("orders");
-
-      expect(tracker.wasCalled()).toBe(false);
-    });
-  });
-
   describe("sync middleware", () => {
     it("should support a transition middleware", async () => {
       const mware = { transition: transitionMiddleware };
@@ -199,8 +159,6 @@ describe("core/middleware", () => {
 
       // Checking logger.error, not console.error (logger is spied above)
       expect(logger.error).toHaveBeenCalled();
-
-      router.clearMiddleware();
     });
 
     it("should fail transition if middleware returns an error", async () => {
@@ -218,7 +176,6 @@ describe("core/middleware", () => {
       const middlewareMock2 = vi.fn().mockReturnValue(true);
 
       router.stop();
-      router.clearMiddleware();
       router.useMiddleware(
         () => middlewareMock1,
         () => middlewareMock2,
@@ -235,8 +192,6 @@ describe("core/middleware", () => {
 
   describe("async middleware", () => {
     it("should support Promise-returning middleware", async () => {
-      router.clearMiddleware();
-
       router.useMiddleware(() => asyncMware);
 
       router.stop();
@@ -250,7 +205,6 @@ describe("core/middleware", () => {
     });
 
     it("should pass async-modified state through chain", async () => {
-      router.clearMiddleware();
       router.useMiddleware(
         () => m1AsyncMiddleware,
         () => m2Middleware,
@@ -266,8 +220,6 @@ describe("core/middleware", () => {
     });
 
     it("should pass state from middleware to middleware (mixed async + sync)", async () => {
-      router.clearMiddleware();
-
       router.useMiddleware(
         () => m1SyncMiddleware,
         () => m2Middleware,
@@ -286,6 +238,25 @@ describe("core/middleware", () => {
   });
 
   describe("useMiddleware", () => {
+    it("should unsubscribe middleware when returned function is called", async () => {
+      const tracker = createTrackingMiddleware();
+
+      const unsub = router.useMiddleware(() => tracker.middleware);
+
+      // Verify middleware is registered
+      await router.navigate("users");
+
+      expect(tracker.wasCalled()).toBe(true);
+
+      tracker.reset();
+      unsub();
+
+      // After unsubscribe, middleware should not execute
+      await router.navigate("orders");
+
+      expect(tracker.wasCalled()).toBe(false);
+    });
+
     // 🔴 CRITICAL: Atomicity of registration on errors
     describe("atomicity on errors", () => {
       it("should not register any middleware if factory throws error", async () => {
@@ -295,8 +266,6 @@ describe("core/middleware", () => {
           throw new Error("Factory initialization failed");
         };
         const validFactory2 = () => transitionMiddleware;
-
-        router.clearMiddleware();
 
         expect(() => {
           router.useMiddleware(validFactory1, failingFactory, validFactory2);
@@ -310,8 +279,6 @@ describe("core/middleware", () => {
         const tracker = createTrackingMiddleware();
         const validFactory = () => tracker.middleware;
         const invalidFactory = () => ({ notAFunction: true }) as any;
-
-        router.clearMiddleware();
 
         expect(() => {
           router.useMiddleware(validFactory, invalidFactory);
@@ -330,8 +297,6 @@ describe("core/middleware", () => {
         };
         const factory4 = () => transitionMiddleware;
 
-        router.clearMiddleware();
-
         expect(() => {
           router.useMiddleware(factory1, factory2, factory3, factory4);
         }).toThrowError("Error in factory3");
@@ -347,7 +312,6 @@ describe("core/middleware", () => {
         const tracker = createTrackingMiddleware();
         const factory = () => tracker.middleware;
 
-        router.clearMiddleware();
         router.useMiddleware(factory);
 
         expect(() => {
@@ -366,7 +330,6 @@ describe("core/middleware", () => {
           return transitionMiddleware;
         }
 
-        router.clearMiddleware();
         router.useMiddleware(myDuplicateFactory);
 
         expect(() => {
@@ -381,7 +344,6 @@ describe("core/middleware", () => {
         // Clear the name property to simulate truly anonymous function
         Object.defineProperty(factories[0], "name", { value: "" });
 
-        router.clearMiddleware();
         router.useMiddleware(factories[0]);
 
         expect(() => {
@@ -392,8 +354,6 @@ describe("core/middleware", () => {
       it("should automatically deduplicate within same batch (Set behavior)", async () => {
         const tracker = createTrackingMiddleware();
         const factory = () => tracker.middleware;
-
-        router.clearMiddleware();
 
         // Set automatically deduplicates, so this won't throw
         const unsub = router.useMiddleware(factory, factory);
@@ -411,8 +371,6 @@ describe("core/middleware", () => {
         const tracker2 = createTrackingMiddleware();
         const factory1 = () => tracker1.middleware;
         const factory2 = () => tracker2.middleware;
-
-        router.clearMiddleware();
 
         // Different references, so should succeed
         expect(() => {
@@ -433,8 +391,6 @@ describe("core/middleware", () => {
         const factory1 = () => tracker1.middleware;
         const factory2 = () => tracker2.middleware;
         const factory3 = () => tracker3.middleware;
-
-        router.clearMiddleware();
 
         const unsub1 = router.useMiddleware(factory1);
         const unsub2 = router.useMiddleware(factory2, factory3);
@@ -477,8 +433,6 @@ describe("core/middleware", () => {
         const factory1 = () => tracker1.middleware;
         const factory2 = () => tracker2.middleware;
 
-        router.clearMiddleware();
-
         const unsub1 = router.useMiddleware(factory1);
         const unsub2 = router.useMiddleware(factory2);
 
@@ -505,8 +459,6 @@ describe("core/middleware", () => {
         const f1 = () => tracker1.middleware;
         const f2 = () => tracker2.middleware;
         const f3 = () => tracker3.middleware;
-
-        router.clearMiddleware();
 
         const u1 = router.useMiddleware(f1);
         const u2 = router.useMiddleware(f2);
@@ -537,8 +489,6 @@ describe("core/middleware", () => {
     // 🟡 IMPORTANT: Type validation
     describe("type validation", () => {
       it("should throw TypeError for non-function parameter", async () => {
-        router.clearMiddleware();
-
         expect(() => {
           router.useMiddleware(null as any);
         }).toThrowError(TypeError);
@@ -550,8 +500,6 @@ describe("core/middleware", () => {
       it("should throw TypeError with index for invalid parameter", async () => {
         const validFactory = () => transitionMiddleware;
 
-        router.clearMiddleware();
-
         expect(() => {
           router.useMiddleware(validFactory, "notAFunction" as any);
         }).toThrowError("at index 1");
@@ -559,8 +507,6 @@ describe("core/middleware", () => {
 
       it("should throw TypeError when factory returns non-function", async () => {
         const invalidFactory = () => "not a middleware" as any;
-
-        router.clearMiddleware();
 
         expect(() => {
           router.useMiddleware(invalidFactory);
@@ -573,16 +519,12 @@ describe("core/middleware", () => {
           return "not a function" as any;
         }
 
-        router.clearMiddleware();
-
         expect(() => {
           router.useMiddleware(myNamedFactory);
         }).toThrowError(/Factory: myNamedFactory/);
       });
 
       it("should validate all types: null, undefined, number, string, object", async () => {
-        router.clearMiddleware();
-
         expect(() => router.useMiddleware(null as any)).toThrowError(TypeError);
         expect(() => router.useMiddleware(undefined as any)).toThrowError(
           TypeError,
@@ -597,8 +539,6 @@ describe("core/middleware", () => {
       it("should throw when factory returns object instead of function", async () => {
         const factory = () => ({ middleware: true }) as any;
 
-        router.clearMiddleware();
-
         expect(() => {
           router.useMiddleware(factory);
         }).toThrowError(TypeError);
@@ -608,8 +548,6 @@ describe("core/middleware", () => {
     // 🟢 DESIRABLE: Edge cases
     describe("edge cases", () => {
       it("should handle call with no parameters", async () => {
-        router.clearMiddleware();
-
         const unsub = router.useMiddleware();
 
         expectTypeOf(unsub).toBeFunction();
@@ -623,8 +561,6 @@ describe("core/middleware", () => {
       it("should reject async factory returning Promise", async () => {
         // Async function returns Promise, not Middleware function
         const asyncFactory = async () => (toState: State) => toState;
-
-        router.clearMiddleware();
 
         expect(() => {
           router.useMiddleware(asyncFactory as any);
@@ -647,8 +583,6 @@ describe("core/middleware", () => {
           throw new Error("Intentional failure");
         };
 
-        router.clearMiddleware();
-
         // First factory executes (side effect), second throws
         expect(() => {
           router.useMiddleware(factoryWithSideEffect, throwingFactory);
@@ -665,29 +599,9 @@ describe("core/middleware", () => {
         await router.navigate("users");
       });
 
-      it("should handle unsubscribe safely after clearMiddleware (idempotent)", async () => {
-        const tracker = createTrackingMiddleware();
-        const factory = () => tracker.middleware;
-
-        router.clearMiddleware();
-
-        const unsub = router.useMiddleware(factory);
-
-        // Clear all middleware
-        router.clearMiddleware();
-
-        // Unsubscribe after clear - should not throw (idempotent behavior)
-        expect(() => {
-          unsub();
-          unsub(); // Multiple calls also safe
-        }).not.toThrowError();
-      });
-
       it("should handle multiple unsubscribe calls safely", async () => {
         const tracker = createTrackingMiddleware();
         const factory = () => tracker.middleware;
-
-        router.clearMiddleware();
 
         const unsub = router.useMiddleware(factory);
 
@@ -708,8 +622,6 @@ describe("core/middleware", () => {
       });
 
       it("should return function for empty batch", async () => {
-        router.clearMiddleware();
-
         const unsub = router.useMiddleware();
 
         expect(unsub).toBeInstanceOf(Function);
@@ -722,8 +634,6 @@ describe("core/middleware", () => {
           // Missing return statement - returns undefined
           vi.fn();
         };
-
-        router.clearMiddleware();
 
         expect(() => {
           router.useMiddleware(factory as any);
@@ -749,7 +659,6 @@ describe("core/middleware", () => {
         const factory2 = createOrderTrackingFactory(2, executionOrder);
         const factory3 = createOrderTrackingFactory(3, executionOrder);
 
-        router.clearMiddleware();
         router.useMiddleware(factory1, factory2, factory3);
 
         await router.navigate("users");
@@ -764,7 +673,6 @@ describe("core/middleware", () => {
         const f2 = createOrderTrackingFactory(2, executionOrder);
         const f3 = createOrderTrackingFactory(3, executionOrder);
 
-        router.clearMiddleware();
         router.useMiddleware(f1);
         router.useMiddleware(f2);
         router.useMiddleware(f3);
@@ -780,16 +688,12 @@ describe("core/middleware", () => {
       it("should always return unsubscribe function", async () => {
         const factory = () => transitionMiddleware;
 
-        router.clearMiddleware();
-
         const result = router.useMiddleware(factory);
 
         expect(typeof result).toBe("function");
       });
 
       it("should return function even for empty call", async () => {
-        router.clearMiddleware();
-
         const result = router.useMiddleware();
 
         expect(typeof result).toBe("function");
@@ -798,8 +702,6 @@ describe("core/middleware", () => {
       it("should return different unsubscribe functions for different calls", async () => {
         const f1 = () => transitionMiddleware;
         const f2 = () => transitionMiddleware;
-
-        router.clearMiddleware();
 
         const unsub1 = router.useMiddleware(f1);
         const unsub2 = router.useMiddleware(f2);
@@ -814,8 +716,6 @@ describe("core/middleware", () => {
     // 🔴 CRITICAL: Reentrancy and complex scenarios
     describe("reentrancy and complex scenarios", () => {
       it("should handle reentrant useMiddleware call from factory", async () => {
-        router.clearMiddleware();
-
         const nestedTracker = createTrackingMiddleware();
         const reentrantTracker = createTrackingMiddleware();
 
@@ -857,8 +757,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory calling unsubscribe of another middleware", async () => {
-        router.clearMiddleware();
-
         const tracker1 = createTrackingMiddleware();
         const tracker2 = createTrackingMiddleware();
         const factory1 = () => tracker1.middleware;
@@ -881,35 +779,11 @@ describe("core/middleware", () => {
         expect(tracker1.wasCalled()).toBe(false);
         expect(tracker2.wasCalled()).toBe(true);
       });
-
-      it("should handle factory calling clearMiddleware during batch", async () => {
-        router.clearMiddleware();
-
-        const tracker1 = createTrackingMiddleware();
-        const tracker2 = createTrackingMiddleware();
-
-        const factory1 = () => tracker1.middleware;
-        const factory2 = (r: typeof router) => {
-          // Clear all middleware during batch initialization
-          r.clearMiddleware();
-
-          return tracker2.middleware;
-        };
-
-        router.useMiddleware(factory1, factory2);
-
-        // Both should be registered (commit phase adds initialized back)
-        await router.navigate("users");
-
-        expect(router.getState()?.name).toBe("users");
-      });
     });
 
     // 🟡 IMPORTANT: Exotic function types as factories
     describe("exotic function types", () => {
       it("should work with Proxy as factory", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
 
         const realFactory = () => tracker.middleware;
@@ -939,8 +813,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory with throwing getter on name property", async () => {
-        router.clearMiddleware();
-
         // Factory that returns non-function to trigger getFactoryName call
         const badFactory = () => null;
 
@@ -958,8 +830,6 @@ describe("core/middleware", () => {
       });
 
       it("should reject generator function as factory", async () => {
-        router.clearMiddleware();
-
         function* generatorFactory() {
           yield transitionMiddleware;
         }
@@ -974,8 +844,6 @@ describe("core/middleware", () => {
       });
 
       it("should reject async generator function as factory", async () => {
-        router.clearMiddleware();
-
         async function* asyncGenFactory() {
           yield transitionMiddleware;
         }
@@ -990,8 +858,6 @@ describe("core/middleware", () => {
       });
 
       it("should reject class constructor as factory (requires new)", async () => {
-        router.clearMiddleware();
-
         class MiddlewareClass {
           router: typeof router;
 
@@ -1020,8 +886,6 @@ describe("core/middleware", () => {
       });
 
       it("should work with bound function as factory", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
         const context = { prefix: "LOG:" };
 
@@ -1049,8 +913,6 @@ describe("core/middleware", () => {
       });
 
       it("should work with frozen function as factory", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
 
         const frozenFactory = Object.freeze(() => tracker.middleware);
@@ -1068,8 +930,6 @@ describe("core/middleware", () => {
       });
 
       it("should work with sealed function as factory", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
 
         const sealedFactory = Object.seal(() => tracker.middleware);
@@ -1090,8 +950,6 @@ describe("core/middleware", () => {
     // 🟢 DESIRABLE: Unusual but valid inputs
     describe("unusual but valid inputs", () => {
       it("should accept self-returning factory", async () => {
-        router.clearMiddleware();
-
         const selfReturningFactory = (): any => {
           return (toState: State) => toState;
         };
@@ -1110,8 +968,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory with very long name in error messages", async () => {
-        router.clearMiddleware();
-
         const longName = "a".repeat(1000);
         const factories: Record<string, () => null> = {
           [longName]: () => null,
@@ -1123,8 +979,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory with unicode name", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
 
         // Use a function expression with computed property to set unicode name
@@ -1144,8 +998,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory with empty string name", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
         const factory = () => tracker.middleware;
 
@@ -1164,8 +1016,6 @@ describe("core/middleware", () => {
       });
 
       it("should handle factory with whitespace-only name", async () => {
-        router.clearMiddleware();
-
         const tracker = createTrackingMiddleware();
         const factory = () => tracker.middleware;
 
@@ -1187,8 +1037,6 @@ describe("core/middleware", () => {
     // 🟡 IMPORTANT: getDependency injection
     describe("getDependency injection", () => {
       it("should provide getDependency function to middleware factory", async () => {
-        router.clearMiddleware();
-
         // Set up a dependency (use any to bypass strict typing)
         (router as any).setDependency("authToken", "secret-token-123");
 

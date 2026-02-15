@@ -112,7 +112,6 @@ describe("router.navigate() - events transition start", () => {
       expect(startCallTime).toBeLessThan(middlewareCallTime);
 
       unsubStart();
-      router.clearMiddleware();
     });
 
     it("should emit TRANSITION_START even when transition is later cancelled", async () => {
@@ -167,7 +166,6 @@ describe("router.navigate() - events transition start", () => {
       // Cleanup
       unsubStart();
       unsubCancel();
-      router.clearMiddleware();
       vi.useRealTimers();
     });
 

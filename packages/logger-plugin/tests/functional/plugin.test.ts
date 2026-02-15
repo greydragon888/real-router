@@ -138,7 +138,6 @@ describe("@real-router/logger-plugin", () => {
         expect.any(Object),
       );
 
-      router.clearMiddleware();
       vi.useRealTimers();
     });
 
@@ -235,7 +234,6 @@ describe("@real-router/logger-plugin", () => {
         // Expected error
       }
 
-      router.clearMiddleware();
       vi.useRealTimers();
     });
 
@@ -360,7 +358,6 @@ describe("@real-router/logger-plugin", () => {
         // Expected error
       }
 
-      router.clearMiddleware();
       vi.useRealTimers();
     });
   });
@@ -557,13 +554,15 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return new Promise((resolve) =>
-            setTimeout(() => {
-              resolve(true);
-            }, 200),
-          );
-        });
+        const unsubMiddleware = router.useMiddleware(
+          () => (_toState, _fromState) => {
+            return new Promise((resolve) =>
+              setTimeout(() => {
+                resolve(true);
+              }, 200),
+            );
+          },
+        );
 
         const navPromise = router.navigate("users");
 
@@ -581,7 +580,7 @@ describe("@real-router/logger-plugin", () => {
 
         expect(warnSpy).not.toHaveBeenCalled();
 
-        router.clearMiddleware();
+        unsubMiddleware();
         await router.start("/");
         vi.useRealTimers();
       });
@@ -593,13 +592,15 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return new Promise((resolve) =>
-            setTimeout(() => {
-              resolve(true);
-            }, 200),
-          );
-        });
+        const unsubMiddleware = router.useMiddleware(
+          () => (_toState, _fromState) => {
+            return new Promise((resolve) =>
+              setTimeout(() => {
+                resolve(true);
+              }, 200),
+            );
+          },
+        );
 
         const navPromise = router.navigate("users");
 
@@ -617,7 +618,7 @@ describe("@real-router/logger-plugin", () => {
 
         expect(warnSpy).not.toHaveBeenCalled();
 
-        router.clearMiddleware();
+        unsubMiddleware();
         await router.start("/");
         vi.useRealTimers();
       });

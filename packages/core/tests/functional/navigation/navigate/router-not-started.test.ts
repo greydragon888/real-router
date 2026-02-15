@@ -154,8 +154,6 @@ describe("router.navigate() - router not started", () => {
 
       expect(guard).not.toHaveBeenCalled();
       expect(middleware).not.toHaveBeenCalled();
-
-      router.clearMiddleware();
     });
 
     it("should handle invalid route names when router not started", async () => {

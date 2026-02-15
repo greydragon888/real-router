@@ -203,8 +203,6 @@ describe("router.navigate() - events transition success", () => {
       expect(middlewareCallTime).toBeLessThan(successCallTime);
 
       unsubSuccess();
-
-      router.clearMiddleware();
     });
 
     it("should not emit TRANSITION_SUCCESS when transition fails", async () => {
@@ -256,7 +254,7 @@ describe("router.navigate() - events transition success", () => {
       );
 
       // Set up async middleware to allow cancellation
-      router.useMiddleware(() => async () => {
+      const unsubMiddleware = router.useMiddleware(() => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
       });
 
@@ -284,7 +282,7 @@ describe("router.navigate() - events transition success", () => {
       unsubSuccess();
       unsubCancel();
 
-      router.clearMiddleware();
+      unsubMiddleware();
       await router.start("/home");
       vi.useRealTimers();
     });
