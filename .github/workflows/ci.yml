@@ -114,6 +114,16 @@ jobs:
         if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:dedupe
 
+      - name: Fix coverage paths for SonarCloud
+        if: needs.check.outputs.should_run == 'true'
+        run: |
+          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
+          # SonarCloud needs project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
+          for lcov in packages/*/coverage/lcov.info; do
+            pkg_dir=$(echo "$lcov" | sed 's|/coverage/lcov.info||')
+            sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
+          done
+
       - name: Upload coverage artifacts
         if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v6
