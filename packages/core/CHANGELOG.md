@@ -1,5 +1,28 @@
 # @real-router/core
 
+## 0.18.0
+
+### Minor Changes
+
+- [#96](https://github.com/greydragon888/real-router/pull/96) [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `path` a required argument in `router.start()` (#90)
+
+  **Breaking Change:** `router.start()` now requires a path string argument.
+
+  **Migration:**
+
+  ```diff
+  - await router.start();
+  + await router.start("/home");
+  ```
+
+  Browser-plugin users are unaffected — the plugin injects browser location automatically.
+
+### Patch Changes
+
+- [#96](https://github.com/greydragon888/real-router/pull/96) [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix plugin interception not working during `router.start()` (#90)
+
+  `RoutesNamespace.matchPath()` called `this.forwardState()` at the namespace level, bypassing facade plugin wrappers. Injected facade's `forwardState` into `RoutesDependencies` so plugins (e.g. `persistent-params-plugin`) can intercept during startup.
+
 ## 0.17.0
 
 ### Minor Changes

@@ -5,6 +5,122 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-15]
+
+### @real-router/browser-plugin@0.3.0
+
+### Minor Changes
+
+- [#96](https://github.com/greydragon888/real-router/pull/96) [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7) Thanks [@greydragon888](https://github.com/greydragon888)! - Simplify `start()` override for required path in core (#90)
+  - Add `start(path?: string)` overload via module augmentation, so TypeScript allows `router.start()` without arguments when browser-plugin is installed.
+  - Remove `StartRouterArguments` type export (**breaking**).
+  - The `start()` override now always provides browser location to core when no path is given.
+
+  **Behavioral change:** When browser is at `/` and `router.start()` is called without arguments, the plugin now passes `"/"` to core (previously fell through to `defaultRoute` resolution). If your `defaultRoute` points to a route with a path other than `/`, you may need to add a route for `/` or call `router.start()` then `router.navigateToDefault()` explicitly.
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+
+### @real-router/core@0.18.0
+
+### Minor Changes
+
+- [#96](https://github.com/greydragon888/real-router/pull/96) [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7) Thanks [@greydragon888](https://github.com/greydragon888)! - Make `path` a required argument in `router.start()` (#90)
+
+  **Breaking Change:** `router.start()` now requires a path string argument.
+
+  **Migration:**
+
+  ```diff
+  - await router.start();
+  + await router.start("/home");
+  ```
+
+  Browser-plugin users are unaffected — the plugin injects browser location automatically.
+
+### Patch Changes
+
+- [#96](https://github.com/greydragon888/real-router/pull/96) [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix plugin interception not working during `router.start()` (#90)
+
+  `RoutesNamespace.matchPath()` called `this.forwardState()` at the namespace level, bypassing facade plugin wrappers. Injected facade's `forwardState` into `RoutesDependencies` so plugins (e.g. `persistent-params-plugin`) can intercept during startup.
+
+### @real-router/react@1.0.0
+
+### Minor Changes
+
+- [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(react)!: remove callback props from BaseLink (#45)
+
+  **Breaking Change:** `successCallback` and `errorCallback` props removed from `BaseLink`/`Link`/`ConnectedLink`.
+
+  ```typescript
+  // Before
+  <Link routeName="users" successCallback={(state) => ...} errorCallback={(err) => ...} />
+
+  // After
+  <Link routeName="users" />
+  ```
+
+  Use `router.addEventListener(events.TRANSITION_SUCCESS, ...)` for navigation tracking.
+
+### Patch Changes
+
+- Updated dependencies [[`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5), [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5)]:
+  - @real-router/browser-plugin@0.2.0
+  - @real-router/core@0.17.0
+  - @real-router/helpers@0.1.20
+
+### @real-router/react@1.0.0
+
+### Minor Changes
+
+- Initial public release with full routing functionality
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @real-router/browser-plugin@0.1.0
+  - @real-router/helpers@0.1.0
+  - @real-router/core@0.1.0
+
+### @real-router/helpers@0.1.21
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+
+### @real-router/logger-plugin@0.2.21
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+
+### @real-router/persistent-params-plugin@0.1.21
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+
+### @real-router/react@1.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+  - @real-router/browser-plugin@0.3.0
+  - @real-router/helpers@0.1.21
+
+### @real-router/rx@0.1.10
+
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+
 ## [2026-02-14]
 
 ### @real-router/browser-plugin@0.2.0
