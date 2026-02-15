@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-15]
 
+### @real-router/core@0.21.0
+
+### Minor Changes
+
+- [#102](https://github.com/greydragon888/real-router/pull/102) [`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING CHANGE**: Remove dot-notation support from route names (#93)
+
+  Dots are now banned in the route `name` field. Use children syntax or the new `{ parent }` option in `addRoute()` instead.
+
+  **Before:**
+
+  ```typescript
+  const routes = [
+    { name: "users", path: "/users" },
+    { name: "users.profile", path: "/:id" }, // ❌ No longer allowed
+  ];
+  ```
+
+  **After (children syntax):**
+
+  ```typescript
+  const routes = [
+    {
+      name: "users",
+      path: "/users",
+      children: [{ name: "profile", path: "/:id" }],
+    },
+  ];
+  ```
+
+  **After ({ parent } option):**
+
+  ```typescript
+  router.addRoute({ name: "users", path: "/users" });
+  router.addRoute({ name: "profile", path: "/:id" }, { parent: "users" });
+  ```
+
+  **Note:** Dots in fullName references (e.g., `navigate("users.profile")`) remain valid and unchanged.
+
+  **Changes:**
+  - Ban dots in route `name` field (throws TypeError with clear message)
+  - Add `addRoute(route, { parent: "users" })` option for lazy loading
+  - Remove ~170 lines of complex recursive dot-notation parsing code
+  - Simplify route tree building from two-pass to single-pass algorithm
+
+### @real-router/browser-plugin@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+
+### @real-router/helpers@0.1.24
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+
+### @real-router/logger-plugin@0.2.24
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+
+### @real-router/persistent-params-plugin@0.1.24
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+
+### @real-router/react@0.4.3
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+  - @real-router/browser-plugin@0.3.3
+  - @real-router/helpers@0.1.24
+
+### @real-router/rx@0.1.13
+
+### Patch Changes
+
+- Updated dependencies [[`8b445e4`](https://github.com/greydragon888/real-router/commit/8b445e4b3695122e3597a450e5f23744a3381a3f)]:
+  - @real-router/core@0.21.0
+
+
 ### @real-router/core@0.20.0
 
 ### Minor Changes
