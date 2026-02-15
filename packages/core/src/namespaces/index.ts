@@ -13,7 +13,6 @@ export type { EventMethodMap } from "./ObservableNamespace";
 export {
   deepFreeze,
   defaultOptions,
-  optionNotFoundError,
   OptionsNamespace,
   VALID_OPTION_VALUES,
   VALID_QUERY_PARAMS,

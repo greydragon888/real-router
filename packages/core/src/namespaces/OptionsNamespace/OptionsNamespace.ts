@@ -2,11 +2,7 @@
 
 import { defaultOptions } from "./constants";
 import { deepFreeze } from "./helpers";
-import {
-  validateOptionExists,
-  validateOptionName,
-  validateOptions,
-} from "./validators";
+import { validateOptions } from "./validators";
 
 import type { Options } from "@real-router/types";
 
@@ -33,17 +29,6 @@ export class OptionsNamespace {
   // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
 
-  static validateOptionName(
-    name: unknown,
-    methodName: string,
-  ): asserts name is string {
-    validateOptionName(name, methodName);
-  }
-
-  static validateOptionExists(optionName: string, methodName: string): void {
-    validateOptionExists(optionName, methodName);
-  }
-
   static validateOptions(
     options: unknown,
     methodName: string,
@@ -61,15 +46,5 @@ export class OptionsNamespace {
    */
   get(): Readonly<Options> {
     return this.#options;
-  }
-
-  /**
-   * Gets a single option value.
-   * Input already validated by facade.
-   *
-   * @param optionName - Already validated by facade
-   */
-  getOption<K extends keyof Options>(optionName: K): Options[K] {
-    return this.#options[optionName];
   }
 }

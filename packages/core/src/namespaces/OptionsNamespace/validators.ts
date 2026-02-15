@@ -12,36 +12,9 @@ import {
   VALID_OPTION_VALUES,
   VALID_QUERY_PARAMS,
 } from "./constants";
-import { optionNotFoundError } from "./helpers";
 import { LIMIT_BOUNDS } from "../../constants";
 
 import type { LimitsConfig, Options } from "@real-router/types";
-
-/**
- * Validates that option name is a string.
- */
-export function validateOptionName(
-  name: unknown,
-  methodName: string,
-): asserts name is string {
-  if (typeof name !== "string") {
-    throw new TypeError(
-      `[router.${methodName}]: option name must be a string, got ${typeof name}`,
-    );
-  }
-}
-
-/**
- * Validates that option exists in defaults.
- */
-export function validateOptionExists(
-  optionName: string,
-  methodName: string,
-): void {
-  if (!Object.hasOwn(defaultOptions, optionName)) {
-    throw optionNotFoundError(methodName, optionName as keyof Options);
-  }
-}
 
 /**
  * Validates that value is a plain object without getters.

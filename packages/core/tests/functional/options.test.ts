@@ -690,54 +690,6 @@ describe("core/options", () => {
     });
   });
 
-  describe("getOption", () => {
-    it("should return a single option value", () => {
-      // Values should match getOptions()
-      expect(router.getOption("trailingSlash")).toBe(
-        router.getOptions().trailingSlash,
-      );
-      expect(router.getOption("allowNotFound")).toBe(
-        router.getOptions().allowNotFound,
-      );
-    });
-
-    it("should return constructor-provided value", () => {
-      const customRouter = createTestRouter({ trailingSlash: "always" });
-
-      expect(customRouter.getOption("trailingSlash")).toBe("always");
-
-      customRouter.stop();
-    });
-
-    it("should throw TypeError for non-string option name", () => {
-      expect(() => {
-        // @ts-expect-error: testing invalid input
-        router.getOption(123);
-      }).toThrowError(TypeError);
-
-      expect(() => {
-        // @ts-expect-error: testing invalid input
-        router.getOption(null);
-      }).toThrowError(TypeError);
-    });
-
-    it("should throw ReferenceError for unknown option name", () => {
-      expect(() => {
-        // @ts-expect-error: testing unknown option
-        router.getOption("unknownOption");
-      }).toThrowError(ReferenceError);
-    });
-
-    // eslint-disable-next-line vitest/expect-expect -- uses expectTypeOf
-    it("should be type-safe", () => {
-      const trailingSlash = router.getOption("trailingSlash");
-
-      expectTypeOf(trailingSlash).toEqualTypeOf<
-        "strict" | "never" | "always" | "preserve"
-      >();
-    });
-  });
-
   describe("dynamic default route/params with callbacks", () => {
     it("should resolve callback defaultRoute via navigateToDefault", async () => {
       const customRouter = createTestRouter({
