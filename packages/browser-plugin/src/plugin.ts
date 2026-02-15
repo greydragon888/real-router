@@ -191,7 +191,7 @@ export function browserPluginFactory(
 
     /**
      * Overrides router.start to integrate with browser location.
-     * If no start path is provided, uses current browser URL.
+     * When no path is provided, resolves current browser URL automatically.
      */
     router.start = async (path?: string) => {
       return routerStart(path ?? browser.getLocation(options));
