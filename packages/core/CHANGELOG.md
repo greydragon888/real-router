@@ -1,5 +1,20 @@
 # @real-router/core
 
+## 0.19.0
+
+### Minor Changes
+
+- [#98](https://github.com/greydragon888/real-router/pull/98) [`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `getOption()` method (#92)
+
+  **Breaking Change:** `getOption()` has been removed. Use `getOptions()` instead — options are immutable after `createRouter()`, so property access is equivalent.
+
+  **Migration:**
+
+  ```diff
+  - router.getOption("defaultRoute")
+  + router.getOptions().defaultRoute
+  ```
+
 ## 0.18.0
 
 ### Minor Changes
