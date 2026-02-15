@@ -384,13 +384,6 @@ Get all router options.\
 Returns: `Options`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/getOptions)
 
-#### `router.getOption(name: keyof Options): unknown`
-
-Get a single router option by name.\
-`name: keyof Options` — option name\
-Returns: option value\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getOption)
-
 ---
 
 ### Other

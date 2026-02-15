@@ -64,7 +64,7 @@ import type { CreateMatcherOptions } from "route-tree";
  * Router class with integrated namespace architecture.
  *
  * All functionality is provided by namespace classes:
- * - OptionsNamespace: getOptions, getOption (immutable)
+ * - OptionsNamespace: getOptions (immutable)
  * - DependenciesNamespace: get/set/remove dependencies
  * - ObservableNamespace: event listeners, subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
@@ -214,7 +214,6 @@ export class Router<
 
     // Options
     this.getOptions = this.getOptions.bind(this);
-    this.getOption = this.getOption.bind(this);
 
     // Router Lifecycle
     this.isActive = this.isActive.bind(this);
@@ -612,15 +611,6 @@ export class Router<
 
   getOptions(): Options {
     return this.#options.get();
-  }
-
-  getOption<K extends keyof Options>(option: K): Options[K] {
-    if (!this.#noValidate) {
-      OptionsNamespace.validateOptionName(option, "getOption");
-      OptionsNamespace.validateOptionExists(option, "getOption");
-    }
-
-    return this.#options.getOption(option);
   }
 
   // ============================================================================

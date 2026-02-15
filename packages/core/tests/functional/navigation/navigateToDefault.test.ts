@@ -575,7 +575,7 @@ describe("navigateToDefault", () => {
       }).toThrowError(TypeError);
 
       // Verify the router still has original values
-      expect(router.getOption("defaultParams")).toStrictEqual({
+      expect(router.getOptions().defaultParams).toStrictEqual({
         id: 100,
         mutable: "original",
       });

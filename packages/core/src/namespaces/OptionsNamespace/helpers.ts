@@ -3,15 +3,6 @@
 import type { Options, Params } from "@real-router/types";
 
 /**
- * Creates a ReferenceError for option not found.
- */
-export const optionNotFoundError = (
-  method: string,
-  name: keyof Options,
-): ReferenceError =>
-  new ReferenceError(`[router.${method}]: option "${name}" not found`);
-
-/**
  * Recursively freezes an object and all nested objects.
  * Only freezes plain objects, not primitives or special objects.
  */

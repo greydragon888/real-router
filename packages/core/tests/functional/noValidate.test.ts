@@ -30,12 +30,6 @@ describe("core/noValidate option", () => {
       expect(() => router.hasRoute(123 as any)).toThrowError(TypeError);
     });
 
-    it("should validate option names", () => {
-      expect(() => router.getOption("unknownOption" as any)).toThrowError(
-        ReferenceError,
-      );
-    });
-
     it("should validate dependencies", () => {
       expect(() => (router as any).getDependency("nonexistent")).toThrowError(
         ReferenceError,
@@ -133,16 +127,6 @@ describe("core/noValidate option", () => {
       it("should skip validation in shouldUpdateNode", () => {
         // Empty string would fail validation with noValidate: false
         expect(() => router.shouldUpdateNode("")).not.toThrowError();
-      });
-    });
-
-    // Options
-    describe("options", () => {
-      it("should skip validation in getOption", () => {
-        // Unknown option - would throw ReferenceError with noValidate: false
-        expect(() =>
-          router.getOption("unknownOption" as any),
-        ).not.toThrowError();
       });
     });
 
@@ -428,37 +412,6 @@ describe("core/noValidate option", () => {
       // navigate doesn't throw directly, but validation happens internally
       // Test getRoute instead which does throw for validation errors
       expect(() => testRouter.getRoute(123 as any)).toThrowError(TypeError);
-
-      testRouter.stop();
-    });
-
-    it("should not throw validation error with noValidate: true for invalid input", () => {
-      const testRouter = createTestRouter({ noValidate: true });
-
-      // getOption with unknown option name won't throw ReferenceError
-      expect(() =>
-        testRouter.getOption("unknownOption" as any),
-      ).not.toThrowError();
-
-      testRouter.stop();
-    });
-
-    it("should throw validation error with noValidate: false for unknown option", () => {
-      const testRouter = createTestRouter({ noValidate: false });
-
-      expect(() => testRouter.getOption("unknownOption" as any)).toThrowError(
-        ReferenceError,
-      );
-
-      testRouter.stop();
-    });
-
-    it("should not throw validation error with noValidate: true for unknown option", () => {
-      const testRouter = createTestRouter({ noValidate: true });
-
-      expect(() =>
-        testRouter.getOption("unknownOption" as any),
-      ).not.toThrowError();
 
       testRouter.stop();
     });
