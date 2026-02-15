@@ -291,7 +291,7 @@ describe("router.start() - error handling", () => {
       it("should allow start() after failed async transition resets isActive", async () => {
         // Issue #50: When async transition fails, isActive is reset
         // Next start() call should be allowed
-        router.useMiddleware(
+        const unsubMiddleware = router.useMiddleware(
           () => () => Promise.reject(new Error("Middleware error")),
         );
 
@@ -305,7 +305,7 @@ describe("router.start() - error handling", () => {
         expect(router.isActive()).toBe(false);
 
         // Clear middleware for second attempt
-        router.clearMiddleware();
+        unsubMiddleware();
 
         // Second start should now work
         await router.start("/users");

@@ -43,7 +43,6 @@ describe("router.navigate() - transitions and cancellation", () => {
       );
 
     await router.navigate("users");
-    router.clearMiddleware();
 
     await Promise.all(promises);
   });

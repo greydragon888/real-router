@@ -182,14 +182,6 @@ export class MiddlewareNamespace<
   }
 
   /**
-   * Removes all registered middleware.
-   */
-  clear(): void {
-    this.#factories.clear();
-    this.#factoryToMiddleware.clear();
-  }
-
-  /**
    * Returns a copy of registered middleware factories.
    * Preserves insertion order.
    */

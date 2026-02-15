@@ -129,7 +129,6 @@ describe("core/observable", () => {
         // because navigations don't cancel each other in the new API
         expect(cb).toHaveBeenCalledTimes(0);
 
-        router.clearMiddleware();
         vi.useRealTimers();
       });
 

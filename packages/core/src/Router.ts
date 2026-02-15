@@ -232,8 +232,6 @@ export class Router<
 
     // Middleware
     this.useMiddleware = this.useMiddleware.bind(this);
-    this.clearMiddleware = this.clearMiddleware.bind(this);
-
     // Dependencies
     this.setDependency = this.setDependency.bind(this);
     this.setDependencies = this.setDependencies.bind(this);
@@ -851,12 +849,6 @@ export class Router<
 
     // 6. Commit
     return this.#middleware.commit(initialized);
-  }
-
-  clearMiddleware(): this {
-    this.#middleware.clear();
-
-    return this;
   }
 
   // ============================================================================

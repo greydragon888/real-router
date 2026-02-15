@@ -236,8 +236,6 @@ describe("navigateToDefault", () => {
         );
         expect(blockingMiddleware).toHaveBeenCalledTimes(1);
       }
-
-      router.clearMiddleware();
     });
 
     it("should respect navigation options when navigating to defaultRoute", async () => {
@@ -362,8 +360,6 @@ describe("navigateToDefault", () => {
 
       expect(canActivateGuard).toHaveBeenCalledTimes(1);
       expect(middleware).toHaveBeenCalledTimes(1);
-
-      router.clearMiddleware();
     });
   });
 
@@ -856,7 +852,6 @@ describe("navigateToDefault", () => {
         expect(error).toStrictEqual(customError);
       }
 
-      router.clearMiddleware();
       vi.useRealTimers();
     });
   });
@@ -957,7 +952,6 @@ describe("navigateToDefault", () => {
 
       expect(state).toBeDefined();
 
-      router.clearMiddleware();
       vi.useRealTimers();
     });
 
