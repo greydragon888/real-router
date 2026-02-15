@@ -12,12 +12,12 @@ import { validateRoutePath } from "./routes";
 import type { RouteDefinition, RouteTree } from "../types";
 
 /**
- * Pattern for complete route validation (all segments at once).
- * Matches: single segment or multiple segments separated by dots.
- * Each segment must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
- * Rejects: leading/trailing/consecutive dots, segments starting with numbers/hyphens.
+ * Pattern for route name validation.
+ * Each route name must start with letter/underscore, followed by alphanumeric/hyphen/underscore.
+ * Dots are NOT allowed - use children array or { parent } option in addRoute() instead.
+ * Rejects: names starting with numbers/hyphens, names containing dots.
  */
-const FULL_ROUTE_PATTERN = /^[A-Z_a-z][\w-]*(?:\.[A-Z_a-z][\w-]*)*$/;
+const ROUTE_NAME_PATTERN = /^[A-Z_a-z][\w-]*$/;
 
 /**
  * Checks if string contains at least one non-whitespace character.
@@ -155,9 +155,8 @@ function validateDecodeParams(
  * Route name rules:
  * - Must be a string
  * - Cannot be empty or whitespace-only
- * - Each segment must match [a-zA-Z_][a-zA-Z0-9_-]*
- * - Segments are separated by dots (e.g., "users.profile")
- * - No consecutive dots, no leading/trailing dots
+ * - Cannot contain dots (use children array or { parent } option instead)
+ * - Must match [a-zA-Z_][a-zA-Z0-9_-]*
  *
  * @param route - Route configuration
  * @param methodName - Calling method for error context
@@ -199,36 +198,45 @@ function validateRouteName(
     return;
   }
 
-  // Validate route pattern (ASCII only: letters, numbers, underscores, hyphens, dots)
-  if (!FULL_ROUTE_PATTERN.test(name)) {
+  // Dots are not allowed in route names
+  if (name.includes(".")) {
+    throw new TypeError(
+      `[router.${methodName}] Route name "${name}" cannot contain dots. ` +
+        `Use children array or { parent } option in addRoute() instead.`,
+    );
+  }
+
+  // Validate route pattern (ASCII only: letters, numbers, underscores, hyphens)
+  if (!ROUTE_NAME_PATTERN.test(name)) {
     throw new TypeError(
       `[router.${methodName}] Invalid route name "${name}". ` +
-        `Each segment must start with a letter or underscore, ` +
-        `followed by letters, numbers, underscores, or hyphens. ` +
-        `Segments are separated by dots (e.g., "users.profile").`,
+        `Name must start with a letter or underscore, ` +
+        `followed by letters, numbers, underscores, or hyphens.`,
     );
   }
 }
 
 /**
- * Resolves a dot-notation route name to a node in the tree.
+ * Finds a node by its fullName in the tree.
+ * Even though user-provided route names cannot contain dots,
+ * fullName is computed during validation (e.g., "parent.child").
  *
  * @param rootNode - Root node to start from
- * @param dotName - Dot-separated route name (e.g., "users.profile")
+ * @param fullName - Full route name (e.g., "users.profile")
  * @returns The resolved node, or undefined if not found
  */
-function resolveByDotNotation(
+function findNodeByFullName(
   rootNode: RouteTree,
-  dotName: string,
+  fullName: string,
 ): RouteTree | undefined {
   // Fast path: single-segment names don't need splitting
-  if (!dotName.includes(".")) {
-    return rootNode.children.get(dotName);
+  if (!fullName.includes(".")) {
+    return rootNode.children.get(fullName);
   }
 
   let current: RouteTree | undefined = rootNode;
 
-  for (const segment of dotName.split(".")) {
+  for (const segment of fullName.split(".")) {
     current = current.children.get(segment);
 
     if (!current) {
@@ -252,7 +260,7 @@ function checkTreeNameDuplicate(
   fullName: string,
   methodName: string,
 ): void {
-  if (resolveByDotNotation(rootNode, fullName)) {
+  if (findNodeByFullName(rootNode, fullName)) {
     throw new Error(
       `[router.${methodName}] Route "${fullName}" already exists`,
     );
@@ -296,7 +304,7 @@ function checkTreePathDuplicate(
   methodName: string,
 ): void {
   const parentNode =
-    parentName === "" ? rootNode : resolveByDotNotation(rootNode, parentName);
+    parentName === "" ? rootNode : findNodeByFullName(rootNode, parentName);
 
   if (!parentNode) {
     return; // Parent doesn't exist, so no duplicate
@@ -309,53 +317,6 @@ function checkTreePathDuplicate(
       );
     }
   }
-}
-
-/**
- * Checks that parent route exists for dot-notation names.
- *
- * For routes like "users.profile", verifies that "users" exists either:
- * - In the existing tree
- * - In the current batch (already added before this route)
- *
- * @param rootNode - Root node to search in
- * @param routeName - Route name (possibly with dots)
- * @param methodName - Calling method for error context
- * @param seenNames - Set of names already seen in batch
- * @throws {Error} If parent route does not exist
- */
-function checkParentExists(
-  rootNode: RouteTree | undefined,
-  routeName: string,
-  methodName: string,
-  seenNames?: Set<string>,
-): void {
-  const parts = routeName.split(".");
-
-  parts.pop(); // Remove last segment (actual route name)
-
-  const parentName = parts.join(".");
-
-  // Check if parent exists in current batch
-  if (seenNames?.has(parentName)) {
-    return; // Parent was added earlier in this batch
-  }
-
-  // Check if parent exists in tree
-  if (rootNode) {
-    if (!resolveByDotNotation(rootNode, parentName)) {
-      throw new Error(
-        `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
-      );
-    }
-
-    return; // Parent exists in tree
-  }
-
-  // No tree and not in batch - parent doesn't exist
-  throw new Error(
-    `[router.${methodName}] Parent route "${parentName}" does not exist for route "${routeName}"`,
-  );
 }
 
 /**
@@ -444,12 +405,6 @@ export function validateRoute(
   const routeName = r.name;
   const fullName = parentName ? `${parentName}.${routeName}` : routeName;
 
-  // Check that parent exists for dot-notation names (e.g., "users.profile" requires "users")
-  // Only check for flat routes (no parentName) with dot-notation
-  if (!parentName && fullName.includes(".")) {
-    checkParentExists(rootNode, fullName, methodName, seenNames);
-  }
-
   // Check for duplicate name in existing tree
   if (rootNode && fullName) {
     checkTreeNameDuplicate(rootNode, fullName, methodName);
@@ -461,19 +416,7 @@ export function validateRoute(
   }
 
   const routePath = r.path;
-
-  // For flat routes with dot-notation names (e.g., "users.settings"),
-  // extract the parent from the name for path checking.
-  // RouteNode will place such routes under their implied parent.
-  let pathCheckParent = parentName;
-
-  if (routeName.includes(".") && !parentName) {
-    const parts = routeName.split(".");
-
-    parts.pop(); // Remove last segment (actual route name)
-
-    pathCheckParent = parts.join(".");
-  }
+  const pathCheckParent = parentName;
 
   // Check for duplicate path in existing tree
   if (rootNode) {
