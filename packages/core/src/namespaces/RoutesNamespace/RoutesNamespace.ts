@@ -353,15 +353,18 @@ export class RoutesNamespace<
    * @param parentName - Optional parent route fullName for nesting
    */
   addRoutes(routes: Route<Dependencies>[], parentName?: string): void {
+    // Add to definitions
     if (parentName) {
       const parentDef = this.#findDefinition(this.#definitions, parentName);
 
-      /* v8 ignore next 5 -- @preserve: parentDef validated in validateParentOption, cannot be null */
-      if (parentDef) {
-        parentDef.children ??= [];
-        for (const route of routes) {
-          parentDef.children.push(sanitizeRoute(route));
-        }
+      /* v8 ignore next -- @preserve: validated in facade, cannot be undefined */
+      if (!parentDef) {
+        return;
+      }
+
+      parentDef.children ??= [];
+      for (const route of routes) {
+        parentDef.children.push(sanitizeRoute(route));
       }
     } else {
       for (const route of routes) {
@@ -369,12 +372,13 @@ export class RoutesNamespace<
       }
     }
 
-    const handlerParent = parentName ?? "";
+    // Register handlers
+    this.#registerAllRouteHandlers(routes, parentName ?? "");
 
-    this.#registerAllRouteHandlers(routes, handlerParent);
-
+    // Rebuild tree
     this.#rebuildTree();
 
+    // Validate and cache forwardTo chains
     this.#refreshForwardMap();
   }
 

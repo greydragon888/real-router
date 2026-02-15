@@ -282,11 +282,12 @@ export function validateShouldUpdateNodeArgs(
 
 /**
  * Validates routes for addition to the router.
- * Checks for duplicates, parent existence, and forwardTo targets/cycles.
+ * Checks parent existence, duplicates, and forwardTo targets/cycles.
  *
  * @param routes - Routes to validate
  * @param tree - Current route tree (optional for initial validation)
  * @param forwardMap - Current forward map for cycle detection
+ * @param parentName - Optional parent route fullName for nesting via addRoute({ parent })
  */
 export function validateRoutes<Dependencies extends DefaultDependencies>(
   routes: Route<Dependencies>[],
@@ -294,6 +295,21 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
   forwardMap?: Record<string, string>,
   parentName?: string,
 ): void {
+  // Validate parent route exists in tree
+  if (parentName && tree) {
+    let node: RouteTree | undefined = tree;
+
+    for (const segment of parentName.split(".")) {
+      node = node.children.get(segment);
+
+      if (!node) {
+        throw new Error(
+          `[router.addRoute] Parent route "${parentName}" does not exist`,
+        );
+      }
+    }
+  }
+
   // Tracking sets for duplicate detection
   const seenNames = new Set<string>();
   const seenPathsByParent = new Map<string, Set<string>>();

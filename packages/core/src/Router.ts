@@ -268,21 +268,15 @@ export class Router<
     const parentName = options?.parent;
 
     if (!this.#noValidate) {
-      // 1. Validate parent option
+      // 1. Validate parent option format
       if (parentName !== undefined) {
         RoutesNamespace.validateParentOption(parentName);
-        // Check parent exists in tree
-        if (!this.#routes.hasRoute(parentName)) {
-          throw new Error(
-            `[router.addRoute] Parent route "${parentName}" does not exist`,
-          );
-        }
       }
 
       // 2. Static validation (route structure and properties)
       RoutesNamespace.validateAddRouteArgs(routeArray);
 
-      // 3. State-dependent validation (duplicates, parent exists, forwardTo)
+      // 3. State-dependent validation (parent exists, duplicates, forwardTo)
       RoutesNamespace.validateRoutes(
         routeArray,
         this.#routes.getTree(),
