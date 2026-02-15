@@ -2,8 +2,14 @@
 "@real-router/core": minor
 ---
 
-Make `path` a required argument in `router.start()`.
+Make `path` a required argument in `router.start()` (#90)
 
-BREAKING CHANGE: `router.start()` now requires a path string argument.
-Use `router.start("/path")` instead of `router.start()`.
-Browser plugin users are unaffected — the plugin injects browser location automatically.
+**Breaking Change:** `router.start()` now requires a path string argument.
+
+**Migration:**
+```diff
+- await router.start();
++ await router.start("/home");
+```
+
+Browser-plugin users are unaffected — the plugin injects browser location automatically.
