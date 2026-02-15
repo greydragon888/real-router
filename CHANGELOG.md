@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-15]
 
+### @real-router/core@0.20.0
+
+### Minor Changes
+
+- [#100](https://github.com/greydragon888/real-router/pull/100) [`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57) Thanks [@greydragon888](https://github.com/greydragon888)! - feat!: remove `clearMiddleware()` method (#91)
+
+  BREAKING CHANGE: `clearMiddleware()` has been removed. Use the `Unsubscribe` function returned by `useMiddleware()` instead.
+
+  Before:
+
+  ```ts
+  router.useMiddleware(myMiddleware);
+  // later...
+  router.clearMiddleware();
+  ```
+
+  After:
+
+  ```ts
+  const unsub = router.useMiddleware(myMiddleware);
+  // later...
+  unsub();
+  ```
+
+### @real-router/browser-plugin@0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+
+### @real-router/helpers@0.1.23
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+
+### @real-router/logger-plugin@0.2.23
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+
+### @real-router/persistent-params-plugin@0.1.23
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+
+### @real-router/react@0.4.2
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+  - @real-router/browser-plugin@0.3.2
+  - @real-router/helpers@0.1.23
+
+### @real-router/rx@0.1.12
+
+### Patch Changes
+
+- Updated dependencies [[`c538d0d`](https://github.com/greydragon888/real-router/commit/c538d0d93be09bc438f8dde989b4770963b29e57)]:
+  - @real-router/core@0.20.0
+
+
 ### @real-router/core@0.19.0
 
 ### Minor Changes
