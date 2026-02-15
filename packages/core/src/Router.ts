@@ -1109,6 +1109,7 @@ export class Router<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name) => this.#dependencies.get(name),
+      forwardState: (name, params) => this.forwardState(name, params),
     };
 
     this.#routes.setDependencies(routesDeps);

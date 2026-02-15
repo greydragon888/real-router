@@ -1138,7 +1138,7 @@ describe("Persistent params plugin", () => {
   });
 
   describe("onTransitionSuccess Removal", () => {
-    it("should remove default param in onTransitionSuccess when URL doesn't contain it", async () => {
+    it("should inject persistent param during start() even when URL doesn't contain it", async () => {
       const routes = [{ name: "route", path: "/route/:id" }];
 
       const router = createRouter(routes, {
@@ -1148,15 +1148,60 @@ describe("Persistent params plugin", () => {
       // Configure with default value
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
 
-      // Start with path that doesn't include mode - this triggers removal in onTransitionSuccess
+      // Start with path that doesn't include mode
+      // forwardState is called during matchPath, so the plugin injects mode=dev
       await router.start("/route/1");
 
-      // The start path doesn't go through forwardState, so mode is not in the state
-      // onTransitionSuccess sees mode is missing and removes it from persistentParams
       const state = router.getState();
 
-      expect(state?.path).toBe("/route/1");
-      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.path).toBe("/route/1?mode=dev");
+      expect(state?.params).toStrictEqual({ id: "1", mode: "dev" });
+
+      // Persistent param carries over to subsequent navigations
+      await router.navigate("route", { id: "2" });
+      const state2 = router.getState();
+
+      expect(state2?.path).toBe("/route/2?mode=dev");
+    });
+
+    it("should remove persistent param in onTransitionSuccess when middleware redirects without it", async () => {
+      const routes = [
+        { name: "route", path: "/route/:id" },
+        { name: "other", path: "/other/:id" },
+      ];
+
+      const router = createRouter(routes, {
+        queryParamsMode: "default",
+      });
+
+      router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
+
+      // Middleware redirects to a state created via makeState (bypasses forwardState)
+      router.useMiddleware(() => (toState) => {
+        if (toState.name === "other") {
+          return router.makeState("route", { id: "99" });
+        }
+
+        return true;
+      });
+
+      await router.start("/route/1");
+
+      // Verify mode is injected during start
+      expect(router.getState()?.params).toStrictEqual({
+        id: "1",
+        mode: "dev",
+      });
+
+      // Navigate to "other" — middleware redirects to makeState("route", { id: "99" })
+      // The redirected state has no persistent params (makeState bypasses forwardState)
+      // onTransitionSuccess sees mode is missing and removes it from persistentParams
+      await router.navigate("other", { id: "1" });
+
+      const state = router.getState();
+
+      expect(state?.path).toBe("/route/99");
+      expect(state?.params).toStrictEqual({ id: "99" });
 
       // After removal, subsequent navigations won't include mode
       await router.navigate("route", { id: "2" });

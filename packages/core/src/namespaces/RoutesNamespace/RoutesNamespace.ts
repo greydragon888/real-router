@@ -549,7 +549,7 @@ export class RoutesNamespace<
         ? this.#config.decoders[name](params as Params)
         : params;
 
-    const { name: routeName, params: routeParams } = this.forwardState<P>(
+    const { name: routeName, params: routeParams } = this.#deps.forwardState<P>(
       name,
       decodedParams as P,
     );

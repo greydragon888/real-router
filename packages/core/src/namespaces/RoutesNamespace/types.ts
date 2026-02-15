@@ -5,6 +5,7 @@ import type {
   DefaultDependencies,
   ForwardToCallback,
   Params,
+  SimpleState,
   State,
   StateMetaInput,
 } from "@real-router/types";
@@ -50,6 +51,12 @@ export interface RoutesDependencies<
 
   /** Get a dependency by name */
   getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K];
+
+  /** Forward state through facade (allows plugin interception) */
+  forwardState: <P extends Params = Params>(
+    name: string,
+    params: P,
+  ) => SimpleState<P>;
 }
 
 /**
