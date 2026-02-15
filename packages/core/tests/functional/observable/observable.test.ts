@@ -13,7 +13,7 @@ const noop = () => undefined;
 describe("core/observable", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("core/observable", () => {
         const cb = vi.fn();
 
         freshRouter.addEventListener(events.ROUTER_START, cb);
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         expect(cb).toHaveBeenCalledTimes(1);
         expect(cb).toHaveBeenCalledWith();
@@ -145,7 +145,7 @@ describe("core/observable", () => {
         freshRouter.addEventListener(events.ROUTER_START, badCb);
         freshRouter.addEventListener(events.ROUTER_START, goodCb);
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         expect(goodCb).toHaveBeenCalled();
 

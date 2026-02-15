@@ -22,7 +22,7 @@ const BATCH = 50;
     addedListenerUnsub = router.addEventListener("$$success", listener);
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -53,7 +53,7 @@ const BATCH = 50;
   router.addEventListener("$$success", removerHandler);
   handlerUnsub = router.addEventListener("$$success", () => {});
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -74,7 +74,7 @@ const BATCH = 50;
     }
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -92,7 +92,7 @@ const BATCH = 50;
     // Testing immutability
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -133,7 +133,7 @@ const BATCH = 50;
     // Event handler
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -154,7 +154,7 @@ if (!IS_ROUTER5) {
     // Event handler
   });
 
-  router.start();
+  router.start("/");
 
   bench("11.4.11 Invoking events on navigation cancel", () => {
     void router.navigate("about");
@@ -173,7 +173,7 @@ if (!IS_ROUTER5) {
     // Async operation - should not block dispatch
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -207,7 +207,7 @@ if (!IS_ROUTER5) {
     // Handler receives toState, fromState, options
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 

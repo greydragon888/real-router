@@ -244,7 +244,7 @@ describe("core/limits (integration via public API)", () => {
       });
 
       // Start router - this triggers ROUTER_START event with maxEventDepth=0
-      await router.start();
+      await router.start("/home");
 
       // Verify event was actually received (confirms event path was executed)
       expect(startEventReceived).toBe(true);

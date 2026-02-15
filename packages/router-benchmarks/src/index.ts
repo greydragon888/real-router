@@ -62,7 +62,7 @@ function warmupJIT(): void {
 
     // Warm up ALL start() variants (critical for sections 10-11)
     // Variant 1: start() without args
-    void router.start();
+    void router.start("/");
     router.stop();
 
     // Variant 2: start(path)
@@ -74,7 +74,7 @@ function warmupJIT(): void {
     router.stop();
 
     // Now do navigation warmup
-    void router.start();
+    void router.start("/");
 
     // Warm up navigation paths
     void router.navigate("about");

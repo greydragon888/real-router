@@ -149,7 +149,7 @@ describe("core/noValidate option", () => {
     // Lifecycle
     describe("lifecycle", () => {
       it("should skip validation in start", () => {
-        expect(() => router.start()).not.toThrowError();
+        expect(() => router.start("/home")).not.toThrowError();
       });
 
       it("should skip validation in canDeactivate", () => {
@@ -167,7 +167,7 @@ describe("core/noValidate option", () => {
       });
 
       it("should skip validation in canNavigateTo", async () => {
-        await router.start();
+        await router.start("/home");
 
         // Invalid type would throw TypeError with noValidate: false
         expect(() => router.canNavigateTo(123 as any)).not.toThrowError();
@@ -245,14 +245,14 @@ describe("core/noValidate option", () => {
     // Navigation
     describe("navigation", () => {
       it("should skip validation in navigate", async () => {
-        await router.start();
+        await router.start("/home");
 
         // Empty route name would throw with noValidate: false
         expect(() => router.navigate("").catch(() => {})).not.toThrowError();
       });
 
       it("should skip validation in navigateToDefault", async () => {
-        await router.start();
+        await router.start("/home");
 
         expect(() =>
           router.navigateToDefault().catch(() => {}),
@@ -260,7 +260,7 @@ describe("core/noValidate option", () => {
       });
 
       it("should skip validation in navigateToState", async () => {
-        await router.start();
+        await router.start("/home");
 
         const state = router.makeState("home", {}, "/home");
 

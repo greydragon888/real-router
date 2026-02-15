@@ -14,7 +14,7 @@ import type { Route } from "../helpers";
     router.addDeactivateGuard("admin.users.list", () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.4.1 Navigation with auto-cleanup of 10 canDeactivate guards",
@@ -34,7 +34,7 @@ import type { Route } from "../helpers";
     router.addDeactivateGuard("admin.users", () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.4.2 Navigation with auto-cleanup of 50 guards", () => {
     router.navigate("admin.users.list");
@@ -51,7 +51,7 @@ import type { Route } from "../helpers";
     router.addDeactivateGuard("admin.users.profile", () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.4.3 Thousand navigations with constant auto-cleanup", () => {
     for (let i = 0; i < 1000; i++) {
@@ -64,7 +64,7 @@ import type { Route } from "../helpers";
 {
   const router = createNestedRouter();
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.4.4 Comparison: navigation with/without auto-cleanup (without cleanup)",
@@ -82,7 +82,7 @@ import type { Route } from "../helpers";
     router.addDeactivateGuard("admin.users.list", () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.4.4 Comparison: navigation with/without auto-cleanup (with cleanup)",
@@ -140,7 +140,7 @@ if (IS_ROUTER5) {
   // @ts-expect-error - use method from router5
   router.add(deepRoute);
   router.addDeactivateGuard("deep.l1.l2.l3.l4.l5.l6", () => () => true);
-  router.start();
+  router.start("/");
 
   bench("12.4.5 Auto-cleanup with deep 7-level hierarchy", () => {
     router.navigate("deep.l1.l2.l3.l4.l5.l6");
@@ -191,7 +191,7 @@ if (IS_ROUTER5) {
 
   router.addRoute(deepRoute);
   router.addDeactivateGuard("deep.l1.l2.l3.l4.l5.l6", () => () => true);
-  router.start();
+  router.start("/");
 
   bench("12.4.5 Auto-cleanup with deep 7-level hierarchy", () => {
     router.navigate("deep.l1.l2.l3.l4.l5.l6");

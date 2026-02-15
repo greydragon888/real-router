@@ -115,7 +115,7 @@ describe("router.start() - edge cases", () => {
     beforeEach(async () => {
       // Disable fallback to UNKNOWN_ROUTE to get ROUTE_NOT_FOUND errors
       router = createTestRouter({ allowNotFound: false });
-      await router.start();
+      await router.start("/home");
     });
 
     it("should reject state with missing path field", async () => {
@@ -185,21 +185,7 @@ describe("router.start() - edge cases", () => {
     });
   });
 
-  describe("Empty string as path", () => {
-    it('should treat empty string "" as no path (use defaultRoute)', async () => {
-      // Note: Empty string "" is falsy in JS, so !first is true
-      // in getStartRouterArguments, and the callback is replaced with noop
-      // This is arguably a bug but current behavior - use explicit path instead
-      try {
-        await router.start("");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
-      }
-    });
-  });
+  // "Empty string as path" test removed in Task 6 — start() now requires path
 
   describe("UNKNOWN_ROUTE special case", () => {
     it("should work normally for UNKNOWN_ROUTE with custom path", async () => {

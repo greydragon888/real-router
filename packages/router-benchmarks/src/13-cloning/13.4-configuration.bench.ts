@@ -23,7 +23,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("route25");
     cloned.stop();
   }
@@ -31,7 +31,7 @@ if (IS_ROUTER5) {
   bench("13.4.1 Clone preserves defaultParams", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("route25");
 
     // Fallback: stop started clone
@@ -52,7 +52,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("route25");
     cloned.stop();
   }
@@ -60,7 +60,7 @@ if (IS_ROUTER5) {
   bench("13.4.1 Clone preserves defaultParams", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("route25");
 
     // Fallback: stop started clone
@@ -90,7 +90,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("custom", { id: "123" });
     cloned.stop();
   }
@@ -98,7 +98,7 @@ if (IS_ROUTER5) {
   bench("13.4.2 Clone preserves decoders/encoders", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("custom", { id: "123" });
 
     // Fallback: stop started clone
@@ -124,7 +124,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("custom", { id: "123" });
     cloned.stop();
   }
@@ -132,7 +132,7 @@ if (IS_ROUTER5) {
   bench("13.4.2 Clone preserves decoders/encoders", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("custom", { id: "123" });
 
     // Fallback: stop started clone
@@ -153,7 +153,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("old2");
     cloned.stop();
   }
@@ -161,7 +161,7 @@ if (IS_ROUTER5) {
   bench("13.4.3 Clone preserves forwardTo chains", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("old2");
 
     // Fallback: stop started clone
@@ -177,7 +177,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("old2");
     cloned.stop();
   }
@@ -185,7 +185,7 @@ if (IS_ROUTER5) {
   bench("13.4.3 Clone preserves forwardTo chains", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("old2");
 
     // Fallback: stop started clone
@@ -204,7 +204,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.navigate("users");
     cloned.stop();
@@ -213,7 +213,7 @@ if (IS_ROUTER5) {
   bench("13.4.4 Clone preserves lifecycle handlers", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.navigate("users");
 
@@ -230,7 +230,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.navigate("users");
     cloned.stop();
@@ -239,7 +239,7 @@ if (IS_ROUTER5) {
   bench("13.4.4 Clone preserves lifecycle handlers", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.navigate("users");
 

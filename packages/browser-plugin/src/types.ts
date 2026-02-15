@@ -220,5 +220,3 @@ export interface Browser {
  * Extends real-router State with additional properties that may be set by external code.
  */
 export type HistoryState = State & Record<string, unknown>;
-
-export type StartRouterArguments = [] | [startPath: string];

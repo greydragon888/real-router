@@ -8,7 +8,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench("12.1.1 Thousand sequential navigations between two routes", () => {
     for (let i = 0; i < 1000; i++) {
@@ -22,7 +22,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   const router = createSimpleRouter();
   const routes = ["home", "about", "users", "home", "about"];
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.1.2 Ten thousand sequential navigations between five routes",
@@ -57,7 +57,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench("12.1.5 Five thousand navigations with query parameters", () => {
     for (let i = 0; i < 5000; i++) {
@@ -77,7 +77,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench("12.1.6 Thousand navigate -> cancel -> navigate cycles", () => {
     for (let i = 0; i < 1000; i++) {
@@ -98,7 +98,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   // Alternate routes to avoid SAME_STATES when reload=false
   const routes = ["about", "home"];
 
-  router.start();
+  router.start("/");
 
   bench("12.1.7 Thousand navigations alternating reload flag", () => {
     for (let i = 0; i < 1000; i++) {
@@ -120,7 +120,7 @@ if (IS_ROUTER5) {
     router.add({ name: route, path: `/${route}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.1.8 Five thousand navigations to random routes", () => {
     for (let i = 0; i < 5000; i++) {
@@ -138,7 +138,7 @@ if (IS_ROUTER5) {
     router.addRoute({ name: route, path: `/${route}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.1.8 Five thousand navigations to random routes", () => {
     for (let i = 0; i < 5000; i++) {

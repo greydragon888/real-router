@@ -12,7 +12,7 @@ describe("router.navigate() - guards can deactivate", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

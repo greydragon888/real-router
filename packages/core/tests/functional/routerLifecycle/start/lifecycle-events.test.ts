@@ -24,7 +24,7 @@ describe("router.start() - lifecycle events", () => {
 
         router.addEventListener(events.ROUTER_START, startListener);
 
-        await router.start();
+        await router.start("/home");
 
         expect(router.isActive()).toBe(true);
         expect(startListener).toHaveBeenCalledTimes(1);
@@ -46,7 +46,7 @@ describe("router.start() - lifecycle events", () => {
           transitionSuccessListener,
         );
 
-        await router.start();
+        await router.start("/home");
 
         expect(startListener).toHaveBeenCalledTimes(1);
         expect(transitionStartListener).toHaveBeenCalledTimes(1);
@@ -141,61 +141,7 @@ describe("router.start() - lifecycle events", () => {
       });
     });
 
-    describe("NO_START_PATH_OR_STATE should emit TRANSITION_ERROR", () => {
-      it("should emit TRANSITION_ERROR when no start path and no default route", async () => {
-        // Create router without default route
-        const routerWithoutDefault = createTestRouter({ defaultRoute: "" });
-        const transitionErrorListener = vi.fn();
-
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await routerWithoutDefault.start();
-        } catch {
-          // Expected to fail
-        }
-
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-        const [toState, fromState, error] =
-          transitionErrorListener.mock.calls[0];
-
-        expect(toState).toBeUndefined();
-        expect(fromState).toBeUndefined();
-        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
-
-        routerWithoutDefault.stop();
-      });
-
-      it("should return error to callback AND emit TRANSITION_ERROR", async () => {
-        const routerWithoutDefault = createTestRouter({ defaultRoute: "" });
-        const transitionErrorListener = vi.fn();
-
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await routerWithoutDefault.start();
-        } catch {
-          // Expected to fail
-        }
-
-        // Event should be triggered
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-        // Check the error
-        const eventError = transitionErrorListener.mock.calls[0][2];
-
-        expect(eventError.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
-
-        routerWithoutDefault.stop();
-      });
-    });
+    // "NO_START_PATH_OR_STATE should emit TRANSITION_ERROR" tests removed in Task 6 — start() now requires path
 
     describe("TRANSITION_ERR should emit TRANSITION_ERROR", () => {
       it("should emit TRANSITION_ERROR when middleware blocks transition", async () => {
@@ -320,34 +266,7 @@ describe("router.start() - lifecycle events", () => {
         expect(error.code).toBe(errorCodes.ROUTE_NOT_FOUND);
       });
 
-      it("should have consistent event signature (toState, fromState, error) for NO_START_PATH_OR_STATE", async () => {
-        const routerWithoutDefault = createTestRouter({ defaultRoute: "" });
-        const transitionErrorListener = vi.fn();
-
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await routerWithoutDefault.start();
-        } catch {
-          // Expected to fail
-        }
-
-        const args = transitionErrorListener.mock.calls[0];
-
-        expect(args).toHaveLength(3);
-
-        const [toState, fromState, error] = args;
-
-        expect(toState).toBeUndefined();
-        expect(fromState).toBeUndefined();
-        expect(error).toBeInstanceOf(RouterError);
-        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
-
-        routerWithoutDefault.stop();
-      });
+      // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
 
       it("should have consistent event signature (toState, fromState, error) for TRANSITION_ERR", async () => {
         const transitionErrorListener = vi.fn();
@@ -409,31 +328,7 @@ describe("router.start() - lifecycle events", () => {
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       });
 
-      it("should NOT emit TRANSITION_SUCCESS for NO_START_PATH_OR_STATE", async () => {
-        const routerWithoutDefault = createTestRouter({ defaultRoute: "" });
-        const transitionSuccessListener = vi.fn();
-        const transitionErrorListener = vi.fn();
-
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await routerWithoutDefault.start();
-        } catch {
-          // Expected to fail
-        }
-
-        expect(transitionSuccessListener).not.toHaveBeenCalled();
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-        routerWithoutDefault.stop();
-      });
+      // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
 
       it("should NOT emit TRANSITION_SUCCESS for TRANSITION_ERR", async () => {
         const transitionSuccessListener = vi.fn();

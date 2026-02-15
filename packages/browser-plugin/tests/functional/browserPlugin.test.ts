@@ -294,7 +294,7 @@ describe("Browser Plugin", async () => {
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         router.getState(),
         "",
-        "/home",
+        "/",
       );
     });
 
@@ -808,7 +808,9 @@ describe("Browser Plugin", async () => {
           (state as any).name = "hacked";
         }).toThrowError();
 
-        expect(state.name).toBe("home");
+        // lastKnownState is set by start() transition, not replaceHistoryState
+        // Browser at "/" matches "index" route
+        expect(state.name).toBe("index");
       });
 
       it("returns undefined after teardown", async () => {
@@ -1036,12 +1038,12 @@ describe("Browser Plugin", async () => {
         // Router already started on "home" (default route)
         vi.spyOn(mockedBrowser, "replaceState");
 
-        await router.navigate("home", {}, { reload: true });
+        await router.navigate("index", {}, { reload: true });
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "home" }),
+          expect.objectContaining({ name: "index" }),
           "",
-          "/home",
+          "/",
         );
       });
 
@@ -1487,7 +1489,7 @@ describe("Browser Plugin", async () => {
         const state = mockedBrowser.getState();
 
         expect(state?.external).toBe("data");
-        expect(state?.name).toBe("home");
+        expect(state?.name).toBe("index");
       });
 
       it("handles preserveHash option on initial navigation", async () => {
@@ -1519,9 +1521,7 @@ describe("Browser Plugin", async () => {
         );
         await router.start();
 
-        // Router already started on "home" (default route)
-        // Add canDeactivate that returns false
-        router.addDeactivateGuard("home", () => () => false);
+        router.addDeactivateGuard("index", () => () => false);
 
         // Navigate should fail
         await expect(
@@ -1530,7 +1530,7 @@ describe("Browser Plugin", async () => {
           code: errorCodes.CANNOT_DEACTIVATE,
         });
 
-        expect(router.getState()?.name).toBe("home");
+        expect(router.getState()?.name).toBe("index");
       });
     });
 
@@ -1822,7 +1822,8 @@ describe("Browser Plugin", async () => {
         await router.navigate("users.list");
 
         // Custom hook should execute without interference
-        expect(customHookStates).toStrictEqual(["home", "users.list"]);
+        // start() at "/" matches "index" route, then navigate to "users.list"
+        expect(customHookStates).toStrictEqual(["index", "users.list"]);
         // Browser plugin should still work
         expect(currentHistoryState?.name).toBe("users.list");
       });
@@ -1966,7 +1967,7 @@ describe("Browser Plugin", async () => {
         // Router should not navigate to non-existent route with malicious name
         // The malicious route name doesn't exist in routerConfig, so state won't match
         expect(router.getState()?.name).not.toContain("<script>");
-        expect(router.getState()?.name).toBe("home"); // Still on default route
+        expect(router.getState()?.name).toBe("index");
       });
 
       it("sanitizes params with special characters via URL encoding", async () => {
@@ -2007,7 +2008,7 @@ describe("Browser Plugin", async () => {
 
         // Router rejects the state because params has modified prototype
         // This protects against prototype pollution attacks
-        expect(router.getState()?.name).toBe("home"); // stays at initial state
+        expect(router.getState()?.name).toBe("index"); // stays at initial state
       });
 
       it("handles popstate with constructor pollution attempt", async () => {
@@ -2026,8 +2027,8 @@ describe("Browser Plugin", async () => {
         // Object prototype should not be polluted
         expect(({} as any).polluted).toBeUndefined();
 
-        // Router should handle the navigation
-        expect(router.getState()?.name).toBe("home");
+        // Router should handle the navigation (async, not awaited)
+        expect(router.getState()?.name).toBe("index");
       });
 
       it("handles popstate with deeply nested malicious objects", async () => {
@@ -2056,7 +2057,7 @@ describe("Browser Plugin", async () => {
 
         // Router should still be in a valid state (no crash)
         expect(router.getState()).toBeDefined();
-        expect(router.getState()?.name).toBe("home");
+        expect(router.getState()?.name).toBe("index");
       });
     });
 

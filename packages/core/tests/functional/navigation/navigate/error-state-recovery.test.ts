@@ -12,7 +12,7 @@ describe("router.navigate() - error state recovery", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

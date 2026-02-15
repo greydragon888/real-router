@@ -1,12 +1,8 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
-import {
-  CACHED_ALREADY_STARTED_ERROR,
-  CACHED_NO_START_PATH_ERROR,
-} from "./constants";
+import { CACHED_ALREADY_STARTED_ERROR } from "./constants";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
-import { resolveOption } from "../OptionsNamespace";
 
 import type { RouterLifecycleDependencies } from "./types";
 import type { NavigationOptions, State } from "@real-router/types";
@@ -70,10 +66,10 @@ export class RouterLifecycleNamespace {
    * Validates start() arguments.
    */
   static validateStartArgs(args: unknown[]): void {
-    /* v8 ignore next 4 -- @preserve: facade limits to 0-1 args via TypeScript overloads */
-    if (args.length > 1) {
+    /* v8 ignore next 4 -- @preserve: facade enforces 1 arg via TypeScript signature */
+    if (args.length !== 1 || typeof args[0] !== "string") {
       throw new Error(
-        "[router.start] Invalid number of arguments. Expected 0-1 arguments.",
+        "[router.start] Expected exactly 1 string argument (startPath).",
       );
     }
   }
@@ -110,10 +106,9 @@ export class RouterLifecycleNamespace {
   }
 
   /**
-   * Starts the router with an optional path.
+   * Starts the router with the given path.
    */
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- start() is an inherently complex state machine
-  async start(startPath?: string): Promise<State> {
+  async start(startPath: string): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
 
@@ -126,31 +121,6 @@ export class RouterLifecycleNamespace {
       throw CACHED_ALREADY_STARTED_ERROR;
     }
 
-    // ==========================================================================
-    // Early return for NO_START_PATH_OR_STATE (Performance Optimization)
-    // ==========================================================================
-    // Check BEFORE setIsActive() to avoid:
-    // - setIsActive/unsetIsActive calls
-    // - Event emission setup
-    //
-    // This is a common error case: start() called without path and no defaultRoute.
-    // Optimizing this path saves ~80% of error handling overhead.
-    // ==========================================================================
-    if (!startPath && !options.defaultRoute) {
-      // Lazy emit: only invoke if listeners exist
-      // hasListeners check (~5ns) vs invokeEventListeners validation (~100ns+)
-      if (deps.hasListeners(events.TRANSITION_ERROR)) {
-        deps.invokeEventListeners(
-          events.TRANSITION_ERROR,
-          undefined,
-          undefined,
-          CACHED_NO_START_PATH_ERROR,
-        );
-      }
-
-      throw CACHED_NO_START_PATH_ERROR;
-    }
-
     // Issue #50: Mark router as active BEFORE attempting transition
     // This allows the transition to proceed (isCancelled() checks isActive())
     this.#active = true;
@@ -161,28 +131,7 @@ export class RouterLifecycleNamespace {
     };
 
     try {
-      const resolvedPath =
-        startPath ??
-        (resolveOption(options.defaultRoute, deps.getDependency) as
-          | string
-          | undefined);
-
-      if (!resolvedPath) {
-        const err = new RouterError(errorCodes.NO_START_PATH_OR_STATE);
-
-        if (deps.hasListeners(events.TRANSITION_ERROR)) {
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            undefined,
-            undefined,
-            err,
-          );
-        }
-
-        throw err;
-      }
-
-      const matchedState = deps.matchPath(resolvedPath);
+      const matchedState = deps.matchPath(startPath);
 
       let finalState: State;
 
@@ -193,59 +142,8 @@ export class RouterLifecycleNamespace {
           startOptions,
           false, // emitSuccess = false - we will emit below
         );
-      } else if (options.defaultRoute && !startPath) {
-        // IMPORTANT: Check !startPath (original argument), NOT !resolvedPath
-        // This distinguishes between:
-        //   - User called start() without path → use defaultRoute (this branch)
-        //   - User called start('/invalid') with explicit path → error, no silent fallback
-        // See: https://github.com/greydragon888/real-router/issues/44
-
-        const defaultParams = resolveOption(
-          options.defaultParams,
-          deps.getDependency,
-        );
-
-        const defaultRoute = deps.buildState(resolvedPath, defaultParams);
-
-        if (!defaultRoute) {
-          const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-            routeName: resolvedPath,
-          });
-
-          if (deps.hasListeners(events.TRANSITION_ERROR)) {
-            deps.invokeEventListeners(
-              events.TRANSITION_ERROR,
-              undefined,
-              undefined,
-              err,
-            );
-          }
-
-          throw err;
-        }
-
-        const toState = deps.makeState(
-          defaultRoute.name,
-          defaultRoute.params,
-          deps.buildPath(defaultRoute.name, defaultRoute.params),
-          {
-            params: defaultRoute.meta,
-            options: startOptions,
-            redirected: false,
-          },
-        );
-
-        finalState = await this.navigateToState(
-          toState,
-          undefined,
-          startOptions,
-          false, // emitSuccess = false - we will emit below
-        );
       } else if (options.allowNotFound) {
-        const notFoundState = deps.makeNotFoundState(
-          resolvedPath,
-          startOptions,
-        );
+        const notFoundState = deps.makeNotFoundState(startPath, startOptions);
 
         finalState = await this.navigateToState(
           notFoundState,
@@ -255,7 +153,7 @@ export class RouterLifecycleNamespace {
         );
       } else {
         const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          path: resolvedPath,
+          path: startPath,
         });
 
         if (deps.hasListeners(events.TRANSITION_ERROR)) {

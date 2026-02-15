@@ -30,7 +30,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
     router.useMiddleware(() => () => {});
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.3.3 Thousand navigations with 10 middleware", () => {
     for (let i = 0; i < 1000; i++) {
@@ -52,7 +52,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
     }));
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.3.4 Navigation with 50 plugins", () => {
     router.navigate(alternatingRoutes[index++ % 2]);
@@ -70,7 +70,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
     }));
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.3.5 Thousand navigations with 20 plugins", () => {
     for (let i = 0; i < 1000; i++) {
@@ -94,7 +94,7 @@ if (IS_ROUTER5) {
     router.addActivateGuard(routeName, () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.3.6 Navigation with 100 canActivate guards on different routes",
@@ -115,7 +115,7 @@ if (IS_ROUTER5) {
     router.addActivateGuard(routeName, () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.3.6 Navigation with 100 canActivate guards on different routes",
@@ -137,7 +137,7 @@ if (IS_ROUTER5) {
     router.addDeactivateGuard(routeName, () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.3.7 Navigation with 100 canDeactivate guards", () => {
     router.navigate("route0");
@@ -153,7 +153,7 @@ if (IS_ROUTER5) {
     router.addDeactivateGuard(routeName, () => () => true);
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.3.7 Navigation with 100 canDeactivate guards", () => {
     router.navigate("route0");

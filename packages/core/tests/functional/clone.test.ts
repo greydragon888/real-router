@@ -81,7 +81,7 @@ describe("router.clone()", () => {
     const clonedRouter = router.clone();
 
     // Verify plugin is cloned by checking it responds to events on cloned router
-    await clonedRouter.start();
+    await clonedRouter.start("/home");
 
     expect(tracker.getCalls().onStart).toBe(1);
 
@@ -194,8 +194,8 @@ describe("router.clone()", () => {
     clonedRouter.usePlugin(tracker.factory);
 
     // Start both routers
-    await router.start();
-    await clonedRouter.start();
+    await router.start("/home");
+    await clonedRouter.start("/home");
 
     // Plugin should only respond on cloned router (2 starts: router + clonedRouter)
     // But we added plugin only to clonedRouter, so only 1 start

@@ -101,7 +101,7 @@ describe("core/middleware", () => {
 
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -155,7 +155,7 @@ describe("core/middleware", () => {
       spyOnFunctions(mware);
       router.stop();
       router.useMiddleware(() => mware.transition);
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users");
 
@@ -178,7 +178,7 @@ describe("core/middleware", () => {
 
       router.useMiddleware(() => redirectMiddleware(targetState));
 
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("index");
 
@@ -193,7 +193,7 @@ describe("core/middleware", () => {
       router.stop();
       router.useMiddleware(() => mutate);
 
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("orders");
 
@@ -224,7 +224,7 @@ describe("core/middleware", () => {
         () => middlewareMock2,
       );
 
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users");
 
@@ -240,7 +240,7 @@ describe("core/middleware", () => {
       router.useMiddleware(() => asyncMware);
 
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users");
 
@@ -257,7 +257,7 @@ describe("core/middleware", () => {
       );
 
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users");
 
@@ -275,7 +275,7 @@ describe("core/middleware", () => {
       );
 
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users");
 

@@ -18,146 +18,7 @@ describe("router.start() - error handling", () => {
     router.stop();
   });
 
-  describe("scenarios without a starting state", () => {
-    describe("start without startPathOrState and without defaultRoute", () => {
-      it("should emit TRANSITION_ERROR when no start state available", async () => {
-        // Create router without defaultRoute for this test
-        // Empty string means no default route
-        const routerWithoutDefault = createTestRouter({
-          defaultRoute: "",
-        });
-
-        const transitionStartListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-        const transitionErrorListener = vi.fn();
-
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_START,
-          transitionStartListener,
-        );
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-        routerWithoutDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await routerWithoutDefault.start();
-        } catch {
-          // Expected to throw
-        }
-
-        expect(transitionStartListener).not.toHaveBeenCalled();
-        expect(transitionSuccessListener).not.toHaveBeenCalled();
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-        routerWithoutDefault.stop();
-      });
-    });
-
-    describe("start without path when defaultRoute function resolves to empty", () => {
-      it("should emit TRANSITION_ERROR and throw NO_START_PATH_OR_STATE", async () => {
-        // defaultRoute is a function that returns empty string
-        const routerWithFuncDefault = createTestRouter({
-          defaultRoute: () => "",
-        });
-
-        const transitionErrorListener = vi.fn();
-
-        routerWithFuncDefault.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        await expect(routerWithFuncDefault.start()).rejects.toMatchObject({
-          code: errorCodes.NO_START_PATH_OR_STATE,
-        });
-
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-
-        routerWithFuncDefault.stop();
-      });
-    });
-
-    describe("start without startPathOrState, but with defaultRoute", () => {
-      it("should navigate to default route when no start state but defaultRoute exists", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        const result = await router.start();
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-        expect(result).toBeDefined();
-        expect(result?.name).toBe("home");
-
-        // Verify via event that default route was used with replace: true
-        const [toState, , options] = transitionSuccessListener.mock.calls[0];
-
-        expect(toState.name).toBe("home");
-        expect(options).toStrictEqual({ replace: true });
-      });
-
-      it("should navigate to default route successfully", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        const result = await router.start();
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-        expect(result).toBeDefined();
-        expect(result?.name).toBe("home");
-
-        const currentState = router.getState();
-
-        expect(currentState?.name).toBe("home");
-      });
-
-      // Issue #50: Two-phase start - Router is NOT started if default route navigation fails
-      it("should NOT start router when default route navigation fails (two-phase start)", async () => {
-        // Set invalid default route
-        router = createTestRouter({ defaultRoute: "nonexistent.route" });
-
-        const startListener = vi.fn();
-        const transitionErrorListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_ERROR,
-          transitionErrorListener,
-        );
-
-        try {
-          await router.start();
-        } catch {
-          // Expected to throw
-        }
-
-        // Issue #50: Router is NOT started when default route fails
-        expect(router.isActive()).toBe(false);
-        expect(startListener).not.toHaveBeenCalled();
-        expect(transitionErrorListener).toHaveBeenCalledTimes(1);
-      });
-    });
-  });
+  // "scenarios without a starting state" tests removed in Task 6 — start() now requires path
 
   // Note: "protectedDone callback guard" tests were removed because they
   // required replacing navigateToState directly, which no longer works
@@ -459,7 +320,7 @@ describe("router.start() - error handling", () => {
     describe("transition error handling when defaultRoute is set", () => {
       beforeEach(async () => {
         router = createTestRouter({ defaultRoute: "home" });
-        await router.start();
+        await router.start("/home");
       });
 
       it("should return transition error to callback instead of falling back silently", async () => {

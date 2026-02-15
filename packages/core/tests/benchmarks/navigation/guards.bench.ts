@@ -80,7 +80,7 @@ boxplot(() => {
         createModifyingGuard("timestamp", Date.now()),
       );
 
-      void router.start();
+      void router.start("/");
 
       const targetRoutes = ["about", "users", "home"] as const;
       let i = 0;
@@ -113,7 +113,7 @@ boxplot(() => {
         createModifyingGuard("guard3", "done"),
       );
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 3 guards modify state", () => {
         do_not_optimize(router.navigate("dashboard"));
@@ -135,7 +135,7 @@ boxplot(() => {
         );
       }
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 5 guards modify state", () => {
         do_not_optimize(router.navigate("admin"));
@@ -162,7 +162,7 @@ boxplot(() => {
         createModifyingMiddleware("middlewareProcessed", true),
       );
 
-      void router.start();
+      void router.start("/");
 
       const targetRoutes = ["profile", "home"] as const;
       let i = 0;
@@ -186,7 +186,7 @@ boxplot(() => {
         router.useMiddleware(createModifyingMiddleware(`mw${m}`, "processed"));
       }
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 3 middleware modify state", () => {
         do_not_optimize(router.navigate("settings"));
@@ -205,7 +205,7 @@ boxplot(() => {
         router.useMiddleware(createModifyingMiddleware(`mw${m}`, "processed"));
       }
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 5 middleware modify state", () => {
         do_not_optimize(router.navigate("checkout"));
@@ -242,7 +242,7 @@ boxplot(() => {
       router.useMiddleware(createModifyingMiddleware("loggingMw", "done"));
       router.useMiddleware(createModifyingMiddleware("analyticsMw", "done"));
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 2 guards + 2 middleware modify state", () => {
         do_not_optimize(router.navigate("secure"));
@@ -276,7 +276,7 @@ boxplot(() => {
       // Logging middleware
       router.useMiddleware(createModifyingMiddleware("timestamp", Date.now()));
 
-      void router.start();
+      void router.start("/");
 
       const orderIds = ["order1", "order2", "order3", "order4"];
       let i = 0;
@@ -310,7 +310,7 @@ boxplot(() => {
         router.addActivateGuard("page", passthroughGuardFactory);
       }
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 3 guards (no state mod)", () => {
         do_not_optimize(router.navigate("page"));
@@ -332,7 +332,7 @@ boxplot(() => {
         );
       }
 
-      void router.start();
+      void router.start("/");
 
       bench("navigate: 3 guards (with state mod)", () => {
         do_not_optimize(router.navigate("page"));

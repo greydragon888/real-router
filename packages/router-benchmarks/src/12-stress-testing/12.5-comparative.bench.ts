@@ -12,7 +12,7 @@ import type { Route } from "../helpers";
   const alternatingRoutes = ["about", "home"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("12.5.1 Comparison: route without parameters", () => {
     router.navigate(alternatingRoutes[index++ % 2]);
@@ -24,7 +24,7 @@ import type { Route } from "../helpers";
   const ids = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("12.5.2 Comparison: route with 5 parameters", () => {
     router.navigate("user", {
@@ -42,7 +42,7 @@ import type { Route } from "../helpers";
   const ids = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("12.5.3 Comparison: route with 10 parameters", () => {
     router.navigate("user", {
@@ -66,7 +66,7 @@ import type { Route } from "../helpers";
   const alternatingRoutes = ["about", "home"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("12.5.4 Comparison: flat routes", () => {
     router.navigate(alternatingRoutes[index++ % 2]);
@@ -105,7 +105,7 @@ if (IS_ROUTER5) {
 
   // @ts-expect-error - use method from router5
   router.add(nestedRoute);
-  router.start();
+  router.start("/");
 
   bench("12.5.5 Comparison: 5 levels of nesting", () => {
     router.navigate(routes[index++ % 2]);
@@ -141,7 +141,7 @@ if (IS_ROUTER5) {
   };
 
   router.addRoute(nestedRoute);
-  router.start();
+  router.start("/");
 
   bench("12.5.5 Comparison: 5 levels of nesting", () => {
     router.navigate(routes[index++ % 2]);
@@ -156,7 +156,7 @@ if (IS_ROUTER5) {
     router.addEventListener("$$success", () => {});
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.5.6 Thousand navigations with 1000 event listeners", () => {
     for (let i = 0; i < 1000; i++) {
@@ -187,7 +187,7 @@ if (IS_ROUTER5) {
     }));
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins",
@@ -215,7 +215,7 @@ if (IS_ROUTER5) {
     }));
   }
 
-  router.start();
+  router.start("/");
 
   bench(
     "12.5.8 Combined stress test: 1000 routes + 20 middleware + 30 plugins",

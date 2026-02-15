@@ -252,16 +252,7 @@ describe("router.start() - path string scenarios", () => {
   });
 
   describe("path string edge cases", () => {
-    it("should handle empty string as path (fallback to defaultRoute)", async () => {
-      try {
-        await router.start("");
-
-        expect.fail("Should have thrown");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error.code).toBe(errorCodes.NO_START_PATH_OR_STATE);
-      }
-    });
+    // "empty string as path" test removed in Task 6 — start() now requires path
 
     it("should handle whitespace-only path as invalid route", async () => {
       router = createTestRouter({ allowNotFound: false });
@@ -323,7 +314,7 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ defaultRoute: "home" });
 
       // Start without path - should use defaultRoute
-      const state = await router.start();
+      const state = await router.start("/home");
 
       expect(state.name).toBe("home");
     });

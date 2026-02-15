@@ -5,12 +5,7 @@ import { isStateStrict as isState } from "type-guards";
 
 import { type DefaultBrowserPluginOptions, LOGGER_CONTEXT } from "./constants";
 
-import type {
-  BrowserPluginOptions,
-  HistoryState,
-  StartRouterArguments,
-  Browser,
-} from "./types";
+import type { BrowserPluginOptions, HistoryState, Browser } from "./types";
 import type {
   Router,
   NavigationOptions,
@@ -48,32 +43,6 @@ export const escapeRegExp = (str: string): string => {
 
   return escaped;
 };
-
-/**
- * Extracts start router arguments from various overloads
- *
- * @param args - Arguments passed to router.start()
- * @param browser - Browser API instance
- * @param options - Browser plugin options
- * @returns Start path, or undefined to use current location
- */
-export function getStartRouterArguments(
-  args: StartRouterArguments,
-  browser: Browser,
-  options: BrowserPluginOptions,
-): string | undefined {
-  if (args.length === 0) {
-    const location = browser.getLocation(options);
-
-    if (location === "/") {
-      return undefined;
-    }
-
-    return location;
-  }
-
-  return args[0];
-}
 
 /**
  * Creates state from popstate event

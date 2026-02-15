@@ -17,85 +17,6 @@ describe("router.start() - arguments validation", () => {
     router.stop();
   });
 
-  describe("arguments validation", () => {
-    describe("call without arguments", () => {
-      it("should handle start without arguments when defaultRoute is present", async () => {
-        const startListener = vi.fn();
-        const transitionSuccessListener = vi.fn();
-
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
-          events.TRANSITION_SUCCESS,
-          transitionSuccessListener,
-        );
-
-        await router.start();
-
-        expect(router.isActive()).toBe(true);
-        expect(startListener).toHaveBeenCalledTimes(1);
-        expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
-
-        const currentState = router.getState();
-
-        expect(currentState).toBeDefined();
-        expect(currentState?.name).toBe("home"); // defaultRoute from createTestRouter
-      });
-
-      it("should handle start with defaultParams", async () => {
-        // Test the defaultParams ?? {} branch when defaultParams is defined
-        router = createTestRouter({
-          defaultRoute: "items",
-          defaultParams: { id: "123" },
-        });
-
-        await router.start();
-
-        expect(router.isActive()).toBe(true);
-
-        const currentState = router.getState();
-
-        expect(currentState).toBeDefined();
-        expect(currentState?.name).toBe("items");
-        expect(currentState?.params).toStrictEqual({ id: "123" });
-        expect(currentState?.path).toBe("/items/123");
-      });
-
-      it("should handle start without defaultParams (undefined)", async () => {
-        // Test navigateToDefault with undefined defaultParams
-        // Reset router and only set defaultRoute without defaultParams
-        router.stop();
-        router = createTestRouter({ defaultRoute: "home" });
-
-        await router.start();
-
-        expect(router.isActive()).toBe(true);
-
-        const currentState = router.getState();
-
-        expect(currentState).toBeDefined();
-        expect(currentState?.name).toBe("home");
-        expect(currentState?.path).toBe("/home");
-        // With undefined defaultParams, empty object is used
-        expect(currentState?.params).toStrictEqual({});
-      });
-
-      it("should handle start when defaultRoute buildState fails", async () => {
-        router = createTestRouter({ defaultRoute: "nonexistent-route" });
-
-        try {
-          await router.start();
-
-          expect.fail("Should have thrown");
-        } catch (error: any) {
-          expect(error).toBeDefined();
-          expect(error?.code).toBe(errorCodes.ROUTE_NOT_FOUND);
-        }
-
-        expect(router.isActive()).toBe(false);
-      });
-    });
-  });
-
   describe("call with path string", () => {
     it("should handle start with valid path", async () => {
       const startListener = vi.fn();
@@ -305,14 +226,14 @@ describe("router state check", () => {
 
   describe("repeated start of already started router", () => {
     it("should return error when starting already started router", async () => {
-      await router.start();
+      await router.start("/home");
 
       const startListener = vi.fn();
 
       router.addEventListener(events.ROUTER_START, startListener);
 
       try {
-        await router.start();
+        await router.start("/home");
 
         expect.fail("Should have thrown");
       } catch (error: any) {
@@ -325,7 +246,7 @@ describe("router state check", () => {
     });
 
     it("should not execute start logic when router is already started", async () => {
-      await router.start();
+      await router.start("/home");
 
       const transitionStartListener = vi.fn();
       const transitionSuccessListener = vi.fn();

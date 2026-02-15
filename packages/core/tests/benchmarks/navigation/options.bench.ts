@@ -27,7 +27,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      void router.start();
+      void router.start("/");
       void router.navigate("about");
 
       let i = 0;
@@ -47,7 +47,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      void router.start();
+      void router.start("/");
       void router.navigate("about");
 
       let i = 0;
@@ -67,7 +67,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter();
 
-      void router.start();
+      void router.start("/");
       void router.navigate("about");
 
       let i = 0;
@@ -101,7 +101,7 @@ boxplot(() => {
         urlParamsEncoding: "uriComponent",
       });
 
-      void router.start();
+      void router.start("/");
 
       const names = [
         "Hello World & Special/Chars",
@@ -127,7 +127,7 @@ boxplot(() => {
         urlParamsEncoding: "uriComponent",
       });
 
-      void router.start();
+      void router.start("/");
 
       const specialStrings = [
         "Hello/World & Special?Chars=Test#Fragment 🚀 Ω ü",
@@ -168,7 +168,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      void router.start();
+      void router.start("/");
 
       const userIds = [123, 456, 789, 101];
       let i = 0;
@@ -196,7 +196,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      void router.start();
+      void router.start("/");
 
       const userIds = ["123", "456", "789", "101"];
       let i = 0;
@@ -227,7 +227,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { trailingSlash: "always" });
 
-      void router.start();
+      void router.start("/");
 
       const routeNames = ["about", "contact", "home"];
       let i = 0;
@@ -246,7 +246,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      void router.start();
+      void router.start("/");
 
       const routeNames = ["about", "contact", "home"];
       let i = 0;
@@ -260,7 +260,7 @@ boxplot(() => {
     {
       const router = createSimpleRouter({ allowNotFound: true });
 
-      void router.start();
+      void router.start("/");
 
       const nonexistentRoutes = [
         "nonexistent-route-1",
@@ -294,7 +294,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes);
 
-      void router.start();
+      void router.start("/");
 
       // Pre-create different long strings to alternate
       const longStrings = [
@@ -321,7 +321,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      void router.start();
+      void router.start("/");
 
       const paramSets = [
         { str: "text", num: 42, bool: true, arr: ["a", "b", "c"] },
@@ -345,7 +345,7 @@ boxplot(() => {
       ];
       const router = createCustomRouter(routes, { queryParamsMode: "loose" });
 
-      void router.start();
+      void router.start("/");
 
       const nestedParams = [
         { data: { level1: { level2: { level3: { value: "deep" } } } } },

@@ -1524,11 +1524,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies [[`5f59ef3`](https://github.com/greydragon888/real-router/commit/5f59ef3f72ad3f26346c0e3e821822cc4fde120c)]:
   - @real-router/core@0.2.1
 
-### @real-router/react@1.0.0
+### @real-router/react@0.4.0
 
 ### Minor Changes
 
-- Initial public release with full routing functionality
+- Migrate to Promise-based navigation API
 
 ### Patch Changes
 

@@ -155,6 +155,28 @@ jobs:
             echo "✅ No private packages in changesets"
           fi
 
+          # --- Check 4: No major version bumps (pre-1.0) ---
+          # TODO: Remove this check after 1.0 stable release
+          MAJOR_BUMPS=""
+          for file in $CHANGESETS; do
+            if [ -f "$file" ]; then
+              if sed -n '/^---$/,/^---$/p' "$file" | grep -q ': major'; then
+                MAJOR_BUMPS="$MAJOR_BUMPS $file"
+              fi
+            fi
+          done
+
+          if [ -n "$MAJOR_BUMPS" ]; then
+            echo "major_bumps=true" >> $GITHUB_OUTPUT
+            echo "files_major_bumps=$MAJOR_BUMPS" >> $GITHUB_OUTPUT
+            echo "::error::Major version bumps found:$MAJOR_BUMPS"
+            HAS_ISSUES=true
+          else
+            echo "major_bumps=false" >> $GITHUB_OUTPUT
+            echo "✅ No major version bumps"
+          fi
+          # --- End: No major version bumps (pre-1.0) ---
+
           # --- Summary ---
           if [ "$HAS_ISSUES" = true ]; then
             echo "has_issues=true" >> $GITHUB_OUTPUT
@@ -227,6 +249,25 @@ jobs:
                 '**How to fix:** Remove the private package from the changeset frontmatter. Only include public `@real-router/*` packages.',
               ].join('\n'));
             }
+
+            // Section: Major version bumps (pre-1.0)
+            // TODO: Remove this section after 1.0 stable release
+            if (`${{ steps.validate.outputs.major_bumps }}` === 'true') {
+              const files = `${{ steps.validate.outputs.files_major_bumps }}`.trim().split(/\s+/);
+              const fileList = files.map(f => `- \`${f}\``).join('\n');
+              sections.push([
+                '### Major Version Bump Not Allowed',
+                '',
+                'The following changeset(s) contain a `major` version bump:',
+                '',
+                fileList,
+                '',
+                '**Why this matters:** All packages are in pre-1.0 phase. Use `minor` for breaking changes until the stable 1.0 release.',
+                '',
+                '**How to fix:** Change `major` to `minor` in the changeset frontmatter.',
+              ].join('\n'));
+            }
+            // End: Major version bumps (pre-1.0)
 
             const body = [
               '## ❌ Changeset Validation Failed',

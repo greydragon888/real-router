@@ -26,7 +26,7 @@ async function withDefault(
 describe("navigateToDefault", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -967,7 +967,7 @@ describe("navigateToDefault", () => {
 
       expect(router.isActive()).toBe(false);
 
-      await router.start();
+      await router.start("/home");
 
       expect(router.isActive()).toBe(true);
 

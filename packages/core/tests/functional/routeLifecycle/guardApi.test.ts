@@ -89,7 +89,7 @@ describe("core/route-lifecycle/guard-api", () => {
     it("skips validation when noValidate is true", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      await noValidateRouter.start();
+      await noValidateRouter.start("/home");
       noValidateRouter.addActivateGuard("admin", false);
 
       expect(() => {
@@ -112,7 +112,7 @@ describe("core/route-lifecycle/guard-api", () => {
     it("skips validation when noValidate is true", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      await noValidateRouter.start();
+      await noValidateRouter.start("/home");
       noValidateRouter.addDeactivateGuard("admin", false);
 
       expect(() => {

@@ -8,13 +8,13 @@ import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     do_not_optimize(router.getState());
     do_not_optimize(cloned.getState());
@@ -24,7 +24,7 @@ if (IS_ROUTER5) {
   bench("13.5.1 Clone state changes do not affect the original", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
 
     do_not_optimize(router.getState());
@@ -35,13 +35,13 @@ if (IS_ROUTER5) {
 } else {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     do_not_optimize(router.getState());
     do_not_optimize(cloned.getState());
@@ -51,7 +51,7 @@ if (IS_ROUTER5) {
   bench("13.5.1 Clone state changes do not affect the original", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
 
     do_not_optimize(router.getState());
@@ -66,7 +66,7 @@ if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let routeIndex = 0;
 
-  router.start();
+  router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
@@ -99,7 +99,7 @@ if (IS_ROUTER5) {
   let index = 0;
 
   router.addEventListener("$$success", () => {});
-  router.start();
+  router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
@@ -111,7 +111,7 @@ if (IS_ROUTER5) {
 
     cloned.addEventListener("$$success", listener);
     router.navigate(routes[i % 2]);
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("users");
     do_not_optimize(clonedCalled);
     cloned.removeEventListener("$$success", listener);
@@ -132,7 +132,7 @@ if (IS_ROUTER5) {
 
     router.navigate(routes[index++ % 2]);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("users");
 
     do_not_optimize(clonedCalled);
@@ -147,7 +147,7 @@ if (IS_ROUTER5) {
   let index = 0;
 
   router.addEventListener("$$success", () => {});
-  router.start();
+  router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
@@ -158,7 +158,7 @@ if (IS_ROUTER5) {
     });
 
     router.navigate(routes[i % 2]);
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("users");
     do_not_optimize(clonedCalled);
     unsub();
@@ -176,7 +176,7 @@ if (IS_ROUTER5) {
 
     router.navigate(routes[index++ % 2]);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("users");
 
     do_not_optimize(clonedCalled);

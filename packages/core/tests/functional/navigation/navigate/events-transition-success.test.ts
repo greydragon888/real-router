@@ -12,7 +12,7 @@ describe("router.navigate() - events transition success", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -285,7 +285,7 @@ describe("router.navigate() - events transition success", () => {
       unsubCancel();
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -335,7 +335,7 @@ describe("router.navigate() - events transition success", () => {
       expect(onSuccess).not.toHaveBeenCalled();
 
       unsubSuccess();
-      await router.start();
+      await router.start("/home");
     });
   });
 });

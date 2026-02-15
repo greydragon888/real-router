@@ -20,7 +20,7 @@ import type { Route } from "../helpers";
   const aliases = ["alias1", "alias2"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("9.3.1 Automatic forward from forwardTo", () => {
     router.navigate(aliases[index++ % 2]);
@@ -39,7 +39,7 @@ import type { Route } from "../helpers";
   const ids = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("9.3.2 Forward with parameters", () => {
     router.navigate("profile", { id: ids[index++ % 2] });
@@ -62,7 +62,7 @@ import type { Route } from "../helpers";
   const starts = ["start1", "start2"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("9.3.3 Chain of forward routes", () => {
     router.navigate(starts[index++ % 2]);

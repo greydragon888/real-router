@@ -7,9 +7,7 @@ import type {
   Options,
   Params,
   RouterError as RouterErrorType,
-  RouteTreeState,
   State,
-  StateMetaInput,
 } from "@real-router/types";
 
 /**
@@ -33,23 +31,6 @@ export interface RouterLifecycleDependencies {
     arg?: RouterErrorType | NavigationOptions,
   ) => void;
 
-  /** Build state from route name and params */
-  buildState: (
-    routeName: string,
-    routeParams: Params,
-  ) => RouteTreeState | undefined;
-
-  /** Make state object with path and meta */
-  makeState: <P extends Params = Params, MP extends Params = Params>(
-    name: string,
-    params?: P,
-    path?: string,
-    meta?: StateMetaInput<MP>,
-  ) => State<P, MP>;
-
-  /** Build path from route name and params */
-  buildPath: (route: string, params?: Params) => string;
-
   /** Make not found state */
   makeNotFoundState: (path: string, options: NavigationOptions) => State;
 
@@ -60,7 +41,4 @@ export interface RouterLifecycleDependencies {
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,
   ) => State<P, MP> | undefined;
-
-  /** Get a dependency by name (untyped — used only for resolveOption) */
-  getDependency: (name: string) => unknown;
 }

@@ -18,7 +18,7 @@ let router: Router;
 describe("core/routes/addRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -1055,7 +1055,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
 
       // Route should be registered
-      await router.start();
+      await router.start("/home");
 
       expect(router.matchPath("/after-stop")?.name).toBe("after-stop");
     });

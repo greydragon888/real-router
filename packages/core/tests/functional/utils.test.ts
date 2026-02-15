@@ -23,7 +23,7 @@ describe("core/utils", () => {
     });
 
     it("should tell if a route is active or not", async () => {
-      await router.start();
+      await router.start("/home");
 
       await router.navigate("users.view", { id: 1 });
 
@@ -107,7 +107,7 @@ describe("core/utils", () => {
       router = createTestRouter({
         queryParamsMode: "loose",
       });
-      await router.start();
+      await router.start("/home");
     });
 
     it("should build paths with extra parameters", () => {

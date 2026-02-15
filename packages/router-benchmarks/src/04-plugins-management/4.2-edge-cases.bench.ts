@@ -87,7 +87,7 @@ const BATCH = 50;
   const router = createSimpleRouter();
 
   router.addActivateGuard("about", true);
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -123,7 +123,7 @@ const BATCH = 50;
     // Cleanup to prevent accumulation
     unsubscribe();
   });
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -149,7 +149,7 @@ const BATCH = 50;
     }
   });
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 

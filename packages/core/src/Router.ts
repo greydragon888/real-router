@@ -631,14 +631,10 @@ export class Router<
     return this.#lifecycle.isActive();
   }
 
-  start(): Promise<State>;
-  start(startPath: string): Promise<State>;
-  start(startPath?: string): Promise<State> {
+  start(startPath: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
-      RouterLifecycleNamespace.validateStartArgs(
-        startPath === undefined ? [] : [startPath],
-      );
+      RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
     // Forward to lifecycle namespace
@@ -1189,11 +1185,6 @@ export class Router<
       invokeEventListeners: (eventName, toState, fromState, arg) => {
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
-      buildState: (routeName, routeParams) =>
-        this.buildState(routeName, routeParams),
-      makeState: (name, params, path, meta) =>
-        this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) => this.buildPath(route, params),
       makeNotFoundState: (path, options) =>
         this.#state.makeNotFoundState(path, options),
       setState: (state) => {
@@ -1202,8 +1193,6 @@ export class Router<
       // RouterLifecycleNamespace only uses matchPath without source parameter
       matchPath: (path, source?: string) =>
         this.#routes.matchPath(path, source, this.#options.get()),
-      getDependency: (name: string) =>
-        this.#dependencies.get(name as keyof Dependencies),
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);

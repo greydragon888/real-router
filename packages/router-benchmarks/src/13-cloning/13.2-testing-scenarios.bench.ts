@@ -84,7 +84,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.stop();
   }
@@ -92,7 +92,7 @@ if (IS_ROUTER5) {
   bench("13.2.3 Clone preserves middleware and plugins", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
 
     // Fallback: stop started clone
@@ -112,7 +112,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
     cloned.stop();
   }
@@ -120,7 +120,7 @@ if (IS_ROUTER5) {
   bench("13.2.3 Clone preserves middleware and plugins", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
     cloned.navigate("about");
 
     // Fallback: stop started clone

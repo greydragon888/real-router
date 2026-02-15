@@ -23,7 +23,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench(`14.1.1 state$ subscribe throughput (1000 navigations)`, async () => {
     const subscription = state$(router).subscribe(() => {
@@ -42,7 +42,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench(`14.1.2 pipe with 1 operator (map) (×${BATCH})`, async () => {
     for (let b = 0; b < BATCH; b++) {
@@ -64,7 +64,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench(
     `14.1.3 pipe with 3 operators (map + filter + distinctUntilChanged) (×${BATCH})`,
@@ -94,7 +94,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench(
     `14.1.4 pipe with 5 operators (map + filter + distinctUntilChanged + debounceTime + takeUntil) (×${BATCH})`,
@@ -133,7 +133,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   bench(
     `14.1.5 Multiple subscriptions (10 subscribers) (×${BATCH})`,

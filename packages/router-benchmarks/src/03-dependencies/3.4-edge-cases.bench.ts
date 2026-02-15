@@ -129,7 +129,7 @@ if (!IS_ROUTER5) {
     });
   }
 
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 

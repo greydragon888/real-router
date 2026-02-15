@@ -12,7 +12,7 @@ import { createSimpleRouter } from "../helpers";
 
   router.addEventListener("$$success", () => {});
   router.addEventListener("$$success", () => {});
-  router.start();
+  router.start("/");
 
   bench("11.3.1 Invoking $$success listeners", () => {
     router.navigate(routes[index++ % 2]);
@@ -25,7 +25,7 @@ import { createSimpleRouter } from "../helpers";
   const routes = ["about", "home"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("11.3.2 Invoking listeners when no subscribers", () => {
     router.navigate(routes[index++ % 2]);
@@ -41,7 +41,7 @@ import { createSimpleRouter } from "../helpers";
   router.addEventListener("$$success", () => {
     // States should be frozen
   });
-  router.start();
+  router.start("/");
 
   bench("11.3.3 Invoking listeners with state freezing", () => {
     router.navigate(routes[index++ % 2]);
@@ -58,7 +58,7 @@ import { createSimpleRouter } from "../helpers";
     router.addEventListener("$$success", () => {});
   }
 
-  router.start();
+  router.start("/");
 
   bench("11.3.4 Invoking multiple listeners for same event", () => {
     router.navigate(routes[index++ % 2]);

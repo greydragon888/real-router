@@ -11,16 +11,10 @@ import {
   handleMissingState,
   updateBrowserState,
   handleTransitionResult,
-  getStartRouterArguments,
   validateOptions,
 } from "./utils";
 
-import type {
-  BrowserPluginOptions,
-  Browser,
-  HistoryState,
-  StartRouterArguments,
-} from "./types";
+import type { BrowserPluginOptions, Browser, HistoryState } from "./types";
 import type {
   PluginFactory,
   Router,
@@ -199,14 +193,8 @@ export function browserPluginFactory(
      * Overrides router.start to integrate with browser location.
      * If no start path is provided, uses current browser URL.
      */
-    router.start = async (...args: StartRouterArguments) => {
-      const startPath = getStartRouterArguments(args, browser, options);
-
-      if (startPath !== undefined) {
-        return routerStart(startPath);
-      }
-
-      return routerStart();
+    router.start = async (path?: string) => {
+      return routerStart(path ?? browser.getLocation(options));
     };
 
     /**

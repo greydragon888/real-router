@@ -19,7 +19,7 @@ describe("stop", () => {
 
   describe("basic stop functionality", () => {
     it("should stop started router", async () => {
-      await router.start();
+      await router.start("/home");
 
       expect(router.isActive()).toBe(true);
 
@@ -41,7 +41,7 @@ describe("stop", () => {
     });
 
     it("should return router instance for method chaining", async () => {
-      await router.start();
+      await router.start("/home");
 
       const result = router.stop();
 
@@ -110,7 +110,7 @@ describe("stop", () => {
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      await router.start();
+      await router.start("/home");
       router.stop();
       router.stop();
       router.stop();
@@ -139,7 +139,7 @@ describe("stop", () => {
 
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
-      await router.start();
+      await router.start("/home");
       router.stop();
 
       expect(stopListener).toHaveBeenCalledTimes(1);
@@ -252,7 +252,7 @@ describe("stop", () => {
       router.addEventListener(events.ROUTER_STOP, stopListener);
 
       for (let i = 0; i < 5; i++) {
-        await router.start();
+        await router.start("/home");
         router.stop();
       }
 
@@ -268,7 +268,7 @@ describe("stop", () => {
         trailingSlash: "always",
       });
 
-      await router.start();
+      await router.start("/home");
       router.stop();
 
       const options = router.getOptions();
@@ -409,7 +409,7 @@ describe("stop", () => {
     });
 
     it("should stop router started with defaultRoute", async () => {
-      await router.start();
+      await router.start("/home");
 
       expect(router.getState()?.name).toBe("home");
 

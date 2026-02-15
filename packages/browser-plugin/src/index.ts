@@ -8,12 +8,7 @@ import type { Params, State } from "@real-router/core";
 export { browserPluginFactory } from "./plugin";
 
 // Types
-export type {
-  BrowserPluginOptions,
-  Browser,
-  HistoryState,
-  StartRouterArguments,
-} from "./types";
+export type { BrowserPluginOptions, Browser, HistoryState } from "./types";
 
 // Type guards (maybe useful for consumers)
 export { isStateStrict as isState, isHistoryState } from "type-guards";
@@ -51,5 +46,13 @@ declare module "@real-router/core" {
      * Added by browser plugin.
      */
     lastKnownState?: State;
+
+    // Method syntax is intentional: property syntax (`start: (path?) => ...`)
+    // causes TS2717 because property declarations must have identical types
+    // when merging. Method syntax creates an overload via declaration merging,
+    // allowing browser-plugin to make `path` optional (core requires it).
+
+    // eslint-disable-next-line @typescript-eslint/method-signature-style -- method syntax required for declaration merging overload (property syntax causes TS2717)
+    start(path?: string): Promise<State>;
   }
 }
