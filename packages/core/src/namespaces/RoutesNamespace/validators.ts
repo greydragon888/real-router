@@ -64,6 +64,21 @@ export function validateAddRouteArgs(routes: readonly Route<any>[]): void {
 }
 
 /**
+ * Validates parent option for addRoute.
+ */
+export function validateParentOption(
+  parent: unknown,
+): asserts parent is string {
+  if (typeof parent !== "string" || parent === "") {
+    throw new TypeError(
+      `[router.addRoute] parent option must be a non-empty string, got ${getTypeDescription(parent)}`,
+    );
+  }
+  // Validate parent is a valid route name format (can contain dots — it's a fullName reference)
+  validateRouteName(parent, "addRoute");
+}
+
+/**
  * Validates isActiveRoute arguments.
  */
 export function validateIsActiveRouteArgs(
@@ -276,20 +291,23 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
   routes: Route<Dependencies>[],
   tree?: RouteTree,
   forwardMap?: Record<string, string>,
+  parentName?: string,
 ): void {
   // Tracking sets for duplicate detection
   const seenNames = new Set<string>();
   const seenPathsByParent = new Map<string, Set<string>>();
 
   for (const route of routes) {
-    // Use route-tree's validateRoute for structural validation
-    // (type, name, path, duplicates, parent exists, children array)
-    // Note: validateRoute handles children recursively
-    // When tree is undefined, only batch validation is performed (initial routes)
-    validateRoute(route, "addRoute", tree, "", seenNames, seenPathsByParent);
+    validateRoute(
+      route,
+      "addRoute",
+      tree,
+      parentName ?? "",
+      seenNames,
+      seenPathsByParent,
+    );
   }
 
-  // Validate forwardTo targets and cycles (only when tree is available)
   if (tree && forwardMap) {
     validateForwardToTargets(routes, forwardMap, tree);
   }

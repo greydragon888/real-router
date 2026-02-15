@@ -24,6 +24,7 @@ import {
   validateRemoveRouteArgs,
   validateSetRootPathArgs,
   validateAddRouteArgs,
+  validateParentOption,
   validateIsActiveRouteArgs,
   validateStateBuilderArgs,
   validateUpdateRouteBasicArgs,
@@ -184,6 +185,10 @@ export class RoutesNamespace<
     validateAddRouteArgs(routes);
   }
 
+  static validateParentOption(parent: unknown): asserts parent is string {
+    validateParentOption(parent);
+  }
+
   static validateIsActiveRouteArgs(
     name: unknown,
     params: unknown,
@@ -240,8 +245,9 @@ export class RoutesNamespace<
     routes: Route<Deps>[],
     tree?: RouteTree,
     forwardMap?: Record<string, string>,
+    parentName?: string,
   ): void {
-    validateRoutes(routes, tree, forwardMap);
+    validateRoutes(routes, tree, forwardMap, parentName);
   }
 
   // =========================================================================
@@ -344,20 +350,30 @@ export class RoutesNamespace<
    * Input already validated by facade (properties and state-dependent checks).
    *
    * @param routes - Routes to add
+   * @param parentName - Optional parent route fullName for nesting
    */
-  addRoutes(routes: Route<Dependencies>[]): void {
-    // Add to definitions
-    for (const route of routes) {
-      this.#definitions.push(sanitizeRoute(route));
+  addRoutes(routes: Route<Dependencies>[], parentName?: string): void {
+    if (parentName) {
+      const parentDef = this.#findDefinition(this.#definitions, parentName);
+      if (parentDef) {
+        if (!parentDef.children) {
+          parentDef.children = [];
+        }
+        for (const route of routes) {
+          parentDef.children.push(sanitizeRoute(route));
+        }
+      }
+    } else {
+      for (const route of routes) {
+        this.#definitions.push(sanitizeRoute(route));
+      }
     }
 
-    // Register handlers
-    this.#registerAllRouteHandlers(routes);
+    const handlerParent = parentName ?? "";
+    this.#registerAllRouteHandlers(routes, handlerParent);
 
-    // Rebuild tree
     this.#rebuildTree();
 
-    // Validate and cache forwardTo chains
     this.#refreshForwardMap();
   }
 
@@ -1344,6 +1360,25 @@ export class RoutesNamespace<
     if (route.defaultParams) {
       this.#config.defaultParams[fullName] = route.defaultParams;
     }
+  }
+
+  #findDefinition(
+    definitions: RouteDefinition[],
+    fullName: string,
+    parentPrefix = "",
+  ): RouteDefinition | undefined {
+    for (const def of definitions) {
+      const currentFullName = parentPrefix
+        ? `${parentPrefix}.${def.name}`
+        : def.name;
+      if (currentFullName === fullName) {
+        return def;
+      }
+      if (def.children && fullName.startsWith(`${currentFullName}.`)) {
+        return this.#findDefinition(def.children, fullName, currentFullName);
+      }
+    }
+    return undefined;
   }
 
   #registerForwardTo(route: Route<Dependencies>, fullName: string): void {
