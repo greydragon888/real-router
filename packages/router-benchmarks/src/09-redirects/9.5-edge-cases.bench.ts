@@ -19,7 +19,7 @@ type RedirectResult = State | void;
       return _router.makeState("about", {}, "/about");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.1 Redirect to the same route", () => {
     router.navigate("about");
@@ -45,7 +45,7 @@ type RedirectResult = State | void;
       return _router.makeState("users", {}, "/users");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.2 Multiple middleware with redirects", () => {
     router.navigate("about");
@@ -79,7 +79,7 @@ type RedirectResult = State | void;
   const starts = ["stepA0", "stepB0"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("9.5.3 Redirect with maximum chain depth", () => {
     router.navigate(starts[index++ % 2]);
@@ -99,7 +99,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.5 Canceling navigation during redirect", () => {
     void router.navigate("about");
@@ -120,7 +120,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.6 Redirect with meta.options preservation", () => {
     router.navigate("about", {}, { reload: true });
@@ -149,7 +149,7 @@ type RedirectResult = State | void;
       return redirectState;
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.7 Redirect with meta.redirected setting", () => {
     router.navigate("about");
@@ -177,7 +177,7 @@ type RedirectResult = State | void;
       );
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.8 Redirect with very long parameter chain", () => {
     router.navigate("about");
@@ -204,7 +204,7 @@ type RedirectResult = State | void;
       );
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.5.9 Conditional redirect depending on parameters", () => {
     router.navigate("user", { id: "admin" });

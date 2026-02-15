@@ -21,7 +21,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.1 Simple redirect from middleware", () => {
     router.navigate("about");
@@ -40,7 +40,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.2 Redirect with parameters", () => {
     router.navigate("user", { id: "123" });
@@ -64,7 +64,7 @@ type RedirectResult = State | void;
       return redirectState;
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.3 Redirect by returning State object", () => {
     router.navigate("about");
@@ -94,7 +94,7 @@ type RedirectResult = State | void;
       );
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.4 Chain of redirects", () => {
     router.navigate("about");
@@ -113,7 +113,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.5 Conditional redirect", () => {
     router.navigate("user", { id: "admin" });
@@ -132,7 +132,7 @@ type RedirectResult = State | void;
       return _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
-  router.start();
+  router.start("/");
 
   bench("9.1.6 Redirect with replace flag", () => {
     router.navigate("about", {}, { replace: true });
@@ -159,7 +159,7 @@ type RedirectResult = State | void;
         }
       },
   );
-  router.start();
+  router.start("/");
 
   bench("9.1.7 Async redirect", async () => {
     await router.navigate("about");

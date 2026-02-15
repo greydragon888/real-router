@@ -22,7 +22,7 @@ describe("router.navigate() - concurrent navigation", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -71,7 +71,7 @@ describe("router.navigate() - concurrent navigation", () => {
       });
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -111,7 +111,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubCancel();
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -143,7 +143,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       expect(asyncGuard).toHaveBeenCalledTimes(1);
 
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -176,7 +176,7 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(middleware1).toHaveBeenCalledTimes(1);
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -206,7 +206,7 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.CANNOT_ACTIVATE,
       });
 
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -255,7 +255,7 @@ describe("router.navigate() - concurrent navigation", () => {
       });
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -297,7 +297,7 @@ describe("router.navigate() - concurrent navigation", () => {
       unsubSuccess();
       unsubCancel();
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -340,7 +340,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubCancel();
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -364,7 +364,7 @@ describe("router.navigate() - concurrent navigation", () => {
       });
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -398,7 +398,7 @@ describe("router.navigate() - concurrent navigation", () => {
       });
 
       router.clearMiddleware();
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -426,7 +426,7 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.CANNOT_ACTIVATE,
       });
 
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
 
@@ -443,7 +443,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      await router.start();
+      await router.start("/home");
 
       const promise = router.navigate("admin");
 
@@ -457,7 +457,7 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.CANNOT_ACTIVATE,
       });
 
-      await router.start();
+      await router.start("/home");
       vi.useRealTimers();
     });
   });

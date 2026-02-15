@@ -13,7 +13,7 @@ if (IS_ROUTER5) {
     const cloned2 = cloneRouter(cloned1);
     const cloned3 = cloneRouter(cloned2);
 
-    cloned3.start();
+    cloned3.start("/");
     cloned3.navigate("about");
 
     // Fallback: stop started clone
@@ -27,7 +27,7 @@ if (IS_ROUTER5) {
     const cloned2 = cloned1.clone();
     const cloned3 = cloned2.clone();
 
-    cloned3.start();
+    cloned3.start("/");
     cloned3.navigate("about");
 
     // Fallback: stop started clone
@@ -39,13 +39,13 @@ if (IS_ROUTER5) {
 if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
   router.navigate("about");
 
   bench("13.6.2 Cloning a running router", () => {
     const cloned = cloneRouter(router);
 
-    cloned.start();
+    cloned.start("/");
 
     // Fallback: stop started clone
     cloned.stop();
@@ -53,13 +53,13 @@ if (IS_ROUTER5) {
 } else {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
   router.navigate("about");
 
   bench("13.6.2 Cloning a running router", () => {
     const cloned = router.clone();
 
-    cloned.start();
+    cloned.start("/");
 
     // Fallback: stop started clone
     cloned.stop();
@@ -76,7 +76,7 @@ if (IS_ROUTER5) {
     // Clone during middleware execution
     do_not_optimize(cloneRouter(router));
   });
-  router.start();
+  router.start("/");
 
   bench("13.6.3 Cloning during original navigation", () => {
     router.navigate(routes[index++ % 2]);
@@ -90,7 +90,7 @@ if (IS_ROUTER5) {
     // Clone during middleware execution
     do_not_optimize(router.clone());
   });
-  router.start();
+  router.start("/");
 
   bench("13.6.3 Cloning during original navigation", () => {
     router.navigate(routes[index++ % 2]);

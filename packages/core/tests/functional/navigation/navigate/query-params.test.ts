@@ -10,7 +10,7 @@ describe("router.navigate() - query params", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

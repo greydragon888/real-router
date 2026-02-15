@@ -17,7 +17,7 @@ import type { Route } from "../helpers";
   const routes = ["home", "about"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.1 Simple navigation between routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -31,7 +31,7 @@ import type { Route } from "../helpers";
   const ids = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.2 Navigation with route parameters", () => {
     router.navigate("user", { id: ids[index++ % 2] });
@@ -67,7 +67,7 @@ import type { Route } from "../helpers";
   const pages = ["1", "2"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.4 Navigation with query parameters", () => {
     router.navigate("search", {
@@ -91,7 +91,7 @@ import type { Route } from "../helpers";
   const ids = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.5 Navigation with multiple parameters", () => {
     router.navigate("complex", {
@@ -119,7 +119,7 @@ import type { Route } from "../helpers";
   // Alternate with home to avoid SAME_STATES short-circuit
   let useDefault = true;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.6 Navigation to default route", () => {
     if (useDefault) {
@@ -136,7 +136,7 @@ import type { Route } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.start();
+  router.start("/");
 
   // Chain starts from about (not home) to avoid SAME_STATES on first navigate
   bench("1.1.7 Sequential navigation chain", () => {
@@ -159,7 +159,7 @@ import type { Route } from "../helpers";
   const names = ["Hello World & Special/Chars", "Another & Item/Name"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.8 Navigation with parameter encoding (uriComponent)", () => {
     router.navigate("item", { name: names[index++ % 2] });
@@ -187,7 +187,7 @@ import type { Route } from "../helpers";
   const ids = [123, 456];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.9 Navigation with parameter decoding", () => {
     router.navigate("user", { id: ids[index++ % 2] });
@@ -216,7 +216,7 @@ import type { Route } from "../helpers";
   const userIds = ["123", "456"];
   let index = 0;
 
-  router.start();
+  router.start("/");
 
   bench("1.1.10 Navigation with parameter encoding", () => {
     router.navigate("profile", { userId: userIds[index++ % 2] });

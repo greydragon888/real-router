@@ -12,7 +12,7 @@ describe("router.navigate() - edge cases input validation", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

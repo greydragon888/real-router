@@ -24,7 +24,7 @@ describe("core/observable/addEventListener", () => {
       const cb = vi.fn();
 
       router.addEventListener(events.ROUTER_START, cb);
-      await router.start();
+      await router.start("/home");
 
       expect(cb).toHaveBeenCalledTimes(1);
       expect(cb).toHaveBeenCalledWith();
@@ -33,7 +33,7 @@ describe("core/observable/addEventListener", () => {
     it("should trigger ROUTER_STOP listener when router stops", async () => {
       const cb = vi.fn();
 
-      await router.start();
+      await router.start("/home");
       router.addEventListener(events.ROUTER_STOP, cb);
       router.stop();
 
@@ -162,7 +162,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, cb3);
       }).not.toThrowError();
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb1).toHaveBeenCalledTimes(1);
       expect(cb2).toHaveBeenCalledTimes(1);
@@ -206,7 +206,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, cb);
       }).not.toThrowError();
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb).toHaveBeenCalledTimes(1);
     });
@@ -226,7 +226,7 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, cb3);
 
       // Should not throw to caller
-      await router.start();
+      await router.start("/home");
 
       // All callbacks should be called
       expect(cb1).toHaveBeenCalledTimes(1);
@@ -242,7 +242,7 @@ describe("core/observable/addEventListener", () => {
       });
 
       router.addEventListener(events.ROUTER_START, cb);
-      await router.start();
+      await router.start("/home");
 
       // Logger format: logger.error(context, message, error)
       expect(errorSpy).toHaveBeenCalledWith(
@@ -267,7 +267,7 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, cb2);
       router.addEventListener(events.ROUTER_START, cb3);
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb1).toHaveBeenCalled();
       expect(cb2).toHaveBeenCalled();
@@ -327,7 +327,7 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, () => calls.push(3));
       router.addEventListener(events.ROUTER_START, () => calls.push(4));
 
-      await router.start();
+      await router.start("/home");
 
       expect(calls).toStrictEqual([1, 2, 3, 4]);
     });
@@ -341,7 +341,7 @@ describe("core/observable/addEventListener", () => {
       router.addEventListener(events.ROUTER_START, () => startCalls.push(2));
       router.addEventListener(events.ROUTER_STOP, () => stopCalls.push(2));
 
-      await router.start();
+      await router.start("/home");
       router.stop();
 
       expect(startCalls).toStrictEqual([1, 2]);
@@ -360,7 +360,7 @@ describe("core/observable/addEventListener", () => {
 
       unsub2(); // Remove middle listener
 
-      await router.start();
+      await router.start("/home");
 
       expect(calls).toStrictEqual([1, 3]); // 2 is skipped
     });
@@ -379,7 +379,7 @@ describe("core/observable/addEventListener", () => {
       const unsub = router.addEventListener(events.ROUTER_START, cb);
 
       unsub();
-      await router.start();
+      await router.start("/home");
 
       expect(cb).not.toHaveBeenCalled();
     });
@@ -407,7 +407,7 @@ describe("core/observable/addEventListener", () => {
 
       unsub2(); // Unsubscribe middle one
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb1).toHaveBeenCalled();
       expect(cb2).not.toHaveBeenCalled();
@@ -423,7 +423,7 @@ describe("core/observable/addEventListener", () => {
 
       router.addEventListener(events.ROUTER_START, cb);
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb).toHaveBeenCalledTimes(1); // Only second registration active
     });
@@ -442,9 +442,9 @@ describe("core/observable/addEventListener", () => {
 
       router.addEventListener(events.ROUTER_START, () => calls.push(2));
 
-      await router.start();
+      await router.start("/home");
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       // First start: both execute (1, 2)
       // Second start: only second executes (2)
@@ -462,13 +462,13 @@ describe("core/observable/addEventListener", () => {
 
       router.addEventListener(events.ROUTER_START, () => calls.push(2));
 
-      await router.start();
+      await router.start("/home");
 
       // First invocation: 1, 2 (new listener not called yet - snapshot)
       expect(calls).toStrictEqual([1, 2]);
 
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       // Second invocation: 1, 2, 3, 3 (new listener now called, and adds another)
       expect(calls.length).toBeGreaterThan(2);
@@ -481,7 +481,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, emptyFn);
       }).not.toThrowError();
 
-      router.start().catch(() => {});
+      router.start("/home").catch(() => {});
     });
 
     it("should work before router.start()", async () => {
@@ -491,7 +491,7 @@ describe("core/observable/addEventListener", () => {
         router.addEventListener(events.ROUTER_START, cb);
       }).not.toThrowError();
 
-      await router.start();
+      await router.start("/home");
 
       expect(cb).toHaveBeenCalled();
     });

@@ -22,7 +22,7 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.1 Navigation in router with 100 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -36,7 +36,7 @@ if (IS_ROUTER5) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.1 Navigation in router with 100 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -54,7 +54,7 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.2 Navigation in router with 500 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -68,7 +68,7 @@ if (IS_ROUTER5) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.2 Navigation in router with 500 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -86,7 +86,7 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.3 Navigation in router with 1000 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -100,7 +100,7 @@ if (IS_ROUTER5) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.3 Navigation in router with 1000 routes", () => {
     router.navigate(routes[index++ % 2]);
@@ -116,7 +116,7 @@ if (IS_ROUTER5) {
     router.add({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.4 Thousand navigations in router with 100 routes", () => {
     for (let i = 0; i < 1000; i++) {
@@ -130,7 +130,7 @@ if (IS_ROUTER5) {
     router.addRoute({ name: `route${i}`, path: `/route${i}` });
   }
 
-  router.start();
+  router.start("/");
 
   bench("12.2.4 Thousand navigations in router with 100 routes", () => {
     for (let i = 0; i < 1000; i++) {
@@ -202,7 +202,7 @@ if (IS_ROUTER5) {
 
   // @ts-expect-error - use method from router5
   router.add(deepRoute);
-  router.start();
+  router.start("/");
 
   // Alternate between two nested levels to avoid SAME_STATES
   const routes = [
@@ -275,7 +275,7 @@ if (IS_ROUTER5) {
   };
 
   router.addRoute(deepRoute);
-  router.start();
+  router.start("/");
 
   // Alternate between two nested levels to avoid SAME_STATES
   const routes = [

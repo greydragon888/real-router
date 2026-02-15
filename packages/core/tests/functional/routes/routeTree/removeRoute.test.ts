@@ -11,7 +11,7 @@ let router: Router;
 describe("core/routes/removeRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

@@ -83,7 +83,7 @@ if (!IS_ROUTER5) {
     // @ts-expect-error - test dependency
     do_not_optimize(getDependency("service"));
   });
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -104,7 +104,7 @@ if (!IS_ROUTER5) {
 
     return true;
   });
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 
@@ -125,7 +125,7 @@ if (!IS_ROUTER5) {
       do_not_optimize(getDependency("logger"));
     },
   }));
-  router.start();
+  router.start("/");
   const routes = ["about", "home"];
   let index = 0;
 

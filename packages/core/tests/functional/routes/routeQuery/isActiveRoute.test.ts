@@ -12,7 +12,7 @@ let router: Router;
 describe("core/routes/routeQuery/isActiveRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

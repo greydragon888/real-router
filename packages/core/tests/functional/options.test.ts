@@ -117,7 +117,7 @@ describe("core/options", () => {
 
     // 🟡 IMPORTANT: Works after start()
     it("should work after router.start()", async () => {
-      await router.start();
+      await router.start("/home");
 
       const opts = router.getOptions();
 
@@ -637,7 +637,7 @@ describe("core/options", () => {
     it("should apply trailingSlash option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "always" });
 
-      await r.start();
+      await r.start("/home");
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -649,7 +649,7 @@ describe("core/options", () => {
     it("should apply trailingSlash 'never' option to buildPath", async () => {
       const r = createTestRouter({ trailingSlash: "never" });
 
-      await r.start();
+      await r.start("/home");
 
       const path = r.buildPath("users.view", { id: "123" });
 
@@ -661,7 +661,7 @@ describe("core/options", () => {
     it("should apply urlParamsEncoding option to buildPath", async () => {
       const r = createTestRouter({ urlParamsEncoding: "uriComponent" });
 
-      await r.start();
+      await r.start("/home");
 
       const path = r.buildPath("users.view", { id: "hello world" });
 
@@ -676,7 +676,7 @@ describe("core/options", () => {
     it("should apply trailingSlash option to matchPath", async () => {
       const r = createTestRouter({ trailingSlash: "strict" });
 
-      await r.start();
+      await r.start("/home");
 
       // Route 'users.list' is defined as '/users/list' without trailing slash
       const withoutSlash = r.matchPath("/users/list");
@@ -807,7 +807,7 @@ describe("core/options", () => {
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
       customRouter.setDependency("routeName", "home");
 
-      const state = await customRouter.start();
+      const state = await customRouter.start("/home");
 
       expect(state).toStrictEqual(expect.objectContaining({ name: "home" }));
 

@@ -26,8 +26,8 @@ describe("SSR race conditions", () => {
       const routerA = baseRouter.clone();
       const routerB = baseRouter.clone();
 
-      await routerA.start();
-      await routerB.start();
+      await routerA.start("/home");
+      await routerB.start("/home");
 
       // Navigate on separate instances (synchronous navigation)
       await routerA.navigate("products", { id: "123" });
@@ -100,8 +100,8 @@ describe("SSR race conditions", () => {
         return true;
       });
 
-      await clone1.start();
-      await clone2.start();
+      await clone1.start("/home");
+      await clone2.start("/home");
 
       // Navigate both (synchronous)
       await clone1.navigate("admin");
@@ -133,7 +133,7 @@ describe("SSR race conditions", () => {
       });
 
       router = createRouter(routes, defaultOptions);
-      await router.start();
+      await router.start("/home");
     });
 
     afterEach(() => {
@@ -207,7 +207,7 @@ describe("SSR race conditions", () => {
     it("should handle navigation cancellation correctly", async () => {
       const router = createRouter(routes, defaultOptions);
 
-      await router.start();
+      await router.start("/home");
 
       let secondNavCompleted = false;
 
@@ -242,7 +242,7 @@ describe("SSR race conditions", () => {
       const baseRouter = createRouter(routes, defaultOptions);
       const clone = baseRouter.clone();
 
-      await clone.start();
+      await clone.start("/home");
       await clone.navigate("admin");
 
       expect(clone.getState()?.name).toBe("admin");

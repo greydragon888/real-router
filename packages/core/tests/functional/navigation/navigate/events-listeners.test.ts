@@ -12,7 +12,7 @@ describe("router.navigate() - events listeners", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -27,7 +27,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const analyticsLog: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         // Side-effect listener (analytics) - should ideally fire once
         freshRouter.addEventListener(
@@ -65,7 +65,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const callLog: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         // Side-effect listener
         freshRouter.addEventListener(
@@ -106,7 +106,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const successLog: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         // Side-effect listener on success
         freshRouter.addEventListener(
@@ -134,7 +134,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const errorLog: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         // Error listener
         freshRouter.addEventListener(
@@ -172,7 +172,7 @@ describe("router.navigate() - events listeners", () => {
         const listener2Calls: string[] = [];
         const listener3Calls: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         // Listener 1: analytics
         freshRouter.addEventListener(
@@ -218,7 +218,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const executionOrder: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         freshRouter.addEventListener(
           events.TRANSITION_START,
@@ -268,7 +268,7 @@ describe("router.navigate() - events listeners", () => {
         const freshRouter = createTestRouter();
         const redirects: string[] = [];
 
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         freshRouter.addEventListener(
           events.TRANSITION_START,

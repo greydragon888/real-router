@@ -79,7 +79,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should accept string values", async () => {
-      await router.start();
+      await router.start("/");
 
       await router.navigate("route1", { id: "1", mode: "dev" });
 
@@ -89,7 +89,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should accept number values", async () => {
-      await router.start();
+      await router.start("/");
 
       await router.navigate("route1", {
         id: "1",
@@ -102,7 +102,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should accept boolean values", async () => {
-      await router.start();
+      await router.start("/");
 
       await router.navigate("route1", {
         id: "1",
@@ -115,7 +115,7 @@ describe("Persistent params plugin", () => {
     });
 
     it("should accept undefined to remove parameter", async () => {
-      await router.start();
+      await router.start("/");
       await router.navigate("route1", { id: "1", mode: "dev" });
 
       await router.navigate("route2", { id: "2", mode: undefined });
@@ -129,7 +129,7 @@ describe("Persistent params plugin", () => {
   describe("Basic Functionality - Default Values", () => {
     it("should inject default param value from configuration", async () => {
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
-      await router.start();
+      await router.start("/");
       await router.navigate("route1", { id: "1" });
 
       const state = router.getState();
@@ -139,7 +139,7 @@ describe("Persistent params plugin", () => {
 
     it("should store and apply multiple default parameters", async () => {
       router.usePlugin(persistentParamsPlugin({ mode: "dev", lang: "en" }));
-      await router.start();
+      await router.start("/");
 
       expect(router.buildPath("route2", { id: "2" })).toBe(
         "/route2/2?mode=dev&lang=en",
@@ -156,7 +156,7 @@ describe("Persistent params plugin", () => {
   describe("Basic Functionality - Multiple Persistent Params", () => {
     beforeEach(async () => {
       router.usePlugin(persistentParamsPlugin(["mode", "lang", "theme"]));
-      await router.start();
+      await router.start("/");
     });
 
     it("should persist multiple parameters independently", async () => {
@@ -199,7 +199,7 @@ describe("Persistent params plugin", () => {
   describe("Basic Functionality - Integration with Router API", () => {
     beforeEach(async () => {
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
-      await router.start();
+      await router.start("/");
     });
 
     it("should use persistent params in buildPath", async () => {
@@ -242,7 +242,7 @@ describe("Persistent params plugin", () => {
   describe("Basic Functionality - Navigate Method Overloads", () => {
     beforeEach(async () => {
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
-      await router.start();
+      await router.start("/");
     });
 
     it("should handle navigate(routeName) without params (line 237)", async () => {
@@ -337,7 +337,7 @@ describe("Persistent params plugin", () => {
         // Root path should remain empty (no "?" added) - covers line 150 falsy branch
         expect(router.getRootPath()).toBe("");
 
-        await router.start();
+        await router.start("/");
         await router.navigate("route1", { id: "1" });
 
         const state = router.getState();
@@ -347,7 +347,7 @@ describe("Persistent params plugin", () => {
 
       it("should do nothing when passed an empty object", async () => {
         router.usePlugin(persistentParamsPlugin({}));
-        await router.start();
+        await router.start("/");
         await router.navigate("route1", { id: "1" });
 
         const state = router.getState();
@@ -359,7 +359,7 @@ describe("Persistent params plugin", () => {
     describe("Parameter Updates and Removal", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should update persistent param value on subsequent transitions", async () => {
@@ -395,7 +395,7 @@ describe("Persistent params plugin", () => {
     describe("Parameter Synchronization", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode", "lang"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should remove param from tracking when set to undefined", async () => {
@@ -435,7 +435,7 @@ describe("Persistent params plugin", () => {
     describe("Same Route Navigation", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should preserve persistent param when navigating to same route", async () => {
@@ -456,7 +456,7 @@ describe("Persistent params plugin", () => {
     describe("Priority of Values", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should prioritize explicit param value over persisted value", async () => {
@@ -482,7 +482,7 @@ describe("Persistent params plugin", () => {
     describe("Special Characters", () => {
       it("should persist value containing special characters", async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
 
         const specialValue = "a&b=c d/☃";
 
@@ -505,7 +505,7 @@ describe("Persistent params plugin", () => {
           // Expected: router not started
         }
 
-        await router.start();
+        await router.start("/");
         await router.navigate("route2", { id: "2" });
 
         const state = router.getState();
@@ -527,7 +527,7 @@ describe("Persistent params plugin", () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
         router.setRootPath("/base?mode");
 
-        await router.start();
+        await router.start("/");
         await router.navigate("route1", { id: "1", mode: "dev" });
 
         const state = router.getState();
@@ -543,7 +543,7 @@ describe("Persistent params plugin", () => {
 
       it("should work correctly after updating root path", async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
         await router.navigate("route1", { id: "1", mode: "dev" });
 
         const state = router.getState();
@@ -716,7 +716,7 @@ describe("Persistent params plugin", () => {
     describe("Invalid Parameter Values", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should reject objects as parameter values", async () => {
@@ -763,7 +763,7 @@ describe("Persistent params plugin", () => {
     describe("Prototype Pollution Protection", () => {
       beforeEach(async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
       });
 
       it("should prevent __proto__ pollution", async () => {
@@ -896,7 +896,7 @@ describe("Persistent params plugin", () => {
           persistentParamsPlugin({ mode: "dev" }),
         );
 
-        await router.start();
+        await router.start("/");
 
         await router.navigate("route1", { id: "1" });
 
@@ -938,7 +938,7 @@ describe("Persistent params plugin", () => {
     describe("Immutability", () => {
       it("should create new params object on merge", async () => {
         router.usePlugin(persistentParamsPlugin(["mode"]));
-        await router.start();
+        await router.start("/");
 
         await router.navigate("route1", { id: "1", mode: "dev" });
         const state1 = router.getState();
@@ -955,7 +955,7 @@ describe("Persistent params plugin", () => {
 
       it("should not mutate persistent params directly", async () => {
         router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
-        await router.start();
+        await router.start("/");
 
         const path1 = router.buildPath("route1", { id: "1" });
 
@@ -996,7 +996,7 @@ describe("Persistent params plugin", () => {
 
     it("should not break navigation on onTransitionSuccess error", async () => {
       router.usePlugin(persistentParamsPlugin(["mode"]));
-      await router.start();
+      await router.start("/");
 
       await router.navigate("route1", { id: "1", mode: "dev" });
 
@@ -1030,7 +1030,7 @@ describe("Persistent params plugin", () => {
       // If a getter throws, the error propagates directly without wrapping.
       // This test verifies error propagation behavior.
       router.usePlugin(persistentParamsPlugin(["mode"]));
-      await router.start();
+      await router.start("/");
 
       // Create params object that throws a generic Error when iterated
       const maliciousParams = {
@@ -1049,7 +1049,7 @@ describe("Persistent params plugin", () => {
       // Note: real-router core validates params in isParams() which reads all values.
       // If a getter throws a non-Error value, it propagates directly.
       router.usePlugin(persistentParamsPlugin(["mode"]));
-      await router.start();
+      await router.start("/");
 
       // Create params object that throws a non-Error value (string)
       const maliciousParams = {
@@ -1075,7 +1075,7 @@ describe("Persistent params plugin", () => {
       router.usePlugin(mockPlugin());
       router.usePlugin(persistentParamsPlugin(["mode"]));
 
-      await router.start();
+      await router.start("/");
       await router.navigate("route1", { id: "1", mode: "dev" });
 
       expect(router.getState()?.path).toBe("/route1/1?mode=dev");
@@ -1089,7 +1089,7 @@ describe("Persistent params plugin", () => {
 
       unsubscribe2();
 
-      await router.start();
+      await router.start("/");
 
       unsubscribe1();
 
@@ -1138,7 +1138,7 @@ describe("Persistent params plugin", () => {
   });
 
   describe("onTransitionSuccess Removal", () => {
-    it("should remove default param in onTransitionSuccess when URL doesn't contain it", async () => {
+    it("should inject persistent param during start() even when URL doesn't contain it", async () => {
       const routes = [{ name: "route", path: "/route/:id" }];
 
       const router = createRouter(routes, {
@@ -1148,15 +1148,60 @@ describe("Persistent params plugin", () => {
       // Configure with default value
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
 
-      // Start with path that doesn't include mode - this triggers removal in onTransitionSuccess
+      // Start with path that doesn't include mode
+      // forwardState is called during matchPath, so the plugin injects mode=dev
       await router.start("/route/1");
 
-      // The start path doesn't go through forwardState, so mode is not in the state
-      // onTransitionSuccess sees mode is missing and removes it from persistentParams
       const state = router.getState();
 
-      expect(state?.path).toBe("/route/1");
-      expect(state?.params).toStrictEqual({ id: "1" });
+      expect(state?.path).toBe("/route/1?mode=dev");
+      expect(state?.params).toStrictEqual({ id: "1", mode: "dev" });
+
+      // Persistent param carries over to subsequent navigations
+      await router.navigate("route", { id: "2" });
+      const state2 = router.getState();
+
+      expect(state2?.path).toBe("/route/2?mode=dev");
+    });
+
+    it("should remove persistent param in onTransitionSuccess when middleware redirects without it", async () => {
+      const routes = [
+        { name: "route", path: "/route/:id" },
+        { name: "other", path: "/other/:id" },
+      ];
+
+      const router = createRouter(routes, {
+        queryParamsMode: "default",
+      });
+
+      router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
+
+      // Middleware redirects to a state created via makeState (bypasses forwardState)
+      router.useMiddleware(() => (toState) => {
+        if (toState.name === "other") {
+          return router.makeState("route", { id: "99" });
+        }
+
+        return true;
+      });
+
+      await router.start("/route/1");
+
+      // Verify mode is injected during start
+      expect(router.getState()?.params).toStrictEqual({
+        id: "1",
+        mode: "dev",
+      });
+
+      // Navigate to "other" — middleware redirects to makeState("route", { id: "99" })
+      // The redirected state has no persistent params (makeState bypasses forwardState)
+      // onTransitionSuccess sees mode is missing and removes it from persistentParams
+      await router.navigate("other", { id: "1" });
+
+      const state = router.getState();
+
+      expect(state?.path).toBe("/route/99");
+      expect(state?.params).toStrictEqual({ id: "99" });
 
       // After removal, subsequent navigations won't include mode
       await router.navigate("route", { id: "2" });

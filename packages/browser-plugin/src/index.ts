@@ -1,5 +1,5 @@
 // packages/browser-plugin/modules/index.ts
-
+/* eslint-disable @typescript-eslint/method-signature-style -- method syntax required for declaration merging overload (property syntax causes TS2717) */
 // Public API exports for browser-plugin
 
 import type { Params, State } from "@real-router/core";
@@ -8,12 +8,7 @@ import type { Params, State } from "@real-router/core";
 export { browserPluginFactory } from "./plugin";
 
 // Types
-export type {
-  BrowserPluginOptions,
-  Browser,
-  HistoryState,
-  StartRouterArguments,
-} from "./types";
+export type { BrowserPluginOptions, Browser, HistoryState } from "./types";
 
 // Type guards (maybe useful for consumers)
 export { isStateStrict as isState, isHistoryState } from "type-guards";
@@ -51,5 +46,7 @@ declare module "@real-router/core" {
      * Added by browser plugin.
      */
     lastKnownState?: State;
+
+    start(path?: string): Promise<State>;
   }
 }

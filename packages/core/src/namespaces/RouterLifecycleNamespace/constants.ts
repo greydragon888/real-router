@@ -18,13 +18,6 @@ import { RouterError } from "../../RouterError";
 // =============================================================================
 
 /**
- * Cached error for start() called without path/state and no defaultRoute.
- */
-export const CACHED_NO_START_PATH_ERROR = new RouterError(
-  errorCodes.NO_START_PATH_OR_STATE,
-);
-
-/**
  * Cached error for start() called when router is already started/starting.
  */
 export const CACHED_ALREADY_STARTED_ERROR = new RouterError(

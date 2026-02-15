@@ -10,7 +10,7 @@ describe("router.navigate() - base cases", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

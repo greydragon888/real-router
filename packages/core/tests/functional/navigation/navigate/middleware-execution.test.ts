@@ -12,7 +12,7 @@ describe("router.navigate() - middleware execution", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {

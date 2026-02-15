@@ -28,7 +28,7 @@ export const TEST_ERROR = new RouterError("ERROR_CODE", {
 export async function createObservableTestRouter(): Promise<Router> {
   const router = createTestRouter();
 
-  await router.start();
+  await router.start("/home");
 
   return router;
 }

@@ -11,7 +11,7 @@ let router: Router;
 describe("router.buildNavigationState()", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -228,7 +228,7 @@ describe("router.buildNavigationState()", () => {
     it("should skip validation and return undefined for invalid input", async () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
-      await noValidateRouter.start();
+      await noValidateRouter.start("/home");
 
       const result = noValidateRouter.buildNavigationState(
         123 as unknown as string,

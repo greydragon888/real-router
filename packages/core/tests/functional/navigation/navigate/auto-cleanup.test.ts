@@ -33,7 +33,7 @@ describe("router.navigate() - auto cleanup", () => {
         },
       );
 
-      await router.start();
+      await router.start("/home");
     });
 
     afterEach(() => {

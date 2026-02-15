@@ -86,7 +86,7 @@ function createOrderedPlugin(id: string, orderTracker: string[]) {
 describe("core/plugins", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
 
     myPluginMethods = {
       onTransitionStart: vi.fn(),
@@ -111,7 +111,7 @@ describe("core/plugins", () => {
 
       router.usePlugin(myPlugin);
 
-      await router.start();
+      await router.start("/home");
 
       // custom method added by plugin
       expect(
@@ -134,7 +134,7 @@ describe("core/plugins", () => {
       const unsubscribe = testRouter.usePlugin(plugin);
 
       // Start and stop to verify plugin is active
-      await testRouter.start();
+      await testRouter.start("/home");
       testRouter.stop();
 
       expect(onStop).toHaveBeenCalledTimes(1);
@@ -145,7 +145,7 @@ describe("core/plugins", () => {
       expect(teardown).toHaveBeenCalled();
 
       // Verify plugin is removed - onStop should not be called again on restart
-      await testRouter.start();
+      await testRouter.start("/home");
       testRouter.stop();
 
       // onStop should still be 1 (not called after unsubscribe)
@@ -161,7 +161,7 @@ describe("core/plugins", () => {
       unsubscribe();
 
       router.stop();
-      await router.start();
+      await router.start("/home");
 
       expect(onStart).not.toHaveBeenCalled();
     });
@@ -183,7 +183,7 @@ describe("core/plugins", () => {
         }).toThrowError("Factory initialization failed");
 
         // No plugins should be registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         // tracker's onStart should not have been called (plugin was rolled back)
         expect(tracker.getCalls().onStart).toBe(0);
@@ -204,7 +204,7 @@ describe("core/plugins", () => {
         }).toThrowError("Unknown property");
 
         // Rollback should leave state unchanged - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         expect(tracker.getCalls().onStart).toBe(0);
       });
@@ -226,7 +226,7 @@ describe("core/plugins", () => {
         }).toThrowError("Error in plugin3");
 
         // All-or-nothing: no plugins registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         expect(tracker1.getCalls().onStart).toBe(0);
         expect(tracker2.getCalls().onStart).toBe(0);
@@ -300,7 +300,7 @@ describe("core/plugins", () => {
         }).toThrowError("Plugin factory already registered");
 
         // Original plugin should remain registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         expect(tracker.getCalls().onStart).toBe(1);
       });
@@ -317,7 +317,7 @@ describe("core/plugins", () => {
         }).not.toThrowError();
 
         // Both plugins should be registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         expect(tracker1.getCalls().onStart).toBe(1);
         expect(tracker2.getCalls().onStart).toBe(1);
@@ -342,7 +342,7 @@ describe("core/plugins", () => {
         );
 
         // Only one factory registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         // onStart should be called exactly once (not twice)
         expect(tracker.getCalls().onStart).toBe(1);
@@ -378,7 +378,7 @@ describe("core/plugins", () => {
         const unsub2 = router.usePlugin(tracker2.factory, tracker3.factory);
 
         // All three should be registered - verify by starting router
-        await router.start();
+        await router.start("/home");
 
         expect(tracker1.getCalls().onStart).toBe(1);
         expect(tracker2.getCalls().onStart).toBe(1);
@@ -391,7 +391,7 @@ describe("core/plugins", () => {
         unsub1();
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // tracker1 should not respond (unsubscribed)
         expect(tracker1.getCalls().onStart).toBe(0);
@@ -405,7 +405,7 @@ describe("core/plugins", () => {
         unsub2();
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // None should respond
         expect(tracker1.getCalls().onStart).toBe(0);
@@ -426,7 +426,7 @@ describe("core/plugins", () => {
         // Unsubscribe in reverse order
         unsub2();
 
-        await router.start();
+        await router.start("/home");
 
         // Only p1 should have onStart called
         expect(orderTracker).toContain("p1");
@@ -436,7 +436,7 @@ describe("core/plugins", () => {
         unsub1();
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // Neither should respond
         expect(orderTracker).not.toContain("p1");
@@ -458,7 +458,7 @@ describe("core/plugins", () => {
         // Unsubscribe middle one
         u2();
 
-        await router.start();
+        await router.start("/home");
 
         // p1 and p3 should respond, p2 should not
         expect(orderTracker).toContain("p1");
@@ -472,7 +472,7 @@ describe("core/plugins", () => {
         orderTracker.length = 0;
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // None should respond (only onStart events, no teardowns)
         expect(
@@ -600,7 +600,7 @@ describe("core/plugins", () => {
 
         // Verify plugin is registered by checking it responds to events
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         expect(tracker.getCalls().onStart).toBe(1);
       });
@@ -637,7 +637,7 @@ describe("core/plugins", () => {
         router.usePlugin(tracker.factory);
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // Only the new tracker should respond
         expect(tracker.getCalls().onStart).toBe(1);
@@ -708,7 +708,7 @@ describe("core/plugins", () => {
         // We test the behavior by ensuring the original function reference is used
 
         router.stop();
-        await router.start();
+        await router.start("/home");
 
         // onStart should have been called with original reference
         expect(onStart).toHaveBeenCalled();
@@ -778,7 +778,7 @@ describe("core/plugins", () => {
         );
 
         // Should not throw when events are emitted
-        router.start().catch(() => {});
+        router.start("/home").catch(() => {});
         router.stop();
 
         warnSpy.mockRestore();
@@ -797,7 +797,7 @@ describe("core/plugins", () => {
           }) as any;
 
         router.usePlugin(factory);
-        await router.start();
+        await router.start("/home");
 
         // onStart function should be called
         expect(onStartFn).toHaveBeenCalled();
@@ -959,7 +959,7 @@ describe("core/plugins", () => {
 
         // Verify plugin was registered - should not throw on restart
         router.stop();
-        await router.start();
+        await router.start("/home");
       });
 
       it("should provide getDependency function to plugin factory", () => {

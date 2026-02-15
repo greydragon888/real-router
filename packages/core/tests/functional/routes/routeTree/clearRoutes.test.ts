@@ -12,7 +12,7 @@ let router: Router;
 describe("core/routes/clearRoutes", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -573,7 +573,7 @@ describe("core/routes/clearRoutes", () => {
     it("should not affect other router instances", async () => {
       const router2 = createTestRouter();
 
-      await router2.start();
+      await router2.start("/home");
 
       let resolveCanActivate: () => void;
 
@@ -679,7 +679,7 @@ describe("core/routes/clearRoutes", () => {
       // since the old defaultRoute ("home") no longer exists and setOption is removed
       router = createTestRouter({ defaultRoute: "dashboard" });
       router.addRoute({ name: "dashboard", path: "/dashboard" });
-      await router.start();
+      await router.start("/dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
 

@@ -12,7 +12,7 @@ describe("router.navigate() - unknown route", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -34,7 +34,7 @@ describe("router.navigate() - unknown route", () => {
         allowNotFound: true, // Enable UNKNOWN_ROUTE behavior
       });
 
-      router.start().catch(() => {});
+      router.start("/home").catch(() => {});
     });
 
     it("should call canDeactivate when transitioning FROM UNKNOWN_ROUTE", async () => {

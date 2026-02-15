@@ -12,7 +12,7 @@ describe("router.navigate() - events transition start", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -77,7 +77,7 @@ describe("router.navigate() - events transition start", () => {
         expect.objectContaining({
           name: "home", // router starts at home by default
           path: "/home",
-        }), // fromState (initial state from router.start())
+        }), // fromState (initial state from router.start("/home"))
       );
 
       unsubStart();
@@ -353,7 +353,7 @@ describe("router.navigate() - events transition start", () => {
       }
 
       unsubStart();
-      await router.start();
+      await router.start("/home");
     });
   });
 });

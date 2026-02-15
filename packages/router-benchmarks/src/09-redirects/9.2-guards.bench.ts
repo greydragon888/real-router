@@ -15,7 +15,7 @@ import { createSimpleRouter } from "../helpers";
 
     return _router.makeState(target, {}, target === "home" ? "/" : "/users");
   });
-  router.start();
+  router.start("/");
 
   bench("9.2.1 Redirect from canActivate guard", () => {
     router.navigate("about");
@@ -42,7 +42,7 @@ import { createSimpleRouter } from "../helpers";
     "users",
     (_router) => () => _router.makeState("about", {}, "/about"),
   );
-  router.start();
+  router.start("/");
   router.navigate("about");
 
   // Navigate away from current route to trigger canDeactivate
@@ -77,7 +77,7 @@ import { createSimpleRouter } from "../helpers";
       return true;
     },
   );
-  router.start();
+  router.start("/");
 
   bench("9.2.3 Redirect with context preservation", () => {
     router.navigate("user", { id: "protected" });

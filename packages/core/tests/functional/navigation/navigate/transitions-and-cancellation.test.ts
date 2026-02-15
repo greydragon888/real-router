@@ -14,7 +14,7 @@ describe("router.navigate() - transitions and cancellation", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
-    await router.start();
+    await router.start("/home");
   });
 
   afterEach(() => {
@@ -57,7 +57,7 @@ describe("router.navigate() - transitions and cancellation", () => {
     }).not.toThrowError();
 
     // Restart for afterEach cleanup
-    await router.start();
+    await router.start("/home");
   });
 
   it("should call middleware, activate, and deactivate hooks during navigation", async () => {
@@ -123,7 +123,7 @@ describe("router.navigate() - transitions and cancellation", () => {
         };
 
         freshRouter.useMiddleware(() => middleware2);
-        await freshRouter.start();
+        await freshRouter.start("/home");
 
         const promise = freshRouter.navigate("users");
 
