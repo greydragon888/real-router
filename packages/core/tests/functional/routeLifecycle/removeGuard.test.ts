@@ -116,7 +116,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing nested route guards independently", async () => {
-    router.addRoute({ name: "admin.settings", path: "/settings" });
+    router.addRoute(
+      { name: "settings", path: "/settings" },
+      { parent: "admin" },
+    );
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.settings", () => () => false);
@@ -130,7 +133,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing parent guard but keeping child guard", async () => {
-    router.addRoute({ name: "admin.settings", path: "/settings" });
+    router.addRoute(
+      { name: "settings", path: "/settings" },
+      { parent: "admin" },
+    );
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.settings", () => () => false);

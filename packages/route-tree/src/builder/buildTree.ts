@@ -80,60 +80,12 @@ function createNode(
 }
 
 /**
- * Resolves parent node for dot-notation names.
- *
- * For example, "users.profile" needs to find the "users" node first.
- *
- * @param root - Root node
- * @param name - Route name (possibly with dots)
- * @returns Parent node and final name segment
- */
-function resolveParent(
-  root: MutableRouteNode,
-  name: string,
-): { parent: MutableRouteNode; finalName: string } {
-  const parts = name.split(".");
-
-  if (parts.length === 1) {
-    return { parent: root, finalName: name };
-  }
-
-  // Navigate to parent
-  let current = root;
-
-  for (let i = 0; i < parts.length - 1; i++) {
-    const partName = parts[i];
-    const found = current.children.find((c) => c.name === partName);
-
-    /* v8 ignore start -- defensive: validateRoutes ensures parent exists before buildTree */
-    if (!found) {
-      throw new Error(
-        `[buildTree] Parent segment "${partName}" not found in "${name}"`,
-      );
-    }
-    /* v8 ignore stop */
-
-    current = found;
-  }
-
-  const finalName = parts.at(-1);
-
-  /* v8 ignore start -- defensive: split always produces non-empty last element for valid names */
-  if (!finalName) {
-    throw new Error(`[buildTree] Empty route name segments in "${name}"`);
-  }
-  /* v8 ignore stop */
-
-  return { parent: current, finalName };
-}
-
-/**
  * Builds the mutable tree structure from route definitions.
  *
- * Handles:
- * - Creating root node
- * - Processing flat and nested routes
- * - Dot-notation names (e.g., "users.profile")
+ * Simplified single-pass algorithm:
+ * - Creates root node
+ * - Adds each route as direct child of root
+ * - createNode() handles nested children recursively
  *
  * @param rootName - Root node name (typically "")
  * @param rootPath - Root node path (typically "")
@@ -145,37 +97,12 @@ export function buildTree(
   rootPath: string,
   routes: readonly RouteDefinition[],
 ): MutableRouteNode {
-  // Create root node
   const root = createNode({ name: rootName, path: rootPath }, null);
 
-  // First pass: add routes with nested children
-  const flatRoutes: RouteDefinition[] = [];
-
   for (const route of routes) {
-    if (route.name.includes(".")) {
-      // Dot-notation name - process later
-      flatRoutes.push(route);
-    } else if (route.children && route.children.length > 0) {
-      // Has children - add directly
-      const node = createNode(route, root);
+    const node = createNode(route, root);
 
-      root.children.push(node);
-    } else {
-      // Simple route without children
-      flatRoutes.push(route);
-    }
-  }
-
-  // Second pass: add flat routes and dot-notation names
-  for (const route of flatRoutes) {
-    const { parent, finalName } = resolveParent(root, route.name);
-
-    const node = createNode(
-      { name: finalName, path: route.path, children: route.children },
-      parent,
-    );
-
-    parent.children.push(node);
+    root.children.push(node);
   }
 
   return root;

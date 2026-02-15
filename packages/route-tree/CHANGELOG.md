@@ -1,5 +1,16 @@
 # route-tree
 
+## 0.3.0
+
+### Minor Changes
+
+- Remove dot-notation support from route names (#93)
+  - Ban dots in route `name` field (throws TypeError)
+  - Remove `resolveParent()` from `buildTree.ts`
+  - Remove `resolveByDotNotation()` and `checkParentExists()` from `route-batch.ts`
+  - Simplify `buildTree()` from two-pass to single-pass algorithm
+  - Update `FULL_ROUTE_PATTERN` regex to reject dots
+
 ## 0.2.0
 
 ### Minor Changes

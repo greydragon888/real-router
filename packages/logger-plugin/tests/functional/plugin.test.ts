@@ -20,8 +20,11 @@ describe("@real-router/logger-plugin", () => {
     router = createRouter(
       [
         { name: "home", path: "/" },
-        { name: "users", path: "/users" },
-        { name: "users.view", path: "/:id" },
+        {
+          name: "users",
+          path: "/users",
+          children: [{ name: "view", path: "/:id" }],
+        },
         { name: "admin", path: "/admin" },
       ],
       { defaultRoute: "home" },

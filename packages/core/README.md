@@ -20,8 +20,11 @@ import { createRouter } from "@real-router/core";
 
 const routes = [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
 ];
 
 const router = createRouter(routes);
@@ -209,10 +212,39 @@ router.useMiddleware((router) => (toState, fromState, done) => {
 
 ### Routes
 
-#### `router.addRoute(route: Route): void`
+#### `router.addRoute(route, options?): void`
 
-Add a route definition at runtime.\
-`route: Route` — route configuration object\
+Add a route definition at runtime.
+
+**Parameters:**
+
+- `route: Route | Route[]` — route configuration object(s)
+- `options?: { parent?: string }` — optional parent route fullName
+
+**Examples:**
+
+```typescript
+// Add route with children syntax
+router.addRoute({
+  name: "users",
+  path: "/users",
+  children: [{ name: "profile", path: "/:id" }],
+});
+
+// Add route under existing parent using { parent } option
+router.addRoute({ name: "profile", path: "/:id" }, { parent: "users" });
+// Creates "users.profile" fullName
+
+// Batch add under same parent
+router.addRoute(
+  [
+    { name: "profile", path: "/:id" },
+    { name: "settings", path: "/settings" },
+  ],
+  { parent: "users" },
+);
+```
+
 Returns: `void`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/addRoute)
 

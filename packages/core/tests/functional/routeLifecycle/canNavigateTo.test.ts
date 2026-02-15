@@ -48,7 +48,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should check nested route guards in correct order", async () => {
-    router.addRoute({ name: "admin.users", path: "/users" });
+    router.addRoute({ name: "users", path: "/users" }, { parent: "admin" });
 
     const adminGuard = vi.fn(() => true);
     const usersGuard = vi.fn(() => true);
@@ -66,7 +66,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return false if any nested parent guard blocks", async () => {
-    router.addRoute({ name: "admin.users", path: "/users" });
+    router.addRoute({ name: "users", path: "/users" }, { parent: "admin" });
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.users", () => () => true);
@@ -139,7 +139,10 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should handle complex nested transitions with mixed guards", async () => {
-    router.addRoute({ name: "admin.settings", path: "/settings" });
+    router.addRoute(
+      { name: "settings", path: "/settings" },
+      { parent: "admin" },
+    );
 
     router.addDeactivateGuard("users.list", () => () => true);
     router.addActivateGuard("admin", () => () => true);
@@ -175,8 +178,14 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should handle transition from deeply nested route", async () => {
-    router.addRoute({ name: "admin.settings", path: "/settings" });
-    router.addRoute({ name: "admin.settings.profile", path: "/profile" });
+    router.addRoute(
+      { name: "settings", path: "/settings" },
+      { parent: "admin" },
+    );
+    router.addRoute(
+      { name: "profile", path: "/profile" },
+      { parent: "admin.settings" },
+    );
 
     router.addDeactivateGuard("admin.settings.profile", () => () => true);
     router.addDeactivateGuard("admin.settings", () => () => true);
@@ -189,8 +198,14 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return false if any guard in deeply nested path blocks", async () => {
-    router.addRoute({ name: "admin.settings", path: "/settings" });
-    router.addRoute({ name: "admin.settings.profile", path: "/profile" });
+    router.addRoute(
+      { name: "settings", path: "/settings" },
+      { parent: "admin" },
+    );
+    router.addRoute(
+      { name: "profile", path: "/profile" },
+      { parent: "admin.settings" },
+    );
 
     router.addDeactivateGuard("admin.settings.profile", () => () => true);
     router.addDeactivateGuard("admin.settings", () => () => false);

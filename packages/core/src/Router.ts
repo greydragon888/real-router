@@ -260,23 +260,33 @@ export class Router<
   // Route Management
   // ============================================================================
 
-  addRoute(routes: Route<Dependencies>[] | Route<Dependencies>): this {
+  addRoute(
+    routes: Route<Dependencies>[] | Route<Dependencies>,
+    options?: { parent?: string },
+  ): this {
     const routeArray = Array.isArray(routes) ? routes : [routes];
+    const parentName = options?.parent;
 
     if (!this.#noValidate) {
-      // 1. Static validation (route structure and properties)
+      // 1. Validate parent option format
+      if (parentName !== undefined) {
+        RoutesNamespace.validateParentOption(parentName);
+      }
+
+      // 2. Static validation (route structure and properties)
       RoutesNamespace.validateAddRouteArgs(routeArray);
 
-      // 2. State-dependent validation (duplicates, parent exists, forwardTo)
+      // 3. State-dependent validation (parent exists, duplicates, forwardTo)
       RoutesNamespace.validateRoutes(
         routeArray,
         this.#routes.getTree(),
         this.#routes.getForwardRecord(),
+        parentName,
       );
     }
 
-    // 3. Execute (add definitions, register handlers, rebuild tree)
-    this.#routes.addRoutes(routeArray);
+    // 4. Execute (add definitions, register handlers, rebuild tree)
+    this.#routes.addRoutes(routeArray, parentName);
 
     return this;
   }

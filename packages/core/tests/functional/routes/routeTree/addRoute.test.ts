@@ -289,7 +289,10 @@ describe("core/routes/addRoute", () => {
     });
 
     expect(() => {
-      router.addRoute({ name: "dup-parent.child", path: "/other" });
+      router.addRoute(
+        { name: "child", path: "/other" },
+        { parent: "dup-parent" },
+      );
     }).toThrowError(
       '[router.addRoute] Route "dup-parent.child" already exists',
     );
@@ -521,71 +524,124 @@ describe("core/routes/addRoute", () => {
     });
   });
 
-  describe("dot-notation parent validation", () => {
-    it("should throw when adding route with dot-notation but parent does not exist", async () => {
-      // Parent "nonexistent" does not exist in router
-      expect(() => {
-        router.addRoute({ name: "nonexistent.child", path: "/child" });
-      }).toThrowError(/parent route "nonexistent" does not exist/i);
+  describe("{ parent } option", () => {
+    it("should add route with { parent } option when parent exists", () => {
+      router.addRoute({ name: "products", path: "/products" });
+
+      router.addRoute({ name: "detail", path: "/:id" }, { parent: "products" });
+
+      expect(router.hasRoute("products.detail")).toBe(true);
+      expect(router.buildPath("products.detail", { id: "123" })).toBe(
+        "/products/123",
+      );
     });
 
-    it("should throw when adding deeply nested route with missing parent", async () => {
-      // "a" exists but "a.b" does not exist
-      router.addRoute({ name: "a", path: "/a" });
+    it("should throw when { parent } option references non-existent parent", () => {
+      expect(() => {
+        router.addRoute(
+          { name: "orphan", path: "/orphan" },
+          { parent: "nonexistent" },
+        );
+      }).toThrowError(
+        '[router.addRoute] Parent route "nonexistent" does not exist',
+      );
+    });
+
+    it("should add multiple routes with same { parent } in batch", () => {
+      router.addRoute({ name: "dashboard", path: "/dashboard" });
+
+      router.addRoute(
+        [
+          { name: "widgets", path: "/widgets" },
+          { name: "charts", path: "/charts" },
+        ],
+        { parent: "dashboard" },
+      );
+
+      expect(router.hasRoute("dashboard.widgets")).toBe(true);
+      expect(router.hasRoute("dashboard.charts")).toBe(true);
+    });
+
+    it("should support nested parent names (fullName) in { parent } option", () => {
+      router.addRoute({
+        name: "shop",
+        path: "/shop",
+        children: [{ name: "category", path: "/:category" }],
+      });
+
+      router.addRoute(
+        { name: "items", path: "/items" },
+        { parent: "shop.category" },
+      );
+
+      expect(router.hasRoute("shop.category.items")).toBe(true);
+      expect(
+        router.buildPath("shop.category.items", { category: "books" }),
+      ).toBe("/shop/books/items");
+    });
+
+    it("should correctly resolve navigation after adding route with { parent }", async () => {
+      router.addRoute({ name: "products", path: "/products" });
+
+      router.addRoute({ name: "detail", path: "/:id" }, { parent: "products" });
+
+      const state = await router.navigate("products.detail", { id: "42" });
+
+      expect(state.name).toBe("products.detail");
+      expect(state.params.id).toBe("42");
+      expect(state.path).toBe("/products/42");
+    });
+
+    it("should correctly build path after adding route with { parent }", () => {
+      router.addRoute({ name: "api", path: "/api" });
+
+      router.addRoute({ name: "v1", path: "/v1" }, { parent: "api" });
+
+      const path = router.buildPath("api.v1");
+
+      expect(path).toBe("/api/v1");
+    });
+
+    it("should validate { parent } option value", () => {
+      expect(() => {
+        router.addRoute(
+          { name: "child", path: "/child" },
+          { parent: "" as any },
+        );
+      }).toThrowError(TypeError);
+
+      expect(() => {
+        router.addRoute(
+          { name: "child", path: "/child" },
+          { parent: 123 as any },
+        );
+      }).toThrowError(TypeError);
+    });
+  });
+
+  describe("dot-notation rejection", () => {
+    it("should throw TypeError when route name contains dots", () => {
+      expect(() => {
+        router.addRoute({ name: "users.profile", path: "/:id" });
+      }).toThrowError(TypeError);
+    });
+
+    it("should include helpful error message for dot-notation", () => {
+      expect(() => {
+        router.addRoute({ name: "users.profile", path: "/:id" });
+      }).toThrowError(
+        '[router.addRoute] Route name "users.profile" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
+      );
+    });
+
+    it("should reject multi-level dot-notation", () => {
+      expect(() => {
+        router.addRoute({ name: "a.b.c", path: "/c" });
+      }).toThrowError(TypeError);
 
       expect(() => {
         router.addRoute({ name: "a.b.c", path: "/c" });
-      }).toThrowError(/parent route "a\.b" does not exist/i);
-    });
-
-    it("should throw when batch contains dot-notation route with missing parent", async () => {
-      expect(() => {
-        router.addRoute([
-          { name: "batch-parent", path: "/batch-parent" },
-          // "other" does not exist
-          { name: "other.nested", path: "/nested" },
-        ]);
-      }).toThrowError(/parent route "other" does not exist/i);
-    });
-
-    it("should allow dot-notation when parent exists", async () => {
-      router.addRoute({
-        name: "existing-parent",
-        path: "/existing-parent",
-      });
-
-      // Should not throw
-      expect(() => {
-        router.addRoute({ name: "existing-parent.child", path: "/child" });
-      }).not.toThrowError();
-
-      expect(router.matchPath("/existing-parent/child")?.name).toBe(
-        "existing-parent.child",
-      );
-    });
-
-    it("should allow dot-notation when parent added in same batch", async () => {
-      // Parent added before child in same batch - should work
-      expect(() => {
-        router.addRoute([
-          { name: "batch-new-parent", path: "/batch-new-parent" },
-          { name: "batch-new-parent.child", path: "/child" },
-        ]);
-      }).not.toThrowError();
-
-      expect(router.matchPath("/batch-new-parent/child")?.name).toBe(
-        "batch-new-parent.child",
-      );
-    });
-
-    it("should throw when parent added after child in same batch", async () => {
-      // Child added before parent in same batch - should fail
-      expect(() => {
-        router.addRoute([
-          { name: "late-parent.child", path: "/child" },
-          { name: "late-parent", path: "/late-parent" },
-        ]);
-      }).toThrowError(/parent route "late-parent" does not exist/i);
+      }).toThrowError(/cannot contain dots/);
     });
   });
 
@@ -1145,7 +1201,7 @@ describe("core/routes/addRoute", () => {
       expect(forwardedState.name).toBe("target");
     });
 
-    it("should handle adding route to deeply nested parent via dot-notation", async () => {
+    it("should handle adding route to deeply nested parent via { parent } option", async () => {
       router.addRoute({
         name: "level1",
         path: "/level1",
@@ -1163,11 +1219,14 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      // Add a child to level3 via dot-notation
-      router.addRoute({
-        name: "level1.level2.level3.level4",
-        path: "/level4",
-      });
+      // Add a child to level3 via { parent } option with nested fullName
+      router.addRoute(
+        {
+          name: "level4",
+          path: "/level4",
+        },
+        { parent: "level1.level2.level3" },
+      );
 
       expect(router.matchPath("/level1/level2/level3/level4")?.name).toBe(
         "level1.level2.level3.level4",
