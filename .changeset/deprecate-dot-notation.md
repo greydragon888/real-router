@@ -1,9 +1,8 @@
 ---
 "@real-router/core": minor
-"route-tree": minor
 ---
 
-**BREAKING CHANGE**: Remove dot-notation support from route names
+**BREAKING CHANGE**: Remove dot-notation support from route names (#93)
 
 Dots are now banned in the route `name` field. Use children syntax or the new `{ parent }` option in `addRoute()` instead.
 
