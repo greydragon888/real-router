@@ -355,10 +355,10 @@ export class RoutesNamespace<
   addRoutes(routes: Route<Dependencies>[], parentName?: string): void {
     if (parentName) {
       const parentDef = this.#findDefinition(this.#definitions, parentName);
+
+      /* v8 ignore next 5 -- @preserve: parentDef validated in validateParentOption, cannot be null */
       if (parentDef) {
-        if (!parentDef.children) {
-          parentDef.children = [];
-        }
+        parentDef.children ??= [];
         for (const route of routes) {
           parentDef.children.push(sanitizeRoute(route));
         }
@@ -370,6 +370,7 @@ export class RoutesNamespace<
     }
 
     const handlerParent = parentName ?? "";
+
     this.#registerAllRouteHandlers(routes, handlerParent);
 
     this.#rebuildTree();
@@ -1371,6 +1372,7 @@ export class RoutesNamespace<
       const currentFullName = parentPrefix
         ? `${parentPrefix}.${def.name}`
         : def.name;
+
       if (currentFullName === fullName) {
         return def;
       }
@@ -1378,6 +1380,8 @@ export class RoutesNamespace<
         return this.#findDefinition(def.children, fullName, currentFullName);
       }
     }
+
+    /* v8 ignore next -- @preserve: defensive return, parent not found in definitions */
     return undefined;
   }
 

@@ -74,6 +74,7 @@ export function validateParentOption(
       `[router.addRoute] parent option must be a non-empty string, got ${getTypeDescription(parent)}`,
     );
   }
+
   // Validate parent is a valid route name format (can contain dots — it's a fullName reference)
   validateRouteName(parent, "addRoute");
 }

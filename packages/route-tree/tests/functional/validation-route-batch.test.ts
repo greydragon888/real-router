@@ -201,9 +201,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(
-          { name: "users.profile", path: "/p" },
+          { name: "profile", path: "/p" },
           methodName,
           rootNode,
+          "users",
         );
       }).toThrowError('[router.add] Route "users.profile" already exists');
     });
@@ -243,9 +244,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(
-          { name: "users.settings", path: "/profile" },
+          { name: "settings", path: "/profile" },
           methodName,
           rootNode,
+          "users",
         );
       }).toThrowError('[router.add] Path "/profile" is already defined');
     });
@@ -497,43 +499,29 @@ describe("validateRoute", () => {
     });
   });
 
-  describe("parent existence validation (dot-notation)", () => {
-    it("should accept route with dot-notation when parent exists in batch", () => {
-      const seenNames = new Set<string>(["users"]);
-
-      expect(() => {
-        validateRoute(
-          { name: "users.profile", path: "/profile" },
-          methodName,
-          undefined,
-          "",
-          seenNames,
-        );
-      }).not.toThrowError();
-    });
-
-    it("should throw when dot-notation parent does not exist in tree", () => {
-      const rootNode = createMockRouteNode("", "", [
-        { name: "admin", path: "/admin" },
-      ]);
-
-      expect(() => {
-        validateRoute(
-          { name: "users.profile", path: "/profile" },
-          methodName,
-          rootNode,
-        );
-      }).toThrowError(
-        '[router.add] Parent route "users" does not exist for route "users.profile"',
-      );
-    });
-
-    it("should throw when dot-notation parent does not exist (no tree, no batch)", () => {
+  describe("dot-notation rejection", () => {
+    it("should throw TypeError when route name contains dots", () => {
       expect(() => {
         validateRoute({ name: "users.profile", path: "/profile" }, methodName);
-      }).toThrowError(
-        '[router.add] Parent route "users" does not exist for route "users.profile"',
-      );
+      }).toThrowError(TypeError);
+      expect(() => {
+        validateRoute({ name: "users.profile", path: "/profile" }, methodName);
+      }).toThrowError(/cannot contain dots/);
+    });
+
+    it("should throw TypeError for multi-level dot-notation", () => {
+      expect(() => {
+        validateRoute({ name: "a.b.c", path: "/path" }, methodName);
+      }).toThrowError(TypeError);
+      expect(() => {
+        validateRoute({ name: "a.b.c", path: "/path" }, methodName);
+      }).toThrowError(/cannot contain dots/);
+    });
+
+    it("should accept simple route names without dots", () => {
+      expect(() => {
+        validateRoute({ name: "users", path: "/users" }, methodName);
+      }).not.toThrowError();
     });
   });
 
@@ -545,98 +533,6 @@ describe("validateRoute", () => {
       expect(() => {
         validateRoute({ name: exactLengthName, path: "/test" }, methodName);
       }).not.toThrowError();
-    });
-
-    it("should compute correct parentName with multi-level dot notation (line 321)", () => {
-      // Test that "a.b.c" extracts parent "a.b" not "ab"
-      // If parts.join(".") was changed to parts.join(""), parent would be "ab" not "a.b"
-      const rootNode = createMockRouteNode("", "", [
-        {
-          name: "a",
-          path: "/a",
-          children: [{ name: "b", path: "/b" }],
-        },
-      ]);
-
-      // Should succeed because parent "a.b" exists
-      expect(() => {
-        validateRoute({ name: "a.b.c", path: "/c" }, methodName, rootNode);
-      }).not.toThrowError();
-
-      // Should fail if parent check used wrong separator
-      const rootNodeMissing = createMockRouteNode("", "", [
-        { name: "ab", path: "/ab" }, // "ab" exists but "a.b" does not
-      ]);
-
-      expect(() => {
-        validateRoute(
-          { name: "a.b.c", path: "/c" },
-          methodName,
-          rootNodeMissing,
-        );
-      }).toThrowError(/Parent route "a.b" does not exist/);
-    });
-
-    it("should compute correct pathCheckParent with multi-level dot notation (line 458, 463)", () => {
-      // When routeName is "a.b.c" and parentName is "", pathCheckParent should be "a.b"
-      // If parts.join(".") was changed to parts.join(""), pathCheckParent would be "ab"
-      const seenPaths = new Map<string, Set<string>>();
-      const seenNames = new Set<string>(["a", "a.b"]); // Parents exist
-
-      // First add a route at level "a.b"
-      seenPaths.set("a.b", new Set(["/existing"]));
-
-      // Now validate "a.b.c" - should check paths at "a.b" level
-      expect(() => {
-        validateRoute(
-          { name: "a.b.c", path: "/existing" }, // Same path
-          methodName,
-          undefined,
-          "",
-          seenNames,
-          seenPaths,
-        );
-      }).toThrowError('[router.add] Path "/existing" is already defined');
-    });
-
-    it("should NOT enter pathCheckParent branch when parentName is set (line 458 && !parentName)", () => {
-      // When parentName is already set (recursive call), should not extract from routeName
-      const seenPaths = new Map<string, Set<string>>();
-      const seenNames = new Set<string>();
-
-      // Simulate recursive validation with parentName set
-      // Even if routeName contains ".", parentName being set should skip extraction
-      validateRoute(
-        { name: "child.name", path: "/child" }, // routeName with dot
-        methodName,
-        undefined,
-        "parent", // parentName is set - should NOT extract from routeName
-        seenNames,
-        seenPaths,
-      );
-
-      // Path should be checked at "parent" level, not at "child" level
-      expect(seenPaths.has("parent")).toBe(true);
-      expect(seenPaths.get("parent")?.has("/child")).toBe(true);
-    });
-
-    it("should NOT enter pathCheckParent branch when routeName has no dot (line 458 includes)", () => {
-      const seenPaths = new Map<string, Set<string>>();
-      const seenNames = new Set<string>();
-
-      // Route without dot in name
-      validateRoute(
-        { name: "simple", path: "/simple" },
-        methodName,
-        undefined,
-        "", // No parent
-        seenNames,
-        seenPaths,
-      );
-
-      // Path should be checked at root level ""
-      expect(seenPaths.has("")).toBe(true);
-      expect(seenPaths.get("")?.has("/simple")).toBe(true);
     });
   });
 

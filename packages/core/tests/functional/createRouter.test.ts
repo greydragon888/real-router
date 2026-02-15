@@ -8,31 +8,6 @@ describe("createRouter", () => {
   });
 
   describe("with routes", () => {
-    it("should accept a flat list of nested routes", () => {
-      const router = createRouter([
-        {
-          name: "home",
-          path: "/home",
-        },
-        {
-          name: "home.dashboard",
-          path: "/dashboard",
-        },
-        {
-          name: "home.notifications",
-          path: "/notifications",
-        },
-      ]);
-
-      expect(router.buildPath("home")).toStrictEqual("/home");
-      expect(router.buildPath("home.dashboard")).toStrictEqual(
-        "/home/dashboard",
-      );
-      expect(router.buildPath("home.notifications")).toStrictEqual(
-        "/home/notifications",
-      );
-    });
-
     it("should accept a list of routes with children", () => {
       const router = createRouter([
         {

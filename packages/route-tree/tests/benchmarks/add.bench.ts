@@ -15,7 +15,7 @@
  * - New: createRouteTreeBuilder().add(route).build() - immutable
  */
 
-import { barplot, bench, boxplot, lineplot, summary } from "mitata";
+import { barplot, bench, lineplot, summary } from "mitata";
 
 import { generateDeepTree, generateWideTree } from "./helpers/generators";
 import { createRouteTreeBuilder } from "../../src/builder";
@@ -50,12 +50,6 @@ interface BenchState {
     createRouteTreeBuilder("", "")
       .addMany(warmupWide)
       .build({ skipFreeze: true });
-
-    // Warmup: dot-notation parsing
-    createRouteTreeBuilder("", "")
-      .add({ name: "users", path: "/users" })
-      .add({ name: "users.profile", path: "/profile" })
-      .build();
 
     // Warmup: incremental add
     const builder = createRouteTreeBuilder("", "");
@@ -148,37 +142,7 @@ barplot(() => {
   });
 });
 
-// 3.5 Dot-notation addition - boxplot shows distribution
-boxplot(() => {
-  summary(() => {
-    bench("build: dot-notation simple (users.profile)", function* () {
-      yield () => {
-        createRouteTreeBuilder("", "")
-          .add({ name: "users.profile", path: "/users/profile" })
-          .build();
-      };
-    }).gc("inner");
-
-    bench("build: dot-notation deep (a.b.c.d.e)", function* () {
-      yield () => {
-        createRouteTreeBuilder("", "")
-          .add({ name: "a.b.c.d.e", path: "/a/b/c/d/e" })
-          .build();
-      };
-    }).gc("inner");
-
-    bench("build: dot-notation with existing parent", function* () {
-      yield () => {
-        createRouteTreeBuilder("", "")
-          .add({ name: "users", path: "/users" })
-          .add({ name: "users.profile", path: "/profile" })
-          .build();
-      };
-    }).gc("inner");
-  });
-});
-
-// 3.6 Incremental add vs addMany - barplot for comparison
+// 3.5 Incremental add vs addMany - barplot for comparison
 barplot(() => {
   summary(() => {
     const routes = generateWideTree(50);

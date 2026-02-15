@@ -22,8 +22,11 @@ import type { NavigationOptions, State } from "@real-router/types";
 // Minimal routes for router creation
 const routes = [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:userId" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:userId" }],
+  },
 ];
 
 // Helper to create router instance

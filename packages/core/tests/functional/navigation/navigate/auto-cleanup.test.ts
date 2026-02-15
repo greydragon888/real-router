@@ -17,16 +17,31 @@ describe("router.navigate() - auto cleanup", () => {
       router = createRouter(
         [
           { name: "home", path: "/" },
-          { name: "users", path: "/users" },
-          { name: "users.list", path: "/list" },
-          { name: "users.view", path: "/view/:id" },
-          { name: "orders", path: "/orders" },
-          { name: "orders.pending", path: "/pending" },
-          { name: "orders.completed", path: "/completed" },
+          {
+            name: "users",
+            path: "/users",
+            children: [
+              { name: "list", path: "/list" },
+              { name: "view", path: "/view/:id" },
+            ],
+          },
+          {
+            name: "orders",
+            path: "/orders",
+            children: [
+              { name: "pending", path: "/pending" },
+              { name: "completed", path: "/completed" },
+            ],
+          },
           { name: "profile", path: "/profile" },
-          { name: "settings", path: "/settings" },
-          { name: "settings.general", path: "/general" },
-          { name: "settings.account", path: "/account" },
+          {
+            name: "settings",
+            path: "/settings",
+            children: [
+              { name: "general", path: "/general" },
+              { name: "account", path: "/account" },
+            ],
+          },
         ],
         {
           defaultRoute: "home",

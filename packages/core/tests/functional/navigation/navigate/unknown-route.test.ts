@@ -24,8 +24,11 @@ describe("router.navigate() - unknown route", () => {
   describe("navigation to UNKNOWN_ROUTE", () => {
     beforeEach(() => {
       const routes = [
-        { name: "orders", path: "/orders" },
-        { name: "orders.pending", path: "/pending" },
+        {
+          name: "orders",
+          path: "/orders",
+          children: [{ name: "pending", path: "/pending" }],
+        },
         { name: "profile", path: "/profile" },
         { name: "settings", path: "/settings" },
       ];

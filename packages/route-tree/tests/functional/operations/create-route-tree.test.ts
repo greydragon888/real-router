@@ -33,10 +33,13 @@ describe("New API - createRouteTree", () => {
     expect([...tree.children.values()][0].children.size).toBe(2);
   });
 
-  it("should handle dot-notation names", () => {
+  it("should handle nested children definitions", () => {
     const tree = createRouteTree("", "", [
-      { name: "users", path: "/users" },
-      { name: "users.profile", path: "/:id" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "profile", path: "/:id" }],
+      },
     ]);
 
     expect([...tree.children.values()][0].name).toBe("users");
