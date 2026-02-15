@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-15]
 
+### @real-router/core@0.19.0
+
+### Minor Changes
+
+- [#98](https://github.com/greydragon888/real-router/pull/98) [`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `getOption()` method (#92)
+
+  **Breaking Change:** `getOption()` has been removed. Use `getOptions()` instead — options are immutable after `createRouter()`, so property access is equivalent.
+
+  **Migration:**
+
+  ```diff
+  - router.getOption("defaultRoute")
+  + router.getOptions().defaultRoute
+  ```
+
+### @real-router/browser-plugin@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+
+### @real-router/helpers@0.1.22
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+
+### @real-router/logger-plugin@0.2.22
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+
+### @real-router/persistent-params-plugin@0.1.22
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+
+### @real-router/react@0.4.1
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+  - @real-router/browser-plugin@0.3.1
+  - @real-router/helpers@0.1.22
+
+### @real-router/rx@0.1.11
+
+### Patch Changes
+
+- Updated dependencies [[`9b46db5`](https://github.com/greydragon888/real-router/commit/9b46db5158648460891cd0db2933fe7f1f2049d0)]:
+  - @real-router/core@0.19.0
+
+
 ### @real-router/browser-plugin@0.3.0
 
 ### Minor Changes
