@@ -2,6 +2,15 @@
 
 ## 1.0.0
 
+### Patch Changes
+
+- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
+  - @real-router/core@0.18.0
+  - @real-router/browser-plugin@0.3.0
+  - @real-router/helpers@0.1.21
+
+## 1.0.0
+
 ### Minor Changes
 
 - [#94](https://github.com/greydragon888/real-router/pull/94) [`401397a`](https://github.com/greydragon888/real-router/commit/401397ad958c933e865d52791a6a7628ef7705a5) Thanks [@greydragon888](https://github.com/greydragon888)! - feat(react)!: remove callback props from BaseLink (#45)
