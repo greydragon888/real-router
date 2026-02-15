@@ -18,21 +18,21 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 
 **vs [router5](https://github.com/router5/router5):**
 
-| Metric | Improvement |
-| --- | --- |
-| Navigation | 2–3x faster |
-| URL building | 20–30x faster |
-| Memory allocations | 3x fewer |
-| Scaling | O(1) vs O(n) — up to 12x at 1000+ routes |
+| Metric             | Improvement                              |
+| ------------------ | ---------------------------------------- |
+| Navigation         | 2–3x faster                              |
+| URL building       | 20–30x faster                            |
+| Memory allocations | 3x fewer                                 |
+| Scaling            | O(1) vs O(n) — up to 12x at 1000+ routes |
 
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
-| Metric | Improvement                           |
-| --- |---------------------------------------|
-| Navigation | 2x faster                             |
-| URL building | 5–10x faster                          |
+| Metric             | Improvement                           |
+| ------------------ | ------------------------------------- |
+| Navigation         | 2x faster                             |
+| URL building       | 5–10x faster                          |
 | Memory allocations | 1.5x fewer                            |
-| Scaling | Both O(1) — stable at any route count |
+| Scaling            | Both O(1) — stable at any route count |
 
 ### Modern Architecture
 
@@ -71,8 +71,11 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 const routes = [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
 ];
 
 const router = createRouter(routes);
@@ -137,11 +140,11 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 
 ### Plugins
 
-| Package                                                                    | Description                                     |
-| -------------------------------------------------------------------------- |-------------------------------------------------|
-| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser history and URL synchronization         |
-| [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking    |
-| [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations        |
+| Package                                                                    | Description                                  |
+| -------------------------------------------------------------------------- | -------------------------------------------- |
+| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser history and URL synchronization      |
+| [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking |
+| [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations     |
 
 ### Utilities
 

@@ -59,9 +59,17 @@ import { createRouteTree } from "route-tree";
 
 const tree = createRouteTree("", "", [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
-  { name: "users.profile.edit", path: "/edit" },
+  {
+    name: "users",
+    path: "/users",
+    children: [
+      {
+        name: "profile",
+        path: "/:id",
+        children: [{ name: "edit", path: "/edit" }],
+      },
+    ],
+  },
 ]);
 ```
 
@@ -84,8 +92,11 @@ import { createMatcher, createRouteTree } from "route-tree";
 
 const tree = createRouteTree("", "", [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
   { name: "search", path: "/search?q&page" },
 ]);
 
@@ -246,8 +257,13 @@ import type {
 ### Absolute Paths
 
 ```typescript
-{ name: "users", path: "/users" },
-{ name: "users.admin", path: "~admin" }  // Absolute: matches /admin, not /users/admin
+{
+  name: "users",
+  path: "/users",
+  children: [
+    { name: "admin", path: "~admin" }  // Absolute: matches /admin, not /users/admin
+  ]
+}
 ```
 
 ## Architecture

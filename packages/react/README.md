@@ -30,8 +30,11 @@ import { createRoot } from "react-dom/client";
 // Define routes
 const routes = [
   { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
 ];
 
 // Create and configure router
@@ -70,6 +73,7 @@ createRoot(document.getElementById("root")!).render(
 ### Provider
 
 #### `<RouterProvider router={router}>`
+
 Provides router instance to component tree via React Context.\
 `router: Router` — router instance from `createRouter()`\
 `children: ReactNode` — child components\
@@ -86,6 +90,7 @@ Provides router instance to component tree via React Context.\
 ### Hooks
 
 #### `useRouter(): Router`
+
 Get router instance. **Never re-renders** on navigation.\
 Returns: `Router` — router instance\
 [Wiki](https://github.com/greydragon888/real-router/wiki/useRouter)
@@ -97,10 +102,11 @@ const NavigateButton = () => {
   const router = useRouter();
 
   return <button onClick={() => router.navigate("home")}>Go Home</button>;
-}
+};
 ```
 
 #### `useRoute(): { router, route, previousRoute }`
+
 Get current route state. **Re-renders on every navigation.**\
 Returns: `{ router: Router, route: State | undefined, previousRoute: State | undefined }`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/useRoute)
@@ -119,10 +125,11 @@ const CurrentRoute = () => {
       <button onClick={() => router.navigate("home")}>Go Home</button>
     </div>
   );
-}
+};
 ```
 
 #### `useRouteNode(nodeName: string): { router, route, previousRoute }`
+
 Optimized hook for nested routes. **Re-renders only when specified node changes.**\
 `nodeName: string` — route segment to observe (e.g., `"users"`)
 Returns: `{ router: Router, route: State | undefined, previousRoute: State | undefined }`\
@@ -148,7 +155,7 @@ const UsersSection = () => {
     default:
       return null;
   }
-}
+};
 ```
 
 ---
@@ -156,6 +163,7 @@ const UsersSection = () => {
 ### Components
 
 #### `<Link routeName={string} routeParams={object} ...props>`
+
 Navigation link with automatic active state detection.\
 `routeName: string` — target route name\
 `routeParams?: Params` — route parameters\
@@ -175,15 +183,17 @@ import { Link } from "@real-router/react";
   activeStrict={false}
 >
   View Profile
-</Link>
+</Link>;
 ```
 
 #### `<ConnectedLink ...props>`
+
 Same as `Link`, but re-renders on every route change.\
 Props: same as `Link`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/ConnectedLink)
 
 #### `<BaseLink router={router} ...props>`
+
 Low-level link component. Requires router instance as prop.\
 `router: Router` — router instance\
 Props: same as `Link`\
