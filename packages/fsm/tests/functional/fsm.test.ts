@@ -367,7 +367,7 @@ describe("FSM", () => {
       // @ts-expect-error — invalid event
       fsm.send("INVALID");
 
-      expect(true).toBe(true);
+      expect(fsm.getState()).toBe("green");
     });
 
     it("should reject payload for no-payload event", () => {
@@ -380,7 +380,7 @@ describe("FSM", () => {
       // @ts-expect-error — RESOLVE does not accept payload
       fsm.send("RESOLVE", { data: "something" });
 
-      expect(true).toBe(true);
+      expect(fsm.getState()).toBe("done");
     });
 
     it("should require payload for payload event", () => {
@@ -391,7 +391,7 @@ describe("FSM", () => {
       // @ts-expect-error — FETCH requires payload
       fsm.send("FETCH");
 
-      expect(true).toBe(true);
+      expect(fsm.getState()).toBe("loading");
     });
   });
 });

@@ -53,22 +53,19 @@ type RingState = `state${number}`;
 type RingEvent = "NEXT";
 
 function createRingConfig(size: number): FSMConfig<RingState, RingEvent, null> {
-  const transitions = {} as Record<
-    RingState,
-    Partial<Record<RingEvent, RingState>>
-  >;
+  const transitions: Record<string, Partial<Record<RingEvent, RingState>>> = {};
 
   for (let i = 0; i < size; i++) {
-    const current = `state${i}` as RingState;
-    const next = `state${(i + 1) % size}` as RingState;
-
-    transitions[current] = { NEXT: next };
+    transitions[`state${i}`] = { NEXT: `state${(i + 1) % size}` };
   }
 
   return {
     initial: "state0" as RingState,
     context: null,
-    transitions,
+    transitions: transitions as Record<
+      RingState,
+      Partial<Record<RingEvent, RingState>>
+    >,
   };
 }
 
