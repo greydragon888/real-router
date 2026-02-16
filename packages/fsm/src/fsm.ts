@@ -1,32 +1,4 @@
-export interface FSMConfig<
-  TStates extends string,
-  TEvents extends string,
-  TContext,
-  TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
-> {
-  initial: TStates;
-  context: TContext;
-  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
-  /** Phantom field for TPayloadMap inference — never set at runtime. */
-  readonly _types?: TPayloadMap;
-}
-
-export interface TransitionInfo<
-  TStates extends string,
-  TEvents extends string,
-  TPayloadMap extends Partial<Record<TEvents, unknown>>,
-> {
-  from: TStates;
-  to: TStates;
-  event: TEvents;
-  payload: TPayloadMap[TEvents] | undefined;
-}
-
-type TransitionListener<
-  TStates extends string,
-  TEvents extends string,
-  TPayloadMap extends Partial<Record<TEvents, unknown>>,
-> = (info: TransitionInfo<TStates, TEvents, TPayloadMap>) => void;
+import type { FSMConfig, TransitionInfo, TransitionListener } from "./types";
 
 /**
  * Synchronous finite state machine engine.
@@ -45,19 +17,21 @@ export class FSM<
   TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
 > {
   #state: TStates;
-  #context: TContext;
-  #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
   #currentTransitions: Partial<Record<TEvents, TStates>>;
-  #listeners: (TransitionListener<TStates, TEvents, TPayloadMap> | null)[];
-  #listenerCount: number;
+  #listenerCount = 0;
+  readonly #context: TContext;
+  readonly #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
+  readonly #listeners: (TransitionListener<
+    TStates,
+    TEvents,
+    TPayloadMap
+  > | null)[] = [];
 
-  constructor(config: FSMConfig<TStates, TEvents, TContext, TPayloadMap>) {
+  constructor(config: FSMConfig<TStates, TEvents, TContext>) {
     this.#state = config.initial;
     this.#context = config.context;
     this.#transitions = config.transitions;
     this.#currentTransitions = config.transitions[config.initial];
-    this.#listeners = [];
-    this.#listenerCount = 0;
   }
 
   send<E extends TEvents>(
@@ -84,9 +58,8 @@ export class FSM<
         event,
         payload: args[0] as TPayloadMap[TEvents] | undefined,
       };
-      const listeners = this.#listeners;
-      for (let i = 0; i < listeners.length; i++) {
-        const listener = listeners[i];
+
+      for (const listener of this.#listeners) {
         if (listener !== null) {
           listener(info);
         }

@@ -7,7 +7,7 @@
   {
     "name": "@real-router/fsm (ESM)",
     "path": "packages/fsm/dist/esm/index.mjs",
-    "limit": "1 kB"
+    "limit": "0.5 kB"
   },
   {
     "name": "@real-router/react (ESM)",

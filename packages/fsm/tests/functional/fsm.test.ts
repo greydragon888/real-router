@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { FSM } from "../../src/fsm.js";
 
-import type { FSMConfig } from "../../src/fsm.js";
+import type { FSMConfig } from "../../src/types.js";
 
 type LightState = "green" | "yellow" | "red";
 type LightEvent = "TIMER" | "RESET";
@@ -24,7 +24,7 @@ interface PayloadMap {
   REJECT: { error: string };
 }
 
-const payloadConfig: FSMConfig<PayloadState, PayloadEvent, null, PayloadMap> = {
+const payloadConfig: FSMConfig<PayloadState, PayloadEvent, null> = {
   initial: "idle",
   context: null,
   transitions: {
@@ -55,7 +55,9 @@ describe("FSM", () => {
     });
 
     it("should no-op at terminal state (empty transitions)", () => {
-      const fsm = new FSM(payloadConfig);
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
 
       fsm.send("FETCH", { url: "/api" });
       fsm.send("RESOLVE");
@@ -107,7 +109,9 @@ describe("FSM", () => {
 
   describe("Payload", () => {
     it("should pass required payload through to TransitionInfo", () => {
-      const fsm = new FSM(payloadConfig);
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
 
       const listener = vi.fn();
 
@@ -124,7 +128,9 @@ describe("FSM", () => {
     });
 
     it("should work without payload for no-payload events", () => {
-      const fsm = new FSM(payloadConfig);
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
 
       fsm.send("FETCH", { url: "/api" });
 
@@ -365,7 +371,9 @@ describe("FSM", () => {
     });
 
     it("should reject payload for no-payload event", () => {
-      const fsm = new FSM(payloadConfig);
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
 
       fsm.send("FETCH", { url: "/api" });
 
@@ -376,7 +384,9 @@ describe("FSM", () => {
     });
 
     it("should require payload for payload event", () => {
-      const fsm = new FSM(payloadConfig);
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
 
       // @ts-expect-error — FETCH requires payload
       fsm.send("FETCH");

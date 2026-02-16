@@ -208,7 +208,11 @@ importers:
 
   packages/core-types: {}
 
-  packages/fsm: {}
+  packages/fsm:
+    devDependencies:
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
 
   packages/helpers:
     dependencies:
