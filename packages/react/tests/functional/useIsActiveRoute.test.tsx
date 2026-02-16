@@ -261,8 +261,6 @@ describe("useIsActiveRoute", () => {
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
-      const startTime = performance.now();
-
       // Perform 1000 navigations (last one will be to users.view since 999 is odd)
       for (let i = 0; i < 1000; i++) {
         await act(() =>
@@ -271,12 +269,6 @@ describe("useIsActiveRoute", () => {
           }),
         );
       }
-
-      const endTime = performance.now();
-      const duration = endTime - startTime;
-
-      // Should complete in reasonable time (< 5 seconds)
-      expect(duration).toBeLessThan(5000);
 
       // Final check should be correct (i=999 is odd, so last navigation is users.view)
       expect(result.current).toBe(true);

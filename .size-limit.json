@@ -5,6 +5,11 @@
     "limit": "22 kB"
   },
   {
+    "name": "@real-router/fsm (ESM)",
+    "path": "packages/fsm/dist/esm/index.mjs",
+    "limit": "0.5 kB"
+  },
+  {
     "name": "@real-router/react (ESM)",
     "path": "packages/react/dist/esm/index.mjs",
     "limit": "2 kB",

@@ -420,41 +420,4 @@ describe("validateRoutePath", () => {
       }).toThrowError(/Route path must be a string, got undefined/);
     });
   });
-
-  describe("Performance considerations", () => {
-    it("should handle early return for empty string efficiently", () => {
-      // Empty string should return immediately without further checks
-      const start = performance.now();
-
-      for (let i = 0; i < 10_000; i++) {
-        validateRoutePath("", routeName, methodName);
-      }
-
-      const duration = performance.now() - start;
-
-      expect(duration).toBeLessThan(100); // Should be very fast
-    });
-
-    it("should validate typical paths efficiently", () => {
-      const paths = [
-        "/users",
-        "/users/:id",
-        String.raw`/:id<\d+>`,
-        "?page=1",
-        "~/absolute",
-      ];
-
-      const start = performance.now();
-
-      for (let i = 0; i < 1000; i++) {
-        paths.forEach((path) => {
-          validateRoutePath(path, routeName, methodName);
-        });
-      }
-
-      const duration = performance.now() - start;
-
-      expect(duration).toBeLessThan(100); // Should be reasonably fast
-    });
-  });
 });

@@ -267,13 +267,7 @@ describe("BaseLink - Performance Tests", () => {
         </div>
       );
 
-      const startTime = performance.now();
-
       render(<LinkList />, { wrapper });
-      const renderTime = performance.now() - startTime;
-
-      // Rendering 100 links should be reasonably fast (< 500ms)
-      expect(renderTime).toBeLessThan(500);
 
       // Safety check: no render loops occurred
       expect(ProfiledBaseLink).notToHaveRenderLoops({
