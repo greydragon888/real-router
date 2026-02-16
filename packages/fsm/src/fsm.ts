@@ -2,16 +2,13 @@ export interface FSMConfig<
   TStates extends string,
   TEvents extends string,
   TContext,
-  TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<
-    TEvents,
-    never
-  >,
+  TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
 > {
   initial: TStates;
   context: TContext;
   transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
-  /** @internal */
-  readonly __payloadMap?: TPayloadMap;
+  /** Phantom field for TPayloadMap inference — never set at runtime. */
+  readonly _types?: TPayloadMap;
 }
 
 export interface TransitionInfo<
@@ -45,16 +42,13 @@ export class FSM<
   TStates extends string,
   TEvents extends string,
   TContext,
-  TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<
-    TEvents,
-    never
-  >,
+  TPayloadMap extends Partial<Record<TEvents, unknown>> = Record<never, never>,
 > {
   #state: TStates;
   #context: TContext;
   #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
   #currentTransitions: Partial<Record<TEvents, TStates>>;
-  #listeners: Array<TransitionListener<TStates, TEvents, TPayloadMap> | null>;
+  #listeners: (TransitionListener<TStates, TEvents, TPayloadMap> | null)[];
   #listenerCount: number;
 
   constructor(config: FSMConfig<TStates, TEvents, TContext, TPayloadMap>) {
@@ -79,6 +73,7 @@ export class FSM<
     }
 
     const from = this.#state;
+
     this.#state = nextState;
     this.#currentTransitions = this.#transitions[nextState];
 
@@ -115,19 +110,22 @@ export class FSM<
     const nullIndex = this.#listeners.indexOf(null);
     let index: number;
 
-    if (nullIndex !== -1) {
-      this.#listeners[nullIndex] = listener;
-      index = nullIndex;
-    } else {
+    if (nullIndex === -1) {
       index = this.#listeners.length;
       this.#listeners.push(listener);
+    } else {
+      this.#listeners[nullIndex] = listener;
+      index = nullIndex;
     }
 
     this.#listenerCount++;
     let subscribed = true;
 
     return () => {
-      if (!subscribed) return;
+      if (!subscribed) {
+        return;
+      }
+
       subscribed = false;
       this.#listeners[index] = null;
       this.#listenerCount--;
