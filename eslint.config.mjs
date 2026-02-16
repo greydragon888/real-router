@@ -16,7 +16,6 @@ import turboConfig from "eslint-config-turbo/flat";
 import importX from "eslint-plugin-import-x";
 import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
 import jsdoc from "eslint-plugin-jsdoc";
-import vitestGlobals from "eslint-plugin-vitest-globals";
 import unicorn from "eslint-plugin-unicorn";
 import noOnlyTests from "eslint-plugin-no-only-tests";
 import promisePlugin from "eslint-plugin-promise";
@@ -694,10 +693,9 @@ export default tsEslint.config(
     ],
     plugins: {
       vitest: vitestPlugin,
-      "vitest-globals": vitestGlobals,
     },
     languageOptions: {
-      globals: vitestGlobals.environments.env.globals,
+      globals: vitestPlugin.configs.env.languageOptions.globals,
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
