@@ -4,13 +4,10 @@
     "types": ["vitest/globals", "node"],
     "paths": {
       "@real-router/core": ["packages/core/src/index.ts"],
+      "@real-router/fsm": ["packages/fsm/src/index.ts"],
       "@real-router/helpers": ["packages/helpers/src/index.ts"],
-      "@real-router/browser-plugin": [
-        "packages/browser-plugin/src/index.ts"
-      ],
-      "@real-router/logger-plugin": [
-        "packages/logger-plugin/src/index.ts"
-      ],
+      "@real-router/browser-plugin": ["packages/browser-plugin/src/index.ts"],
+      "@real-router/logger-plugin": ["packages/logger-plugin/src/index.ts"],
       "@real-router/persistent-params-plugin": [
         "packages/persistent-params-plugin/src/index.ts"
       ],
