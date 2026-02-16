@@ -19,10 +19,10 @@ const lightConfig: FSMConfig<LightState, LightEvent, { count: number }> = {
 
 type PayloadState = "idle" | "loading" | "done";
 type PayloadEvent = "FETCH" | "RESOLVE" | "REJECT";
-type PayloadMap = {
+interface PayloadMap {
   FETCH: { url: string };
   REJECT: { error: string };
-};
+}
 
 const payloadConfig: FSMConfig<PayloadState, PayloadEvent, null, PayloadMap> = {
   initial: "idle",
@@ -91,12 +91,12 @@ describe("FSM", () => {
       });
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("LOOP");
 
-      expect(listener).toHaveBeenCalledOnce();
-      expect(listener).toHaveBeenCalledWith({
+      expect(listener).toHaveBeenCalledExactlyOnceWith({
         from: "a",
         to: "a",
         event: "LOOP",
@@ -110,6 +110,7 @@ describe("FSM", () => {
       const fsm = new FSM(payloadConfig);
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("FETCH", { url: "/api/data" });
@@ -128,6 +129,7 @@ describe("FSM", () => {
       fsm.send("FETCH", { url: "/api" });
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("RESOLVE");
@@ -144,6 +146,7 @@ describe("FSM", () => {
       const fsm = new FSM(lightConfig);
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("TIMER");
@@ -161,6 +164,7 @@ describe("FSM", () => {
       const fsm = new FSM(lightConfig);
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("TIMER");
@@ -177,13 +181,14 @@ describe("FSM", () => {
       const fsm = new FSM(lightConfig);
 
       const order: number[] = [];
+
       fsm.onTransition(() => order.push(1));
       fsm.onTransition(() => order.push(2));
       fsm.onTransition(() => order.push(3));
 
       fsm.send("TIMER");
 
-      expect(order).toEqual([1, 2, 3]);
+      expect(order).toStrictEqual([1, 2, 3]);
     });
 
     it("should not call unsubscribed listener", () => {
@@ -203,6 +208,7 @@ describe("FSM", () => {
       const fsm = new FSM(lightConfig);
 
       const listener = vi.fn();
+
       fsm.onTransition(listener);
 
       fsm.send("RESET");
@@ -225,18 +231,19 @@ describe("FSM", () => {
 
       fsm.send("TIMER");
 
-      expect(calls).toEqual(["first", "third"]);
+      expect(calls).toStrictEqual(["first", "third"]);
     });
 
     it("should propagate listener exception (state already updated)", () => {
       const fsm = new FSM(lightConfig);
 
       const error = new Error("boom");
+
       fsm.onTransition(() => {
         throw error;
       });
 
-      expect(() => fsm.send("TIMER")).toThrow(error);
+      expect(() => fsm.send("TIMER")).toThrowError(error);
       expect(fsm.getState()).toBe("yellow");
     });
 
@@ -244,6 +251,7 @@ describe("FSM", () => {
       const fsm = new FSM(lightConfig);
 
       const states: string[] = [];
+
       fsm.onTransition(({ to }) => {
         states.push(to);
         if (to === "yellow") {
@@ -254,7 +262,7 @@ describe("FSM", () => {
       fsm.send("TIMER");
 
       expect(fsm.getState()).toBe("red");
-      expect(states).toEqual(["yellow", "red"]);
+      expect(states).toStrictEqual(["yellow", "red"]);
     });
 
     it("should transition without listeners (no allocation)", () => {
@@ -285,6 +293,7 @@ describe("FSM", () => {
       const calls: string[] = [];
 
       const unsub1 = fsm.onTransition(() => calls.push("a"));
+
       fsm.onTransition(() => calls.push("b"));
 
       unsub1();
@@ -293,7 +302,7 @@ describe("FSM", () => {
 
       fsm.send("TIMER");
 
-      expect(calls).toEqual(["c", "b"]);
+      expect(calls).toStrictEqual(["c", "b"]);
     });
   });
 
@@ -351,6 +360,8 @@ describe("FSM", () => {
 
       // @ts-expect-error — invalid event
       fsm.send("INVALID");
+
+      expect(true).toBe(true);
     });
 
     it("should reject payload for no-payload event", () => {
@@ -360,6 +371,8 @@ describe("FSM", () => {
 
       // @ts-expect-error — RESOLVE does not accept payload
       fsm.send("RESOLVE", { data: "something" });
+
+      expect(true).toBe(true);
     });
 
     it("should require payload for payload event", () => {
@@ -367,6 +380,8 @@ describe("FSM", () => {
 
       // @ts-expect-error — FETCH requires payload
       fsm.send("FETCH");
+
+      expect(true).toBe(true);
     });
   });
 });
