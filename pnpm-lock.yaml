@@ -208,6 +208,8 @@ importers:
 
   packages/core-types: {}
 
+  packages/fsm: {}
+
   packages/helpers:
     dependencies:
       '@real-router/core':
