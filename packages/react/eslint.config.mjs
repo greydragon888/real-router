@@ -17,7 +17,6 @@ import promisePlugin from "eslint-plugin-promise";
 import eslintPluginPrettierRecommended from "eslint-plugin-prettier/recommended";
 import sonarjsPlugin from "eslint-plugin-sonarjs";
 import vitestPlugin from "@vitest/eslint-plugin";
-import vitestGlobals from "eslint-plugin-vitest-globals";
 import noOnlyTests from "eslint-plugin-no-only-tests";
 import jsdoc from "eslint-plugin-jsdoc";
 
@@ -427,10 +426,9 @@ export default tsEslint.config(
     files: ["tests/**/*.test.tsx"],
     plugins: {
       vitest: vitestPlugin,
-      "vitest-globals": vitestGlobals,
     },
     languageOptions: {
-      globals: vitestGlobals.environments.env.globals,
+      globals: vitestPlugin.configs.env.languageOptions.globals,
     },
     rules: {
       ...vitestPlugin.configs.all.rules,
