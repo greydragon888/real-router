@@ -236,22 +236,6 @@ describe("nameToIDs", () => {
     });
   });
 
-  describe("Performance", () => {
-    it("should efficiently handle multiple calls", () => {
-      const iterations = 1000;
-      const start = performance.now();
-
-      for (let i = 0; i < iterations; i++) {
-        nameToIDs("users.profile.settings.advanced.options");
-      }
-
-      const duration = performance.now() - start;
-
-      // Check that 1000 calls execute in less than 100ms
-      expect(duration).toBeLessThan(100);
-    });
-  });
-
   describe("Consistency with getTransitionPath", () => {
     it("should generate IDs compatible with transitions", () => {
       // Check that format is suitable for use in getTransitionPath

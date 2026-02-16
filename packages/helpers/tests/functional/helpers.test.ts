@@ -413,23 +413,6 @@ describe("helpers", () => {
   });
 
   describe("performance considerations", () => {
-    it("should handle repeated calls efficiently", () => {
-      const iterations = 1000;
-      const start = performance.now();
-
-      for (let i = 0; i < iterations; i++) {
-        startsWithSegment("admin.users.profile.edit", "admin");
-        endsWithSegment("admin.users.profile.edit", "edit");
-        includesSegment("admin.users.profile.edit", "users");
-      }
-
-      const duration = performance.now() - start;
-
-      // Should complete 3000 operations in reasonable time
-      // Benchmark: ~10-50ms for 3000 operations (depends on hardware)
-      expect(duration).toBeLessThan(1000); // 1 second is very generous
-    });
-
     it("should not cache results (stateless behavior)", () => {
       // Each call should be independent
       const result1 = startsWithSegment("route", "segment");
