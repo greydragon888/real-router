@@ -1,6 +1,6 @@
 {
   "name": "@real-router/fsm",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "commonjs",
   "description": "Universal synchronous FSM engine for Real-Router",
   "main": "./dist/cjs/index.js",
