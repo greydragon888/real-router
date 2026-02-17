@@ -1330,9 +1330,8 @@ export class Router<
         case "DONE": {
           const p = payload as TransitionPayloads["DONE"];
 
-          /* v8 ignore next -- @preserve: unreachable in Phase C — lifecycle sends STARTED before transitionFSM receives DONE */
+          /* v8 ignore next 3 -- @preserve: unreachable in Phase C — lifecycle sends STARTED before transitionFSM receives DONE */
           if (this.#routerFSM.getState() === "STARTING") {
-            /* v8 ignore next -- @preserve: unreachable in Phase C — lifecycle sends STARTED before transitionFSM receives DONE */
             this.#routerFSM.send("STARTED");
           } else {
             this.#routerFSM.send("COMPLETE", {
