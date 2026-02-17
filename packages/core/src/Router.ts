@@ -9,6 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
+import { events } from "./constants";
 import { createRouterFSM, createTransitionFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
@@ -110,12 +111,7 @@ export class Router<
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
 
-  // @ts-expect-error TS6133: FSM fields initialized in Phase A, wired in Phase B
-  // eslint-disable-next-line no-unused-private-class-members
   readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
-
-  // @ts-expect-error TS6133: FSM fields initialized in Phase A, wired in Phase B
-  // eslint-disable-next-line no-unused-private-class-members
   readonly #transitionFSM: FSM<
     TransitionPhase,
     TransitionEvent,
@@ -665,7 +661,8 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    // Forward to lifecycle namespace
+    this.#routerFSM.send("START");
+
     return this.#lifecycle.start(startPath);
   }
 
@@ -1092,6 +1089,85 @@ export class Router<
   // ============================================================================
 
   /**
+   * Maps plugin event names to FSM sends (shadow mode).
+   * Called from both invokeEventListeners lambdas BEFORE observable.invoke.
+   * Phase B: FSM runs in parallel — all observable.invoke calls remain.
+   */
+  #handleEvent(
+    eventName: string,
+    toState: State | undefined,
+    fromState: State | undefined,
+    arg?: unknown,
+  ): void {
+    switch (eventName) {
+      case events.TRANSITION_START: {
+        /* v8 ignore next 4 -- @preserve branch: toState is always defined for TRANSITION_START */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("START", { toState, fromState });
+          this.#routerFSM.send("NAVIGATE", { toState, fromState });
+        }
+
+        break;
+      }
+      case events.TRANSITION_SUCCESS: {
+        /* v8 ignore next 7 -- @preserve branch: toState is always defined for TRANSITION_SUCCESS */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("DONE", {
+            state: toState,
+            fromState,
+            opts: arg as NavigationOptions,
+          });
+          this.#routerFSM.send("COMPLETE", {
+            state: toState,
+            fromState,
+            opts: arg as NavigationOptions,
+          });
+        }
+
+        break;
+      }
+      case events.TRANSITION_CANCEL: {
+        /* v8 ignore next 4 -- @preserve branch: toState is always defined for TRANSITION_CANCEL */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("CANCEL", { toState, fromState });
+          this.#routerFSM.send("CANCEL", { toState, fromState });
+        }
+
+        break;
+      }
+      case events.TRANSITION_ERROR: {
+        /* v8 ignore next 6 -- @preserve branch: toState is always defined for TRANSITION_ERROR */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("ERROR", {
+            state: toState,
+            fromState,
+            error: arg,
+          });
+        }
+
+        this.#routerFSM.send("FAIL", {
+          /* v8 ignore next -- @preserve branch: toState is always defined for TRANSITION_ERROR ternary */
+          ...(toState !== undefined && { toState }),
+          fromState,
+          error: arg,
+        });
+
+        break;
+      }
+      case events.ROUTER_START: {
+        this.#routerFSM.send("STARTED");
+
+        break;
+      }
+      case events.ROUTER_STOP: {
+        this.#routerFSM.send("STOP");
+
+        break;
+      }
+    }
+  }
+
+  /**
    * Sets up dependencies between namespaces.
    * Called once in constructor after all namespaces are created.
    */
@@ -1181,6 +1257,7 @@ export class Router<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
+        this.#handleEvent(eventName, toState, fromState, arg);
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
       getDependency: (name: string) =>
@@ -1206,6 +1283,7 @@ export class Router<
       getOptions: () => this.#options.get(),
       hasListeners: (eventName) => this.#observable.hasListeners(eventName),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
+        this.#handleEvent(eventName, toState, fromState, arg);
         this.#observable.invoke(eventName, toState, fromState, arg);
       },
       makeNotFoundState: (path, options) =>
