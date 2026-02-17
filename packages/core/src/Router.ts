@@ -1409,7 +1409,10 @@ export class Router<
         );
       }
 
-      /* v8 ignore next 8 -- @preserve: unreachable in Phase C — cancel always goes through fallback (stop sets routerFSM to IDLE) */
+      /* v8 ignore next 8 -- @preserve: unreachable — TRANSITION_CANCEL only fires after stop(),
+         which sends STOP→IDLE before the async transition checks isCancelled().
+         By the time the NavigationDependencies lambda emits TRANSITION_CANCEL,
+         routerFSM is already IDLE, so CANCEL goes through the fallback path. */
       if (event === "CANCEL" && from === "TRANSITIONING") {
         const p = payload as RouterPayloads["CANCEL"];
 

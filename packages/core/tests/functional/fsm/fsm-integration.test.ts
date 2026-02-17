@@ -308,4 +308,80 @@ describe("FSM integration", () => {
       expect((stateSeenInsideListener as { name: string }).name).toBe("admin");
     });
   });
+
+  describe("stop and cancel", () => {
+    it("stop() emits ROUTER_STOP — RouterFSM transitions READY→IDLE", async () => {
+      await router.start("/home");
+
+      const onStop = vi.fn();
+
+      router.addEventListener(events.ROUTER_STOP, onStop);
+
+      router.stop();
+
+      expect(onStop).toHaveBeenCalledTimes(1);
+    });
+
+    it("isActive() returns false and getState() is undefined after stop()", async () => {
+      await router.start("/home");
+
+      expect(router.isActive()).toBe(true);
+
+      router.stop();
+
+      expect(router.isActive()).toBe(false);
+      expect(router.getState()).toBeUndefined();
+    });
+
+    it("stop() during async navigation emits TRANSITION_CANCEL via fallback — routerFSM already IDLE", async () => {
+      vi.useFakeTimers();
+
+      await router.start("/home");
+
+      const onCancel = vi.fn();
+      const onSuccess = vi.fn();
+
+      router.addEventListener(events.TRANSITION_CANCEL, onCancel);
+      router.addEventListener(events.TRANSITION_SUCCESS, onSuccess);
+
+      const unsub = router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      const promise = router.navigate("users");
+
+      setTimeout(() => {
+        router.stop();
+      }, 10);
+
+      await vi.runAllTimersAsync();
+
+      await expect(promise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(onSuccess).not.toHaveBeenCalled();
+
+      unsub();
+      vi.useRealTimers();
+    });
+
+    it("router recovers after stop() — can start() and navigate() again", async () => {
+      await router.start("/home");
+
+      router.stop();
+
+      expect(router.isActive()).toBe(false);
+
+      await router.start("/users");
+
+      expect(router.isActive()).toBe(true);
+      expect(router.getState()?.name).toBe("users");
+
+      const state = await router.navigate("admin");
+
+      expect(state.name).toBe("admin");
+    });
+  });
 });

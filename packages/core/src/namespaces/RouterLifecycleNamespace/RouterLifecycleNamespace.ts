@@ -173,6 +173,10 @@ export class RouterLifecycleNamespace {
       this.#started = true;
       deps.invokeEventListeners(events.ROUTER_START);
 
+      // Note: ROUTER_START above triggers routerFSM STARTING→READY, which already
+      // emits TRANSITION_SUCCESS via routerFSM.onTransition. This second invocation
+      // is a no-op for emission (routerFSM ignores COMPLETE from READY), but it is
+      // needed to transition transitionFSM from RUNNING→IDLE via the DONE event.
       deps.invokeEventListeners(
         events.TRANSITION_SUCCESS,
         finalState,
