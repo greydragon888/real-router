@@ -626,6 +626,41 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/**/*.ts"]` to recognize standalone benchmark scripts (like `isolated-anomalies.ts`) that are not imported from `index.ts`.
 
+## FSM Package
+
+### Why a Separate Package?
+
+`@real-router/fsm` is a standalone synchronous finite state machine engine extracted as its own package. It has **zero dependencies** and can be used independently of the router.
+
+### Design Decisions
+
+**Single-class, no validation:** The entire FSM is 107 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
+
+**O(1) transitions:** A `#currentTransitions` cache stores the transition map for the current state, avoiding double lookup (`transitions[state][event]`).
+
+**Null-slot listener pattern:** Same pattern used in `@real-router/core`'s observable. Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
+
+**Listener count fast-path:** `#listenerCount` tracks active listeners. When zero, `send()` skips `TransitionInfo` object creation and listener iteration entirely.
+
+**Type-safe payloads via `TPayloadMap`:** A fourth generic parameter maps event names to payload types. Events not in the map accept no payload. Uses conditional rest parameters for zero-overhead at runtime.
+
+### Reentrancy
+
+`send()` inside `onTransition` is allowed and executes synchronously inline (no queue). State is updated before listeners fire, so reentrant `send()` reads the already-updated state. Callers must prevent infinite loops.
+
+### Package Structure
+
+```
+packages/fsm/
+├── src/
+│   ├── fsm.ts    — FSM class (all logic, 107 lines)
+│   ├── types.ts  — FSMConfig, TransitionInfo, TransitionListener
+│   └── index.ts  — public exports
+└── tests/
+    ├── functional/  — vitest tests (100% coverage)
+    └── benchmarks/  — mitata benchmarks
+```
+
 ## Logger Package
 
 ### Why?
