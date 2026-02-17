@@ -9,6 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
+import { createRouterFSM, createTransitionFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
@@ -26,6 +27,14 @@ import {
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
+import type {
+  RouterEvent,
+  RouterPayloads,
+  RouterState,
+  TransitionEvent,
+  TransitionPayloads,
+  TransitionPhase,
+} from "./fsm";
 import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
 import type {
@@ -44,6 +53,7 @@ import type {
   Route,
   RouteConfigUpdate,
 } from "./types";
+import type { FSM } from "@real-router/fsm";
 import type {
   DefaultDependencies,
   EventName,
@@ -99,6 +109,19 @@ export class Router<
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
+
+  // @ts-expect-error TS6133: FSM fields initialized in Phase A, wired in Phase B
+  // eslint-disable-next-line no-unused-private-class-members
+  readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
+
+  // @ts-expect-error TS6133: FSM fields initialized in Phase A, wired in Phase B
+  // eslint-disable-next-line no-unused-private-class-members
+  readonly #transitionFSM: FSM<
+    TransitionPhase,
+    TransitionEvent,
+    null,
+    TransitionPayloads
+  >;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -172,6 +195,13 @@ export class Router<
     this.#lifecycle = new RouterLifecycleNamespace();
     this.#clone = new CloneNamespace<Dependencies>();
     this.#noValidate = noValidate;
+
+    // =========================================================================
+    // Initialize FSMs
+    // =========================================================================
+
+    this.#routerFSM = createRouterFSM();
+    this.#transitionFSM = createTransitionFSM();
 
     // =========================================================================
     // Setup Dependencies

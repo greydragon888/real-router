@@ -192,6 +192,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@real-router/fsm':
+        specifier: workspace:^
+        version: link:../fsm
       '@real-router/logger':
         specifier: workspace:^
         version: link:../logger
