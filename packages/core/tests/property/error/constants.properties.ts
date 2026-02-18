@@ -24,6 +24,7 @@ describe("RouterError Constants Properties", () => {
         "CANNOT_ACTIVATE",
         "TRANSITION_ERR",
         "TRANSITION_CANCELLED",
+        "ROUTER_DISPOSED",
       ];
 
       for (const code of requiredCodes) {
@@ -203,7 +204,7 @@ describe("RouterError Constants Properties", () => {
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility
-      const expectedCount = 9;
+      const expectedCount = 10;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);
@@ -223,6 +224,7 @@ describe("RouterError Constants Properties", () => {
         CANNOT_ACTIVATE: "CANNOT_ACTIVATE",
         TRANSITION_ERR: "TRANSITION_ERR",
         TRANSITION_CANCELLED: "CANCELLED",
+        ROUTER_DISPOSED: "DISPOSED",
       };
 
       for (const [key, expectedValue] of Object.entries(expectedMapping)) {

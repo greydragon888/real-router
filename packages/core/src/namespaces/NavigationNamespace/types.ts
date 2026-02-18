@@ -9,6 +9,7 @@ import type {
   Params,
   State,
   StateMetaInput,
+  TransitionPhase,
 } from "@real-router/types";
 
 /**
@@ -90,6 +91,18 @@ export interface NavigationDependencies {
     fromState: State | undefined,
     error: unknown,
   ) => void;
+}
+
+export interface TransitionOutput {
+  state: State;
+  meta: {
+    phase: TransitionPhase;
+    segments: {
+      deactivated: string[];
+      activated: string[];
+      intersection: string;
+    };
+  };
 }
 
 /**

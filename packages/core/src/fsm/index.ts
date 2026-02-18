@@ -9,5 +9,5 @@ export type { RouterEvent, RouterPayloads, RouterState } from "./routerFSM";
 export type {
   TransitionEvent,
   TransitionPayloads,
-  TransitionPhase,
+  TransitionFSMState,
 } from "./transitionFSM";

@@ -185,6 +185,13 @@ export class StateNamespace {
     return this.#previousState as State<P, MP> | undefined;
   }
 
+  reset(): void {
+    this.#frozenState = undefined;
+    this.#previousState = undefined;
+    this.#urlParamsCache.clear();
+    this.#stateId = 0;
+  }
+
   // =========================================================================
   // Dependency Injection
   // =========================================================================

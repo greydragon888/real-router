@@ -9,7 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
-import { events } from "./constants";
+import { errorCodes, events } from "./constants";
 import { createRouterFSM, createTransitionFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
@@ -26,6 +26,7 @@ import {
   StateNamespace,
 } from "./namespaces";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
@@ -34,8 +35,8 @@ import type {
   RouterPayloads,
   RouterState,
   TransitionEvent,
+  TransitionFSMState,
   TransitionPayloads,
-  TransitionPhase,
 } from "./fsm";
 import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
@@ -63,7 +64,6 @@ import type {
   Options,
   Params,
   Plugin,
-  RouterError,
   RouteTreeState,
   SimpleState,
   State,
@@ -115,7 +115,7 @@ export class Router<
 
   readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #transitionFSM: FSM<
-    TransitionPhase,
+    TransitionFSMState,
     TransitionEvent,
     null,
     TransitionPayloads
@@ -253,6 +253,7 @@ export class Router<
     this.isActive = this.isActive.bind(this);
     this.start = this.start.bind(this);
     this.stop = this.stop.bind(this);
+    this.dispose = this.dispose.bind(this);
 
     // Route Lifecycle (Guards)
     this.addActivateGuard = this.addActivateGuard.bind(this);
@@ -721,6 +722,47 @@ export class Router<
     this.#routerFSM.send("STOP");
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.#routerFSM.getState() === "DISPOSED") {
+      return;
+    }
+
+    if (this.#transitionFSM.getState() !== "IDLE") {
+      const currentToState = this.#currentToState;
+
+      /* v8 ignore next 6 -- @preserve: currentToState undefined during dispose() is a defensive guard */
+      if (currentToState !== undefined) {
+        this.#transitionFSM.send("CANCEL", {
+          toState: currentToState,
+          fromState: this.#state.get(),
+        });
+      }
+    }
+
+    const state = this.#routerFSM.getState();
+
+    /* v8 ignore next 4 -- @preserve: dispose() during STARTING is a race condition, hard to test reliably */
+    if (state === "STARTING") {
+      this.#routerFSM.send("STOP");
+    } else if (state === "READY" || state === "TRANSITIONING") {
+      this.#lifecycle.stop();
+      this.#routerFSM.send("STOP");
+    }
+
+    this.#routerFSM.send("DISPOSE");
+
+    this.#plugins.disposeAll();
+    this.#middleware.clearAll();
+    this.#observable.clearAll();
+    this.#routes.clearRoutes();
+    this.#routeLifecycle.clearAll();
+    this.#state.reset();
+    this.#dependencies.reset();
+    this.#currentToState = undefined;
+
+    this.#markDisposed();
   }
 
   // ============================================================================
@@ -1481,6 +1523,37 @@ export class Router<
       },
     );
   }
+
+  #markDisposed(): void {
+    this.navigate = throwDisposed as never;
+    this.navigateToDefault = throwDisposed as never;
+    this.navigateToState = throwDisposed as never;
+    this.start = throwDisposed as never;
+    this.stop = throwDisposed as never;
+    this.addRoute = throwDisposed as never;
+    this.removeRoute = throwDisposed as never;
+    this.clearRoutes = throwDisposed as never;
+    this.updateRoute = throwDisposed as never;
+    this.addActivateGuard = throwDisposed as never;
+    this.addDeactivateGuard = throwDisposed as never;
+    this.removeActivateGuard = throwDisposed as never;
+    this.removeDeactivateGuard = throwDisposed as never;
+    this.usePlugin = throwDisposed as never;
+    this.useMiddleware = throwDisposed as never;
+    this.setDependency = throwDisposed as never;
+    this.setDependencies = throwDisposed as never;
+    this.removeDependency = throwDisposed as never;
+    this.resetDependencies = throwDisposed as never;
+    this.addEventListener = throwDisposed as never;
+    this.subscribe = throwDisposed as never;
+    this.setRootPath = throwDisposed as never;
+    this.clone = throwDisposed as never;
+    this.canNavigateTo = throwDisposed as never;
+  }
+}
+
+function throwDisposed(): never {
+  throw new RouterError(errorCodes.ROUTER_DISPOSED);
 }
 
 /**

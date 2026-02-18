@@ -196,6 +196,11 @@ export class MiddlewareNamespace<
     return [...this.#factoryToMiddleware.values()];
   }
 
+  clearAll(): void {
+    this.#factories.clear();
+    this.#factoryToMiddleware.clear();
+  }
+
   // =========================================================================
   // Private methods
   // =========================================================================

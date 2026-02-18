@@ -45,7 +45,8 @@ export type ErrorCodeValues =
   | "CANNOT_DEACTIVATE"
   | "CANNOT_ACTIVATE"
   | "TRANSITION_ERR"
-  | "CANCELLED";
+  | "CANCELLED"
+  | "DISPOSED";
 
 /**
  * Error code keys
@@ -59,7 +60,8 @@ export type ErrorCodeKeys =
   | "CANNOT_DEACTIVATE"
   | "CANNOT_ACTIVATE"
   | "TRANSITION_ERR"
-  | "TRANSITION_CANCELLED";
+  | "TRANSITION_CANCELLED"
+  | "ROUTER_DISPOSED";
 
 /**
  * Mapping of event keys to plugin methods
@@ -98,4 +100,5 @@ export interface ErrorCodeToValueMap {
   CANNOT_ACTIVATE: "CANNOT_ACTIVATE";
   TRANSITION_ERR: "TRANSITION_ERR";
   TRANSITION_CANCELLED: "CANCELLED";
+  ROUTER_DISPOSED: "DISPOSED";
 }
