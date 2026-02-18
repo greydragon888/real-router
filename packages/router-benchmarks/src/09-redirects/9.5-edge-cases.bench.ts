@@ -104,7 +104,8 @@ type RedirectResult = State | void;
   bench("9.5.5 Canceling navigation during redirect", () => {
     void router.navigate("about");
 
-    router.cancel();
+    router.stop();
+    router.start("/");
   }).gc("inner");
 }
 

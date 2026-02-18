@@ -335,7 +335,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.isNavigating(),
+      this.#transitionFSM.getState() !== "IDLE",
     );
 
     if (!canRemove) {
@@ -356,8 +356,10 @@ export class Router<
   }
 
   clearRoutes(): this {
+    const isNavigating = this.#transitionFSM.getState() !== "IDLE";
+
     // Validate operation can proceed
-    const canClear = this.#routes.validateClearRoutes(this.isNavigating());
+    const canClear = this.#routes.validateClearRoutes(isNavigating);
 
     if (!canClear) {
       return this;
@@ -420,7 +422,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.isNavigating()) {
+    if (this.#transitionFSM.getState() !== "IDLE") {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -661,10 +663,6 @@ export class Router<
     const s = this.#routerFSM.getState();
 
     return s !== "IDLE" && s !== "DISPOSED";
-  }
-
-  isNavigating(): boolean {
-    return this.#transitionFSM.getState() !== "IDLE";
   }
 
   start(startPath: string): Promise<State> {
@@ -1094,22 +1092,6 @@ export class Router<
     return this.#navigation.navigateToState(toState, fromState, opts);
   }
 
-  cancel(): this {
-    /* v8 ignore next 9 -- @preserve: cancel() while TRANSITIONING requires concurrent navigation test setup */
-    if (this.#transitionFSM.getState() !== "IDLE") {
-      const currentToState = this.#currentToState;
-
-      if (currentToState !== undefined) {
-        this.#transitionFSM.send("CANCEL", {
-          toState: currentToState,
-          fromState: this.#state.get(),
-        });
-      }
-    }
-
-    return this;
-  }
-
   // ============================================================================
   // Subscription (backed by ObservableNamespace)
   // ============================================================================
@@ -1233,7 +1215,7 @@ export class Router<
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name: string) =>
         this.#dependencies.get(name as keyof Dependencies),
-      startTransition: (toState, fromState, _opts) => {
+      startTransition: (toState, fromState) => {
         this.#currentToState = toState;
         this.#transitionFSM.send("START", { toState, fromState });
       },
@@ -1279,6 +1261,7 @@ export class Router<
       getLifecycleFunctions: () => this.#routeLifecycle.getFunctions(),
       getMiddlewareFunctions: () => this.#middleware.getFunctions(),
       isActive: () => this.isActive(),
+
       getTransitionState: () => this.#transitionFSM.getState(),
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);

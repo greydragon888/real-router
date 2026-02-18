@@ -8,7 +8,7 @@ import type { Router } from "@real-router/core";
 
 let router: Router;
 
-describe("TransitionFSM integration (Release 3)", () => {
+describe("R3: #navigating → TransitionFSM, stop via FSM, start() restructure", () => {
   beforeEach(() => {
     router = createTestRouter();
   });
@@ -18,97 +18,33 @@ describe("TransitionFSM integration (Release 3)", () => {
     vi.useRealTimers();
   });
 
-  it("isNavigating() returns true during RUNNING state", async () => {
+  it("transition is in progress during middleware execution", async () => {
     await router.start("/home");
 
     vi.useFakeTimers();
 
-    let isNavigatingDuringTransition: boolean | undefined;
+    let transitionStartFired = false;
+
+    router.addEventListener(events.TRANSITION_START, () => {
+      transitionStartFired = true;
+    });
 
     const unsub = router.useMiddleware(() => async () => {
-      isNavigatingDuringTransition = router.isNavigating();
+      // During middleware, TRANSITION_START has already fired
+      expect(transitionStartFired).toBe(true);
+
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
+
+    // Reset after start() transition
+    transitionStartFired = false;
 
     const promise = router.navigate("users");
 
     await vi.runAllTimersAsync();
     await promise;
 
-    expect(isNavigatingDuringTransition).toBe(true);
-
-    unsub();
-  });
-
-  it("isNavigating() returns false when IDLE", async () => {
-    expect(router.isNavigating()).toBe(false);
-
-    await router.start("/home");
-
-    expect(router.isNavigating()).toBe(false);
-
-    await router.navigate("users");
-
-    expect(router.isNavigating()).toBe(false);
-  });
-
-  it("cancel() sends CANCEL to TransitionFSM when RUNNING", async () => {
-    await router.start("/home");
-
-    vi.useFakeTimers();
-
-    const onCancel = vi.fn();
-
-    router.addEventListener(events.TRANSITION_CANCEL, onCancel);
-
-    const unsub = router.useMiddleware(() => async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-
-    const promise = router.navigate("users").catch((error: unknown) => error);
-
-    await vi.advanceTimersByTimeAsync(10);
-
-    router.cancel();
-
-    await vi.runAllTimersAsync();
-    await promise;
-
-    expect(onCancel).toHaveBeenCalledTimes(1);
-
-    unsub();
-  });
-
-  it("cancel() is no-op when TransitionFSM is IDLE", async () => {
-    await router.start("/home");
-
-    expect(router.isNavigating()).toBe(false);
-    expect(() => router.cancel()).not.toThrowError();
-    expect(router.isNavigating()).toBe(false);
-    expect(router.isActive()).toBe(true);
-  });
-
-  it("isCancelled() returns true after cancel()", async () => {
-    await router.start("/home");
-
-    vi.useFakeTimers();
-
-    const unsub = router.useMiddleware(() => async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-
-    const promise = router.navigate("users").catch((error: unknown) => error);
-
-    await vi.advanceTimersByTimeAsync(10);
-
-    expect(router.isNavigating()).toBe(true);
-
-    router.cancel();
-
-    expect(router.isNavigating()).toBe(false);
-
-    await vi.runAllTimersAsync();
-    await promise;
+    expect(transitionStartFired).toBe(true);
 
     unsub();
   });
@@ -142,7 +78,7 @@ describe("TransitionFSM integration (Release 3)", () => {
     await router.start("/home");
   });
 
-  it("isCancelled() returns true after stop() during transition", async () => {
+  it("stop() during transition rejects with TRANSITION_CANCELLED", async () => {
     await router.start("/home");
 
     vi.useFakeTimers();

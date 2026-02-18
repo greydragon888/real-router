@@ -126,16 +126,6 @@ export class NavigationNamespace {
   }
 
   /**
-   * Cancels the current transition if one is in progress.
-   * [R3 Phase D] No longer needed - cancellation is handled by transitionFSM.
-   * Kept for backward compatibility.
-   */
-  /* v8 ignore next 2 -- @preserve: R3 Phase D - no-op method kept for backward compatibility */
-  cancel(): void {
-    // No-op: cancellation is now handled by transitionFSM
-  }
-
-  /**
    * Internal navigation function that accepts pre-built state.
    * Used by RouterLifecycleNamespace for start() transitions.
    */
@@ -156,7 +146,7 @@ export class NavigationNamespace {
     }
 
     deps.cancelNavigation();
-    deps.startTransition(toState, fromState, opts);
+    deps.startTransition(toState, fromState);
 
     try {
       const finalState = await transition(
@@ -193,8 +183,7 @@ export class NavigationNamespace {
             break;
           }
           case errorCodes.ROUTE_NOT_FOUND: {
-            deps.emitTransitionError(undefined, deps.getState(), error);
-
+            // sendTransitionError already called in try block above
             break;
           }
           case errorCodes.CANNOT_ACTIVATE:

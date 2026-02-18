@@ -58,11 +58,7 @@ export interface NavigationDependencies {
   getDependency: (name: string) => unknown;
 
   /** Start transition and send START event to transitionFSM */
-  startTransition: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => void;
+  startTransition: (toState: State, fromState: State | undefined) => void;
 
   /** Cancel navigation if transition is running */
   cancelNavigation: () => void;
@@ -109,7 +105,7 @@ export interface TransitionDependencies {
   /** Get middleware functions array */
   getMiddlewareFunctions: () => Middleware[];
 
-  /** Check if router is active (for cancellation check) */
+  /** Check if router is active (for cancellation check on stop()) */
   isActive: () => boolean;
 
   /** Get current transition FSM state */
