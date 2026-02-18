@@ -23,8 +23,6 @@ export async function transition(
 
   // State management functions
   // Issue #36: Check both explicit cancellation AND router shutdown
-  // Issue #50: Use isActive() instead of isStarted() for two-phase start support
-  // isActive() is true during initial start transition, isStarted() is false
   const isCancelled = () => !deps.isActive();
 
   const { toDeactivate, toActivate, intersection } = getTransitionPath(
