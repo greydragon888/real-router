@@ -121,8 +121,8 @@ export interface TransitionDependencies {
   /** Check if router is active (for cancellation check on stop()) */
   isActive: () => boolean;
 
-  /** Get current transition FSM state */
-  getTransitionState: () => "IDLE" | "RUNNING";
+  /** Check if a transition is currently in progress */
+  isTransitioning: () => boolean;
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;

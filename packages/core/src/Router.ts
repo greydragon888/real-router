@@ -693,7 +693,7 @@ export class Router<
   }
 
   stop(): this {
-    if (this.#transitionFSM.getState() !== "IDLE") {
+    if (this.#transitionFSM.canSend("CANCEL")) {
       const currentToState = this.#currentToState;
 
       /* v8 ignore next 6 -- @preserve: currentToState undefined during stop() is a defensive guard */
@@ -729,7 +729,7 @@ export class Router<
       return;
     }
 
-    if (this.#transitionFSM.getState() !== "IDLE") {
+    if (this.#transitionFSM.canSend("CANCEL")) {
       const currentToState = this.#currentToState;
 
       /* v8 ignore next 6 -- @preserve: currentToState undefined during dispose() is a defensive guard */
@@ -1260,10 +1260,8 @@ export class Router<
       cancelNavigation: () => {
         const currentToState = this.#currentToState;
 
-        if (
-          this.#transitionFSM.getState() !== "IDLE" &&
-          currentToState !== undefined
-        ) {
+        /* v8 ignore next 6 -- @preserve: cancelNavigation() only called when isTransitioning(), currentToState always set */
+        if (currentToState !== undefined) {
           this.#transitionFSM.send("CANCEL", {
             toState: currentToState,
             fromState: this.#state.get(),
@@ -1300,7 +1298,7 @@ export class Router<
       getMiddlewareFunctions: () => this.#middleware.getFunctions(),
       isActive: () => this.isActive(),
 
-      getTransitionState: () => this.#transitionFSM.getState(),
+      isTransitioning: () => !this.#transitionFSM.canSend("START"),
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);
       },

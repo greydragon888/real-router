@@ -133,15 +133,15 @@ export class NavigationNamespace {
     const deps = this.#deps;
     const transitionDeps = this.#transitionDeps;
 
-    if (transitionDeps.getTransitionState() !== "IDLE") {
+    if (transitionDeps.isTransitioning()) {
       logger.warn(
         "router.navigate",
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use router.clone() to create isolated instance per request.",
       );
+      deps.cancelNavigation();
     }
 
-    deps.cancelNavigation();
     deps.startTransition(toState, fromState);
 
     try {
