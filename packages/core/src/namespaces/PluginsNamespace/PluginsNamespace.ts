@@ -325,7 +325,7 @@ export class PluginsNamespace<
             ),
           );
 
-          if (methodName === "onStart" && this.#deps.isStarted()) {
+          if (methodName === "onStart" && this.#deps.canNavigate()) {
             logger.warn(
               LOGGER_CONTEXT,
               "Router already started, onStart will not be called",

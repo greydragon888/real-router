@@ -10,13 +10,13 @@ function setupNamespace(): PluginsNamespace {
   const mockRouter = {} as Router;
   const mockGetDependency = vi.fn();
   const mockAddEventListener = vi.fn().mockReturnValue(() => {});
-  const mockIsStarted = vi.fn().mockReturnValue(false);
+  const mockCanNavigate = vi.fn().mockReturnValue(false);
 
   ns.setRouter(mockRouter);
   ns.setDependencies({
     getDependency: mockGetDependency,
     addEventListener: mockAddEventListener,
-    isStarted: mockIsStarted,
+    canNavigate: mockCanNavigate,
   });
 
   return ns;

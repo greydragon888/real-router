@@ -672,7 +672,7 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    if (this.#routerFSM.getState() !== "IDLE") {
+    if (!this.#routerFSM.canSend("START")) {
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
 
@@ -1224,11 +1224,7 @@ export class Router<
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
         this.#observable.addEventListener(eventName, cb),
-      isStarted: () => {
-        const s = this.#routerFSM.getState();
-
-        return s === "READY" || s === "TRANSITIONING";
-      },
+      canNavigate: () => this.#routerFSM.canSend("NAVIGATE"),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
     };
@@ -1354,16 +1350,11 @@ export class Router<
         case "DONE": {
           const p = payload as TransitionPayloads["DONE"];
 
-          /* v8 ignore next 3 -- @preserve: unreachable — completeStart() sends STARTED before transitionFSM receives DONE */
-          if (this.#routerFSM.getState() === "STARTING") {
-            this.#routerFSM.send("STARTED");
-          } else {
-            this.#routerFSM.send("COMPLETE", {
-              state: p.state,
-              fromState: p.fromState,
-              opts: p.opts,
-            });
-          }
+          this.#routerFSM.send("COMPLETE", {
+            state: p.state,
+            fromState: p.fromState,
+            opts: p.opts,
+          });
 
           this.#currentToState = undefined;
 
@@ -1407,7 +1398,7 @@ export class Router<
         this.#observable.invoke(events.ROUTER_START);
       }
 
-      /* v8 ignore next 6 -- @preserve: from=TRANSITIONING branch requires stop() during active navigation */
+      /* v8 ignore next 6 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
       if (
         event === "STOP" &&
         to === "IDLE" &&
@@ -1470,15 +1461,11 @@ export class Router<
     // =========================================================================
     // Setup cyclic dependencies via functional references
     // =========================================================================
-    // Navigation → RouterLifecycle.isStarted() (check before navigation)
+    // Navigation → canNavigate() (check before navigation)
     // RouterLifecycle → Navigation.navigateToState() (for start transitions)
     // =========================================================================
 
-    this.#navigation.isRouterStarted = () => {
-      const s = this.#routerFSM.getState();
-
-      return s === "READY" || s === "TRANSITIONING";
-    };
+    this.#navigation.canNavigate = () => this.#routerFSM.canSend("NAVIGATE");
 
     // Use facade method so tests can spy on router.navigateToState
     this.#lifecycle.navigateToState = (

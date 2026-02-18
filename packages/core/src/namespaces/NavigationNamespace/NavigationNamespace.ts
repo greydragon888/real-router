@@ -32,11 +32,10 @@ export class NavigationNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * Functional reference to RouterLifecycleNamespace.isStarted().
+   * Functional reference to check if navigation is possible.
    * Must be set before calling navigate().
    */
-
-  isRouterStarted!: () => boolean;
+  canNavigate!: () => boolean;
 
   // Dependencies injected via setDependencies (replaces full router reference)
   #depsStore: NavigationDependencies | undefined;
@@ -121,14 +120,6 @@ export class NavigationNamespace {
   // =========================================================================
   // Instance methods
   // =========================================================================
-
-  /* v8 ignore next 6 -- @preserve: isNavigating() reserved for future use; Router.ts uses its own isNavigating() */
-  isNavigating(): boolean {
-    return (
-      this.isRouterStarted() &&
-      this.#transitionDeps.getTransitionState() === "RUNNING"
-    );
-  }
 
   /**
    * Internal navigation function that accepts pre-built state.
@@ -243,7 +234,7 @@ export class NavigationNamespace {
   ): Promise<State> {
     const deps = this.#deps;
 
-    if (!this.isRouterStarted()) {
+    if (!this.canNavigate()) {
       const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
 
       return Promise.reject(err);

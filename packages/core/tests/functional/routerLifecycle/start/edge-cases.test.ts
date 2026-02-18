@@ -28,7 +28,7 @@ describe("router.start() - edge cases", () => {
   });
 
   describe("Proxy state objects", () => {
-    it("should accept Proxy state (no structuredClone in invokeEventListeners)", async () => {
+    it("should accept Proxy state objects", async () => {
       const state = await router.start("/users/list");
 
       expect(state).toBeDefined();
