@@ -35,8 +35,8 @@ import type {
   RouterPayloads,
   RouterState,
   TransitionEvent,
+  TransitionFSMState,
   TransitionPayloads,
-  TransitionPhase,
 } from "./fsm";
 import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
@@ -115,7 +115,7 @@ export class Router<
 
   readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #transitionFSM: FSM<
-    TransitionPhase,
+    TransitionFSMState,
     TransitionEvent,
     null,
     TransitionPayloads

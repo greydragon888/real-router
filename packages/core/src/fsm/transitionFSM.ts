@@ -6,12 +6,12 @@ import type { FSMConfig } from "@real-router/fsm";
 import type { NavigationOptions, State } from "@real-router/types";
 
 /**
- * Transition FSM phases.
+ * Transition FSM states.
  *
  * - IDLE: No transition in progress
  * - RUNNING: Transition is executing
  */
-export type TransitionPhase = "IDLE" | "RUNNING";
+export type TransitionFSMState = "IDLE" | "RUNNING";
 
 /**
  * Transition FSM events.
@@ -62,7 +62,11 @@ export interface TransitionPayloads {
  * - IDLE → RUNNING (START)
  * - RUNNING → IDLE (DONE, BLOCKED, ERROR, CANCEL)
  */
-const transitionFSMConfig: FSMConfig<TransitionPhase, TransitionEvent, null> = {
+const transitionFSMConfig: FSMConfig<
+  TransitionFSMState,
+  TransitionEvent,
+  null
+> = {
   initial: "IDLE",
   context: null,
   transitions: {
@@ -84,12 +88,12 @@ const transitionFSMConfig: FSMConfig<TransitionPhase, TransitionEvent, null> = {
  * @returns FSM instance with initial state "IDLE"
  */
 export function createTransitionFSM(): FSM<
-  TransitionPhase,
+  TransitionFSMState,
   TransitionEvent,
   null,
   TransitionPayloads
 > {
-  return new FSM<TransitionPhase, TransitionEvent, null, TransitionPayloads>(
+  return new FSM<TransitionFSMState, TransitionEvent, null, TransitionPayloads>(
     transitionFSMConfig,
   );
 }

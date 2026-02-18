@@ -14,7 +14,12 @@ import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
 import type { NavigationDependencies, TransitionDependencies } from "./types";
-import type { NavigationOptions, Params, State } from "@real-router/types";
+import type {
+  NavigationOptions,
+  Params,
+  State,
+  TransitionMeta,
+} from "@real-router/types";
 
 /**
  * Independent namespace for managing navigation.
@@ -149,21 +154,43 @@ export class NavigationNamespace {
     deps.startTransition(toState, fromState);
 
     try {
-      const finalState = await transition(
+      const transitionStart = performance.now();
+
+      const { state: finalState, meta: transitionOutput } = await transition(
         transitionDeps,
         toState,
         fromState,
         opts,
       );
 
+      const duration = performance.now() - transitionStart;
+
       if (
         finalState.name === constants.UNKNOWN_ROUTE ||
         deps.hasRoute(finalState.name)
       ) {
-        deps.setState(finalState);
-        deps.sendTransitionDone(finalState, fromState, opts);
+        const transitionMeta: TransitionMeta = {
+          phase: transitionOutput.phase,
+          duration,
+          ...(fromState?.name !== undefined && { from: fromState.name }),
+          reason: "success",
+          segments: transitionOutput.segments,
+        };
 
-        return finalState;
+        Object.freeze(transitionMeta.segments.deactivated);
+        Object.freeze(transitionMeta.segments.activated);
+        Object.freeze(transitionMeta.segments);
+        Object.freeze(transitionMeta);
+
+        const stateWithTransition: State = {
+          ...finalState,
+          transition: transitionMeta,
+        };
+
+        deps.setState(stateWithTransition);
+        deps.sendTransitionDone(stateWithTransition, fromState, opts);
+
+        return stateWithTransition;
       } else {
         const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
           routeName: finalState.name,

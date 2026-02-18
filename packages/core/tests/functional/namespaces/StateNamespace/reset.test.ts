@@ -90,4 +90,13 @@ describe("StateNamespace/reset", () => {
 
     expect(ns.get()?.name).toBe("admin");
   });
+
+  it("set() freezes external unfrozen state in place", () => {
+    const unfrozenState = { name: "home", params: {}, path: "/home" };
+
+    ns.set(unfrozenState as never);
+
+    expect(Object.isFrozen(ns.get())).toBe(true);
+    expect(ns.get()?.name).toBe("home");
+  });
 });
