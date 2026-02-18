@@ -62,7 +62,7 @@ describe("FSM lifecycle — Release 2 (boolean flags removed)", () => {
       vi.useRealTimers();
     });
 
-    it("isActive() returns false after stop() — RouterFSM transitions to IDLE (DISPOSED state)", async () => {
+    it("isActive() returns false after stop() — RouterFSM transitions to IDLE", async () => {
       await router.start("/home");
 
       expect(router.isActive()).toBe(true);
