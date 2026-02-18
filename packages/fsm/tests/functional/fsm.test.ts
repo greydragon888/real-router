@@ -336,6 +336,68 @@ describe("FSM", () => {
     });
   });
 
+  describe("canSend()", () => {
+    it("should return true for valid event in current state", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(fsm.canSend("TIMER")).toBe(true);
+    });
+
+    it("should return false for invalid event in current state", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(fsm.canSend("RESET")).toBe(false);
+    });
+
+    it("should return false for terminal state (no transitions)", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      fsm.send("FETCH", { url: "/api" });
+      fsm.send("RESOLVE");
+
+      expect(fsm.getState()).toBe("done");
+      expect(fsm.canSend("FETCH")).toBe(false);
+      expect(fsm.canSend("RESOLVE")).toBe(false);
+    });
+
+    it("should reflect state changes after send()", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(fsm.canSend("RESET")).toBe(false);
+
+      fsm.send("TIMER");
+      fsm.send("TIMER");
+
+      expect(fsm.getState()).toBe("red");
+      expect(fsm.canSend("RESET")).toBe(true);
+    });
+
+    it("should return correct value during onTransition callback", () => {
+      const fsm = new FSM(lightConfig);
+
+      let canSendTimerDuringTransition: boolean | undefined;
+
+      fsm.onTransition(({ to }) => {
+        if (to === "yellow") {
+          canSendTimerDuringTransition = fsm.canSend("TIMER");
+        }
+      });
+
+      fsm.send("TIMER");
+
+      expect(canSendTimerDuringTransition).toBe(true);
+    });
+
+    it("should reject invalid event names", () => {
+      const fsm = new FSM(lightConfig);
+
+      // @ts-expect-error — invalid event
+      expect(fsm.canSend("INVALID")).toBe(false);
+    });
+  });
+
   describe("getState()", () => {
     it("should return initial state after creation", () => {
       const fsm = new FSM(lightConfig);

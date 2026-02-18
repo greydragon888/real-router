@@ -69,6 +69,10 @@ export class FSM<
     return this.#state;
   }
 
+  canSend(event: TEvents): boolean {
+    return this.#currentTransitions[event] !== undefined;
+  }
+
   getState(): TStates {
     return this.#state;
   }
