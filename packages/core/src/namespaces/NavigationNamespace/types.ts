@@ -3,13 +3,10 @@
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
   ActivationFn,
-  EventsKeys,
-  EventToNameMap,
   Middleware,
   NavigationOptions,
   Options,
   Params,
-  RouterError as RouterErrorType,
   State,
   StateMetaInput,
 } from "@real-router/types";
@@ -56,14 +53,6 @@ export interface NavigationDependencies {
     state2: State | undefined,
     ignoreQueryParams?: boolean,
   ) => boolean;
-
-  /** Invoke event listeners */
-  invokeEventListeners: (
-    eventName: EventToNameMap[EventsKeys],
-    toState?: State,
-    fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
-  ) => void;
 
   /** Get a dependency by name (untyped — used only for resolveOption) */
   getDependency: (name: string) => unknown;
