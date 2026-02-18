@@ -30,6 +30,7 @@ export class PluginsNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
+  readonly #unsubscribes = new Set<Unsubscribe>();
 
   #routerStore: Router<Dependencies> | undefined;
   #depsStore: PluginsDependencies<Dependencies> | undefined;
@@ -146,19 +147,24 @@ export class PluginsNamespace<
 
       let unsubscribed = false;
 
-      return () => {
+      const unsubscribe: Unsubscribe = () => {
         if (unsubscribed) {
           return;
         }
 
         unsubscribed = true;
         this.#plugins.delete(factory);
+        this.#unsubscribes.delete(unsubscribe);
         try {
           cleanup();
         } catch (error) {
           logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
         }
       };
+
+      this.#unsubscribes.add(unsubscribe);
+
+      return unsubscribe;
     }
 
     // Deduplicate batch with warning (validation already done by facade)
@@ -198,12 +204,13 @@ export class PluginsNamespace<
     // Return unsubscribe function
     let unsubscribed = false;
 
-    return () => {
+    const unsubscribe: Unsubscribe = () => {
       if (unsubscribed) {
         return;
       }
 
       unsubscribed = true;
+      this.#unsubscribes.delete(unsubscribe);
 
       for (const { factory } of initializedPlugins) {
         this.#plugins.delete(factory);
@@ -217,6 +224,10 @@ export class PluginsNamespace<
         }
       }
     };
+
+    this.#unsubscribes.add(unsubscribe);
+
+    return unsubscribe;
   }
 
   /**
@@ -232,6 +243,18 @@ export class PluginsNamespace<
    */
   has(factory: PluginFactory<Dependencies>): boolean {
     return this.#plugins.has(factory);
+  }
+
+  disposeAll(): void {
+    for (const unsubscribe of this.#unsubscribes) {
+      try {
+        unsubscribe();
+        // eslint-disable-next-line no-empty
+      } catch {}
+    }
+
+    this.#plugins.clear();
+    this.#unsubscribes.clear();
   }
 
   // =========================================================================

@@ -92,6 +92,14 @@ export class ObservableNamespace {
     this.#limits = limits;
   }
 
+  clearAll(): void {
+    for (const key of Object.keys(this.#callbacks)) {
+      this.#callbacks[key as EventName]?.clear();
+    }
+
+    this.#eventDepthMap = null;
+  }
+
   // =========================================================================
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
