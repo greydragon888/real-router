@@ -33,6 +33,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   CANNOT_ACTIVATE: "CANNOT_ACTIVATE", // canActivate guard blocked navigation
   TRANSITION_ERR: "TRANSITION_ERR", // Generic transition failure
   TRANSITION_CANCELLED: "CANCELLED", // Navigation cancelled by user or new navigation
+  ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
 });
 
 /**
