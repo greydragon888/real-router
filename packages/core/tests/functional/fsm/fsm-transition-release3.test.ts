@@ -65,7 +65,7 @@ describe("TransitionFSM integration (Release 3)", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    const promise = router.navigate("users").catch((e: unknown) => e);
+    const promise = router.navigate("users").catch((error: unknown) => error);
 
     await vi.advanceTimersByTimeAsync(10);
 
@@ -83,7 +83,7 @@ describe("TransitionFSM integration (Release 3)", () => {
     await router.start("/home");
 
     expect(router.isNavigating()).toBe(false);
-    expect(() => router.cancel()).not.toThrow();
+    expect(() => router.cancel()).not.toThrowError();
     expect(router.isNavigating()).toBe(false);
     expect(router.isActive()).toBe(true);
   });
@@ -97,7 +97,7 @@ describe("TransitionFSM integration (Release 3)", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    const promise = router.navigate("users").catch((e: unknown) => e);
+    const promise = router.navigate("users").catch((error: unknown) => error);
 
     await vi.advanceTimersByTimeAsync(10);
 
@@ -126,7 +126,7 @@ describe("TransitionFSM integration (Release 3)", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    const promise = router.navigate("users").catch((e: unknown) => e);
+    const promise = router.navigate("users").catch((error: unknown) => error);
 
     await vi.advanceTimersByTimeAsync(10);
 
@@ -181,8 +181,8 @@ describe("TransitionFSM integration (Release 3)", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    const promise1 = router.navigate("users").catch((e: unknown) => e);
-    const promise2 = router.navigate("admin").catch((e: unknown) => e);
+    const promise1 = router.navigate("users").catch((error: unknown) => error);
+    const promise2 = router.navigate("admin").catch((error: unknown) => error);
 
     await vi.runAllTimersAsync();
     await promise1;
@@ -277,7 +277,7 @@ describe("TransitionFSM integration (Release 3)", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 
-    const promise = router.navigate("users").catch((e: unknown) => e);
+    const promise = router.navigate("users").catch((error: unknown) => error);
 
     await vi.advanceTimersByTimeAsync(10);
 
