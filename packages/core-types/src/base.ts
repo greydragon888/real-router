@@ -11,11 +11,29 @@ export interface SimpleState<P extends Params = Params> {
   params: P;
 }
 
+export type TransitionPhase = "deactivating" | "activating" | "middleware";
+
+export type TransitionReason = "success" | "blocked" | "cancelled" | "error";
+
+export interface TransitionMeta {
+  phase: TransitionPhase;
+  duration: number;
+  from?: string;
+  reason: TransitionReason;
+  blocker?: string;
+  segments: {
+    deactivated: string[];
+    activated: string[];
+    intersection: string;
+  };
+}
+
 export interface State<P extends Params = Params, MP extends Params = Params> {
   name: string;
   params: P;
   path: string;
   meta?: StateMeta<MP> | undefined;
+  transition?: TransitionMeta | undefined;
 }
 
 export interface StateMeta<P extends Params = Params> {
