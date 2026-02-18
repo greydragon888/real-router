@@ -1,6 +1,5 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
-import { CACHED_ALREADY_STARTED_ERROR } from "./constants";
 import { errorCodes, events } from "../../constants";
 import { RouterError } from "../../RouterError";
 
@@ -19,7 +18,8 @@ import type { NavigationOptions, State } from "@real-router/types";
 /**
  * Independent namespace for managing router lifecycle.
  *
- * Handles start(), stop(), isStarted(), and isActive().
+ * Handles start() and stop(). Lifecycle state (isActive, isStarted) is managed
+ * by RouterFSM in the facade (Router.ts).
  */
 export class RouterLifecycleNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
@@ -37,9 +37,6 @@ export class RouterLifecycleNamespace {
     opts: NavigationOptions,
     emitSuccess: boolean,
   ) => Promise<State>;
-
-  #started = false;
-  #active = false;
 
   // Dependencies injected via setDependencies (replaces full router reference)
   #depsStore: RouterLifecycleDependencies | undefined;
@@ -91,126 +88,87 @@ export class RouterLifecycleNamespace {
   // =========================================================================
 
   /**
-   * Checks if the router has completed its initial start.
-   */
-  isStarted(): boolean {
-    return this.#started;
-  }
-
-  /**
-   * Checks if the router is starting or started (allows transitions).
-   * Used by transition to check if transitions should be cancelled.
-   */
-  isActive(): boolean {
-    return this.#active;
-  }
-
-  /**
    * Starts the router with the given path.
+   *
+   * Guards (concurrent start, already started) are handled by the facade via
+   * RouterFSM state checks before this method is called.
    */
   async start(startPath: string): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
-
-    // Early return if already started or starting (concurrent start() protection)
-    // Issue #50: Check both isStarted() and isActive() to block concurrent start() calls
-    // - isStarted(): Router has completed initial start
-    // - isActive(): Router is in the process of starting (async transition in progress)
-    // Performance: Uses cached error to avoid object allocation (~500ns-2μs saved)
-    if (this.#started || this.#active) {
-      throw CACHED_ALREADY_STARTED_ERROR;
-    }
-
-    // Issue #50: Mark router as active BEFORE attempting transition
-    // This allows the transition to proceed (isCancelled() checks isActive())
-    this.#active = true;
 
     // Base options for all operations in start() method
     const startOptions: NavigationOptions = {
       replace: true, // start() always replace history
     };
 
-    try {
-      const matchedState = deps.matchPath(startPath);
+    const matchedState = deps.matchPath(startPath);
 
-      let finalState: State;
+    let finalState: State;
 
-      if (matchedState) {
-        finalState = await this.navigateToState(
-          matchedState,
+    if (matchedState) {
+      finalState = await this.navigateToState(
+        matchedState,
+        undefined,
+        startOptions,
+        false, // emitSuccess = false - we will emit below
+      );
+    } else if (options.allowNotFound) {
+      const notFoundState = deps.makeNotFoundState(startPath, startOptions);
+
+      finalState = await this.navigateToState(
+        notFoundState,
+        undefined,
+        startOptions,
+        false, // emitSuccess = false - we will emit below
+      );
+    } else {
+      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        path: startPath,
+      });
+
+      if (deps.hasListeners(events.TRANSITION_ERROR)) {
+        deps.invokeEventListeners(
+          events.TRANSITION_ERROR,
           undefined,
-          startOptions,
-          false, // emitSuccess = false - we will emit below
-        );
-      } else if (options.allowNotFound) {
-        const notFoundState = deps.makeNotFoundState(startPath, startOptions);
-
-        finalState = await this.navigateToState(
-          notFoundState,
           undefined,
-          startOptions,
-          false, // emitSuccess = false - we will emit below
+          err,
         );
-      } else {
-        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          path: startPath,
-        });
-
-        if (deps.hasListeners(events.TRANSITION_ERROR)) {
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            undefined,
-            undefined,
-            err,
-          );
-        }
-
-        throw err;
       }
 
-      // Two-phase start: Only set started and emit ROUTER_START on success
-      // See: https://github.com/greydragon888/real-router/issues/50
-      this.#started = true;
-      deps.invokeEventListeners(events.ROUTER_START);
-
-      // Note: ROUTER_START above triggers routerFSM STARTING→READY, which already
-      // emits TRANSITION_SUCCESS via routerFSM.onTransition. This second invocation
-      // is a no-op for emission (routerFSM ignores COMPLETE from READY), but it is
-      // needed to transition transitionFSM from RUNNING→IDLE via the DONE event.
-      deps.invokeEventListeners(
-        events.TRANSITION_SUCCESS,
-        finalState,
-        undefined,
-        {
-          replace: true,
-        },
-      );
-
-      return finalState;
-    } catch (error) {
-      // Issue #50: Unset active flag on failure (router is no longer starting)
-      this.#active = false;
-
-      throw error;
+      throw err;
     }
+
+    // KEEP: triggers routerFSM.send("STARTED") → STARTING→READY via #handleEvent chain
+    deps.invokeEventListeners(events.ROUTER_START);
+
+    // KEEP: triggers transitionFSM.send("DONE") → RUNNING→IDLE via #handleEvent chain
+    // (routerFSM.send("COMPLETE") is a no-op since FSM is already READY)
+    deps.invokeEventListeners(
+      events.TRANSITION_SUCCESS,
+      finalState,
+      undefined,
+      {
+        replace: true,
+      },
+    );
+
+    return finalState;
   }
 
   /**
    * Stops the router and resets state.
+   *
+   * Called only for READY/TRANSITIONING states (facade handles STARTING/IDLE/DISPOSED).
+   * Order: setState(undefined) → invokeEventListeners(ROUTER_STOP) → chain →
+   *        routerFSM.send("STOP") → onTransition → observable.invoke(ROUTER_STOP)
+   * State is cleared BEFORE ROUTER_STOP emission ✓
    */
   stop(): void {
     const deps = this.#deps;
 
-    // Issue #50: Always unset active flag when stopping
-    // This cancels any in-flight transitions via isCancelled() check
-    this.#active = false;
+    deps.setState();
 
-    if (this.#started) {
-      this.#started = false;
-
-      deps.setState();
-
-      deps.invokeEventListeners(events.ROUTER_STOP);
-    }
+    deps.invokeEventListeners(events.ROUTER_STOP);
   }
 }
