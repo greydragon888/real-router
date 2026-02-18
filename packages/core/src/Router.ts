@@ -1340,6 +1340,8 @@ export class Router<
             });
           }
 
+          this.#currentToState = undefined;
+
           break;
         }
         case "CANCEL": {
@@ -1349,6 +1351,8 @@ export class Router<
             toState: p.toState,
             fromState: p.fromState,
           });
+
+          this.#currentToState = undefined;
 
           break;
         }
@@ -1365,6 +1369,8 @@ export class Router<
               error: p.error,
             });
           }
+
+          this.#currentToState = undefined;
 
           break;
         }
