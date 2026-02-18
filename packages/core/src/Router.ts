@@ -1384,7 +1384,11 @@ export class Router<
         );
       }
 
-      if (event === "STOP" && to === "IDLE") {
+      if (
+        event === "STOP" &&
+        to === "IDLE" &&
+        (from === "READY" || from === "TRANSITIONING")
+      ) {
         this.#observable.invoke(events.ROUTER_STOP);
       }
 
