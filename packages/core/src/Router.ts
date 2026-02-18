@@ -335,7 +335,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.#navigation.isNavigating(),
+      this.isNavigating(),
     );
 
     if (!canRemove) {
@@ -357,9 +357,7 @@ export class Router<
 
   clearRoutes(): this {
     // Validate operation can proceed
-    const canClear = this.#routes.validateClearRoutes(
-      this.#navigation.isNavigating(),
-    );
+    const canClear = this.#routes.validateClearRoutes(this.isNavigating());
 
     if (!canClear) {
       return this;
@@ -422,7 +420,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.#navigation.isNavigating()) {
+    if (this.isNavigating()) {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -665,6 +663,10 @@ export class Router<
     return s !== "IDLE" && s !== "DISPOSED";
   }
 
+  isNavigating(): boolean {
+    return this.#transitionFSM.getState() !== "IDLE";
+  }
+
   start(startPath: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
@@ -678,8 +680,13 @@ export class Router<
     this.#routerFSM.send("START");
 
     return this.#lifecycle.start(startPath).catch((error: unknown) => {
-      if (this.#routerFSM.getState() === "STARTING") {
+      const currentState = this.#routerFSM.getState();
+
+      if (currentState === "STARTING") {
         this.#routerFSM.send("FAIL", {});
+      } else if (currentState === "READY") {
+        this.#lifecycle.stop();
+        this.#routerFSM.send("STOP");
       }
 
       throw error;
@@ -687,6 +694,17 @@ export class Router<
   }
 
   stop(): this {
+    if (this.#transitionFSM.getState() !== "IDLE") {
+      const currentToState = this.#currentToState;
+
+      if (currentToState !== undefined) {
+        this.#transitionFSM.send("CANCEL", {
+          toState: currentToState,
+          fromState: this.#state.get(),
+        });
+      }
+    }
+
     const prevState = this.#routerFSM.getState();
 
     if (prevState === "STARTING") {
@@ -700,6 +718,7 @@ export class Router<
     }
 
     this.#lifecycle.stop();
+    this.#routerFSM.send("STOP");
 
     return this;
   }
@@ -1065,27 +1084,27 @@ export class Router<
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    emitSuccess: boolean,
   ): Promise<State> {
     if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateToStateArgs(
-        toState,
-        fromState,
-        opts,
-        emitSuccess,
-      );
+      NavigationNamespace.validateNavigateToStateArgs(toState, fromState, opts);
     }
 
-    return this.#navigation.navigateToState(
-      toState,
-      fromState,
-      opts,
-      emitSuccess,
-    );
+    return this.#navigation.navigateToState(toState, fromState, opts);
   }
 
-  cancel(): void {
-    this.#navigation.cancel();
+  cancel(): this {
+    if (this.#transitionFSM.getState() !== "IDLE") {
+      const currentToState = this.#currentToState;
+
+      if (currentToState !== undefined) {
+        this.#transitionFSM.send("CANCEL", {
+          toState: currentToState,
+          fromState: this.#state.get(),
+        });
+      }
+    }
+
+    return this;
   }
 
   // ============================================================================
@@ -1423,10 +1442,20 @@ export class Router<
     this.#transitionFSM.onTransition(({ event, payload }) => {
       /* v8 ignore next -- @preserve: all cases covered but branch analysis counts default */
       switch (event) {
+        case "START": {
+          const p = payload as TransitionPayloads["START"];
+
+          this.#routerFSM.send("NAVIGATE", {
+            toState: p.toState,
+            fromState: p.fromState,
+          });
+
+          break;
+        }
         case "DONE": {
           const p = payload as TransitionPayloads["DONE"];
 
-          /* v8 ignore next 3 -- @preserve: unreachable in Phase C — lifecycle sends STARTED before transitionFSM receives DONE */
+          /* v8 ignore next 3 -- @preserve: unreachable — completeStart() sends STARTED before transitionFSM receives DONE */
           if (this.#routerFSM.getState() === "STARTING") {
             this.#routerFSM.send("STARTED");
           } else {
@@ -1471,13 +1500,6 @@ export class Router<
     this.#routerFSM.onTransition(({ from, to, event, payload }) => {
       if (from === "STARTING" && to === "READY") {
         this.#observable.invoke(events.ROUTER_START);
-        this.#observable.invoke(
-          events.TRANSITION_SUCCESS,
-          /* v8 ignore next -- @preserve: state is always set when STARTING→READY, ?? undefined is defensive */
-          this.#state.get() ?? undefined,
-          undefined,
-          { replace: true } as NavigationOptions,
-        );
       }
 
       if (
@@ -1509,10 +1531,6 @@ export class Router<
         );
       }
 
-      /* v8 ignore next 8 -- @preserve: unreachable — TRANSITION_CANCEL only fires after stop(),
-         which sends STOP→IDLE before the async transition checks isCancelled().
-         By the time the NavigationDependencies lambda emits TRANSITION_CANCEL,
-         routerFSM is already IDLE, so CANCEL goes through the fallback path. */
       if (event === "CANCEL" && from === "TRANSITIONING") {
         const p = payload as RouterPayloads["CANCEL"];
 
@@ -1561,9 +1579,7 @@ export class Router<
       toState: State,
       fromState: State | undefined,
       opts: NavigationOptions,
-      emitSuccess: boolean,
-    ) =>
-      this.#navigation.navigateToState(toState, fromState, opts, emitSuccess);
+    ) => this.#navigation.navigateToState(toState, fromState, opts);
 
     // CloneNamespace needs access to collect cloning data and apply config
     this.#clone.setCallbacks(

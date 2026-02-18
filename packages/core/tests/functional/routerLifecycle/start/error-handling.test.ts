@@ -428,10 +428,11 @@ describe("router.start() - error handling", () => {
           // Expected
         }
 
-        // Issue #50: Router is NOT started if transition fails
-        // Two-phase start ensures isStarted() only returns true after successful transition
+        // R3: completeStart() fires ROUTER_START BEFORE navigateToState(),
+        // so ROUTER_START is emitted even when the transition fails.
+        // Router is stopped (READY→IDLE) after the failed transition.
         expect(router.isActive()).toBe(false);
-        expect(startListener).not.toHaveBeenCalled();
+        expect(startListener).toHaveBeenCalledTimes(1);
       });
 
       // Note: TRANSITION_CANCELLED test was removed because it required mocking

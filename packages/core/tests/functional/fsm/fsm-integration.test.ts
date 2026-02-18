@@ -412,7 +412,7 @@ describe("FSM integration", () => {
       expect(isActiveWhenTransitioning).toBe(true);
     });
 
-    it("stop() during STARTING transitions FSM to IDLE — no ROUTER_STOP emitted", async () => {
+    it("stop() during guard emits ROUTER_STOP — router was READY before navigation (R3)", async () => {
       const onStop = vi.fn();
 
       router.addEventListener(events.ROUTER_STOP, onStop);
@@ -425,7 +425,7 @@ describe("FSM integration", () => {
 
       await expect(router.start("/home")).rejects.toBeDefined();
 
-      expect(onStop).not.toHaveBeenCalled();
+      expect(onStop).toHaveBeenCalledTimes(1);
       expect(router.isActive()).toBe(false);
     });
   });

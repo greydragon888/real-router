@@ -74,7 +74,7 @@ describe("FSM lifecycle — Release 2 (boolean flags removed)", () => {
   });
 
   describe("stop() during STARTING — facade sends STOP directly to FSM", () => {
-    it("stop() during STARTING does NOT emit ROUTER_STOP — FSM transitions STARTING→IDLE directly", async () => {
+    it("stop() during navigation emits ROUTER_STOP — router was READY before navigation (R3)", async () => {
       vi.useFakeTimers();
 
       const onStop = vi.fn();
@@ -98,7 +98,7 @@ describe("FSM lifecycle — Release 2 (boolean flags removed)", () => {
       const result = await startPromise;
 
       expect(result).toBeDefined();
-      expect(onStop).not.toHaveBeenCalled();
+      expect(onStop).toHaveBeenCalledTimes(1);
 
       unsub();
       vi.useRealTimers();

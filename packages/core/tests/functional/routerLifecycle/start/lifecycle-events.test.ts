@@ -58,10 +58,11 @@ describe("router.start() - lifecycle events", () => {
         const transitionSuccessOrder =
           transitionSuccessListener.mock.invocationCallOrder[0];
 
-        // Issue #50: Two-phase start ensures ROUTER_START comes after TRANSITION_START
-        // but before TRANSITION_SUCCESS (handleTransitionComplete sets started then emits)
-        expect(transitionStartOrder).toBeLessThan(startOrder);
-        expect(startOrder).toBeLessThan(transitionSuccessOrder);
+        // R3: completeStart() fires ROUTER_START BEFORE navigateToState(),
+        // so ROUTER_START now comes BEFORE TRANSITION_START (reversed from R2).
+        // Order: ROUTER_START → TRANSITION_START → TRANSITION_SUCCESS
+        expect(startOrder).toBeLessThan(transitionStartOrder);
+        expect(transitionStartOrder).toBeLessThan(transitionSuccessOrder);
       });
     });
   });

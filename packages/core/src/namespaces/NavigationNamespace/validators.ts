@@ -27,7 +27,6 @@ export function validateNavigateToStateArgs(
   toState: unknown,
   fromState: unknown,
   opts: unknown,
-  emitSuccess: unknown,
 ): void {
   // toState must be a valid state object
   if (
@@ -57,13 +56,6 @@ export function validateNavigateToStateArgs(
   if (typeof opts !== "object" || opts === null) {
     throw new TypeError(
       `[router.navigateToState] Invalid opts: expected NavigationOptions object, got ${getTypeDescription(opts)}`,
-    );
-  }
-
-  // emitSuccess must be a boolean
-  if (typeof emitSuccess !== "boolean") {
-    throw new TypeError(
-      `[router.navigateToState] Invalid emitSuccess: expected boolean, got ${getTypeDescription(emitSuccess)}`,
     );
   }
 }
