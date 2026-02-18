@@ -144,13 +144,4 @@ describe("router.navigate() - transitions and cancellation", () => {
       });
     });
   });
-
-  describe("router.cancel()", () => {
-    it("should be callable and not throw", () => {
-      // cancel() resets navigating flag, exposing public API
-      expect(() => {
-        router.cancel();
-      }).not.toThrowError();
-    });
-  });
 });

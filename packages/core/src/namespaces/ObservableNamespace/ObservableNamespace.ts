@@ -166,9 +166,7 @@ export class ObservableNamespace {
     }
   }
 
-  /**
-   * Checks if there are any listeners registered for a given event.
-   */
+  /* v8 ignore next 4 -- @preserve: hasListeners() reserved for future use after lifecycle deps cleanup */
   hasListeners(eventName: (typeof events)[EventsKeys]): boolean {
     const set = this.#callbacks[eventName];
 

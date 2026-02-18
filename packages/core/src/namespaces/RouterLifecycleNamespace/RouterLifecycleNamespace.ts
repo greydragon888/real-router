@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/RouterLifecycleNamespace.ts
 
-import { errorCodes, events } from "../../constants";
+import { errorCodes } from "../../constants";
 import { RouterError } from "../../RouterError";
 
 import type { RouterLifecycleDependencies } from "./types";
@@ -10,7 +10,6 @@ import type { NavigationOptions, State } from "@real-router/types";
 // CYCLIC DEPENDENCIES
 // ═══════════════════════════════════════════════════════════════════════════════
 // RouterLifecycle → Navigation.navigateToState() (for start transitions)
-// RouterLifecycle → Navigation.isNavigating() (check before stop)
 //
 // Solution: functional references configured in Router.#setupDependencies()
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -35,7 +34,6 @@ export class RouterLifecycleNamespace {
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    emitSuccess: boolean,
   ) => Promise<State>;
 
   // Dependencies injected via setDependencies (replaces full router reference)
@@ -97,12 +95,23 @@ export class RouterLifecycleNamespace {
     const deps = this.#deps;
     const options = deps.getOptions();
 
-    // Base options for all operations in start() method
     const startOptions: NavigationOptions = {
-      replace: true, // start() always replace history
+      replace: true,
     };
 
     const matchedState = deps.matchPath(startPath);
+
+    if (!matchedState && !options.allowNotFound) {
+      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        path: startPath,
+      });
+
+      deps.emitTransitionError(undefined, undefined, err);
+
+      throw err;
+    }
+
+    deps.completeStart();
 
     let finalState: State;
 
@@ -111,47 +120,16 @@ export class RouterLifecycleNamespace {
         matchedState,
         undefined,
         startOptions,
-        false, // emitSuccess = false - we will emit below
       );
-    } else if (options.allowNotFound) {
+    } else {
       const notFoundState = deps.makeNotFoundState(startPath, startOptions);
 
       finalState = await this.navigateToState(
         notFoundState,
         undefined,
         startOptions,
-        false, // emitSuccess = false - we will emit below
       );
-    } else {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        path: startPath,
-      });
-
-      if (deps.hasListeners(events.TRANSITION_ERROR)) {
-        deps.invokeEventListeners(
-          events.TRANSITION_ERROR,
-          undefined,
-          undefined,
-          err,
-        );
-      }
-
-      throw err;
     }
-
-    // KEEP: triggers routerFSM.send("STARTED") → STARTING→READY via #handleEvent chain
-    deps.invokeEventListeners(events.ROUTER_START);
-
-    // KEEP: triggers transitionFSM.send("DONE") → RUNNING→IDLE via #handleEvent chain
-    // (routerFSM.send("COMPLETE") is a no-op since FSM is already READY)
-    deps.invokeEventListeners(
-      events.TRANSITION_SUCCESS,
-      finalState,
-      undefined,
-      {
-        replace: true,
-      },
-    );
 
     return finalState;
   }
@@ -160,15 +138,8 @@ export class RouterLifecycleNamespace {
    * Stops the router and resets state.
    *
    * Called only for READY/TRANSITIONING states (facade handles STARTING/IDLE/DISPOSED).
-   * Order: setState(undefined) → invokeEventListeners(ROUTER_STOP) → chain →
-   *        routerFSM.send("STOP") → onTransition → observable.invoke(ROUTER_STOP)
-   * State is cleared BEFORE ROUTER_STOP emission ✓
    */
   stop(): void {
-    const deps = this.#deps;
-
-    deps.setState();
-
-    deps.invokeEventListeners(events.ROUTER_STOP);
+    this.#deps.setState();
   }
 }

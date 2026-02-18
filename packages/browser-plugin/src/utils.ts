@@ -169,7 +169,7 @@ export function updateBrowserState(
 /**
  * Handles transition result (success or error)
  *
- * Success case is handled by navigateToState with emitSuccess=true.
+ * Success case is handled by the router FSM chain (TRANSITION_SUCCESS event).
  * This function only handles error cases that need URL restoration.
  *
  * @param err - Router error or undefined if successful
@@ -189,7 +189,7 @@ export function handleTransitionResult(
   browser: Browser,
   options: BrowserPluginOptions,
 ): void {
-  // Success case handled by navigateToState with emitSuccess=true
+  // Success case handled by the router FSM chain (TRANSITION_SUCCESS event)
   if (!err) {
     return;
   }

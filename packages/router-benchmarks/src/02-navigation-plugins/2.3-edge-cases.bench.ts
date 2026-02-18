@@ -141,7 +141,7 @@ const alternatingRoutes = ["about", "home"];
 
 // 2.3.11 Cancelling navigation during middleware execution
 // router5: navigate() does not reliably return a cancel function
-// real-router: use router.cancel() to cancel in-flight navigation
+// real-router: use router.stop() to cancel in-flight navigation, then restart
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;
@@ -154,7 +154,8 @@ if (!IS_ROUTER5) {
   bench("2.3.11 Cancelling navigation during middleware execution", () => {
     void router.navigate(alternatingRoutes[index++ % 2]);
 
-    router.cancel();
+    router.stop();
+    router.start("/");
   }).gc("inner");
 }
 

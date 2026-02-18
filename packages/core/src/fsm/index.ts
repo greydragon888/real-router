@@ -1,15 +1,13 @@
 // packages/core/src/fsm/index.ts
 
-export {
-  createRouterFSM,
-  type RouterEvent,
-  type RouterPayloads,
-  type RouterState,
-} from "./routerFSM";
+export { createRouterFSM } from "./routerFSM";
 
-export {
-  createTransitionFSM,
-  type TransitionEvent,
-  type TransitionPayloads,
-  type TransitionPhase,
+export { createTransitionFSM } from "./transitionFSM";
+
+export type { RouterEvent, RouterPayloads, RouterState } from "./routerFSM";
+
+export type {
+  TransitionEvent,
+  TransitionPayloads,
+  TransitionPhase,
 } from "./transitionFSM";

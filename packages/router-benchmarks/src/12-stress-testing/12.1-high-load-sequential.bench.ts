@@ -73,17 +73,18 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   }).gc("inner");
 }
 
-// 12.1.6 Thousand navigate -> cancel -> navigate cycles
+// 12.1.6 Thousand navigate -> stop -> navigate cycles
 {
   const router = createSimpleRouter();
 
   router.start("/");
 
-  bench("12.1.6 Thousand navigate -> cancel -> navigate cycles", () => {
+  bench("12.1.6 Thousand navigate -> stop -> navigate cycles", () => {
     for (let i = 0; i < 1000; i++) {
       void router.navigate("about");
 
-      router.cancel();
+      router.stop();
+      router.start("/");
       router.navigate("users");
     }
   }).gc("inner");

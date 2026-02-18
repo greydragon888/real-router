@@ -9,7 +9,7 @@ import {
   validateNavigateToStateArgs,
   validateNavigationOptions,
 } from "./validators";
-import { events, errorCodes, constants } from "../../constants";
+import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
@@ -32,8 +32,6 @@ export class NavigationNamespace {
    */
 
   isRouterStarted!: () => boolean;
-
-  #navigating = false;
 
   // Dependencies injected via setDependencies (replaces full router reference)
   #depsStore: NavigationDependencies | undefined;
@@ -80,9 +78,8 @@ export class NavigationNamespace {
     toState: unknown,
     fromState: unknown,
     opts: unknown,
-    emitSuccess: unknown,
   ): void {
-    validateNavigateToStateArgs(toState, fromState, opts, emitSuccess);
+    validateNavigateToStateArgs(toState, fromState, opts);
   }
 
   static validateNavigateToDefaultArgs(opts: unknown): void {
@@ -120,18 +117,12 @@ export class NavigationNamespace {
   // Instance methods
   // =========================================================================
 
-  /**
-   * Checks if a navigation transition is currently in progress.
-   */
+  /* v8 ignore next 6 -- @preserve: isNavigating() reserved for future use; Router.ts uses its own isNavigating() */
   isNavigating(): boolean {
-    return this.isRouterStarted() && this.#navigating;
-  }
-
-  /**
-   * Cancels the current transition if one is in progress.
-   */
-  cancel(): void {
-    this.#navigating = false;
+    return (
+      this.isRouterStarted() &&
+      this.#transitionDeps.getTransitionState() === "RUNNING"
+    );
   }
 
   /**
@@ -142,13 +133,11 @@ export class NavigationNamespace {
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    emitSuccess: boolean,
   ): Promise<State> {
     const deps = this.#deps;
     const transitionDeps = this.#transitionDeps;
 
-    // Warn about concurrent navigation (potential SSR race condition)
-    if (this.#navigating) {
+    if (transitionDeps.getTransitionState() !== "IDLE") {
       logger.warn(
         "router.navigate",
         "Concurrent navigation detected on shared router instance. " +
@@ -156,15 +145,8 @@ export class NavigationNamespace {
       );
     }
 
-    // Cancel previous transition
-    this.cancel();
-
-    // Set navigating flag BEFORE emitting TRANSITION_START
-    // This ensures isNavigating() returns true during event handlers
-    this.#navigating = true;
-
-    // Emit TRANSITION_START (after navigating flag is set)
-    deps.invokeEventListeners(events.TRANSITION_START, toState, fromState);
+    deps.cancelNavigation();
+    deps.startTransition(toState, fromState);
 
     try {
       const finalState = await transition(
@@ -174,74 +156,52 @@ export class NavigationNamespace {
         opts,
       );
 
-      // Route was already validated in navigate() via buildState().
-      // Since guards can no longer redirect (Issue #55), the state.name cannot change.
-      // However, routes can be dynamically removed during async navigation,
-      // so we do a lightweight check with hasRoute() instead of full buildState().
-      // UNKNOWN_ROUTE is always valid (used for 404 handling).
       if (
         finalState.name === constants.UNKNOWN_ROUTE ||
         deps.hasRoute(finalState.name)
       ) {
         deps.setState(finalState);
+        deps.sendTransitionDone(finalState, fromState, opts);
 
-        // Emit TRANSITION_SUCCESS only if requested
-        if (emitSuccess) {
-          deps.invokeEventListeners(
-            events.TRANSITION_SUCCESS,
-            finalState,
-            fromState,
-            opts,
-          );
-        }
-
-        // State is already frozen from transition module
         return finalState;
       } else {
-        // Route was removed during async navigation
-        throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
           routeName: finalState.name,
         });
+
+        deps.sendTransitionError(finalState, fromState, err);
+
+        throw err;
       }
     } catch (error) {
-      // Error handling
       /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
       if (error instanceof RouterError) {
-        if (error.code === errorCodes.TRANSITION_CANCELLED) {
-          deps.invokeEventListeners(
-            events.TRANSITION_CANCEL,
-            toState,
-            fromState,
-          );
-        } else if (error.code === errorCodes.ROUTE_NOT_FOUND) {
-          // ROUTE_NOT_FOUND after successful transition (route removed)
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            undefined,
-            deps.getState(),
-            error,
-          );
-        } else {
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            toState,
-            fromState,
-            error,
-          );
+        switch (error.code) {
+          case errorCodes.TRANSITION_CANCELLED: {
+            // cancel/stop already sent CANCEL to TransitionFSM
+
+            break;
+          }
+          case errorCodes.ROUTE_NOT_FOUND: {
+            // sendTransitionError already called in try block above
+            break;
+          }
+          case errorCodes.CANNOT_ACTIVATE:
+          case errorCodes.CANNOT_DEACTIVATE: {
+            deps.sendTransitionBlocked(toState, fromState, error);
+
+            break;
+          }
+          default: {
+            deps.sendTransitionError(toState, fromState, error);
+          }
         }
       } else {
-        /* v8 ignore next 7 -- @preserve: transition pipeline always wraps errors into RouterError */
-        deps.invokeEventListeners(
-          events.TRANSITION_ERROR,
-          toState,
-          fromState,
-          error as RouterError,
-        );
+        /* v8 ignore next 2 -- @preserve: transition pipeline always wraps errors into RouterError */
+        deps.sendTransitionError(toState, fromState, error as RouterError);
       }
 
       throw error;
-    } finally {
-      this.#navigating = false;
     }
   }
 
@@ -256,14 +216,12 @@ export class NavigationNamespace {
   ): Promise<State> {
     const deps = this.#deps;
 
-    // Quick check of the state of the router
     if (!this.isRouterStarted()) {
       const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
 
       return Promise.reject(err);
     }
 
-    // build route state with segments (avoids duplicate getSegmentsByName call)
     let result;
 
     try {
@@ -275,19 +233,13 @@ export class NavigationNamespace {
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
-      deps.invokeEventListeners(
-        events.TRANSITION_ERROR,
-        undefined,
-        deps.getState(),
-        err,
-      );
+      deps.emitTransitionError(undefined, deps.getState(), err);
 
       return Promise.reject(err);
     }
 
     const { state: route } = result;
 
-    // create a target state
     const toState = deps.makeState(
       route.name,
       route.params,
@@ -301,7 +253,6 @@ export class NavigationNamespace {
 
     const fromState = deps.getState();
 
-    // Fast verification for the same states
     if (
       !opts.reload &&
       !opts.force &&
@@ -309,26 +260,17 @@ export class NavigationNamespace {
     ) {
       const err = new RouterError(errorCodes.SAME_STATES);
 
-      deps.invokeEventListeners(
-        events.TRANSITION_ERROR,
-        toState,
-        fromState,
-        err,
-      );
+      deps.emitTransitionError(toState, fromState, err);
 
       const rejection = Promise.reject(err);
 
-      // Suppress unhandled rejection for expected SAME_STATES error
       rejection.catch(() => {});
 
       return rejection;
     }
 
-    // transition execution with TRANSITION_SUCCESS emission
-    // Note: Guards cannot redirect - redirects are handled in middleware only
-    const promise = this.navigateToState(toState, fromState, opts, true); // emitSuccess = true for public navigate()
+    const promise = this.navigateToState(toState, fromState, opts);
 
-    // Unhandled rejection mitigation: suppress expected errors
     promise.catch((error: unknown) => {
       if (
         error instanceof RouterError &&
@@ -337,7 +279,6 @@ export class NavigationNamespace {
       ) {
         // Expected errors - suppress unhandled rejection warnings
       } else {
-        // Unexpected errors - log for debugging
         logger.error("router.navigate", "Unexpected navigation error", error);
       }
     });

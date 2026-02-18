@@ -125,9 +125,9 @@ describe("core/observable", () => {
 
         expect(secondResult.name).toBe("orders");
 
-        // TRANSITION_CANCEL listener is not triggered in this scenario
-        // because navigations don't cancel each other in the new API
-        expect(cb).toHaveBeenCalledTimes(0);
+        // R3: concurrent navigation sends CANCEL to TransitionFSM,
+        // which emits TRANSITION_CANCEL for the cancelled first navigation
+        expect(cb).toHaveBeenCalledTimes(1);
 
         vi.useRealTimers();
       });

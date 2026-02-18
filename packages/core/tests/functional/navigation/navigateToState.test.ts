@@ -18,27 +18,22 @@ describe("navigateToState argument validation", () => {
 
   it("should throw TypeError for invalid toState (null)", () => {
     expect(() => {
-      void router.navigateToState(null as never, undefined, {}, true);
+      void router.navigateToState(null as never, undefined, {});
     }).toThrowError(TypeError);
     expect(() => {
-      void router.navigateToState(null as never, undefined, {}, true);
+      void router.navigateToState(null as never, undefined, {});
     }).toThrowError(/Invalid toState/);
   });
 
   it("should throw TypeError for invalid toState (missing name)", () => {
     expect(() => {
-      void router.navigateToState({ path: "/" } as never, undefined, {}, true);
+      void router.navigateToState({ path: "/" } as never, undefined, {});
     }).toThrowError(TypeError);
   });
 
   it("should throw TypeError for invalid toState (missing path)", () => {
     expect(() => {
-      void router.navigateToState(
-        { name: "home" } as never,
-        undefined,
-        {},
-        true,
-      );
+      void router.navigateToState({ name: "home" } as never, undefined, {});
     }).toThrowError(TypeError);
   });
 
@@ -46,15 +41,10 @@ describe("navigateToState argument validation", () => {
     const toState = router.makeState("home", {}, "/");
 
     expect(() => {
-      void router.navigateToState(toState, "invalid" as never, {}, true);
+      void router.navigateToState(toState, "invalid" as never, {});
     }).toThrowError(TypeError);
     expect(() => {
-      void router.navigateToState(
-        toState,
-        { notAState: true } as never,
-        {},
-        true,
-      );
+      void router.navigateToState(toState, { notAState: true } as never, {});
     }).toThrowError(/Invalid fromState/);
   });
 
@@ -62,29 +52,18 @@ describe("navigateToState argument validation", () => {
     const toState = router.makeState("home", {}, "/");
 
     expect(() => {
-      void router.navigateToState(toState, undefined, null as never, true);
+      void router.navigateToState(toState, undefined, null as never);
     }).toThrowError(TypeError);
     expect(() => {
-      void router.navigateToState(toState, undefined, null as never, true);
+      void router.navigateToState(toState, undefined, null as never);
     }).toThrowError(/Invalid opts/);
-  });
-
-  it("should throw TypeError for invalid emitSuccess", () => {
-    const toState = router.makeState("home", {}, "/");
-
-    expect(() => {
-      void router.navigateToState(toState, undefined, {}, "true" as never);
-    }).toThrowError(TypeError);
-    expect(() => {
-      void router.navigateToState(toState, undefined, {}, 1 as never);
-    }).toThrowError(/Invalid emitSuccess/);
   });
 
   it("should accept valid arguments", async () => {
     const toState = router.makeState("home", {}, "/");
     const fromState = router.getState();
 
-    const result = await router.navigateToState(toState, fromState, {}, true);
+    const result = await router.navigateToState(toState, fromState, {});
 
     expect(result).toBeDefined();
   });
@@ -92,7 +71,7 @@ describe("navigateToState argument validation", () => {
   it("should accept undefined fromState", async () => {
     const toState = router.makeState("home", {}, "/");
 
-    const result = await router.navigateToState(toState, undefined, {}, false);
+    const result = await router.navigateToState(toState, undefined, {});
 
     expect(result).toBeDefined();
   });
