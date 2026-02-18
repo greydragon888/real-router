@@ -13,7 +13,11 @@ import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
-import type { NavigationDependencies, TransitionDependencies } from "./types";
+import type {
+  NavigationDependencies,
+  TransitionDependencies,
+  TransitionOutput,
+} from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -160,23 +164,12 @@ export class NavigationNamespace {
         finalState.name === constants.UNKNOWN_ROUTE ||
         deps.hasRoute(finalState.name)
       ) {
-        const transitionMeta: TransitionMeta = {
-          phase: transitionOutput.phase,
+        const stateWithTransition = NavigationNamespace.#buildSuccessState(
+          finalState,
+          transitionOutput,
           duration,
-          ...(fromState?.name !== undefined && { from: fromState.name }),
-          reason: "success",
-          segments: transitionOutput.segments,
-        };
-
-        Object.freeze(transitionMeta.segments.deactivated);
-        Object.freeze(transitionMeta.segments.activated);
-        Object.freeze(transitionMeta.segments);
-        Object.freeze(transitionMeta);
-
-        const stateWithTransition: State = {
-          ...finalState,
-          transition: transitionMeta,
-        };
+          fromState,
+        );
 
         deps.setState(stateWithTransition);
         deps.sendTransitionDone(stateWithTransition, fromState, opts);
@@ -192,32 +185,7 @@ export class NavigationNamespace {
         throw err;
       }
     } catch (error) {
-      /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
-      if (error instanceof RouterError) {
-        switch (error.code) {
-          case errorCodes.TRANSITION_CANCELLED: {
-            // cancel/stop already sent CANCEL to TransitionFSM
-
-            break;
-          }
-          case errorCodes.ROUTE_NOT_FOUND: {
-            // sendTransitionError already called in try block above
-            break;
-          }
-          case errorCodes.CANNOT_ACTIVATE:
-          case errorCodes.CANNOT_DEACTIVATE: {
-            deps.sendTransitionBlocked(toState, fromState, error);
-
-            break;
-          }
-          default: {
-            deps.sendTransitionError(toState, fromState, error);
-          }
-        }
-      } else {
-        /* v8 ignore next 2 -- @preserve: transition pipeline always wraps errors into RouterError */
-        deps.sendTransitionError(toState, fromState, error as RouterError);
-      }
+      this.#routeTransitionError(error, toState, fromState);
 
       throw error;
     }
@@ -339,5 +307,73 @@ export class NavigationNamespace {
     );
 
     return this.navigate(resolvedRoute, resolvedParams, opts);
+  }
+
+  // =========================================================================
+  // Private methods
+  // =========================================================================
+
+  /**
+   * Builds the final state with frozen TransitionMeta attached.
+   */
+  static #buildSuccessState(
+    finalState: State,
+    transitionOutput: TransitionOutput["meta"],
+    duration: number,
+    fromState: State | undefined,
+  ): State {
+    const transitionMeta: TransitionMeta = {
+      phase: transitionOutput.phase,
+      duration,
+      ...(fromState?.name !== undefined && { from: fromState.name }),
+      reason: "success",
+      segments: transitionOutput.segments,
+    };
+
+    Object.freeze(transitionMeta.segments.deactivated);
+    Object.freeze(transitionMeta.segments.activated);
+    Object.freeze(transitionMeta.segments);
+    Object.freeze(transitionMeta);
+
+    return {
+      ...finalState,
+      transition: transitionMeta,
+    };
+  }
+
+  /**
+   * Routes a caught transition error to the correct FSM event.
+   */
+  #routeTransitionError(
+    error: unknown,
+    toState: State,
+    fromState: State | undefined,
+  ): void {
+    /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
+    if (error instanceof RouterError) {
+      switch (error.code) {
+        case errorCodes.TRANSITION_CANCELLED: {
+          // cancel/stop already sent CANCEL to TransitionFSM
+
+          break;
+        }
+        case errorCodes.ROUTE_NOT_FOUND: {
+          // sendTransitionError already called in try block
+          break;
+        }
+        case errorCodes.CANNOT_ACTIVATE:
+        case errorCodes.CANNOT_DEACTIVATE: {
+          this.#deps.sendTransitionBlocked(toState, fromState, error);
+
+          break;
+        }
+        default: {
+          this.#deps.sendTransitionError(toState, fromState, error);
+        }
+      }
+    } else {
+      /* v8 ignore next 2 -- @preserve: transition pipeline always wraps errors into RouterError */
+      this.#deps.sendTransitionError(toState, fromState, error as RouterError);
+    }
   }
 }
