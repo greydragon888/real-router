@@ -346,14 +346,11 @@ export function browserPluginFactory(
         isTransitioning = true;
 
         try {
-          // Use internal navigateToState with emitSuccess = true
           // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
-
           const toState = await router.navigateToState(
             state,
             routerState,
             transitionOptions,
-            true, // emitSuccess = true - event emitted with transitionOptions (includes replace: true)
           );
 
           handleTransitionResult(

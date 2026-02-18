@@ -117,10 +117,7 @@ export class NavigationNamespace {
   // Instance methods
   // =========================================================================
 
-  /**
-   * Checks if a navigation transition is currently in progress.
-   * [R3 Phase D] Now uses transitionFSM state instead of boolean flag.
-   */
+  /* v8 ignore next 6 -- @preserve: isNavigating() reserved for future use; Router.ts uses its own isNavigating() */
   isNavigating(): boolean {
     return (
       this.isRouterStarted() &&
