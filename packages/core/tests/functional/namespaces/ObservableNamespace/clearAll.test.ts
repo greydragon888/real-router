@@ -40,16 +40,16 @@ describe("ObservableNamespace/clearAll", () => {
     expect(ns.hasListeners(events.ROUTER_START)).toBe(true);
   });
 
-  it("resets eventDepthMap to null (invoke still works after clearAll)", () => {
+  it("resets eventDepthMap to null (emit still works after clearAll)", () => {
     const cb = vi.fn();
 
     ns.addEventListener(events.ROUTER_START, cb);
-    ns.invoke(events.ROUTER_START);
+    ns.emitRouterStart();
 
     ns.clearAll();
 
     expect(() => {
-      ns.invoke(events.ROUTER_START);
+      ns.emitRouterStart();
     }).not.toThrowError();
   });
 });

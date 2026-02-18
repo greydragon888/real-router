@@ -27,7 +27,7 @@ describe("router.start() - error handling", () => {
 
   describe("error handling edge cases", () => {
     describe("event listener exceptions", () => {
-      // NOTE: Event listener exceptions are CAUGHT by invokeFor() in observable.ts
+      // NOTE: Event listener exceptions are CAUGHT by ObservableNamespace.#emit()
       // and logged via logger.error(). They do NOT propagate to caller.
       // This is correct behavior - protects router from user code errors.
 

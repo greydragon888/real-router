@@ -4,6 +4,4 @@ export { ObservableNamespace } from "./ObservableNamespace";
 
 export { validEventNames } from "./constants";
 
-export { invokeFor } from "./helpers";
-
 export type { EventMethodMap } from "./types";

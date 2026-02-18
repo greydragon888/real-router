@@ -2,11 +2,7 @@
 
 export { DependenciesNamespace } from "./DependenciesNamespace";
 
-export {
-  invokeFor,
-  ObservableNamespace,
-  validEventNames,
-} from "./ObservableNamespace";
+export { ObservableNamespace, validEventNames } from "./ObservableNamespace";
 
 export type { EventMethodMap } from "./ObservableNamespace";
 

@@ -3,7 +3,6 @@
 import { logger } from "@real-router/logger";
 
 import { validEventNames } from "./constants";
-import { invokeFor } from "./helpers";
 import { DEFAULT_LIMITS, events } from "../../constants";
 
 import type { EventMethodMap } from "./types";
@@ -104,74 +103,36 @@ export class ObservableNamespace {
   // Instance methods (trust input - already validated by facade)
   // =========================================================================
 
-  /**
-   * Central event dispatcher.
-   * Input should be validated by facade before calling.
-   */
-  invoke(
-    eventName: (typeof events)[EventsKeys],
+  emitRouterStart(): void {
+    this.#emit(events.ROUTER_START);
+  }
+
+  emitRouterStop(): void {
+    this.#emit(events.ROUTER_STOP);
+  }
+
+  emitTransitionStart(toState: State, fromState?: State): void {
+    this.#emit(events.TRANSITION_START, toState, fromState);
+  }
+
+  emitTransitionSuccess(
+    toState: State,
+    fromState?: State,
+    opts?: NavigationOptions,
+  ): void {
+    this.#emit(events.TRANSITION_SUCCESS, toState, fromState, opts);
+  }
+
+  emitTransitionError(
     toState?: State,
     fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
+    error?: RouterErrorType,
   ): void {
-    // Check recursion depth (business logic, not input validation)
-    this.#checkRecursionDepth(eventName);
+    this.#emit(events.TRANSITION_ERROR, toState, fromState, error);
+  }
 
-    const depthMap = this.#getEventDepthMap();
-
-    try {
-      depthMap[eventName]++;
-
-      switch (eventName) {
-        case events.TRANSITION_START:
-        case events.TRANSITION_CANCEL: {
-          invokeFor(
-            eventName,
-            this.#getCallbackSet(eventName),
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- validated by facade
-            toState!,
-            fromState,
-          );
-
-          break;
-        }
-        case events.TRANSITION_ERROR: {
-          invokeFor(
-            eventName,
-            this.#getCallbackSet(eventName),
-            toState,
-            fromState,
-            arg as RouterErrorType,
-          );
-
-          break;
-        }
-        case events.TRANSITION_SUCCESS: {
-          invokeFor(
-            eventName,
-            this.#getCallbackSet(eventName),
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- validated by facade
-            toState!,
-            fromState,
-            arg as NavigationOptions,
-          );
-
-          break;
-        }
-        // for events.ROUTER_START, events.ROUTER_STOP
-        default: {
-          const _exhaustiveCheck:
-            | typeof events.ROUTER_START
-            | typeof events.ROUTER_STOP = eventName;
-
-          invokeFor(_exhaustiveCheck, this.#getCallbackSet(_exhaustiveCheck));
-
-          break;
-        }
-      }
-    } finally {
-      depthMap[eventName]--;
-    }
+  emitTransitionCancel(toState: State, fromState?: State): void {
+    this.#emit(events.TRANSITION_CANCEL, toState, fromState);
   }
 
   hasListeners(eventName: (typeof events)[EventsKeys]): boolean {
@@ -306,6 +267,35 @@ export class ObservableNamespace {
     };
 
     return this.#eventDepthMap;
+  }
+
+  #emit(eventName: (typeof events)[EventsKeys], ...args: unknown[]): void {
+    const set = this.#callbacks[eventName];
+
+    if (!set || set.size === 0) {
+      return;
+    }
+
+    this.#checkRecursionDepth(eventName);
+
+    const depthMap = this.#getEventDepthMap();
+
+    try {
+      depthMap[eventName]++;
+
+      const listeners = [...set];
+
+      for (const cb of listeners) {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+          Function.prototype.apply.call(cb as Function, undefined, args);
+        } catch (error) {
+          logger.error("Router", `Error in listener for ${eventName}:`, error);
+        }
+      }
+    } finally {
+      depthMap[eventName]--;
+    }
   }
 
   #checkRecursionDepth(eventName: (typeof events)[EventsKeys]): void {

@@ -9,7 +9,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
-import { errorCodes, events } from "./constants";
+import { errorCodes } from "./constants";
 import { createRouterFSM, createTransitionFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
@@ -1282,8 +1282,7 @@ export class Router<
         this.#transitionFSM.send("ERROR", { state: toState, fromState, error });
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.#observable.invoke(
-          events.TRANSITION_ERROR,
+        this.#observable.emitTransitionError(
           toState,
           fromState,
           error as RouterError,
@@ -1321,8 +1320,7 @@ export class Router<
         this.#routerFSM.send("STARTED");
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.#observable.invoke(
-          events.TRANSITION_ERROR,
+        this.#observable.emitTransitionError(
           toState,
           fromState,
           error as unknown as RouterError,
@@ -1393,7 +1391,7 @@ export class Router<
 
     this.#routerFSM.onTransition(({ from, to, event, payload }) => {
       if (from === "STARTING" && to === "READY") {
-        this.#observable.invoke(events.ROUTER_START);
+        this.#observable.emitRouterStart();
       }
 
       /* v8 ignore next 6 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
@@ -1402,45 +1400,31 @@ export class Router<
         to === "IDLE" &&
         (from === "READY" || from === "TRANSITIONING")
       ) {
-        this.#observable.invoke(events.ROUTER_STOP);
+        this.#observable.emitRouterStop();
       }
 
       if (from === "READY" && to === "TRANSITIONING") {
         const p = payload as RouterPayloads["NAVIGATE"];
 
-        this.#observable.invoke(
-          events.TRANSITION_START,
-          p.toState,
-          p.fromState,
-        );
+        this.#observable.emitTransitionStart(p.toState, p.fromState);
       }
 
       if (event === "COMPLETE" && from === "TRANSITIONING") {
         const p = payload as RouterPayloads["COMPLETE"];
 
-        this.#observable.invoke(
-          events.TRANSITION_SUCCESS,
-          p.state,
-          p.fromState,
-          p.opts,
-        );
+        this.#observable.emitTransitionSuccess(p.state, p.fromState, p.opts);
       }
 
       if (event === "CANCEL" && from === "TRANSITIONING") {
         const p = payload as RouterPayloads["CANCEL"];
 
-        this.#observable.invoke(
-          events.TRANSITION_CANCEL,
-          p.toState,
-          p.fromState,
-        );
+        this.#observable.emitTransitionCancel(p.toState, p.fromState);
       }
 
       if (event === "FAIL" && from === "TRANSITIONING") {
         const p = payload as RouterPayloads["FAIL"];
 
-        this.#observable.invoke(
-          events.TRANSITION_ERROR,
+        this.#observable.emitTransitionError(
           p.toState,
           p.fromState,
           p.error as RouterError | undefined,
