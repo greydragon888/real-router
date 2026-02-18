@@ -289,4 +289,14 @@ export interface Router {
    * @returns true if navigation is allowed, false otherwise
    */
   canNavigateTo: (name: string, params?: Params) => boolean;
+
+  /**
+   * Dispose the router and release all resources.
+   *
+   * Stops the router if active, calls plugin teardown, clears all event
+   * listeners, middleware, routes, and dependencies. After disposal, all
+   * mutating methods throw a ROUTER_DISPOSED error. Idempotent — safe to
+   * call multiple times.
+   */
+  dispose: () => void;
 }
