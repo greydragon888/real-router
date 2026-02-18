@@ -127,6 +127,12 @@ export class Router<
    */
   readonly #noValidate: boolean;
 
+  /**
+   * Current target state for transition (stored for dependency injection).
+   * Used by startTransition to pass toState to transitionFSM.
+   */
+  #currentToState: State | undefined;
+
   // ============================================================================
   // Constructor
   // ============================================================================
@@ -1309,6 +1315,50 @@ export class Router<
       },
       getDependency: (name: string) =>
         this.#dependencies.get(name as keyof Dependencies),
+      /* v8 ignore next 3 -- @preserve: R3 Phase B implementation */
+      startTransition: (toState, fromState, _opts) => {
+        this.#currentToState = toState;
+        this.#transitionFSM.send("START", { toState, fromState });
+      },
+      /* v8 ignore next 11 -- @preserve: R3 Phase B implementation */
+      cancelNavigation: () => {
+        const currentToState = this.#currentToState;
+
+        if (
+          this.#transitionFSM.getState() !== "IDLE" &&
+          currentToState !== undefined
+        ) {
+          this.#transitionFSM.send("CANCEL", {
+            toState: currentToState,
+            fromState: this.#state.get(),
+          });
+        }
+      },
+      /* v8 ignore next 2 -- @preserve: R3 Phase B implementation */
+      sendTransitionDone: (state, fromState, opts) => {
+        this.#transitionFSM.send("DONE", { state, fromState, opts });
+      },
+      /* v8 ignore next 5 -- @preserve: R3 Phase B implementation */
+      sendTransitionBlocked: (toState, fromState, error) => {
+        this.#transitionFSM.send("BLOCKED", {
+          state: toState,
+          fromState,
+          error,
+        });
+      },
+      /* v8 ignore next 2 -- @preserve: R3 Phase B implementation */
+      sendTransitionError: (toState, fromState, error) => {
+        this.#transitionFSM.send("ERROR", { state: toState, fromState, error });
+      },
+      /* v8 ignore next 6 -- @preserve: R3 Phase B implementation */
+      emitTransitionError: (toState, fromState, error) => {
+        this.#observable.invoke(
+          events.TRANSITION_ERROR,
+          toState,
+          fromState,
+          error as RouterError,
+        );
+      },
     };
 
     this.#navigation.setDependencies(navigationDeps);
@@ -1317,6 +1367,9 @@ export class Router<
       getLifecycleFunctions: () => this.#routeLifecycle.getFunctions(),
       getMiddlewareFunctions: () => this.#middleware.getFunctions(),
       isActive: () => this.isActive(),
+      /* v8 ignore next -- @preserve: R3 Phase B implementation */
+      /* v8 ignore next -- used by NavigationNamespace after Task 2 integration */
+      getTransitionState: () => this.#transitionFSM.getState(),
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);
       },
@@ -1349,6 +1402,20 @@ export class Router<
       // RouterLifecycleNamespace only uses matchPath without source parameter
       matchPath: (path, source?: string) =>
         this.#routes.matchPath(path, source, this.#options.get()),
+      /* v8 ignore next 2 -- @preserve: R3 Phase B implementation */
+      /* v8 ignore next 3 -- used by RouterLifecycleNamespace.start() after Task 2 integration */
+      completeStart: () => {
+        this.#routerFSM.send("STARTED");
+      },
+      /* v8 ignore next 6 -- @preserve: R3 Phase B implementation */
+      emitTransitionError: (toState, fromState, error) => {
+        this.#observable.invoke(
+          events.TRANSITION_ERROR,
+          toState,
+          fromState,
+          error as unknown as RouterError,
+        );
+      },
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);

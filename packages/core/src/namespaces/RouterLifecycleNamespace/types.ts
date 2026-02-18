@@ -41,4 +41,14 @@ export interface RouterLifecycleDependencies {
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,
   ) => State<P, MP> | undefined;
+
+  /** Complete router start by sending STARTED event to routerFSM */
+  completeStart: () => void;
+
+  /** Emit TRANSITION_ERROR event to listeners */
+  emitTransitionError: (
+    toState: State | undefined,
+    fromState: State | undefined,
+    error: Error,
+  ) => void;
 }

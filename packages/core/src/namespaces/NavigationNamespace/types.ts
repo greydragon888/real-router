@@ -67,6 +67,44 @@ export interface NavigationDependencies {
 
   /** Get a dependency by name (untyped — used only for resolveOption) */
   getDependency: (name: string) => unknown;
+
+  /** Start transition and send START event to transitionFSM */
+  startTransition: (
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
+
+  /** Cancel navigation if transition is running */
+  cancelNavigation: () => void;
+
+  /** Send DONE event to transitionFSM */
+  sendTransitionDone: (
+    state: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
+
+  /** Send BLOCKED event to transitionFSM */
+  sendTransitionBlocked: (
+    toState: State,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
+
+  /** Send ERROR event to transitionFSM */
+  sendTransitionError: (
+    toState: State,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
+
+  /** Emit TRANSITION_ERROR event to listeners */
+  emitTransitionError: (
+    toState: State | undefined,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
 }
 
 /**
@@ -84,6 +122,9 @@ export interface TransitionDependencies {
 
   /** Check if router is active (for cancellation check) */
   isActive: () => boolean;
+
+  /** Get current transition FSM state */
+  getTransitionState: () => "IDLE" | "RUNNING";
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;
