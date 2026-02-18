@@ -384,4 +384,49 @@ describe("FSM integration", () => {
       expect(state.name).toBe("admin");
     });
   });
+
+  describe("RouterFSM lifecycle (Release 2)", () => {
+    it("isActive() returns true when STARTING (during start, before READY) — FSM in STARTING state", async () => {
+      let isActiveWhenStarting: boolean | undefined;
+
+      router.addEventListener(events.TRANSITION_START, () => {
+        isActiveWhenStarting = router.isActive();
+      });
+
+      await router.start("/home");
+
+      expect(isActiveWhenStarting).toBe(true);
+    });
+
+    it("isActive() returns true when TRANSITIONING (during navigate) — FSM in TRANSITIONING state", async () => {
+      await router.start("/home");
+
+      let isActiveWhenTransitioning: boolean | undefined;
+
+      router.addEventListener(events.TRANSITION_START, () => {
+        isActiveWhenTransitioning = router.isActive();
+      });
+
+      await router.navigate("users");
+
+      expect(isActiveWhenTransitioning).toBe(true);
+    });
+
+    it("stop() during STARTING transitions FSM to IDLE — no ROUTER_STOP emitted", async () => {
+      const onStop = vi.fn();
+
+      router.addEventListener(events.ROUTER_STOP, onStop);
+
+      router.addActivateGuard("home", () => () => {
+        router.stop();
+
+        return false;
+      });
+
+      await expect(router.start("/home")).rejects.toBeDefined();
+
+      expect(onStop).not.toHaveBeenCalled();
+      expect(router.isActive()).toBe(false);
+    });
+  });
 });

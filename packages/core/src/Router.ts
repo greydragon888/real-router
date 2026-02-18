@@ -25,6 +25,7 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
+import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
@@ -653,7 +654,9 @@ export class Router<
   // ============================================================================
 
   isActive(): boolean {
-    return this.#lifecycle.isActive();
+    const s = this.#routerFSM.getState();
+
+    return s !== "IDLE" && s !== "DISPOSED";
   }
 
   start(startPath: string): Promise<State> {
@@ -662,12 +665,34 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
+    if (this.#routerFSM.getState() !== "IDLE") {
+      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
+    }
+
     this.#routerFSM.send("START");
 
-    return this.#lifecycle.start(startPath);
+    return this.#lifecycle.start(startPath).catch((error: unknown) => {
+      if (this.#routerFSM.getState() === "STARTING") {
+        this.#routerFSM.send("FAIL", {});
+      }
+
+      throw error;
+    });
   }
 
   stop(): this {
+    const prevState = this.#routerFSM.getState();
+
+    if (prevState === "STARTING") {
+      this.#routerFSM.send("STOP");
+
+      return this;
+    }
+
+    if (prevState !== "READY" && prevState !== "TRANSITIONING") {
+      return this;
+    }
+
     this.#lifecycle.stop();
 
     return this;
@@ -1230,7 +1255,11 @@ export class Router<
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
         this.#observable.addEventListener(eventName, cb),
-      isStarted: () => this.#lifecycle.isStarted(),
+      isStarted: () => {
+        const s = this.#routerFSM.getState();
+
+        return s === "READY" || s === "TRANSITIONING";
+      },
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
     };
@@ -1287,7 +1316,7 @@ export class Router<
     const transitionDeps: TransitionDependencies = {
       getLifecycleFunctions: () => this.#routeLifecycle.getFunctions(),
       getMiddlewareFunctions: () => this.#middleware.getFunctions(),
-      isActive: () => this.#lifecycle.isActive(),
+      isActive: () => this.isActive(),
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);
       },
@@ -1384,7 +1413,11 @@ export class Router<
         );
       }
 
-      if (event === "STOP" && to === "IDLE") {
+      if (
+        event === "STOP" &&
+        to === "IDLE" &&
+        (from === "READY" || from === "TRANSITIONING")
+      ) {
         this.#observable.invoke(events.ROUTER_STOP);
       }
 
@@ -1450,7 +1483,11 @@ export class Router<
     // RouterLifecycle → Navigation.navigateToState() (for start transitions)
     // =========================================================================
 
-    this.#navigation.isRouterStarted = () => this.#lifecycle.isStarted();
+    this.#navigation.isRouterStarted = () => {
+      const s = this.#routerFSM.getState();
+
+      return s === "READY" || s === "TRANSITIONING";
+    };
 
     // Use facade method so tests can spy on router.navigateToState
     this.#lifecycle.navigateToState = (
