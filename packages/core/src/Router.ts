@@ -9,6 +9,8 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
+import { events } from "./constants";
+import { createRouterFSM, createTransitionFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
@@ -26,6 +28,14 @@ import {
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
+import type {
+  RouterEvent,
+  RouterPayloads,
+  RouterState,
+  TransitionEvent,
+  TransitionPayloads,
+  TransitionPhase,
+} from "./fsm";
 import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
 import type {
@@ -44,6 +54,7 @@ import type {
   Route,
   RouteConfigUpdate,
 } from "./types";
+import type { FSM } from "@real-router/fsm";
 import type {
   DefaultDependencies,
   EventName,
@@ -51,6 +62,7 @@ import type {
   Options,
   Params,
   Plugin,
+  RouterError,
   RouteTreeState,
   SimpleState,
   State,
@@ -99,6 +111,14 @@ export class Router<
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
+
+  readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
+  readonly #transitionFSM: FSM<
+    TransitionPhase,
+    TransitionEvent,
+    null,
+    TransitionPayloads
+  >;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -172,6 +192,13 @@ export class Router<
     this.#lifecycle = new RouterLifecycleNamespace();
     this.#clone = new CloneNamespace<Dependencies>();
     this.#noValidate = noValidate;
+
+    // =========================================================================
+    // Initialize FSMs
+    // =========================================================================
+
+    this.#routerFSM = createRouterFSM();
+    this.#transitionFSM = createTransitionFSM();
 
     // =========================================================================
     // Setup Dependencies
@@ -635,7 +662,8 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    // Forward to lifecycle namespace
+    this.#routerFSM.send("START");
+
     return this.#lifecycle.start(startPath);
   }
 
@@ -1062,6 +1090,85 @@ export class Router<
   // ============================================================================
 
   /**
+   * Maps plugin event names to FSM sends.
+   * Called from both invokeEventListeners lambdas.
+   * Phase C: Events route through FSM chain → observable.invoke via onTransition.
+   */
+  #handleEvent(
+    eventName: string,
+    toState: State | undefined,
+    fromState: State | undefined,
+    arg?: unknown,
+  ): void {
+    switch (eventName) {
+      case events.TRANSITION_START: {
+        /* v8 ignore next 4 -- @preserve branch: toState is always defined for TRANSITION_START */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("START", { toState, fromState });
+          this.#routerFSM.send("NAVIGATE", { toState, fromState });
+        }
+
+        break;
+      }
+      case events.TRANSITION_SUCCESS: {
+        /* v8 ignore next 7 -- @preserve branch: toState is always defined for TRANSITION_SUCCESS */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("DONE", {
+            state: toState,
+            fromState,
+            opts: arg as NavigationOptions,
+          });
+          this.#routerFSM.send("COMPLETE", {
+            state: toState,
+            fromState,
+            opts: arg as NavigationOptions,
+          });
+        }
+
+        break;
+      }
+      case events.TRANSITION_CANCEL: {
+        /* v8 ignore next 4 -- @preserve branch: toState is always defined for TRANSITION_CANCEL */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("CANCEL", { toState, fromState });
+          this.#routerFSM.send("CANCEL", { toState, fromState });
+        }
+
+        break;
+      }
+      case events.TRANSITION_ERROR: {
+        /* v8 ignore next 6 -- @preserve branch: toState is always defined for TRANSITION_ERROR */
+        if (toState !== undefined) {
+          this.#transitionFSM.send("ERROR", {
+            state: toState,
+            fromState,
+            error: arg,
+          });
+        }
+
+        this.#routerFSM.send("FAIL", {
+          /* v8 ignore next -- @preserve branch: toState is always defined for TRANSITION_ERROR ternary */
+          ...(toState !== undefined && { toState }),
+          fromState,
+          error: arg,
+        });
+
+        break;
+      }
+      case events.ROUTER_START: {
+        this.#routerFSM.send("STARTED");
+
+        break;
+      }
+      case events.ROUTER_STOP: {
+        this.#routerFSM.send("STOP");
+
+        break;
+      }
+    }
+  }
+
+  /**
    * Sets up dependencies between namespaces.
    * Called once in constructor after all namespaces are created.
    */
@@ -1151,7 +1258,25 @@ export class Router<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
-        this.#observable.invoke(eventName, toState, fromState, arg);
+        // Capture routerFSM state BEFORE #handleEvent mutates it
+        const routerState = this.#routerFSM.getState();
+
+        this.#handleEvent(eventName, toState, fromState, arg);
+        // routerFSM.onTransition only emits events that originate from TRANSITIONING.
+        // For other states, fall back to direct observable.invoke.
+        if (
+          routerState !== "TRANSITIONING" &&
+          (eventName === events.TRANSITION_ERROR ||
+            eventName === events.TRANSITION_CANCEL)
+        ) {
+          this.#observable.invoke(eventName, toState, fromState, arg);
+        }
+
+        // TRANSITION_START: routerFSM.onTransition handles READY→TRANSITIONING.
+        // All other states (STARTING for start(), TRANSITIONING for redirect) need fallback.
+        if (eventName === events.TRANSITION_START && routerState !== "READY") {
+          this.#observable.invoke(eventName, toState, fromState, arg);
+        }
       },
       getDependency: (name: string) =>
         this.#dependencies.get(name as keyof Dependencies),
@@ -1176,7 +1301,16 @@ export class Router<
       getOptions: () => this.#options.get(),
       hasListeners: (eventName) => this.#observable.hasListeners(eventName),
       invokeEventListeners: (eventName, toState, fromState, arg) => {
-        this.#observable.invoke(eventName, toState, fromState, arg);
+        // Capture routerFSM state BEFORE #handleEvent mutates it
+        const routerWasStarting = this.#routerFSM.getState() === "STARTING";
+
+        this.#handleEvent(eventName, toState, fromState, arg);
+        // Fallback: TRANSITION_ERROR during start() (routerFSM STARTING) → emit directly
+        // routerFSM transitions STARTING→IDLE on FAIL, but onTransition only
+        // handles FAIL from TRANSITIONING, so the event would be lost
+        if (eventName === events.TRANSITION_ERROR && routerWasStarting) {
+          this.#observable.invoke(eventName, toState, fromState, arg);
+        }
       },
       makeNotFoundState: (path, options) =>
         this.#state.makeNotFoundState(path, options),
@@ -1189,6 +1323,117 @@ export class Router<
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);
+
+    this.#transitionFSM.onTransition(({ event, payload }) => {
+      /* v8 ignore next -- @preserve: all cases covered but branch analysis counts default */
+      switch (event) {
+        case "DONE": {
+          const p = payload as TransitionPayloads["DONE"];
+
+          /* v8 ignore next 3 -- @preserve: unreachable in Phase C — lifecycle sends STARTED before transitionFSM receives DONE */
+          if (this.#routerFSM.getState() === "STARTING") {
+            this.#routerFSM.send("STARTED");
+          } else {
+            this.#routerFSM.send("COMPLETE", {
+              state: p.state,
+              fromState: p.fromState,
+              opts: p.opts,
+            });
+          }
+
+          break;
+        }
+        case "CANCEL": {
+          const p = payload as TransitionPayloads["CANCEL"];
+
+          this.#routerFSM.send("CANCEL", {
+            toState: p.toState,
+            fromState: p.fromState,
+          });
+
+          break;
+        }
+        case "BLOCKED":
+        case "ERROR": {
+          const p = payload as TransitionPayloads["ERROR"];
+
+          if (this.#routerFSM.getState() === "STARTING") {
+            this.#routerFSM.send("FAIL", {});
+          } else {
+            this.#routerFSM.send("FAIL", {
+              toState: p.state,
+              fromState: p.fromState,
+              error: p.error,
+            });
+          }
+
+          break;
+        }
+      }
+    });
+
+    this.#routerFSM.onTransition(({ from, to, event, payload }) => {
+      if (from === "STARTING" && to === "READY") {
+        this.#observable.invoke(events.ROUTER_START);
+        this.#observable.invoke(
+          events.TRANSITION_SUCCESS,
+          /* v8 ignore next -- @preserve: state is always set when STARTING→READY, ?? undefined is defensive */
+          this.#state.get() ?? undefined,
+          undefined,
+          { replace: true } as NavigationOptions,
+        );
+      }
+
+      if (event === "STOP" && to === "IDLE") {
+        this.#observable.invoke(events.ROUTER_STOP);
+      }
+
+      if (from === "READY" && to === "TRANSITIONING") {
+        const p = payload as RouterPayloads["NAVIGATE"];
+
+        this.#observable.invoke(
+          events.TRANSITION_START,
+          p.toState,
+          p.fromState,
+        );
+      }
+
+      if (event === "COMPLETE" && from === "TRANSITIONING") {
+        const p = payload as RouterPayloads["COMPLETE"];
+
+        this.#observable.invoke(
+          events.TRANSITION_SUCCESS,
+          p.state,
+          p.fromState,
+          p.opts,
+        );
+      }
+
+      /* v8 ignore next 8 -- @preserve: unreachable — TRANSITION_CANCEL only fires after stop(),
+         which sends STOP→IDLE before the async transition checks isCancelled().
+         By the time the NavigationDependencies lambda emits TRANSITION_CANCEL,
+         routerFSM is already IDLE, so CANCEL goes through the fallback path. */
+      if (event === "CANCEL" && from === "TRANSITIONING") {
+        const p = payload as RouterPayloads["CANCEL"];
+
+        this.#observable.invoke(
+          events.TRANSITION_CANCEL,
+          p.toState,
+          p.fromState,
+        );
+      }
+
+      if (event === "FAIL" && from === "TRANSITIONING") {
+        const p = payload as RouterPayloads["FAIL"];
+
+        this.#observable.invoke(
+          events.TRANSITION_ERROR,
+          p.toState,
+          p.fromState,
+          p.error as RouterError | undefined,
+        );
+      }
+    });
 
     // StateNamespace needs access to route config and path building
     this.#state.setDependencies({
