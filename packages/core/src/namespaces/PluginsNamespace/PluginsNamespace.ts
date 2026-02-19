@@ -247,10 +247,7 @@ export class PluginsNamespace<
 
   disposeAll(): void {
     for (const unsubscribe of this.#unsubscribes) {
-      try {
-        unsubscribe();
-        // eslint-disable-next-line no-empty
-      } catch {}
+      unsubscribe();
     }
 
     this.#plugins.clear();

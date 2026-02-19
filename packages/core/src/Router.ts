@@ -682,18 +682,7 @@ export class Router<
   }
 
   stop(): this {
-    if (this.#routerFSM.canSend(routerEvents.CANCEL)) {
-      const currentToState = this.#currentToState;
-
-      /* v8 ignore next 7 -- @preserve: currentToState undefined during stop() is a defensive guard */
-      if (currentToState !== undefined) {
-        this.#routerFSM.send(routerEvents.CANCEL, {
-          toState: currentToState,
-          fromState: this.#state.get(),
-        });
-        this.#currentToState = undefined;
-      }
-    }
+    this.#cancelTransitionIfRunning();
 
     const prevState = this.#routerFSM.getState();
 
@@ -722,18 +711,7 @@ export class Router<
       return;
     }
 
-    if (this.#routerFSM.canSend(routerEvents.CANCEL)) {
-      const currentToState = this.#currentToState;
-
-      /* v8 ignore next 7 -- @preserve: currentToState undefined during dispose() is a defensive guard */
-      if (currentToState !== undefined) {
-        this.#routerFSM.send(routerEvents.CANCEL, {
-          toState: currentToState,
-          fromState: this.#state.get(),
-        });
-        this.#currentToState = undefined;
-      }
-    }
+    this.#cancelTransitionIfRunning();
 
     const state = this.#routerFSM.getState();
 
@@ -1097,15 +1075,15 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    const promise = this.#navigation.navigate(
+    const promiseState = this.#navigation.navigate(
       routeName,
       routeParams ?? {},
       opts,
     );
 
-    Router.#suppressUnhandledRejection(promise);
+    Router.#suppressUnhandledRejection(promiseState);
 
-    return promise;
+    return promiseState;
   }
 
   navigateToDefault(): Promise<State>;
@@ -1124,11 +1102,11 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    const promise = this.#navigation.navigateToDefault(opts);
+    const promiseState = this.#navigation.navigateToDefault(opts);
 
-    Router.#suppressUnhandledRejection(promise);
+    Router.#suppressUnhandledRejection(promiseState);
 
-    return promise;
+    return promiseState;
   }
 
   navigateToState(
@@ -1172,24 +1150,51 @@ export class Router<
   }
 
   /**
+   * Pre-allocated callback for #suppressUnhandledRejection.
+   * Avoids creating a new closure on every navigate() call.
+   */
+  static readonly #onSuppressedError = (error: unknown): void => {
+    if (
+      error instanceof RouterError &&
+      (error.code === errorCodes.SAME_STATES ||
+        error.code === errorCodes.TRANSITION_CANCELLED ||
+        error.code === errorCodes.ROUTER_NOT_STARTED ||
+        error.code === errorCodes.ROUTE_NOT_FOUND)
+    ) {
+      return;
+    }
+
+    logger.error("router.navigate", "Unexpected navigation error", error);
+  };
+
+  /**
    * Fire-and-forget safety: prevents unhandled rejection warnings
    * when navigate/navigateToDefault is called without await.
    * Expected errors are silently suppressed; unexpected ones are logged.
    */
   static #suppressUnhandledRejection(promise: Promise<State>): void {
-    promise.catch((error: unknown) => {
-      if (
-        error instanceof RouterError &&
-        (error.code === errorCodes.SAME_STATES ||
-          error.code === errorCodes.TRANSITION_CANCELLED ||
-          error.code === errorCodes.ROUTER_NOT_STARTED ||
-          error.code === errorCodes.ROUTE_NOT_FOUND)
-      ) {
-        return;
-      }
+    promise.catch(Router.#onSuppressedError);
+  }
 
-      logger.error("router.navigate", "Unexpected navigation error", error);
-    });
+  /**
+   * Cancels an in-flight transition if one is running.
+   * Used by stop() and dispose() to abort before changing FSM state.
+   */
+  #cancelTransitionIfRunning(): void {
+    if (!this.#routerFSM.canSend(routerEvents.CANCEL)) {
+      return;
+    }
+
+    const currentToState = this.#currentToState;
+
+    /* v8 ignore next 7 -- @preserve: currentToState always set when transitioning, guard is defensive */
+    if (currentToState !== undefined) {
+      this.#routerFSM.send(routerEvents.CANCEL, {
+        toState: currentToState,
+        fromState: this.#state.get(),
+      });
+      this.#currentToState = undefined;
+    }
   }
 
   /**

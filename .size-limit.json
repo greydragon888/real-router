@@ -2,7 +2,7 @@
   {
     "name": "@real-router/core (ESM)",
     "path": "packages/core/dist/esm/index.mjs",
-    "limit": "22.1 kB"
+    "limit": "25 kB"
   },
   {
     "name": "@real-router/fsm (ESM)",

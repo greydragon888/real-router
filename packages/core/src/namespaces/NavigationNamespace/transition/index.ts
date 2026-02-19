@@ -85,10 +85,9 @@ export async function transition(
   if (fromState) {
     const activeSegments = nameToIDs(toState.name);
     const previousActiveSegments = nameToIDs(fromState.name);
-    const activeSet = new Set(activeSegments);
 
     for (const name of previousActiveSegments) {
-      if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
+      if (!activeSegments.includes(name) && canDeactivateFunctions.has(name)) {
         deps.clearCanDeactivate(name);
       }
     }
