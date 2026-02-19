@@ -9,6 +9,8 @@ type TestEventMap = {
   click: [x: number, y: number];
   hover: [target: string];
   reset: [];
+  submit: [action: string, data: object, validate: boolean];
+  complex: [a: string, b: string, c: string, d: string];
 };
 
 /* eslint-disable unicorn/prefer-event-target -- custom EventEmitter, not Node.js EventEmitter */
@@ -31,6 +33,26 @@ describe("EventEmitter", () => {
 
       expect(cb).toHaveBeenCalledTimes(1);
       expect(cb).toHaveBeenCalledWith(10, 20);
+    });
+
+    it("should call listener with 3 args (switch case 3)", () => {
+      const emitter = createEmitter();
+      const cb = vi.fn();
+
+      emitter.on("submit", cb);
+      emitter.emit("submit", "save", { id: 1 }, true);
+
+      expect(cb).toHaveBeenCalledWith("save", { id: 1 }, true);
+    });
+
+    it("should call listener with 4+ args (switch default)", () => {
+      const emitter = createEmitter();
+      const cb = vi.fn();
+
+      emitter.on("complex", cb);
+      emitter.emit("complex", "a", "b", "c", "d");
+
+      expect(cb).toHaveBeenCalledWith("a", "b", "c", "d");
     });
 
     it("should return an unsubscribe function", () => {
@@ -473,6 +495,30 @@ describe("EventEmitter", () => {
       emitter.emit("click", 1, 2);
 
       expect(hoverCb).toHaveBeenCalledWith("from-click");
+    });
+
+    it("should call listener with 3 args when depth tracking is on", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+      });
+      const cb = vi.fn();
+
+      emitter.on("submit", cb);
+      emitter.emit("submit", "save", { id: 1 }, true);
+
+      expect(cb).toHaveBeenCalledWith("save", { id: 1 }, true);
+    });
+
+    it("should call listener with 4+ args when depth tracking is on", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+      });
+      const cb = vi.fn();
+
+      emitter.on("complex", cb);
+      emitter.emit("complex", "a", "b", "c", "d");
+
+      expect(cb).toHaveBeenCalledWith("a", "b", "c", "d");
     });
 
     it("should decrement depth after emit completes (including after error)", () => {

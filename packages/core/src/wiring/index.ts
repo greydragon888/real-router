@@ -4,4 +4,4 @@ export { RouterWiringBuilder } from "./RouterWiringBuilder";
 
 export { wireRouter } from "./wireRouter";
 
-export type { WiringOptions, RouterFacade } from "./types";
+export type { WiringOptions } from "./types";

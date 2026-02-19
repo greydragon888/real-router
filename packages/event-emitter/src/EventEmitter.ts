@@ -124,31 +124,13 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       return;
     }
 
-    this.#checkRecursionDepth(eventName);
+    if (this.#limits.maxEventDepth === 0) {
+      this.#emitFast(set, eventName, args);
 
-    const depthMap = this.#getDepthMap();
-
-    try {
-      depthMap.set(eventName, (depthMap.get(eventName) ?? 0) + 1);
-
-      const listeners = [...set];
-
-      for (const cb of listeners) {
-        try {
-          Function.prototype.apply.call(cb, undefined, args);
-        } catch (error) {
-          if (error instanceof RecursionDepthError) {
-            throw error;
-          }
-
-          this.#onListenerError?.(eventName, error);
-        }
-      }
-    } finally {
-      // Safe: depthMap.set() at try start guarantees the value exists
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      depthMap.set(eventName, depthMap.get(eventName)! - 1);
+      return;
     }
+
+    this.#emitWithDepthTracking(set, eventName, args);
   }
 
   /**
@@ -171,6 +153,120 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   // ===========================================================================
 
   /**
+   * Fast emit path — no depth tracking, no try/finally overhead.
+   * Used when maxEventDepth === 0 (depth protection disabled).
+   */
+  #emitFast(set: Set<AnyCallback>, eventName: string, args: unknown[]): void {
+    const listeners = [...set];
+
+    for (const cb of listeners) {
+      try {
+        switch (args.length) {
+          case 0: {
+            (cb as () => void)();
+
+            break;
+          }
+          case 1: {
+            (cb as (a: unknown) => void)(args[0]);
+
+            break;
+          }
+          case 2: {
+            (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
+
+            break;
+          }
+          case 3: {
+            (cb as (a: unknown, b: unknown, c: unknown) => void)(
+              args[0],
+              args[1],
+              args[2],
+            );
+
+            break;
+          }
+          default: {
+            Function.prototype.apply.call(cb, undefined, args);
+          }
+        }
+      } catch (error) {
+        this.#onListenerError?.(eventName, error);
+      }
+    }
+  }
+
+  /**
+   * Emit path with recursion depth tracking and protection.
+   * Used when maxEventDepth > 0.
+   */
+  #emitWithDepthTracking(
+    set: Set<AnyCallback>,
+    eventName: string,
+    args: unknown[],
+  ): void {
+    this.#depthMap ??= new Map();
+    const depthMap = this.#depthMap;
+    const depth = depthMap.get(eventName) ?? 0;
+
+    if (depth >= this.#limits.maxEventDepth) {
+      throw new RecursionDepthError(
+        `Maximum recursion depth (${this.#limits.maxEventDepth}) exceeded for event: ${eventName}`,
+      );
+    }
+
+    try {
+      depthMap.set(eventName, depth + 1);
+
+      const listeners = [...set];
+
+      for (const cb of listeners) {
+        try {
+          switch (args.length) {
+            case 0: {
+              (cb as () => void)();
+
+              break;
+            }
+            case 1: {
+              (cb as (a: unknown) => void)(args[0]);
+
+              break;
+            }
+            case 2: {
+              (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
+
+              break;
+            }
+            case 3: {
+              (cb as (a: unknown, b: unknown, c: unknown) => void)(
+                args[0],
+                args[1],
+                args[2],
+              );
+
+              break;
+            }
+            default: {
+              Function.prototype.apply.call(cb, undefined, args);
+            }
+          }
+        } catch (error) {
+          if (error instanceof RecursionDepthError) {
+            throw error;
+          }
+
+          this.#onListenerError?.(eventName, error);
+        }
+      }
+    } finally {
+      // Safe: depthMap.set() at try start guarantees the value exists
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      depthMap.set(eventName, depthMap.get(eventName)! - 1);
+    }
+  }
+
+  /**
    * Gets or creates a Set for the given event name (lazy initialization).
    */
   #getCallbackSet(eventName: string): Set<AnyCallback> {
@@ -185,35 +281,5 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     this.#callbacks.set(eventName, set);
 
     return set;
-  }
-
-  /**
-   * Gets or creates the depth map (lazy initialization).
-   */
-  #getDepthMap(): Map<string, number> {
-    this.#depthMap ??= new Map();
-
-    return this.#depthMap;
-  }
-
-  /**
-   * Checks if the recursion depth for an event exceeds the limit.
-   * Throws RecursionDepthError which propagates past per-listener catch.
-   */
-  #checkRecursionDepth(eventName: string): void {
-    const { maxEventDepth } = this.#limits;
-
-    if (maxEventDepth === 0) {
-      return;
-    }
-
-    const depthMap = this.#getDepthMap();
-    const depth = depthMap.get(eventName) ?? 0;
-
-    if (depth >= maxEventDepth) {
-      throw new RecursionDepthError(
-        `Maximum recursion depth (${maxEventDepth}) exceeded for event: ${eventName}`,
-      );
-    }
   }
 }

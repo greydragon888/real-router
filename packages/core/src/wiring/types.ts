@@ -14,31 +14,10 @@ import type {
   StateNamespace,
 } from "../namespaces";
 import type { Router } from "../Router";
-import type { ActivationFnFactory, Limits, RouterEventMap } from "../types";
+import type { Limits, RouterEventMap } from "../types";
 import type { FSM } from "@real-router/fsm";
-import type {
-  DefaultDependencies,
-  Params,
-  SimpleState,
-  State,
-} from "@real-router/types";
+import type { DefaultDependencies, State } from "@real-router/types";
 import type { EventEmitter } from "event-emitter";
-
-export interface RouterFacade<Dependencies extends DefaultDependencies> {
-  addActivateGuard: (
-    name: string,
-    handler: ActivationFnFactory<Dependencies> | boolean,
-  ) => unknown;
-  addDeactivateGuard: (
-    name: string,
-    handler: ActivationFnFactory<Dependencies> | boolean,
-  ) => unknown;
-  forwardState: <P extends Params>(
-    routeName: string,
-    routeParams: P,
-  ) => SimpleState<P>;
-  isActive: () => boolean;
-}
 
 /**
  * Constructor options bag for RouterWiringBuilder.
