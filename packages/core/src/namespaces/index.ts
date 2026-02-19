@@ -2,10 +2,6 @@
 
 export { DependenciesNamespace } from "./DependenciesNamespace";
 
-export { ObservableNamespace, validEventNames } from "./ObservableNamespace";
-
-export type { EventMethodMap } from "./ObservableNamespace";
-
 export {
   deepFreeze,
   defaultOptions,

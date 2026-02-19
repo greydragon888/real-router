@@ -1,6 +1,7 @@
 // packages/real-router/modules/constants.ts
 
 import type {
+  EventName,
   EventToNameMap,
   EventToPluginMap,
   ErrorCodeToValueMap,
@@ -69,6 +70,18 @@ export const events: EventToNameMap = {
   TRANSITION_SUCCESS: "$$success", // Emitted when navigation completes successfully
   TRANSITION_ERROR: "$$error", // Emitted when navigation fails
 };
+
+/**
+ * Valid event names for validation.
+ */
+export const validEventNames = new Set<EventName>([
+  events.ROUTER_START,
+  events.TRANSITION_START,
+  events.TRANSITION_SUCCESS,
+  events.TRANSITION_ERROR,
+  events.TRANSITION_CANCEL,
+  events.ROUTER_STOP,
+]);
 
 /**
  * Default limits configuration for the router.

@@ -7,17 +7,50 @@
  * rather than core-types to avoid circular dependencies.
  */
 
+import type { events, plugins } from "./constants";
 import type { Router } from "./Router";
 import type {
   ActivationFn,
   DefaultDependencies,
+  EventsKeys,
   ForwardToCallback,
   LimitsConfig,
   Middleware,
+  NavigationOptions,
   Params,
   Plugin,
+  RouterError as RouterErrorType,
   RouteTreeState,
+  State,
 } from "@real-router/types";
+
+export type EventMethodMap = {
+  [K in EventsKeys as (typeof events)[K]]: (typeof plugins)[K];
+};
+
+/**
+ * Event argument tuples for the router's 6 events.
+ *
+ * Uses explicit `| undefined` unions (not optional `?`) to satisfy
+ * `exactOptionalPropertyTypes` when passing undefined args from FSM payloads.
+ */
+// eslint-disable-next-line @typescript-eslint/consistent-type-definitions -- must be `type` for Record<string, unknown[]> constraint
+export type RouterEventMap = {
+  $start: [];
+  $stop: [];
+  $$start: [toState: State, fromState: State | undefined];
+  $$success: [
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions | undefined,
+  ];
+  $$error: [
+    toState: State | undefined,
+    fromState: State | undefined,
+    error: RouterErrorType | undefined,
+  ];
+  $$cancel: [toState: State, fromState: State | undefined];
+};
 
 /**
  * Immutable limits configuration type.

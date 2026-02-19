@@ -1,4 +1,5 @@
 // packages/core/src/Router.ts
+/* eslint-disable unicorn/prefer-event-target -- custom EventEmitter package, not Node.js EventEmitter */
 
 /**
  * Router class - facade with integrated namespaces.
@@ -7,9 +8,14 @@
  */
 
 import { logger } from "@real-router/logger";
+import { EventEmitter } from "event-emitter";
 import { validateRouteName } from "type-guards";
 
-import { errorCodes } from "./constants";
+import { errorCodes, events } from "./constants";
+import {
+  validateListenerArgs,
+  validateSubscribeListener,
+} from "./eventValidation";
 import { createRouterFSM, routerEvents, routerStates } from "./fsm";
 import { createLimits } from "./helpers";
 import {
@@ -17,7 +23,6 @@ import {
   DependenciesNamespace,
   MiddlewareNamespace,
   NavigationNamespace,
-  ObservableNamespace,
   OptionsNamespace,
   PluginsNamespace,
   RouteLifecycleNamespace,
@@ -31,7 +36,6 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
 import type { RouterEvent, RouterPayloads, RouterState } from "./fsm";
-import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
 import type {
   NavigationDependencies,
@@ -43,11 +47,13 @@ import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNa
 import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
+  EventMethodMap,
   Limits,
   MiddlewareFactory,
   PluginFactory,
   Route,
   RouteConfigUpdate,
+  RouterEventMap,
 } from "./types";
 import type { FSM } from "@real-router/fsm";
 import type {
@@ -72,7 +78,7 @@ import type { CreateMatcherOptions } from "route-tree";
  * All functionality is provided by namespace classes:
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesNamespace: get/set/remove dependencies
- * - ObservableNamespace: event listeners, subscribe
+ * - EventEmitter: event listeners, subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
@@ -96,7 +102,6 @@ export class Router<
   readonly #options: OptionsNamespace;
   readonly #limits: Limits;
   readonly #dependencies: DependenciesNamespace<Dependencies>;
-  readonly #observable: ObservableNamespace;
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
   readonly #routeLifecycle: RouteLifecycleNamespace<Dependencies>;
@@ -107,6 +112,7 @@ export class Router<
   readonly #clone: CloneNamespace<Dependencies>;
 
   readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
+  readonly #emitter: EventEmitter<RouterEventMap>;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -172,7 +178,6 @@ export class Router<
     this.#options = new OptionsNamespace(options);
     this.#limits = createLimits(options.limits);
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
-    this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
@@ -192,6 +197,17 @@ export class Router<
     // =========================================================================
 
     this.#routerFSM = createRouterFSM();
+    this.#emitter = new EventEmitter<RouterEventMap>({
+      onListenerError: (eventName, error) => {
+        logger.error("Router", `Error in listener for ${eventName}:`, error);
+      },
+      onListenerWarn: (eventName, count) => {
+        logger.warn(
+          "router.addEventListener",
+          `Event "${eventName}" has ${count} listeners — possible memory leak`,
+        );
+      },
+    });
 
     // =========================================================================
     // Setup Dependencies
@@ -710,10 +726,10 @@ export class Router<
     }
 
     this.#routerFSM.send(routerEvents.DISPOSE);
+    this.#emitter.clearAll();
 
     this.#plugins.disposeAll();
     this.#middleware.clearAll();
-    this.#observable.clearAll();
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();
@@ -1015,7 +1031,7 @@ export class Router<
   }
 
   // ============================================================================
-  // Events (backed by ObservableNamespace)
+  // Events (backed by EventEmitter)
   // ============================================================================
 
   addEventListener<E extends EventName>(
@@ -1023,10 +1039,33 @@ export class Router<
     cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
     if (!this.#noValidate) {
-      ObservableNamespace.validateListenerArgs(eventName, cb);
+      validateListenerArgs(eventName, cb);
     }
 
-    return this.#observable.addEventListener(eventName, cb);
+    return this.#emitter.on(
+      eventName,
+      cb as (...args: RouterEventMap[typeof eventName]) => void,
+    );
+  }
+
+  // ============================================================================
+  // Subscription (backed by EventEmitter)
+  // ============================================================================
+
+  subscribe(listener: SubscribeFn): Unsubscribe {
+    if (!this.#noValidate) {
+      validateSubscribeListener(listener);
+    }
+
+    return this.#emitter.on(
+      events.TRANSITION_SUCCESS,
+      (toState: State, fromState?: State) => {
+        listener({
+          route: toState,
+          previousRoute: fromState,
+        });
+      },
+    );
   }
 
   // ============================================================================
@@ -1105,18 +1144,6 @@ export class Router<
   }
 
   // ============================================================================
-  // Subscription (backed by ObservableNamespace)
-  // ============================================================================
-
-  subscribe(listener: SubscribeFn): Unsubscribe {
-    if (!this.#noValidate) {
-      ObservableNamespace.validateSubscribeListener(listener);
-    }
-
-    return this.#observable.subscribe(listener);
-  }
-
-  // ============================================================================
   // Cloning
   // ============================================================================
 
@@ -1168,17 +1195,16 @@ export class Router<
       return;
     }
 
-    const currentToState = this.#currentToState;
-
-    /* v8 ignore next 7 -- @preserve: currentToState always set when transitioning, guard is defensive */
-    if (currentToState !== undefined) {
-      this.#routerFSM.send(routerEvents.CANCEL, {
-        toState: currentToState,
-        fromState: this.#state.get(),
-      });
-      this.#currentToState = undefined;
-    }
+    this.#routerFSM.send(routerEvents.CANCEL, {
+      toState: this.#currentToState!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+      fromState: this.#state.get(),
+    });
+    this.#currentToState = undefined;
   }
+
+  // ============================================================================
+  // Dependency wiring (private)
+  // ============================================================================
 
   /**
    * Sets up dependencies between namespaces.
@@ -1202,7 +1228,11 @@ export class Router<
     this.#dependencies.setLimits(this.#limits);
     this.#plugins.setLimits(this.#limits);
     this.#middleware.setLimits(this.#limits);
-    this.#observable.setLimits(this.#limits);
+    this.#emitter.setLimits({
+      maxListeners: this.#limits.maxListeners,
+      warnListeners: this.#limits.warnListeners,
+      maxEventDepth: this.#limits.maxEventDepth,
+    });
     this.#routeLifecycle.setLimits(this.#limits);
   }
 
@@ -1256,7 +1286,10 @@ export class Router<
 
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
-        this.#observable.addEventListener(eventName, cb),
+        this.#emitter.on(
+          eventName,
+          cb as (...args: RouterEventMap[typeof eventName]) => void,
+        ),
       canNavigate: () => this.#routerFSM.canSend(routerEvents.NAVIGATE),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
@@ -1295,16 +1328,11 @@ export class Router<
         });
       },
       cancelNavigation: () => {
-        const currentToState = this.#currentToState;
-
-        /* v8 ignore next 7 -- @preserve: cancelNavigation() only called when isTransitioning(), currentToState always set */
-        if (currentToState !== undefined) {
-          this.#routerFSM.send(routerEvents.CANCEL, {
-            toState: currentToState,
-            fromState: this.#state.get(),
-          });
-          this.#currentToState = undefined;
-        }
+        this.#routerFSM.send(routerEvents.CANCEL, {
+          toState: this.#currentToState!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+          fromState: this.#state.get(),
+        });
+        this.#currentToState = undefined;
       },
       sendTransitionDone: (state, fromState, opts) => {
         this.#routerFSM.send(routerEvents.COMPLETE, {
@@ -1340,7 +1368,8 @@ export class Router<
         } else {
           // TRANSITIONING: concurrent navigation with invalid args.
           // Direct emit to avoid disturbing the ongoing transition.
-          this.#observable.emitTransitionError(
+          this.#emitter.emit(
+            events.TRANSITION_ERROR,
             toState,
             fromState,
             error as RouterError,
@@ -1395,27 +1424,33 @@ export class Router<
     const fsm = this.#routerFSM;
 
     fsm.on(routerStates.STARTING, routerEvents.STARTED, () => {
-      this.#observable.emitRouterStart();
+      this.#emitter.emit(events.ROUTER_START);
     });
 
     fsm.on(routerStates.READY, routerEvents.STOP, () => {
-      this.#observable.emitRouterStop();
+      this.#emitter.emit(events.ROUTER_STOP);
     });
 
     fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
-      this.#observable.emitTransitionStart(p.toState, p.fromState);
+      this.#emitter.emit(events.TRANSITION_START, p.toState, p.fromState);
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (p) => {
-      this.#observable.emitTransitionSuccess(p.state, p.fromState, p.opts);
+      this.#emitter.emit(
+        events.TRANSITION_SUCCESS,
+        p.state,
+        p.fromState,
+        p.opts,
+      );
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
-      this.#observable.emitTransitionCancel(p.toState, p.fromState);
+      this.#emitter.emit(events.TRANSITION_CANCEL, p.toState, p.fromState);
     });
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, (p) => {
-      this.#observable.emitTransitionError(
+      this.#emitter.emit(
+        events.TRANSITION_ERROR,
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,
@@ -1423,7 +1458,8 @@ export class Router<
     });
 
     fsm.on(routerStates.READY, routerEvents.FAIL, (p) => {
-      this.#observable.emitTransitionError(
+      this.#emitter.emit(
+        events.TRANSITION_ERROR,
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,
@@ -1431,7 +1467,8 @@ export class Router<
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {
-      this.#observable.emitTransitionError(
+      this.#emitter.emit(
+        events.TRANSITION_ERROR,
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,

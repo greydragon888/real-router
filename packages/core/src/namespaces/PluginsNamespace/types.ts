@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/PluginsNamespace/types.ts
 
-import type { EventMethodMap } from "../index";
+import type { EventMethodMap } from "../../types";
 import type {
   DefaultDependencies,
   EventName,
