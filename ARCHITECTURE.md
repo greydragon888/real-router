@@ -16,6 +16,7 @@ real-router/
 │   ├── persistent-params-plugin/  # Parameter persistence
 │   ├── helpers/              # Route comparison utilities
 │   ├── logger/               # @real-router/logger — isomorphic logging
+│   ├── fsm/                  # @real-router/fsm — finite state machine engine (internal)
 │   ├── route-tree/           # Route tree building, validation, matcher factory (internal)
 │   ├── path-matcher/         # Segment Trie URL matching and path building (internal)
 │   ├── search-params/        # Query string handling (internal)
@@ -49,7 +50,7 @@ real-router/
              │              @real-router/core                  │
              │  ┌─────────────────────────────────────────┐    │
              │  │  Bundles: route-tree, path-matcher,     │    │
-             │  │  search-params, type-guards             │    │
+             │  │  search-params, type-guards, fsm        │    │
              │  └─────────────────────────────────────────┘    │
              └──────────────────────┬──────────────────────────┘
                                     │
@@ -64,7 +65,7 @@ real-router/
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
 
-**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `@real-router/logger`
+**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `@real-router/logger`, `@real-router/fsm`
 
 ## Core Architecture
 
@@ -73,9 +74,11 @@ The `@real-router/core` package uses a **facade + namespaces** pattern:
 ```
 Router.ts (facade) ─────────────────────────────────────────────────
     │
+    ├── RouterFSM              — finite state machine (lifecycle + navigation state)
+    │
     ├── RoutesNamespace        — route tree, path operations, forwarding
     ├── StateNamespace         — current/previous state storage
-    ├── NavigationNamespace    — navigate(), cancel, transition logic
+    ├── NavigationNamespace    — navigate(), transition pipeline
     ├── OptionsNamespace       — router configuration
     ├── DependenciesNamespace  — dependency injection container
     ├── ObservableNamespace    — events, subscribe, Symbol.observable
@@ -86,9 +89,37 @@ Router.ts (facade) ────────────────────�
     └── CloneNamespace         — SSR cloning support
 ```
 
-**Key principle:** Router.ts is a thin facade. All business logic lives in namespaces.
+**Key principle:** Router.ts is a thin facade. All business logic lives in namespaces. All lifecycle state is driven by a single FSM — no boolean flags.
 
 **Detailed documentation:** [packages/core/CLAUDE.md](packages/core/CLAUDE.md)
+
+## Router FSM
+
+All router lifecycle and navigation state is managed by a single finite state machine:
+
+```
+IDLE → STARTING → READY ⇄ TRANSITIONING (+ NAVIGATE self-loop) → IDLE | DISPOSED
+```
+
+| State | Description |
+|-------|-------------|
+| `IDLE` | Router not started or stopped |
+| `STARTING` | Initializing (synchronous window before first await) |
+| `READY` | Ready for navigation |
+| `TRANSITIONING` | Navigation in progress |
+| `DISPOSED` | Terminal state, no transitions out |
+
+FSM events trigger observable emissions via `fsm.on(from, event, action)`:
+- `STARTED` → `emitRouterStart()`
+- `NAVIGATE` → `emitTransitionStart()`
+- `COMPLETE` → `emitTransitionSuccess()`
+- `CANCEL` → `emitTransitionCancel()`
+- `FAIL` → `emitTransitionError()`
+- `STOP` → `emitRouterStop()`
+
+**Key invariant:** All router events are consequences of FSM transitions, never manual calls.
+
+**`dispose()`** permanently terminates the router (IDLE → DISPOSED). Unlike `stop()`, it cannot be restarted. All mutating methods throw `RouterError(ROUTER_DISPOSED)` after disposal. Idempotent — safe to call multiple times.
 
 ## Data Flow
 
@@ -126,7 +157,7 @@ const state = await router.navigate(name, params, options)
                     ▼
             ┌───────────────┐
             │  setState()   │  Freeze & store state
-            │  + events     │  Emit TRANSITION_SUCCESS
+            │  + FSM send   │  COMPLETE → emitTransitionSuccess
             └───────┬───────┘
                     │
                     ▼
@@ -140,7 +171,7 @@ const state = await router.navigate(name, params, options)
               (or rejects with RouterError)
 ```
 
-On error at any step: `TRANSITION_ERROR` event emitted, Promise rejects with `RouterError`.
+On error at any step: FSM sends `FAIL` → `emitTransitionError()`, Promise rejects with `RouterError`.
 
 ### Navigation API
 
@@ -162,13 +193,16 @@ try {
 } catch (err) {
   if (err instanceof RouterError) {
     // ROUTE_NOT_FOUND, CANNOT_ACTIVATE, CANNOT_DEACTIVATE,
-    // TRANSITION_CANCELLED, SAME_STATES
+    // TRANSITION_CANCELLED, SAME_STATES, ROUTER_DISPOSED
   }
 }
 
-// Cancel current navigation
+// Concurrent navigation cancels previous
 router.navigate("slow-route");
-router.cancel(); // Previous promise rejects with TRANSITION_CANCELLED
+router.navigate("fast-route"); // Previous promise rejects with TRANSITION_CANCELLED
+
+// Permanent disposal (cannot restart)
+router.dispose();
 ```
 
 **Guards** return `boolean | Promise<boolean> | State | void` (no callbacks):
@@ -228,6 +262,16 @@ interface State {
     redirected?: boolean; // Was this a redirect?
     source?: string;      // "popstate" | "navigate" | etc.
   };
+  transition?: {          // Set after every successful navigation (deeply frozen)
+    phase: TransitionPhase;   // "deactivating" | "activating" | "middleware"
+    from?: string;            // Previous route name (undefined on start())
+    reason: TransitionReason; // "success" | "blocked" | "cancelled" | "error"
+    segments: {
+      deactivated: string[];  // Segments leaving
+      activated: string[];    // Segments entering
+      intersection: string;   // Common ancestor
+    };
+  };
 }
 ```
 
@@ -265,6 +309,7 @@ createRouter(routes, {
 | `maxMiddleware`        | 50      | Middleware chain overflow           |
 | `maxDependencies`      | 100     | Circular/excessive dependencies     |
 | `maxListeners`         | 10,000  | Event listener memory leaks         |
+| `warnListeners`        | 1,000   | Warn threshold for possible leaks (0 = off) |
 | `maxEventDepth`        | 5       | Recursive event infinite loops      |
 | `maxLifecycleHandlers` | 200     | Guard function accumulation         |
 

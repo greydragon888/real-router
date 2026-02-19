@@ -440,7 +440,8 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 | Package                        | Limit  |
 | ------------------------------ | ------ |
-| @real-router/core              | 21 kB  |
+| @real-router/core              | 25 kB  |
+| @real-router/fsm               | 0.5 kB |
 | @real-router/react             | 2 kB   |
 | @real-router/rx                | 1.5 kB |
 | @real-router/browser-plugin    | 4 kB   |
@@ -646,9 +647,13 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 
 ### Design Decisions
 
-**Single-class, no validation:** The entire FSM is 107 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
+**Single-class, no validation:** The entire FSM is ~137 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
 
 **O(1) transitions:** A `#currentTransitions` cache stores the transition map for the current state, avoiding double lookup (`transitions[state][event]`).
+
+**`canSend(event): boolean`** — O(1) check if event is valid in current state. Uses cached `#currentTransitions`.
+
+**`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Key format `${from}\0${event}` prevents collisions. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
 
 **Null-slot listener pattern:** Same pattern used in `@real-router/core`'s observable. Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
 
@@ -665,7 +670,7 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 ```
 packages/fsm/
 ├── src/
-│   ├── fsm.ts    — FSM class (all logic, 107 lines)
+│   ├── fsm.ts    — FSM class (all logic, ~137 lines)
 │   ├── types.ts  — FSMConfig, TransitionInfo, TransitionListener
 │   └── index.ts  — public exports
 └── tests/
@@ -853,7 +858,10 @@ Issues:
 
 ```
 src/
-├── Router.ts (facade, ~900 lines)
+├── Router.ts (facade, ~1500 lines)
+├── fsm/
+│   ├── routerFSM.ts          — FSM config, states, events, factory
+│   └── index.ts
 └── namespaces/
     ├── RoutesNamespace/
     │   ├── RoutesNamespace.ts
@@ -984,13 +992,11 @@ buildStateResolved(resolvedName, resolvedParams) {
 - `navigate` — could be intercepted for analytics
 - `buildPath` — could be intercepted for URL rewriting
 
-### FSM Migration (R4): dispose() and TransitionMeta
-
-**R4 additions** built on top of R1 (RouterFSM), R3 (lifecycle cleanup):
+### FSM Migration: dispose(), TransitionMeta, Event Flow
 
 #### dispose() — Terminal State
 
-Router now supports permanent disposal via `router.dispose()`. The RouterFSM transitions to a terminal `DISPOSED` state. All mutating methods throw `ROUTER_DISPOSED` after disposal.
+Router supports permanent disposal via `router.dispose()`. RouterFSM transitions to terminal `DISPOSED` state. All mutating methods throw `ROUTER_DISPOSED` after disposal.
 
 **Cleanup order:** plugins → middleware → observable → routes+lifecycle → state → deps → currentToState → markDisposed
 
@@ -1001,20 +1007,35 @@ Router now supports permanent disposal via `router.dispose()`. The RouterFSM tra
 After each navigation, `state.transition` contains `TransitionMeta` with:
 
 - `phase` — last pipeline phase reached (`"deactivating"` | `"activating"` | `"middleware"`)
-- `duration` — elapsed ms (`performance.now()` delta)
 - `from` — previous route name (undefined on first navigation)
 - `reason` — always `"success"` for resolved navigations
 - `segments` — `{ deactivated, activated, intersection }` (all deeply frozen arrays)
 
-`TransitionMeta` is built by `NavigationNamespace` after each successful navigation and attached to the state object before freezing.
+`TransitionMeta` is built by `NavigationNamespace` after each successful navigation and attached to the state object before freezing. Transition timing is available via `@real-router/logger-plugin`.
 
-#### Bundle Size Delta (R4)
+#### FSM-Driven Event Flow
 
-| Package           | Before R4 | After R4 | Delta |
-| ----------------- | --------- | -------- | ----- |
-| @real-router/core | ~22.00 kB | 22.06 kB | +60 B |
+All router events are consequences of FSM transitions via `fsm.on(from, event, action)`:
 
-Size limit updated from `22 kB` → `22.1 kB` in `.size-limit.json` to accommodate R4 additions. The TransitionMeta building code added only ~60 B gzipped (well within the expected +1-2 kB estimate).
+```
+navigate() → routerFSM.send("NAVIGATE") → emitTransitionStart()
+           → [transition pipeline]
+           → routerFSM.send("COMPLETE") → emitTransitionSuccess()
+
+stop()    → routerFSM.send("CANCEL")  → emitTransitionCancel()  (if transitioning)
+          → routerFSM.send("STOP")    → emitRouterStop()
+```
+
+**Key change vs master:** `invokeEventListeners` lambdas replaced by typed FSM actions. No manual flag management (`#started`, `#active`, `#navigating` booleans removed).
+
+#### Removed API
+
+- **`router.cancel()`** — functionality integrated into `stop()`, `dispose()`, and concurrent navigation logic
+- **`emitSuccess` parameter** — removed from `navigateToState()` (core + browser-plugin)
+
+#### Bundle Size
+
+Size limit updated from `22.1 kB` → `25 kB` in `.size-limit.json` to accommodate FSM integration. Current: 83.6 KB raw / 22.81 KB gzip.
 
 ### Type Guard Hierarchy
 
