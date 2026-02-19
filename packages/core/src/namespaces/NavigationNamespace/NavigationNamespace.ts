@@ -26,6 +26,20 @@ import type {
 } from "@real-router/types";
 
 /**
+ * Creates a rejected promise with suppressed unhandled rejection warning.
+ * Used for expected errors (e.g. SAME_STATES) in fire-and-forget navigations.
+ */
+/* eslint-disable promise/no-promise-in-callback */
+const suppressedReject = (err: RouterError): Promise<never> => {
+  const rejection = Promise.reject(err);
+
+  rejection.catch(() => {});
+
+  return rejection;
+};
+/* eslint-enable promise/no-promise-in-callback */
+
+/**
  * Independent namespace for managing navigation.
  *
  * Handles navigate(), navigateToDefault(), navigateToState(), and transition state.
@@ -248,23 +262,16 @@ export class NavigationNamespace {
 
       deps.emitTransitionError(toState, fromState, err);
 
-      const rejection = Promise.reject(err);
-
-      rejection.catch(() => {});
-
-      return rejection;
+      return suppressedReject(err);
     }
 
     const promise = this.navigateToState(toState, fromState, opts);
 
     promise.catch((error: unknown) => {
       if (
-        error instanceof RouterError &&
-        (error.code === errorCodes.SAME_STATES ||
-          error.code === errorCodes.TRANSITION_CANCELLED)
+        !(error instanceof RouterError) ||
+        error.code !== errorCodes.TRANSITION_CANCELLED
       ) {
-        // Expected errors - suppress unhandled rejection warnings
-      } else {
         logger.error("router.navigate", "Unexpected navigation error", error);
       }
     });
@@ -349,31 +356,28 @@ export class NavigationNamespace {
     toState: State,
     fromState: State | undefined,
   ): void {
-    /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
-    if (error instanceof RouterError) {
-      switch (error.code) {
-        case errorCodes.TRANSITION_CANCELLED: {
-          // cancel/stop already sent CANCEL to TransitionFSM
-
-          break;
-        }
-        case errorCodes.ROUTE_NOT_FOUND: {
-          // sendTransitionError already called in try block
-          break;
-        }
-        case errorCodes.CANNOT_ACTIVATE:
-        case errorCodes.CANNOT_DEACTIVATE: {
-          this.#deps.sendTransitionBlocked(toState, fromState, error);
-
-          break;
-        }
-        default: {
-          this.#deps.sendTransitionError(toState, fromState, error);
-        }
-      }
-    } else {
-      /* v8 ignore next 2 -- @preserve: transition pipeline always wraps errors into RouterError */
+    /* v8 ignore next 3 -- @preserve: transition pipeline always wraps errors into RouterError */
+    if (!(error instanceof RouterError)) {
       this.#deps.sendTransitionError(toState, fromState, error as RouterError);
+
+      return;
+    }
+
+    // Already routed: cancel/stop sent CANCEL, sendTransitionError called in try block
+    if (
+      error.code === errorCodes.TRANSITION_CANCELLED ||
+      error.code === errorCodes.ROUTE_NOT_FOUND
+    ) {
+      return;
+    }
+
+    if (
+      error.code === errorCodes.CANNOT_ACTIVATE ||
+      error.code === errorCodes.CANNOT_DEACTIVATE
+    ) {
+      this.#deps.sendTransitionBlocked(toState, fromState, error);
+    } else {
+      this.#deps.sendTransitionError(toState, fromState, error);
     }
   }
 }
