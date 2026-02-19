@@ -162,12 +162,12 @@ export class ObservableNamespace {
       );
     }
 
-    const maxListeners = this.#limits.maxListeners;
+    const { maxListeners, warnListeners } = this.#limits;
 
-    if (set.size === 1000) {
+    if (warnListeners !== 0 && set.size === warnListeners) {
       logger.warn(
         "router.addEventListener",
-        `Event "${eventName}" has 1000 listeners — possible memory leak`,
+        `Event "${eventName}" has ${warnListeners} listeners — possible memory leak`,
       );
     }
 

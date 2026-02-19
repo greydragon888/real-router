@@ -36,6 +36,14 @@ export interface LimitsConfig {
   maxListeners: number;
 
   /**
+   * Listener count at which a memory leak warning is logged per event type.
+   * Set to 0 to disable the warning.
+   *
+   * @default 1000
+   */
+  warnListeners: number;
+
+  /**
    * Maximum depth of nested event propagation.
    * Prevents infinite recursion in event handling chains.
    *

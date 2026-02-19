@@ -79,6 +79,7 @@ export const DEFAULT_LIMITS = {
   maxPlugins: 50,
   maxMiddleware: 50,
   maxListeners: 10_000,
+  warnListeners: 1000,
   maxEventDepth: 5,
   maxLifecycleHandlers: 200,
 } as const;
@@ -92,6 +93,7 @@ export const LIMIT_BOUNDS = {
   maxPlugins: { min: 0, max: 1000 },
   maxMiddleware: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
+  warnListeners: { min: 0, max: 100_000 },
   maxEventDepth: { min: 0, max: 100 },
   maxLifecycleHandlers: { min: 0, max: 10_000 },
 } as const;
