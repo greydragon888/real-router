@@ -1,8 +1,7 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
-import { events } from "../constants";
-import { routerEvents, routerStates } from "../fsm";
-
+import type { EventBusNamespace } from "../namespaces";
+import type { WiringOptions } from "./types";
 import type { MiddlewareDependencies } from "../namespaces/MiddlewareNamespace";
 import type {
   NavigationDependencies,
@@ -12,12 +11,9 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
-import type { RouterEventMap } from "../types";
-import type { WiringOptions } from "./types";
 import type {
   DefaultDependencies,
   NavigationOptions,
-  RouterError,
   State,
 } from "@real-router/types";
 
@@ -35,10 +31,7 @@ export class RouterWiringBuilder<
   private readonly plugins: WiringOptions<Dependencies>["plugins"];
   private readonly navigation: WiringOptions<Dependencies>["navigation"];
   private readonly lifecycle: WiringOptions<Dependencies>["lifecycle"];
-  private readonly routerFSM: WiringOptions<Dependencies>["routerFSM"];
-  private readonly emitter: WiringOptions<Dependencies>["emitter"];
-  private readonly getCurrentToState: WiringOptions<Dependencies>["getCurrentToState"];
-  private readonly setCurrentToState: WiringOptions<Dependencies>["setCurrentToState"];
+  private readonly eventBus: EventBusNamespace;
 
   constructor(wiringOptions: WiringOptions<Dependencies>) {
     this.router = wiringOptions.router;
@@ -52,17 +45,14 @@ export class RouterWiringBuilder<
     this.plugins = wiringOptions.plugins;
     this.navigation = wiringOptions.navigation;
     this.lifecycle = wiringOptions.lifecycle;
-    this.routerFSM = wiringOptions.routerFSM;
-    this.emitter = wiringOptions.emitter;
-    this.getCurrentToState = wiringOptions.getCurrentToState;
-    this.setCurrentToState = wiringOptions.setCurrentToState;
+    this.eventBus = wiringOptions.eventBus;
   }
 
   wireLimits(): void {
     this.dependencies.setLimits(this.limits);
     this.plugins.setLimits(this.limits);
     this.middleware.setLimits(this.limits);
-    this.emitter.setLimits({
+    this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
       warnListeners: this.limits.warnListeners,
       maxEventDepth: this.limits.maxEventDepth,
@@ -118,11 +108,8 @@ export class RouterWiringBuilder<
 
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
-        this.emitter.on(
-          eventName,
-          cb as (...args: RouterEventMap[typeof eventName]) => void,
-        ),
-      canNavigate: () => this.routerFSM.canSend(routerEvents.NAVIGATE),
+        this.eventBus.addEventListener(eventName, cb),
+      canNavigate: () => this.eventBus.canBeginTransition(),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.dependencies.get(dependencyName),
     };
@@ -155,60 +142,25 @@ export class RouterWiringBuilder<
       getDependency: (name: string) =>
         this.dependencies.get(name as keyof Dependencies),
       startTransition: (toState, fromState) => {
-        this.setCurrentToState(toState);
-        this.routerFSM.send(routerEvents.NAVIGATE, {
-          toState,
-          fromState,
-        });
+        this.eventBus.beginTransition(toState, fromState);
       },
       cancelNavigation: () => {
-        this.routerFSM.send(routerEvents.CANCEL, {
-          toState: this.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
-          fromState: this.state.get(),
-        });
-        this.setCurrentToState(undefined);
+        this.eventBus.cancelTransition(
+          this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+          this.state.get(),
+        );
       },
       sendTransitionDone: (state, fromState, opts) => {
-        this.routerFSM.send(routerEvents.COMPLETE, {
-          state,
-          fromState,
-          opts,
-        });
-        this.setCurrentToState(undefined);
+        this.eventBus.completeTransition(state, fromState, opts);
       },
       sendTransitionBlocked: (toState, fromState, error) => {
-        this.routerFSM.send(routerEvents.FAIL, {
-          toState,
-          fromState,
-          error,
-        });
-        this.setCurrentToState(undefined);
+        this.eventBus.failTransition(toState, fromState, error);
       },
       sendTransitionError: (toState, fromState, error) => {
-        this.routerFSM.send(routerEvents.FAIL, {
-          toState,
-          fromState,
-          error,
-        });
-        this.setCurrentToState(undefined);
+        this.eventBus.failTransition(toState, fromState, error);
       },
       emitTransitionError: (toState, fromState, error) => {
-        if (this.routerFSM.getState() === routerStates.READY) {
-          this.routerFSM.send(routerEvents.FAIL, {
-            toState,
-            fromState,
-            error,
-          });
-        } else {
-          // TRANSITIONING: concurrent navigation with invalid args.
-          // Direct emit to avoid disturbing the ongoing transition.
-          this.emitter.emit(
-            events.TRANSITION_ERROR,
-            toState,
-            fromState,
-            error as RouterError,
-          );
-        }
+        this.eventBus.emitOrFailTransitionError(toState, fromState, error);
       },
     };
 
@@ -218,8 +170,7 @@ export class RouterWiringBuilder<
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
       getMiddlewareFunctions: () => this.middleware.getFunctions(),
       isActive: () => this.router.isActive(),
-      isTransitioning: () =>
-        this.routerFSM.getState() === routerStates.TRANSITIONING,
+      isTransitioning: () => this.eventBus.isTransitioning(),
       clearCanDeactivate: (name) => {
         this.routeLifecycle.clearCanDeactivate(name);
       },
@@ -239,14 +190,10 @@ export class RouterWiringBuilder<
       matchPath: (path, source?: string) =>
         this.routes.matchPath(path, source, this.options.get()),
       completeStart: () => {
-        this.routerFSM.send(routerEvents.STARTED);
+        this.eventBus.completeStart();
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.routerFSM.send(routerEvents.FAIL, {
-          toState,
-          fromState,
-          error,
-        });
+        this.eventBus.failTransition(toState, fromState, error);
       },
     };
 
@@ -263,8 +210,7 @@ export class RouterWiringBuilder<
   }
 
   wireCyclicDeps(): void {
-    this.navigation.canNavigate = () =>
-      this.routerFSM.canSend(routerEvents.NAVIGATE);
+    this.navigation.canNavigate = () => this.eventBus.canBeginTransition();
 
     this.lifecycle.navigateToState = (
       toState: State,

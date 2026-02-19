@@ -1,9 +1,9 @@
 // packages/core/src/wiring/types.ts
 
-import type { RouterEvent, RouterPayloads, RouterState } from "../fsm";
 import type {
   CloneNamespace,
   DependenciesNamespace,
+  EventBusNamespace,
   MiddlewareNamespace,
   NavigationNamespace,
   OptionsNamespace,
@@ -14,10 +14,8 @@ import type {
   StateNamespace,
 } from "../namespaces";
 import type { Router } from "../Router";
-import type { Limits, RouterEventMap } from "../types";
-import type { FSM } from "@real-router/fsm";
-import type { DefaultDependencies, State } from "@real-router/types";
-import type { EventEmitter } from "event-emitter";
+import type { Limits } from "../types";
+import type { DefaultDependencies } from "@real-router/types";
 
 /**
  * Constructor options bag for RouterWiringBuilder.
@@ -50,12 +48,6 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   lifecycle: RouterLifecycleNamespace;
   /** Clone namespace (SSR cloning) */
   clone: CloneNamespace<Dependencies>;
-  /** Router finite state machine */
-  routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
-  /** Event emitter for router events */
-  emitter: EventEmitter<RouterEventMap>;
-  /** Get the current in-flight toState (replaces #currentToState private field) */
-  getCurrentToState: () => State | undefined;
-  /** Set the current in-flight toState (replaces #currentToState private field) */
-  setCurrentToState: (state: State | undefined) => void;
+  /** EventBus namespace — unified FSM + EventEmitter abstraction */
+  eventBus: EventBusNamespace;
 }

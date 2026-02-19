@@ -11,16 +11,13 @@ import { logger } from "@real-router/logger";
 import { EventEmitter } from "event-emitter";
 import { validateRouteName } from "type-guards";
 
-import { errorCodes, events } from "./constants";
-import {
-  validateListenerArgs,
-  validateSubscribeListener,
-} from "./eventValidation";
-import { createRouterFSM, routerEvents, routerStates } from "./fsm";
+import { errorCodes } from "./constants";
+import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
   DependenciesNamespace,
+  EventBusNamespace,
   MiddlewareNamespace,
   NavigationNamespace,
   OptionsNamespace,
@@ -36,7 +33,6 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
-import type { RouterEvent, RouterPayloads, RouterState } from "./fsm";
 import type {
   ActivationFnFactory,
   EventMethodMap,
@@ -47,7 +43,6 @@ import type {
   RouteConfigUpdate,
   RouterEventMap,
 } from "./types";
-import type { FSM } from "@real-router/fsm";
 import type {
   DefaultDependencies,
   EventName,
@@ -103,20 +98,13 @@ export class Router<
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
 
-  readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
-  readonly #emitter: EventEmitter<RouterEventMap>;
+  readonly #eventBus: EventBusNamespace;
 
   /**
    * When true, skips argument validation in public methods for production performance.
    * Constructor options are always validated (needed to validate noValidate itself).
    */
   readonly #noValidate: boolean;
-
-  /**
-   * Current target state for transition (stored for dependency injection).
-   * Used by startTransition to pass toState to routerFSM.
-   */
-  #currentToState: State | undefined;
 
   // ============================================================================
   // Constructor
@@ -185,11 +173,11 @@ export class Router<
     this.#noValidate = noValidate;
 
     // =========================================================================
-    // Initialize FSMs
+    // Initialize EventBus
     // =========================================================================
 
-    this.#routerFSM = createRouterFSM();
-    this.#emitter = new EventEmitter<RouterEventMap>({
+    const routerFSM = createRouterFSM();
+    const emitter = new EventEmitter<RouterEventMap>({
       onListenerError: (eventName, error) => {
         logger.error("Router", `Error in listener for ${eventName}:`, error);
       },
@@ -200,6 +188,8 @@ export class Router<
         );
       },
     });
+
+    this.#eventBus = new EventBusNamespace({ routerFSM, emitter });
 
     // =========================================================================
     // Wire Dependencies
@@ -219,15 +209,9 @@ export class Router<
         navigation: this.#navigation,
         lifecycle: this.#lifecycle,
         clone: this.#clone,
-        routerFSM: this.#routerFSM,
-        emitter: this.#emitter,
-        getCurrentToState: () => this.#currentToState,
-        setCurrentToState: (state) => {
-          this.#currentToState = state;
-        },
+        eventBus: this.#eventBus,
       }),
     );
-    this.#setupFSMActions();
     this.#setupCloneCallbacks();
 
     // =========================================================================
@@ -353,7 +337,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.#routerFSM.getState() === routerStates.TRANSITIONING,
+      this.#eventBus.isTransitioning(),
     );
 
     if (!canRemove) {
@@ -374,8 +358,7 @@ export class Router<
   }
 
   clearRoutes(): this {
-    const isNavigating =
-      this.#routerFSM.getState() === routerStates.TRANSITIONING;
+    const isNavigating = this.#eventBus.isTransitioning();
 
     // Validate operation can proceed
     const canClear = this.#routes.validateClearRoutes(isNavigating);
@@ -441,7 +424,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.#routerFSM.getState() === routerStates.TRANSITIONING) {
+    if (this.#eventBus.isTransitioning()) {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -679,9 +662,7 @@ export class Router<
   // ============================================================================
 
   isActive(): boolean {
-    const s = this.#routerFSM.getState();
-
-    return s !== routerStates.IDLE && s !== routerStates.DISPOSED;
+    return this.#eventBus.isActive();
   }
 
   async start(startPath: string): Promise<State> {
@@ -690,18 +671,18 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    if (!this.#routerFSM.canSend(routerEvents.START)) {
+    if (!this.#eventBus.canStart()) {
       throw CACHED_ALREADY_STARTED_ERROR;
     }
 
-    this.#routerFSM.send(routerEvents.START);
+    this.#eventBus.sendStart();
 
     try {
       return await this.#lifecycle.start(startPath);
     } catch (error) {
-      if (this.#routerFSM.getState() === routerStates.READY) {
+      if (this.#eventBus.isReady()) {
         this.#lifecycle.stop();
-        this.#routerFSM.send(routerEvents.STOP);
+        this.#eventBus.sendStop();
       }
 
       throw error;
@@ -709,39 +690,32 @@ export class Router<
   }
 
   stop(): this {
-    this.#cancelTransitionIfRunning();
+    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
 
-    const prevState = this.#routerFSM.getState();
-
-    if (
-      prevState !== routerStates.READY &&
-      prevState !== routerStates.TRANSITIONING
-    ) {
+    if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
       return this;
     }
 
     this.#lifecycle.stop();
-    this.#routerFSM.send(routerEvents.STOP);
+    this.#eventBus.sendStop();
 
     return this;
   }
 
   dispose(): void {
-    if (this.#routerFSM.getState() === routerStates.DISPOSED) {
+    if (this.#eventBus.isDisposed()) {
       return;
     }
 
-    this.#cancelTransitionIfRunning();
+    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
 
-    const state = this.#routerFSM.getState();
-
-    if (state === routerStates.READY || state === routerStates.TRANSITIONING) {
+    if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
       this.#lifecycle.stop();
-      this.#routerFSM.send(routerEvents.STOP);
+      this.#eventBus.sendStop();
     }
 
-    this.#routerFSM.send(routerEvents.DISPOSE);
-    this.#emitter.clearAll();
+    this.#eventBus.sendDispose();
+    this.#eventBus.clearAll();
 
     this.#plugins.disposeAll();
     this.#middleware.clearAll();
@@ -749,7 +723,6 @@ export class Router<
     this.#routeLifecycle.clearAll();
     this.#state.reset();
     this.#dependencies.reset();
-    this.#currentToState = undefined;
 
     this.#markDisposed();
   }
@@ -1054,13 +1027,10 @@ export class Router<
     cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
     if (!this.#noValidate) {
-      validateListenerArgs(eventName, cb);
+      EventBusNamespace.validateListenerArgs(eventName, cb);
     }
 
-    return this.#emitter.on(
-      eventName,
-      cb as (...args: RouterEventMap[typeof eventName]) => void,
-    );
+    return this.#eventBus.addEventListener(eventName, cb);
   }
 
   // ============================================================================
@@ -1069,18 +1039,10 @@ export class Router<
 
   subscribe(listener: SubscribeFn): Unsubscribe {
     if (!this.#noValidate) {
-      validateSubscribeListener(listener);
+      EventBusNamespace.validateSubscribeListener(listener);
     }
 
-    return this.#emitter.on(
-      events.TRANSITION_SUCCESS,
-      (toState: State, fromState?: State) => {
-        listener({
-          route: toState,
-          previousRoute: fromState,
-        });
-      },
-    );
+    return this.#eventBus.subscribe(listener);
   }
 
   // ============================================================================
@@ -1199,85 +1161,6 @@ export class Router<
    */
   static #suppressUnhandledRejection(promise: Promise<State>): void {
     promise.catch(Router.#onSuppressedError);
-  }
-
-  /**
-   * Cancels an in-flight transition if one is running.
-   * Used by stop() and dispose() to abort before changing FSM state.
-   */
-  #cancelTransitionIfRunning(): void {
-    if (!this.#routerFSM.canSend(routerEvents.CANCEL)) {
-      return;
-    }
-
-    this.#routerFSM.send(routerEvents.CANCEL, {
-      toState: this.#currentToState!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
-      fromState: this.#state.get(),
-    });
-    this.#currentToState = undefined;
-  }
-
-  // ============================================================================
-  // Dependency wiring (private)
-  // ============================================================================
-
-  // Main wiring done by wireRouter() in constructor.
-  // FSM actions and clone callbacks remain here (access private fields of other Router instances).
-
-  #setupFSMActions(): void {
-    const fsm = this.#routerFSM;
-
-    fsm.on(routerStates.STARTING, routerEvents.STARTED, () => {
-      this.#emitter.emit(events.ROUTER_START);
-    });
-
-    fsm.on(routerStates.READY, routerEvents.STOP, () => {
-      this.#emitter.emit(events.ROUTER_STOP);
-    });
-
-    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
-      this.#emitter.emit(events.TRANSITION_START, p.toState, p.fromState);
-    });
-
-    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_SUCCESS,
-        p.state,
-        p.fromState,
-        p.opts,
-      );
-    });
-
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
-      this.#emitter.emit(events.TRANSITION_CANCEL, p.toState, p.fromState);
-    });
-
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
-      );
-    });
-
-    fsm.on(routerStates.READY, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
-      );
-    });
-
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
-      );
-    });
   }
 
   #setupCloneCallbacks(): void {
