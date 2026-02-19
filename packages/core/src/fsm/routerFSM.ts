@@ -81,7 +81,7 @@ export interface RouterPayloads {
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
  * - STARTING → READY (STARTED), IDLE (FAIL, STOP)
- * - READY → TRANSITIONING (NAVIGATE), IDLE (STOP), DISPOSED (DISPOSE)
+ * - READY → TRANSITIONING (NAVIGATE), IDLE (STOP)
  * - TRANSITIONING → TRANSITIONING (NAVIGATE, self-loop for canSend), READY (COMPLETE, CANCEL, FAIL), IDLE (STOP)
  * - DISPOSED → (no transitions)
  */
@@ -101,7 +101,6 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
     [routerStates.READY]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
       [routerEvents.STOP]: routerStates.IDLE,
-      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
     [routerStates.TRANSITIONING]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
