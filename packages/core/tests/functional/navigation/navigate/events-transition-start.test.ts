@@ -160,7 +160,7 @@ describe("router.navigate() - events transition start", () => {
 
       expect(secondResult.name).toBe("orders");
 
-      // R3: cancelNavigation() sends CANCEL to TransitionFSM when second nav starts,
+      // R3: cancelNavigation() sends CANCEL to RouterFSM when second nav starts,
       // emitting TRANSITION_CANCEL for the cancelled first navigation
       expect(onCancel).toHaveBeenCalledTimes(1);
 

@@ -125,7 +125,7 @@ describe("core/observable", () => {
 
         expect(secondResult.name).toBe("orders");
 
-        // R3: concurrent navigation sends CANCEL to TransitionFSM,
+        // R3: concurrent navigation sends CANCEL to RouterFSM,
         // which emits TRANSITION_CANCEL for the cancelled first navigation
         expect(cb).toHaveBeenCalledTimes(1);
 

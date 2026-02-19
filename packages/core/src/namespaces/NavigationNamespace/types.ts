@@ -58,27 +58,27 @@ export interface NavigationDependencies {
   /** Get a dependency by name (untyped — used only for resolveOption) */
   getDependency: (name: string) => unknown;
 
-  /** Start transition and send START event to transitionFSM */
+  /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;
 
   /** Cancel navigation if transition is running */
   cancelNavigation: () => void;
 
-  /** Send DONE event to transitionFSM */
+  /** Send COMPLETE event to routerFSM */
   sendTransitionDone: (
     state: State,
     fromState: State | undefined,
     opts: NavigationOptions,
   ) => void;
 
-  /** Send BLOCKED event to transitionFSM */
+  /** Send FAIL event to routerFSM (transition blocked) */
   sendTransitionBlocked: (
     toState: State,
     fromState: State | undefined,
     error: unknown,
   ) => void;
 
-  /** Send ERROR event to transitionFSM */
+  /** Send FAIL event to routerFSM (transition error) */
   sendTransitionError: (
     toState: State,
     fromState: State | undefined,

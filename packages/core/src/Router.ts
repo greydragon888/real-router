@@ -10,14 +10,7 @@ import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
 import { errorCodes } from "./constants";
-import {
-  createRouterFSM,
-  createTransitionFSM,
-  routerEvents,
-  routerStates,
-  transitionEvents,
-  transitionStates,
-} from "./fsm";
+import { createRouterFSM, routerEvents, routerStates } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
@@ -37,14 +30,7 @@ import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 
-import type {
-  RouterEvent,
-  RouterPayloads,
-  RouterState,
-  TransitionEvent,
-  TransitionFSMState,
-  TransitionPayloads,
-} from "./fsm";
+import type { RouterEvent, RouterPayloads, RouterState } from "./fsm";
 import type { EventMethodMap } from "./namespaces";
 import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
 import type {
@@ -121,12 +107,6 @@ export class Router<
   readonly #clone: CloneNamespace<Dependencies>;
 
   readonly #routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>;
-  readonly #transitionFSM: FSM<
-    TransitionFSMState,
-    TransitionEvent,
-    null,
-    TransitionPayloads
-  >;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -136,7 +116,7 @@ export class Router<
 
   /**
    * Current target state for transition (stored for dependency injection).
-   * Used by startTransition to pass toState to transitionFSM.
+   * Used by startTransition to pass toState to routerFSM.
    */
   #currentToState: State | undefined;
 
@@ -212,7 +192,6 @@ export class Router<
     // =========================================================================
 
     this.#routerFSM = createRouterFSM();
-    this.#transitionFSM = createTransitionFSM();
 
     // =========================================================================
     // Setup Dependencies
@@ -343,7 +322,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.#transitionFSM.getState() !== transitionStates.IDLE,
+      this.#routerFSM.getState() === routerStates.TRANSITIONING,
     );
 
     if (!canRemove) {
@@ -365,7 +344,7 @@ export class Router<
 
   clearRoutes(): this {
     const isNavigating =
-      this.#transitionFSM.getState() !== transitionStates.IDLE;
+      this.#routerFSM.getState() === routerStates.TRANSITIONING;
 
     // Validate operation can proceed
     const canClear = this.#routes.validateClearRoutes(isNavigating);
@@ -431,7 +410,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.#transitionFSM.getState() !== transitionStates.IDLE) {
+    if (this.#routerFSM.getState() === routerStates.TRANSITIONING) {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -703,15 +682,16 @@ export class Router<
   }
 
   stop(): this {
-    if (this.#transitionFSM.canSend(transitionEvents.CANCEL)) {
+    if (this.#routerFSM.canSend(routerEvents.CANCEL)) {
       const currentToState = this.#currentToState;
 
-      /* v8 ignore next 6 -- @preserve: currentToState undefined during stop() is a defensive guard */
+      /* v8 ignore next 7 -- @preserve: currentToState undefined during stop() is a defensive guard */
       if (currentToState !== undefined) {
-        this.#transitionFSM.send(transitionEvents.CANCEL, {
+        this.#routerFSM.send(routerEvents.CANCEL, {
           toState: currentToState,
           fromState: this.#state.get(),
         });
+        this.#currentToState = undefined;
       }
     }
 
@@ -742,15 +722,16 @@ export class Router<
       return;
     }
 
-    if (this.#transitionFSM.canSend(transitionEvents.CANCEL)) {
+    if (this.#routerFSM.canSend(routerEvents.CANCEL)) {
       const currentToState = this.#currentToState;
 
-      /* v8 ignore next 6 -- @preserve: currentToState undefined during dispose() is a defensive guard */
+      /* v8 ignore next 7 -- @preserve: currentToState undefined during dispose() is a defensive guard */
       if (currentToState !== undefined) {
-        this.#transitionFSM.send(transitionEvents.CANCEL, {
+        this.#routerFSM.send(routerEvents.CANCEL, {
           toState: currentToState,
           fromState: this.#state.get(),
         });
+        this.#currentToState = undefined;
       }
     }
 
@@ -1304,7 +1285,7 @@ export class Router<
         this.#dependencies.get(name as keyof Dependencies),
       startTransition: (toState, fromState) => {
         this.#currentToState = toState;
-        this.#transitionFSM.send(transitionEvents.START, {
+        this.#routerFSM.send(routerEvents.NAVIGATE, {
           toState,
           fromState,
         });
@@ -1312,34 +1293,38 @@ export class Router<
       cancelNavigation: () => {
         const currentToState = this.#currentToState;
 
-        /* v8 ignore next 6 -- @preserve: cancelNavigation() only called when isTransitioning(), currentToState always set */
+        /* v8 ignore next 7 -- @preserve: cancelNavigation() only called when isTransitioning(), currentToState always set */
         if (currentToState !== undefined) {
-          this.#transitionFSM.send(transitionEvents.CANCEL, {
+          this.#routerFSM.send(routerEvents.CANCEL, {
             toState: currentToState,
             fromState: this.#state.get(),
           });
+          this.#currentToState = undefined;
         }
       },
       sendTransitionDone: (state, fromState, opts) => {
-        this.#transitionFSM.send(transitionEvents.DONE, {
+        this.#routerFSM.send(routerEvents.COMPLETE, {
           state,
           fromState,
           opts,
         });
+        this.#currentToState = undefined;
       },
       sendTransitionBlocked: (toState, fromState, error) => {
-        this.#transitionFSM.send(transitionEvents.BLOCKED, {
-          state: toState,
+        this.#routerFSM.send(routerEvents.FAIL, {
+          toState,
           fromState,
           error,
         });
+        this.#currentToState = undefined;
       },
       sendTransitionError: (toState, fromState, error) => {
-        this.#transitionFSM.send(transitionEvents.ERROR, {
-          state: toState,
+        this.#routerFSM.send(routerEvents.FAIL, {
+          toState,
           fromState,
           error,
         });
+        this.#currentToState = undefined;
       },
       emitTransitionError: (toState, fromState, error) => {
         this.#observable.emitTransitionError(
@@ -1358,7 +1343,7 @@ export class Router<
       isActive: () => this.isActive(),
 
       isTransitioning: () =>
-        !this.#transitionFSM.canSend(transitionEvents.START),
+        this.#routerFSM.getState() === routerStates.TRANSITIONING,
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);
       },
@@ -1390,65 +1375,6 @@ export class Router<
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);
-
-    this.#transitionFSM.onTransition(({ event, payload }) => {
-      /* v8 ignore next -- @preserve: all cases covered but branch analysis counts default */
-      switch (event) {
-        case transitionEvents.START: {
-          const p = payload as TransitionPayloads["START"];
-
-          this.#routerFSM.send(routerEvents.NAVIGATE, {
-            toState: p.toState,
-            fromState: p.fromState,
-          });
-
-          break;
-        }
-        case transitionEvents.DONE: {
-          const p = payload as TransitionPayloads["DONE"];
-
-          this.#routerFSM.send(routerEvents.COMPLETE, {
-            state: p.state,
-            fromState: p.fromState,
-            opts: p.opts,
-          });
-
-          this.#currentToState = undefined;
-
-          break;
-        }
-        case transitionEvents.CANCEL: {
-          const p = payload as TransitionPayloads["CANCEL"];
-
-          this.#routerFSM.send(routerEvents.CANCEL, {
-            toState: p.toState,
-            fromState: p.fromState,
-          });
-
-          this.#currentToState = undefined;
-
-          break;
-        }
-        case transitionEvents.BLOCKED:
-        case transitionEvents.ERROR: {
-          const p = payload as TransitionPayloads["ERROR"];
-
-          if (this.#routerFSM.getState() === routerStates.STARTING) {
-            this.#routerFSM.send(routerEvents.FAIL, {});
-          } else {
-            this.#routerFSM.send(routerEvents.FAIL, {
-              toState: p.state,
-              fromState: p.fromState,
-              error: p.error,
-            });
-          }
-
-          this.#currentToState = undefined;
-
-          break;
-        }
-      }
-    });
 
     this.#routerFSM.onTransition(({ from, to, event, payload }) => {
       if (from === routerStates.STARTING && to === routerStates.READY) {

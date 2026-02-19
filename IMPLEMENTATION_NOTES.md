@@ -986,7 +986,7 @@ buildStateResolved(resolvedName, resolvedParams) {
 
 ### FSM Migration (R4): dispose() and TransitionMeta
 
-**R4 additions** built on top of R1 (RouterFSM), R2 (TransitionFSM), R3 (lifecycle cleanup):
+**R4 additions** built on top of R1 (RouterFSM), R3 (lifecycle cleanup):
 
 #### dispose() — Terminal State
 
