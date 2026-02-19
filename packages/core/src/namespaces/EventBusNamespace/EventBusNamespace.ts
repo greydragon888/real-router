@@ -115,13 +115,12 @@ export class EventBusNamespace {
   completeTransition(
     state: State,
     fromState?: State,
-    opts?: NavigationOptions,
+    opts: NavigationOptions = {},
   ): void {
     this.#fsm.send(routerEvents.COMPLETE, {
       state,
       fromState,
-      /* v8 ignore next -- @preserve: opts always provided by Router.ts callers */
-      opts: opts ?? {},
+      opts,
     });
     this.#currentToState = undefined;
   }
