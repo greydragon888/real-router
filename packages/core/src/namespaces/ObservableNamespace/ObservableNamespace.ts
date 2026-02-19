@@ -135,36 +135,15 @@ export class ObservableNamespace {
     this.#emit(events.TRANSITION_CANCEL, toState, fromState);
   }
 
-  hasListeners(eventName: (typeof events)[EventsKeys]): boolean {
-    const set = this.#callbacks[eventName];
-
-    return set !== undefined && set.size > 0;
-  }
-
   /**
    * Removes an event listener.
-   * Input should be validated by facade before calling.
+   * Only called from unsubscribe closures returned by addEventListener().
    */
   removeEventListener<E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
   ): void {
-    // Don't create Set just for removal - check if it exists first
-    const set = this.#callbacks[eventName];
-
-    if (!set || set.size === 0) {
-      return;
-    }
-
-    const deleted = set.delete(cb);
-
-    if (!deleted) {
-      logger.warn(
-        "Router",
-        `Attempted to remove non-existent listener for "${eventName}". ` +
-          `This might indicate a memory leak or incorrect cleanup logic.`,
-      );
-    }
+    this.#callbacks[eventName]?.delete(cb);
   }
 
   /**
@@ -177,12 +156,9 @@ export class ObservableNamespace {
   ): Unsubscribe {
     const set = this.#getCallbackSet(eventName);
 
-    // Duplicate check (business logic)
     if (set.has(cb)) {
       throw new Error(
-        `[router.addEventListener] Listener already exists for event "${eventName}". ` +
-          `Each listener function can only be registered once per event. ` +
-          `Store the returned unsubscribe function to remove the listener.`,
+        `[router.addEventListener] Duplicate listener for "${eventName}"`,
       );
     }
 
@@ -191,17 +167,13 @@ export class ObservableNamespace {
     if (set.size === 1000) {
       logger.warn(
         "router.addEventListener",
-        `Warning: Event "${eventName}" has ${set.size} listeners. ` +
-          `This might indicate a memory leak.`,
+        `Event "${eventName}" has 1000 listeners — possible memory leak`,
       );
     }
 
     if (maxListeners !== 0 && set.size >= maxListeners) {
       throw new Error(
-        `[router.addEventListener] Maximum listener limit (${maxListeners}) ` +
-          `reached for event "${eventName}". ` +
-          `This is a critical memory leak. The application is creating listeners ` +
-          `exponentially. Check for loops or recursive calls that register listeners.`,
+        `[router.addEventListener] Listener limit (${maxListeners}) reached for "${eventName}"`,
       );
     }
 

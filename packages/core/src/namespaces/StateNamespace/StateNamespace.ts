@@ -165,15 +165,7 @@ export class StateNamespace {
 
     // If state is already frozen (from makeState()), use it directly.
     // For external states, freeze in place without cloning.
-    if (!state) {
-      this.#frozenState = undefined;
-    } else if (Object.isFrozen(state)) {
-      // State is already frozen (typically from makeState)
-      this.#frozenState = state;
-    } else {
-      // External state - freeze in place without cloning.
-      this.#frozenState = freezeStateInPlace(state);
-    }
+    this.#frozenState = state ? freezeStateInPlace(state) : undefined;
   }
 
   /**
