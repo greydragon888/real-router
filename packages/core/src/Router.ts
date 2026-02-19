@@ -10,7 +10,14 @@ import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
 import { errorCodes } from "./constants";
-import { createRouterFSM, createTransitionFSM } from "./fsm";
+import {
+  createRouterFSM,
+  createTransitionFSM,
+  routerEvents,
+  routerStates,
+  transitionEvents,
+  transitionStates,
+} from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
@@ -336,7 +343,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.#transitionFSM.getState() !== "IDLE",
+      this.#transitionFSM.getState() !== transitionStates.IDLE,
     );
 
     if (!canRemove) {
@@ -357,7 +364,8 @@ export class Router<
   }
 
   clearRoutes(): this {
-    const isNavigating = this.#transitionFSM.getState() !== "IDLE";
+    const isNavigating =
+      this.#transitionFSM.getState() !== transitionStates.IDLE;
 
     // Validate operation can proceed
     const canClear = this.#routes.validateClearRoutes(isNavigating);
@@ -423,7 +431,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.#transitionFSM.getState() !== "IDLE") {
+    if (this.#transitionFSM.getState() !== transitionStates.IDLE) {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -663,7 +671,7 @@ export class Router<
   isActive(): boolean {
     const s = this.#routerFSM.getState();
 
-    return s !== "IDLE" && s !== "DISPOSED";
+    return s !== routerStates.IDLE && s !== routerStates.DISPOSED;
   }
 
   async start(startPath: string): Promise<State> {
@@ -672,22 +680,22 @@ export class Router<
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    if (!this.#routerFSM.canSend("START")) {
+    if (!this.#routerFSM.canSend(routerEvents.START)) {
       throw CACHED_ALREADY_STARTED_ERROR;
     }
 
-    this.#routerFSM.send("START");
+    this.#routerFSM.send(routerEvents.START);
 
     try {
       return await this.#lifecycle.start(startPath);
     } catch (error) {
       const currentState = this.#routerFSM.getState();
 
-      if (currentState === "STARTING") {
-        this.#routerFSM.send("FAIL", {});
-      } else if (currentState === "READY") {
+      if (currentState === routerStates.STARTING) {
+        this.#routerFSM.send(routerEvents.FAIL, {});
+      } else if (currentState === routerStates.READY) {
         this.#lifecycle.stop();
-        this.#routerFSM.send("STOP");
+        this.#routerFSM.send(routerEvents.STOP);
       }
 
       throw error;
@@ -695,12 +703,12 @@ export class Router<
   }
 
   stop(): this {
-    if (this.#transitionFSM.canSend("CANCEL")) {
+    if (this.#transitionFSM.canSend(transitionEvents.CANCEL)) {
       const currentToState = this.#currentToState;
 
       /* v8 ignore next 6 -- @preserve: currentToState undefined during stop() is a defensive guard */
       if (currentToState !== undefined) {
-        this.#transitionFSM.send("CANCEL", {
+        this.#transitionFSM.send(transitionEvents.CANCEL, {
           toState: currentToState,
           fromState: this.#state.get(),
         });
@@ -710,33 +718,36 @@ export class Router<
     const prevState = this.#routerFSM.getState();
 
     /* v8 ignore next 4 -- @preserve: stop() during STARTING is a race condition, hard to test reliably */
-    if (prevState === "STARTING") {
-      this.#routerFSM.send("STOP");
+    if (prevState === routerStates.STARTING) {
+      this.#routerFSM.send(routerEvents.STOP);
 
       return this;
     }
 
-    if (prevState !== "READY" && prevState !== "TRANSITIONING") {
+    if (
+      prevState !== routerStates.READY &&
+      prevState !== routerStates.TRANSITIONING
+    ) {
       return this;
     }
 
     this.#lifecycle.stop();
-    this.#routerFSM.send("STOP");
+    this.#routerFSM.send(routerEvents.STOP);
 
     return this;
   }
 
   dispose(): void {
-    if (this.#routerFSM.getState() === "DISPOSED") {
+    if (this.#routerFSM.getState() === routerStates.DISPOSED) {
       return;
     }
 
-    if (this.#transitionFSM.canSend("CANCEL")) {
+    if (this.#transitionFSM.canSend(transitionEvents.CANCEL)) {
       const currentToState = this.#currentToState;
 
       /* v8 ignore next 6 -- @preserve: currentToState undefined during dispose() is a defensive guard */
       if (currentToState !== undefined) {
-        this.#transitionFSM.send("CANCEL", {
+        this.#transitionFSM.send(transitionEvents.CANCEL, {
           toState: currentToState,
           fromState: this.#state.get(),
         });
@@ -746,14 +757,17 @@ export class Router<
     const state = this.#routerFSM.getState();
 
     /* v8 ignore next 4 -- @preserve: dispose() during STARTING is a race condition, hard to test reliably */
-    if (state === "STARTING") {
-      this.#routerFSM.send("STOP");
-    } else if (state === "READY" || state === "TRANSITIONING") {
+    if (state === routerStates.STARTING) {
+      this.#routerFSM.send(routerEvents.STOP);
+    } else if (
+      state === routerStates.READY ||
+      state === routerStates.TRANSITIONING
+    ) {
       this.#lifecycle.stop();
-      this.#routerFSM.send("STOP");
+      this.#routerFSM.send(routerEvents.STOP);
     }
 
-    this.#routerFSM.send("DISPOSE");
+    this.#routerFSM.send(routerEvents.DISPOSE);
 
     this.#plugins.disposeAll();
     this.#middleware.clearAll();
@@ -1259,7 +1273,7 @@ export class Router<
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
         this.#observable.addEventListener(eventName, cb),
-      canNavigate: () => this.#routerFSM.canSend("NAVIGATE"),
+      canNavigate: () => this.#routerFSM.canSend(routerEvents.NAVIGATE),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
     };
@@ -1290,31 +1304,42 @@ export class Router<
         this.#dependencies.get(name as keyof Dependencies),
       startTransition: (toState, fromState) => {
         this.#currentToState = toState;
-        this.#transitionFSM.send("START", { toState, fromState });
+        this.#transitionFSM.send(transitionEvents.START, {
+          toState,
+          fromState,
+        });
       },
       cancelNavigation: () => {
         const currentToState = this.#currentToState;
 
         /* v8 ignore next 6 -- @preserve: cancelNavigation() only called when isTransitioning(), currentToState always set */
         if (currentToState !== undefined) {
-          this.#transitionFSM.send("CANCEL", {
+          this.#transitionFSM.send(transitionEvents.CANCEL, {
             toState: currentToState,
             fromState: this.#state.get(),
           });
         }
       },
       sendTransitionDone: (state, fromState, opts) => {
-        this.#transitionFSM.send("DONE", { state, fromState, opts });
+        this.#transitionFSM.send(transitionEvents.DONE, {
+          state,
+          fromState,
+          opts,
+        });
       },
       sendTransitionBlocked: (toState, fromState, error) => {
-        this.#transitionFSM.send("BLOCKED", {
+        this.#transitionFSM.send(transitionEvents.BLOCKED, {
           state: toState,
           fromState,
           error,
         });
       },
       sendTransitionError: (toState, fromState, error) => {
-        this.#transitionFSM.send("ERROR", { state: toState, fromState, error });
+        this.#transitionFSM.send(transitionEvents.ERROR, {
+          state: toState,
+          fromState,
+          error,
+        });
       },
       emitTransitionError: (toState, fromState, error) => {
         this.#observable.emitTransitionError(
@@ -1332,7 +1357,8 @@ export class Router<
       getMiddlewareFunctions: () => this.#middleware.getFunctions(),
       isActive: () => this.isActive(),
 
-      isTransitioning: () => !this.#transitionFSM.canSend("START"),
+      isTransitioning: () =>
+        !this.#transitionFSM.canSend(transitionEvents.START),
       clearCanDeactivate: (name) => {
         this.#routeLifecycle.clearCanDeactivate(name);
       },
@@ -1352,7 +1378,7 @@ export class Router<
       matchPath: (path, source?: string) =>
         this.#routes.matchPath(path, source, this.#options.get()),
       completeStart: () => {
-        this.#routerFSM.send("STARTED");
+        this.#routerFSM.send(routerEvents.STARTED);
       },
       emitTransitionError: (toState, fromState, error) => {
         this.#observable.emitTransitionError(
@@ -1368,20 +1394,20 @@ export class Router<
     this.#transitionFSM.onTransition(({ event, payload }) => {
       /* v8 ignore next -- @preserve: all cases covered but branch analysis counts default */
       switch (event) {
-        case "START": {
+        case transitionEvents.START: {
           const p = payload as TransitionPayloads["START"];
 
-          this.#routerFSM.send("NAVIGATE", {
+          this.#routerFSM.send(routerEvents.NAVIGATE, {
             toState: p.toState,
             fromState: p.fromState,
           });
 
           break;
         }
-        case "DONE": {
+        case transitionEvents.DONE: {
           const p = payload as TransitionPayloads["DONE"];
 
-          this.#routerFSM.send("COMPLETE", {
+          this.#routerFSM.send(routerEvents.COMPLETE, {
             state: p.state,
             fromState: p.fromState,
             opts: p.opts,
@@ -1391,10 +1417,10 @@ export class Router<
 
           break;
         }
-        case "CANCEL": {
+        case transitionEvents.CANCEL: {
           const p = payload as TransitionPayloads["CANCEL"];
 
-          this.#routerFSM.send("CANCEL", {
+          this.#routerFSM.send(routerEvents.CANCEL, {
             toState: p.toState,
             fromState: p.fromState,
           });
@@ -1403,14 +1429,14 @@ export class Router<
 
           break;
         }
-        case "BLOCKED":
-        case "ERROR": {
+        case transitionEvents.BLOCKED:
+        case transitionEvents.ERROR: {
           const p = payload as TransitionPayloads["ERROR"];
 
-          if (this.#routerFSM.getState() === "STARTING") {
-            this.#routerFSM.send("FAIL", {});
+          if (this.#routerFSM.getState() === routerStates.STARTING) {
+            this.#routerFSM.send(routerEvents.FAIL, {});
           } else {
-            this.#routerFSM.send("FAIL", {
+            this.#routerFSM.send(routerEvents.FAIL, {
               toState: p.state,
               fromState: p.fromState,
               error: p.error,
@@ -1425,38 +1451,44 @@ export class Router<
     });
 
     this.#routerFSM.onTransition(({ from, to, event, payload }) => {
-      if (from === "STARTING" && to === "READY") {
+      if (from === routerStates.STARTING && to === routerStates.READY) {
         this.#observable.emitRouterStart();
       }
 
       /* v8 ignore next 6 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
       if (
-        event === "STOP" &&
-        to === "IDLE" &&
-        (from === "READY" || from === "TRANSITIONING")
+        event === routerEvents.STOP &&
+        to === routerStates.IDLE &&
+        (from === routerStates.READY || from === routerStates.TRANSITIONING)
       ) {
         this.#observable.emitRouterStop();
       }
 
-      if (from === "READY" && to === "TRANSITIONING") {
+      if (from === routerStates.READY && to === routerStates.TRANSITIONING) {
         const p = payload as RouterPayloads["NAVIGATE"];
 
         this.#observable.emitTransitionStart(p.toState, p.fromState);
       }
 
-      if (event === "COMPLETE" && from === "TRANSITIONING") {
+      if (
+        event === routerEvents.COMPLETE &&
+        from === routerStates.TRANSITIONING
+      ) {
         const p = payload as RouterPayloads["COMPLETE"];
 
         this.#observable.emitTransitionSuccess(p.state, p.fromState, p.opts);
       }
 
-      if (event === "CANCEL" && from === "TRANSITIONING") {
+      if (
+        event === routerEvents.CANCEL &&
+        from === routerStates.TRANSITIONING
+      ) {
         const p = payload as RouterPayloads["CANCEL"];
 
         this.#observable.emitTransitionCancel(p.toState, p.fromState);
       }
 
-      if (event === "FAIL" && from === "TRANSITIONING") {
+      if (event === routerEvents.FAIL && from === routerStates.TRANSITIONING) {
         const p = payload as RouterPayloads["FAIL"];
 
         this.#observable.emitTransitionError(
@@ -1482,7 +1514,8 @@ export class Router<
     // RouterLifecycle → Navigation.navigateToState() (for start transitions)
     // =========================================================================
 
-    this.#navigation.canNavigate = () => this.#routerFSM.canSend("NAVIGATE");
+    this.#navigation.canNavigate = () =>
+      this.#routerFSM.canSend(routerEvents.NAVIGATE);
 
     // Use facade method so tests can spy on router.navigateToState
     this.#lifecycle.navigateToState = (

@@ -14,12 +14,15 @@ import type { NavigationOptions, State } from "@real-router/types";
  * - TRANSITIONING: Navigation in progress
  * - DISPOSED: Router has been disposed (R2+)
  */
-export type RouterState =
-  | "IDLE"
-  | "STARTING"
-  | "READY"
-  | "TRANSITIONING"
-  | "DISPOSED";
+export const routerStates = {
+  IDLE: "IDLE",
+  STARTING: "STARTING",
+  READY: "READY",
+  TRANSITIONING: "TRANSITIONING",
+  DISPOSED: "DISPOSED",
+} as const;
+
+export type RouterState = (typeof routerStates)[keyof typeof routerStates];
 
 /**
  * Router FSM events.
@@ -33,15 +36,18 @@ export type RouterState =
  * - STOP: Stop router
  * - DISPOSE: Dispose router (R2+)
  */
-export type RouterEvent =
-  | "START"
-  | "STARTED"
-  | "NAVIGATE"
-  | "COMPLETE"
-  | "FAIL"
-  | "CANCEL"
-  | "STOP"
-  | "DISPOSE";
+export const routerEvents = {
+  START: "START",
+  STARTED: "STARTED",
+  NAVIGATE: "NAVIGATE",
+  COMPLETE: "COMPLETE",
+  FAIL: "FAIL",
+  CANCEL: "CANCEL",
+  STOP: "STOP",
+  DISPOSE: "DISPOSE",
+} as const;
+
+export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
 
 /**
  * Typed payloads for router FSM events.
@@ -80,31 +86,31 @@ export interface RouterPayloads {
  * - DISPOSED → (no transitions)
  */
 const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
-  initial: "IDLE",
+  initial: routerStates.IDLE,
   context: null,
   transitions: {
-    IDLE: {
-      START: "STARTING",
-      DISPOSE: "DISPOSED",
+    [routerStates.IDLE]: {
+      [routerEvents.START]: routerStates.STARTING,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
-    STARTING: {
-      STARTED: "READY",
-      FAIL: "IDLE",
-      STOP: "IDLE",
+    [routerStates.STARTING]: {
+      [routerEvents.STARTED]: routerStates.READY,
+      [routerEvents.FAIL]: routerStates.IDLE,
+      [routerEvents.STOP]: routerStates.IDLE,
     },
-    READY: {
-      NAVIGATE: "TRANSITIONING",
-      STOP: "IDLE",
-      DISPOSE: "DISPOSED",
+    [routerStates.READY]: {
+      [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
+      [routerEvents.STOP]: routerStates.IDLE,
+      [routerEvents.DISPOSE]: routerStates.DISPOSED,
     },
-    TRANSITIONING: {
-      NAVIGATE: "TRANSITIONING",
-      COMPLETE: "READY",
-      CANCEL: "READY",
-      FAIL: "READY",
-      STOP: "IDLE",
+    [routerStates.TRANSITIONING]: {
+      [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
+      [routerEvents.COMPLETE]: routerStates.READY,
+      [routerEvents.CANCEL]: routerStates.READY,
+      [routerEvents.FAIL]: routerStates.READY,
+      [routerEvents.STOP]: routerStates.IDLE,
     },
-    DISPOSED: {},
+    [routerStates.DISPOSED]: {},
   },
 };
 

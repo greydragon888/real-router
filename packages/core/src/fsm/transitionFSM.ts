@@ -11,7 +11,13 @@ import type { NavigationOptions, State } from "@real-router/types";
  * - IDLE: No transition in progress
  * - RUNNING: Transition is executing
  */
-export type TransitionFSMState = "IDLE" | "RUNNING";
+export const transitionStates = {
+  IDLE: "IDLE",
+  RUNNING: "RUNNING",
+} as const;
+
+export type TransitionFSMState =
+  (typeof transitionStates)[keyof typeof transitionStates];
 
 /**
  * Transition FSM events.
@@ -22,7 +28,16 @@ export type TransitionFSMState = "IDLE" | "RUNNING";
  * - ERROR: Transition failed with error
  * - CANCEL: Transition cancelled
  */
-export type TransitionEvent = "START" | "DONE" | "BLOCKED" | "ERROR" | "CANCEL";
+export const transitionEvents = {
+  START: "START",
+  DONE: "DONE",
+  BLOCKED: "BLOCKED",
+  ERROR: "ERROR",
+  CANCEL: "CANCEL",
+} as const;
+
+export type TransitionEvent =
+  (typeof transitionEvents)[keyof typeof transitionEvents];
 
 /**
  * Typed payloads for transition FSM events.
@@ -67,17 +82,17 @@ const transitionFSMConfig: FSMConfig<
   TransitionEvent,
   null
 > = {
-  initial: "IDLE",
+  initial: transitionStates.IDLE,
   context: null,
   transitions: {
-    IDLE: {
-      START: "RUNNING",
+    [transitionStates.IDLE]: {
+      [transitionEvents.START]: transitionStates.RUNNING,
     },
-    RUNNING: {
-      DONE: "IDLE",
-      BLOCKED: "IDLE",
-      ERROR: "IDLE",
-      CANCEL: "IDLE",
+    [transitionStates.RUNNING]: {
+      [transitionEvents.DONE]: transitionStates.IDLE,
+      [transitionEvents.BLOCKED]: transitionStates.IDLE,
+      [transitionEvents.ERROR]: transitionStates.IDLE,
+      [transitionEvents.CANCEL]: transitionStates.IDLE,
     },
   },
 };
