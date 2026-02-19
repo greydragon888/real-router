@@ -1409,11 +1409,6 @@ export class Router<
       this.#observable.emitRouterStop();
     });
 
-    /* v8 ignore next 3 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
-    fsm.on(routerStates.TRANSITIONING, routerEvents.STOP, () => {
-      this.#observable.emitRouterStop();
-    });
-
     fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
       this.#observable.emitTransitionStart(p.toState, p.fromState);
     });
