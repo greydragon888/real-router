@@ -312,6 +312,118 @@ describe("FSM", () => {
     });
   });
 
+  describe("on()", () => {
+    it("should call action on matching (from, event) with correct payload", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      const action = vi.fn();
+
+      fsm.on("idle", "FETCH", action);
+
+      fsm.send("FETCH", { url: "/api/data" });
+
+      expect(action).toHaveBeenCalledExactlyOnceWith({ url: "/api/data" });
+    });
+
+    it("should NOT call action when from-state doesn't match", () => {
+      const fsm = new FSM(lightConfig);
+
+      const action = vi.fn();
+
+      fsm.on("red", "TIMER", action);
+
+      fsm.send("TIMER");
+
+      expect(action).not.toHaveBeenCalled();
+      expect(fsm.getState()).toBe("yellow");
+    });
+
+    it("should NOT call action on no-op send", () => {
+      const fsm = new FSM(lightConfig);
+
+      const action = vi.fn();
+
+      fsm.on("green", "RESET", action);
+
+      fsm.send("RESET");
+
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("should not fire after unsubscribe", () => {
+      const fsm = new FSM(lightConfig);
+
+      const action = vi.fn();
+      const unsub = fsm.on("green", "TIMER", action);
+
+      unsub();
+
+      fsm.send("TIMER");
+
+      expect(action).not.toHaveBeenCalled();
+    });
+
+    it("should support multiple actions for different (from, event) pairs", () => {
+      const fsm = new FSM(lightConfig);
+
+      const calls: string[] = [];
+
+      fsm.on("green", "TIMER", () => calls.push("green→yellow"));
+      fsm.on("yellow", "TIMER", () => calls.push("yellow→red"));
+
+      fsm.send("TIMER");
+      fsm.send("TIMER");
+
+      expect(calls).toStrictEqual(["green→yellow", "yellow→red"]);
+    });
+
+    it("should fire before onTransition listeners", () => {
+      const fsm = new FSM(lightConfig);
+
+      const order: string[] = [];
+
+      fsm.onTransition(() => order.push("listener"));
+      fsm.on("green", "TIMER", () => order.push("action"));
+
+      fsm.send("TIMER");
+
+      expect(order).toStrictEqual(["action", "listener"]);
+    });
+
+    it("should overwrite previous action for same (from, event)", () => {
+      const fsm = new FSM(lightConfig);
+
+      const first = vi.fn();
+      const second = vi.fn();
+
+      fsm.on("green", "TIMER", first);
+      fsm.on("green", "TIMER", second);
+
+      fsm.send("TIMER");
+
+      expect(first).not.toHaveBeenCalled();
+      expect(second).toHaveBeenCalledTimes(1);
+    });
+
+    it("should receive undefined payload for no-payload events", () => {
+      const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
+        payloadConfig,
+      );
+
+      fsm.send("FETCH", { url: "/api" });
+
+      const action = vi.fn();
+
+      fsm.on("loading", "RESOLVE", action);
+
+      fsm.send("RESOLVE");
+
+      expect(action).toHaveBeenCalledExactlyOnceWith(undefined);
+    });
+  });
+
   describe("getContext()", () => {
     it("should return the same reference as config", () => {
       const context = { count: 0 };
