@@ -18,8 +18,6 @@ import type {
 } from "@real-router/types";
 import type { EventEmitter } from "event-emitter";
 
-const stubUnsubscribe: Unsubscribe = () => undefined;
-
 export class EventBusNamespace {
   readonly #fsm: FSM<RouterState, RouterEvent, null, RouterPayloads>;
   readonly #emitter: EventEmitter<RouterEventMap>;
@@ -62,191 +60,201 @@ export class EventBusNamespace {
   }
 
   emitRouterStart(): void {
-    // TODO: implement in Task 2
+    this.#emitter.emit(events.ROUTER_START);
   }
 
   emitRouterStop(): void {
-    // TODO: implement in Task 2
+    this.#emitter.emit(events.ROUTER_STOP);
   }
 
-  emitTransitionStart(_toState: State, _fromState?: State): void {
-    // TODO: implement in Task 2
+  emitTransitionStart(toState: State, fromState?: State): void {
+    this.#emitter.emit(events.TRANSITION_START, toState, fromState);
   }
 
   emitTransitionSuccess(
-    _toState: State,
-    _fromState?: State,
-    _opts?: NavigationOptions,
+    toState: State,
+    fromState?: State,
+    opts?: NavigationOptions,
   ): void {
-    // TODO: implement in Task 2
+    this.#emitter.emit(events.TRANSITION_SUCCESS, toState, fromState, opts);
   }
 
   emitTransitionError(
-    _toState?: State,
-    _fromState?: State,
-    _error?: RouterError,
+    toState?: State,
+    fromState?: State,
+    error?: RouterError,
   ): void {
-    // TODO: implement in Task 2
+    this.#emitter.emit(events.TRANSITION_ERROR, toState, fromState, error);
   }
 
-  emitTransitionCancel(_toState: State, _fromState?: State): void {
-    // TODO: implement in Task 2
+  emitTransitionCancel(toState: State, fromState?: State): void {
+    this.#emitter.emit(events.TRANSITION_CANCEL, toState, fromState);
   }
 
   sendStart(): void {
-    // TODO: implement in Task 2
+    this.#fsm.send(routerEvents.START);
   }
 
   sendStop(): void {
-    // TODO: implement in Task 2
+    this.#fsm.send(routerEvents.STOP);
   }
 
   sendDispose(): void {
-    // TODO: implement in Task 2
+    this.#fsm.send(routerEvents.DISPOSE);
   }
 
   completeStart(): void {
-    // TODO: implement in Task 2
+    this.#fsm.send(routerEvents.STARTED);
   }
 
-  beginTransition(_toState: State, _fromState?: State): void {
-    // TODO: implement in Task 2
+  beginTransition(toState: State, fromState?: State): void {
+    this.#currentToState = toState;
+    this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
   }
 
   completeTransition(
-    _state: State,
-    _fromState?: State,
-    _opts?: NavigationOptions,
+    state: State,
+    fromState?: State,
+    opts?: NavigationOptions,
   ): void {
-    // TODO: implement in Task 2
+    this.#fsm.send(routerEvents.COMPLETE, {
+      state,
+      fromState,
+      opts: opts ?? {},
+    });
+    this.#currentToState = undefined;
   }
 
-  failTransition(_toState?: State, _fromState?: State, _error?: unknown): void {
-    // TODO: implement in Task 2
+  failTransition(toState?: State, fromState?: State, error?: unknown): void {
+    this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
+    this.#currentToState = undefined;
   }
 
-  cancelTransition(_toState: State, _fromState?: State): void {
-    // TODO: implement in Task 2
+  cancelTransition(toState: State, fromState?: State): void {
+    this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
+    this.#currentToState = undefined;
   }
 
   emitOrFailTransitionError(
-    _toState?: State,
-    _fromState?: State,
-    _error?: unknown,
+    toState?: State,
+    fromState?: State,
+    error?: unknown,
   ): void {
-    // TODO: implement in Task 2
+    if (this.#fsm.getState() === routerStates.READY) {
+      this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
+    } else {
+      // TRANSITIONING: concurrent navigation with invalid args.
+      // Direct emit to avoid disturbing the ongoing transition.
+      this.emitTransitionError(toState, fromState, error as RouterError);
+    }
   }
 
   canBeginTransition(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.canSend(routerEvents.NAVIGATE);
   }
 
   canStart(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.canSend(routerEvents.START);
   }
 
   canCancel(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.canSend(routerEvents.CANCEL);
   }
 
   isActive(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    const s = this.#fsm.getState();
+
+    return s !== routerStates.IDLE && s !== routerStates.DISPOSED;
   }
 
   isDisposed(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.getState() === routerStates.DISPOSED;
   }
 
   isTransitioning(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.getState() === routerStates.TRANSITIONING;
   }
 
   isReady(): boolean {
-    // TODO: implement in Task 2
-    return false;
+    return this.#fsm.getState() === routerStates.READY;
   }
 
   getState(): RouterState {
-    // TODO: implement in Task 2
     return this.#fsm.getState();
   }
 
   getCurrentToState(): State | undefined {
-    // TODO: implement in Task 2
     return this.#currentToState;
   }
 
   setCurrentToState(state: State | undefined): void {
-    // TODO: implement in Task 2
     this.#currentToState = state;
   }
 
   addEventListener<E extends EventName>(
-    _eventName: E,
-    _cb: Plugin[EventMethodMap[E]],
+    eventName: E,
+    cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
-    // TODO: implement in Task 2
-    return stubUnsubscribe;
+    return this.#emitter.on(
+      eventName,
+      cb as (...args: RouterEventMap[typeof eventName]) => void,
+    );
   }
 
-  subscribe(_listener: SubscribeFn): Unsubscribe {
-    // TODO: implement in Task 2
-    return stubUnsubscribe;
+  subscribe(listener: SubscribeFn): Unsubscribe {
+    return this.#emitter.on(
+      events.TRANSITION_SUCCESS,
+      (toState: State, fromState?: State) => {
+        listener({ route: toState, previousRoute: fromState });
+      },
+    );
   }
 
   clearAll(): void {
-    // TODO: implement in Task 2
+    this.#emitter.clearAll();
   }
 
-  setLimits(_limits: {
+  setLimits(limits: {
     maxListeners: number;
     warnListeners: number;
     maxEventDepth: number;
   }): void {
-    // TODO: implement in Task 2
+    this.#emitter.setLimits(limits);
   }
 
-  cancelTransitionIfRunning(_fromState: State | undefined): void {
-    // TODO: implement in Task 2
+  cancelTransitionIfRunning(fromState: State | undefined): void {
+    if (!this.canCancel()) {
+      return;
+    }
+
+    this.cancelTransition(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
   }
 
   #setupFSMActions(): void {
     const fsm = this.#fsm;
 
     fsm.on(routerStates.STARTING, routerEvents.STARTED, () => {
-      this.#emitter.emit(events.ROUTER_START);
+      this.emitRouterStart();
     });
 
     fsm.on(routerStates.READY, routerEvents.STOP, () => {
-      this.#emitter.emit(events.ROUTER_STOP);
+      this.emitRouterStop();
     });
 
     fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
-      this.#emitter.emit(events.TRANSITION_START, p.toState, p.fromState);
+      this.emitTransitionStart(p.toState, p.fromState);
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_SUCCESS,
-        p.state,
-        p.fromState,
-        p.opts,
-      );
+      this.emitTransitionSuccess(p.state, p.fromState, p.opts);
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
-      this.#emitter.emit(events.TRANSITION_CANCEL, p.toState, p.fromState);
+      this.emitTransitionCancel(p.toState, p.fromState);
     });
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
+      this.emitTransitionError(
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,
@@ -254,8 +262,7 @@ export class EventBusNamespace {
     });
 
     fsm.on(routerStates.READY, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
+      this.emitTransitionError(
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,
@@ -263,8 +270,7 @@ export class EventBusNamespace {
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {
-      this.#emitter.emit(
-        events.TRANSITION_ERROR,
+      this.emitTransitionError(
         p.toState,
         p.fromState,
         p.error as RouterError | undefined,

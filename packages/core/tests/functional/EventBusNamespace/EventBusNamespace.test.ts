@@ -414,10 +414,10 @@ describe("EventBusNamespace", () => {
       expect(namespace.canBeginTransition()).toBe(false);
     });
 
-    it("canStart returns false", () => {
+    it("canStart returns true when FSM is in IDLE state (START is a valid event from IDLE)", () => {
       const { namespace } = createTestSubjects();
 
-      expect(namespace.canStart()).toBe(false);
+      expect(namespace.canStart()).toBe(true);
     });
 
     it("canCancel returns false", () => {
@@ -426,8 +426,24 @@ describe("EventBusNamespace", () => {
       expect(namespace.canCancel()).toBe(false);
     });
 
-    it("isActive returns false", () => {
+    it("isActive returns false in IDLE state", () => {
       const { namespace } = createTestSubjects();
+
+      expect(namespace.isActive()).toBe(false);
+    });
+
+    it("isActive returns true when FSM is in STARTING state", () => {
+      const { fsm, namespace } = createTestSubjects();
+
+      fsm.send(routerEvents.START);
+
+      expect(namespace.isActive()).toBe(true);
+    });
+
+    it("isActive returns false when FSM is in DISPOSED state", () => {
+      const { fsm, namespace } = createTestSubjects();
+
+      fsm.send(routerEvents.DISPOSE);
 
       expect(namespace.isActive()).toBe(false);
     });
@@ -529,6 +545,71 @@ describe("EventBusNamespace", () => {
       expect(() => {
         namespace.cancelTransitionIfRunning(undefined);
       }).not.toThrowError();
+    });
+
+    it("cancelTransitionIfRunning cancels the ongoing transition when FSM is in TRANSITIONING state", () => {
+      const { fsm, emitter, namespace } = createTestSubjects();
+      const listener = vi.fn();
+
+      emitter.on(events.TRANSITION_CANCEL, listener);
+
+      const toState = {
+        name: "a",
+        params: {},
+        path: "/a",
+        meta: { id: 1, params: {}, options: {}, redirected: false },
+      };
+
+      fsm.send(routerEvents.START);
+      fsm.send(routerEvents.STARTED);
+      namespace.beginTransition(toState);
+
+      namespace.cancelTransitionIfRunning(undefined);
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("emitOrFailTransitionError routes error through FSM when in READY state", () => {
+      const { fsm, emitter, namespace } = createTestSubjects();
+      const listener = vi.fn();
+
+      emitter.on(events.TRANSITION_ERROR, listener);
+
+      fsm.send(routerEvents.START);
+      fsm.send(routerEvents.STARTED);
+
+      namespace.emitOrFailTransitionError();
+
+      expect(listener).toHaveBeenCalledTimes(1);
+    });
+
+    it("subscribe fires listener with route and previousRoute on TRANSITION_SUCCESS", () => {
+      const { fsm, namespace } = createTestSubjects();
+      const listener = vi.fn();
+
+      namespace.subscribe(listener);
+
+      const toState = {
+        name: "a",
+        params: {},
+        path: "/a",
+        meta: { id: 1, params: {}, options: {}, redirected: false },
+      };
+
+      fsm.send(routerEvents.START);
+      fsm.send(routerEvents.STARTED);
+      fsm.send(routerEvents.NAVIGATE, { toState, fromState: undefined });
+      fsm.send(routerEvents.COMPLETE, {
+        state: toState,
+        fromState: undefined,
+        opts: {},
+      });
+
+      expect(listener).toHaveBeenCalledTimes(1);
+      expect(listener).toHaveBeenCalledWith({
+        route: toState,
+        previousRoute: undefined,
+      });
     });
   });
 });
