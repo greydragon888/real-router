@@ -166,7 +166,7 @@ describe("core/limits (integration via public API)", () => {
       // 2nd listener should throw
       expect(() => {
         router.addEventListener(events.ROUTER_START, () => {});
-      }).toThrowError("Maximum listener limit");
+      }).toThrowError("Listener limit");
     });
   });
 
@@ -335,7 +335,7 @@ describe("core/limits (integration via public API)", () => {
       // 10001st listener should throw
       expect(() => {
         router.addEventListener(events.ROUTER_START, () => {});
-      }).toThrowError("Maximum listener limit");
+      }).toThrowError("Listener limit");
     });
 
     it("should work without explicit limits option", () => {

@@ -175,6 +175,45 @@ describe("dispose", () => {
     });
   });
 
+  describe("dispose() plugin teardown edge cases", () => {
+    it("should not double-teardown when plugin was manually unsubscribed before dispose()", async () => {
+      const teardownSpy = vi.fn();
+
+      const unsubscribe = router.usePlugin(() => ({
+        teardown: teardownSpy,
+      }));
+
+      await router.start("/home");
+
+      unsubscribe();
+
+      expect(teardownSpy).toHaveBeenCalledTimes(1);
+
+      router.dispose();
+
+      expect(teardownSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("should isolate teardown errors — one failing plugin does not block others", async () => {
+      const goodTeardown = vi.fn();
+
+      router.usePlugin(() => ({
+        teardown: () => {
+          throw new Error("teardown error");
+        },
+      }));
+      router.usePlugin(() => ({ teardown: goodTeardown }));
+
+      await router.start("/home");
+
+      expect(() => {
+        router.dispose();
+      }).not.toThrowError();
+
+      expect(goodTeardown).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("guardAgainstDisposed — mutating methods throw after dispose()", () => {
     beforeEach(() => {
       router.dispose();

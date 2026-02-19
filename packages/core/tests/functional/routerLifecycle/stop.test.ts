@@ -385,6 +385,25 @@ describe("stop", () => {
     });
   });
 
+  describe("stop clears state completely", () => {
+    it("should allow areStatesEqual after stop and restart", async () => {
+      await router.start("/home");
+
+      const s1 = router.getState()!;
+      const s2 = router.getState()!;
+
+      expect(router.areStatesEqual(s1, s2)).toBe(true);
+
+      router.stop();
+      await router.start("/home");
+
+      const s3 = router.getState()!;
+      const s4 = router.getState()!;
+
+      expect(router.areStatesEqual(s3, s4)).toBe(true);
+    });
+  });
+
   describe("stop with different router states", () => {
     it("should stop router started with path string", async () => {
       await router.start("/users/list");

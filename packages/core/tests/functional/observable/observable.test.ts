@@ -181,30 +181,21 @@ describe("core/observable", () => {
         }).not.toThrowError();
       });
 
-      it("should warn when unsubscribing a listener that was already removed", () => {
-        const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
-
+      it("should be idempotent (double unsubscribe is a no-op)", async () => {
         const cb1 = vi.fn();
         const cb2 = vi.fn();
 
-        // Add two listeners to ensure set is not empty after first removal
         router.addEventListener(events.ROUTER_STOP, cb1);
         const unsubscribe2 = router.addEventListener(events.ROUTER_STOP, cb2);
 
-        // First unsubscribe - should succeed without warning
         unsubscribe2();
+        unsubscribe2(); // second call is a no-op
 
-        expect(warnSpy).not.toHaveBeenCalled();
+        router.stop();
+        await router.start("/home");
 
-        // Second unsubscribe - should warn (set still has cb1, but cb2 is gone)
-        unsubscribe2();
-
-        expect(warnSpy).toHaveBeenCalledWith(
-          "Router",
-          expect.stringContaining("non-existent listener"),
-        );
-
-        warnSpy.mockRestore();
+        expect(cb1).toHaveBeenCalledTimes(1);
+        expect(cb2).not.toHaveBeenCalled();
       });
 
       it("should only unsubscribe the specific listener", () => {
@@ -246,7 +237,7 @@ describe("core/observable", () => {
 
         expect(() => {
           router.addEventListener(events.ROUTER_START, cb);
-        }).toThrowError("Listener already exists");
+        }).toThrowError("Duplicate listener");
       });
     });
   });
