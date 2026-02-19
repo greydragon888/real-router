@@ -17,7 +17,6 @@ export type TransitionReason = "success" | "blocked" | "cancelled" | "error";
 
 export interface TransitionMeta {
   phase: TransitionPhase;
-  duration: number;
   from?: string;
   reason: TransitionReason;
   blocker?: string;

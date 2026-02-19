@@ -149,16 +149,12 @@ export class NavigationNamespace {
     deps.startTransition(toState, fromState);
 
     try {
-      const transitionStart = performance.now();
-
       const { state: finalState, meta: transitionOutput } = await transition(
         transitionDeps,
         toState,
         fromState,
         opts,
       );
-
-      const duration = performance.now() - transitionStart;
 
       if (
         finalState.name === constants.UNKNOWN_ROUTE ||
@@ -167,7 +163,6 @@ export class NavigationNamespace {
         const stateWithTransition = NavigationNamespace.#buildSuccessState(
           finalState,
           transitionOutput,
-          duration,
           fromState,
         );
 
@@ -289,12 +284,10 @@ export class NavigationNamespace {
   static #buildSuccessState(
     finalState: State,
     transitionOutput: TransitionOutput["meta"],
-    duration: number,
     fromState: State | undefined,
   ): State {
     const transitionMeta: TransitionMeta = {
       phase: transitionOutput.phase,
-      duration,
       ...(fromState?.name !== undefined && { from: fromState.name }),
       reason: "success",
       segments: transitionOutput.segments,

@@ -35,12 +35,6 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
 
       expect(state.transition?.phase).toBe("middleware");
     });
-
-    it("should set duration >= 0", async () => {
-      const state = await router.navigate("users");
-
-      expect(state.transition?.duration).toBeGreaterThanOrEqual(0);
-    });
   });
 
   describe("from field", () => {
