@@ -668,11 +668,7 @@ export class Router<
     try {
       return await this.#lifecycle.start(startPath);
     } catch (error) {
-      const currentState = this.#routerFSM.getState();
-
-      if (currentState === routerStates.STARTING) {
-        this.#routerFSM.send(routerEvents.FAIL, {});
-      } else if (currentState === routerStates.READY) {
+      if (this.#routerFSM.getState() === routerStates.READY) {
         this.#lifecycle.stop();
         this.#routerFSM.send(routerEvents.STOP);
       }
@@ -1335,11 +1331,21 @@ export class Router<
         this.#currentToState = undefined;
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.#observable.emitTransitionError(
-          toState,
-          fromState,
-          error as RouterError,
-        );
+        if (this.#routerFSM.getState() === routerStates.READY) {
+          this.#routerFSM.send(routerEvents.FAIL, {
+            toState,
+            fromState,
+            error,
+          });
+        } else {
+          // TRANSITIONING: concurrent navigation with invalid args.
+          // Direct emit to avoid disturbing the ongoing transition.
+          this.#observable.emitTransitionError(
+            toState,
+            fromState,
+            error as RouterError,
+          );
+        }
       },
     };
 
@@ -1374,11 +1380,11 @@ export class Router<
         this.#routerFSM.send(routerEvents.STARTED);
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.#observable.emitTransitionError(
+        this.#routerFSM.send(routerEvents.FAIL, {
           toState,
           fromState,
-          error as unknown as RouterError,
-        );
+          error,
+        });
       },
     };
 
@@ -1406,6 +1412,22 @@ export class Router<
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
       this.#observable.emitTransitionCancel(p.toState, p.fromState);
+    });
+
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, (p) => {
+      this.#observable.emitTransitionError(
+        p.toState,
+        p.fromState,
+        p.error as RouterError | undefined,
+      );
+    });
+
+    fsm.on(routerStates.READY, routerEvents.FAIL, (p) => {
+      this.#observable.emitTransitionError(
+        p.toState,
+        p.fromState,
+        p.error as RouterError | undefined,
+      );
     });
 
     fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {

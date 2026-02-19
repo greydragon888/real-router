@@ -65,7 +65,7 @@ export interface RouterPayloads {
     opts: NavigationOptions;
   };
   FAIL: {
-    toState?: State;
+    toState?: State | undefined;
     fromState?: State | undefined;
     error?: unknown;
   };
@@ -81,7 +81,7 @@ export interface RouterPayloads {
  * Transitions:
  * - IDLE → STARTING (START), DISPOSED (DISPOSE)
  * - STARTING → READY (STARTED), IDLE (FAIL)
- * - READY → TRANSITIONING (NAVIGATE), IDLE (STOP)
+ * - READY → TRANSITIONING (NAVIGATE), READY (FAIL, self-loop for early validation errors), IDLE (STOP)
  * - TRANSITIONING → TRANSITIONING (NAVIGATE, self-loop for canSend), READY (COMPLETE, CANCEL, FAIL)
  * - DISPOSED → (no transitions)
  */
@@ -99,6 +99,7 @@ const routerFSMConfig: FSMConfig<RouterState, RouterEvent, null> = {
     },
     [routerStates.READY]: {
       [routerEvents.NAVIGATE]: routerStates.TRANSITIONING,
+      [routerEvents.FAIL]: routerStates.READY,
       [routerEvents.STOP]: routerStates.IDLE,
     },
     [routerStates.TRANSITIONING]: {

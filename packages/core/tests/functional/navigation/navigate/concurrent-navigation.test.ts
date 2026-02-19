@@ -462,6 +462,62 @@ describe("router.navigate() - concurrent navigation", () => {
     });
   });
 
+  describe("early validation errors during active transition", () => {
+    it("should emit TRANSITION_ERROR for ROUTE_NOT_FOUND without disrupting ongoing transition", async () => {
+      vi.useFakeTimers();
+
+      const onError = vi.fn();
+      const onSuccess = vi.fn();
+
+      const unsub = router.useMiddleware(() => async () => {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      const unsubError = router.addEventListener(
+        events.TRANSITION_ERROR,
+        onError,
+      );
+      const unsubSuccess = router.addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
+
+      // Start a slow navigation (FSM → TRANSITIONING)
+      const promise = router.navigate("orders.pending");
+
+      // Synchronously navigate to nonexistent route while transitioning
+      await expect(
+        router.navigate("nonexistent_route_xyz"),
+      ).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+
+      // TRANSITION_ERROR should have been emitted for the bad route
+      expect(onError).toHaveBeenCalledTimes(1);
+      expect(onError).toHaveBeenCalledWith(
+        undefined,
+        expect.objectContaining({ name: "home" }),
+        expect.objectContaining({ code: errorCodes.ROUTE_NOT_FOUND }),
+      );
+
+      // Original transition should complete successfully
+      await vi.runAllTimersAsync();
+      await promise;
+
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "orders.pending" }),
+        expect.objectContaining({ name: "home" }),
+        expect.anything(),
+      );
+
+      unsubError();
+      unsubSuccess();
+      unsub();
+      vi.useRealTimers();
+    });
+  });
+
   // Note: "Issue #56: isNavigating()" tests were removed because isNavigating()
   // is no longer part of the public API.
 
