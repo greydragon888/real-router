@@ -1197,28 +1197,41 @@ export class Router<
    * Called once in constructor after all namespaces are created.
    */
   #setupDependencies(): void {
-    // Set limits for all namespaces that use them
+    this.#setupLimits();
+    this.#setupRouteLifecycleDeps();
+    this.#setupRoutesDeps();
+    this.#setupMiddlewareDeps();
+    this.#setupPluginsDeps();
+    this.#setupNavigationDeps();
+    this.#setupLifecycleDeps();
+    this.#setupFSMActions();
+    this.#setupStateDeps();
+    this.#setupCyclicDeps();
+    this.#setupCloneCallbacks();
+  }
+
+  #setupLimits(): void {
     this.#dependencies.setLimits(this.#limits);
     this.#plugins.setLimits(this.#limits);
     this.#middleware.setLimits(this.#limits);
     this.#observable.setLimits(this.#limits);
     this.#routeLifecycle.setLimits(this.#limits);
+  }
 
-    // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setDependencies()
-    // will register pending canActivate handlers which need RouteLifecycleNamespace
+  // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setDependencies()
+  // will register pending canActivate handlers which need RouteLifecycleNamespace
+  #setupRouteLifecycleDeps(): void {
     this.#routeLifecycle.setRouter(this);
 
-    // RouteLifecycleNamespace uses function injection for getDependency
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
     };
 
     this.#routeLifecycle.setDependencies(routeLifecycleDeps);
+  }
 
-    // RoutesNamespace uses function injection (will register pending canActivate handlers)
-    // Use facade method for proper validation
-
+  #setupRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
         this.addActivateGuard(name, handler);
@@ -1237,20 +1250,22 @@ export class Router<
 
     this.#routes.setDependencies(routesDeps);
     this.#routes.setLifecycleNamespace(this.#routeLifecycle);
+  }
 
+  #setupMiddlewareDeps(): void {
     this.#middleware.setRouter(this);
 
-    // MiddlewareNamespace uses function injection for getDependency
     const middlewareDeps: MiddlewareDependencies<Dependencies> = {
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
         this.#dependencies.get(dependencyName),
     };
 
     this.#middleware.setDependencies(middlewareDeps);
+  }
 
+  #setupPluginsDeps(): void {
     this.#plugins.setRouter(this);
 
-    // PluginsNamespace uses function injection for internal @internal method calls
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
         this.#observable.addEventListener(eventName, cb),
@@ -1260,8 +1275,9 @@ export class Router<
     };
 
     this.#plugins.setDependencies(pluginsDeps);
+  }
 
-    // NavigationNamespace uses function injection
+  #setupNavigationDeps(): void {
     const navigationDeps: NavigationDependencies = {
       getOptions: () => this.#options.get(),
       hasRoute: (name) => this.#routes.hasRoute(name),
@@ -1350,9 +1366,9 @@ export class Router<
     };
 
     this.#navigation.setTransitionDependencies(transitionDeps);
+  }
 
-    // RouterLifecycleNamespace uses function injection
-    // Use facade methods to ensure spies work and plugin interception is possible
+  #setupLifecycleDeps(): void {
     const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.#options.get(),
       makeNotFoundState: (path, options) =>
@@ -1375,82 +1391,69 @@ export class Router<
     };
 
     this.#lifecycle.setDependencies(lifecycleDeps);
+  }
 
-    this.#routerFSM.onTransition(({ from, to, event, payload }) => {
-      if (from === routerStates.STARTING && to === routerStates.READY) {
-        this.#observable.emitRouterStart();
-      }
+  #setupFSMActions(): void {
+    const fsm = this.#routerFSM;
 
-      /* v8 ignore next 6 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
-      if (
-        event === routerEvents.STOP &&
-        to === routerStates.IDLE &&
-        (from === routerStates.READY || from === routerStates.TRANSITIONING)
-      ) {
-        this.#observable.emitRouterStop();
-      }
-
-      if (from === routerStates.READY && to === routerStates.TRANSITIONING) {
-        const p = payload as RouterPayloads["NAVIGATE"];
-
-        this.#observable.emitTransitionStart(p.toState, p.fromState);
-      }
-
-      if (
-        event === routerEvents.COMPLETE &&
-        from === routerStates.TRANSITIONING
-      ) {
-        const p = payload as RouterPayloads["COMPLETE"];
-
-        this.#observable.emitTransitionSuccess(p.state, p.fromState, p.opts);
-      }
-
-      if (
-        event === routerEvents.CANCEL &&
-        from === routerStates.TRANSITIONING
-      ) {
-        const p = payload as RouterPayloads["CANCEL"];
-
-        this.#observable.emitTransitionCancel(p.toState, p.fromState);
-      }
-
-      if (event === routerEvents.FAIL && from === routerStates.TRANSITIONING) {
-        const p = payload as RouterPayloads["FAIL"];
-
-        this.#observable.emitTransitionError(
-          p.toState,
-          p.fromState,
-          p.error as RouterError | undefined,
-        );
-      }
+    fsm.on(routerStates.STARTING, routerEvents.STARTED, () => {
+      this.#observable.emitRouterStart();
     });
 
-    // StateNamespace needs access to route config and path building
+    fsm.on(routerStates.READY, routerEvents.STOP, () => {
+      this.#observable.emitRouterStop();
+    });
+
+    /* v8 ignore next 3 -- @preserve: from=TRANSITIONING unreachable — stop() cancels transition first, moving FSM to READY before STOP */
+    fsm.on(routerStates.TRANSITIONING, routerEvents.STOP, () => {
+      this.#observable.emitRouterStop();
+    });
+
+    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
+      this.#observable.emitTransitionStart(p.toState, p.fromState);
+    });
+
+    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (p) => {
+      this.#observable.emitTransitionSuccess(p.state, p.fromState, p.opts);
+    });
+
+    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
+      this.#observable.emitTransitionCancel(p.toState, p.fromState);
+    });
+
+    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {
+      this.#observable.emitTransitionError(
+        p.toState,
+        p.fromState,
+        p.error as RouterError | undefined,
+      );
+    });
+  }
+
+  #setupStateDeps(): void {
     this.#state.setDependencies({
       getDefaultParams: () => this.#routes.getConfig().defaultParams,
       buildPath: (name, params) =>
         this.#routes.buildPath(name, params, this.#options.get()),
       getUrlParams: (name) => this.#routes.getUrlParams(name),
     });
+  }
 
-    // =========================================================================
-    // Setup cyclic dependencies via functional references
-    // =========================================================================
+  #setupCyclicDeps(): void {
     // Navigation → canNavigate() (check before navigation)
-    // RouterLifecycle → Navigation.navigateToState() (for start transitions)
-    // =========================================================================
-
     this.#navigation.canNavigate = () =>
       this.#routerFSM.canSend(routerEvents.NAVIGATE);
 
+    // RouterLifecycle → Navigation.navigateToState() (for start transitions)
     // Use facade method so tests can spy on router.navigateToState
     this.#lifecycle.navigateToState = (
       toState: State,
       fromState: State | undefined,
       opts: NavigationOptions,
     ) => this.#navigation.navigateToState(toState, fromState, opts);
+  }
 
-    // CloneNamespace needs access to collect cloning data and apply config
+  #setupCloneCallbacks(): void {
     this.#clone.setCallbacks(
       // getCloneData: collect all data needed for cloning
       () => {
