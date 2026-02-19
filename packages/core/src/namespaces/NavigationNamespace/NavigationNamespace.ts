@@ -126,6 +126,61 @@ export class NavigationNamespace {
   // =========================================================================
 
   /**
+   * Navigates to a route by name.
+   * Arguments should be pre-parsed and validated by facade.
+   */
+  async navigate(
+    name: string,
+    params: Params,
+    opts: NavigationOptions,
+  ): Promise<State> {
+    if (!this.canNavigate()) {
+      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+    }
+
+    const deps = this.#deps;
+
+    const result = deps.buildStateWithSegments(name, params);
+
+    if (!result) {
+      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
+
+      deps.emitTransitionError(undefined, deps.getState(), err);
+
+      throw err;
+    }
+
+    const { state: route } = result;
+
+    const toState = deps.makeState(
+      route.name,
+      route.params,
+      deps.buildPath(route.name, route.params),
+      {
+        params: route.meta,
+        options: opts,
+        redirected: opts.redirected ?? false,
+      },
+    );
+
+    const fromState = deps.getState();
+
+    if (
+      !opts.reload &&
+      !opts.force &&
+      deps.areStatesEqual(fromState, toState, false)
+    ) {
+      const err = new RouterError(errorCodes.SAME_STATES);
+
+      deps.emitTransitionError(toState, fromState, err);
+
+      throw err;
+    }
+
+    return this.navigateToState(toState, fromState, opts);
+  }
+
+  /**
    * Internal navigation function that accepts pre-built state.
    * Used by RouterLifecycleNamespace for start() transitions.
    */
@@ -184,61 +239,6 @@ export class NavigationNamespace {
 
       throw error;
     }
-  }
-
-  /**
-   * Navigates to a route by name.
-   * Arguments should be pre-parsed and validated by facade.
-   */
-  async navigate(
-    name: string,
-    params: Params,
-    opts: NavigationOptions,
-  ): Promise<State> {
-    const deps = this.#deps;
-
-    if (!this.canNavigate()) {
-      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
-    }
-
-    const result = deps.buildStateWithSegments(name, params);
-
-    if (!result) {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
-
-      deps.emitTransitionError(undefined, deps.getState(), err);
-
-      throw err;
-    }
-
-    const { state: route } = result;
-
-    const toState = deps.makeState(
-      route.name,
-      route.params,
-      deps.buildPath(route.name, route.params),
-      {
-        params: route.meta,
-        options: opts,
-        redirected: opts.redirected ?? false,
-      },
-    );
-
-    const fromState = deps.getState();
-
-    if (
-      !opts.reload &&
-      !opts.force &&
-      deps.areStatesEqual(fromState, toState, false)
-    ) {
-      const err = new RouterError(errorCodes.SAME_STATES);
-
-      deps.emitTransitionError(toState, fromState, err);
-
-      throw err;
-    }
-
-    return this.navigateToState(toState, fromState, opts);
   }
 
   /**
