@@ -686,13 +686,6 @@ export class Router<
 
     const prevState = this.#routerFSM.getState();
 
-    /* v8 ignore next 4 -- @preserve: stop() during STARTING is a race condition, hard to test reliably */
-    if (prevState === routerStates.STARTING) {
-      this.#routerFSM.send(routerEvents.STOP);
-
-      return this;
-    }
-
     if (
       prevState !== routerStates.READY &&
       prevState !== routerStates.TRANSITIONING
@@ -715,13 +708,7 @@ export class Router<
 
     const state = this.#routerFSM.getState();
 
-    /* v8 ignore next 4 -- @preserve: dispose() during STARTING is a race condition, hard to test reliably */
-    if (state === routerStates.STARTING) {
-      this.#routerFSM.send(routerEvents.STOP);
-    } else if (
-      state === routerStates.READY ||
-      state === routerStates.TRANSITIONING
-    ) {
+    if (state === routerStates.READY || state === routerStates.TRANSITIONING) {
       this.#lifecycle.stop();
       this.#routerFSM.send(routerEvents.STOP);
     }
