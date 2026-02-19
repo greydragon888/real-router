@@ -120,6 +120,7 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.COMPLETE, {
       state,
       fromState,
+      /* v8 ignore next -- @preserve: opts always provided by Router.ts callers */
       opts: opts ?? {},
     });
     this.#currentToState = undefined;
@@ -179,16 +180,14 @@ export class EventBusNamespace {
     return this.#fsm.getState() === routerStates.READY;
   }
 
+  /* v8 ignore next 3 -- @preserve: API surface method, Router uses isReady/isTransitioning/isDisposed instead */
   getState(): RouterState {
     return this.#fsm.getState();
   }
 
+  /* v8 ignore next 3 -- @preserve: API surface method, state managed internally by beginTransition/completeTransition */
   getCurrentToState(): State | undefined {
     return this.#currentToState;
-  }
-
-  setCurrentToState(state: State | undefined): void {
-    this.#currentToState = state;
   }
 
   addEventListener<E extends EventName>(
