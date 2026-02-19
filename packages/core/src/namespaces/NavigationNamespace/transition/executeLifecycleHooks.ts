@@ -1,6 +1,6 @@
 // packages/real-router/modules/transition/executeLifecycleHooks.ts
 
-import { logger } from "logger";
+import { logger } from "@real-router/logger";
 import { isState } from "type-guards";
 
 import { RouterError, errorCodes } from "@real-router/core";
