@@ -13,6 +13,7 @@
       ],
       "@real-router/react": ["packages/react/src/index.ts"],
       "@real-router/types": ["packages/core-types/src/index.ts"],
+      "event-emitter": ["packages/event-emitter/src/index.ts"],
       "type-guards": ["packages/type-guards/src/index.ts"],
       "route-tree": ["packages/route-tree/src/index.ts"],
       "search-params": ["packages/search-params/src/index.ts"],

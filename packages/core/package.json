@@ -61,6 +61,7 @@
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
+    "event-emitter": "workspace:^",
     "route-tree": "workspace:^",
     "type-guards": "workspace:^"
   }

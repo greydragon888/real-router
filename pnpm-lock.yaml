@@ -202,6 +202,9 @@ importers:
         specifier: workspace:^
         version: link:../core-types
     devDependencies:
+      event-emitter:
+        specifier: workspace:^
+        version: link:../event-emitter
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
@@ -210,6 +213,8 @@ importers:
         version: link:../type-guards
 
   packages/core-types: {}
+
+  packages/event-emitter: {}
 
   packages/fsm:
     devDependencies:
