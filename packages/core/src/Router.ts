@@ -666,19 +666,21 @@ export class Router<
     return s !== "IDLE" && s !== "DISPOSED";
   }
 
-  start(startPath: string): Promise<State> {
+  async start(startPath: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
     if (!this.#routerFSM.canSend("START")) {
-      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
+      throw CACHED_ALREADY_STARTED_ERROR;
     }
 
     this.#routerFSM.send("START");
 
-    return this.#lifecycle.start(startPath).catch((error: unknown) => {
+    try {
+      return await this.#lifecycle.start(startPath);
+    } catch (error) {
       const currentState = this.#routerFSM.getState();
 
       if (currentState === "STARTING") {
@@ -689,7 +691,7 @@ export class Router<
       }
 
       throw error;
-    });
+    }
   }
 
   stop(): this {
@@ -1100,7 +1102,15 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    return this.#navigation.navigate(routeName, routeParams ?? {}, opts);
+    const promise = this.#navigation.navigate(
+      routeName,
+      routeParams ?? {},
+      opts,
+    );
+
+    Router.#suppressUnhandledRejection(promise);
+
+    return promise;
   }
 
   navigateToDefault(): Promise<State>;
@@ -1119,7 +1129,11 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    return this.#navigation.navigateToDefault(opts);
+    const promise = this.#navigation.navigateToDefault(opts);
+
+    Router.#suppressUnhandledRejection(promise);
+
+    return promise;
   }
 
   navigateToState(
@@ -1160,6 +1174,27 @@ export class Router<
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
     );
+  }
+
+  /**
+   * Fire-and-forget safety: prevents unhandled rejection warnings
+   * when navigate/navigateToDefault is called without await.
+   * Expected errors are silently suppressed; unexpected ones are logged.
+   */
+  static #suppressUnhandledRejection(promise: Promise<State>): void {
+    promise.catch((error: unknown) => {
+      if (
+        error instanceof RouterError &&
+        (error.code === errorCodes.SAME_STATES ||
+          error.code === errorCodes.TRANSITION_CANCELLED ||
+          error.code === errorCodes.ROUTER_NOT_STARTED ||
+          error.code === errorCodes.ROUTE_NOT_FOUND)
+      ) {
+        return;
+      }
+
+      logger.error("router.navigate", "Unexpected navigation error", error);
+    });
   }
 
   /**

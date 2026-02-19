@@ -26,20 +26,6 @@ import type {
 } from "@real-router/types";
 
 /**
- * Creates a rejected promise with suppressed unhandled rejection warning.
- * Used for expected errors (e.g. SAME_STATES) in fire-and-forget navigations.
- */
-/* eslint-disable promise/no-promise-in-callback */
-const suppressedReject = (err: RouterError): Promise<never> => {
-  const rejection = Promise.reject(err);
-
-  rejection.catch(() => {});
-
-  return rejection;
-};
-/* eslint-enable promise/no-promise-in-callback */
-
-/**
  * Independent namespace for managing navigation.
  *
  * Handles navigate(), navigateToDefault(), navigateToState(), and transition state.
@@ -209,7 +195,7 @@ export class NavigationNamespace {
    * Navigates to a route by name.
    * Arguments should be pre-parsed and validated by facade.
    */
-  navigate(
+  async navigate(
     name: string,
     params: Params,
     opts: NavigationOptions,
@@ -217,25 +203,17 @@ export class NavigationNamespace {
     const deps = this.#deps;
 
     if (!this.canNavigate()) {
-      const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
-
-      return Promise.reject(err);
+      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
     }
 
-    let result;
-
-    try {
-      result = deps.buildStateWithSegments(name, params);
-    } catch (error) {
-      return Promise.reject(error as Error);
-    }
+    const result = deps.buildStateWithSegments(name, params);
 
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
       deps.emitTransitionError(undefined, deps.getState(), err);
 
-      return Promise.reject(err);
+      throw err;
     }
 
     const { state: route } = result;
@@ -262,37 +240,24 @@ export class NavigationNamespace {
 
       deps.emitTransitionError(toState, fromState, err);
 
-      return suppressedReject(err);
+      throw err;
     }
 
-    const promise = this.navigateToState(toState, fromState, opts);
-
-    promise.catch((error: unknown) => {
-      if (
-        !(error instanceof RouterError) ||
-        error.code !== errorCodes.TRANSITION_CANCELLED
-      ) {
-        logger.error("router.navigate", "Unexpected navigation error", error);
-      }
-    });
-
-    return promise;
+    return this.navigateToState(toState, fromState, opts);
   }
 
   /**
    * Navigates to the default route if configured.
    * Arguments should be pre-parsed and validated by facade.
    */
-  navigateToDefault(opts: NavigationOptions): Promise<State> {
+  async navigateToDefault(opts: NavigationOptions): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute not configured",
-        }),
-      );
+      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: "defaultRoute not configured",
+      });
     }
 
     const resolvedRoute = resolveOption(
@@ -301,11 +266,9 @@ export class NavigationNamespace {
     );
 
     if (!resolvedRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute resolved to empty",
-        }),
-      );
+      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: "defaultRoute resolved to empty",
+      });
     }
 
     const resolvedParams = resolveOption(
