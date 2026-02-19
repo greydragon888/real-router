@@ -4,7 +4,7 @@
 
 Полный перевод ядра роутера с ручного управления состоянием через булевые флаги (`#started`, `#active`, `#navigating`) и прямые вызовы событий на **детерминированное управление через единый конечный автомат** (FSM). Все жизненные события роутера — следствие FSM-переходов, а не ручных вызовов.
 
-**25 коммитов, 57 файлов, +1792/-1012 строк, 4099 тестов, 100% coverage.**
+**34 коммита, 97 файлов, +4468/-1456 строк, 4101 тест, 100% coverage.**
 
 ---
 
@@ -170,13 +170,29 @@ fsm.on("idle", "FETCH", (payload) => {
 | `static #suppressUnhandledRejection()` | Fire-and-forget safety |
 | `static #onSuppressedError` | Кэшированный callback (одна аллокация на класс) |
 
-### Декомпозиция `#setupDependencies()`
+### Декомпозиция `#setupDependencies()` → Builder+Director
 
-Монолитный метод (275 строк) → 11 фокусированных приватных методов:
+Двухэтапная эволюция:
 
-`#setupLimits` → `#setupRouteLifecycleDeps` → `#setupRoutesDeps` → `#setupMiddlewareDeps` → `#setupPluginsDeps` → `#setupNavigationDeps` → `#setupLifecycleDeps` → `#setupFSMActions` → `#setupStateDeps` → `#setupCyclicDeps` → `#setupCloneCallbacks`
+1. **Этап 1** (6e54b23): Монолитный метод (275 строк) → 11 приватных методов в Router.ts
+2. **Этап 2** (47c7a5b, 254c8d9): 9 из 11 методов извлечены в `src/wiring/` — паттерн Builder+Director
 
-**Ordering constraint**: `#setupRouteLifecycleDeps()` до `#setupRoutesDeps()` (Routes setup регистрирует pending `canActivate` handlers).
+**`RouterWiringBuilder`** (275 строк, 9 public-методов):
+`wireLimits` → `wireRouteLifecycleDeps` → `wireRoutesDeps` → `wireMiddlewareDeps` → `wirePluginsDeps` → `wireNavigationDeps` (97 строк, самый большой) → `wireLifecycleDeps` → `wireStateDeps` → `wireCyclicDeps`
+
+**`wireRouter(builder)`** — director-функция, вызывает методы в правильном порядке (28 строк).
+
+**`WiringOptions<Dependencies>`** — options bag: все namespace'ы, FSM, emitter, router + `getCurrentToState`/`setCurrentToState` callbacks (мост к приватному полю `#currentToState`).
+
+**Остались в Router.ts** (требуют доступ к приватным полям):
+- `#setupFSMActions()` — 8 FSM actions, используют `#emitter` напрямую
+- `#setupCloneCallbacks()` — clone lambda, замыкание на приватные поля
+
+**Ordering constraints**:
+- `wireRouteLifecycleDeps()` до `wireRoutesDeps()` — Routes setup регистрирует pending `canActivate` handlers
+- `wireCyclicDeps()` последний — резолвит циклические зависимости Navigation ⇄ Lifecycle
+
+Router.ts: 1585 → 1366 строк (-219).
 
 ### DI-зависимости — изменения
 
@@ -393,10 +409,15 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 ## Файлы — diff vs master
 
-### Добавлены (2)
+### Добавлены (6 core + event-emitter пакет)
 
 - `packages/core/src/fsm/routerFSM.ts` — config, types, factory, `routerStates`/`routerEvents`
 - `packages/core/src/fsm/index.ts` — barrel exports
+- `packages/core/src/wiring/RouterWiringBuilder.ts` — Builder: 9 wire-методов (275 строк)
+- `packages/core/src/wiring/wireRouter.ts` — Director: вызов методов в правильном порядке
+- `packages/core/src/wiring/types.ts` — `WiringOptions<Dependencies>` interface
+- `packages/core/src/wiring/index.ts` — barrel exports
+- `packages/event-emitter/` — приватный пакет: generic `EventEmitter<TEventMap>` (50 тестов, 100% coverage)
 
 ### Удалены (2 src + 9 tests)
 
@@ -410,7 +431,7 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 ### Изменены (production)
 
-- `Router.ts` — FSM интеграция, dispose(), decomposed setup, async/throw
+- `Router.ts` — FSM интеграция, dispose(), wiring extraction (1585→1366 строк), async/throw
 - `NavigationNamespace.ts` — decomposed, FSM DI, async/throw, no duration
 - `NavigationNamespace/transition/index.ts` — Set→includes
 - `NavigationNamespace/transition/executeMiddleware.ts` — logger import fix
@@ -439,9 +460,9 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 | Метрика | Значение |
 |---------|----------|
-| Коммитов | 27 |
-| Файлов изменено | 58 |
-| Строк | +1792 / -1012 (net +780) + event-emitter perf |
+| Коммитов | 34 |
+| Файлов изменено | 97 |
+| Строк | +4468 / -1456 (net +3012) |
 | Тестов | 4101 (core: 2286, fsm: 40, event-emitter: 50) |
 | Coverage | 100% |
 | Bundle size | 83.6 KB raw / 22.81 KB gzip |
