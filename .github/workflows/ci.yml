@@ -315,7 +315,7 @@ jobs:
               if (diff !== 0) hasChanges = true;
 
               const status = item.passed === false ? '❌' : '✅';
-              rows.push(`| ${status} ${item.name} | ${formatBytes(item.size)} | ${formatBytes(baseMap.get(item.name))} | ${formatDiff(item.size, baseMap.get(item.name))} |`);
+              rows.push(`| ${status} | ${item.name} | ${formatBytes(item.size)} | ${formatBytes(baseMap.get(item.name))} | ${formatDiff(item.size, baseMap.get(item.name))} |`);
             }
 
             let body = `## Bundle Size Report\n\n`;
