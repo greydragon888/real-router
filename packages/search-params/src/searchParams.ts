@@ -37,6 +37,18 @@ function extractParamName(rawName: string): {
 }
 
 /**
+ * Extracts parameter name from a query parameter chunk (e.g., "key=value" or "key").
+ *
+ * @internal
+ */
+const extractChunkName = (chunk: string): string => {
+  const eqPos = chunk.indexOf("=");
+  const rawName = eqPos === -1 ? chunk : chunk.slice(0, eqPos);
+
+  return extractParamName(rawName).name;
+};
+
+/**
  * Adds a decoded value to params object, handling array accumulation.
  *
  * @internal
@@ -345,11 +357,7 @@ export const omit = (
   const removed: string[] = [];
 
   forEachParam(searchPart, (chunk) => {
-    const eqPos = chunk.indexOf("=");
-    const rawName = eqPos === -1 ? chunk : chunk.slice(0, eqPos);
-    const { name } = extractParamName(rawName);
-
-    if (omitSet.has(name)) {
+    if (omitSet.has(extractChunkName(chunk))) {
       removed.push(chunk);
     } else {
       kept.push(chunk);
@@ -398,11 +406,7 @@ export const keep = (
   const kept: string[] = [];
 
   forEachParam(searchPart, (chunk) => {
-    const eqPos = chunk.indexOf("=");
-    const rawName = eqPos === -1 ? chunk : chunk.slice(0, eqPos);
-    const { name } = extractParamName(rawName);
-
-    if (keepSet.has(name)) {
+    if (keepSet.has(extractChunkName(chunk))) {
       kept.push(chunk);
     }
   });
