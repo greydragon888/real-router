@@ -12,7 +12,9 @@ export function createOperator<T, R>(
   return (source: RxObservable<T>) =>
     new RxObservable<R>((observer) => {
       const subscription = source.subscribe({
-        next: (value) => next(value, observer),
+        next: (value) => {
+          next(value, observer);
+        },
         error: (error) => observer.error?.(error),
         complete: () => observer.complete?.(),
       });

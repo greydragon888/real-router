@@ -408,6 +408,19 @@ export default tsEslint.config(
       "import-x/resolver-next": [
         createTypeScriptImportResolver({
           alwaysTryTypes: true,
+          conditionNames: [
+            "development",
+            "types",
+            "import",
+            "esm2020",
+            "es2020",
+            "es2015",
+            "require",
+            "node",
+            "node-addons",
+            "browser",
+            "default",
+          ],
           project: ["./tsconfig.json", "packages/*/tsconfig.json"],
         }),
       ],
