@@ -1,5 +1,22 @@
 # @real-router/types
 
+## 0.13.0
+
+### Minor Changes
+
+- [#127](https://github.com/greydragon888/real-router/pull/127) [`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove redundant `StateMeta.redirected` and `StateMeta.source` fields (#121)
+
+  **Breaking change:** `StateMeta` no longer includes `redirected` or `source` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta.redirected) { ... }
+  + if (state.meta.options.redirected) { ... }
+  ```
+
+  The `source` field was dead code — no consumer ever read it, so no migration is needed.
+
 ## 0.12.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # route-tree
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/types@0.13.0
+
 ## 0.3.0
 
 ### Minor Changes
