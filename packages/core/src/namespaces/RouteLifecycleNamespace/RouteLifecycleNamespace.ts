@@ -54,37 +54,9 @@ export class RouteLifecycleNamespace<
 
   readonly #registering = new Set<string>();
 
-  #routerStore: Router<Dependencies> | undefined;
-  #depsStore: RouteLifecycleDependencies<Dependencies> | undefined;
+  #router!: Router<Dependencies>;
+  #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
-
-  /**
-   * Gets router or throws if not initialized.
-   */
-  get #router(): Router<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
-    if (!this.#routerStore) {
-      throw new Error(
-        "[real-router] RouteLifecycleNamespace: router not initialized",
-      );
-    }
-
-    return this.#routerStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): RouteLifecycleDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] RouteLifecycleNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade for input validation)
@@ -98,11 +70,11 @@ export class RouteLifecycleNamespace<
   }
 
   setRouter(router: Router<Dependencies>): void {
-    this.#routerStore = router;
+    this.#router = router;
   }
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   setLimits(limits: Limits): void {

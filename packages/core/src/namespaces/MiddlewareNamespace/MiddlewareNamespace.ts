@@ -35,37 +35,9 @@ export class MiddlewareNamespace<
     Middleware
   >();
 
-  #routerStore: Router<Dependencies> | undefined;
-  #depsStore: MiddlewareDependencies<Dependencies> | undefined;
+  #router!: Router<Dependencies>;
+  #deps!: MiddlewareDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
-
-  /**
-   * Gets router or throws if not initialized.
-   */
-  get #router(): Router<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
-    if (!this.#routerStore) {
-      throw new Error(
-        "[real-router] MiddlewareNamespace: router not initialized",
-      );
-    }
-
-    return this.#routerStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): MiddlewareDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] MiddlewareNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -105,11 +77,11 @@ export class MiddlewareNamespace<
   // =========================================================================
 
   setRouter(router: Router<Dependencies>): void {
-    this.#routerStore = router;
+    this.#router = router;
   }
 
   setDependencies(deps: MiddlewareDependencies<Dependencies>): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   setLimits(limits: Limits): void {

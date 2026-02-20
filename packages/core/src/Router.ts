@@ -1170,7 +1170,7 @@ function deriveMatcherOptions(
     strictTrailingSlash: options.trailingSlash === "strict",
     strictQueryParams: options.queryParamsMode === "strict",
     urlParamsEncoding: options.urlParamsEncoding,
-    /* v8 ignore next -- @preserve branch: queryParams always set via defaultOptions */
-    queryParams: options.queryParams ?? {},
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    queryParams: options.queryParams!,
   };
 }

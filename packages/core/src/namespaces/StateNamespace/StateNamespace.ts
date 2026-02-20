@@ -45,26 +45,12 @@ export class StateNamespace {
   /**
    * Dependencies injected from Router.
    */
-  #depsStore: StateNamespaceDependencies | undefined;
+  #deps!: StateNamespaceDependencies;
 
   /**
    * Cache for URL params by route name.
    */
   readonly #urlParamsCache = new Map<string, string[]>();
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): StateNamespaceDependencies {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] StateNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -193,7 +179,7 @@ export class StateNamespace {
    * Must be called before using makeState, areStatesEqual, etc.
    */
   setDependencies(deps: StateNamespaceDependencies): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   // =========================================================================

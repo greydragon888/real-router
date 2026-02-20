@@ -32,35 +32,9 @@ export class PluginsNamespace<
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
   readonly #unsubscribes = new Set<Unsubscribe>();
 
-  #routerStore: Router<Dependencies> | undefined;
-  #depsStore: PluginsDependencies<Dependencies> | undefined;
+  #router!: Router<Dependencies>;
+  #deps!: PluginsDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
-
-  /**
-   * Gets router or throws if not initialized.
-   */
-  get #router(): Router<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
-    if (!this.#routerStore) {
-      throw new Error("[real-router] PluginsNamespace: router not initialized");
-    }
-
-    return this.#routerStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): PluginsDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] PluginsNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -104,11 +78,11 @@ export class PluginsNamespace<
   // =========================================================================
 
   setRouter(router: Router<Dependencies>): void {
-    this.#routerStore = router;
+    this.#router = router;
   }
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   setLimits(limits: Limits): void {

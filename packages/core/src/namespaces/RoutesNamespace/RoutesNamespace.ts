@@ -104,7 +104,7 @@ export class RoutesNamespace<
   #depsStore: RoutesDependencies<Dependencies> | undefined;
 
   // Lifecycle handlers reference (set after construction)
-  #lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
+  #lifecycleNamespace!: RouteLifecycleNamespace<Dependencies>;
 
   // When true, skips validation for production performance
   readonly #noValidate: boolean;
@@ -113,7 +113,7 @@ export class RoutesNamespace<
    * Gets dependencies or throws if not initialized.
    */
   get #deps(): RoutesDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
+    /* v8 ignore next 3 -- @preserve: defensive guard, unreachable via public API (RouterWiringBuilder always calls setDependencies) */
     if (!this.#depsStore) {
       throw new Error(
         "[real-router] RoutesNamespace: dependencies not initialized",
@@ -284,7 +284,8 @@ export class RoutesNamespace<
   setLifecycleNamespace(
     namespace: RouteLifecycleNamespace<Dependencies> | undefined,
   ): void {
-    this.#lifecycleNamespace = namespace;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    this.#lifecycleNamespace = namespace!;
   }
 
   // =========================================================================
@@ -355,12 +356,8 @@ export class RoutesNamespace<
   addRoutes(routes: Route<Dependencies>[], parentName?: string): void {
     // Add to definitions
     if (parentName) {
-      const parentDef = this.#findDefinition(this.#definitions, parentName);
-
-      /* v8 ignore next -- @preserve: validated in facade, cannot be undefined */
-      if (!parentDef) {
-        return;
-      }
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const parentDef = this.#findDefinition(this.#definitions, parentName)!;
 
       parentDef.children ??= [];
       for (const route of routes) {
@@ -683,8 +680,8 @@ export class RoutesNamespace<
       return undefined;
     }
 
-    /* v8 ignore next -- @preserve: meta always exists when segments exist */
-    const meta = this.#matcher.getMetaByName(resolvedName) ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const meta = this.#matcher.getMetaByName(resolvedName)!;
 
     return createRouteState(
       { segments, params: resolvedParams, meta },
@@ -707,8 +704,8 @@ export class RoutesNamespace<
       return undefined;
     }
 
-    /* v8 ignore next -- @preserve: meta always exists when segments exist */
-    const meta = this.#matcher.getMetaByName(resolvedName) ?? {};
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const meta = this.#matcher.getMetaByName(resolvedName)!;
     const state = createRouteState<P>(
       {
         segments: segments as readonly RouteTree[],
@@ -906,9 +903,8 @@ export class RoutesNamespace<
     sourceName: string,
     targetName: string,
   ): void {
-    const context = "validateForwardToParamCompatibility";
-    const sourceSegments = this.#getSegmentsOrThrow(sourceName, context);
-    const targetSegments = this.#getSegmentsOrThrow(targetName, context);
+    const sourceSegments = this.#getSegmentsOrThrow(sourceName);
+    const targetSegments = this.#getSegmentsOrThrow(targetName);
 
     // Get source and target URL params using helper
     const sourceParams = this.#collectUrlParams(sourceSegments);
@@ -1128,13 +1124,6 @@ export class RoutesNamespace<
         // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
         current = fn(this.#deps.getDependency as any, params);
 
-        /* v8 ignore next 4 -- @preserve: defensive check, validated at registration */
-        if (typeof current !== "string") {
-          throw new TypeError(
-            `forwardTo callback must return a string, got ${typeof current}`,
-          );
-        }
-
         depth++;
         continue;
       }
@@ -1172,17 +1161,9 @@ export class RoutesNamespace<
    * Gets segments by name or throws if not found.
    * Use when route existence has been validated by hasRoute() beforehand.
    */
-  #getSegmentsOrThrow(name: string, context: string): readonly RouteTree[] {
-    const segments = this.#matcher.getSegmentsByName(name);
-
-    /* v8 ignore next 4 -- @preserve: defensive check, hasRoute() validates before call */
-    if (!segments) {
-      throw new ReferenceError(
-        `[real-router] ${context}: route "${name}" does not exist`,
-      );
-    }
-
-    return segments as readonly RouteTree[];
+  #getSegmentsOrThrow(name: string): readonly RouteTree[] {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.#matcher.getSegmentsByName(name)! as readonly RouteTree[];
   }
 
   /**
@@ -1190,14 +1171,8 @@ export class RoutesNamespace<
    * Use when segments array is guaranteed to be non-empty.
    */
   #getLastSegment(segments: readonly RouteTree[]): RouteTree {
-    const last = segments.at(-1);
-
-    /* v8 ignore next 3 -- @preserve: defensive check, segments always non-empty when called */
-    if (!last) {
-      throw new Error("[real-router] Internal error: empty segments array");
-    }
-
-    return last;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return segments.at(-1)!;
   }
 
   /**
@@ -1297,22 +1272,19 @@ export class RoutesNamespace<
       shouldClear(this.#config.forwardMap[key]),
     );
 
-    // Clear lifecycle handlers if namespace is set
-    /* v8 ignore next -- @preserve unreachable: Router always sets lifecycleNamespace */
-    if (this.#lifecycleNamespace) {
-      const [canDeactivateFactories, canActivateFactories] =
-        this.#lifecycleNamespace.getFactories();
+    // Clear lifecycle handlers
+    const [canDeactivateFactories, canActivateFactories] =
+      this.#lifecycleNamespace.getFactories();
 
-      for (const n of Object.keys(canActivateFactories)) {
-        if (shouldClear(n)) {
-          this.#lifecycleNamespace.clearCanActivate(n);
-        }
+    for (const n of Object.keys(canActivateFactories)) {
+      if (shouldClear(n)) {
+        this.#lifecycleNamespace.clearCanActivate(n);
       }
+    }
 
-      for (const n of Object.keys(canDeactivateFactories)) {
-        if (shouldClear(n)) {
-          this.#lifecycleNamespace.clearCanDeactivate(n);
-        }
+    for (const n of Object.keys(canDeactivateFactories)) {
+      if (shouldClear(n)) {
+        this.#lifecycleNamespace.clearCanDeactivate(n);
       }
     }
   }
@@ -1402,7 +1374,6 @@ export class RoutesNamespace<
       }
     }
 
-    /* v8 ignore next -- @preserve: defensive return, parent not found in definitions */
     return undefined;
   }
 
@@ -1491,18 +1462,15 @@ export class RoutesNamespace<
       route.encodeParams = this.#config.encoders[routeName];
     }
 
-    /* v8 ignore next -- @preserve unreachable: Router always sets lifecycleNamespace */
-    if (this.#lifecycleNamespace) {
-      const [canDeactivateFactories, canActivateFactories] =
-        this.#lifecycleNamespace.getFactories();
+    const [canDeactivateFactories, canActivateFactories] =
+      this.#lifecycleNamespace.getFactories();
 
-      if (routeName in canActivateFactories) {
-        route.canActivate = canActivateFactories[routeName];
-      }
+    if (routeName in canActivateFactories) {
+      route.canActivate = canActivateFactories[routeName];
+    }
 
-      if (routeName in canDeactivateFactories) {
-        route.canDeactivate = canDeactivateFactories[routeName];
-      }
+    if (routeName in canDeactivateFactories) {
+      route.canDeactivate = canDeactivateFactories[routeName];
     }
 
     if (routeDef.children) {

@@ -28,12 +28,8 @@ export function rethrowAsRouterError(
   segment?: string,
 ): never {
   if (error instanceof RouterError) {
-    const err = makeError(errorCode, error);
-
-    /* v8 ignore next 3 -- @preserve: makeError always returns when err is RouterError */
-    if (err) {
-      throw err;
-    }
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    throw makeError(errorCode, error)!;
   }
 
   throw new RouterError(errorCode, wrapSyncError(error, segment));

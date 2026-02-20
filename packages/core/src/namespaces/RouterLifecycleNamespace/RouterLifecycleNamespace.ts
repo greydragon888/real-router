@@ -26,47 +26,13 @@ export class RouterLifecycleNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Dependencies injected via setDependencies (replaces full router reference)
-  #navigateToStateStore:
-    | ((
-        toState: State,
-        fromState: State | undefined,
-        opts: NavigationOptions,
-      ) => Promise<State>)
-    | undefined;
-
-  #depsStore: RouterLifecycleDependencies | undefined;
-
-  /**
-   * Gets navigateToState or throws if not initialized.
-   */
-  get #navigateToState(): (
+  #navigateToState!: (
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-  ) => Promise<State> {
-    /* v8 ignore next 3 -- @preserve: always set by wireCyclicDeps */
-    if (!this.#navigateToStateStore) {
-      throw new Error(
-        "[real-router] RouterLifecycleNamespace: navigateToState not initialized",
-      );
-    }
+  ) => Promise<State>;
 
-    return this.#navigateToStateStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): RouterLifecycleDependencies {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] RouterLifecycleNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
+  #deps!: RouterLifecycleDependencies;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -99,7 +65,7 @@ export class RouterLifecycleNamespace {
       opts: NavigationOptions,
     ) => Promise<State>,
   ): void {
-    this.#navigateToStateStore = fn;
+    this.#navigateToState = fn;
   }
 
   /**
@@ -107,7 +73,7 @@ export class RouterLifecycleNamespace {
    * Must be called before using lifecycle methods.
    */
   setDependencies(deps: RouterLifecycleDependencies): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   // =========================================================================

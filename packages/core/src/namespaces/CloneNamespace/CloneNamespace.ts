@@ -23,21 +23,7 @@ export class CloneNamespace<
   /**
    * Function to get cloning data from the source router.
    */
-  #getCloneDataStore: (() => CloneData<Dependencies>) | undefined;
-
-  /**
-   * Gets clone data function or throws if not initialized.
-   */
-  get #getCloneData(): () => CloneData<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: always set by wireCloneCallbacks */
-    if (!this.#getCloneDataStore) {
-      throw new Error(
-        "[real-router] CloneNamespace: getCloneData not initialized",
-      );
-    }
-
-    return this.#getCloneDataStore;
-  }
+  #getCloneData!: () => CloneData<Dependencies>;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -80,7 +66,7 @@ export class CloneNamespace<
    * Sets the function to collect clone data.
    */
   setGetCloneData(getCloneData: () => CloneData<Dependencies>): void {
-    this.#getCloneDataStore = getCloneData;
+    this.#getCloneData = getCloneData;
   }
 
   /**

@@ -36,51 +36,9 @@ export class NavigationNamespace {
   // ═══════════════════════════════════════════════════════════════════════════
 
   // Dependencies injected via setDependencies (replaces full router reference)
-  #canNavigateStore: (() => boolean) | undefined;
-  #depsStore: NavigationDependencies | undefined;
-  #transitionDepsStore: TransitionDependencies | undefined;
-
-  /**
-   * Gets canNavigate check or throws if not initialized.
-   */
-  get #canNavigate(): () => boolean {
-    /* v8 ignore next 3 -- @preserve: always set by wireCyclicDeps */
-    if (!this.#canNavigateStore) {
-      throw new Error(
-        "[real-router] NavigationNamespace: canNavigate not initialized",
-      );
-    }
-
-    return this.#canNavigateStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): NavigationDependencies {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] NavigationNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
-
-  /**
-   * Gets transition dependencies or throws if not initialized.
-   */
-  get #transitionDeps(): TransitionDependencies {
-    /* v8 ignore next 3 -- @preserve: transitionDeps always set by Router.ts */
-    if (!this.#transitionDepsStore) {
-      throw new Error(
-        "[real-router] NavigationNamespace: transition dependencies not initialized",
-      );
-    }
-
-    return this.#transitionDepsStore;
-  }
+  #canNavigate!: () => boolean;
+  #deps!: NavigationDependencies;
+  #transitionDeps!: TransitionDependencies;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -119,7 +77,7 @@ export class NavigationNamespace {
    * Must be called before using navigate().
    */
   setCanNavigate(fn: () => boolean): void {
-    this.#canNavigateStore = fn;
+    this.#canNavigate = fn;
   }
 
   /**
@@ -127,7 +85,7 @@ export class NavigationNamespace {
    * Must be called before using navigation methods.
    */
   setDependencies(deps: NavigationDependencies): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   /**
@@ -135,7 +93,7 @@ export class NavigationNamespace {
    * Must be called before using navigation methods.
    */
   setTransitionDependencies(deps: TransitionDependencies): void {
-    this.#transitionDepsStore = deps;
+    this.#transitionDeps = deps;
   }
 
   // =========================================================================
@@ -329,28 +287,23 @@ export class NavigationNamespace {
     toState: State,
     fromState: State | undefined,
   ): void {
-    /* v8 ignore next 3 -- @preserve: transition pipeline always wraps errors into RouterError */
-    if (!(error instanceof RouterError)) {
-      this.#deps.sendTransitionError(toState, fromState, error as RouterError);
-
-      return;
-    }
+    const routerError = error as RouterError;
 
     // Already routed: cancel/stop sent CANCEL, sendTransitionError called in try block
     if (
-      error.code === errorCodes.TRANSITION_CANCELLED ||
-      error.code === errorCodes.ROUTE_NOT_FOUND
+      routerError.code === errorCodes.TRANSITION_CANCELLED ||
+      routerError.code === errorCodes.ROUTE_NOT_FOUND
     ) {
       return;
     }
 
     if (
-      error.code === errorCodes.CANNOT_ACTIVATE ||
-      error.code === errorCodes.CANNOT_DEACTIVATE
+      routerError.code === errorCodes.CANNOT_ACTIVATE ||
+      routerError.code === errorCodes.CANNOT_DEACTIVATE
     ) {
-      this.#deps.sendTransitionBlocked(toState, fromState, error);
+      this.#deps.sendTransitionBlocked(toState, fromState, routerError);
     } else {
-      this.#deps.sendTransitionError(toState, fromState, error);
+      this.#deps.sendTransitionError(toState, fromState, routerError);
     }
   }
 }
