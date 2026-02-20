@@ -9,7 +9,7 @@
 
 import eslintConfig from "../../eslint.config.mjs";
 import tsEslint from "typescript-eslint";
-import reactPlugin from "eslint-plugin-react";
+import eslintReact from "@eslint-react/eslint-plugin";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import testingLibraryPlugin from "eslint-plugin-testing-library";
 import unicorn from "eslint-plugin-unicorn";
@@ -362,25 +362,18 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // REACT CONFIGURATION
+  // REACT CONFIGURATION (@eslint-react v2)
   // ============================================
+  // Migrated from eslint-plugin-react to @eslint-react/eslint-plugin
+  // Using recommended-type-checked preset:
+  // - All recommended rules (jsx-key, no-children-prop, etc.)
+  // - Disables rules already enforced by TypeScript (jsx-no-undef, etc.)
+  // - Adds type-aware rules (no-leaked-conditional-rendering, etc.)
+  // - Includes dom/ rules (no-unsafe-target-blank, no-unknown-property)
+  // - Includes hooks-extra/ rules (no-unnecessary-use-memo, etc.)
   {
-    settings: {
-      react: {
-        version: "18.0",
-      },
-    },
-  },
-  reactPlugin.configs.flat.recommended,
-  reactPlugin.configs.flat["jsx-runtime"],
-  {
+    ...eslintReact.configs["recommended-type-checked"],
     files: ["**/*.tsx"],
-    rules: {
-      "react/react-in-jsx-scope": "off",
-      "react/jsx-uses-react": "off",
-      "react/prop-types": "off",
-      "react/display-name": "off",
-    },
   },
   // ============================================
   // REACT HOOKS CONFIGURATION (v7+ flat config API)

@@ -5,7 +5,7 @@ import {
   waitFor,
   fireEvent,
 } from "@testing-library/react";
-import { useContext, useState, useEffect } from "react";
+import { use, useState, useEffect } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
@@ -46,7 +46,7 @@ describe("RouterProvider - Integration Tests", () => {
       let capturedRouter: Router | null = null;
 
       const RouterCapture: FC = () => {
-        capturedRouter = useContext(RouterContext);
+        capturedRouter = use(RouterContext);
 
         return (
           <div data-testid="has-router">{capturedRouter ? "yes" : "no"}</div>
@@ -70,7 +70,7 @@ describe("RouterProvider - Integration Tests", () => {
       let capturedPreviousRoute: string | undefined;
 
       const RouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         capturedRoute = context?.route?.name;
         capturedPreviousRoute = context?.previousRoute?.name;
@@ -129,7 +129,7 @@ describe("RouterProvider - Integration Tests", () => {
       let navigatorFromRouteContext: any;
 
       const ContextCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         navigatorFromRouteContext = context?.navigator;
 
@@ -155,7 +155,7 @@ describe("RouterProvider - Integration Tests", () => {
       let previousRoute: string | undefined = "not-set";
 
       const RouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         previousRoute = context?.previousRoute?.name;
 
@@ -177,7 +177,7 @@ describe("RouterProvider - Integration Tests", () => {
       let routeParams: Record<string, string> | undefined;
 
       const ParamsCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         routeParams = context?.route?.params as
           | Record<string, string>
@@ -207,7 +207,7 @@ describe("RouterProvider - Integration Tests", () => {
       await router.start("/users/list");
 
       const RouteDisplay: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return (
           <div>
@@ -240,7 +240,7 @@ describe("RouterProvider - Integration Tests", () => {
       await router.start("/users/list");
 
       const RouteTracker: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return (
           <div data-testid="previous">
@@ -280,7 +280,7 @@ describe("RouterProvider - Integration Tests", () => {
       await router.start("/users/list");
 
       const ParamsDisplay: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
         const params = context?.route?.params as
           | Record<string, string>
           | undefined;
@@ -414,13 +414,13 @@ describe("RouterProvider - Integration Tests", () => {
       await router2.start("/about");
 
       const OuterRouteDisplay: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return <div data-testid="outer">{context?.route?.name}</div>;
       };
 
       const InnerRouteDisplay: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return <div data-testid="inner">{context?.route?.name}</div>;
       };
@@ -468,13 +468,13 @@ describe("RouterProvider - Integration Tests", () => {
       let innerRouter: Router | null = null;
 
       const OuterRouterCapture: FC = () => {
-        outerRouter = useContext(RouterContext);
+        outerRouter = use(RouterContext);
 
         return null;
       };
 
       const InnerRouterCapture: FC = () => {
-        innerRouter = useContext(RouterContext);
+        innerRouter = use(RouterContext);
 
         return null;
       };
@@ -590,7 +590,7 @@ describe("RouterProvider - Integration Tests", () => {
       };
 
       const Consumer2: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return <div data-testid="consumer-2">{context?.route?.name}</div>;
       };
@@ -629,7 +629,7 @@ describe("RouterProvider - Integration Tests", () => {
       let route: string | undefined = "not-set";
 
       const RouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         route = context?.route?.name;
 
@@ -772,9 +772,9 @@ describe("RouterProvider - Integration Tests", () => {
       // Component must use RouteContext to trigger re-renders on navigation
       // RouterContext alone doesn't change on navigation
       const RouterCapture: FC = () => {
-        const routerFromContext = useContext(RouterContext);
+        const routerFromContext = use(RouterContext);
         // Subscribe to route changes to trigger re-renders
-        const routeContext = useContext(RouteContext);
+        const routeContext = use(RouteContext);
 
         // Only capture when we have both contexts
         if (routerFromContext && routeContext) {

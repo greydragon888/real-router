@@ -1,5 +1,5 @@
 import { act, configure, renderHook, screen } from "@testing-library/react";
-import { useContext } from "react";
+import { use } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
@@ -31,7 +31,7 @@ describe("RouterProvider component", () => {
   });
 
   it("should provides value from context correctly", () => {
-    const { result } = renderHook(() => useContext(RouterContext), {
+    const { result } = renderHook(() => use(RouterContext), {
       wrapper,
     });
 
@@ -39,7 +39,7 @@ describe("RouterProvider component", () => {
   });
 
   it("should render chile component", () => {
-    renderHook(() => useContext(RouterContext), {
+    renderHook(() => use(RouterContext), {
       wrapper: () => (
         <RouterProvider router={router}>
           <div data-testid="child">Test</div>
@@ -51,7 +51,7 @@ describe("RouterProvider component", () => {
   });
 
   it("should provides initial state from context", () => {
-    const { result } = renderHook(() => useContext(RouteContext), {
+    const { result } = renderHook(() => use(RouteContext), {
       wrapper,
     });
 
@@ -59,7 +59,7 @@ describe("RouterProvider component", () => {
   });
 
   it("should updates context on router state change", async () => {
-    const { result } = renderHook(() => useContext(RouteContext), {
+    const { result } = renderHook(() => use(RouteContext), {
       wrapper,
     });
 
@@ -80,7 +80,7 @@ describe("RouterProvider component", () => {
 
     vi.spyOn(router, "subscribe").mockImplementation(() => unsubscribe);
 
-    const { unmount } = renderHook(() => useContext(RouteContext), {
+    const { unmount } = renderHook(() => use(RouteContext), {
       wrapper,
     });
 
@@ -97,7 +97,7 @@ describe("RouterProvider component", () => {
 
     vi.spyOn(router, "subscribe");
 
-    const { rerender, unmount } = renderHook(() => useContext(RouteContext), {
+    const { rerender, unmount } = renderHook(() => use(RouteContext), {
       wrapper,
     });
 
@@ -125,7 +125,7 @@ describe("RouterProvider component", () => {
       return unsubscribeSpy;
     });
 
-    const { unmount } = renderHook(() => useContext(RouteContext), { wrapper });
+    const { unmount } = renderHook(() => use(RouteContext), { wrapper });
 
     // eslint-disable-next-line @typescript-eslint/unbound-method -- spied method
     expect(router.subscribe).toHaveBeenCalledTimes(1);

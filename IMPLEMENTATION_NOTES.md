@@ -608,6 +608,25 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
 
+## ESLint React Plugin Migration
+
+### eslint-plugin-react → @eslint-react/eslint-plugin
+
+`packages/react/eslint.config.mjs` migrated from `eslint-plugin-react` (v7) to `@eslint-react/eslint-plugin` (v2).
+
+**Why:**
+
+- Type-aware rules (e.g., `no-leaked-conditional-rendering` catches `{count && <Comp />}` via TypeScript types)
+- Drops dead class-component rules (`no-direct-mutation-state`, `no-find-dom-node`, `no-is-mounted`, etc.)
+- Active maintenance, flat config first
+- Extra hooks rules (`hooks-extra/no-unnecessary-use-memo`, `hooks-extra/no-unnecessary-use-callback`)
+
+**Preset:** `recommended-type-checked` — disables rules already enforced by TypeScript (`jsx-no-undef`), adds type-aware rules.
+
+**Gaps:** `react/no-unescaped-entities` has no equivalent — dropped (JSX compiler catches most cases).
+
+**Note:** `eslint-plugin-react-hooks` is kept as-is — `@eslint-react` does not replace `rules-of-hooks` or `exhaustive-deps`.
+
 ## Infrastructure Changes (rou3 Migration — historical)
 
 ### SonarQube Scanner Rename

@@ -55,12 +55,10 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   );
 
   return (
-    <RouterContext.Provider value={router}>
-      <NavigatorContext.Provider value={navigator}>
-        <RouteContext.Provider value={routeContextValue}>
-          {children}
-        </RouteContext.Provider>
-      </NavigatorContext.Provider>
-    </RouterContext.Provider>
+    <RouterContext value={router}>
+      <NavigatorContext value={navigator}>
+        <RouteContext value={routeContextValue}>{children}</RouteContext>
+      </NavigatorContext>
+    </RouterContext>
   );
 };

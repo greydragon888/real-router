@@ -1,5 +1,5 @@
 import { render, act } from "@testing-library/react";
-import { memo, useContext } from "react";
+import { memo, use } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { withProfiler } from "vitest-react-profiler";
 
@@ -145,7 +145,7 @@ describe("RouterProvider - Performance Tests", () => {
       await router.start("/users/list");
 
       const RouteConsumer: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return <div>{context?.route?.name}</div>;
       };
@@ -172,7 +172,7 @@ describe("RouterProvider - Performance Tests", () => {
 
       // RouterContext only provides router instance which is stable
       const RouterConsumer: FC = memo(() => {
-        const routerFromContext = useContext(RouterContext);
+        const routerFromContext = use(RouterContext);
 
         return <div>{routerFromContext ? "Has Router" : "No Router"}</div>;
       });
@@ -205,7 +205,7 @@ describe("RouterProvider - Performance Tests", () => {
       let capturedRouter: Router | null = null;
 
       const RouterCapture: FC = () => {
-        const routerFromContext = useContext(RouterContext);
+        const routerFromContext = use(RouterContext);
 
         capturedRouter = routerFromContext;
 
@@ -236,7 +236,7 @@ describe("RouterProvider - Performance Tests", () => {
       let previousRoute: string | undefined;
 
       const RouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         currentRoute = context?.route?.name;
         previousRoute = context?.previousRoute?.name;
@@ -363,7 +363,7 @@ describe("RouterProvider - Performance Tests", () => {
       let outerRoute: string | undefined;
 
       const InnerRouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         innerRoute = context?.route?.name;
 
@@ -371,7 +371,7 @@ describe("RouterProvider - Performance Tests", () => {
       };
 
       const OuterRouteCapture: FC = () => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         outerRoute = context?.route?.name;
 
@@ -425,13 +425,13 @@ describe("RouterProvider - Performance Tests", () => {
       let innerRouter: Router | null = null;
 
       const OuterRouterCapture: FC = () => {
-        outerRouter = useContext(RouterContext);
+        outerRouter = use(RouterContext);
 
         return null;
       };
 
       const InnerRouterCapture: FC = () => {
-        innerRouter = useContext(RouterContext);
+        innerRouter = use(RouterContext);
 
         return null;
       };
@@ -463,7 +463,7 @@ describe("RouterProvider - Performance Tests", () => {
       await router.start("/users/list");
 
       const ChildComponent: FC<{ label: string }> = ({ label }) => {
-        const context = useContext(RouteContext);
+        const context = use(RouteContext);
 
         return (
           <div>

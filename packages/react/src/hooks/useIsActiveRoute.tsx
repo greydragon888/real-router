@@ -38,11 +38,11 @@ export function useIsActiveRoute(
 
   // Cache the active state
   const isActiveRef = useRef<boolean | undefined>(undefined);
-  const lastCacheKey = useRef<string | undefined>(undefined);
+  const lastCacheKeyRef = useRef<string | undefined>(undefined);
 
-  if (lastCacheKey.current !== cacheKey) {
+  if (lastCacheKeyRef.current !== cacheKey) {
     isActiveRef.current = undefined;
-    lastCacheKey.current = cacheKey;
+    lastCacheKeyRef.current = cacheKey;
   }
 
   // Optimize shouldUpdate to skip unrelated routes
