@@ -35,8 +35,8 @@ function booleanToFactory<Dependencies extends DefaultDependencies>(
 /**
  * Independent namespace for managing route lifecycle handlers.
  *
- * Static methods handle validation (called by facade).
- * Instance methods handle storage and business logic.
+ * Static methods handle input validation (called by facade).
+ * Instance methods handle state-dependent validation, storage and business logic.
  */
 export class RouteLifecycleNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -87,8 +87,7 @@ export class RouteLifecycleNamespace<
   }
 
   // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // Proxy to functions in validators.ts for separation of concerns
+  // Static validation methods (called by facade for input validation)
   // =========================================================================
 
   static validateHandler<D extends DefaultDependencies>(
@@ -96,22 +95,6 @@ export class RouteLifecycleNamespace<
     methodName: string,
   ): asserts handler is ActivationFnFactory<D> | boolean {
     validateHandler<D>(handler, methodName);
-  }
-
-  static validateNotRegistering(
-    isRegistering: boolean,
-    name: string,
-    methodName: string,
-  ): void {
-    validateNotRegistering(isRegistering, name, methodName);
-  }
-
-  static validateHandlerLimit(
-    currentCount: number,
-    methodName: string,
-    maxLifecycleHandlers?: number,
-  ): void {
-    validateHandlerLimit(currentCount, methodName, maxLifecycleHandlers);
   }
 
   setRouter(router: Router<Dependencies>): void {
@@ -127,66 +110,40 @@ export class RouteLifecycleNamespace<
   }
 
   // =========================================================================
-  // State accessors (for facade validation)
+  // Instance methods
   // =========================================================================
 
   /**
-   * Returns true if route is currently being registered.
-   * Used by facade for self-modification validation.
-   */
-  isRegistering(name: string): boolean {
-    return this.#registering.has(name);
-  }
-
-  /**
-   * Returns the number of canActivate handlers.
-   * Used by facade for limit validation.
-   */
-  countCanActivate(): number {
-    return this.#canActivateFactories.size;
-  }
-
-  /**
-   * Returns the number of canDeactivate handlers.
-   * Used by facade for limit validation.
-   */
-  countCanDeactivate(): number {
-    return this.#canDeactivateFactories.size;
-  }
-
-  /**
-   * Returns true if canActivate handler exists for route.
-   * Used by facade to determine if this is an overwrite.
-   */
-  hasCanActivate(name: string): boolean {
-    return this.#canActivateFactories.has(name);
-  }
-
-  /**
-   * Returns true if canDeactivate handler exists for route.
-   * Used by facade to determine if this is an overwrite.
-   */
-  hasCanDeactivate(name: string): boolean {
-    return this.#canDeactivateFactories.has(name);
-  }
-
-  // =========================================================================
-  // Instance methods (trust input - already validated by facade)
-  // =========================================================================
-
-  /**
-   * Registers a canActivate guard for a route.
-   * Input already validated by facade (not registering, limit).
+   * Adds a canActivate guard for a route.
+   * Handles state-dependent validation, overwrite detection, and registration.
    *
-   * @param name - Route name (already validated by facade)
-   * @param handler - Guard function or boolean (already validated)
-   * @param isOverwrite - True if overwriting existing handler (computed by facade)
+   * @param name - Route name (input-validated by facade)
+   * @param handler - Guard function or boolean (input-validated by facade)
+   * @param skipValidation - True when called during route config building (#noValidate)
    */
-  registerCanActivate(
+  addCanActivate(
     name: string,
     handler: ActivationFnFactory<Dependencies> | boolean,
-    isOverwrite: boolean,
+    skipValidation: boolean,
   ): void {
+    if (!skipValidation) {
+      validateNotRegistering(
+        this.#registering.has(name),
+        name,
+        "addActivateGuard",
+      );
+    }
+
+    const isOverwrite = this.#canActivateFactories.has(name);
+
+    if (!isOverwrite && !skipValidation) {
+      validateHandlerLimit(
+        this.#canActivateFactories.size + 1,
+        "addActivateGuard",
+        this.#limits.maxLifecycleHandlers,
+      );
+    }
+
     this.#registerHandler(
       "activate",
       name,
@@ -199,18 +156,36 @@ export class RouteLifecycleNamespace<
   }
 
   /**
-   * Registers a canDeactivate guard for a route.
-   * Input already validated by facade (not registering, limit).
+   * Adds a canDeactivate guard for a route.
+   * Handles state-dependent validation, overwrite detection, and registration.
    *
-   * @param name - Route name (already validated by facade)
-   * @param handler - Guard function or boolean (already validated)
-   * @param isOverwrite - True if overwriting existing handler (computed by facade)
+   * @param name - Route name (input-validated by facade)
+   * @param handler - Guard function or boolean (input-validated by facade)
+   * @param skipValidation - True when called during route config building (#noValidate)
    */
-  registerCanDeactivate(
+  addCanDeactivate(
     name: string,
     handler: ActivationFnFactory<Dependencies> | boolean,
-    isOverwrite: boolean,
+    skipValidation: boolean,
   ): void {
+    if (!skipValidation) {
+      validateNotRegistering(
+        this.#registering.has(name),
+        name,
+        "addDeactivateGuard",
+      );
+    }
+
+    const isOverwrite = this.#canDeactivateFactories.has(name);
+
+    if (!isOverwrite && !skipValidation) {
+      validateHandlerLimit(
+        this.#canDeactivateFactories.size + 1,
+        "addDeactivateGuard",
+        this.#limits.maxLifecycleHandlers,
+      );
+    }
+
     this.#registerHandler(
       "deactivate",
       name,
@@ -326,7 +301,7 @@ export class RouteLifecycleNamespace<
   // =========================================================================
 
   /**
-   * Registers a handler. Input already validated by facade.
+   * Registers a handler.
    * Handles overwrite warning, count threshold warnings, and factory compilation.
    */
   #registerHandler(
@@ -338,7 +313,7 @@ export class RouteLifecycleNamespace<
     methodName: string,
     isOverwrite: boolean,
   ): void {
-    // Emit warnings (validation done by facade)
+    // Emit warnings
     if (isOverwrite) {
       logger.warn(
         `router.${methodName}`,

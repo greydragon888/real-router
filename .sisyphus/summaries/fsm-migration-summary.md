@@ -4,7 +4,7 @@
 
 Полный перевод ядра роутера с ручного управления состоянием через булевые флаги (`#started`, `#active`, `#navigating`) и прямые вызовы событий на **детерминированное управление через единый конечный автомат** (FSM). Все жизненные события роутера — следствие FSM-переходов, а не ручных вызовов.
 
-**34 коммита, 97 файлов, +4468/-1456 строк, 4101 тест, 100% coverage.**
+**40 коммитов, 100 файлов, +4676/-1590 строк, 4150 тестов, 100% coverage.**
 
 ---
 
@@ -50,18 +50,18 @@ CANCEL:   { toState: State; fromState: State | undefined }
 
 ### FSM Actions (8 штук)
 
-FSM-действия зарегистрированы через `fsm.on(from, event, action)` в `#setupFSMActions()`:
+FSM-действия зарегистрированы через `fsm.on(from, event, action)` в `EventBusNamespace.#setupFSMActions()`:
 
 | from | event | action |
 |------|-------|--------|
-| STARTING | STARTED | `#emitter.emit(ROUTER_START)` |
-| STARTING | FAIL | `#emitter.emit(TRANSITION_ERROR, ...)` |
-| READY | STOP | `#emitter.emit(ROUTER_STOP)` |
-| READY | NAVIGATE | `#emitter.emit(TRANSITION_START, ...)` |
-| READY | FAIL | `#emitter.emit(TRANSITION_ERROR, ...)` — self-loop, ранние валидационные ошибки |
-| TRANSITIONING | COMPLETE | `#emitter.emit(TRANSITION_SUCCESS, ...)` |
-| TRANSITIONING | CANCEL | `#emitter.emit(TRANSITION_CANCEL, ...)` |
-| TRANSITIONING | FAIL | `#emitter.emit(TRANSITION_ERROR, ...)` |
+| STARTING | STARTED | `emitRouterStart()` |
+| STARTING | FAIL | `emitTransitionError(...)` |
+| READY | STOP | `emitRouterStop()` |
+| READY | NAVIGATE | `emitTransitionStart(...)` |
+| READY | FAIL | `emitTransitionError(...)` — self-loop, ранние валидационные ошибки |
+| TRANSITIONING | COMPLETE | `emitTransitionSuccess(...)` |
+| TRANSITIONING | CANCEL | `emitTransitionCancel(...)` |
+| TRANSITIONING | FAIL | `emitTransitionError(...)` |
 
 ---
 
@@ -140,8 +140,7 @@ fsm.on("idle", "FETCH", (payload) => {
 
 ### Новые поля
 
-- `#routerFSM: FSM<RouterState, RouterEvent, null, RouterPayloads>` — единый FSM
-- `#currentToState: State | undefined` — текущий target state для cancel payload
+- `#eventBus: EventBusNamespace` — единый event source, инкапсулирует FSM + EventEmitter + `#currentToState`
 
 ### Удалённые поля (из namespace'ов)
 
@@ -153,22 +152,26 @@ fsm.on("idle", "FETCH", (payload) => {
 
 | Метод | Что изменилось |
 |-------|---------------|
-| `isActive()` | Inline FSM check вместо делегирования в namespace |
-| `start(path)` | `async` с FSM lifecycle: `send(START)` → lifecycle → `try/catch` с recovery |
-| `stop()` | `#cancelTransitionIfRunning()` + three-way FSM dispatch + `send(STOP)` |
+| `isActive()` | `#eventBus.isActive()` |
+| `start(path)` | `async`, `#eventBus.canStart()` → `sendStart()` → lifecycle → `try/catch` с `isReady()` recovery |
+| `stop()` | `#eventBus.cancelTransitionIfRunning()` + `isReady()/isTransitioning()` + `sendStop()` |
 | `navigate()` | `async/throw` вместо `Promise.reject()`, `#suppressUnhandledRejection` |
 | `navigateToDefault()` | Аналогично navigate |
 | `navigateToState()` | Удалён `emitSuccess` параметр |
-| `removeRoute/clearRoutes/updateRoute` | `isNavigating` через `routerFSM.getState() === TRANSITIONING` |
+| `addActivateGuard()` | Упрощён до input validation + `#routeLifecycle.addCanActivate(name, handler, noValidate)` |
+| `addDeactivateGuard()` | Упрощён до input validation + `#routeLifecycle.addCanDeactivate(name, handler, noValidate)` |
+| `removeRoute/clearRoutes/updateRoute` | `#eventBus.isTransitioning()` |
 
-### Новые приватные методы
+### Приватные методы Router.ts
 
 | Метод | Назначение |
 |-------|-----------|
-| `#cancelTransitionIfRunning()` | Отмена in-flight transition (из stop/dispose) |
+| `#setupCloneCallbacks()` | Clone lambda, замыкание на приватные поля других Router instances |
 | `#markDisposed()` | Перезапись 23 методов на throw ROUTER_DISPOSED |
 | `static #suppressUnhandledRejection()` | Fire-and-forget safety |
 | `static #onSuppressedError` | Кэшированный callback (одна аллокация на класс) |
+
+**Перенесены в EventBusNamespace**: `#setupFSMActions()`, `#cancelTransitionIfRunning()`.
 
 ### Декомпозиция `#setupDependencies()` → Builder+Director
 
@@ -182,66 +185,90 @@ fsm.on("idle", "FETCH", (payload) => {
 
 **`wireRouter(builder)`** — director-функция, вызывает методы в правильном порядке (28 строк).
 
-**`WiringOptions<Dependencies>`** — options bag: все namespace'ы, FSM, emitter, router + `getCurrentToState`/`setCurrentToState` callbacks (мост к приватному полю `#currentToState`).
+**`WiringOptions<Dependencies>`** — options bag: все namespace'ы, `eventBus: EventBusNamespace`, router.
 
-**Остались в Router.ts** (требуют доступ к приватным полям):
-- `#setupFSMActions()` — 8 FSM actions, используют `#emitter` напрямую
-- `#setupCloneCallbacks()` — clone lambda, замыкание на приватные поля
+**Остаётся в Router.ts**:
+- `#setupCloneCallbacks()` — clone lambda, замыкание на приватные поля других Router instances
 
 **Ordering constraints**:
 - `wireRouteLifecycleDeps()` до `wireRoutesDeps()` — Routes setup регистрирует pending `canActivate` handlers
 - `wireCyclicDeps()` последний — резолвит циклические зависимости Navigation ⇄ Lifecycle
 
-Router.ts: 1585 → 1366 строк (-219).
+Router.ts: 1585 → 1366 → 1249 → 1209 строк (-376 итого).
 
 ### DI-зависимости — изменения
 
 **NavigationDependencies** — добавлены:
-- `startTransition(toState, fromState)` → `routerFSM.send(NAVIGATE)`
-- `cancelNavigation()` → `routerFSM.send(CANCEL)`
-- `sendTransitionDone(state, fromState, opts)` → `routerFSM.send(COMPLETE)`
-- `sendTransitionBlocked(toState, fromState, error)` → `routerFSM.send(FAIL)`
-- `sendTransitionError(toState, fromState, error)` → `routerFSM.send(FAIL)`
-- `emitTransitionError(toState, fromState, error)` → FSM send(FAIL) из READY (self-loop), fallback на direct emit из TRANSITIONING (concurrent navigation edge case)
+- `startTransition(toState, fromState)` → `eventBus.beginTransition()`
+- `cancelNavigation()` → `eventBus.cancelTransition()`
+- `sendTransitionDone(state, fromState, opts)` → `eventBus.completeTransition()`
+- `sendTransitionBlocked(toState, fromState, error)` → `eventBus.failTransition()`
+- `sendTransitionError(toState, fromState, error)` → `eventBus.failTransition()`
+- `emitTransitionError(toState, fromState, error)` → `eventBus.emitOrFailTransitionError()` (READY → FSM FAIL, TRANSITIONING → direct emit)
 
 **NavigationDependencies** — удалены:
 - `invokeEventListeners` лямбда
 
 **RouterLifecycleDependencies** — добавлены:
-- `completeStart()` → `routerFSM.send(STARTED)`
-- `emitTransitionError()` → `routerFSM.send(FAIL)` из STARTING (→IDLE), action эмитит $$error
+- `completeStart()` → `eventBus.completeStart()`
+- `emitTransitionError()` → `eventBus.failTransition()` из STARTING (→IDLE), action эмитит $$error
 
 **RouterLifecycleDependencies** — удалены:
 - `hasListeners` зависимость
 - `invokeEventListeners` лямбда
 
 **TransitionDependencies** — добавлены:
-- `isTransitioning()` → `routerFSM.getState() === TRANSITIONING`
+- `isTransitioning()` → `eventBus.isTransitioning()`
 
 **PluginsDependencies** — изменены:
-- `isStarted` → `canNavigate` (через `routerFSM.canSend(NAVIGATE)`)
+- `isStarted` → `canNavigate` (через `eventBus.canBeginTransition()`)
 
 **Cyclic refs** — изменены:
-- `isRouterStarted` → `canNavigate` (через `routerFSM.canSend(NAVIGATE)`)
+- `isRouterStarted` → `canNavigate` (через `eventBus.canBeginTransition()`)
 
 ---
 
 ## Namespace — внутренние изменения
 
-### ObservableNamespace → event-emitter + inline
+### ObservableNamespace → event-emitter → EventBusNamespace
 
-**ObservableNamespace удалён.** Generic event-emitter логика извлечена в приватный пакет `event-emitter`, Router.ts владеет `#emitter: EventEmitter<RouterEventMap>` напрямую.
+Три этапа эволюции event-системы:
 
-| Было (master) | Промежуточное (composition) | Финал (inline) |
-|----------------|---------------------------|----------------|
-| `invoke(eventName, ...args)` с switch-routing | 6 emit-методов делегируют к `#emitter` | FSM actions вызывают `#emitter.emit()` напрямую |
-| `#callbacks`, `#emit()`, `#checkRecursionDepth` | Вся логика в EventEmitter | EventEmitter (отдельный пакет) |
-| `removeEventListener` | Удалён (dead code после composition) | — |
-| Static validators в классе | В классе | `src/eventValidation.ts` (standalone функции) |
-| `RouterEventMap` type | В ObservableNamespace.ts | В `src/types.ts` |
-| `validEventNames` Set | В `constants.ts` namespace | В `src/constants.ts` |
+| Этап | Что | Коммиты |
+|------|-----|---------|
+| 1. Extraction | Generic event-emitter логика → приватный пакет `event-emitter` | 19a33f4 |
+| 2. Inline | ObservableNamespace удалён, Router.ts владеет `#emitter` напрямую | 79e623e |
+| 3. EventBusNamespace | FSM + EventEmitter + `#currentToState` инкапсулированы в единый namespace | 4c47c9f–67111b4 |
+
+| Было (master) | Промежуточное (inline) | Финал (EventBusNamespace) |
+|----------------|----------------------|--------------------------|
+| `invoke(eventName, ...args)` с switch-routing | FSM actions → `#emitter.emit()` напрямую | FSM actions → `emit*()` methods внутри namespace |
+| `#callbacks`, `#emit()`, `#checkRecursionDepth` | EventEmitter (отдельный пакет) | EventEmitter (отдельный пакет) |
+| `removeEventListener` | Удалён (dead code) | — |
+| Static validators в классе | `src/eventValidation.ts` (standalone) | Static methods на `EventBusNamespace` |
+| `RouterEventMap` type | В `src/types.ts` | В `src/types.ts` |
+| Router знает о FSM и emitter | Router знает о FSM и emitter | Router знает только о `#eventBus` |
 
 **Пакет `event-emitter`**: generic `EventEmitter<TEventMap>` с snapshot iteration, `RecursionDepthError` sentinel (testable, без v8 ignore), listener limits, duplicate detection. 50 тестов, 100% coverage.
+
+### EventBusNamespace (278 строк)
+
+Инкапсулирует FSM + EventEmitter + `#currentToState` как единый event source. Router.ts и RouterWiringBuilder не имеют прямого доступа к FSM/emitter.
+
+**Структура:**
+
+| Категория | Методы | Описание |
+|-----------|--------|----------|
+| Emit wrappers (6) | `emitRouterStart/Stop`, `emitTransition{Start,Success,Error,Cancel}` | Делегация к `#emitter.emit()` |
+| FSM sends (4) | `sendStart`, `sendStop`, `sendDispose`, `completeStart` | Делегация к `#fsm.send()` |
+| Transition methods (4) | `beginTransition`, `completeTransition`, `failTransition`, `cancelTransition` | FSM send + `#currentToState` management |
+| Composite (2) | `emitOrFailTransitionError`, `cancelTransitionIfRunning` | Условная логика (FSM state branching) |
+| State queries (7) | `isActive`, `isReady`, `isTransitioning`, `isDisposed`, `canBeginTransition`, `canStart`, `canCancel` | FSM state checks |
+| Subscriptions (4) | `addEventListener`, `subscribe`, `clearAll`, `setLimits` | Emitter delegation |
+| Validators (3) | `validateEventName`, `validateListenerArgs`, `validateSubscribeListener` | Static, из удалённого `eventValidation.ts` |
+| Internal (1) | `#setupFSMActions()` | 8 FSM→emit bridge registrations |
+
+**`#currentToState`** — private field, управляется только через `beginTransition` (set) и `completeTransition`/`failTransition`/`cancelTransition` (reset). `getCurrentToState()` — API surface для wiring (v8 ignore, не вызывается Router.ts).
 
 #### EventEmitter emit() оптимизации
 
@@ -262,6 +289,26 @@ Router.ts: 1585 → 1366 строк (-219).
 | emit() depth ON (maxEventDepth=5) | 34.2 ns | 31.0 ns | **-9%** |
 | Full navigation (3p + 10 subs) | 175.3 ns | 161.1 ns | **-8%** |
 | 1000 emits, 1 listener | 30.5 μs | 19.1 μs | **-38%** |
+
+### RouteLifecycleNamespace
+
+Перенос state-dependent бизнес-логики из facade в namespace.
+
+| Было (facade) | Стало (namespace) |
+|----------------|-------------------|
+| Facade запрашивал `isRegistering()`, `hasCanActivate()`, `countCanActivate()` | Namespace инкапсулирует проверки внутри `addCanActivate()`/`addCanDeactivate()` |
+| `registerCanActivate(name, handler, isOverwrite)` — input trusted | `addCanActivate(name, handler, skipValidation)` — self-validating |
+| 7 public accessors + 2 static proxy methods | Удалены (мёртвый код) |
+
+**Новые instance methods:**
+- `addCanActivate(name, handler, skipValidation)` — not-registering check, overwrite detection, handler limit validation, registration
+- `addCanDeactivate(name, handler, skipValidation)` — аналогично
+
+**Удалены instance methods (7):** `registerCanActivate`, `registerCanDeactivate`, `isRegistering`, `hasCanActivate`, `hasCanDeactivate`, `countCanActivate`, `countCanDeactivate`
+
+**Удалены static methods (2):** `validateNotRegistering`, `validateHandlerLimit` (были proxy к validators.ts, теперь вызываются напрямую из instance methods)
+
+**Сохранены:** `static validateHandler` (input validation из facade), `clearCanActivate`/`clearCanDeactivate`, `#registerHandler`, все остальные public methods.
 
 ### NavigationNamespace
 
@@ -313,33 +360,34 @@ start() → RouterLifecycleNS
 ```
 navigate() → NavigationNS.navigateToState()
   → deps.startTransition(toState, fromState)
-    → routerFSM.send("NAVIGATE")
-      → fsm.on(READY, NAVIGATE) → #emitter.emit(TRANSITION_START)
+    → eventBus.beginTransition() → fsm.send(NAVIGATE)
+      → fsm.on(READY, NAVIGATE) → emitTransitionStart()
   → [transition pipeline: guards → middleware]
   → deps.sendTransitionDone(state, fromState, opts)
-    → routerFSM.send("COMPLETE")
-      → fsm.on(TRANSITIONING, COMPLETE) → #emitter.emit(TRANSITION_SUCCESS)
+    → eventBus.completeTransition() → fsm.send(COMPLETE)
+      → fsm.on(TRANSITIONING, COMPLETE) → emitTransitionSuccess()
 
 start() → Router.start()
-  → routerFSM.send("START")
+  → eventBus.sendStart() → fsm.send(START)
   → RouterLifecycleNS.start()
-    → deps.completeStart() → routerFSM.send("STARTED")
-      → fsm.on(STARTING, STARTED) → #emitter.emit(ROUTER_START)
+    → deps.completeStart() → eventBus.completeStart() → fsm.send(STARTED)
+      → fsm.on(STARTING, STARTED) → emitRouterStart()
     → navigateToState() → [полный FSM-цикл выше]
 
 stop() → Router.stop()
-  → #cancelTransitionIfRunning()
-    → routerFSM.send("CANCEL")
-      → fsm.on(TRANSITIONING, CANCEL) → #emitter.emit(TRANSITION_CANCEL)
+  → eventBus.cancelTransitionIfRunning()
+    → eventBus.cancelTransition() → fsm.send(CANCEL)
+      → fsm.on(TRANSITIONING, CANCEL) → emitTransitionCancel()
   → lifecycle.stop() → setState(undefined)
-  → routerFSM.send("STOP")
-    → fsm.on(READY, STOP) → #emitter.emit(ROUTER_STOP)
+  → eventBus.sendStop() → fsm.send(STOP)
+    → fsm.on(READY, STOP) → emitRouterStop()
 
 dispose() → Router.dispose()
-  → #cancelTransitionIfRunning()
-  → [stop if READY/TRANSITIONING/STARTING]
-  → routerFSM.send("DISPOSE") → IDLE→DISPOSED
-  → [cleanup: emitter → plugins → middleware → routes → state → deps]
+  → eventBus.cancelTransitionIfRunning()
+  → [stop if isReady/isTransitioning]
+  → eventBus.sendDispose() → fsm.send(DISPOSE) → IDLE→DISPOSED
+  → eventBus.clearAll()
+  → [cleanup: plugins → middleware → routes → state → deps]
   → #markDisposed()
 ```
 
@@ -351,9 +399,9 @@ dispose() → Router.dispose()
 
 Ранние ошибки теперь в основном маршрутизируются через FSM:
 
-- **READY** (navigate с невалидным route/same state): DI `emitTransitionError` отправляет `send(FAIL)` → READY→READY self-loop → action эмитит $$error. Навигация не начинается (нет `TRANSITION_START`).
-- **STARTING** (start с невалидным путём): DI `emitTransitionError` отправляет `send(FAIL)` → STARTING→IDLE → action эмитит $$error (с guard `error !== undefined`).
-- **TRANSITIONING** (edge case: concurrent navigation с плохими аргументами): Direct emit, чтобы не нарушать текущий transition. Единственный оставшийся bypass FSM.
+- **READY** (navigate с невалидным route/same state): `eventBus.emitOrFailTransitionError()` → `fsm.send(FAIL)` → READY→READY self-loop → action эмитит $$error. Навигация не начинается (нет `TRANSITION_START`).
+- **STARTING** (start с невалидным путём): `eventBus.failTransition()` → `fsm.send(FAIL)` → STARTING→IDLE → action эмитит $$error (с guard `error !== undefined`).
+- **TRANSITIONING** (edge case: concurrent navigation с плохими аргументами): `eventBus.emitOrFailTransitionError()` → direct emit через `emitTransitionError()`, чтобы не нарушать текущий transition. Единственный оставшийся bypass FSM.
 
 ### isCancelled() в transition pipeline
 
@@ -383,22 +431,26 @@ FSM уже в IDLE после stop(). Listener вызывает `dispose()` → 
 
 ## Решённые альтернативы
 
-### Замена ObservableNamespace на EventEmitter (реализовано)
+### Эволюция event-системы: ObservableNamespace → inline → EventBusNamespace
 
-Изначально отвергалось по 3 причинам — все сняты после извлечения EventEmitter:
-1. ~~Несовпадение сигнатур~~ — FSM actions распаковывают payload, вызывают `emitter.emit()` с правильной сигнатурой
-2. ~~Отсутствие features в FSM~~ — EventEmitter предоставляет recursion depth, limits, duplicate detection 1:1
-3. ~~Concurrent navigation edge case~~ — direct `emitter.emit()` работает так же
+**Этап 1**: ObservableNamespace удалён, EventEmitter извлечён в отдельный пакет. Router.ts владел FSM + emitter напрямую. Один уровень индирекции убран.
 
-**Итог**: ObservableNamespace удалён. Router.ts владеет `#emitter: EventEmitter<RouterEventMap>`. FSM actions вызывают `emitter.emit()` напрямую. Один уровень индирекции убран.
+**Этап 2**: FSM + EventEmitter + `#currentToState` инкапсулированы в EventBusNamespace — единый event source. Router.ts не знает о FSM/emitter. Wiring работает через семантические методы (`beginTransition`, `failTransition`, `canBeginTransition`) вместо raw `fsm.send()`/`emitter.emit()`.
+
+Мотивация EventBusNamespace:
+1. Router.ts теряет все imports из `./fsm` и `event-emitter` (-7 imports)
+2. `#setupFSMActions` (55 строк) и `#cancelTransitionIfRunning` (11 строк) переезжают из Router — это wiring-логика, не facade-логика
+3. `WiringOptions` упрощается: 4 поля (`routerFSM`, `emitter`, `getCurrentToState`, `setCurrentToState`) → 1 (`eventBus`)
+4. `#currentToState` управляется полностью внутри namespace (set в `beginTransition`, reset в `complete/fail/cancelTransition`)
 
 ---
 
-## v8 ignore — текущее состояние (1 FSM-related блок)
+## v8 ignore — текущее состояние (3 FSM-related блока)
 
 | Категория | Кол-во | Место |
 |-----------|--------|-------|
 | Error wrapping инвариант | 1 | `#routeTransitionError()` |
+| API surface methods | 2 | `EventBusNamespace.getState()`, `EventBusNamespace.getCurrentToState()` |
 
 Defensive guard `currentToState` (2 блока) — убраны, заменены на non-null assertion.
 Recursion depth guard в ObservableNamespace — убран вместе с namespace (EventEmitter покрывает 100% без v8 ignore).
@@ -409,20 +461,24 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 ## Файлы — diff vs master
 
-### Добавлены (6 core + event-emitter пакет)
+### Добавлены (9 core + event-emitter пакет)
 
 - `packages/core/src/fsm/routerFSM.ts` — config, types, factory, `routerStates`/`routerEvents`
 - `packages/core/src/fsm/index.ts` — barrel exports
-- `packages/core/src/wiring/RouterWiringBuilder.ts` — Builder: 9 wire-методов (275 строк)
+- `packages/core/src/wiring/RouterWiringBuilder.ts` — Builder: 9 wire-методов (221 строк)
 - `packages/core/src/wiring/wireRouter.ts` — Director: вызов методов в правильном порядке
 - `packages/core/src/wiring/types.ts` — `WiringOptions<Dependencies>` interface
 - `packages/core/src/wiring/index.ts` — barrel exports
+- `packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts` — FSM+emitter+currentToState encapsulation (278 строк)
+- `packages/core/src/namespaces/EventBusNamespace/types.ts` — `EventBusOptions` interface
+- `packages/core/src/namespaces/EventBusNamespace/index.ts` — barrel exports
 - `packages/event-emitter/` — приватный пакет: generic `EventEmitter<TEventMap>` (50 тестов, 100% coverage)
 
-### Удалены (2 src + 9 tests)
+### Удалены (3 src + 9 tests)
 
 - `packages/core/src/namespaces/ObservableNamespace/helpers.ts` — содержал `invokeFor()`
 - `packages/core/src/fsm/transitionFSM.ts` — промежуточный FSM, слит в RouterFSM
+- `packages/core/src/eventValidation.ts` — validators перенесены в EventBusNamespace static methods
 
 Тесты (implementation details):
 - `tests/functional/fsm/` — 3 файла
@@ -431,7 +487,8 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 ### Изменены (production)
 
-- `Router.ts` — FSM интеграция, dispose(), wiring extraction (1585→1366 строк), async/throw
+- `Router.ts` — FSM интеграция, dispose(), wiring extraction, EventBusNamespace, guard delegation (1585→1209 строк), async/throw
+- `RouteLifecycleNamespace.ts` — `addCanActivate`/`addCanDeactivate` encapsulate state-dependent validation, 9 dead methods removed
 - `NavigationNamespace.ts` — decomposed, FSM DI, async/throw, no duration
 - `NavigationNamespace/transition/index.ts` — Set→includes
 - `NavigationNamespace/transition/executeMiddleware.ts` — logger import fix
@@ -441,7 +498,7 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 - `RouterLifecycleNamespace.ts` — simplified, flags removed
 - `RouterLifecycleNamespace/types.ts` — DI types
 - `RouterLifecycleNamespace/constants.ts` — cached error
-- `ObservableNamespace.ts` — typed emit methods, cleanup
+- `ObservableNamespace.ts` → удалён (заменён EventBusNamespace)
 - `PluginsNamespace.ts` — disposeAll(), removed empty catch
 - `MiddlewareNamespace.ts` — clearAll()
 - `StateNamespace.ts` — reset(), simplified set()
@@ -460,9 +517,10 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 | Метрика | Значение |
 |---------|----------|
-| Коммитов | 34 |
-| Файлов изменено | 97 |
-| Строк | +4468 / -1456 (net +3012) |
-| Тестов | 4101 (core: 2286, fsm: 40, event-emitter: 50) |
+| Коммитов | 40 |
+| Файлов изменено | 100 |
+| Строк | +4676 / -1590 (net +3086) |
+| Тестов | 4150 (core: 2287, fsm: 40, event-emitter: 50) |
 | Coverage | 100% |
-| Bundle size | 83.6 KB raw / 22.81 KB gzip |
+| Router.ts | 1585 → 1209 строк (-376) |
+| Bundle size | 86.2 KB raw / 22.4 KB gzip |

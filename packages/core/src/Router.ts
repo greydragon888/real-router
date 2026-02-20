@@ -736,37 +736,17 @@ export class Router<
     canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
-      // 1. Validate input
       validateRouteName(name, "addDeactivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canDeactivateHandler,
         "addDeactivateGuard",
       );
-
-      // 2. Validate not registering
-      RouteLifecycleNamespace.validateNotRegistering(
-        this.#routeLifecycle.isRegistering(name),
-        name,
-        "addDeactivateGuard",
-      );
     }
 
-    // 3. Check if overwrite and validate limit
-    const isOverwrite = this.#routeLifecycle.hasCanDeactivate(name);
-
-    if (!isOverwrite && !this.#noValidate) {
-      RouteLifecycleNamespace.validateHandlerLimit(
-        this.#routeLifecycle.countCanDeactivate() + 1,
-        "addDeactivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
-
-    // 4. Execute
-    this.#routeLifecycle.registerCanDeactivate(
+    this.#routeLifecycle.addCanDeactivate(
       name,
       canDeactivateHandler,
-      isOverwrite,
+      this.#noValidate,
     );
 
     return this;
@@ -777,37 +757,17 @@ export class Router<
     canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
-      // 1. Validate input
       validateRouteName(name, "addActivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canActivateHandler,
         "addActivateGuard",
       );
-
-      // 2. Validate not registering
-      RouteLifecycleNamespace.validateNotRegistering(
-        this.#routeLifecycle.isRegistering(name),
-        name,
-        "addActivateGuard",
-      );
     }
 
-    // 3. Check if overwrite and validate limit
-    const isOverwrite = this.#routeLifecycle.hasCanActivate(name);
-
-    if (!isOverwrite && !this.#noValidate) {
-      RouteLifecycleNamespace.validateHandlerLimit(
-        this.#routeLifecycle.countCanActivate() + 1,
-        "addActivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
-
-    // 4. Execute
-    this.#routeLifecycle.registerCanActivate(
+    this.#routeLifecycle.addCanActivate(
       name,
       canActivateHandler,
-      isOverwrite,
+      this.#noValidate,
     );
 
     return this;
