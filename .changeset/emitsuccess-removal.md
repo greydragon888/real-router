@@ -2,6 +2,6 @@
 "@real-router/core": minor
 ---
 
-**Breaking:** Remove `emitSuccess` parameter from `navigateToState()`
+**Breaking:** Remove `emitSuccess` parameter from `navigateToState()` (#123)
 
 The `emitSuccess` parameter has been removed from `navigateToState()`. Event emission is now driven by FSM transitions and is no longer optional.

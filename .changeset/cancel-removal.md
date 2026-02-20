@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-**Breaking:** Remove `router.cancel()` method
+**Breaking:** Remove `router.cancel()` method (#123)
 
 The `cancel()` method has been removed. Its functionality is now handled internally:
 

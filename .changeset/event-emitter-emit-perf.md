@@ -2,7 +2,7 @@
 "@real-router/core": patch
 ---
 
-Optimize EventEmitter emit() hot path
+Optimize EventEmitter emit() hot path (#123)
 
 Three optimizations to the internal event-emitter `emit()`:
 1. Replace `Function.prototype.apply.call` with switch by args.length (direct calls for 0-3 args)
