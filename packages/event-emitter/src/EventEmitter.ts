@@ -161,37 +161,45 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
     for (const cb of listeners) {
       try {
-        switch (args.length) {
-          case 0: {
-            (cb as () => void)();
-
-            break;
-          }
-          case 1: {
-            (cb as (a: unknown) => void)(args[0]);
-
-            break;
-          }
-          case 2: {
-            (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
-
-            break;
-          }
-          case 3: {
-            (cb as (a: unknown, b: unknown, c: unknown) => void)(
-              args[0],
-              args[1],
-              args[2],
-            );
-
-            break;
-          }
-          default: {
-            Function.prototype.apply.call(cb, undefined, args);
-          }
-        }
+        this.#callListener(cb, args);
       } catch (error) {
         this.#onListenerError?.(eventName, error);
+      }
+    }
+  }
+
+  /**
+   * Calls a listener with the provided arguments, dispatching by argument count.
+   * Optimized for 0-3 args with direct calls; falls back to apply for larger counts.
+   */
+  #callListener(cb: AnyCallback, args: unknown[]): void {
+    switch (args.length) {
+      case 0: {
+        (cb as () => void)();
+
+        break;
+      }
+      case 1: {
+        (cb as (a: unknown) => void)(args[0]);
+
+        break;
+      }
+      case 2: {
+        (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
+
+        break;
+      }
+      case 3: {
+        (cb as (a: unknown, b: unknown, c: unknown) => void)(
+          args[0],
+          args[1],
+          args[2],
+        );
+
+        break;
+      }
+      default: {
+        Function.prototype.apply.call(cb, undefined, args);
       }
     }
   }
@@ -222,35 +230,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
       for (const cb of listeners) {
         try {
-          switch (args.length) {
-            case 0: {
-              (cb as () => void)();
-
-              break;
-            }
-            case 1: {
-              (cb as (a: unknown) => void)(args[0]);
-
-              break;
-            }
-            case 2: {
-              (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
-
-              break;
-            }
-            case 3: {
-              (cb as (a: unknown, b: unknown, c: unknown) => void)(
-                args[0],
-                args[1],
-                args[2],
-              );
-
-              break;
-            }
-            default: {
-              Function.prototype.apply.call(cb, undefined, args);
-            }
-          }
+          this.#callListener(cb, args);
         } catch (error) {
           if (error instanceof RecursionDepthError) {
             throw error;
