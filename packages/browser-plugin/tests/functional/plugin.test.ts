@@ -451,21 +451,21 @@ describe("Browser Plugin", async () => {
           name: "users.view",
           params: { id: "1" },
           path: "/users/view/1",
-          meta: { id: 1, params: {}, options: {}, redirected: false },
+          meta: { id: 1, params: {}, options: {} },
         };
 
         const state2: State = {
           name: "users.view",
           params: { id: "2" },
           path: "/users/view/2",
-          meta: { id: 2, params: {}, options: {}, redirected: false },
+          meta: { id: 2, params: {}, options: {} },
         };
 
         const state3: State = {
           name: "users.list",
           params: {},
           path: "/users/list",
-          meta: { id: 3, params: {}, options: {}, redirected: false },
+          meta: { id: 3, params: {}, options: {} },
         };
 
         // Dispatch three rapid popstate events (like user clicking back 3 times)
@@ -575,7 +575,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 2, params: {}, options: {}, redirected: false },
+          meta: { id: 2, params: {}, options: {} },
         };
 
         globalThis.dispatchEvent(
@@ -617,7 +617,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 2, params: {}, options: {}, redirected: false },
+          meta: { id: 2, params: {}, options: {} },
         };
 
         globalThis.dispatchEvent(
@@ -851,7 +851,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 1, params: {}, options: {}, redirected: false },
+          meta: { id: 1, params: {}, options: {} },
         };
 
         router.lastKnownState = externalState;

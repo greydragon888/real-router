@@ -134,7 +134,6 @@ export class NavigationNamespace {
       {
         params: route.meta,
         options: opts,
-        redirected: opts.redirected ?? false,
       },
     );
 

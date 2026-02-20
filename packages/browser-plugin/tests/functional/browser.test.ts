@@ -9,7 +9,7 @@ const validState: HistoryState = {
   name: "home",
   params: {},
   path: "/home",
-  meta: { id: 1, params: {}, options: {}, redirected: false },
+  meta: { id: 1, params: {}, options: {} },
 };
 
 const USER_LIST_URL = "/users/list";

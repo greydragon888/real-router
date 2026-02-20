@@ -38,13 +38,7 @@ export function isMetaFields<MP extends Params = Params>(
     return false;
   }
 
-  // Check redirected field if present
-  if ("redirected" in obj && typeof obj.redirected !== "boolean") {
-    return false;
-  }
-
-  // Check source field if present
-  return !("source" in obj && typeof obj.source !== "string");
+  return true;
 }
 
 /**

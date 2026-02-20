@@ -123,7 +123,7 @@ describe("core/state", () => {
         "home",
         {},
         "/home",
-        { params: {}, options: {}, redirected: false, source: "" },
+        { params: {}, options: {} },
         999,
       );
 
@@ -164,7 +164,7 @@ describe("core/state", () => {
             "home",
             {},
             "/home",
-            { params: {}, options: {}, redirected: false },
+            { params: {}, options: {} },
             "999" as unknown as number,
           ),
         ).toThrowError(TypeError);
@@ -173,7 +173,7 @@ describe("core/state", () => {
             "home",
             {},
             "/home",
-            { params: {}, options: {}, redirected: false },
+            { params: {}, options: {} },
             {} as unknown as number,
           ),
         ).toThrowError(/Invalid forceId/);

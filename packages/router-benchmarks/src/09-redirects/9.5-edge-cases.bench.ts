@@ -128,35 +128,6 @@ type RedirectResult = State | void;
   }).gc("inner");
 }
 
-// 9.5.7 Redirect with meta.redirected setting
-{
-  const router = createSimpleRouter();
-
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
-      const redirectState = _router.makeState(
-        target,
-        {},
-        target === "home" ? "/" : "/users",
-        {
-          params: {},
-          options: {},
-          redirected: true,
-        },
-      );
-
-      return redirectState;
-    }
-  });
-  router.start("/");
-
-  bench("9.5.7 Redirect with meta.redirected setting", () => {
-    router.navigate("about");
-  }).gc("inner");
-}
-
 // 9.5.8 Redirect with very long parameter chain
 {
   const router = createSimpleRouter();

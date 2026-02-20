@@ -57,7 +57,6 @@ boxplot(() => {
         id: 1,
         params: { source: "browser" },
         options: {},
-        redirected: false,
       });
 
       do_not_optimize(freezeStateInPlace(state));
@@ -79,7 +78,6 @@ boxplot(() => {
           id: 1,
           params: { tab: "overview", filter: "active" },
           options: { reload: true },
-          redirected: false,
         },
       );
 
@@ -139,7 +137,6 @@ boxplot(() => {
           id: 1,
           params: { source: "browser" },
           options: {},
-          redirected: false,
         }),
       );
 

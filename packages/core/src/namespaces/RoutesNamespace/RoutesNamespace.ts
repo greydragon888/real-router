@@ -547,7 +547,6 @@ export class RoutesNamespace<
    */
   matchPath<P extends Params = Params, MP extends Params = Params>(
     path: string,
-    source?: string,
     options?: Options,
   ): State<P, MP> | undefined {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
@@ -593,8 +592,6 @@ export class RoutesNamespace<
     return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
       params: meta as MP,
       options: EMPTY_OPTIONS,
-      source,
-      redirected: false,
     });
   }
 

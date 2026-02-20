@@ -43,7 +43,6 @@ describe("router.navigate() - navigation meta and options", () => {
         meta: {
           id: 42,
           options: { guardFlag: true },
-          redirected: true,
           params: { userId: "guard123", source: "canActivate" },
         },
       };
@@ -55,14 +54,13 @@ describe("router.navigate() - navigation meta and options", () => {
     const state = await router.navigate("profile", {}, {});
 
     // mergeStates logic:
-    // 1. Default meta values (id: 1, options: {}, redirected: false, params: {})
+    // 1. Default meta values (id: 1, options: {}, params: {})
     // 2. fromState.meta (original navigation state)
     // 3. toState.meta (guard's modified state) - overwrites
     // 4. Special params merge: toState.params + fromState.params
 
     expect(state.meta?.id).toBe(42); // Guard's id overwrites default
     expect(state.meta?.options.guardFlag).toBe(true); // Guard's options
-    expect(state.meta?.redirected).toBe(true); // Guard's redirected
     expect(state.meta?.params.userId).toBe("guard123"); // From guard
     expect(state.meta?.params.source).toBe("canActivate"); // From guard
   });
@@ -211,45 +209,8 @@ describe("router.navigate() - navigation meta and options", () => {
     expect(state.meta?.params.activateOrder).toBe(1);
   });
 
-  describe("Issue #54: state.meta.redirected behavior", () => {
-    // Issue #54 was about meta.redirected not reflecting redirect status.
-    // After guards redirect removal: meta.redirected is always false
-    // because guards cannot redirect anymore.
-
-    describe("meta.redirected should be false for normal navigation", () => {
-      it("should have meta.redirected = false for direct navigation", async () => {
-        const state = await router.navigate("users");
-
-        expect(state.meta?.redirected).toBe(false);
-      });
-
-      it("should have meta.redirected = false for navigation with params", async () => {
-        const state = await router.navigate("users.view", { id: "123" });
-
-        expect(state.meta?.redirected).toBe(false);
-      });
-
-      it("should have meta.redirected = false for navigation with options", async () => {
-        const state = await router.navigate("users", {}, { replace: true });
-
-        expect(state.meta?.redirected).toBe(false);
-      });
-    });
-
-    // Note: Guards cannot redirect anymore, so no "meta.redirected = true" tests
-    // Middleware redirect tests have been removed as well since guards can't redirect
-  });
-
-  describe("Issue #59: meta.redirected reflects opts.redirected (verifies 12.3 fix)", () => {
-    /**
-     * Issue #59 / 12.3: Verify that state.meta.redirected properly reflects
-     * the opts.redirected value passed during navigation.
-     *
-     * Previously, redirected was always set to false, ignoring opts.redirected.
-     * The fix changed `redirected: false` to `redirected: opts.redirected ?? false`.
-     */
-
-    it("should have meta.redirected = false for normal navigation", async () => {
+  describe("Issue #59: opts.redirected flows through to meta.options (verifies 12.3 fix)", () => {
+    it("should not have meta.options.redirected for normal navigation", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
@@ -257,17 +218,16 @@ describe("router.navigate() - navigation meta and options", () => {
       const resultState = await freshRouter.navigate("users", {}, {});
 
       expect(resultState).toBeDefined();
-      expect(resultState.meta?.redirected).toBe(false);
+      expect(resultState.meta?.options.redirected).toBeUndefined();
 
       freshRouter.stop();
     });
 
-    it("should have meta.redirected = true when opts.redirected is true", async () => {
+    it("should have meta.options.redirected = true when opts.redirected is true", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
 
-      // Simulate what would happen during a redirect
       const resultState = await freshRouter.navigate(
         "users",
         {},
@@ -275,7 +235,7 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       expect(resultState).toBeDefined();
-      expect(resultState.meta?.redirected).toBe(true);
+      expect(resultState.meta?.options.redirected).toBe(true);
 
       freshRouter.stop();
     });
@@ -290,15 +250,13 @@ describe("router.navigate() - navigation meta and options", () => {
         events.TRANSITION_SUCCESS,
         (toState: State) => {
           stateLog.push({
-            redirected: toState.meta?.redirected,
+            redirected: toState.meta?.options.redirected,
           });
         },
       );
 
-      // Normal navigation
       await freshRouter.navigate("users", {}, {});
 
-      // Navigation with redirected flag
       await freshRouter.navigate(
         "users.view",
         { id: "1" },
@@ -306,7 +264,7 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       expect(stateLog).toStrictEqual([
-        { redirected: false },
+        { redirected: undefined },
         { redirected: true },
       ]);
 

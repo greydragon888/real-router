@@ -39,8 +39,6 @@ export interface StateMeta<P extends Params = Params> {
   id: number;
   params: P;
   options: NavigationOptions;
-  redirected: boolean;
-  source?: string | undefined;
 }
 
 /**
@@ -217,7 +215,7 @@ export interface NavigationOptions {
    * @description
    * Automatically set by the router when a navigation is triggered by a redirect from
    * middleware or lifecycle hooks. This flag is used internally to track redirect chains
-   * and is stored in state.meta.redirected.
+   * and is stored in state.meta.options.redirected.
    *
    * @default false (auto-set by router during redirects)
    *
@@ -233,14 +231,14 @@ export interface NavigationOptions {
    * @example
    * // Accessing redirect flag in lifecycle
    * router.addActivateGuard('dashboard', (toState, fromState) => {
-   *   if (toState.meta?.redirected) {
+   *   if (toState.meta?.options?.redirected) {
    *     console.log('This navigation is from a redirect');
    *   }
    *   return true;
    * });
    *
    * @see {@link Router.navigate} for redirect handling implementation
-   * @see {@link State.meta.redirected} for redirect flag in state
+   * @see {@link NavigationOptions.redirected} for the input mechanism
    */
   redirected?: boolean | undefined;
 }

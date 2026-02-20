@@ -11,7 +11,7 @@ const homeState: State = {
   name: "home",
   params: {},
   path: "/home",
-  meta: { id: 5, params: { home: {} }, redirected: false, options: {} },
+  meta: { id: 5, params: { home: {} }, options: {} },
 };
 
 describe("router.start() - state object scenarios", () => {

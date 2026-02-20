@@ -50,12 +50,11 @@ describe("Utils", () => {
             // Note: makeState then overrides with ++stateId, but the fallback branch is executed
             params: {},
             options: {},
-            redirected: false,
           },
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {}, "popstate");
+      const state = createStateFromEvent(evt, router, browser, {});
 
       expect(state).toBeDefined();
       // Note: id is overwritten by makeState with ++stateId (value 2 after router.start)
@@ -76,12 +75,11 @@ describe("Utils", () => {
             id: 5,
             // params is NOT in the object - should fallback to {}
             options: {},
-            redirected: false,
           },
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {}, "popstate");
+      const state = createStateFromEvent(evt, router, browser, {});
 
       expect(state).toBeDefined();
       expect(state?.meta?.params).toStrictEqual({});
@@ -100,43 +98,34 @@ describe("Utils", () => {
             id: 5,
             params: {},
             // options is NOT in the object - should fallback to {}
-            redirected: false,
           },
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {}, "popstate");
+      const state = createStateFromEvent(evt, router, browser, {});
 
       expect(state).toBeDefined();
       expect(state?.meta?.options).toStrictEqual({});
     });
 
-    it("uses all fallbacks when meta has only redirected (lines 112-114)", async () => {
+    it("uses all fallbacks when meta is empty (lines 112-114)", async () => {
       await router.start("/home");
 
-      // Create event with state that has minimal meta - only redirected
-      // All other properties are missing (NOT included, not undefined)
       const evt = {
         state: {
           name: "home",
           params: {},
           path: "/home",
-          meta: {
-            // Only redirected is present - all other properties use fallbacks
-            redirected: false,
-          },
+          meta: {},
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {}, "popstate");
+      const state = createStateFromEvent(evt, router, browser, {});
 
       expect(state).toBeDefined();
-      // Note: id is overwritten by makeState with ++stateId, so we just check it exists
       expect(state?.meta?.id).toBeGreaterThanOrEqual(1);
-      // params and options fallbacks ARE used and preserved
       expect(state?.meta?.params).toStrictEqual({});
       expect(state?.meta?.options).toStrictEqual({});
-      expect(state?.meta?.redirected).toBe(false);
     });
 
     it("matches path when event has no state (new navigation)", async () => {
@@ -147,7 +136,7 @@ describe("Utils", () => {
         state: null,
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {}, "popstate");
+      const state = createStateFromEvent(evt, router, browser, {});
 
       expect(state).toBeDefined();
       expect(state?.name).toBe("home");
@@ -173,7 +162,7 @@ describe("Utils", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 1, params: {}, options: {}, redirected: false },
+        meta: { id: 1, params: {}, options: {} },
       };
 
       const result = shouldSkipTransition(newState, undefined, router);
@@ -186,7 +175,7 @@ describe("Utils", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 1, params: {}, options: {}, redirected: false },
+        meta: { id: 1, params: {}, options: {} },
       };
 
       const result = shouldSkipTransition(state, state, router);
@@ -226,13 +215,13 @@ describe("Utils", () => {
       name: "home",
       params: {},
       path: "/home",
-      meta: { id: 1, params: {}, options: {}, redirected: false },
+      meta: { id: 1, params: {}, options: {} },
     };
     const toState: State = {
       name: "users",
       params: {},
       path: "/users",
-      meta: { id: 2, params: {}, options: {}, redirected: false },
+      meta: { id: 2, params: {}, options: {} },
     };
 
     beforeEach(async () => {

@@ -421,7 +421,6 @@ Clone router for SSR.\
 Returns: `Router`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/clone)
 
-
 ---
 
 ## Plugin Development API
@@ -430,11 +429,10 @@ The following methods are designed for **plugin authors**. They provide low-leve
 
 These methods are stable but intended for plugin development, not application code.
 
-#### `router.matchPath(path: string, source?: string): State | undefined`
+#### `router.matchPath(path: string): State | undefined`
 
 Match URL path to route state.\
 `path: string` — URL path to match\
-`source?: string` — navigation source identifier\
 Returns: `State | undefined`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/matchPath)
 

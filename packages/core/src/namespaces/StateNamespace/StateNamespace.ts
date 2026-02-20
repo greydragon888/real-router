@@ -202,7 +202,6 @@ export class StateNamespace {
           id: forceId ?? ++this.#stateId,
           params: meta.params,
           options: meta.options,
-          redirected: meta.redirected,
         }
       : undefined;
 
@@ -242,7 +241,6 @@ export class StateNamespace {
       {
         options,
         params: {},
-        redirected: false,
       },
     );
   }

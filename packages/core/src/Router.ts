@@ -513,13 +513,12 @@ export class Router<
 
   matchPath<P extends Params = Params, MP extends Params = Params>(
     path: string,
-    source?: string,
   ): State<P, MP> | undefined {
     if (!this.#noValidate) {
       RoutesNamespace.validateMatchPathArgs(path);
     }
 
-    return this.#routes.matchPath<P, MP>(path, source, this.#options.get());
+    return this.#routes.matchPath<P, MP>(path, this.#options.get());
   }
 
   setRootPath(rootPath: string): void {
@@ -633,7 +632,6 @@ export class Router<
       {
         params: routeInfo.meta,
         options: {},
-        redirected: false,
       },
     );
   }

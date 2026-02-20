@@ -241,7 +241,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 555,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
@@ -266,7 +265,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 444,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
@@ -290,7 +288,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 333,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
@@ -425,7 +422,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 555,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const promiseRedirectMiddleware = vi
@@ -452,7 +448,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 444,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const promiseRedirectMiddleware = vi
@@ -478,7 +473,6 @@ describe("router.navigate() - promise resolve values", () => {
             id: 333,
             options: {},
             params: {},
-            redirected: false,
           },
         };
         const promiseRedirectMiddleware = vi

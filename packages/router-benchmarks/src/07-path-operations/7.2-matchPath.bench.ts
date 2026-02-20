@@ -117,17 +117,6 @@ const routes: Route[] = [
   }).gc("inner");
 }
 
-// 7.2.8 Matching with source parameter
-{
-  const router = createRouter(routes);
-
-  bench(`7.2.8 Matching with source parameter (×${BATCH})`, () => {
-    for (let i = 0; i < BATCH; i++) {
-      do_not_optimize(router.matchPath("/users", "users"));
-    }
-  }).gc("inner");
-}
-
 // 7.2.9 Matching with trailing slash
 {
   const router = createRouter(routes, {

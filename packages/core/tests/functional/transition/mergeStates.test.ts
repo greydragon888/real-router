@@ -13,7 +13,6 @@ function createState(
     id: 1,
     params: {},
     options: {},
-    redirected: false,
     ...metaOverrides,
   };
 
@@ -111,24 +110,6 @@ describe("transition/mergeStates", () => {
 
       expect(result.meta?.options).toStrictEqual({});
     });
-
-    it("should use toState.meta.redirected over fromState.meta.redirected", () => {
-      const toState = createState({}, { redirected: true });
-      const fromState = createState({}, { redirected: false });
-
-      const result = mergeStates(toState, fromState);
-
-      expect(result.meta?.redirected).toBe(true);
-    });
-
-    it("should use default redirected=false when both are false", () => {
-      const toState = createState({}, { redirected: false });
-      const fromState = createState({}, { redirected: false });
-
-      const result = mergeStates(toState, fromState);
-
-      expect(result.meta?.redirected).toBe(false);
-    });
   });
 
   describe("meta.params merging", () => {
@@ -182,36 +163,6 @@ describe("transition/mergeStates", () => {
     });
   });
 
-  describe("meta.source handling", () => {
-    it("should use toState.meta.source when defined", () => {
-      const toState = createState({}, { source: "middleware" });
-      const fromState = createState({}, { source: "guard" });
-
-      const result = mergeStates(toState, fromState);
-
-      expect(result.meta?.source).toBe("middleware");
-    });
-
-    it("should use fromState.meta.source when toState.meta.source is undefined", () => {
-      const toState = createState({}, {});
-      const fromState = createState({}, { source: "guard" });
-
-      const result = mergeStates(toState, fromState);
-
-      expect(result.meta?.source).toBe("guard");
-    });
-
-    it("should not include source when both are undefined", () => {
-      const toState = createState({}, {});
-      const fromState = createState({}, {});
-
-      const result = mergeStates(toState, fromState);
-
-      // source should not be present in meta
-      expect("source" in (result.meta ?? {})).toBe(false);
-    });
-  });
-
   describe("undefined meta handling", () => {
     it("should handle undefined toState.meta", () => {
       const toState: State = { name: "test", params: {}, path: "/test" };
@@ -241,7 +192,6 @@ describe("transition/mergeStates", () => {
 
       expect(result.meta?.id).toBe(1);
       expect(result.meta?.options).toStrictEqual({});
-      expect(result.meta?.redirected).toBe(false);
       expect(result.meta?.params).toStrictEqual({});
     });
 
@@ -257,7 +207,6 @@ describe("transition/mergeStates", () => {
       expect(result.meta).toStrictEqual({
         id: 1,
         options: {},
-        redirected: false,
         params: {},
       });
     });
@@ -331,7 +280,7 @@ describe("transition/mergeStates", () => {
     it("should handle identical states", () => {
       const state = createState(
         { name: "test", params: { id: "1" }, path: "/test/1" },
-        { id: 1, params: { extra: "data" }, options: {}, redirected: false },
+        { id: 1, params: { extra: "data" }, options: {} },
       );
 
       const result = mergeStates(state, state);
@@ -401,7 +350,7 @@ describe("transition/mergeStates", () => {
     it("should handle guard adding timestamp to meta.params", () => {
       const toState = createState(
         { name: "users.view", params: { id: "123" }, path: "/users/123" },
-        { id: 5, params: {}, options: {}, redirected: false },
+        { id: 5, params: {}, options: {} },
       );
       const fromState = createState(
         { name: "users.view", params: { id: "123" }, path: "/users/123" },
@@ -409,7 +358,6 @@ describe("transition/mergeStates", () => {
           id: 5,
           params: { timestamp: 1_234_567_890 },
           options: {},
-          redirected: false,
         },
       );
 
@@ -417,23 +365,6 @@ describe("transition/mergeStates", () => {
 
       expect(result.name).toBe("users.view");
       expect(result.meta?.params).toStrictEqual({ timestamp: 1_234_567_890 });
-    });
-
-    it("should handle middleware setting redirect flag", () => {
-      const toState = createState(
-        { name: "login", params: {}, path: "/login" },
-        { id: 6, params: {}, options: { replace: true }, redirected: true },
-      );
-      const fromState = createState(
-        { name: "dashboard", params: {}, path: "/dashboard" },
-        { id: 5, params: {}, options: {}, redirected: false },
-      );
-
-      const result = mergeStates(toState, fromState);
-
-      expect(result.name).toBe("login");
-      expect(result.meta?.redirected).toBe(true);
-      expect(result.meta?.options).toStrictEqual({ replace: true });
     });
 
     it("should handle multiple guards modifying state chain", () => {

@@ -98,7 +98,6 @@ describe("RouterError Circular References Properties", () => {
           id: 1,
           params: metaParams,
           options: {},
-          redirected: false,
         },
       };
 
@@ -128,7 +127,6 @@ describe("RouterError Circular References Properties", () => {
           options: {
             state: optionsState,
           },
-          redirected: false,
         },
       };
 
