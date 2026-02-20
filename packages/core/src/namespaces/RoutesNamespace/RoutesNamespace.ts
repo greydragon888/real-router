@@ -871,6 +871,23 @@ export class RoutesNamespace<
   }
 
   /**
+   * Applies cloned route config from source router.
+   * Used by clone to copy decoders, encoders, defaultParams, forwardMap,
+   * forwardFnMap and resolvedForwardMap into this namespace's config.
+   */
+  applyClonedConfig(
+    config: RouteConfig,
+    resolvedForwardMap: Record<string, string>,
+  ): void {
+    Object.assign(this.#config.decoders, config.decoders);
+    Object.assign(this.#config.encoders, config.encoders);
+    Object.assign(this.#config.defaultParams, config.defaultParams);
+    Object.assign(this.#config.forwardMap, config.forwardMap);
+    Object.assign(this.#config.forwardFnMap, config.forwardFnMap);
+    this.setResolvedForwardMap({ ...resolvedForwardMap });
+  }
+
+  /**
    * Creates a clone of the routes for a new router (from tree).
    */
   cloneRoutes(): Route<Dependencies>[] {

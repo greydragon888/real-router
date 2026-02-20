@@ -24,5 +24,6 @@ export function wireRouter<Dependencies extends DefaultDependencies>(
   builder.wireNavigationDeps();
   builder.wireLifecycleDeps();
   builder.wireStateDeps();
+  builder.wireCloneCallbacks();
   builder.wireCyclicDeps();
 }

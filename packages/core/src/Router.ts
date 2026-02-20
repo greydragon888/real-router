@@ -212,7 +212,6 @@ export class Router<
         eventBus: this.#eventBus,
       }),
     );
-    this.#setupCloneCallbacks();
 
     // =========================================================================
     // Bind Public Methods
@@ -1093,6 +1092,11 @@ export class Router<
       dependencies,
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
+      (newRouter, config, resolvedForwardMap) => {
+        const typedRouter = newRouter as unknown as Router<Dependencies>;
+
+        typedRouter.#routes.applyClonedConfig(config, resolvedForwardMap);
+      },
     );
   }
 
@@ -1121,43 +1125,6 @@ export class Router<
    */
   static #suppressUnhandledRejection(promise: Promise<State>): void {
     promise.catch(Router.#onSuppressedError);
-  }
-
-  #setupCloneCallbacks(): void {
-    this.#clone.setCallbacks(
-      // getCloneData: collect all data needed for cloning
-      () => {
-        const [canDeactivateFactories, canActivateFactories] =
-          this.#routeLifecycle.getFactories();
-
-        return {
-          routes: this.#routes.cloneRoutes(),
-          options: { ...this.#options.get() },
-          dependencies: this.#dependencies.getAll(),
-          canDeactivateFactories,
-          canActivateFactories,
-          middlewareFactories: this.#middleware.getFactories(),
-          pluginFactories: this.#plugins.getAll(),
-          routeConfig: this.#routes.getConfig(),
-          resolvedForwardMap: this.#routes.getResolvedForwardMap(),
-        };
-      },
-      // applyConfig: apply route config to new router
-      (newRouter, config, resolvedForwardMap) => {
-        // Access new router's internal config via type assertion
-        // This is safe because we know the newRouter is a Router instance
-        const typedRouter = newRouter as unknown as Router<Dependencies>;
-        const newConfig = typedRouter.#routes.getConfig();
-
-        Object.assign(newConfig.decoders, config.decoders);
-        Object.assign(newConfig.encoders, config.encoders);
-        Object.assign(newConfig.defaultParams, config.defaultParams);
-        Object.assign(newConfig.forwardMap, config.forwardMap);
-        Object.assign(newConfig.forwardFnMap, config.forwardFnMap);
-
-        typedRouter.#routes.setResolvedForwardMap({ ...resolvedForwardMap });
-      },
-    );
   }
 
   #markDisposed(): void {

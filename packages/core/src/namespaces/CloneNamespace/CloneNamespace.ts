@@ -26,15 +26,10 @@ export class CloneNamespace<
   #getCloneDataStore: (() => CloneData<Dependencies>) | undefined;
 
   /**
-   * Function to apply config to a new router.
-   */
-  #applyConfigStore: ApplyConfigFn<Dependencies> | undefined;
-
-  /**
    * Gets clone data function or throws if not initialized.
    */
   get #getCloneData(): () => CloneData<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: always set by Router.ts */
+    /* v8 ignore next 3 -- @preserve: always set by wireCloneCallbacks */
     if (!this.#getCloneDataStore) {
       throw new Error(
         "[real-router] CloneNamespace: getCloneData not initialized",
@@ -42,20 +37,6 @@ export class CloneNamespace<
     }
 
     return this.#getCloneDataStore;
-  }
-
-  /**
-   * Gets apply config function or throws if not initialized.
-   */
-  get #applyConfig(): ApplyConfigFn<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: always set by Router.ts */
-    if (!this.#applyConfigStore) {
-      throw new Error(
-        "[real-router] CloneNamespace: applyConfig not initialized",
-      );
-    }
-
-    return this.#applyConfigStore;
   }
 
   // =========================================================================
@@ -96,14 +77,10 @@ export class CloneNamespace<
   }
 
   /**
-   * Sets the cloning functions.
+   * Sets the function to collect clone data.
    */
-  setCallbacks(
-    getCloneData: () => CloneData<Dependencies>,
-    applyConfig: ApplyConfigFn<Dependencies>,
-  ): void {
+  setGetCloneData(getCloneData: () => CloneData<Dependencies>): void {
     this.#getCloneDataStore = getCloneData;
-    this.#applyConfigStore = applyConfig;
   }
 
   /**
@@ -111,10 +88,12 @@ export class CloneNamespace<
    *
    * @param dependencies - Optional new dependencies for the cloned router
    * @param factory - Factory function to create the new router instance
+   * @param applyConfig - Function to apply route config to the new router
    */
   clone(
     dependencies: Dependencies | undefined,
     factory: RouterFactory<Dependencies>,
+    applyConfig: ApplyConfigFn<Dependencies>,
   ): Router<Dependencies> {
     // Collect all data from source router
     const data = this.#getCloneData();
@@ -148,7 +127,7 @@ export class CloneNamespace<
     }
 
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
-    this.#applyConfig(newRouter, data.routeConfig, data.resolvedForwardMap);
+    applyConfig(newRouter, data.routeConfig, data.resolvedForwardMap);
 
     return newRouter;
   }

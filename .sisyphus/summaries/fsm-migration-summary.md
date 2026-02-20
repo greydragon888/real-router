@@ -4,7 +4,7 @@
 
 Полный перевод ядра роутера с ручного управления состоянием через булевые флаги (`#started`, `#active`, `#navigating`) и прямые вызовы событий на **детерминированное управление через единый конечный автомат** (FSM). Все жизненные события роутера — следствие FSM-переходов, а не ручных вызовов.
 
-**40 коммитов, 100 файлов, +4676/-1590 строк, 4150 тестов, 100% coverage.**
+**41 коммит, 100 файлов, +4693/-1641 строк, 4150 тестов, 100% coverage.**
 
 ---
 
@@ -166,12 +166,13 @@ fsm.on("idle", "FETCH", (payload) => {
 
 | Метод | Назначение |
 |-------|-----------|
-| `#setupCloneCallbacks()` | Clone lambda, замыкание на приватные поля других Router instances |
 | `#markDisposed()` | Перезапись 23 методов на throw ROUTER_DISPOSED |
 | `static #suppressUnhandledRejection()` | Fire-and-forget safety |
 | `static #onSuppressedError` | Кэшированный callback (одна аллокация на класс) |
 
 **Перенесены в EventBusNamespace**: `#setupFSMActions()`, `#cancelTransitionIfRunning()`.
+**Перенесены в RouterWiringBuilder**: `getCloneData` callback из `#setupCloneCallbacks()`.
+**Инлайнено в `clone()`**: `applyConfig` callback (same-class private field access).
 
 ### Декомпозиция `#setupDependencies()` → Builder+Director
 
@@ -180,21 +181,19 @@ fsm.on("idle", "FETCH", (payload) => {
 1. **Этап 1** (6e54b23): Монолитный метод (275 строк) → 11 приватных методов в Router.ts
 2. **Этап 2** (47c7a5b, 254c8d9): 9 из 11 методов извлечены в `src/wiring/` — паттерн Builder+Director
 
-**`RouterWiringBuilder`** (275 строк, 9 public-методов):
-`wireLimits` → `wireRouteLifecycleDeps` → `wireRoutesDeps` → `wireMiddlewareDeps` → `wirePluginsDeps` → `wireNavigationDeps` (97 строк, самый большой) → `wireLifecycleDeps` → `wireStateDeps` → `wireCyclicDeps`
+**`RouterWiringBuilder`** (296 строк, 10 public-методов):
+`wireLimits` → `wireRouteLifecycleDeps` → `wireRoutesDeps` → `wireMiddlewareDeps` → `wirePluginsDeps` → `wireNavigationDeps` (97 строк, самый большой) → `wireLifecycleDeps` → `wireStateDeps` → `wireCloneCallbacks` → `wireCyclicDeps`
 
-**`wireRouter(builder)`** — director-функция, вызывает методы в правильном порядке (28 строк).
+**`wireRouter(builder)`** — director-функция, вызывает методы в правильном порядке (29 строк).
 
 **`WiringOptions<Dependencies>`** — options bag: все namespace'ы, `eventBus: EventBusNamespace`, router.
-
-**Остаётся в Router.ts**:
-- `#setupCloneCallbacks()` — clone lambda, замыкание на приватные поля других Router instances
 
 **Ordering constraints**:
 - `wireRouteLifecycleDeps()` до `wireRoutesDeps()` — Routes setup регистрирует pending `canActivate` handlers
 - `wireCyclicDeps()` последний — резолвит циклические зависимости Navigation ⇄ Lifecycle
+- `wireCloneCallbacks()` — без ограничений порядка (lazy callbacks, вызываются в момент `clone()`)
 
-Router.ts: 1585 → 1366 → 1249 → 1209 строк (-376 итого).
+Router.ts: 1585 → 1366 → 1249 → 1209 → 1176 строк (-409 итого).
 
 ### DI-зависимости — изменения
 
@@ -465,7 +464,7 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 - `packages/core/src/fsm/routerFSM.ts` — config, types, factory, `routerStates`/`routerEvents`
 - `packages/core/src/fsm/index.ts` — barrel exports
-- `packages/core/src/wiring/RouterWiringBuilder.ts` — Builder: 9 wire-методов (221 строк)
+- `packages/core/src/wiring/RouterWiringBuilder.ts` — Builder: 10 wire-методов (242 строки)
 - `packages/core/src/wiring/wireRouter.ts` — Director: вызов методов в правильном порядке
 - `packages/core/src/wiring/types.ts` — `WiringOptions<Dependencies>` interface
 - `packages/core/src/wiring/index.ts` — barrel exports
@@ -487,7 +486,7 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 ### Изменены (production)
 
-- `Router.ts` — FSM интеграция, dispose(), wiring extraction, EventBusNamespace, guard delegation (1585→1209 строк), async/throw
+- `Router.ts` — FSM интеграция, dispose(), wiring extraction, EventBusNamespace, guard delegation, clone refactor (1585→1176 строк), async/throw
 - `RouteLifecycleNamespace.ts` — `addCanActivate`/`addCanDeactivate` encapsulate state-dependent validation, 9 dead methods removed
 - `NavigationNamespace.ts` — decomposed, FSM DI, async/throw, no duration
 - `NavigationNamespace/transition/index.ts` — Set→includes
@@ -517,10 +516,10 @@ Recursion depth guard в ObservableNamespace — убран вместе с name
 
 | Метрика | Значение |
 |---------|----------|
-| Коммитов | 40 |
+| Коммитов | 41 |
 | Файлов изменено | 100 |
-| Строк | +4676 / -1590 (net +3086) |
+| Строк | +4693 / -1641 (net +3052) |
 | Тестов | 4150 (core: 2287, fsm: 40, event-emitter: 50) |
 | Coverage | 100% |
-| Router.ts | 1585 → 1209 строк (-376) |
+| Router.ts | 1585 → 1176 строк (-409) |
 | Bundle size | 86.2 KB raw / 22.4 KB gzip |
