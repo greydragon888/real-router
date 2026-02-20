@@ -292,7 +292,7 @@ describe("Browser Plugin", async () => {
       await router.start();
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
-        router.getState(),
+        expect.objectContaining({ name: "index", params: {}, path: "/" }),
         "",
         "/",
       );

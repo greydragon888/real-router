@@ -1,4 +1,5 @@
 // packages/core/src/Router.ts
+/* eslint-disable unicorn/prefer-event-target -- custom EventEmitter package, not Node.js EventEmitter */
 
 /**
  * Router class - facade with integrated namespaces.
@@ -7,15 +8,18 @@
  */
 
 import { logger } from "@real-router/logger";
+import { EventEmitter } from "event-emitter";
 import { validateRouteName } from "type-guards";
 
+import { errorCodes } from "./constants";
+import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   CloneNamespace,
   DependenciesNamespace,
+  EventBusNamespace,
   MiddlewareNamespace,
   NavigationNamespace,
-  ObservableNamespace,
   OptionsNamespace,
   PluginsNamespace,
   RouteLifecycleNamespace,
@@ -23,26 +27,21 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
+import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
+import { RouterWiringBuilder, wireRouter } from "./wiring";
 
-import type { EventMethodMap } from "./namespaces";
-import type { MiddlewareDependencies } from "./namespaces/MiddlewareNamespace";
-import type {
-  NavigationDependencies,
-  TransitionDependencies,
-} from "./namespaces/NavigationNamespace";
-import type { PluginsDependencies } from "./namespaces/PluginsNamespace";
-import type { RouteLifecycleDependencies } from "./namespaces/RouteLifecycleNamespace";
-import type { RouterLifecycleDependencies } from "./namespaces/RouterLifecycleNamespace";
-import type { RoutesDependencies } from "./namespaces/RoutesNamespace";
 import type {
   ActivationFnFactory,
+  EventMethodMap,
   Limits,
   MiddlewareFactory,
   PluginFactory,
   Route,
   RouteConfigUpdate,
+  RouterEventMap,
 } from "./types";
 import type {
   DefaultDependencies,
@@ -66,7 +65,7 @@ import type { CreateMatcherOptions } from "route-tree";
  * All functionality is provided by namespace classes:
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesNamespace: get/set/remove dependencies
- * - ObservableNamespace: event listeners, subscribe
+ * - EventEmitter: event listeners, subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
@@ -90,7 +89,6 @@ export class Router<
   readonly #options: OptionsNamespace;
   readonly #limits: Limits;
   readonly #dependencies: DependenciesNamespace<Dependencies>;
-  readonly #observable: ObservableNamespace;
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
   readonly #routeLifecycle: RouteLifecycleNamespace<Dependencies>;
@@ -99,6 +97,8 @@ export class Router<
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
   readonly #clone: CloneNamespace<Dependencies>;
+
+  readonly #eventBus: EventBusNamespace;
 
   /**
    * When true, skips argument validation in public methods for production performance.
@@ -158,7 +158,6 @@ export class Router<
     this.#options = new OptionsNamespace(options);
     this.#limits = createLimits(options.limits);
     this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
-    this.#observable = new ObservableNamespace();
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
@@ -174,10 +173,45 @@ export class Router<
     this.#noValidate = noValidate;
 
     // =========================================================================
-    // Setup Dependencies
+    // Initialize EventBus
     // =========================================================================
 
-    this.#setupDependencies();
+    const routerFSM = createRouterFSM();
+    const emitter = new EventEmitter<RouterEventMap>({
+      onListenerError: (eventName, error) => {
+        logger.error("Router", `Error in listener for ${eventName}:`, error);
+      },
+      onListenerWarn: (eventName, count) => {
+        logger.warn(
+          "router.addEventListener",
+          `Event "${eventName}" has ${count} listeners — possible memory leak`,
+        );
+      },
+    });
+
+    this.#eventBus = new EventBusNamespace({ routerFSM, emitter });
+
+    // =========================================================================
+    // Wire Dependencies
+    // =========================================================================
+
+    wireRouter(
+      new RouterWiringBuilder<Dependencies>({
+        router: this,
+        options: this.#options,
+        limits: this.#limits,
+        dependencies: this.#dependencies,
+        state: this.#state,
+        routes: this.#routes,
+        routeLifecycle: this.#routeLifecycle,
+        middleware: this.#middleware,
+        plugins: this.#plugins,
+        navigation: this.#navigation,
+        lifecycle: this.#lifecycle,
+        clone: this.#clone,
+        eventBus: this.#eventBus,
+      }),
+    );
 
     // =========================================================================
     // Bind Public Methods
@@ -219,6 +253,7 @@ export class Router<
     this.isActive = this.isActive.bind(this);
     this.start = this.start.bind(this);
     this.stop = this.stop.bind(this);
+    this.dispose = this.dispose.bind(this);
 
     // Route Lifecycle (Guards)
     this.addActivateGuard = this.addActivateGuard.bind(this);
@@ -301,7 +336,7 @@ export class Router<
     const canRemove = this.#routes.validateRemoveRoute(
       name,
       this.#state.get()?.name,
-      this.#navigation.isNavigating(),
+      this.#eventBus.isTransitioning(),
     );
 
     if (!canRemove) {
@@ -322,10 +357,10 @@ export class Router<
   }
 
   clearRoutes(): this {
+    const isNavigating = this.#eventBus.isTransitioning();
+
     // Validate operation can proceed
-    const canClear = this.#routes.validateClearRoutes(
-      this.#navigation.isNavigating(),
-    );
+    const canClear = this.#routes.validateClearRoutes(isNavigating);
 
     if (!canClear) {
       return this;
@@ -388,7 +423,7 @@ export class Router<
     }
 
     // Warn if navigation is in progress
-    if (this.#navigation.isNavigating()) {
+    if (this.#eventBus.isTransitioning()) {
       logger.error(
         "router.updateRoute",
         `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
@@ -626,23 +661,69 @@ export class Router<
   // ============================================================================
 
   isActive(): boolean {
-    return this.#lifecycle.isActive();
+    return this.#eventBus.isActive();
   }
 
-  start(startPath: string): Promise<State> {
+  async start(startPath: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
-    // Forward to lifecycle namespace
-    return this.#lifecycle.start(startPath);
+    if (!this.#eventBus.canStart()) {
+      throw CACHED_ALREADY_STARTED_ERROR;
+    }
+
+    this.#eventBus.sendStart();
+
+    try {
+      return await this.#lifecycle.start(startPath);
+    } catch (error) {
+      if (this.#eventBus.isReady()) {
+        this.#lifecycle.stop();
+        this.#eventBus.sendStop();
+      }
+
+      throw error;
+    }
   }
 
   stop(): this {
+    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
+
+    if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
+      return this;
+    }
+
     this.#lifecycle.stop();
+    this.#eventBus.sendStop();
 
     return this;
+  }
+
+  dispose(): void {
+    if (this.#eventBus.isDisposed()) {
+      return;
+    }
+
+    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
+
+    if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
+      this.#lifecycle.stop();
+      this.#eventBus.sendStop();
+    }
+
+    this.#eventBus.sendDispose();
+    this.#eventBus.clearAll();
+
+    this.#plugins.disposeAll();
+    this.#middleware.clearAll();
+    this.#routes.clearRoutes();
+    this.#routeLifecycle.clearAll();
+    this.#state.reset();
+    this.#dependencies.reset();
+
+    this.#markDisposed();
   }
 
   // ============================================================================
@@ -654,37 +735,17 @@ export class Router<
     canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
-      // 1. Validate input
       validateRouteName(name, "addDeactivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canDeactivateHandler,
         "addDeactivateGuard",
       );
-
-      // 2. Validate not registering
-      RouteLifecycleNamespace.validateNotRegistering(
-        this.#routeLifecycle.isRegistering(name),
-        name,
-        "addDeactivateGuard",
-      );
     }
 
-    // 3. Check if overwrite and validate limit
-    const isOverwrite = this.#routeLifecycle.hasCanDeactivate(name);
-
-    if (!isOverwrite && !this.#noValidate) {
-      RouteLifecycleNamespace.validateHandlerLimit(
-        this.#routeLifecycle.countCanDeactivate() + 1,
-        "addDeactivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
-
-    // 4. Execute
-    this.#routeLifecycle.registerCanDeactivate(
+    this.#routeLifecycle.addCanDeactivate(
       name,
       canDeactivateHandler,
-      isOverwrite,
+      this.#noValidate,
     );
 
     return this;
@@ -695,37 +756,17 @@ export class Router<
     canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
-      // 1. Validate input
       validateRouteName(name, "addActivateGuard");
       RouteLifecycleNamespace.validateHandler(
         canActivateHandler,
         "addActivateGuard",
       );
-
-      // 2. Validate not registering
-      RouteLifecycleNamespace.validateNotRegistering(
-        this.#routeLifecycle.isRegistering(name),
-        name,
-        "addActivateGuard",
-      );
     }
 
-    // 3. Check if overwrite and validate limit
-    const isOverwrite = this.#routeLifecycle.hasCanActivate(name);
-
-    if (!isOverwrite && !this.#noValidate) {
-      RouteLifecycleNamespace.validateHandlerLimit(
-        this.#routeLifecycle.countCanActivate() + 1,
-        "addActivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
-
-    // 4. Execute
-    this.#routeLifecycle.registerCanActivate(
+    this.#routeLifecycle.addCanActivate(
       name,
       canActivateHandler,
-      isOverwrite,
+      this.#noValidate,
     );
 
     return this;
@@ -937,7 +978,7 @@ export class Router<
   }
 
   // ============================================================================
-  // Events (backed by ObservableNamespace)
+  // Events (backed by EventEmitter)
   // ============================================================================
 
   addEventListener<E extends EventName>(
@@ -945,10 +986,22 @@ export class Router<
     cb: Plugin[EventMethodMap[E]],
   ): Unsubscribe {
     if (!this.#noValidate) {
-      ObservableNamespace.validateListenerArgs(eventName, cb);
+      EventBusNamespace.validateListenerArgs(eventName, cb);
     }
 
-    return this.#observable.addEventListener(eventName, cb);
+    return this.#eventBus.addEventListener(eventName, cb);
+  }
+
+  // ============================================================================
+  // Subscription (backed by EventEmitter)
+  // ============================================================================
+
+  subscribe(listener: SubscribeFn): Unsubscribe {
+    if (!this.#noValidate) {
+      EventBusNamespace.validateSubscribeListener(listener);
+    }
+
+    return this.#eventBus.subscribe(listener);
   }
 
   // ============================================================================
@@ -980,7 +1033,15 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    return this.#navigation.navigate(routeName, routeParams ?? {}, opts);
+    const promiseState = this.#navigation.navigate(
+      routeName,
+      routeParams ?? {},
+      opts,
+    );
+
+    Router.#suppressUnhandledRejection(promiseState);
+
+    return promiseState;
   }
 
   navigateToDefault(): Promise<State>;
@@ -999,46 +1060,23 @@ export class Router<
     }
 
     // 3. Execute navigation with parsed arguments
-    return this.#navigation.navigateToDefault(opts);
+    const promiseState = this.#navigation.navigateToDefault(opts);
+
+    Router.#suppressUnhandledRejection(promiseState);
+
+    return promiseState;
   }
 
   navigateToState(
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-    emitSuccess: boolean,
   ): Promise<State> {
     if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateToStateArgs(
-        toState,
-        fromState,
-        opts,
-        emitSuccess,
-      );
+      NavigationNamespace.validateNavigateToStateArgs(toState, fromState, opts);
     }
 
-    return this.#navigation.navigateToState(
-      toState,
-      fromState,
-      opts,
-      emitSuccess,
-    );
-  }
-
-  cancel(): void {
-    this.#navigation.cancel();
-  }
-
-  // ============================================================================
-  // Subscription (backed by ObservableNamespace)
-  // ============================================================================
-
-  subscribe(listener: SubscribeFn): Unsubscribe {
-    if (!this.#noValidate) {
-      ObservableNamespace.validateSubscribeListener(listener);
-    }
-
-    return this.#observable.subscribe(listener);
+    return this.#navigation.navigateToState(toState, fromState, opts);
   }
 
   // ============================================================================
@@ -1054,204 +1092,71 @@ export class Router<
       dependencies,
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
+      (newRouter, config, resolvedForwardMap) => {
+        const typedRouter = newRouter as unknown as Router<Dependencies>;
+
+        typedRouter.#routes.applyClonedConfig(config, resolvedForwardMap);
+      },
     );
   }
-
-  // ============================================================================
-  // Private Methods
-  // ============================================================================
 
   /**
-   * Sets up dependencies between namespaces.
-   * Called once in constructor after all namespaces are created.
+   * Pre-allocated callback for #suppressUnhandledRejection.
+   * Avoids creating a new closure on every navigate() call.
    */
-  #setupDependencies(): void {
-    // Set limits for all namespaces that use them
-    this.#dependencies.setLimits(this.#limits);
-    this.#plugins.setLimits(this.#limits);
-    this.#middleware.setLimits(this.#limits);
-    this.#observable.setLimits(this.#limits);
-    this.#routeLifecycle.setLimits(this.#limits);
+  static readonly #onSuppressedError = (error: unknown): void => {
+    if (
+      error instanceof RouterError &&
+      (error.code === errorCodes.SAME_STATES ||
+        error.code === errorCodes.TRANSITION_CANCELLED ||
+        error.code === errorCodes.ROUTER_NOT_STARTED ||
+        error.code === errorCodes.ROUTE_NOT_FOUND)
+    ) {
+      return;
+    }
 
-    // RouteLifecycleNamespace must be set up FIRST because RoutesNamespace.setDependencies()
-    // will register pending canActivate handlers which need RouteLifecycleNamespace
-    this.#routeLifecycle.setRouter(this);
+    logger.error("router.navigate", "Unexpected navigation error", error);
+  };
 
-    // RouteLifecycleNamespace uses function injection for getDependency
-    const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.#dependencies.get(dependencyName),
-    };
-
-    this.#routeLifecycle.setDependencies(routeLifecycleDeps);
-
-    // RoutesNamespace uses function injection (will register pending canActivate handlers)
-    // Use facade method for proper validation
-
-    const routesDeps: RoutesDependencies<Dependencies> = {
-      addActivateGuard: (name, handler) => {
-        this.addActivateGuard(name, handler);
-      },
-      addDeactivateGuard: (name, handler) => {
-        this.addDeactivateGuard(name, handler);
-      },
-      makeState: (name, params, path, meta) =>
-        this.#state.makeState(name, params, path, meta),
-      getState: () => this.#state.get(),
-      areStatesEqual: (state1, state2, ignoreQueryParams) =>
-        this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
-      getDependency: (name) => this.#dependencies.get(name),
-      forwardState: (name, params) => this.forwardState(name, params),
-    };
-
-    this.#routes.setDependencies(routesDeps);
-    this.#routes.setLifecycleNamespace(this.#routeLifecycle);
-
-    this.#middleware.setRouter(this);
-
-    // MiddlewareNamespace uses function injection for getDependency
-    const middlewareDeps: MiddlewareDependencies<Dependencies> = {
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.#dependencies.get(dependencyName),
-    };
-
-    this.#middleware.setDependencies(middlewareDeps);
-
-    this.#plugins.setRouter(this);
-
-    // PluginsNamespace uses function injection for internal @internal method calls
-    const pluginsDeps: PluginsDependencies<Dependencies> = {
-      addEventListener: (eventName, cb) =>
-        this.#observable.addEventListener(eventName, cb),
-      isStarted: () => this.#lifecycle.isStarted(),
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.#dependencies.get(dependencyName),
-    };
-
-    this.#plugins.setDependencies(pluginsDeps);
-
-    // NavigationNamespace uses function injection
-    const navigationDeps: NavigationDependencies = {
-      getOptions: () => this.#options.get(),
-      hasRoute: (name) => this.#routes.hasRoute(name),
-      getState: () => this.#state.get(),
-      setState: (state) => {
-        this.#state.set(state);
-      },
-      buildStateWithSegments: (routeName, routeParams) => {
-        // Call forwardState to allow plugin interception
-        const { name, params } = this.forwardState(routeName, routeParams);
-
-        return this.#routes.buildStateWithSegmentsResolved(name, params);
-      },
-      makeState: (name, params, path, meta) =>
-        this.#state.makeState(name, params, path, meta),
-      buildPath: (route, params) =>
-        this.#routes.buildPath(route, params, this.#options.get()),
-      areStatesEqual: (state1, state2, ignoreQueryParams) =>
-        this.#state.areStatesEqual(state1, state2, ignoreQueryParams),
-      invokeEventListeners: (eventName, toState, fromState, arg) => {
-        this.#observable.invoke(eventName, toState, fromState, arg);
-      },
-      getDependency: (name: string) =>
-        this.#dependencies.get(name as keyof Dependencies),
-    };
-
-    this.#navigation.setDependencies(navigationDeps);
-
-    const transitionDeps: TransitionDependencies = {
-      getLifecycleFunctions: () => this.#routeLifecycle.getFunctions(),
-      getMiddlewareFunctions: () => this.#middleware.getFunctions(),
-      isActive: () => this.#lifecycle.isActive(),
-      clearCanDeactivate: (name) => {
-        this.#routeLifecycle.clearCanDeactivate(name);
-      },
-    };
-
-    this.#navigation.setTransitionDependencies(transitionDeps);
-
-    // RouterLifecycleNamespace uses function injection
-    // Use facade methods to ensure spies work and plugin interception is possible
-    const lifecycleDeps: RouterLifecycleDependencies = {
-      getOptions: () => this.#options.get(),
-      hasListeners: (eventName) => this.#observable.hasListeners(eventName),
-      invokeEventListeners: (eventName, toState, fromState, arg) => {
-        this.#observable.invoke(eventName, toState, fromState, arg);
-      },
-      makeNotFoundState: (path, options) =>
-        this.#state.makeNotFoundState(path, options),
-      setState: (state) => {
-        this.#state.set(state);
-      },
-      // RouterLifecycleNamespace only uses matchPath without source parameter
-      matchPath: (path, source?: string) =>
-        this.#routes.matchPath(path, source, this.#options.get()),
-    };
-
-    this.#lifecycle.setDependencies(lifecycleDeps);
-
-    // StateNamespace needs access to route config and path building
-    this.#state.setDependencies({
-      getDefaultParams: () => this.#routes.getConfig().defaultParams,
-      buildPath: (name, params) =>
-        this.#routes.buildPath(name, params, this.#options.get()),
-      getUrlParams: (name) => this.#routes.getUrlParams(name),
-    });
-
-    // =========================================================================
-    // Setup cyclic dependencies via functional references
-    // =========================================================================
-    // Navigation → RouterLifecycle.isStarted() (check before navigation)
-    // RouterLifecycle → Navigation.navigateToState() (for start transitions)
-    // =========================================================================
-
-    this.#navigation.isRouterStarted = () => this.#lifecycle.isStarted();
-
-    // Use facade method so tests can spy on router.navigateToState
-    this.#lifecycle.navigateToState = (
-      toState: State,
-      fromState: State | undefined,
-      opts: NavigationOptions,
-      emitSuccess: boolean,
-    ) =>
-      this.#navigation.navigateToState(toState, fromState, opts, emitSuccess);
-
-    // CloneNamespace needs access to collect cloning data and apply config
-    this.#clone.setCallbacks(
-      // getCloneData: collect all data needed for cloning
-      () => {
-        const [canDeactivateFactories, canActivateFactories] =
-          this.#routeLifecycle.getFactories();
-
-        return {
-          routes: this.#routes.cloneRoutes(),
-          options: { ...this.#options.get() },
-          dependencies: this.#dependencies.getAll(),
-          canDeactivateFactories,
-          canActivateFactories,
-          middlewareFactories: this.#middleware.getFactories(),
-          pluginFactories: this.#plugins.getAll(),
-          routeConfig: this.#routes.getConfig(),
-          resolvedForwardMap: this.#routes.getResolvedForwardMap(),
-        };
-      },
-      // applyConfig: apply route config to new router
-      (newRouter, config, resolvedForwardMap) => {
-        // Access new router's internal config via type assertion
-        // This is safe because we know the newRouter is a Router instance
-        const typedRouter = newRouter as unknown as Router<Dependencies>;
-        const newConfig = typedRouter.#routes.getConfig();
-
-        Object.assign(newConfig.decoders, config.decoders);
-        Object.assign(newConfig.encoders, config.encoders);
-        Object.assign(newConfig.defaultParams, config.defaultParams);
-        Object.assign(newConfig.forwardMap, config.forwardMap);
-        Object.assign(newConfig.forwardFnMap, config.forwardFnMap);
-
-        typedRouter.#routes.setResolvedForwardMap({ ...resolvedForwardMap });
-      },
-    );
+  /**
+   * Fire-and-forget safety: prevents unhandled rejection warnings
+   * when navigate/navigateToDefault is called without await.
+   * Expected errors are silently suppressed; unexpected ones are logged.
+   */
+  static #suppressUnhandledRejection(promise: Promise<State>): void {
+    promise.catch(Router.#onSuppressedError);
   }
+
+  #markDisposed(): void {
+    this.navigate = throwDisposed as never;
+    this.navigateToDefault = throwDisposed as never;
+    this.navigateToState = throwDisposed as never;
+    this.start = throwDisposed as never;
+    this.stop = throwDisposed as never;
+    this.addRoute = throwDisposed as never;
+    this.removeRoute = throwDisposed as never;
+    this.clearRoutes = throwDisposed as never;
+    this.updateRoute = throwDisposed as never;
+    this.addActivateGuard = throwDisposed as never;
+    this.addDeactivateGuard = throwDisposed as never;
+    this.removeActivateGuard = throwDisposed as never;
+    this.removeDeactivateGuard = throwDisposed as never;
+    this.usePlugin = throwDisposed as never;
+    this.useMiddleware = throwDisposed as never;
+    this.setDependency = throwDisposed as never;
+    this.setDependencies = throwDisposed as never;
+    this.removeDependency = throwDisposed as never;
+    this.resetDependencies = throwDisposed as never;
+    this.addEventListener = throwDisposed as never;
+    this.subscribe = throwDisposed as never;
+    this.setRootPath = throwDisposed as never;
+    this.clone = throwDisposed as never;
+    this.canNavigateTo = throwDisposed as never;
+  }
+}
+
+function throwDisposed(): never {
+  throw new RouterError(errorCodes.ROUTER_DISPOSED);
 }
 
 /**
@@ -1265,7 +1170,7 @@ function deriveMatcherOptions(
     strictTrailingSlash: options.trailingSlash === "strict",
     strictQueryParams: options.queryParamsMode === "strict",
     urlParamsEncoding: options.urlParamsEncoding,
-    /* v8 ignore next -- @preserve branch: queryParams always set via defaultOptions */
-    queryParams: options.queryParams ?? {},
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    queryParams: options.queryParams!,
   };
 }

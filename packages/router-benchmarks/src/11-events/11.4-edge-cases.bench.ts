@@ -143,7 +143,7 @@ const BATCH = 50;
   }).gc("inner");
 }
 
-// 11.4.11 Invoking events on navigation cancel
+// 11.4.11 Invoking events on navigation cancel (via stop + restart)
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
@@ -159,7 +159,8 @@ if (!IS_ROUTER5) {
   bench("11.4.11 Invoking events on navigation cancel", () => {
     void router.navigate("about");
 
-    router.cancel();
+    router.stop();
+    router.start("/");
     // events should be ["START", "CANCEL"]
   }).gc("inner");
 }

@@ -45,26 +45,12 @@ export class StateNamespace {
   /**
    * Dependencies injected from Router.
    */
-  #depsStore: StateNamespaceDependencies | undefined;
+  #deps!: StateNamespaceDependencies;
 
   /**
    * Cache for URL params by route name.
    */
   readonly #urlParamsCache = new Map<string, string[]>();
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): StateNamespaceDependencies {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] StateNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -165,15 +151,7 @@ export class StateNamespace {
 
     // If state is already frozen (from makeState()), use it directly.
     // For external states, freeze in place without cloning.
-    if (!state) {
-      this.#frozenState = undefined;
-    } else if (Object.isFrozen(state)) {
-      // State is already frozen (typically from makeState)
-      this.#frozenState = state;
-    } else {
-      // External state - freeze in place without cloning.
-      this.#frozenState = freezeStateInPlace(state);
-    }
+    this.#frozenState = state ? freezeStateInPlace(state) : undefined;
   }
 
   /**
@@ -185,6 +163,13 @@ export class StateNamespace {
     return this.#previousState as State<P, MP> | undefined;
   }
 
+  reset(): void {
+    this.#frozenState = undefined;
+    this.#previousState = undefined;
+    this.#urlParamsCache.clear();
+    this.#stateId = 0;
+  }
+
   // =========================================================================
   // Dependency Injection
   // =========================================================================
@@ -194,7 +179,7 @@ export class StateNamespace {
    * Must be called before using makeState, areStatesEqual, etc.
    */
   setDependencies(deps: StateNamespaceDependencies): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   // =========================================================================

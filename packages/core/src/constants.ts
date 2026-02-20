@@ -1,6 +1,7 @@
 // packages/real-router/modules/constants.ts
 
 import type {
+  EventName,
   EventToNameMap,
   EventToPluginMap,
   ErrorCodeToValueMap,
@@ -33,6 +34,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   CANNOT_ACTIVATE: "CANNOT_ACTIVATE", // canActivate guard blocked navigation
   TRANSITION_ERR: "TRANSITION_ERR", // Generic transition failure
   TRANSITION_CANCELLED: "CANCELLED", // Navigation cancelled by user or new navigation
+  ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
 });
 
 /**
@@ -70,6 +72,18 @@ export const events: EventToNameMap = {
 };
 
 /**
+ * Valid event names for validation.
+ */
+export const validEventNames = new Set<EventName>([
+  events.ROUTER_START,
+  events.TRANSITION_START,
+  events.TRANSITION_SUCCESS,
+  events.TRANSITION_ERROR,
+  events.TRANSITION_CANCEL,
+  events.ROUTER_STOP,
+]);
+
+/**
  * Default limits configuration for the router.
  * These values match the hardcoded constants from the current codebase.
  */
@@ -78,6 +92,7 @@ export const DEFAULT_LIMITS = {
   maxPlugins: 50,
   maxMiddleware: 50,
   maxListeners: 10_000,
+  warnListeners: 1000,
   maxEventDepth: 5,
   maxLifecycleHandlers: 200,
 } as const;
@@ -91,6 +106,7 @@ export const LIMIT_BOUNDS = {
   maxPlugins: { min: 0, max: 1000 },
   maxMiddleware: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
+  warnListeners: { min: 0, max: 100_000 },
   maxEventDepth: { min: 0, max: 100 },
   maxLifecycleHandlers: { min: 0, max: 10_000 },
 } as const;

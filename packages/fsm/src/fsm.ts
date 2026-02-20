@@ -19,6 +19,7 @@ export class FSM<
   #state: TStates;
   #currentTransitions: Partial<Record<TEvents, TStates>>;
   #listenerCount = 0;
+  #actions: Map<string, (payload: unknown) => void> | null = null;
   readonly #context: TContext;
   readonly #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
   readonly #listeners: (TransitionListener<
@@ -51,6 +52,14 @@ export class FSM<
     this.#state = nextState;
     this.#currentTransitions = this.#transitions[nextState];
 
+    if (this.#actions !== null) {
+      const action = this.#actions.get(`${from}\0${event}`);
+
+      if (action !== undefined) {
+        action(args[0]);
+      }
+    }
+
     if (this.#listenerCount > 0) {
       const info: TransitionInfo<TStates, TEvents, TPayloadMap> = {
         from,
@@ -69,12 +78,33 @@ export class FSM<
     return this.#state;
   }
 
+  canSend(event: TEvents): boolean {
+    return this.#currentTransitions[event] !== undefined;
+  }
+
   getState(): TStates {
     return this.#state;
   }
 
   getContext(): TContext {
     return this.#context;
+  }
+
+  on<E extends TEvents>(
+    from: TStates,
+    event: E,
+    action: E extends keyof TPayloadMap
+      ? (payload: TPayloadMap[E]) => void
+      : () => void,
+  ): () => void {
+    this.#actions ??= new Map();
+    const key = `${from}\0${event}`;
+
+    this.#actions.set(key, action as (payload: unknown) => void);
+
+    return () => {
+      this.#actions?.delete(key);
+    };
   }
 
   onTransition(

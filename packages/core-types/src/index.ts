@@ -17,6 +17,9 @@ export type {
   NavigationOptions,
   Unsubscribe,
   RouterError,
+  TransitionPhase,
+  TransitionReason,
+  TransitionMeta,
 } from "./base";
 
 // Router types (base types without Router dependency)

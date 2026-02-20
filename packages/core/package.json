@@ -56,10 +56,12 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@real-router/fsm": "workspace:^",
     "@real-router/logger": "workspace:^",
     "@real-router/types": "workspace:^"
   },
   "devDependencies": {
+    "event-emitter": "workspace:^",
     "route-tree": "workspace:^",
     "type-guards": "workspace:^"
   }

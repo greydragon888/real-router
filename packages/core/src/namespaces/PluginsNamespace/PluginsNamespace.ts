@@ -30,36 +30,11 @@ export class PluginsNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
+  readonly #unsubscribes = new Set<Unsubscribe>();
 
-  #routerStore: Router<Dependencies> | undefined;
-  #depsStore: PluginsDependencies<Dependencies> | undefined;
+  #router!: Router<Dependencies>;
+  #deps!: PluginsDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
-
-  /**
-   * Gets router or throws if not initialized.
-   */
-  get #router(): Router<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: router always set by Router.ts */
-    if (!this.#routerStore) {
-      throw new Error("[real-router] PluginsNamespace: router not initialized");
-    }
-
-    return this.#routerStore;
-  }
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): PluginsDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] PluginsNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -103,11 +78,11 @@ export class PluginsNamespace<
   // =========================================================================
 
   setRouter(router: Router<Dependencies>): void {
-    this.#routerStore = router;
+    this.#router = router;
   }
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   setLimits(limits: Limits): void {
@@ -146,19 +121,24 @@ export class PluginsNamespace<
 
       let unsubscribed = false;
 
-      return () => {
+      const unsubscribe: Unsubscribe = () => {
         if (unsubscribed) {
           return;
         }
 
         unsubscribed = true;
         this.#plugins.delete(factory);
+        this.#unsubscribes.delete(unsubscribe);
         try {
           cleanup();
         } catch (error) {
           logger.error(LOGGER_CONTEXT, "Error during cleanup:", error);
         }
       };
+
+      this.#unsubscribes.add(unsubscribe);
+
+      return unsubscribe;
     }
 
     // Deduplicate batch with warning (validation already done by facade)
@@ -198,12 +178,13 @@ export class PluginsNamespace<
     // Return unsubscribe function
     let unsubscribed = false;
 
-    return () => {
+    const unsubscribe: Unsubscribe = () => {
       if (unsubscribed) {
         return;
       }
 
       unsubscribed = true;
+      this.#unsubscribes.delete(unsubscribe);
 
       for (const { factory } of initializedPlugins) {
         this.#plugins.delete(factory);
@@ -217,6 +198,10 @@ export class PluginsNamespace<
         }
       }
     };
+
+    this.#unsubscribes.add(unsubscribe);
+
+    return unsubscribe;
   }
 
   /**
@@ -232,6 +217,15 @@ export class PluginsNamespace<
    */
   has(factory: PluginFactory<Dependencies>): boolean {
     return this.#plugins.has(factory);
+  }
+
+  disposeAll(): void {
+    for (const unsubscribe of this.#unsubscribes) {
+      unsubscribe();
+    }
+
+    this.#plugins.clear();
+    this.#unsubscribes.clear();
   }
 
   // =========================================================================
@@ -302,7 +296,7 @@ export class PluginsNamespace<
             ),
           );
 
-          if (methodName === "onStart" && this.#deps.isStarted()) {
+          if (methodName === "onStart" && this.#deps.canNavigate()) {
             logger.warn(
               LOGGER_CONTEXT,
               "Router already started, onStart will not be called",

@@ -9,12 +9,21 @@ import {
   validateNavigateToStateArgs,
   validateNavigationOptions,
 } from "./validators";
-import { events, errorCodes, constants } from "../../constants";
+import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { resolveOption } from "../OptionsNamespace";
 
-import type { NavigationDependencies, TransitionDependencies } from "./types";
-import type { NavigationOptions, Params, State } from "@real-router/types";
+import type {
+  NavigationDependencies,
+  TransitionDependencies,
+  TransitionOutput,
+} from "./types";
+import type {
+  NavigationOptions,
+  Params,
+  State,
+  TransitionMeta,
+} from "@real-router/types";
 
 /**
  * Independent namespace for managing navigation.
@@ -26,46 +35,10 @@ export class NavigationNamespace {
   // Functional reference for cyclic dependency
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Functional reference to RouterLifecycleNamespace.isStarted().
-   * Must be set before calling navigate().
-   */
-
-  isRouterStarted!: () => boolean;
-
-  #navigating = false;
-
   // Dependencies injected via setDependencies (replaces full router reference)
-  #depsStore: NavigationDependencies | undefined;
-  #transitionDepsStore: TransitionDependencies | undefined;
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
-  get #deps(): NavigationDependencies {
-    /* v8 ignore next 3 -- @preserve: deps always set by Router.ts */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] NavigationNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
-  }
-
-  /**
-   * Gets transition dependencies or throws if not initialized.
-   */
-  get #transitionDeps(): TransitionDependencies {
-    /* v8 ignore next 3 -- @preserve: transitionDeps always set by Router.ts */
-    if (!this.#transitionDepsStore) {
-      throw new Error(
-        "[real-router] NavigationNamespace: transition dependencies not initialized",
-      );
-    }
-
-    return this.#transitionDepsStore;
-  }
+  #canNavigate!: () => boolean;
+  #deps!: NavigationDependencies;
+  #transitionDeps!: TransitionDependencies;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -80,9 +53,8 @@ export class NavigationNamespace {
     toState: unknown,
     fromState: unknown,
     opts: unknown,
-    emitSuccess: unknown,
   ): void {
-    validateNavigateToStateArgs(toState, fromState, opts, emitSuccess);
+    validateNavigateToStateArgs(toState, fromState, opts);
   }
 
   static validateNavigateToDefaultArgs(opts: unknown): void {
@@ -101,11 +73,19 @@ export class NavigationNamespace {
   // =========================================================================
 
   /**
+   * Sets the canNavigate check (cyclic dependency on EventBusNamespace).
+   * Must be called before using navigate().
+   */
+  setCanNavigate(fn: () => boolean): void {
+    this.#canNavigate = fn;
+  }
+
+  /**
    * Sets dependencies for navigation operations.
    * Must be called before using navigation methods.
    */
   setDependencies(deps: NavigationDependencies): void {
-    this.#depsStore = deps;
+    this.#deps = deps;
   }
 
   /**
@@ -113,7 +93,7 @@ export class NavigationNamespace {
    * Must be called before using navigation methods.
    */
   setTransitionDependencies(deps: TransitionDependencies): void {
-    this.#transitionDepsStore = deps;
+    this.#transitionDeps = deps;
   }
 
   // =========================================================================
@@ -121,173 +101,32 @@ export class NavigationNamespace {
   // =========================================================================
 
   /**
-   * Checks if a navigation transition is currently in progress.
-   */
-  isNavigating(): boolean {
-    return this.isRouterStarted() && this.#navigating;
-  }
-
-  /**
-   * Cancels the current transition if one is in progress.
-   */
-  cancel(): void {
-    this.#navigating = false;
-  }
-
-  /**
-   * Internal navigation function that accepts pre-built state.
-   * Used by RouterLifecycleNamespace for start() transitions.
-   */
-  async navigateToState(
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-    emitSuccess: boolean,
-  ): Promise<State> {
-    const deps = this.#deps;
-    const transitionDeps = this.#transitionDeps;
-
-    // Warn about concurrent navigation (potential SSR race condition)
-    if (this.#navigating) {
-      logger.warn(
-        "router.navigate",
-        "Concurrent navigation detected on shared router instance. " +
-          "For SSR, use router.clone() to create isolated instance per request.",
-      );
-    }
-
-    // Cancel previous transition
-    this.cancel();
-
-    // Set navigating flag BEFORE emitting TRANSITION_START
-    // This ensures isNavigating() returns true during event handlers
-    this.#navigating = true;
-
-    // Emit TRANSITION_START (after navigating flag is set)
-    deps.invokeEventListeners(events.TRANSITION_START, toState, fromState);
-
-    try {
-      const finalState = await transition(
-        transitionDeps,
-        toState,
-        fromState,
-        opts,
-      );
-
-      // Route was already validated in navigate() via buildState().
-      // Since guards can no longer redirect (Issue #55), the state.name cannot change.
-      // However, routes can be dynamically removed during async navigation,
-      // so we do a lightweight check with hasRoute() instead of full buildState().
-      // UNKNOWN_ROUTE is always valid (used for 404 handling).
-      if (
-        finalState.name === constants.UNKNOWN_ROUTE ||
-        deps.hasRoute(finalState.name)
-      ) {
-        deps.setState(finalState);
-
-        // Emit TRANSITION_SUCCESS only if requested
-        if (emitSuccess) {
-          deps.invokeEventListeners(
-            events.TRANSITION_SUCCESS,
-            finalState,
-            fromState,
-            opts,
-          );
-        }
-
-        // State is already frozen from transition module
-        return finalState;
-      } else {
-        // Route was removed during async navigation
-        throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: finalState.name,
-        });
-      }
-    } catch (error) {
-      // Error handling
-      /* v8 ignore next -- @preserve: transition pipeline always wraps errors into RouterError */
-      if (error instanceof RouterError) {
-        if (error.code === errorCodes.TRANSITION_CANCELLED) {
-          deps.invokeEventListeners(
-            events.TRANSITION_CANCEL,
-            toState,
-            fromState,
-          );
-        } else if (error.code === errorCodes.ROUTE_NOT_FOUND) {
-          // ROUTE_NOT_FOUND after successful transition (route removed)
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            undefined,
-            deps.getState(),
-            error,
-          );
-        } else {
-          deps.invokeEventListeners(
-            events.TRANSITION_ERROR,
-            toState,
-            fromState,
-            error,
-          );
-        }
-      } else {
-        /* v8 ignore next 7 -- @preserve: transition pipeline always wraps errors into RouterError */
-        deps.invokeEventListeners(
-          events.TRANSITION_ERROR,
-          toState,
-          fromState,
-          error as RouterError,
-        );
-      }
-
-      throw error;
-    } finally {
-      this.#navigating = false;
-    }
-  }
-
-  /**
    * Navigates to a route by name.
    * Arguments should be pre-parsed and validated by facade.
    */
-  navigate(
+  async navigate(
     name: string,
     params: Params,
     opts: NavigationOptions,
   ): Promise<State> {
+    if (!this.#canNavigate()) {
+      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+    }
+
     const deps = this.#deps;
 
-    // Quick check of the state of the router
-    if (!this.isRouterStarted()) {
-      const err = new RouterError(errorCodes.ROUTER_NOT_STARTED);
-
-      return Promise.reject(err);
-    }
-
-    // build route state with segments (avoids duplicate getSegmentsByName call)
-    let result;
-
-    try {
-      result = deps.buildStateWithSegments(name, params);
-    } catch (error) {
-      return Promise.reject(error as Error);
-    }
+    const result = deps.buildStateWithSegments(name, params);
 
     if (!result) {
       const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
-      deps.invokeEventListeners(
-        events.TRANSITION_ERROR,
-        undefined,
-        deps.getState(),
-        err,
-      );
+      deps.emitTransitionError(undefined, deps.getState(), err);
 
-      return Promise.reject(err);
+      throw err;
     }
 
     const { state: route } = result;
 
-    // create a target state
     const toState = deps.makeState(
       route.name,
       route.params,
@@ -301,7 +140,6 @@ export class NavigationNamespace {
 
     const fromState = deps.getState();
 
-    // Fast verification for the same states
     if (
       !opts.reload &&
       !opts.force &&
@@ -309,56 +147,87 @@ export class NavigationNamespace {
     ) {
       const err = new RouterError(errorCodes.SAME_STATES);
 
-      deps.invokeEventListeners(
-        events.TRANSITION_ERROR,
-        toState,
-        fromState,
-        err,
-      );
+      deps.emitTransitionError(toState, fromState, err);
 
-      const rejection = Promise.reject(err);
-
-      // Suppress unhandled rejection for expected SAME_STATES error
-      rejection.catch(() => {});
-
-      return rejection;
+      throw err;
     }
 
-    // transition execution with TRANSITION_SUCCESS emission
-    // Note: Guards cannot redirect - redirects are handled in middleware only
-    const promise = this.navigateToState(toState, fromState, opts, true); // emitSuccess = true for public navigate()
+    return this.navigateToState(toState, fromState, opts);
+  }
 
-    // Unhandled rejection mitigation: suppress expected errors
-    promise.catch((error: unknown) => {
+  /**
+   * Internal navigation function that accepts pre-built state.
+   * Used by RouterLifecycleNamespace for start() transitions.
+   */
+  async navigateToState(
+    toState: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ): Promise<State> {
+    const deps = this.#deps;
+    const transitionDeps = this.#transitionDeps;
+
+    if (transitionDeps.isTransitioning()) {
+      logger.warn(
+        "router.navigate",
+        "Concurrent navigation detected on shared router instance. " +
+          "For SSR, use router.clone() to create isolated instance per request.",
+      );
+      deps.cancelNavigation();
+    }
+
+    deps.startTransition(toState, fromState);
+
+    try {
+      const { state: finalState, meta: transitionOutput } = await transition(
+        transitionDeps,
+        toState,
+        fromState,
+        opts,
+      );
+
       if (
-        error instanceof RouterError &&
-        (error.code === errorCodes.SAME_STATES ||
-          error.code === errorCodes.TRANSITION_CANCELLED)
+        finalState.name === constants.UNKNOWN_ROUTE ||
+        deps.hasRoute(finalState.name)
       ) {
-        // Expected errors - suppress unhandled rejection warnings
-      } else {
-        // Unexpected errors - log for debugging
-        logger.error("router.navigate", "Unexpected navigation error", error);
-      }
-    });
+        const stateWithTransition = NavigationNamespace.#buildSuccessState(
+          finalState,
+          transitionOutput,
+          fromState,
+        );
 
-    return promise;
+        deps.setState(stateWithTransition);
+        deps.sendTransitionDone(stateWithTransition, fromState, opts);
+
+        return stateWithTransition;
+      } else {
+        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: finalState.name,
+        });
+
+        deps.sendTransitionError(finalState, fromState, err);
+
+        throw err;
+      }
+    } catch (error) {
+      this.#routeTransitionError(error, toState, fromState);
+
+      throw error;
+    }
   }
 
   /**
    * Navigates to the default route if configured.
    * Arguments should be pre-parsed and validated by facade.
    */
-  navigateToDefault(opts: NavigationOptions): Promise<State> {
+  async navigateToDefault(opts: NavigationOptions): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute not configured",
-        }),
-      );
+      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: "defaultRoute not configured",
+      });
     }
 
     const resolvedRoute = resolveOption(
@@ -367,11 +236,9 @@ export class NavigationNamespace {
     );
 
     if (!resolvedRoute) {
-      return Promise.reject(
-        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: "defaultRoute resolved to empty",
-        }),
-      );
+      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+        routeName: "defaultRoute resolved to empty",
+      });
     }
 
     const resolvedParams = resolveOption(
@@ -380,5 +247,63 @@ export class NavigationNamespace {
     );
 
     return this.navigate(resolvedRoute, resolvedParams, opts);
+  }
+
+  // =========================================================================
+  // Private methods
+  // =========================================================================
+
+  /**
+   * Builds the final state with frozen TransitionMeta attached.
+   */
+  static #buildSuccessState(
+    finalState: State,
+    transitionOutput: TransitionOutput["meta"],
+    fromState: State | undefined,
+  ): State {
+    const transitionMeta: TransitionMeta = {
+      phase: transitionOutput.phase,
+      ...(fromState?.name !== undefined && { from: fromState.name }),
+      reason: "success",
+      segments: transitionOutput.segments,
+    };
+
+    Object.freeze(transitionMeta.segments.deactivated);
+    Object.freeze(transitionMeta.segments.activated);
+    Object.freeze(transitionMeta.segments);
+    Object.freeze(transitionMeta);
+
+    return {
+      ...finalState,
+      transition: transitionMeta,
+    };
+  }
+
+  /**
+   * Routes a caught transition error to the correct FSM event.
+   */
+  #routeTransitionError(
+    error: unknown,
+    toState: State,
+    fromState: State | undefined,
+  ): void {
+    const routerError = error as RouterError;
+
+    // Already routed: cancel/stop sent CANCEL, sendTransitionError called in try block
+    if (
+      routerError.code === errorCodes.TRANSITION_CANCELLED ||
+      routerError.code === errorCodes.ROUTE_NOT_FOUND
+    ) {
+      return;
+    }
+
+    if (
+      routerError.code === errorCodes.CANNOT_ACTIVATE ||
+      routerError.code === errorCodes.CANNOT_DEACTIVATE
+    ) {
+      this.#deps.sendTransitionBlocked(toState, fromState, routerError);
+    } else {
+      this.#deps.sendTransitionError(toState, fromState, routerError);
+    }
   }
 }

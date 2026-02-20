@@ -6,7 +6,7 @@ import { constants, errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../../transitionPath";
 
-import type { TransitionDependencies } from "../types";
+import type { TransitionDependencies, TransitionOutput } from "../types";
 import type { NavigationOptions, State } from "@real-router/types";
 
 export async function transition(
@@ -14,7 +14,7 @@ export async function transition(
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
-): Promise<State> {
+): Promise<TransitionOutput> {
   // We're caching the necessary data
   const [canDeactivateFunctions, canActivateFunctions] =
     deps.getLifecycleFunctions();
@@ -23,11 +23,12 @@ export async function transition(
 
   // State management functions
   // Issue #36: Check both explicit cancellation AND router shutdown
-  // Issue #50: Use isActive() instead of isStarted() for two-phase start support
-  // isActive() is true during initial start transition, isStarted() is false
   const isCancelled = () => !deps.isActive();
 
-  const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
+  const { toDeactivate, toActivate, intersection } = getTransitionPath(
+    toState,
+    fromState,
+  );
 
   // determine the necessary steps
   const shouldDeactivate =
@@ -84,14 +85,23 @@ export async function transition(
   if (fromState) {
     const activeSegments = nameToIDs(toState.name);
     const previousActiveSegments = nameToIDs(fromState.name);
-    const activeSet = new Set(activeSegments);
 
     for (const name of previousActiveSegments) {
-      if (!activeSet.has(name) && canDeactivateFunctions.has(name)) {
+      if (!activeSegments.includes(name) && canDeactivateFunctions.has(name)) {
         deps.clearCanDeactivate(name);
       }
     }
   }
 
-  return currentState;
+  return {
+    state: currentState,
+    meta: {
+      phase: "middleware",
+      segments: {
+        deactivated: toDeactivate,
+        activated: toActivate,
+        intersection,
+      },
+    },
+  };
 }

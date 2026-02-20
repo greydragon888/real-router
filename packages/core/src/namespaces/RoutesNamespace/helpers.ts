@@ -140,14 +140,6 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
     return;
   }
 
-  /* v8 ignore next 5 -- @preserve: defensive check, validated by TypeScript */
-  if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
-    throw new TypeError(
-      `[router.addRoute] forwardTo must be a string or function for route "${fullName}", ` +
-        `got ${getTypeDescription(forwardTo)}`,
-    );
-  }
-
   if (typeof forwardTo === "function") {
     const isNativeAsync =
       (forwardTo as { constructor: { name: string } }).constructor.name ===

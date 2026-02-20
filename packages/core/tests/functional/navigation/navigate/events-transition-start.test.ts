@@ -160,8 +160,9 @@ describe("router.navigate() - events transition start", () => {
 
       expect(secondResult.name).toBe("orders");
 
-      // TRANSITION_CANCEL is not emitted in the new API
-      expect(onCancel).toHaveBeenCalledTimes(0);
+      // R3: cancelNavigation() sends CANCEL to RouterFSM when second nav starts,
+      // emitting TRANSITION_CANCEL for the cancelled first navigation
+      expect(onCancel).toHaveBeenCalledTimes(1);
 
       // Cleanup
       unsubStart();

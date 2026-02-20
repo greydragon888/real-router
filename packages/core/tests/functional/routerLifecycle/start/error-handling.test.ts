@@ -27,7 +27,7 @@ describe("router.start() - error handling", () => {
 
   describe("error handling edge cases", () => {
     describe("event listener exceptions", () => {
-      // NOTE: Event listener exceptions are CAUGHT by invokeFor() in observable.ts
+      // NOTE: Event listener exceptions are CAUGHT by EventEmitter.emit()
       // and logged via logger.error(). They do NOT propagate to caller.
       // This is correct behavior - protects router from user code errors.
 
@@ -428,10 +428,11 @@ describe("router.start() - error handling", () => {
           // Expected
         }
 
-        // Issue #50: Router is NOT started if transition fails
-        // Two-phase start ensures isStarted() only returns true after successful transition
+        // R3: completeStart() fires ROUTER_START BEFORE navigateToState(),
+        // so ROUTER_START is emitted even when the transition fails.
+        // Router is stopped (READY→IDLE) after the failed transition.
         expect(router.isActive()).toBe(false);
-        expect(startListener).not.toHaveBeenCalled();
+        expect(startListener).toHaveBeenCalledTimes(1);
       });
 
       // Note: TRANSITION_CANCELLED test was removed because it required mocking

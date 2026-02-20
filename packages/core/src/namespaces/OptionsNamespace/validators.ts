@@ -188,7 +188,6 @@ export function validateOptions(
 
   for (const [key, value] of Object.entries(options)) {
     // Skip optional fields that aren't in defaultOptions (limits, logger, etc.)
-    /* v8 ignore next -- @preserve branch: optional field handled separately */
     if (!isObjKey(key, defaultOptions)) {
       validateOptionalField(key, value, methodName);
       continue;

@@ -28,6 +28,7 @@ export const SCOPES = [
   "persistent-params-plugin",
   "react",
   "rx",
+  "event-emitter",
   "router-benchmarks",
   "deps",
   "config",

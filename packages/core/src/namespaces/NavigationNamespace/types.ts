@@ -3,15 +3,13 @@
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
   ActivationFn,
-  EventsKeys,
-  EventToNameMap,
   Middleware,
   NavigationOptions,
   Options,
   Params,
-  RouterError as RouterErrorType,
   State,
   StateMetaInput,
+  TransitionPhase,
 } from "@real-router/types";
 
 /**
@@ -57,16 +55,54 @@ export interface NavigationDependencies {
     ignoreQueryParams?: boolean,
   ) => boolean;
 
-  /** Invoke event listeners */
-  invokeEventListeners: (
-    eventName: EventToNameMap[EventsKeys],
-    toState?: State,
-    fromState?: State,
-    arg?: RouterErrorType | NavigationOptions,
-  ) => void;
-
   /** Get a dependency by name (untyped — used only for resolveOption) */
   getDependency: (name: string) => unknown;
+
+  /** Start transition and send NAVIGATE event to routerFSM */
+  startTransition: (toState: State, fromState: State | undefined) => void;
+
+  /** Cancel navigation if transition is running */
+  cancelNavigation: () => void;
+
+  /** Send COMPLETE event to routerFSM */
+  sendTransitionDone: (
+    state: State,
+    fromState: State | undefined,
+    opts: NavigationOptions,
+  ) => void;
+
+  /** Send FAIL event to routerFSM (transition blocked) */
+  sendTransitionBlocked: (
+    toState: State,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
+
+  /** Send FAIL event to routerFSM (transition error) */
+  sendTransitionError: (
+    toState: State,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
+
+  /** Emit TRANSITION_ERROR event to listeners */
+  emitTransitionError: (
+    toState: State | undefined,
+    fromState: State | undefined,
+    error: unknown,
+  ) => void;
+}
+
+export interface TransitionOutput {
+  state: State;
+  meta: {
+    phase: TransitionPhase;
+    segments: {
+      deactivated: string[];
+      activated: string[];
+      intersection: string;
+    };
+  };
 }
 
 /**
@@ -82,8 +118,11 @@ export interface TransitionDependencies {
   /** Get middleware functions array */
   getMiddlewareFunctions: () => Middleware[];
 
-  /** Check if router is active (for cancellation check) */
+  /** Check if router is active (for cancellation check on stop()) */
   isActive: () => boolean;
+
+  /** Check if a transition is currently in progress */
+  isTransitioning: () => boolean;
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;

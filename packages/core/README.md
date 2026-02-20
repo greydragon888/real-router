@@ -421,11 +421,6 @@ Clone router for SSR.\
 Returns: `Router`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/clone)
 
-#### `router.cancel(): void`
-
-Cancel the current navigation in progress.\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/cancel)
 
 ---
 

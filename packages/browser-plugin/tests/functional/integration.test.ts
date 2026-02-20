@@ -123,21 +123,20 @@ describe("Browser Plugin Integration", () => {
       await router.navigate("users.list");
 
       // Verify execution order - hooks fire in order per lifecycle stage
-      // Note: Two-phase start (Issue #50) means TRANSITION_START fires before ROUTER_START
-      // because the transition must complete before router is considered "started"
+      // ROUTER_START fires before TRANSITION_START: onStart precedes start transition
       expect(executionOrder).toStrictEqual([
-        "plugin1:onTransitionStart", // Start transition begins
-        "plugin2:onTransitionStart",
-        "plugin1:onStart", // Router marked as started after successful transition
+        "plugin1:onStart",
         "plugin2:onStart",
-        "plugin1:onTransitionSuccess", // Start transition completes
-        "plugin2:onTransitionSuccess",
-        "browser:replaceState", // Browser plugin updates history for start()
-        "plugin1:onTransitionStart", // Navigate transition begins
+        "plugin1:onTransitionStart",
         "plugin2:onTransitionStart",
         "plugin1:onTransitionSuccess",
         "plugin2:onTransitionSuccess",
-        "browser:pushState", // Browser plugin updates history for navigate()
+        "browser:replaceState",
+        "plugin1:onTransitionStart",
+        "plugin2:onTransitionStart",
+        "plugin1:onTransitionSuccess",
+        "plugin2:onTransitionSuccess",
+        "browser:pushState",
       ]);
     });
 

@@ -192,6 +192,9 @@ importers:
 
   packages/core:
     dependencies:
+      '@real-router/fsm':
+        specifier: workspace:^
+        version: link:../fsm
       '@real-router/logger':
         specifier: workspace:^
         version: link:../logger
@@ -199,6 +202,9 @@ importers:
         specifier: workspace:^
         version: link:../core-types
     devDependencies:
+      event-emitter:
+        specifier: workspace:^
+        version: link:../event-emitter
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
@@ -207,6 +213,8 @@ importers:
         version: link:../type-guards
 
   packages/core-types: {}
+
+  packages/event-emitter: {}
 
   packages/fsm:
     devDependencies:

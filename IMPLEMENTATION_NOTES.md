@@ -35,6 +35,7 @@ pnpm version  # runs changeset version + sync + changelog aggregation
 ```
 
 Scripts executed:
+
 1. `changeset version` — updates package versions and changelogs
 2. `.changeset/sync-version.mjs` — syncs root package.json version from core
 3. `.changeset/aggregate-changelog.mjs` — aggregates package changelogs to root CHANGELOG.md
@@ -49,15 +50,20 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 ## [2026-01-24]
 
 ### @real-router/core@0.2.0
+
 ### Minor Changes
+
 - Feature X
 
 ### @real-router/helpers@0.1.1
+
 ### Patch Changes
+
 - Updated dependencies
 ```
 
 **Features:**
+
 - Runs after `changeset version`
 - Only includes public packages (skips private)
 - Includes ALL versions: initial releases, patches, dependency updates
@@ -108,6 +114,7 @@ Root `CHANGELOG.md` is auto-populated from package changelogs:
 **Problem discovered (Issue #18):** `npm publish` does NOT convert `workspace:^` protocol to actual versions. Packages were published with literal `"@real-router/logger": "workspace:^"` in dependencies, causing `npm install` to fail.
 
 **Solution:** Use `pnpm publish` which:
+
 1. Converts `workspace:^` → `^0.2.0` (actual version)
 2. Internally calls `npm publish` (OIDC works)
 
@@ -120,18 +127,21 @@ pnpm publish --provenance --access public --no-git-checks
 ```
 
 **Sources:**
+
 - [pnpm workspaces docs](https://pnpm.io/workspaces) — workspace protocol conversion
 - [pnpm/pnpm#9812](https://github.com/pnpm/pnpm/issues/9812) — "pnpm publish runs npm publish under the hood"
 
 ### Publish Order in changesets.yml
 
 Packages are published in dependency order:
+
 1. `@real-router/logger` (no @real-router deps)
 2. `@real-router/types` (no deps)
 3. `@real-router/core` (depends on types, logger)
 4. All other packages
 
 **Important:** The `publish_package` function must return `0` even when package is already published:
+
 ```bash
 # ✅ CORRECT - skip is not an error
 echo "⏭️ $name@$local_version already published"
@@ -153,14 +163,16 @@ router.usePlugin(browserPluginFactory()); // ❌ TypeScript Error
 **Solution:** Publish `@real-router/types` as a standalone public package. All packages import types from it.
 
 **JS bundling:** tsup with `noExternal` option bundles private packages:
+
 ```typescript
 // packages/core/tsup.config.mts
 export default createIsomorphicConfig({
-  noExternal: ["type-guards", "route-tree", "search-params"],
+  noExternal: ["event-emitter", "type-guards", "route-tree"],
 });
 ```
 
 **DTS generation:** tsup with `dts: { resolve: true }` generates type declarations:
+
 ```typescript
 // tsup.base.mts
 dts: {
@@ -177,6 +189,7 @@ dts: {
 | react .d.ts | 1,813 | 80 | -96% |
 
 This approach ensures:
+
 - Types are not duplicated across packages
 - Module augmentation works correctly
 - Type compatibility between packages (same type identity)
@@ -425,20 +438,21 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 `.size-limit.json` defines per-package limits:
 
-| Package                            | Limit  |
-| ---------------------------------- | ------ |
-| @real-router/core                  | 21 kB  |
-| @real-router/react                 | 2 kB   |
-| @real-router/rx                    | 1.5 kB |
-| @real-router/browser-plugin        | 4 kB   |
-| @real-router/helpers               | 0.5 kB |
-| path-matcher                       | 4 kB   |
-| route-tree                         | 6.5 kB |
-| search-params                      | 1.5 kB |
-| type-guards                        | 1.5 kB |
-| @real-router/logger                | 0.5 kB |
-| @real-router/logger-plugin         | 1.5 kB |
-| @real-router/persistent-params     | 1.5 kB |
+| Package                        | Limit  |
+| ------------------------------ | ------ |
+| @real-router/core              | 25 kB  |
+| @real-router/fsm               | 0.5 kB |
+| @real-router/react             | 2 kB   |
+| @real-router/rx                | 1.5 kB |
+| @real-router/browser-plugin    | 4 kB   |
+| @real-router/helpers           | 0.5 kB |
+| path-matcher                   | 4 kB   |
+| route-tree                     | 6.5 kB |
+| search-params                  | 1.5 kB |
+| type-guards                    | 1.5 kB |
+| @real-router/logger            | 0.5 kB |
+| @real-router/logger-plugin     | 1.5 kB |
+| @real-router/persistent-params | 1.5 kB |
 
 React package ignores `react` and `react-dom` from size calculation.
 
@@ -506,11 +520,7 @@ Build only runs after tests pass.
     ]
   },
   "type-check": {
-    "inputs": [
-      "**/*.{ts,tsx}",
-      "!dist/**",
-      "!**/node_modules/**"
-    ]
+    "inputs": ["**/*.{ts,tsx}", "!dist/**", "!**/node_modules/**"]
   },
   "test": {
     "inputs": [
@@ -533,6 +543,7 @@ Build only runs after tests pass.
 **Problem:** macOS Spotlight continuously indexes `node_modules`, causing high I/O during file operations.
 
 **Symptoms:**
+
 - `pnpm install` slow even with warm cache
 - High `system` time in `time` output (2:1 ratio system:user = I/O bottleneck)
 - `mds_stores` process using CPU
@@ -544,12 +555,14 @@ System Settings → Siri & Spotlight → Spotlight Privacy → "+" → select no
 ```
 
 **Verification:**
+
 ```bash
 # Should return 0 results if excluded
 mdfind -onlyin ./node_modules "kMDItemFSName == '*.ts'" | wc -l
 ```
 
 **Additional recommendations:**
+
 - Exclude `node_modules` from Time Machine backups
 - Exclude from antivirus real-time scanning (if applicable)
 
@@ -569,13 +582,13 @@ uses: changesets/action@c48e67d110a68bc90ccf1098e9646092baacaa87 # v1.6.0
 
 **Pinned actions:**
 
-| Action                            | SHA        | Tag    |
-| --------------------------------- | ---------- | ------ |
-| `changesets/action`               | `c48e67d1` | v1.6.0 |
-| `codecov/codecov-action`          | `671740ac` | v5     |
-| `SonarSource/sonarqube-scan-action` | `a31c9398` | v7   |
-| `dependabot/fetch-metadata`       | `21025c70` | v2     |
-| `softprops/action-gh-release`     | `a06a81a0` | v2     |
+| Action                              | SHA        | Tag    |
+| ----------------------------------- | ---------- | ------ |
+| `changesets/action`                 | `c48e67d1` | v1.6.0 |
+| `codecov/codecov-action`            | `671740ac` | v5     |
+| `SonarSource/sonarqube-scan-action` | `a31c9398` | v7     |
+| `dependabot/fetch-metadata`         | `21025c70` | v2     |
+| `softprops/action-gh-release`       | `a06a81a0` | v2     |
 
 **Why:** Mutable tags can be force-pushed by a compromised maintainer. SHA pins are immutable — even if the tag is moved, the pinned commit stays the same.
 
@@ -634,11 +647,15 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 
 ### Design Decisions
 
-**Single-class, no validation:** The entire FSM is 107 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
+**Single-class, no validation:** The entire FSM is ~137 lines. TypeScript generics enforce correctness at compile time — no runtime validation of config, states, or events. This keeps the hot path allocation-free.
 
 **O(1) transitions:** A `#currentTransitions` cache stores the transition map for the current state, avoiding double lookup (`transitions[state][event]`).
 
-**Null-slot listener pattern:** Same pattern used in `@real-router/core`'s observable. Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
+**`canSend(event): boolean`** — O(1) check if event is valid in current state. Uses cached `#currentTransitions`.
+
+**`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Key format `${from}\0${event}` prevents collisions. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
+
+**Null-slot listener pattern:** Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
 
 **Listener count fast-path:** `#listenerCount` tracks active listeners. When zero, `send()` skips `TransitionInfo` object creation and listener iteration entirely.
 
@@ -653,7 +670,7 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 ```
 packages/fsm/
 ├── src/
-│   ├── fsm.ts    — FSM class (all logic, 107 lines)
+│   ├── fsm.ts    — FSM class (all logic, ~137 lines)
 │   ├── types.ts  — FSMConfig, TransitionInfo, TransitionListener
 │   └── index.ts  — public exports
 └── tests/
@@ -831,6 +848,7 @@ src/core/
 ```
 
 Issues:
+
 - Circular dependencies between decorators
 - Hard to test individual concerns
 - Unclear boundaries of responsibility
@@ -840,7 +858,15 @@ Issues:
 
 ```
 src/
-├── Router.ts (facade, ~900 lines)
+├── Router.ts (facade, ~1176 lines)
+├── fsm/
+│   ├── routerFSM.ts          — FSM config, states, events, factory
+│   └── index.ts
+├── wiring/
+│   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring (10 methods)
+│   ├── wireRouter.ts          — Director: calls wire methods in correct order
+│   ├── types.ts               — WiringOptions<Dependencies> interface
+│   └── index.ts
 └── namespaces/
     ├── RoutesNamespace/
     │   ├── RoutesNamespace.ts
@@ -848,12 +874,14 @@ src/
     │   ├── helpers.ts
     │   ├── types.ts
     │   └── stateBuilder.ts
+    ├── EventBusNamespace/     — FSM + EventEmitter encapsulation (replaces ObservableNamespace)
     ├── StateNamespace/
     ├── NavigationNamespace/
     └── ... (11 namespaces total)
 ```
 
 **Benefits:**
+
 - Clear separation of concerns
 - Each namespace is independently testable
 - No circular dependencies
@@ -894,12 +922,14 @@ class RoutesNamespace {
 ```
 
 **Why static methods?**
+
 1. **No instance needed** — validation doesn't require state
 2. **Clear contract** — `static` signals "pure validation, no side effects"
 3. **Testable independently** — can test validation without Router instance
 4. **Type narrowing** — `asserts` keyword narrows types for TypeScript
 
 **Why validate in facade, not namespace?**
+
 1. **Single entry point** — all public API goes through facade
 2. **Consistent error messages** — facade knows method names for errors
 3. **Namespace trusts facade** — cleaner internal code without defensive checks
@@ -920,6 +950,7 @@ router.forwardState = (name, params) => {
 ```
 
 Original code in Router.ts:
+
 ```typescript
 buildState(routeName, routeParams) {
   const { name, params } = this.forwardState(routeName, routeParams); // ✅ Interceptable
@@ -928,6 +959,7 @@ buildState(routeName, routeParams) {
 ```
 
 After moving to namespace:
+
 ```typescript
 // RoutesNamespace.ts
 buildState(routeName, routeParams) {
@@ -961,9 +993,55 @@ buildStateResolved(resolvedName, resolvedParams) {
 **Rule:** Methods that plugins may intercept must be called at facade level, not inside namespaces.
 
 **Affected methods:**
+
 - `forwardState` — intercepted by persistent-params-plugin
 - `navigate` — could be intercepted for analytics
 - `buildPath` — could be intercepted for URL rewriting
+
+### FSM Migration: dispose(), TransitionMeta, Event Flow
+
+#### dispose() — Terminal State
+
+Router supports permanent disposal via `router.dispose()`. RouterFSM transitions to terminal `DISPOSED` state. All mutating methods throw `ROUTER_DISPOSED` after disposal.
+
+**Cleanup order:** plugins → middleware → eventBus → routes+lifecycle → state → deps → currentToState → markDisposed
+
+**Idempotency:** Second call is a no-op (FSM state check prevents double-cleanup).
+
+#### Enhanced State Object (TransitionMeta)
+
+After each navigation, `state.transition` contains `TransitionMeta` with:
+
+- `phase` — last pipeline phase reached (`"deactivating"` | `"activating"` | `"middleware"`)
+- `from` — previous route name (undefined on first navigation)
+- `reason` — always `"success"` for resolved navigations
+- `segments` — `{ deactivated, activated, intersection }` (all deeply frozen arrays)
+
+`TransitionMeta` is built by `NavigationNamespace` after each successful navigation and attached to the state object before freezing. Transition timing is available via `@real-router/logger-plugin`.
+
+#### FSM-Driven Event Flow
+
+All router events are consequences of FSM transitions via `fsm.on(from, event, action)`:
+
+```
+navigate() → routerFSM.send("NAVIGATE") → emitTransitionStart()
+           → [transition pipeline]
+           → routerFSM.send("COMPLETE") → emitTransitionSuccess()
+
+stop()    → routerFSM.send("CANCEL")  → emitTransitionCancel()  (if transitioning)
+          → routerFSM.send("STOP")    → emitRouterStop()
+```
+
+**Key change vs master:** `invokeEventListeners` lambdas replaced by typed FSM actions. No manual flag management (`#started`, `#active`, `#navigating` booleans removed).
+
+#### Removed API
+
+- **`router.cancel()`** — functionality integrated into `stop()`, `dispose()`, and concurrent navigation logic
+- **`emitSuccess` parameter** — removed from `navigateToState()` (core + browser-plugin)
+
+#### Bundle Size
+
+Size limit updated from `22.1 kB` → `25 kB` in `.size-limit.json` to accommodate FSM integration. Current: 83.6 KB raw / 22.81 KB gzip.
 
 ### Type Guard Hierarchy
 
@@ -1008,6 +1086,7 @@ function isStateStructural(value): value is State {
 ```
 
 **Usage:**
+
 - `isState` from `type-guards` — for public API validation (params must be serializable)
 - `isStateStructural` in `helpers.ts` — for internal operations like `deepFreezeState` that handle any structure
 

@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/PluginsNamespace/types.ts
 
-import type { EventMethodMap } from "../index";
+import type { EventMethodMap } from "../../types";
 import type {
   DefaultDependencies,
   EventName,
@@ -24,8 +24,8 @@ export interface PluginsDependencies<
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
 
-  /** Check if router is started (for warning about late onStart) */
-  isStarted: () => boolean;
+  /** Check if navigation is possible (for warning about late onStart) */
+  canNavigate: () => boolean;
 
   /** Get dependency value for plugin factory */
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K];

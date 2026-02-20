@@ -3,14 +3,6 @@
 export { DependenciesNamespace } from "./DependenciesNamespace";
 
 export {
-  invokeFor,
-  ObservableNamespace,
-  validEventNames,
-} from "./ObservableNamespace";
-
-export type { EventMethodMap } from "./ObservableNamespace";
-
-export {
   deepFreeze,
   defaultOptions,
   OptionsNamespace,
@@ -46,3 +38,5 @@ export { RouterLifecycleNamespace } from "./RouterLifecycleNamespace";
 export { CloneNamespace } from "./CloneNamespace";
 
 export type { ApplyConfigFn, CloneData, RouterFactory } from "./CloneNamespace";
+
+export { EventBusNamespace } from "./EventBusNamespace";

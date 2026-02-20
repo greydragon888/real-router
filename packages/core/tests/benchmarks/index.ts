@@ -29,7 +29,6 @@ import "./validation/isNavigationOptions.bench";
 // import "./routes/routeQuery/shouldUpdateNode.bench";
 // import "./routes/routePath/buildPath.bench";
 // import "./routes/routePath/matchPath.bench";
-// import "./observable/invokeEventListeners.bench.ts";
 
 // ============================================================================
 // Run benchmarks and save results

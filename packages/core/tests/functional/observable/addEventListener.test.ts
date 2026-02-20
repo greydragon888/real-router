@@ -127,7 +127,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         router.addEventListener(events.TRANSITION_START, cb);
-      }).toThrowError("Listener already exists");
+      }).toThrowError("Duplicate listener");
       expect(() => {
         router.addEventListener(events.TRANSITION_START, cb);
       }).toThrowError(events.TRANSITION_START);
@@ -178,7 +178,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         router.addEventListener(events.ROUTER_START, cb);
-      }).toThrowError("Listener already exists");
+      }).toThrowError("Duplicate listener");
     });
 
     it("should detect duplicates with class methods", () => {
@@ -192,7 +192,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         router.addEventListener(events.ROUTER_START, handler.method);
-      }).toThrowError("Listener already exists");
+      }).toThrowError("Duplicate listener");
     });
 
     it("should allow re-registration after unsubscribe", async () => {

@@ -144,6 +144,22 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
+    // 🟡 IMPORTANT: Validates limits option (optional field)
+    it("should validate and accept limits option", () => {
+      const customRouter = createRouter([{ name: "test", path: "/test" }], {
+        limits: {
+          maxPlugins: 50,
+          maxMiddleware: 100,
+        },
+      });
+
+      const opts = customRouter.getOptions();
+
+      expect(opts.limits).toStrictEqual({ maxPlugins: 50, maxMiddleware: 100 });
+
+      customRouter.stop();
+    });
+
     // 🟡 IMPORTANT: Returns default values for optional fields when not set
     it("should return default values for optional fields when not set", () => {
       // Create router without custom options
