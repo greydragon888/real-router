@@ -4,6 +4,7 @@
 export type {
   QueryParamsMode,
   QueryParamsOptions,
+  RouteParams,
   RouteTreeState,
 } from "./route-node-types";
 

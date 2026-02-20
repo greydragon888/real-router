@@ -51,6 +51,7 @@
   },
   "sideEffects": false,
   "dependencies": {
+    "@real-router/types": "workspace:^",
     "path-matcher": "workspace:^",
     "search-params": "workspace:^"
   }

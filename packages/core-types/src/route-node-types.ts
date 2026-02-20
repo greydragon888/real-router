@@ -5,7 +5,7 @@
  *
  * This module exports ONLY the essential types used by real-router:
  * - QueryParamsMode, QueryParamsOptions
- * - RouteTreeState
+ * - RouteParams, RouteTreeState
  *
  * These types are copied from route-node to avoid circular dependencies.
  *
@@ -46,7 +46,7 @@ type ParamSource = "url" | "query";
 type ParamTypeMap = Record<string, ParamSource>;
 type RouteTreeStateMeta = Record<string, ParamTypeMap>;
 
-interface RouteParams {
+export interface RouteParams {
   [key: string]:
     | string
     | string[]

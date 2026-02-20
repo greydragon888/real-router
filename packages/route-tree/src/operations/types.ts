@@ -9,6 +9,7 @@
  */
 
 import type { RouteTree } from "../builder/types";
+import type { RouteParams } from "@real-router/types";
 import type { Options as QueryParamsOptions } from "search-params";
 
 // =============================================================================
@@ -80,29 +81,6 @@ export type ParamTypeMap = Record<string, ParamSource>;
 export type RouteTreeStateMeta = Record<string, ParamTypeMap>;
 
 // =============================================================================
-// Route Params Types
-// =============================================================================
-
-/**
- * Route parameters object.
- * Supports nested objects and arrays for complex parameter structures.
- */
-export interface RouteParams {
-  [key: string]:
-    | string
-    | string[]
-    | number
-    | number[]
-    | boolean
-    | boolean[]
-    | RouteParams
-    | RouteParams[]
-    | Record<string, string | number | boolean>
-    | null
-    | undefined;
-}
-
-// =============================================================================
 // Match Result Types
 // =============================================================================
 
@@ -139,3 +117,5 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
   /** Parameter metadata by segment */
   meta: RouteTreeStateMeta;
 }
+
+export { type RouteParams } from "@real-router/types";
