@@ -26,7 +26,6 @@ function createState(
     id: 1,
     params: {},
     options: {},
-    redirected: false,
     ...metaOverrides,
   };
 

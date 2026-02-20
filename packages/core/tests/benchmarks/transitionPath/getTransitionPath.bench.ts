@@ -32,7 +32,6 @@ function createState(
       id: 1,
       params: metaParams,
       options,
-      redirected: false,
     },
   };
 }

@@ -38,7 +38,6 @@ import { createSimpleRouter } from "../helpers";
         router.makeState("about", {}, "/about", {
           params: {},
           options: { reload: true },
-          redirected: false,
         }),
       );
     }

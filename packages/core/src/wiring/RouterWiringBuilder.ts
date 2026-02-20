@@ -185,8 +185,7 @@ export class RouterWiringBuilder<
       setState: (state) => {
         this.state.set(state);
       },
-      matchPath: (path, source?: string) =>
-        this.routes.matchPath(path, source, this.options.get()),
+      matchPath: (path) => this.routes.matchPath(path, this.options.get()),
       completeStart: () => {
         this.eventBus.completeStart();
       },

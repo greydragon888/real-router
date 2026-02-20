@@ -28,7 +28,6 @@ describe("core/routes", () => {
         "a.b.c.e": { p4: "url" },
       },
       options: {},
-      redirected: false,
     };
 
     describe("input validation", () => {
@@ -550,7 +549,6 @@ describe("core/routes", () => {
           ...state.meta,
           id: 1,
           params: {},
-          redirected: false,
           options: { reload: true },
         },
       };

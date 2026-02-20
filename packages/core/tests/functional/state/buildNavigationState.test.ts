@@ -66,13 +66,6 @@ describe("router.buildNavigationState()", () => {
       expect(state).toBeDefined();
       expect(state?.meta?.options).toStrictEqual({});
     });
-
-    it("should return State with meta.redirected as false", () => {
-      const state = router.buildNavigationState("home");
-
-      expect(state).toBeDefined();
-      expect(state?.meta?.redirected).toBe(false);
-    });
   });
 
   describe("route not found", () => {

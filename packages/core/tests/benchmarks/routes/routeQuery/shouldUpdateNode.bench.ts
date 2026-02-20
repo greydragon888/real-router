@@ -71,9 +71,7 @@ function makeState(
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
-    meta: options
-      ? { id: 1, params: {}, options, redirected: false }
-      : undefined,
+    meta: options ? { id: 1, params: {}, options } : undefined,
   };
 }
 

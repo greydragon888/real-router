@@ -59,7 +59,6 @@ describe("transitionPath", () => {
           "a.b.c.d": {},
         },
         options: {},
-        redirected: false,
       };
 
       expect(
@@ -220,7 +219,6 @@ describe("transitionPath", () => {
         id: 0,
         params: {},
         options: {},
-        redirected: false,
       };
 
       expect(
@@ -240,14 +238,12 @@ describe("transitionPath", () => {
         id: 1,
         params: {},
         options: {},
-        redirected: false,
       };
 
       const meta2 = {
         id: 2,
         params: {},
         options: {},
-        redirected: false,
       };
 
       expect(

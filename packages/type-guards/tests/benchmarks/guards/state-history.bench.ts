@@ -50,15 +50,6 @@ boxplot(() => {
       });
     });
 
-    bench("isHistoryState: with redirected", () => {
-      isHistoryState({
-        name: "login",
-        params: {},
-        path: "/login",
-        meta: { redirected: true, source: "/protected" },
-      });
-    });
-
     bench("isHistoryState: with all meta fields", () => {
       isHistoryState({
         name: "dashboard",
@@ -68,8 +59,6 @@ boxplot(() => {
           id: 42,
           params: { from: "home" },
           options: { replace: true },
-          redirected: false,
-          source: "navigation",
         },
       });
     });
@@ -79,7 +68,7 @@ boxplot(() => {
         name: "admin.users.edit",
         params: { userId: "789" },
         path: "/admin/users/789/edit",
-        meta: { id: 10, source: "edit-button" },
+        meta: { id: 10 },
       });
     });
   });
@@ -164,24 +153,6 @@ boxplot(() => {
         params: {},
         path: "/",
         meta: { options: "invalid" },
-      } as any);
-    });
-
-    bench("isHistoryState: reject invalid meta.redirected type", () => {
-      isHistoryState({
-        name: "home",
-        params: {},
-        path: "/",
-        meta: { redirected: "yes" },
-      } as any);
-    });
-
-    bench("isHistoryState: reject invalid meta.source type", () => {
-      isHistoryState({
-        name: "home",
-        params: {},
-        path: "/",
-        meta: { source: 123 },
       } as any);
     });
   });

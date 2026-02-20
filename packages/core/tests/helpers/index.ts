@@ -27,6 +27,5 @@ export const makeState = (
     id: 0,
     params: metaParams,
     options,
-    redirected: false,
   },
 });

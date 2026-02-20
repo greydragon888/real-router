@@ -229,7 +229,7 @@ export function browserPluginFactory(
     router.matchUrl = (url) => {
       const path = urlToPath(url);
 
-      return path ? router.matchPath(path, source) : undefined;
+      return path ? router.matchPath(path) : undefined;
     };
 
     /**
@@ -252,7 +252,6 @@ export function browserPluginFactory(
         {
           params: state.meta,
           options: {},
-          redirected: false,
         },
         1, // forceId
       );
@@ -314,13 +313,7 @@ export function browserPluginFactory(
       // Top-level error recovery
       try {
         const routerState = router.getState();
-        const state = createStateFromEvent(
-          evt,
-          router,
-          browser,
-          options,
-          source,
-        );
+        const state = createStateFromEvent(evt, router, browser, options);
         const isNewState = !isState(evt.state);
 
         // Handle missing state

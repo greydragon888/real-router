@@ -330,7 +330,7 @@ boxplot(() => {
 
     // Popstate event simulation - with source parameter
     bench("matchPath: popstate simulation", () => {
-      router.matchPath("/users/view/123", "popstate");
+      router.matchPath("/users/view/123");
     });
 
     // Rapid navigation (batch of 10 matches)

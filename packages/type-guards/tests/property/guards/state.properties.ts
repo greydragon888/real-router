@@ -114,8 +114,7 @@ describe("State Type Guards Properties", () => {
           const hasUndefinedFields =
             ("id" in meta && meta.id === undefined) ||
             ("params" in meta && meta.params === undefined) ||
-            ("options" in meta && meta.options === undefined) ||
-            ("redirected" in meta && meta.redirected === undefined);
+            ("options" in meta && meta.options === undefined);
 
           if (hasUndefinedFields) {
             expect(result).toBe(false);
@@ -316,23 +315,5 @@ describe("State Type Guards Properties", () => {
         return true;
       },
     );
-
-    it("State with meta.redirected = true", () => {
-      const state = {
-        name: "test",
-        path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: {},
-          options: {},
-          redirected: true,
-        },
-      };
-
-      expect(isState(state)).toBe(true);
-
-      return true;
-    });
   });
 });

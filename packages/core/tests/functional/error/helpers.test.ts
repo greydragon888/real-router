@@ -50,7 +50,6 @@ describe("deepFreezeState", () => {
           id: 1,
           params: { source: "browser" },
           options: {},
-          redirected: false,
         },
       };
 
@@ -475,7 +474,6 @@ describe("deepFreezeState", () => {
           id: 1,
           params: { source: "navigation" },
           options: {},
-          redirected: false,
         },
       };
 
@@ -497,7 +495,6 @@ describe("deepFreezeState", () => {
           id: 1,
           params: {},
           options: { replace: true },
-          redirected: false,
         },
       };
 
@@ -519,7 +516,6 @@ describe("deepFreezeState", () => {
           id: 1,
           params: {},
           options: { state: { custom: "value" } },
-          redirected: false,
         },
       };
 
@@ -541,7 +537,6 @@ describe("deepFreezeState", () => {
           id: 1,
           params: {},
           options: {},
-          redirected: false,
         },
       };
 
@@ -605,7 +600,6 @@ describe("freezeStateInPlace", () => {
           id: 1,
           params: { source: "browser" },
           options: {},
-          redirected: false,
         },
       };
 

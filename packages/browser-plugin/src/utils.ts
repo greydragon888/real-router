@@ -51,7 +51,6 @@ export const escapeRegExp = (str: string): string => {
  * @param router - Router instance
  * @param browser - Browser API instance
  * @param options - Browser plugin options
- * @param source - Event source identifier
  * @returns Router state or undefined
  */
 export function createStateFromEvent(
@@ -59,12 +58,11 @@ export function createStateFromEvent(
   router: Router,
   browser: Browser,
   options: BrowserPluginOptions,
-  source: string,
 ): State | undefined {
   const isNewState = !isState(evt.state);
 
   if (isNewState) {
-    return router.matchPath(browser.getLocation(options), source);
+    return router.matchPath(browser.getLocation(options));
   }
 
   return router.makeState(
@@ -75,8 +73,6 @@ export function createStateFromEvent(
       ...evt.state.meta,
       params: evt.state.meta?.params ?? {},
       options: evt.state.meta?.options ?? {},
-      redirected: !!evt.state.meta?.redirected,
-      source,
     },
     evt.state.meta?.id,
   );

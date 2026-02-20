@@ -12,7 +12,7 @@ describe("transition/executeMiddleware", () => {
     name,
     params: {},
     path: `/${name}`,
-    meta: { id: 1, params: {}, options: {}, redirected: false },
+    meta: { id: 1, params: {}, options: {} },
   });
 
   describe("safeCallback error handling", () => {

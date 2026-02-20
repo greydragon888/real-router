@@ -25,8 +25,6 @@ describe("State Type Guards", () => {
           id: 1,
           params: {},
           options: {},
-          redirected: false,
-          source: "popstate",
         },
       };
 
@@ -193,32 +191,6 @@ describe("State Type Guards", () => {
 
         expect(isStateStrict(invalid)).toBe(false);
       });
-
-      it("rejects meta with invalid redirected type", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: {
-            redirected: "invalid",
-          },
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
-      });
-
-      it("rejects meta with invalid source type", () => {
-        const invalid = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: {
-            source: 123,
-          },
-        };
-
-        expect(isStateStrict(invalid)).toBe(false);
-      });
     });
   });
 
@@ -232,7 +204,6 @@ describe("State Type Guards", () => {
           id: 1,
           params: {},
           options: {},
-          redirected: false,
         },
       };
 
@@ -442,85 +413,6 @@ describe("State Type Guards", () => {
             params: {},
             path: "/home",
             meta: { id: {} },
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("meta.redirected field validation (line 160)", () => {
-      it("accepts valid redirected boolean in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { redirected: true },
-          }),
-        ).toBe(true);
-
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { redirected: false },
-          }),
-        ).toBe(true);
-      });
-
-      it("rejects non-boolean redirected in meta (string)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { redirected: "true" },
-          }),
-        ).toBe(false);
-      });
-
-      it("rejects non-boolean redirected in meta (number)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { redirected: 1 },
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("meta.source field validation (line 161)", () => {
-      it("accepts valid source string in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { source: "popstate" },
-          }),
-        ).toBe(true);
-      });
-
-      it("rejects non-string source in meta (number)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { source: 123 },
-          }),
-        ).toBe(false);
-      });
-
-      it("rejects non-string source in meta (object)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { source: {} },
           }),
         ).toBe(false);
       });

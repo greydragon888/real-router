@@ -31,7 +31,7 @@ boxplot(() => {
         name: "profile",
         params: { userId: "456" },
         path: "/profile/456",
-        meta: { id: 1, redirected: false },
+        meta: { id: 1 },
       });
     });
 
@@ -52,8 +52,6 @@ boxplot(() => {
           id: 42,
           params: { previous: "home" },
           options: { reload: true },
-          redirected: false,
-          source: "navigation",
         },
       });
     });

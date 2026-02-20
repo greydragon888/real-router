@@ -36,7 +36,6 @@ export const mergeStates = (toState: State, fromState: State): State => {
     // Defaults first
     id: 1,
     options: {},
-    redirected: false,
     // fromMeta fields (lower priority, may include custom fields)
     ...fromMeta,
     // toMeta fields (higher priority, may include custom fields)

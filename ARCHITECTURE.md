@@ -107,15 +107,16 @@ All router lifecycle and navigation state is managed by a single finite state ma
 IDLE → STARTING → READY ⇄ TRANSITIONING (+ NAVIGATE self-loop) → IDLE | DISPOSED
 ```
 
-| State | Description |
-|-------|-------------|
-| `IDLE` | Router not started or stopped |
-| `STARTING` | Initializing (synchronous window before first await) |
-| `READY` | Ready for navigation |
-| `TRANSITIONING` | Navigation in progress |
-| `DISPOSED` | Terminal state, no transitions out |
+| State           | Description                                          |
+| --------------- | ---------------------------------------------------- |
+| `IDLE`          | Router not started or stopped                        |
+| `STARTING`      | Initializing (synchronous window before first await) |
+| `READY`         | Ready for navigation                                 |
+| `TRANSITIONING` | Navigation in progress                               |
+| `DISPOSED`      | Terminal state, no transitions out                   |
 
 FSM events trigger observable emissions via `fsm.on(from, event, action)`:
+
 - `STARTED` → `emitRouterStart()`
 - `NAVIGATE` → `emitTransitionStart()`
 - `COMPLETE` → `emitTransitionSuccess()`
@@ -258,24 +259,23 @@ state.params.id = "new"; // ❌ TypeError: Cannot assign to read only property
 
 ```typescript
 interface State {
-  name: string;           // "users.profile"
-  path: string;           // "/users/123"
-  params: Params;         // { id: "123" }
+  name: string; // "users.profile"
+  path: string; // "/users/123"
+  params: Params; // { id: "123" }
   meta?: {
-    id?: number;          // Unique transition ID
-    params?: Params;      // Original params before forwarding
-    options?: object;     // Navigation options
-    redirected?: boolean; // Was this a redirect?
-    source?: string;      // "popstate" | "navigate" | etc.
+    id?: number; // Unique transition ID
+    params?: Params; // Original params before forwarding
+    options?: object; // Navigation options
   };
-  transition?: {          // Set after every successful navigation (deeply frozen)
-    phase: TransitionPhase;   // "deactivating" | "activating" | "middleware"
-    from?: string;            // Previous route name (undefined on start())
+  transition?: {
+    // Set after every successful navigation (deeply frozen)
+    phase: TransitionPhase; // "deactivating" | "activating" | "middleware"
+    from?: string; // Previous route name (undefined on start())
     reason: TransitionReason; // "success" | "blocked" | "cancelled" | "error"
     segments: {
-      deactivated: string[];  // Segments leaving
-      activated: string[];    // Segments entering
-      intersection: string;   // Common ancestor
+      deactivated: string[]; // Segments leaving
+      activated: string[]; // Segments entering
+      intersection: string; // Common ancestor
     };
   };
 }
@@ -283,11 +283,11 @@ interface State {
 
 ## Extension Points
 
-| Extension | Purpose | Scope | Can Block |
-|-----------|---------|-------|-----------|
-| **Guards** | Route access control | Per-route | Yes |
-| **Middleware** | Transform/redirect navigation | Global | Yes |
-| **Plugins** | React to events, extend router | Global | No |
+| Extension      | Purpose                        | Scope     | Can Block |
+| -------------- | ------------------------------ | --------- | --------- |
+| **Guards**     | Route access control           | Per-route | Yes       |
+| **Middleware** | Transform/redirect navigation  | Global    | Yes       |
+| **Plugins**    | React to events, extend router | Global    | No        |
 
 ### Guard vs Middleware Decision
 
@@ -302,24 +302,25 @@ Router enforces configurable limits to prevent resource exhaustion:
 ```typescript
 createRouter(routes, {
   limits: {
-    maxPlugins: 100,      // Default: 50
-    maxMiddleware: 100,   // Default: 50
+    maxPlugins: 100, // Default: 50
+    maxMiddleware: 100, // Default: 50
     maxDependencies: 200, // Default: 100
   },
 });
 ```
 
-| Limit                  | Default | Protects Against                    |
-| ---------------------- | ------- | ----------------------------------- |
-| `maxPlugins`           | 50      | Plugin stack overflow               |
-| `maxMiddleware`        | 50      | Middleware chain overflow           |
-| `maxDependencies`      | 100     | Circular/excessive dependencies     |
-| `maxListeners`         | 10,000  | Event listener memory leaks         |
+| Limit                  | Default | Protects Against                            |
+| ---------------------- | ------- | ------------------------------------------- |
+| `maxPlugins`           | 50      | Plugin stack overflow                       |
+| `maxMiddleware`        | 50      | Middleware chain overflow                   |
+| `maxDependencies`      | 100     | Circular/excessive dependencies             |
+| `maxListeners`         | 10,000  | Event listener memory leaks                 |
 | `warnListeners`        | 1,000   | Warn threshold for possible leaks (0 = off) |
-| `maxEventDepth`        | 5       | Recursive event infinite loops      |
-| `maxLifecycleHandlers` | 200     | Guard function accumulation         |
+| `maxEventDepth`        | 5       | Recursive event infinite loops              |
+| `maxLifecycleHandlers` | 200     | Guard function accumulation                 |
 
 **Design:**
+
 - **Centralized** — All limits defined in `core/constants.ts` (`DEFAULT_LIMITS`, `LIMIT_BOUNDS`)
 - **Immutable** — Set at creation, cannot change at runtime
 - **Injected** — Router calls `namespace.setLimits()` during initialization

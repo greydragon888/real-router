@@ -149,7 +149,6 @@ export const stateFullArbitrary = fc.record({
         }),
         { nil: undefined },
       ),
-      redirected: fc.option(fc.boolean(), { nil: undefined }),
     }),
     { nil: undefined },
   ),
@@ -177,8 +176,6 @@ export const historyStateArbitrary = fc
     force: fc.boolean(),
     hasState: fc.boolean(),
     state: fc.dictionary(fc.string(), fc.anything()),
-    hasRedirected: fc.boolean(),
-    redirected: fc.boolean(),
   })
   .map((data) => {
     const meta: Record<string, unknown> = {};
@@ -211,10 +208,6 @@ export const historyStateArbitrary = fc
       }
 
       meta.options = options;
-    }
-
-    if (data.hasRedirected) {
-      meta.redirected = data.redirected;
     }
 
     return {

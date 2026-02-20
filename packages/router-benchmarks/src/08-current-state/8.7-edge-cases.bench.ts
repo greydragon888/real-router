@@ -47,23 +47,6 @@ import { createSimpleRouter } from "../helpers";
   }).gc("inner");
 }
 
-// 8.7.8 State with meta.redirected
-{
-  const router = createSimpleRouter();
-
-  bench("8.7.8 State with meta.redirected", () => {
-    for (let i = 0; i < 100; i++) {
-      do_not_optimize(
-        router.makeState("about", {}, "/about", {
-          params: {},
-          options: {},
-          redirected: true,
-        }),
-      );
-    }
-  }).gc("inner");
-}
-
 // 8.7.9 Sequential state ID generation
 {
   const router = createSimpleRouter();
