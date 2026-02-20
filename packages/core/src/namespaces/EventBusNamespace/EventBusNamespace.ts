@@ -233,39 +233,39 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (papams) => {
-      this.emitTransitionStart(papams.toState, papams.fromState);
+    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (params) => {
+      this.emitTransitionStart(params.toState, params.fromState);
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (papams) => {
-      this.emitTransitionSuccess(papams.state, papams.fromState, papams.opts);
+    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (params) => {
+      this.emitTransitionSuccess(params.state, params.fromState, params.opts);
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (papams) => {
-      this.emitTransitionCancel(papams.toState, papams.fromState);
+    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (params) => {
+      this.emitTransitionCancel(params.toState, params.fromState);
     });
 
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, (papams) => {
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, (params) => {
       this.emitTransitionError(
-        papams.toState,
-        papams.fromState,
-        papams.error as RouterError | undefined,
+        params.toState,
+        params.fromState,
+        params.error as RouterError | undefined,
       );
     });
 
-    fsm.on(routerStates.READY, routerEvents.FAIL, (papams) => {
+    fsm.on(routerStates.READY, routerEvents.FAIL, (params) => {
       this.emitTransitionError(
-        papams.toState,
-        papams.fromState,
-        papams.error as RouterError | undefined,
+        params.toState,
+        params.fromState,
+        params.error as RouterError | undefined,
       );
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (papams) => {
+    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (params) => {
       this.emitTransitionError(
-        papams.toState,
-        papams.fromState,
-        papams.error as RouterError | undefined,
+        params.toState,
+        params.fromState,
+        params.error as RouterError | undefined,
       );
     });
   }

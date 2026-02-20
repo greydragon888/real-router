@@ -1374,6 +1374,7 @@ export class RoutesNamespace<
       }
     }
 
+    /* v8 ignore next -- @preserve: defensive return, callers validate route exists before calling */
     return undefined;
   }
 
