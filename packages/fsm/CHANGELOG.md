@@ -1,5 +1,17 @@
 # @real-router/fsm
 
+## 0.2.0
+
+### Minor Changes
+
+- [#123](https://github.com/greydragon888/real-router/pull/123) [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `canSend()` for O(1) event validity check (#123)
+
+  New `canSend(event): boolean` method checks if an event is valid in the current state. Uses cached `#currentTransitions` for O(1) lookup without triggering any transitions or side effects.
+
+- [#123](https://github.com/greydragon888/real-router/pull/123) [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19) Thanks [@greydragon888](https://github.com/greydragon888)! - Add typed `on(from, event, action)` for transition actions (#123)
+
+  New `on(from, event, action)` method registers a type-safe action for a specific `(from, event)` pair. Actions fire before `onTransition` listeners. Lazy `#actions` Map — zero-cost when not used. Returns an unsubscribe function.
+
 ## 0.1.0
 
 ### Minor Changes

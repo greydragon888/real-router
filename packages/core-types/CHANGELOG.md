@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.12.0
+
+### Minor Changes
+
+- [#123](https://github.com/greydragon888/real-router/pull/123) [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19) Thanks [@greydragon888](https://github.com/greydragon888)! - Add TransitionMeta types and ROUTER_DISPOSED error code (#123)
+
+  New types: `TransitionMeta`, `TransitionPhase`, `TransitionReason`. New error code: `ROUTER_DISPOSED` for disposed router operations.
+
 ## 0.11.0
 
 ### Minor Changes
