@@ -25,19 +25,34 @@ export class RouterLifecycleNamespace {
   // Functional references for cyclic dependencies
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Functional reference to NavigationNamespace.navigateToState().
-   * Must be set before calling start().
-   */
+  // Dependencies injected via setDependencies (replaces full router reference)
+  #navigateToStateStore:
+    | ((
+        toState: State,
+        fromState: State | undefined,
+        opts: NavigationOptions,
+      ) => Promise<State>)
+    | undefined;
 
-  navigateToState!: (
+  #depsStore: RouterLifecycleDependencies | undefined;
+
+  /**
+   * Gets navigateToState or throws if not initialized.
+   */
+  get #navigateToState(): (
     toState: State,
     fromState: State | undefined,
     opts: NavigationOptions,
-  ) => Promise<State>;
+  ) => Promise<State> {
+    /* v8 ignore next 3 -- @preserve: always set by wireCyclicDeps */
+    if (!this.#navigateToStateStore) {
+      throw new Error(
+        "[real-router] RouterLifecycleNamespace: navigateToState not initialized",
+      );
+    }
 
-  // Dependencies injected via setDependencies (replaces full router reference)
-  #depsStore: RouterLifecycleDependencies | undefined;
+    return this.#navigateToStateStore;
+  }
 
   /**
    * Gets dependencies or throws if not initialized.
@@ -72,6 +87,20 @@ export class RouterLifecycleNamespace {
   // =========================================================================
   // Dependency injection
   // =========================================================================
+
+  /**
+   * Sets the navigateToState reference (cyclic dependency on NavigationNamespace).
+   * Must be called before using start().
+   */
+  setNavigateToState(
+    fn: (
+      toState: State,
+      fromState: State | undefined,
+      opts: NavigationOptions,
+    ) => Promise<State>,
+  ): void {
+    this.#navigateToStateStore = fn;
+  }
 
   /**
    * Sets dependencies for lifecycle operations.
@@ -116,7 +145,7 @@ export class RouterLifecycleNamespace {
     let finalState: State;
 
     if (matchedState) {
-      finalState = await this.navigateToState(
+      finalState = await this.#navigateToState(
         matchedState,
         undefined,
         startOptions,
@@ -124,7 +153,7 @@ export class RouterLifecycleNamespace {
     } else {
       const notFoundState = deps.makeNotFoundState(startPath, startOptions);
 
-      finalState = await this.navigateToState(
+      finalState = await this.#navigateToState(
         notFoundState,
         undefined,
         startOptions,

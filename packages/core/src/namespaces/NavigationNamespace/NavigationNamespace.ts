@@ -35,15 +35,24 @@ export class NavigationNamespace {
   // Functional reference for cyclic dependency
   // ═══════════════════════════════════════════════════════════════════════════
 
-  /**
-   * Functional reference to check if navigation is possible.
-   * Must be set before calling navigate().
-   */
-  canNavigate!: () => boolean;
-
   // Dependencies injected via setDependencies (replaces full router reference)
+  #canNavigateStore: (() => boolean) | undefined;
   #depsStore: NavigationDependencies | undefined;
   #transitionDepsStore: TransitionDependencies | undefined;
+
+  /**
+   * Gets canNavigate check or throws if not initialized.
+   */
+  get #canNavigate(): () => boolean {
+    /* v8 ignore next 3 -- @preserve: always set by wireCyclicDeps */
+    if (!this.#canNavigateStore) {
+      throw new Error(
+        "[real-router] NavigationNamespace: canNavigate not initialized",
+      );
+    }
+
+    return this.#canNavigateStore;
+  }
 
   /**
    * Gets dependencies or throws if not initialized.
@@ -106,6 +115,14 @@ export class NavigationNamespace {
   // =========================================================================
 
   /**
+   * Sets the canNavigate check (cyclic dependency on EventBusNamespace).
+   * Must be called before using navigate().
+   */
+  setCanNavigate(fn: () => boolean): void {
+    this.#canNavigateStore = fn;
+  }
+
+  /**
    * Sets dependencies for navigation operations.
    * Must be called before using navigation methods.
    */
@@ -134,7 +151,7 @@ export class NavigationNamespace {
     params: Params,
     opts: NavigationOptions,
   ): Promise<State> {
-    if (!this.canNavigate()) {
+    if (!this.#canNavigate()) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
     }
 

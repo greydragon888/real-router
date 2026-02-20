@@ -11,11 +11,7 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
-import type {
-  DefaultDependencies,
-  NavigationOptions,
-  State,
-} from "@real-router/types";
+import type { DefaultDependencies } from "@real-router/types";
 
 export class RouterWiringBuilder<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -231,12 +227,10 @@ export class RouterWiringBuilder<
   }
 
   wireCyclicDeps(): void {
-    this.navigation.canNavigate = () => this.eventBus.canBeginTransition();
+    this.navigation.setCanNavigate(() => this.eventBus.canBeginTransition());
 
-    this.lifecycle.navigateToState = (
-      toState: State,
-      fromState: State | undefined,
-      opts: NavigationOptions,
-    ) => this.navigation.navigateToState(toState, fromState, opts);
+    this.lifecycle.setNavigateToState((toState, fromState, opts) =>
+      this.navigation.navigateToState(toState, fromState, opts),
+    );
   }
 }
