@@ -243,7 +243,8 @@ jobs:
         id: pr_sizes
         run: |
           echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          npx size-limit --json 2>/dev/null >> $GITHUB_OUTPUT || echo "[]" >> $GITHUB_OUTPUT
+          output=$(npx size-limit --json 2>/dev/null) || true
+          echo "${output:-[]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Checkout base branch
@@ -262,7 +263,8 @@ jobs:
         id: base_sizes
         run: |
           echo "sizes<<EOF" >> $GITHUB_OUTPUT
-          npx size-limit --json 2>/dev/null >> $GITHUB_OUTPUT || echo "[]" >> $GITHUB_OUTPUT
+          output=$(npx size-limit --json 2>/dev/null) || true
+          echo "${output:-[]}" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Compare and comment
