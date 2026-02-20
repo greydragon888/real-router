@@ -21,8 +21,5 @@
     "@real-router/logger": "workspace:^",
     "@real-router/rx": "workspace:^",
     "@real-router/types": "workspace:^"
-  },
-  "devDependencies": {
-    "mitata": "1.0.34"
   }
 }

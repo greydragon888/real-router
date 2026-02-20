@@ -49,8 +49,5 @@
     "lint:types": "attw --pack .",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
   },
-  "sideEffects": false,
-  "devDependencies": {
-    "mitata": "1.0.34"
-  }
+  "sideEffects": false
 }
