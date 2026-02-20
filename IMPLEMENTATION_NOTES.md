@@ -167,7 +167,7 @@ router.usePlugin(browserPluginFactory()); // ❌ TypeScript Error
 ```typescript
 // packages/core/tsup.config.mts
 export default createIsomorphicConfig({
-  noExternal: ["type-guards", "route-tree", "search-params"],
+  noExternal: ["event-emitter", "type-guards", "route-tree"],
 });
 ```
 
@@ -655,7 +655,7 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 
 **`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Key format `${from}\0${event}` prevents collisions. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
 
-**Null-slot listener pattern:** Same pattern used in `@real-router/core`'s observable. Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
+**Null-slot listener pattern:** Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
 
 **Listener count fast-path:** `#listenerCount` tracks active listeners. When zero, `send()` skips `TransitionInfo` object creation and listener iteration entirely.
 
@@ -858,9 +858,14 @@ Issues:
 
 ```
 src/
-├── Router.ts (facade, ~1500 lines)
+├── Router.ts (facade, ~1176 lines)
 ├── fsm/
 │   ├── routerFSM.ts          — FSM config, states, events, factory
+│   └── index.ts
+├── wiring/
+│   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring (10 methods)
+│   ├── wireRouter.ts          — Director: calls wire methods in correct order
+│   ├── types.ts               — WiringOptions<Dependencies> interface
 │   └── index.ts
 └── namespaces/
     ├── RoutesNamespace/
@@ -869,6 +874,7 @@ src/
     │   ├── helpers.ts
     │   ├── types.ts
     │   └── stateBuilder.ts
+    ├── EventBusNamespace/     — FSM + EventEmitter encapsulation (replaces ObservableNamespace)
     ├── StateNamespace/
     ├── NavigationNamespace/
     └── ... (11 namespaces total)
@@ -998,7 +1004,7 @@ buildStateResolved(resolvedName, resolvedParams) {
 
 Router supports permanent disposal via `router.dispose()`. RouterFSM transitions to terminal `DISPOSED` state. All mutating methods throw `ROUTER_DISPOSED` after disposal.
 
-**Cleanup order:** plugins → middleware → observable → routes+lifecycle → state → deps → currentToState → markDisposed
+**Cleanup order:** plugins → middleware → eventBus → routes+lifecycle → state → deps → currentToState → markDisposed
 
 **Idempotency:** Second call is a no-op (FSM state check prevents double-cleanup).
 

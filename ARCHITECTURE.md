@@ -17,6 +17,7 @@ real-router/
 │   ├── helpers/              # Route comparison utilities
 │   ├── logger/               # @real-router/logger — isomorphic logging
 │   ├── fsm/                  # @real-router/fsm — finite state machine engine (internal)
+│   ├── event-emitter/        # Generic typed event emitter (internal)
 │   ├── route-tree/           # Route tree building, validation, matcher factory (internal)
 │   ├── path-matcher/         # Segment Trie URL matching and path building (internal)
 │   ├── search-params/        # Query string handling (internal)
@@ -50,7 +51,8 @@ real-router/
              │              @real-router/core                  │
              │  ┌─────────────────────────────────────────┐    │
              │  │  Bundles: route-tree, path-matcher,     │    │
-             │  │  search-params, type-guards, fsm        │    │
+             │  │  search-params, type-guards, fsm,      │    │
+             │  │  event-emitter                          │    │
              │  └─────────────────────────────────────────┘    │
              └──────────────────────┬──────────────────────────┘
                                     │
@@ -65,7 +67,7 @@ real-router/
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
 
-**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `@real-router/logger`, `@real-router/fsm`
+**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `@real-router/logger`, `@real-router/fsm`
 
 ## Core Architecture
 
@@ -81,15 +83,19 @@ Router.ts (facade) ────────────────────�
     ├── NavigationNamespace    — navigate(), transition pipeline
     ├── OptionsNamespace       — router configuration
     ├── DependenciesNamespace  — dependency injection container
-    ├── ObservableNamespace    — events, subscribe, Symbol.observable
+    ├── EventBusNamespace     — FSM + EventEmitter encapsulation, events, subscribe
     ├── PluginsNamespace       — plugin lifecycle management
     ├── MiddlewareNamespace    — middleware chain execution
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards
     ├── RouterLifecycleNamespace — start/stop operations
     └── CloneNamespace         — SSR cloning support
+
+wiring/ (construction-time, Builder+Director pattern)
+    ├── RouterWiringBuilder    — Builder: namespace dependency wiring (10 methods)
+    └── wireRouter             — Director: calls wire methods in correct order
 ```
 
-**Key principle:** Router.ts is a thin facade. All business logic lives in namespaces. All lifecycle state is driven by a single FSM — no boolean flags.
+**Key principle:** Router.ts is a thin facade. All business logic lives in namespaces. All lifecycle state is driven by a single FSM — no boolean flags. Namespace dependency wiring is delegated to `RouterWiringBuilder` (Builder+Director pattern).
 
 **Detailed documentation:** [packages/core/CLAUDE.md](packages/core/CLAUDE.md)
 
