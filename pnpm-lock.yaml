@@ -258,9 +258,6 @@ importers:
 
   packages/react:
     dependencies:
-      '@real-router/browser-plugin':
-        specifier: workspace:^
-        version: link:../browser-plugin
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
@@ -280,6 +277,9 @@ importers:
         specifier: '>=18.0.0'
         version: 19.2.3(react@19.2.3)
     devDependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../browser-plugin
       '@testing-library/dom':
         specifier: 10.4.1
         version: 10.4.1
