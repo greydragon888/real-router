@@ -179,12 +179,6 @@ export class EventBusNamespace {
     return this.#fsm.getState() === routerStates.READY;
   }
 
-  /* v8 ignore next 3 -- @preserve: API surface method, Router uses isReady/isTransitioning/isDisposed instead */
-  getState(): RouterState {
-    return this.#fsm.getState();
-  }
-
-  /* v8 ignore next 3 -- @preserve: API surface method, state managed internally by beginTransition/completeTransition */
   getCurrentToState(): State | undefined {
     return this.#currentToState;
   }
@@ -239,39 +233,39 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (p) => {
-      this.emitTransitionStart(p.toState, p.fromState);
+    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (papams) => {
+      this.emitTransitionStart(papams.toState, papams.fromState);
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (p) => {
-      this.emitTransitionSuccess(p.state, p.fromState, p.opts);
+    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (papams) => {
+      this.emitTransitionSuccess(papams.state, papams.fromState, papams.opts);
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (p) => {
-      this.emitTransitionCancel(p.toState, p.fromState);
+    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (papams) => {
+      this.emitTransitionCancel(papams.toState, papams.fromState);
     });
 
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, (p) => {
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, (papams) => {
       this.emitTransitionError(
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
+        papams.toState,
+        papams.fromState,
+        papams.error as RouterError | undefined,
       );
     });
 
-    fsm.on(routerStates.READY, routerEvents.FAIL, (p) => {
+    fsm.on(routerStates.READY, routerEvents.FAIL, (papams) => {
       this.emitTransitionError(
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
+        papams.toState,
+        papams.fromState,
+        papams.error as RouterError | undefined,
       );
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (p) => {
+    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (papams) => {
       this.emitTransitionError(
-        p.toState,
-        p.fromState,
-        p.error as RouterError | undefined,
+        papams.toState,
+        papams.fromState,
+        papams.error as RouterError | undefined,
       );
     });
   }
