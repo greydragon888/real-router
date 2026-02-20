@@ -31,6 +31,21 @@
     "limit": "0.5 kB"
   },
   {
+    "name": "@real-router/logger (ESM)",
+    "path": "packages/logger/dist/esm/index.mjs",
+    "limit": "0.5 kB"
+  },
+  {
+    "name": "@real-router/logger-plugin (ESM)",
+    "path": "packages/logger-plugin/dist/esm/index.mjs",
+    "limit": "1.5 kB"
+  },
+  {
+    "name": "@real-router/persistent-params-plugin (ESM)",
+    "path": "packages/persistent-params-plugin/dist/esm/index.mjs",
+    "limit": "1.5 kB"
+  },
+  {
     "name": "path-matcher (ESM)",
     "path": "packages/path-matcher/dist/esm/index.mjs",
     "limit": "4 kB"
@@ -51,18 +66,8 @@
     "limit": "1.5 kB"
   },
   {
-    "name": "@real-router/logger (ESM)",
-    "path": "packages/logger/dist/esm/index.mjs",
-    "limit": "0.5 kB"
-  },
-  {
-    "name": "@real-router/logger-plugin (ESM)",
-    "path": "packages/logger-plugin/dist/esm/index.mjs",
-    "limit": "1.5 kB"
-  },
-  {
-    "name": "@real-router/persistent-params-plugin (ESM)",
-    "path": "packages/persistent-params-plugin/dist/esm/index.mjs",
-    "limit": "1.5 kB"
+    "name": "event-emitter (ESM)",
+    "path": "packages/event-emitter/dist/esm/index.mjs",
+    "limit": "2 kB"
   }
 ]

@@ -19,7 +19,7 @@ export const makeError = (
 
 /**
  * Re-throws a caught error as a RouterError with the given error code.
- * If the error is already a RouterError, sets the code via makeError.
+ * If the error is already a RouterError, sets the code directly.
  * Otherwise wraps it with wrapSyncError metadata.
  */
 export function rethrowAsRouterError(
@@ -28,8 +28,9 @@ export function rethrowAsRouterError(
   segment?: string,
 ): never {
   if (error instanceof RouterError) {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    throw makeError(errorCode, error)!;
+    error.setCode(errorCode);
+
+    throw error;
   }
 
   throw new RouterError(errorCode, wrapSyncError(error, segment));
