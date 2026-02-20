@@ -18,7 +18,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "src"
   ],
   "homepage": "https://github.com/greydragon888/real-router",
   "repository": {
