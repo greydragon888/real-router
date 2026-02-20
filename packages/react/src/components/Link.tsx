@@ -1,8 +1,7 @@
 // packages/react/modules/components/Link.tsx
 
-import { useRouter } from "@real-router/react";
-
 import { BaseLink } from "./BaseLink";
+import { useRouter } from "../hooks/useRouter";
 
 import type { BaseLinkProps } from "./interfaces";
 import type { FC } from "react";

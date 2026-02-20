@@ -486,7 +486,7 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should log warning when removing non-existent route", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.removeRoute("nonexistent");
@@ -500,7 +500,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should log warning when removing non-existent child route", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({
@@ -584,7 +584,7 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should block removal of currently active route with warning", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "dashboard", path: "/dashboard" });
@@ -609,7 +609,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should block removal of parent when child is active", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({
@@ -699,7 +699,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should return router for chaining when removal blocked", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.addRoute({ name: "blocked", path: "/blocked" });
@@ -829,7 +829,7 @@ describe("core/routes/removeRoute", () => {
     // 12.3: Removal during active async navigation
     describe("removal during async navigation (12.3)", () => {
       it("should warn when removing route during active navigation", async () => {
-        const { logger } = await import("logger");
+        const { logger } = await import("@real-router/logger");
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         let resolveCanActivate: () => void;
@@ -880,7 +880,7 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should prevent removal when async navigation has completed", async () => {
-        const { logger } = await import("logger");
+        const { logger } = await import("@real-router/logger");
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         router.addRoute({
@@ -914,7 +914,7 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should warn when removing unrelated route during navigation", async () => {
-        const { logger } = await import("logger");
+        const { logger } = await import("@real-router/logger");
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         let resolveCanActivate: () => void;
@@ -992,7 +992,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.4: Empty string as route name
     it("should handle empty string gracefully with warning", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // Empty string passes validation (represents root node)
@@ -1020,7 +1020,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.6: Exact boundary (10000 characters)
     it("should accept name with exactly 10000 characters", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       const exactLimit = "a".repeat(10_000);
@@ -1052,7 +1052,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.8: System routes (@@prefix)
     it("should handle system route prefix gracefully", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // System routes bypass pattern validation but don't exist
@@ -1203,7 +1203,7 @@ describe("core/routes/removeRoute", () => {
      */
 
     it("should handle __proto__ as route name gracefully", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // __proto__ passes pattern validation [a-zA-Z_][a-zA-Z0-9_]*
@@ -1222,7 +1222,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should handle constructor as route name gracefully", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.removeRoute("constructor");
@@ -1236,7 +1236,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should handle prototype as route name gracefully", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       router.removeRoute("prototype");
@@ -1259,7 +1259,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should safely handle nested prototype pollution attempts", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // Try various prototype pollution patterns

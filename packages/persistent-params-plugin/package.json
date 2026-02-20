@@ -8,6 +8,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "development": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -54,6 +55,7 @@
     "@real-router/core": "workspace:^"
   },
   "devDependencies": {
+    "@real-router/types": "workspace:^",
     "type-guards": "workspace:^"
   }
 }

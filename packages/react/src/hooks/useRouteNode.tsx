@@ -3,8 +3,7 @@
 import { getNavigator } from "@real-router/core";
 import { useCallback, useMemo } from "react";
 
-import { useRouter } from "@real-router/react";
-
+import { useRouter } from "./useRouter";
 import { useRouterSubscription } from "./useRouterSubscription";
 import { getCachedShouldUpdate } from "../utils";
 

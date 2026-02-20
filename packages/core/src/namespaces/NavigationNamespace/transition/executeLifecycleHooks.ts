@@ -3,11 +3,11 @@
 import { logger } from "@real-router/logger";
 import { isState } from "type-guards";
 
-import { RouterError, errorCodes } from "@real-router/core";
-
 import { rethrowAsRouterError } from "./makeError";
 import { mergeStates } from "./mergeStates";
 import { processLifecycleResult } from "./processLifecycleResult";
+import { errorCodes } from "../../../constants";
+import { RouterError } from "../../../RouterError";
 
 import type { State, ActivationFn } from "@real-router/types";
 

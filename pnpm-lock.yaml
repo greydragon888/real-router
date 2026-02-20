@@ -180,6 +180,12 @@ importers:
         specifier: workspace:^
         version: link:../logger
     devDependencies:
+      '@real-router/logger-plugin':
+        specifier: workspace:^
+        version: link:../logger-plugin
+      '@real-router/persistent-params-plugin':
+        specifier: workspace:^
+        version: link:../persistent-params-plugin
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1
@@ -247,6 +253,9 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -311,6 +320,9 @@ importers:
       '@real-router/rx':
         specifier: workspace:^
         version: link:../rx
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
       router5:
         specifier: 8.0.1
         version: 8.0.1

@@ -627,6 +627,56 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Note:** `eslint-plugin-react-hooks` is kept as-is — `@eslint-react` does not replace `rules-of-hooks` or `exhaustive-deps`.
 
+## Module Resolution: `customConditions` + `development` Export Condition
+
+### Problem
+
+Root `tsconfig.json` used manual `paths` mappings to resolve workspace packages to source files for IDE navigation:
+
+```json
+"paths": {
+  "@real-router/core": ["packages/core/src/index.ts"],
+  // ... 13 more mappings
+}
+```
+
+Issues: manual sync required, already out-of-sync (`@real-router/rx` and `path-matcher` missing), duplicates info from `exports`.
+
+### Solution
+
+TypeScript 5.0+ `customConditions` with `"development"` export condition:
+
+**Root tsconfig.json:**
+```json
+{ "customConditions": ["development"] }
+```
+
+**Each package.json exports:**
+```json
+"exports": {
+  ".": {
+    "development": "./src/index.ts",
+    "types": { ... },
+    "import": "./dist/esm/index.mjs",
+    "require": "./dist/cjs/index.js"
+  }
+}
+```
+
+`"development"` must be **first** in `exports` — TypeScript picks the first matching condition. In production (Node.js, bundlers), `"development"` is unknown and ignored — resolution falls through to `"types"` / `"import"` / `"require"`.
+
+### Self-Import Fix
+
+Packages that imported themselves by published name (e.g., `@real-router/core` importing from `"@real-router/core"`) worked with `paths` (TypeScript resolved to source), but broke with `customConditions` during build — esbuild doesn't know `customConditions` and tried resolving via `exports`, pointing to `./dist/esm/index.mjs` which doesn't exist mid-build.
+
+**Fixed in:** `@real-router/core` (2 files), `@real-router/react` (3 files) — replaced self-imports with relative imports.
+
+**Also fixed:** `import("logger")` → `import("@real-router/logger")` in core test files (bare `logger` alias no longer exists without `paths`).
+
+### Production Safety
+
+`"development"` is a custom condition name. Node.js, esbuild, webpack, rollup, and tsup do **not** recognize it by default. Verified with `pnpm build && pnpm lint:types` (attw --pack).
+
 ## Infrastructure Changes (rou3 Migration — historical)
 
 ### SonarQube Scanner Rename

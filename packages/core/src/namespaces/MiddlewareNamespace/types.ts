@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/MiddlewareNamespace/types.ts
 
-import type { MiddlewareFactory } from "@real-router/core";
+import type { MiddlewareFactory } from "../../types";
 import type { DefaultDependencies, Middleware } from "@real-router/types";
 
 /**

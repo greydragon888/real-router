@@ -8,6 +8,7 @@
   "types": "./dist/esm/index.d.mts",
   "exports": {
     ".": {
+      "development": "./src/index.ts",
       "types": {
         "import": "./dist/esm/index.d.mts",
         "require": "./dist/cjs/index.d.ts"
@@ -55,6 +56,8 @@
     "@real-router/logger": "workspace:^"
   },
   "devDependencies": {
+    "@real-router/logger-plugin": "workspace:^",
+    "@real-router/persistent-params-plugin": "workspace:^",
     "@testing-library/jest-dom": "6.9.1",
     "jsdom": "27.4.0",
     "type-guards": "workspace:^"

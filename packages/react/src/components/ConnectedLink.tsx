@@ -1,8 +1,8 @@
 // packages/react/modules/components/ConnectedLink.tsx
 
-import { useRoute, useRouter } from "@real-router/react";
-
 import { BaseLink } from "./BaseLink";
+import { useRoute } from "../hooks/useRoute";
+import { useRouter } from "../hooks/useRouter";
 
 import type { BaseLinkProps } from "./interfaces";
 import type { FC } from "react";

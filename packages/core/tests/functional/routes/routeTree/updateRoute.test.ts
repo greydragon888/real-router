@@ -958,7 +958,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("navigation warnings", () => {
     it("should error when updating route during active navigation", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
       let resolveCanActivate: () => void;
@@ -1003,7 +1003,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should not log error when updating route without active navigation", async () => {
-      const { logger } = await import("logger");
+      const { logger } = await import("@real-router/logger");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
       router.addRoute({ name: "ur-no-warn", path: "/ur-no-warn" });

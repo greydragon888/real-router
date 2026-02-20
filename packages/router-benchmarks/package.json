@@ -19,7 +19,8 @@
     "router6": "1.0.2",
     "@real-router/core": "workspace:^",
     "@real-router/logger": "workspace:^",
-    "@real-router/rx": "workspace:^"
+    "@real-router/rx": "workspace:^",
+    "@real-router/types": "workspace:^"
   },
   "devDependencies": {
     "mitata": "1.0.34"
