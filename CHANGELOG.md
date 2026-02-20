@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-20]
 
+### @real-router/core@0.23.0
+
+### Minor Changes
+
+- [#127](https://github.com/greydragon888/real-router/pull/127) [`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `source` parameter from `matchPath()` (#121)
+
+  **Breaking change:** `matchPath()` no longer accepts a second `source` argument.
+
+  **Migration:**
+
+  ```diff
+  - router.matchPath('/users/123', 'popstate')
+  + router.matchPath('/users/123')
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/types@0.13.0
+
+### @real-router/types@0.13.0
+
+### Minor Changes
+
+- [#127](https://github.com/greydragon888/real-router/pull/127) [`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove redundant `StateMeta.redirected` and `StateMeta.source` fields (#121)
+
+  **Breaking change:** `StateMeta` no longer includes `redirected` or `source` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta.redirected) { ... }
+  + if (state.meta.options.redirected) { ... }
+  ```
+
+  The `source` field was dead code — no consumer ever read it, so no migration is needed.
+
+### @real-router/browser-plugin@0.5.0
+
+### Minor Changes
+
+- [#127](https://github.com/greydragon888/real-router/pull/127) [`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `StateMeta.redirected` and `StateMeta.source` writes (#121)
+
+  Internal state construction no longer sets the removed `redirected` and `source` fields on `state.meta`. No public API change — `NavigationOptions.source` and `NavigationOptions.redirected` are unaffected.
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+
+### @real-router/helpers@0.1.26
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+
+### @real-router/logger-plugin@0.2.26
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+
+### @real-router/persistent-params-plugin@0.1.26
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+
+### @real-router/react@0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+  - @real-router/helpers@0.1.26
+
+### @real-router/react@0.4.4
+
+### Patch Changes
+
+- Updated dependencies [[`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19), [`be94ab2`](https://github.com/greydragon888/real-router/commit/be94ab231647999db580b41c5be5e032bc622b19)]:
+  - @real-router/browser-plugin@0.4.0
+  - @real-router/core@0.22.0
+  - @real-router/helpers@0.1.25
+
+### @real-router/rx@0.1.15
+
+### Patch Changes
+
+- Updated dependencies [[`9a500cc`](https://github.com/greydragon888/real-router/commit/9a500cc1d4f8f707c9cd0e6cd0836949ad77a7fb)]:
+  - @real-router/core@0.23.0
+
+
 ### @real-router/browser-plugin@0.4.0
 
 ### Minor Changes
