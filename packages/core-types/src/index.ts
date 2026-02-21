@@ -33,6 +33,7 @@ export type {
   DefaultParamsCallback,
   ActivationFn,
   GuardFn,
+  MiddlewareFn,
   DefaultDependencies,
   Config,
   Plugin,

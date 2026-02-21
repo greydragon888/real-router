@@ -166,6 +166,11 @@ export type GuardFn = (
   fromState: State | undefined,
 ) => boolean | Promise<boolean>;
 
+export type MiddlewareFn = (
+  toState: Readonly<State>,
+  fromState: Readonly<State> | undefined,
+) => void | Promise<void>;
+
 export type DefaultDependencies = object;
 
 export interface Config {
@@ -194,7 +199,7 @@ export interface Plugin {
 }
 
 // eslint-disable-next-line sonarjs/redundant-type-aliases
-export type Middleware = ActivationFn;
+export type Middleware = MiddlewareFn;
 
 export interface SubscribeState {
   route: State;
