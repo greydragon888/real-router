@@ -113,7 +113,12 @@ export class CloneNamespace<
     }
 
     // Apply route config (decoders, encoders, defaultParams, forwardMap)
-    applyConfig(newRouter, data.routeConfig, data.resolvedForwardMap);
+    applyConfig(
+      newRouter,
+      data.routeConfig,
+      data.resolvedForwardMap,
+      data.routeCustomFields,
+    );
 
     return newRouter;
   }

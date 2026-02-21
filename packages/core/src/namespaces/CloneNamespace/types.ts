@@ -23,6 +23,7 @@ export interface CloneData<Dependencies extends DefaultDependencies> {
   pluginFactories: PluginFactory<Dependencies>[];
   routeConfig: RouteConfig;
   resolvedForwardMap: Record<string, string>;
+  routeCustomFields: Record<string, Record<string, unknown>>;
 }
 
 /**
@@ -43,4 +44,5 @@ export type ApplyConfigFn<
   router: Router<Dependencies>,
   config: RouteConfig,
   resolvedForwardMap: Record<string, string>,
+  routeCustomFields: Record<string, Record<string, unknown>>,
 ) => void;

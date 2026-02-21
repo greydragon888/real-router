@@ -221,6 +221,7 @@ export class RouterWiringBuilder<
         pluginFactories: this.plugins.getAll(),
         routeConfig: this.routes.getConfig(),
         resolvedForwardMap: this.routes.getResolvedForwardMap(),
+        routeCustomFields: this.routes.getRouteCustomFields(),
       };
     });
   }

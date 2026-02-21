@@ -81,6 +81,9 @@ export class RoutesNamespace<
     null,
   ) as Record<string, string>;
 
+  readonly #routeCustomFields: Record<string, Record<string, unknown>> =
+    Object.create(null) as Record<string, Record<string, unknown>>;
+
   // Pending canActivate handlers that need to be registered after router is set
   // Key: route name, Value: canActivate factory
   readonly #pendingCanActivate = new Map<
@@ -346,6 +349,18 @@ export class RoutesNamespace<
     return this.#enrichRoute(definition, name);
   }
 
+  getRouteConfig(name: string): Record<string, unknown> | undefined {
+    if (!this.#matcher.hasRoute(name)) {
+      return undefined;
+    }
+
+    return this.#routeCustomFields[name];
+  }
+
+  getRouteCustomFields(): Record<string, Record<string, unknown>> {
+    return this.#routeCustomFields;
+  }
+
   /**
    * Adds one or more routes to the router.
    * Input already validated by facade (properties and state-dependent checks).
@@ -497,6 +512,10 @@ export class RoutesNamespace<
     // Clear forward cache
     for (const key in this.#resolvedForwardMap) {
       delete this.#resolvedForwardMap[key];
+    }
+
+    for (const key in this.#routeCustomFields) {
+      delete this.#routeCustomFields[key];
     }
 
     // Rebuild empty tree
@@ -872,6 +891,7 @@ export class RoutesNamespace<
   applyClonedConfig(
     config: RouteConfig,
     resolvedForwardMap: Record<string, string>,
+    routeCustomFields: Record<string, Record<string, unknown>>,
   ): void {
     Object.assign(this.#config.decoders, config.decoders);
     Object.assign(this.#config.encoders, config.encoders);
@@ -879,6 +899,7 @@ export class RoutesNamespace<
     Object.assign(this.#config.forwardMap, config.forwardMap);
     Object.assign(this.#config.forwardFnMap, config.forwardFnMap);
     this.setResolvedForwardMap({ ...resolvedForwardMap });
+    Object.assign(this.#routeCustomFields, routeCustomFields);
   }
 
   /**
@@ -1263,6 +1284,7 @@ export class RoutesNamespace<
     clearConfigEntries(this.#config.defaultParams, shouldClear);
     clearConfigEntries(this.#config.forwardMap, shouldClear);
     clearConfigEntries(this.#config.forwardFnMap, shouldClear);
+    clearConfigEntries(this.#routeCustomFields, shouldClear);
 
     // Clear forwardMap entries pointing TO deleted route
     clearConfigEntries(this.#config.forwardMap, (key) =>
@@ -1305,6 +1327,26 @@ export class RoutesNamespace<
     route: Route<Dependencies>,
     fullName: string,
   ): void {
+    // Store custom (non-standard) route fields for getRouteConfig()
+    const {
+      name: _name,
+      path: _path,
+      children: _children,
+      canActivate: _ca,
+      canDeactivate: _cd,
+      forwardTo: _ft,
+      encodeParams: _ep,
+      decodeParams: _dp,
+      defaultParams: _defP,
+      ...customFields
+    } = route;
+    if (Object.keys(customFields).length > 0) {
+      this.#routeCustomFields[fullName] = customFields as Record<
+        string,
+        unknown
+      >;
+    }
+
     // Register canActivate via deps.canActivate (allows tests to spy on router.canActivate)
     if (route.canActivate) {
       // Note: Uses #depsStore directly because this method is called from constructor

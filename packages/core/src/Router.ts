@@ -226,6 +226,7 @@ export class Router<
     this.removeRoute = this.removeRoute.bind(this);
     this.clearRoutes = this.clearRoutes.bind(this);
     this.getRoute = this.getRoute.bind(this);
+    this.getRouteConfig = this.getRouteConfig.bind(this);
     this.hasRoute = this.hasRoute.bind(this);
     this.updateRoute = this.updateRoute.bind(this);
 
@@ -384,6 +385,10 @@ export class Router<
     }
 
     return this.#routes.getRoute(name);
+  }
+
+  getRouteConfig(name: string): Record<string, unknown> | undefined {
+    return this.#routes.getRouteConfig(name);
   }
 
   hasRoute(name: string): boolean {
@@ -1090,10 +1095,14 @@ export class Router<
       dependencies,
       (routes, options, deps) =>
         new Router<Dependencies>(routes, options, deps),
-      (newRouter, config, resolvedForwardMap) => {
+      (newRouter, config, resolvedForwardMap, routeCustomFields) => {
         const typedRouter = newRouter as unknown as Router<Dependencies>;
 
-        typedRouter.#routes.applyClonedConfig(config, resolvedForwardMap);
+        typedRouter.#routes.applyClonedConfig(
+          config,
+          resolvedForwardMap,
+          routeCustomFields,
+        );
       },
     );
   }

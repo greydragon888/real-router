@@ -933,13 +933,11 @@ describe("navigateToDefault", () => {
       await withDefault("users", { redirect: "default" });
 
       // Add middleware that could potentially cause circular navigation
-      router.useMiddleware(() => (toState) => {
+      router.useMiddleware(() => async (toState) => {
         if (toState.name === "users" && toState.params.redirect === "default") {
           // Simulate middleware that might trigger another default navigation
-          return new Promise((resolve) => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
         }
-
-        return true;
       });
 
       const promise = router.navigateToDefault();
