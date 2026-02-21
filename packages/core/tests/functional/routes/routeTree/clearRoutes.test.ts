@@ -282,19 +282,20 @@ describe("core/routes/clearRoutes", () => {
 
     it("should preserve middleware", async () => {
       const middlewareCalls: string[] = [];
-      const middleware = () => async () => {
-        middlewareCalls.push("mw");
-      };
 
-      router.useMiddleware(middleware);
+      router.usePlugin(() => ({
+        onTransitionSuccess: () => {
+          middlewareCalls.push("mw");
+        },
+      }));
 
       router.clearRoutes();
 
-      // Add route and navigate to verify middleware is still active
+      // Add route and navigate to verify plugin is still active
       router.addRoute({ name: "test", path: "/test" });
       await router.navigate("test");
 
-      // Middleware should have been called (proving it's still registered)
+      // Plugin should have been called (proving it's still registered)
       expect(middlewareCalls).toContain("mw");
     });
 

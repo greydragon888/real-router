@@ -130,7 +130,7 @@ describe("router.navigate() - error sync exceptions", () => {
           throw new Error("Middleware error");
         });
 
-        router.useMiddleware(() => errorMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
 
         const state = await router.navigate("orders.pending");
 
@@ -145,8 +145,8 @@ describe("router.navigate() - error sync exceptions", () => {
         });
         const nextMiddleware = vi.fn().mockReturnValue(true);
 
-        router.useMiddleware(() => errorMiddleware);
-        router.useMiddleware(() => nextMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
+        router.usePlugin(() => ({ onTransitionSuccess: nextMiddleware }));
 
         const state = await router.navigate("profile");
 
@@ -163,7 +163,7 @@ describe("router.navigate() - error sync exceptions", () => {
         });
 
         router.addActivateGuard("orders", () => activateGuard);
-        router.useMiddleware(() => errorMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
 
         const state = await router.navigate("orders");
 
@@ -228,7 +228,9 @@ describe("router.navigate() - error sync exceptions", () => {
         throw new Error("Middleware failed synchronously");
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
       const state = await router.navigate("users");
 
@@ -326,7 +328,9 @@ describe("router.navigate() - error sync exceptions", () => {
         throw { custom: "middleware error", data: 123 };
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
       const state = await router.navigate("users");
 
@@ -362,7 +366,9 @@ describe("router.navigate() - error sync exceptions", () => {
         throw 42;
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
       const state = await router.navigate("users");
 
@@ -380,7 +386,9 @@ describe("router.navigate() - error sync exceptions", () => {
         throw error;
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
       const state = await router.navigate("users");
 

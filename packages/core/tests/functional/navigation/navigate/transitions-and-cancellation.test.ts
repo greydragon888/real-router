@@ -28,7 +28,7 @@ describe("router.navigate() - transitions and cancellation", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     };
 
-    router.useMiddleware(() => middleware);
+    router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
     const promises = Array.from({ length: 5 })
       .fill(null)
@@ -65,10 +65,8 @@ describe("router.navigate() - transitions and cancellation", () => {
     const activateMock = vi.fn().mockReturnValue(true);
     const deactivateMock = vi.fn().mockReturnValue(true);
 
-    router.useMiddleware(
-      () => middlewareMock1 as any,
-      () => middlewareMock2 as any,
-    );
+    router.usePlugin(() => ({ onTransitionSuccess: middlewareMock1 as any }));
+    router.usePlugin(() => ({ onTransitionSuccess: middlewareMock2 as any }));
     router.addActivateGuard("users", () => activateMock as any);
     router.addDeactivateGuard("users", () => deactivateMock as any);
 

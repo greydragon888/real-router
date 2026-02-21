@@ -68,27 +68,28 @@ describe("router.start() - edge cases", () => {
     });
   });
 
-  describe("Async middleware + stop()", () => {
-    it("should cancel transition when stop() called during async middleware", async () => {
-      let resolveMiddleware: () => void;
-      const middlewarePromise = new Promise<boolean>((resolve) => {
-        resolveMiddleware = () => {
+  describe("Async guard + stop()", () => {
+    it("should cancel transition when stop() called during async guard", async () => {
+      let resolveGuard: () => void;
+      const guardPromise = new Promise<boolean>((resolve) => {
+        resolveGuard = () => {
           resolve(true);
         };
       });
 
-      router.useMiddleware(() => async () => {
-        await middlewarePromise;
+      router.addActivateGuard("users.list", () => async () => {
+        await guardPromise;
+        return true;
       });
 
       const startPromise = router.start("/users/list");
 
-      // Stop during async middleware
+      // Stop during async guard
       router.stop();
 
-      // Complete middleware
-      resolveMiddleware!();
-      await middlewarePromise;
+      // Complete guard
+      resolveGuard!();
+      await guardPromise;
 
       // Wait for start to complete
       try {

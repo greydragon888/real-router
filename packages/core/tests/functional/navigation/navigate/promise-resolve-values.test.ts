@@ -90,7 +90,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when middleware returns Promise.resolve(undefined)", async () => {
         const promiseMiddleware = vi.fn().mockResolvedValue(undefined);
 
-        router.useMiddleware(() => promiseMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -101,8 +101,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseMiddleware1 = vi.fn().mockResolvedValue(undefined);
         const promiseMiddleware2 = vi.fn().mockResolvedValue(undefined);
 
-        router.useMiddleware(() => promiseMiddleware1);
-        router.useMiddleware(() => promiseMiddleware2);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware1 }));
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware2 }));
 
         await router.navigate("profile", {}, {});
 
@@ -115,7 +115,7 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseMiddleware = vi.fn().mockResolvedValue(undefined);
 
         router.addActivateGuard("orders", () => syncGuard);
-        router.useMiddleware(() => promiseMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders", {}, {});
 
@@ -191,7 +191,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when middleware returns true", async () => {
         const middleware = vi.fn().mockReturnValue(true);
 
-        router.useMiddleware(() => middleware);
+        router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -202,8 +202,8 @@ describe("router.navigate() - promise resolve values", () => {
         const middleware1 = vi.fn().mockReturnValue(true);
         const middleware2 = vi.fn().mockReturnValue(true);
 
-        router.useMiddleware(() => middleware1);
-        router.useMiddleware(() => middleware2);
+        router.usePlugin(() => ({ onTransitionSuccess: middleware1 }));
+        router.usePlugin(() => ({ onTransitionSuccess: middleware2 }));
 
         await router.navigate("profile", {}, {});
 
@@ -216,7 +216,7 @@ describe("router.navigate() - promise resolve values", () => {
         const middleware = vi.fn().mockReturnValue(true);
 
         router.addActivateGuard("orders", () => guard);
-        router.useMiddleware(() => middleware);
+        router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
         await router.navigate("orders", {}, {});
 
@@ -245,7 +245,7 @@ describe("router.navigate() - promise resolve values", () => {
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
-        router.useMiddleware(() => redirectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -269,8 +269,8 @@ describe("router.navigate() - promise resolve values", () => {
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
-        router.useMiddleware(() => firstMiddleware);
-        router.useMiddleware(() => redirectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: firstMiddleware }));
+        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
 
         await router.navigate("orders", {}, {});
 
@@ -293,7 +293,7 @@ describe("router.navigate() - promise resolve values", () => {
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
         router.addActivateGuard("profile", () => guard);
-        router.useMiddleware(() => redirectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
 
         await router.navigate("profile", {}, {});
 
@@ -372,7 +372,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when middleware returns Promise.resolve(true)", async () => {
         const promiseMiddleware = vi.fn().mockResolvedValue(true);
 
-        router.useMiddleware(() => promiseMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -383,8 +383,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseMiddleware1 = vi.fn().mockResolvedValue(true);
         const promiseMiddleware2 = vi.fn().mockResolvedValue(true);
 
-        router.useMiddleware(() => promiseMiddleware1);
-        router.useMiddleware(() => promiseMiddleware2);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware1 }));
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware2 }));
 
         await router.navigate("profile", {}, {});
 
@@ -397,7 +397,7 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseMiddleware = vi.fn().mockResolvedValue(true);
 
         router.addActivateGuard("orders", () => promiseGuard);
-        router.useMiddleware(() => promiseMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders", {}, {});
 
@@ -428,7 +428,7 @@ describe("router.navigate() - promise resolve values", () => {
           .fn()
           .mockResolvedValue(redirectState);
 
-        router.useMiddleware(() => promiseRedirectMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -454,8 +454,8 @@ describe("router.navigate() - promise resolve values", () => {
           .fn()
           .mockResolvedValue(redirectState);
 
-        router.useMiddleware(() => firstPromiseMiddleware);
-        router.useMiddleware(() => promiseRedirectMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: firstPromiseMiddleware }));
+        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
 
         await router.navigate("orders", {}, {});
 
@@ -480,7 +480,7 @@ describe("router.navigate() - promise resolve values", () => {
           .mockResolvedValue(redirectState);
 
         router.addActivateGuard("profile", () => promiseGuard);
-        router.useMiddleware(() => promiseRedirectMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
 
         await router.navigate("profile", {}, {});
 

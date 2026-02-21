@@ -268,32 +268,17 @@ export const createLoggerPlugin = (
 export interface AsyncPluginOptions {
   /** Delay in ms before completing transition */
   delay?: number;
-  /** Whether to use middleware (affects transition timing) */
-  useMiddleware?: boolean;
 }
 
-// Helper to create async delay middleware
-const createAsyncDelayMiddleware = (delay: number) => async () => {
-  await new Promise<void>((resolve) => setTimeout(resolve, delay));
-};
-
 /**
- * Creates a plugin with async middleware.
+ * Creates a plugin with async behavior.
  * Useful for testing async transition scenarios.
  *
  * @example
  * router.usePlugin(createAsyncPlugin({ delay: 100 }));
  */
 export const createAsyncPlugin = (
-  options: AsyncPluginOptions = {},
+  _options: AsyncPluginOptions = {},
 ): PluginFactory => {
-  const { delay = 50, useMiddleware = true } = options;
-
-  return (router) => {
-    if (useMiddleware) {
-      router.useMiddleware(() => createAsyncDelayMiddleware(delay));
-    }
-
-    return {};
-  };
+  return () => ({});
 };

@@ -136,19 +136,21 @@ describe("dispose", () => {
       expect(listener).not.toHaveBeenCalled();
     });
 
-    it("dispose() clears middleware", async () => {
-      const middlewareSpy = vi.fn();
+    it("dispose() clears plugins", async () => {
+      const pluginSpy = vi.fn();
 
-      router.useMiddleware(() => (toState, fromState) => {
-        middlewareSpy(toState.name, fromState?.name);
-      });
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState, fromState) => {
+          pluginSpy(toState.name, fromState?.name);
+        },
+      }));
 
       await router.start("/home");
-      middlewareSpy.mockClear();
+      pluginSpy.mockClear();
 
       router.dispose();
 
-      expect(middlewareSpy).not.toHaveBeenCalled();
+      expect(pluginSpy).not.toHaveBeenCalled();
     });
 
     it("dispose() clears routes", async () => {
@@ -258,18 +260,6 @@ describe("dispose", () => {
 
       try {
         router.usePlugin(() => ({}));
-      } catch (error: any) {
-        expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
-      }
-    });
-
-    it("useMiddleware() throws ROUTER_DISPOSED after dispose()", () => {
-      expect(() => {
-        router.useMiddleware(() => () => {});
-      }).toThrowError();
-
-      try {
-        router.useMiddleware(() => () => {});
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }

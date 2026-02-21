@@ -92,11 +92,6 @@ describe("core/observable/addEventListener", () => {
     it("should trigger TRANSITION_CANCEL listener when navigation is cancelled", async () => {
       const cb = vi.fn();
 
-      // Add slow middleware to allow cancellation
-      router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
-
       router.addEventListener(events.TRANSITION_CANCEL, cb);
       await router.start("/");
 

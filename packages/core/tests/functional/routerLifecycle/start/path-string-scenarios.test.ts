@@ -196,15 +196,15 @@ describe("router.start() - path string scenarios", () => {
     });
   });
 
-  describe("allowNotFound with middleware errors", () => {
-    it("should emit TRANSITION_ERROR only once when middleware fails for unknown route", async () => {
+  describe("allowNotFound with guard errors", () => {
+    it("should emit TRANSITION_ERROR only once when guard fails for unknown route", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
 
-      router.useMiddleware(
-        () => () => Promise.reject({ message: "Middleware error" }),
-      );
+      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+        return Promise.reject(new Error("Guard error"));
+      });
 
       const transitionErrorListener = vi.fn();
 
@@ -214,21 +214,21 @@ describe("router.start() - path string scenarios", () => {
         await router.start(invalidPath);
       } catch (error: any) {
         expect(error).toBeDefined();
-        expect(error?.code).toBe("TRANSITION_ERR");
+        expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
       }
     });
 
-    it("should not attempt defaultRoute when middleware fails for unknown route", async () => {
+    it("should not attempt defaultRoute when guard fails for unknown route", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
-      let middlewareCallCount = 0;
+      let guardCallCount = 0;
 
-      router.useMiddleware(() => () => {
-        middlewareCallCount++;
+      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+        guardCallCount++;
 
-        return Promise.reject({ message: "Middleware error" });
+        return false;
       });
 
       try {
@@ -236,7 +236,7 @@ describe("router.start() - path string scenarios", () => {
 
         expect.fail("Should have thrown");
       } catch {
-        expect(middlewareCallCount).toBe(1); // only for UNKNOWN_ROUTE
+        expect(guardCallCount).toBe(1); // only for UNKNOWN_ROUTE
       }
     });
 
@@ -345,8 +345,8 @@ describe("router.start() - path string scenarios", () => {
     it("should throw error when transition fails", async () => {
       const invalidPath = "/nonexistent/route";
 
-      // Block all transitions to force failure
-      router.useMiddleware(() => () => {
+      // Block transition via guard to force failure
+      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
         throw new Error("Blocked");
       });
 

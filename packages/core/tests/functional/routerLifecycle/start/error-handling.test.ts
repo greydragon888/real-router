@@ -258,8 +258,11 @@ describe("router.start() - error handling", () => {
           resolveMiddleware = resolve;
         });
 
-        // Add async middleware that delays the transition
-        router.useMiddleware(() => () => middlewarePromise);
+        // Add async guard that delays the transition
+        router.addActivateGuard("home", () => async () => {
+          await middlewarePromise;
+          return true;
+        });
 
         // Start first transition (will be pending in middleware)
         const startPromise = router.start("/home");
@@ -319,10 +322,8 @@ describe("router.start() - error handling", () => {
 
       it("should return transition error to callback instead of falling back silently", async () => {
         // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "users.list") {
-            throw new Error("Blocked");
-          } // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         try {
@@ -336,10 +337,8 @@ describe("router.start() - error handling", () => {
 
       it("should emit TRANSITION_ERROR event when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "users.list") {
-            throw new Error("Blocked");
-          } // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
@@ -360,10 +359,8 @@ describe("router.start() - error handling", () => {
 
       it("should NOT silently navigate to defaultRoute when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "users.list") {
-            throw new Error("Blocked");
-          } // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();
@@ -388,10 +385,8 @@ describe("router.start() - error handling", () => {
 
       it("should NOT emit TRANSITION_SUCCESS when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "users.list") {
-            throw new Error("Blocked");
-          } // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();

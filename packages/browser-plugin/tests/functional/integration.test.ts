@@ -271,7 +271,7 @@ describe("Browser Plugin Integration", () => {
   });
 
   describe("Async Plugins", () => {
-    it("works with async middleware plugins", async () => {
+    it("works with async plugins", async () => {
       router.usePlugin(createAsyncPlugin({ delay: 50 }));
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
 

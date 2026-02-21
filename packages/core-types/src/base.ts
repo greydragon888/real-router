@@ -11,7 +11,7 @@ export interface SimpleState<P extends Params = Params> {
   params: P;
 }
 
-export type TransitionPhase = "deactivating" | "activating" | "middleware";
+export type TransitionPhase = "deactivating" | "activating";
 
 export type TransitionReason = "success" | "blocked" | "cancelled" | "error";
 
@@ -80,7 +80,7 @@ export interface RouterError extends Error {
  *
  * All options are optional and have sensible defaults. Options can be combined to achieve
  * complex navigation behaviors. The options object is stored in state.meta.options and is
- * available to middleware, guards, and event listeners.
+ * available to guards and event listeners.
  *
  * @see {@link Router.navigate} for navigation method that accepts these options
  * @see {@link State.meta} for where options are stored after navigation
@@ -121,11 +121,11 @@ export interface NavigationOptions {
    *
    * Without `reload`:
    * - Navigation to current route throws SAME_STATES error
-   * - No lifecycle hooks or middleware execute
+   * - No lifecycle hooks execute
    * - No events are fired
    *
    * With `reload`:
-   * - Full transition executes (deactivate → activate → middleware)
+   * - Full transition executes (deactivate → activate)
    * - All lifecycle hooks run again
    * - TRANSITION_SUCCESS event fires with same state
    * - State object is recreated (new reference)
@@ -178,16 +178,16 @@ export interface NavigationOptions {
    *
    * @description
    * When `true`, bypasses only the canDeactivate lifecycle hooks for segments being
-   * deactivated. canActivate guards and middleware still execute normally. This allows
+   * deactivated. canActivate guards still execute normally. This allows
    * forcing navigation away from routes with confirmation dialogs or unsaved changes.
    *
    * Skipped vs executed:
    * ```
    * // Normal transition
-   * deactivate(fromSegments) → activate(toSegments) → middleware → success
+   * deactivate(fromSegments) → activate(toSegments) → success
    *
    * // With forceDeactivate: true
-   * [skip deactivate] → activate(toSegments) → middleware → success
+   * [skip deactivate] → activate(toSegments) → success
    * ```
    *
    * ⚠️ Data loss risk: Bypassing canDeactivate means unsaved changes will be lost
@@ -214,19 +214,10 @@ export interface NavigationOptions {
    *
    * @description
    * Automatically set by the router when a navigation is triggered by a redirect from
-   * middleware or lifecycle hooks. This flag is used internally to track redirect chains
+   * guards or lifecycle hooks. This flag is used internally to track redirect chains
    * and is stored in state.meta.options.redirected.
    *
    * @default false (auto-set by router during redirects)
-   *
-   * @example
-   * // Middleware triggers automatic redirect
-   * router.useMiddleware((toState, fromState, opts) => {
-   *   if (!isAuthenticated && toState.name !== 'login') {
-   *     // Router will automatically set redirected: true
-   *     return { name: 'login', params: { next: toState.path } };
-   *   }
-   * });
    *
    * @example
    * // Accessing redirect flag in lifecycle

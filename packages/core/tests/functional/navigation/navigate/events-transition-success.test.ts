@@ -165,7 +165,7 @@ describe("router.navigate() - events transition success", () => {
       // Setup guards and middleware for different routes (not parent-child)
       router.addActivateGuard("profile", () => canActivateGuard);
       router.addDeactivateGuard("users", () => canDeactivateGuard);
-      router.useMiddleware(() => middleware);
+      router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
       // Navigate to users first
       await router.navigate("users");

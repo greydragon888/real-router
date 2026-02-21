@@ -59,9 +59,11 @@ describe("router.navigate() - error state recovery", () => {
 
       expect(router.getState()?.name).toBe("users");
 
-      router.useMiddleware(() => () => {
-        throw new Error("Middleware error");
-      });
+      router.usePlugin(() => ({
+        onTransitionSuccess: () => {
+          throw new Error("Middleware error");
+        },
+      }));
 
       const state = await router.navigate("home");
 
@@ -153,14 +155,14 @@ describe("router.navigate() - error state recovery", () => {
     });
 
     it("should handle Promise rejection in middleware", async () => {
-      router.useMiddleware(
-        () => () =>
+      router.usePlugin(() => ({
+        onTransitionSuccess: () =>
           new Promise((_resolve, reject) =>
             setTimeout(() => {
               reject(new Error("Async middleware error"));
             }, 10),
           ),
-      );
+      }));
 
       const state = await router.navigate("users");
 

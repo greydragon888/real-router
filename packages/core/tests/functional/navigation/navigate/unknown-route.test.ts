@@ -77,14 +77,18 @@ describe("router.navigate() - unknown route", () => {
       expect(canActivateGuard).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle middleware when transitioning TO normal route after UNKNOWN_ROUTE", async () => {
-      const middleware = vi.fn().mockReturnValue(true);
+    it("should handle plugin when transitioning TO normal route after UNKNOWN_ROUTE", async () => {
+      const middleware = vi.fn();
 
       const freshRouter = createRouter([{ name: "orders", path: "/orders" }], {
         allowNotFound: true,
       });
 
-      freshRouter.useMiddleware(() => middleware);
+      freshRouter.usePlugin(() => ({
+        onTransitionSuccess: () => {
+          middleware();
+        },
+      }));
 
       // Start with UNKNOWN_ROUTE
       await freshRouter.start("/unknown-middleware-test");

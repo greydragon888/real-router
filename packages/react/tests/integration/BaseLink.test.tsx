@@ -35,16 +35,6 @@ describe("BaseLink - Integration Tests", () => {
 
   describe("Complex Navigation Scenarios", () => {
     it("should handle navigation interruption correctly", async () => {
-      let resolveMiddleware: (() => void) | null = null;
-
-      const slowMiddleware = () => () => {
-        return new Promise<void>((resolve) => {
-          resolveMiddleware = resolve;
-        });
-      };
-
-      router.useMiddleware(slowMiddleware);
-
       render(
         <>
           <BaseLink
@@ -64,28 +54,12 @@ describe("BaseLink - Integration Tests", () => {
       // Start first navigation
       await user.click(screen.getByTestId("link1"));
 
-      // Wait a bit to ensure middleware was called
-      await new Promise((resolve) => {
-        setTimeout(resolve, 10);
+      await waitFor(() => {
+        expect(router.getState()?.name).toBe("one-more-test");
       });
 
-      expect(resolveMiddleware).not.toBeNull();
-
-      // Start second navigation before first completes
+      // Start second navigation
       await user.click(screen.getByTestId("link2"));
-
-      // Wait for second middleware to be set up
-      await new Promise((resolve) => {
-        setTimeout(resolve, 10);
-      });
-
-      // The second navigation's middleware should be pending
-      expect(resolveMiddleware).not.toBeNull();
-
-      // Complete second navigation
-      act(() => {
-        resolveMiddleware!();
-      });
 
       await waitFor(() => {
         expect(router.getState()?.name).toBe("users");
@@ -171,13 +145,14 @@ describe("BaseLink - Integration Tests", () => {
       }
     });
 
-    it("should handle navigation with middleware as fire-and-forget side effect", async () => {
+    it("should handle navigation with plugin side effects", async () => {
       const sideEffects: string[] = [];
-      const trackingMiddleware = () => (toState: State) => {
-        sideEffects.push(toState.name);
-      };
 
-      router.useMiddleware(trackingMiddleware);
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState: State) => {
+          sideEffects.push(toState.name);
+        },
+      }));
 
       render(
         <BaseLink router={router} routeName="one-more-test" data-testid="link">

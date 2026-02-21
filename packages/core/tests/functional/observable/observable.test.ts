@@ -96,12 +96,13 @@ describe("core/observable", () => {
 
         const cb = vi.fn();
 
-        // Use middleware to delay only "users" navigation
-        router.useMiddleware(() => async (toState) => {
-          if (toState.name === "users") {
-            await new Promise((resolve) => setTimeout(resolve, 50));
-          }
-        });
+        router.usePlugin(() => ({
+          onTransitionSuccess: async (toState) => {
+            if (toState.name === "users") {
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          },
+        }));
 
         router.addEventListener(events.TRANSITION_CANCEL, cb);
 

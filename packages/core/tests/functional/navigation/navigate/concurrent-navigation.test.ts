@@ -485,8 +485,10 @@ describe("router.navigate() - concurrent navigation", () => {
       const onError = vi.fn();
       const onSuccess = vi.fn();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("orders.pending", () => () => {
+        return new Promise<boolean>((resolve) =>
+          setTimeout(() => resolve(true), 50),
+        );
       });
 
       const unsubError = router.addEventListener(
@@ -529,7 +531,6 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubError();
       unsubSuccess();
-      unsub();
       vi.useRealTimers();
     });
   });

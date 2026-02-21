@@ -348,18 +348,18 @@ describe("navigateToDefault", () => {
 
     it("should handle guards and middleware for defaultRoute navigation", async () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
-      const middleware = vi.fn().mockReturnValue(true);
+      const pluginSpy = vi.fn();
 
       await withDefault("settings.account");
       router.addActivateGuard("settings.account", () => canActivateGuard);
-      router.useMiddleware(() => middleware);
+      router.usePlugin(() => ({ onTransitionSuccess: pluginSpy }));
 
       const state = await router.navigateToDefault();
 
       expect(state.name).toBe("settings.account");
 
       expect(canActivateGuard).toHaveBeenCalledTimes(1);
-      expect(middleware).toHaveBeenCalledTimes(1);
+      expect(pluginSpy).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -931,12 +931,16 @@ describe("navigateToDefault", () => {
       await withDefault("users", { redirect: "default" });
 
       // Add middleware that could potentially cause circular navigation
-      router.useMiddleware(() => async (toState) => {
-        if (toState.name === "users" && toState.params.redirect === "default") {
-          // Simulate middleware that might trigger another default navigation
-          await new Promise((resolve) => setTimeout(resolve, 10));
-        }
-      });
+      router.usePlugin(() => ({
+        onTransitionSuccess: async (toState) => {
+          if (
+            toState.name === "users" &&
+            toState.params.redirect === "default"
+          ) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+        },
+      }));
 
       const promise = router.navigateToDefault();
 

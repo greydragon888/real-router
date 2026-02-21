@@ -134,17 +134,19 @@ describe("core/routes/routeTree/getRouteConfig", () => {
     });
   });
 
-  describe("middleware integration", () => {
-    it("should allow middleware to access route config during post-commit execution", async () => {
+  describe("plugin integration", () => {
+    it("should allow plugin to access route config during post-commit execution", async () => {
       const capturedConfig: unknown[] = [];
 
       const middlewareRouter = createRouter([
         { name: "gc-mw-home", path: "/", title: "Home" } as never,
       ]);
 
-      middlewareRouter.useMiddleware(() => (toState) => {
-        capturedConfig.push(middlewareRouter.getRouteConfig(toState.name));
-      });
+      middlewareRouter.usePlugin(() => ({
+        onTransitionSuccess: (toState) => {
+          capturedConfig.push(middlewareRouter.getRouteConfig(toState.name));
+        },
+      }));
 
       await middlewareRouter.start("/");
 

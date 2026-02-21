@@ -118,7 +118,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Middleware failed");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("orders.pending");
 
@@ -132,8 +132,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
         const nextMiddleware = vi.fn().mockResolvedValue(true);
 
-        router.useMiddleware(() => rejectingMiddleware);
-        router.useMiddleware(() => nextMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
+        router.usePlugin(() => ({ onTransitionSuccess: nextMiddleware }));
 
         const state = await router.navigate("profile");
 
@@ -149,7 +149,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
 
         router.addActivateGuard("orders", () => passingGuard);
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("orders");
 
@@ -167,7 +167,7 @@ describe("router.navigate() - promise reject", () => {
         };
         const rejectingMiddleware = vi.fn().mockRejectedValue(rejectValue);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("profile");
 
@@ -207,7 +207,7 @@ describe("router.navigate() - promise reject", () => {
         });
         const rejectingMiddleware = vi.fn().mockRejectedValue(middlewareError);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("orders.pending", {}, {});
 
@@ -386,7 +386,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectString = "Middleware blocked";
         const rejectingMiddleware = vi.fn().mockRejectedValue(rejectString);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("orders.pending", {}, {});
 
@@ -399,7 +399,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectNumber = 500;
         const rejectingMiddleware = vi.fn().mockRejectedValue(rejectNumber);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("profile", {}, {});
 
@@ -412,7 +412,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectBoolean = false;
         const rejectingMiddleware = vi.fn().mockRejectedValue(rejectBoolean);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("settings", {}, {});
 
@@ -426,8 +426,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingMiddleware1 = vi.fn().mockRejectedValue(rejectString);
         const nextMiddleware = vi.fn().mockResolvedValue(true);
 
-        router.useMiddleware(() => rejectingMiddleware1);
-        router.useMiddleware(() => nextMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware1 }));
+        router.usePlugin(() => ({ onTransitionSuccess: nextMiddleware }));
 
         const state = await router.navigate("orders", {}, {});
 
@@ -445,7 +445,7 @@ describe("router.navigate() - promise reject", () => {
         };
         const rejectingMiddleware = vi.fn().mockRejectedValue(rejectObject);
 
-        router.useMiddleware(() => rejectingMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("profile", {}, {});
 
