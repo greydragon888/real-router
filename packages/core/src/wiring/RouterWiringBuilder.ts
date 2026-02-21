@@ -160,13 +160,13 @@ export class RouterWiringBuilder<
       emitTransitionError: (toState, fromState, error) => {
         this.eventBus.emitOrFailTransitionError(toState, fromState, error);
       },
+      getMiddlewareFunctions: () => this.middleware.getFunctions(),
     };
 
     this.navigation.setDependencies(navigationDeps);
 
     const transitionDeps: TransitionDependencies = {
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
-      getMiddlewareFunctions: () => this.middleware.getFunctions(),
       isActive: () => this.router.isActive(),
       isTransitioning: () => this.eventBus.isTransitioning(),
       clearCanDeactivate: (name) => {

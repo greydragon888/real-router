@@ -16,7 +16,7 @@ import type {
   ForwardToCallback,
   GuardFn,
   LimitsConfig,
-  Middleware,
+  MiddlewareFn,
   NavigationOptions,
   Params,
   Plugin,
@@ -192,7 +192,7 @@ export type MiddlewareFactory<
 > = (
   router: Router<Dependencies>,
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
-) => Middleware;
+) => MiddlewareFn;
 
 /**
  * Factory function for creating plugins.

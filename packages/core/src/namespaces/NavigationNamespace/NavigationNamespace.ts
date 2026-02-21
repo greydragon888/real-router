@@ -2,6 +2,7 @@
 
 import { logger } from "@real-router/logger";
 
+import { executeMiddleware } from "./transition/executeMiddleware";
 import { transition } from "./transition";
 import {
   validateNavigateArgs,
@@ -197,6 +198,15 @@ export class NavigationNamespace {
 
         deps.setState(stateWithTransition);
         deps.sendTransitionDone(stateWithTransition, fromState, opts);
+
+        const middlewareFunctions = this.#deps.getMiddlewareFunctions();
+        if (middlewareFunctions.length > 0) {
+          executeMiddleware(
+            middlewareFunctions,
+            stateWithTransition,
+            fromState,
+          );
+        }
 
         return stateWithTransition;
       } else {

@@ -3,7 +3,7 @@
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
   GuardFn,
-  Middleware,
+  MiddlewareFn,
   NavigationOptions,
   Options,
   Params,
@@ -91,6 +91,9 @@ export interface NavigationDependencies {
     fromState: State | undefined,
     error: unknown,
   ) => void;
+
+  /** Get snapshot of middleware functions for post-commit execution */
+  getMiddlewareFunctions: () => MiddlewareFn[];
 }
 
 export interface TransitionOutput {
@@ -111,9 +114,6 @@ export interface TransitionOutput {
 export interface TransitionDependencies {
   /** Get lifecycle functions (canDeactivate, canActivate maps) */
   getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
-
-  /** Get middleware functions array */
-  getMiddlewareFunctions: () => Middleware[];
 
   /** Check if router is active (for cancellation check on stop()) */
   isActive: () => boolean;

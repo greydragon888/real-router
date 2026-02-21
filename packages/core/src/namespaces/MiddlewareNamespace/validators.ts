@@ -11,7 +11,7 @@ import { LOGGER_CONTEXT } from "./constants";
 import { DEFAULT_LIMITS } from "../../constants";
 
 import type { MiddlewareFactory } from "../../types";
-import type { DefaultDependencies, Middleware } from "@real-router/types";
+import type { DefaultDependencies, MiddlewareFn } from "@real-router/types";
 
 /**
  * Gets a displayable name for a factory function.
@@ -43,7 +43,7 @@ export function validateUseMiddlewareArgs<D extends DefaultDependencies>(
 export function validateMiddleware<D extends DefaultDependencies>(
   middleware: unknown,
   factory: MiddlewareFactory<D>,
-): asserts middleware is Middleware {
+): asserts middleware is MiddlewareFn {
   if (typeof middleware !== "function") {
     throw new TypeError(
       `[${LOGGER_CONTEXT}] Middleware factory must return a function, ` +

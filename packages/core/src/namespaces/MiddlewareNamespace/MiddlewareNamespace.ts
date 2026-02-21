@@ -17,7 +17,7 @@ import type { Router } from "../../Router";
 import type { Limits, MiddlewareFactory } from "../../types";
 import type {
   DefaultDependencies,
-  Middleware,
+  MiddlewareFn,
   Unsubscribe,
 } from "@real-router/types";
 
@@ -33,7 +33,7 @@ export class MiddlewareNamespace<
   readonly #factories = new Set<MiddlewareFactory<Dependencies>>();
   readonly #factoryToMiddleware = new Map<
     MiddlewareFactory<Dependencies>,
-    Middleware
+    MiddlewareFn
   >();
 
   #router!: Router<Dependencies>;
@@ -54,7 +54,7 @@ export class MiddlewareNamespace<
   static validateMiddleware<D extends DefaultDependencies>(
     middleware: unknown,
     factory: MiddlewareFactory<D>,
-  ): asserts middleware is Middleware {
+  ): asserts middleware is MiddlewareFn {
     validateMiddleware<D>(middleware, factory);
   }
 
@@ -173,7 +173,7 @@ export class MiddlewareNamespace<
   /**
    * Returns the actual middleware functions in execution order.
    */
-  getFunctions(): Middleware[] {
+  getFunctions(): MiddlewareFn[] {
     return [...this.#factoryToMiddleware.values()];
   }
 

@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/MiddlewareNamespace/types.ts
 
 import type { MiddlewareFactory } from "../../types";
-import type { DefaultDependencies, Middleware } from "@real-router/types";
+import type { DefaultDependencies, MiddlewareFn } from "@real-router/types";
 
 /**
  * Dependencies injected into MiddlewareNamespace.
@@ -24,5 +24,5 @@ export interface InitializedMiddleware<
   Dependencies extends DefaultDependencies,
 > {
   factory: MiddlewareFactory<Dependencies>;
-  middleware: Middleware;
+  middleware: MiddlewareFn;
 }
