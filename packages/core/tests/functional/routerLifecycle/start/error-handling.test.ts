@@ -289,13 +289,11 @@ describe("router.start() - error handling", () => {
       });
 
       it("should allow start() after failed async transition resets isActive", async () => {
-        // Issue #50: When async transition fails, isActive is reset
-        // Next start() call should be allowed
-        const unsubMiddleware = router.useMiddleware(
-          () => () => Promise.reject(new Error("Middleware error")),
+        router.addActivateGuard(
+          "home",
+          () => () => Promise.reject(new Error("Guard error")),
         );
 
-        // First start fails in middleware
         try {
           await router.start("/home");
         } catch {
@@ -304,10 +302,6 @@ describe("router.start() - error handling", () => {
 
         expect(router.isActive()).toBe(false);
 
-        // Clear middleware for second attempt
-        unsubMiddleware();
-
-        // Second start should now work
         await router.start("/users");
 
         expect(router.isActive()).toBe(true);
@@ -326,7 +320,9 @@ describe("router.start() - error handling", () => {
       it("should return transition error to callback instead of falling back silently", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+          if (toState.name === "users.list") {
+            throw new Error("Blocked");
+          } // Block users.list
         });
 
         try {
@@ -341,7 +337,9 @@ describe("router.start() - error handling", () => {
       it("should emit TRANSITION_ERROR event when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+          if (toState.name === "users.list") {
+            throw new Error("Blocked");
+          } // Block users.list
         });
 
         const transitionErrorListener = vi.fn();
@@ -363,7 +361,9 @@ describe("router.start() - error handling", () => {
       it("should NOT silently navigate to defaultRoute when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+          if (toState.name === "users.list") {
+            throw new Error("Blocked");
+          } // Block users.list
         });
 
         const transitionSuccessListener = vi.fn();
@@ -389,7 +389,9 @@ describe("router.start() - error handling", () => {
       it("should NOT emit TRANSITION_SUCCESS when transition fails", async () => {
         // Add middleware that blocks the transition
         router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+          if (toState.name === "users.list") {
+            throw new Error("Blocked");
+          } // Block users.list
         });
 
         const transitionSuccessListener = vi.fn();
@@ -410,12 +412,10 @@ describe("router.start() - error handling", () => {
 
       // Two-phase start - Router is NOT started if transition fails
       it("should NOT start router when transition fails (two-phase start)", async () => {
-        // Stop router first
         router.stop();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         const startListener = vi.fn();
@@ -428,9 +428,6 @@ describe("router.start() - error handling", () => {
           // Expected
         }
 
-        // R3: completeStart() fires ROUTER_START BEFORE navigateToState(),
-        // so ROUTER_START is emitted even when the transition fails.
-        // Router is stopped (READY→IDLE) after the failed transition.
         expect(router.isActive()).toBe(false);
         expect(startListener).toHaveBeenCalledTimes(1);
       });

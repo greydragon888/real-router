@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import {
   describe,
   beforeEach,
@@ -14,57 +13,13 @@ import { createTestRouter } from "../helpers";
 
 import type { Middleware, State, Router } from "@real-router/core";
 
-type ExtendedState = State & { m1: boolean; m2: boolean; m3: boolean };
-const noop = () => undefined;
-
-const transitionMiddleware: Middleware = (toState) => {
-  const newState = { ...toState, hitMware: true };
-
-  return newState;
-};
-
-const transitionMutateMiddleware: Middleware = (toState) => {
-  const newState = {
-    ...toState,
-    params: { ...toState.params, mutated: true },
-    hitMware: true,
-  };
-
-  return newState;
-};
-
 const transitionErrorMiddleware: Middleware = () => {
   throw new RouterError("ERR_CODE");
 };
 
 const redirectMiddleware =
-  (targetState: State): Middleware =>
-  () =>
-    targetState;
-
-// Async middleware functions
-const m2Middleware: Middleware = (toState) =>
-  Promise.resolve({
-    ...toState,
-    m2: (toState as ExtendedState).m1,
-  });
-
-const asyncMware: Middleware = (toState) =>
-  Promise.resolve({ ...toState, asyncFlag: true });
-
-const m1AsyncMiddleware: Middleware = (toState) =>
-  Promise.resolve({ ...toState, m1: true });
-
-const m1SyncMiddleware: Middleware = (toState) => {
-  return { ...toState, m1: true } as ExtendedState;
-};
-
-const m3SyncMiddleware: Middleware = (toState) => {
-  return {
-    ...toState,
-    m3: (toState as ExtendedState).m2,
-  } as ExtendedState;
-};
+  (_targetState: State): Middleware =>
+  () => {};
 
 const spyOnFunctions = (obj: Record<string, Middleware>): void => {
   for (const key in obj) {
@@ -72,10 +27,6 @@ const spyOnFunctions = (obj: Record<string, Middleware>): void => {
   }
 };
 
-/**
- * Creates a trackable middleware that records when it's called.
- * Used to verify middleware registration/execution behavior.
- */
 function createTrackingMiddleware(): {
   middleware: Middleware;
   wasCalled: () => boolean;
@@ -84,10 +35,8 @@ function createTrackingMiddleware(): {
   let called = false;
 
   return {
-    middleware: (toState) => {
+    middleware: () => {
       called = true;
-
-      return toState;
     },
     wasCalled: () => called,
     reset: () => {
@@ -98,8 +47,49 @@ function createTrackingMiddleware(): {
 
 describe("core/middleware", () => {
   let router: Router;
+  let hitMware: boolean;
+  let asyncFlag: boolean;
+  let m1Called: boolean;
+  let m2Called: boolean;
+  let m3Called: boolean;
+
+  let transitionMiddleware: Middleware;
+  let transitionMutateMiddleware: Middleware;
+  let m2Middleware: Middleware;
+  let asyncMware: Middleware;
+  let m1AsyncMiddleware: Middleware;
+  let m1SyncMiddleware: Middleware;
+  let m3SyncMiddleware: Middleware;
 
   beforeEach(async () => {
+    hitMware = false;
+    asyncFlag = false;
+    m1Called = false;
+    m2Called = false;
+    m3Called = false;
+
+    transitionMiddleware = () => {
+      hitMware = true;
+    };
+    transitionMutateMiddleware = () => {
+      hitMware = true;
+    };
+    m2Middleware = async () => {
+      m2Called = true;
+    };
+    asyncMware = async () => {
+      asyncFlag = true;
+    };
+    m1AsyncMiddleware = async () => {
+      m1Called = true;
+    };
+    m1SyncMiddleware = () => {
+      m1Called = true;
+    };
+    m3SyncMiddleware = () => {
+      m3Called = true;
+    };
+
     router = createTestRouter();
     await router.start("/home");
   });
@@ -120,14 +110,10 @@ describe("core/middleware", () => {
       await router.navigate("users");
 
       expect(mware.transition).toHaveBeenCalled();
-      expect(
-        (router.getState() as State & { hitMware: boolean }).hitMware,
-      ).toBe(true);
+      expect(hitMware).toBe(true);
     });
 
-    it("should redirect if middleware returns a new state", async () => {
-      vi.spyOn(logger, "error").mockImplementation(noop);
-
+    it("should not redirect when middleware does not return a state", async () => {
       const targetState = {
         name: "home",
         params: {},
@@ -142,33 +128,31 @@ describe("core/middleware", () => {
 
       await router.navigate("index");
 
-      expect(router.getState()?.name).toBe(targetState.name);
-      expect(router.getState()?.path).toBe(targetState.path);
+      expect(router.getState()?.name).toBe("index");
     });
 
-    it("should log a warning if state is changed during transition", async () => {
-      const mutate = transitionMutateMiddleware;
-
-      vi.spyOn(logger, "error").mockImplementation(noop);
+    it("should call middleware during transition", async () => {
       router.stop();
-      router.useMiddleware(() => mutate);
+      router.useMiddleware(() => transitionMutateMiddleware);
 
       await router.start("/home");
 
       await router.navigate("orders");
 
-      // Checking logger.error, not console.error (logger is spied above)
-      expect(logger.error).toHaveBeenCalled();
+      expect(hitMware).toBe(true);
     });
 
-    it("should fail transition if middleware returns an error", async () => {
+    it("should not fail transition when middleware returns an error (fire-and-forget)", async () => {
       const errMware = { transitionErr: transitionErrorMiddleware };
 
       spyOnFunctions(errMware);
 
       router.useMiddleware(() => errMware.transitionErr);
 
-      await expect(router.navigate("users")).rejects.toThrowError();
+      const state = await router.navigate("users");
+
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
 
     it("should be able to take more than one middleware", async () => {
@@ -199,12 +183,10 @@ describe("core/middleware", () => {
 
       await router.navigate("users");
 
-      expect(
-        (router.getState() as State & { asyncFlag: boolean }).asyncFlag,
-      ).toBe(true);
+      expect(asyncFlag).toBe(true);
     });
 
-    it("should pass async-modified state through chain", async () => {
+    it("should call all middleware in chain", async () => {
       router.useMiddleware(
         () => m1AsyncMiddleware,
         () => m2Middleware,
@@ -215,11 +197,11 @@ describe("core/middleware", () => {
 
       await router.navigate("users");
 
-      expect((router.getState() as ExtendedState).m1).toBe(true);
-      expect((router.getState() as ExtendedState).m2).toBe(true);
+      expect(m1Called).toBe(true);
+      expect(m2Called).toBe(true);
     });
 
-    it("should pass state from middleware to middleware (mixed async + sync)", async () => {
+    it("should call all middleware in mixed async + sync chain", async () => {
       router.useMiddleware(
         () => m1SyncMiddleware,
         () => m2Middleware,
@@ -231,9 +213,9 @@ describe("core/middleware", () => {
 
       await router.navigate("users");
 
-      expect((router.getState() as ExtendedState).m1).toBe(true);
-      expect((router.getState() as ExtendedState).m2).toBe(true);
-      expect((router.getState() as ExtendedState).m3).toBe(true);
+      expect(m1Called).toBe(true);
+      expect(m2Called).toBe(true);
+      expect(m3Called).toBe(true);
     });
   });
 
@@ -645,10 +627,8 @@ describe("core/middleware", () => {
     describe("execution order", () => {
       // Helper function to create order-tracking middleware factories
       const createOrderTrackingFactory = (order: number, tracker: number[]) => {
-        return () => (toState: State) => {
+        return () => () => {
           tracker.push(order);
-
-          return toState;
         };
       };
 

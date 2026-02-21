@@ -346,7 +346,9 @@ describe("router.start() - path string scenarios", () => {
       const invalidPath = "/nonexistent/route";
 
       // Block all transitions to force failure
-      router.useMiddleware(() => () => false);
+      router.useMiddleware(() => () => {
+        throw new Error("Blocked");
+      });
 
       try {
         await router.start(invalidPath);

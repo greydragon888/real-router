@@ -284,8 +284,6 @@ describe("core/routes/clearRoutes", () => {
       const middlewareCalls: string[] = [];
       const middleware = () => async () => {
         middlewareCalls.push("mw");
-
-        return true;
       };
 
       router.useMiddleware(middleware);

@@ -384,8 +384,8 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR with correct event structure", async () => {
         const validPath = "/orders/view/456";
 
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "orders.view";
+        router.addActivateGuard("orders.view", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
@@ -420,15 +420,10 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when Promise rejects", async () => {
         const validPath = "/users/view/789";
 
-        // Add middleware that returns rejected Promise
-
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "users.view") {
-            return Promise.reject({ message: "Async access denied" });
-          }
-
-          return true;
-        });
+        router.addActivateGuard(
+          "users.view",
+          () => () => Promise.reject(new Error("Async access denied")),
+        );
 
         const transitionErrorListener = vi.fn();
 
@@ -442,10 +437,8 @@ describe("router.start() - state object scenarios", () => {
 
           expect.fail("Should have thrown");
         } catch (error: any) {
-          // Should emit TRANSITION_ERROR for rejected promises
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-          // Check the event data (users.view)
           const [toState, fromState, eventError] =
             transitionErrorListener.mock.calls[0];
 
@@ -453,7 +446,6 @@ describe("router.start() - state object scenarios", () => {
           expect(fromState).toBeUndefined();
           expect(eventError).toBeDefined();
 
-          // Error should be defined
           expect(error).toBeDefined();
         }
       });
@@ -461,9 +453,8 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when transition is blocked", async () => {
         const validPath = "/settings/general";
 
-        // Add middleware that blocks specific transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "settings.general";
+        router.addActivateGuard("settings.general", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
@@ -478,7 +469,6 @@ describe("router.start() - state object scenarios", () => {
 
           expect.fail("Should have thrown");
         } catch (error: any) {
-          // Issue #44: Error should be reported (no silent fallback)
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
           const [blockedToState, , eventError] =
@@ -487,17 +477,15 @@ describe("router.start() - state object scenarios", () => {
           expect(blockedToState.name).toBe("settings.general");
           expect(eventError).toBeDefined();
 
-          // Error should be defined (no silent fallback)
           expect(error).toBeDefined();
         }
       });
 
-      // Issue #44: No silent fallback - only TRANSITION_ERROR is emitted
       it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", async () => {
         const validPath = "/orders/completed";
 
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "orders.completed";
+        router.addActivateGuard("orders.completed", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();
@@ -527,12 +515,11 @@ describe("router.start() - state object scenarios", () => {
         expect(errorToState.name).toBe("orders.completed");
       });
 
-      // Issue #44: No silent fallback - router state remains undefined
       it("should not silently fallback when primary transition fails", async () => {
         const validPath = "/items/123";
 
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "items";
+        router.addActivateGuard("items", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
@@ -564,8 +551,8 @@ describe("router.start() - state object scenarios", () => {
           path: "/users/view/999",
         };
 
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.view";
+        router.addActivateGuard("users.view", () => () => {
+          throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
@@ -596,8 +583,8 @@ describe("router.start() - state object scenarios", () => {
 
         const validPath = "/profile/user/123";
 
-        // Add middleware that returns rejected Promise with custom data
-        router.useMiddleware(
+        router.addActivateGuard(
+          "profile.user",
           () => () =>
             Promise.reject({
               message: "Custom async error",
@@ -618,13 +605,12 @@ describe("router.start() - state object scenarios", () => {
 
           expect.fail("Should have thrown");
         } catch {
-          // Should emit TRANSITION_ERROR with custom error data
           expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
           const error = transitionErrorListener.mock.calls[0][2];
 
           expect(error).toBeDefined();
-          expect(error).toBeInstanceOf(Error); // RouterError
+          expect(error).toBeInstanceOf(Error);
         }
       });
     });

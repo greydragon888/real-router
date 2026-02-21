@@ -69,11 +69,7 @@ const BATCH = 50;
   let index = 0;
 
   router.useMiddleware(() => (toState) => {
-    if (toState.name === "about") {
-      return { name: "home", params: {}, path: "/" };
-    }
-
-    return toState;
+    void toState;
   });
   router.start("/users");
 

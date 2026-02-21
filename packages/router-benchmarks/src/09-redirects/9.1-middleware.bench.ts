@@ -4,21 +4,16 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
-import type { State } from "@real-router/core";
-
-// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-type RedirectResult = State | void;
-
 // 9.1.1 Simple redirect from middleware
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => (toState, fromState) => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
   router.start("/");
@@ -32,12 +27,12 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => (toState, fromState) => {
     if (toState.name === "user") {
       const target = fromState?.name === "home" ? "about" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
   router.start("/");
@@ -51,17 +46,12 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => (toState, fromState) => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
-      const redirectState = _router.makeState(
-        target,
-        {},
-        target === "home" ? "/" : "/users",
-      );
 
-      return redirectState;
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
   router.start("/");
@@ -77,17 +67,17 @@ type RedirectResult = State | void;
   // Track redirect count to alternate final destination
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState): RedirectResult => {
+  router.useMiddleware((_router) => (toState) => {
     if (toState.name === "about") {
-      return _router.makeState("users", {}, "/users");
+      void _router.makeState("users", {}, "/users");
     }
   });
-  router.useMiddleware((_router) => (toState): RedirectResult => {
+  router.useMiddleware((_router) => (toState) => {
     if (toState.name === "users") {
       // Alternate final destination to avoid SAME_STATES
       const target = redirectCount++ % 2 === 0 ? "home" : "user";
 
-      return _router.makeState(
+      void _router.makeState(
         target,
         target === "user" ? { id: "1" } : {},
         target === "home" ? "/" : "/users/1",
@@ -105,12 +95,12 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => (toState, fromState) => {
     if (toState.name === "user" && toState.params.id === "admin") {
       const target = fromState?.name === "home" ? "about" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
   });
   router.start("/");
@@ -124,12 +114,12 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => (toState, fromState) => {
     if (toState.name === "about") {
       const target = fromState?.name === "home" ? "users" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
   });
   router.start("/");
@@ -143,22 +133,15 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware(
-    (_router) =>
-      async (toState, fromState): Promise<RedirectResult> => {
-        if (toState.name === "about") {
-          await Promise.resolve();
-          const target = fromState?.name === "home" ? "users" : "home";
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
+  router.useMiddleware((_router) => async (toState, fromState) => {
+    if (toState.name === "about") {
+      await Promise.resolve();
+      const target = fromState?.name === "home" ? "users" : "home";
 
-          return _router.makeState(
-            target,
-            {},
-            target === "home" ? "/" : "/users",
-          );
-        }
-      },
-  );
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
+    }
+  });
   router.start("/");
 
   bench("9.1.7 Async redirect", async () => {

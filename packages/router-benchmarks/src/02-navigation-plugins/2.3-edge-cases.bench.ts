@@ -1,6 +1,5 @@
 // packages/router-benchmarks/modules/02-navigation-plugins/2.3-edge-cases.bench.ts
 
-/* eslint-disable @typescript-eslint/no-shadow */
 import { bench } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
@@ -129,8 +128,8 @@ const alternatingRoutes = ["about", "home"];
   const targets = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware((router) => () => {
-    return router.makeState("users", {});
+  router.useMiddleware((_router) => () => {
+    void _router.makeState("users", {});
   });
   router.start("/");
 

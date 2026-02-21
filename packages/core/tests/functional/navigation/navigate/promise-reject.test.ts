@@ -114,24 +114,20 @@ describe("router.navigate() - promise reject", () => {
     });
 
     describe("middleware returns Promise.reject(Error)", () => {
-      it("should block transition when middleware returns Promise.reject(Error)", async () => {
+      it("should not block transition when middleware returns Promise.reject(Error)", async () => {
         const testError = new Error("Middleware failed");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        try {
-          await router.navigate("orders.pending");
+        const state = await router.navigate("orders.pending");
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-          expect(error?.message).toContain("Middleware failed");
-          expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders.pending");
+        expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
-      it("should stop on first promise-rejecting middleware", async () => {
+      it("should call all middleware even when first rejects (fire-and-forget)", async () => {
         const testError = new Error("First middleware error");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
         const nextMiddleware = vi.fn().mockResolvedValue(true);
@@ -139,20 +135,15 @@ describe("router.navigate() - promise reject", () => {
         router.useMiddleware(() => rejectingMiddleware);
         router.useMiddleware(() => nextMiddleware);
 
-        try {
-          await router.navigate("profile");
+        const state = await router.navigate("profile");
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-          expect(error?.message).toContain("First middleware error");
-          expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
-          // Next middleware should not be called due to rejection
-          expect(nextMiddleware).not.toHaveBeenCalled();
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("profile");
+        expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
+        expect(nextMiddleware).toHaveBeenCalledTimes(1);
       });
 
-      it("should block transition in rejecting middleware even with passing guards", async () => {
+      it("should not block transition in rejecting middleware even with passing guards", async () => {
         const passingGuard = vi.fn().mockResolvedValue(true);
         const testError = new Error("Middleware rejection");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
@@ -160,17 +151,12 @@ describe("router.navigate() - promise reject", () => {
         router.addActivateGuard("orders", () => passingGuard);
         router.useMiddleware(() => rejectingMiddleware);
 
-        try {
-          await router.navigate("orders");
+        const state = await router.navigate("orders");
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-          expect(error?.message).toContain("Middleware rejection");
-          // Guard should pass, but middleware rejects
-          expect(passingGuard).toHaveBeenCalledTimes(1);
-          expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders");
+        expect(passingGuard).toHaveBeenCalledTimes(1);
+        expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
       it("should handle non-Error rejections", async () => {
@@ -183,19 +169,11 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        try {
-          await router.navigate("profile");
+        const state = await router.navigate("profile");
 
-          expect.fail("Should have thrown error");
-        } catch (error: any) {
-          expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-          // Should handle non-Error rejections gracefully
-          // Custom properties should be merged (avoiding conflicts with RouterError getters)
-          expect(error?.custom).toBe("error");
-          expect(error?.statusCode).toBe(500);
-          expect(error?.reason).toBe("access denied");
-          expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("profile");
+        expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
     });
 
@@ -231,17 +209,11 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        let err: any;
+        const state = await router.navigate("orders.pending", {}, {});
 
-        try {
-          await router.navigate("orders.pending", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err?.message).toContain("Middleware failed");
-        expect(err?.cause).toBe(networkError);
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders.pending");
+        expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
       it("should handle Error with undefined cause (line 64 false branch)", async () => {
@@ -416,17 +388,10 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        let err: any;
+        const state = await router.navigate("orders.pending", {}, {});
 
-        try {
-          await router.navigate("orders.pending", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err).toBeInstanceOf(Error);
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders.pending");
         expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
@@ -436,17 +401,10 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        let err: any;
+        const state = await router.navigate("profile", {}, {});
 
-        try {
-          await router.navigate("profile", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err).toBeInstanceOf(Error);
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("profile");
         expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
@@ -456,17 +414,10 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        let err: any;
+        const state = await router.navigate("settings", {}, {});
 
-        try {
-          await router.navigate("settings", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err).toBeInstanceOf(Error);
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("settings");
         expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
 
@@ -478,20 +429,12 @@ describe("router.navigate() - promise reject", () => {
         router.useMiddleware(() => rejectingMiddleware1);
         router.useMiddleware(() => nextMiddleware);
 
-        let err: any;
+        const state = await router.navigate("orders", {}, {});
 
-        try {
-          await router.navigate("orders", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err).toBeInstanceOf(Error);
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders");
         expect(rejectingMiddleware1).toHaveBeenCalledTimes(1);
-        // Next middleware should not be called due to rejection
-        expect(nextMiddleware).not.toHaveBeenCalled();
+        expect(nextMiddleware).toHaveBeenCalledTimes(1);
       });
 
       it("should wrap object rejection in RouterError (avoiding property conflicts)", async () => {
@@ -504,21 +447,10 @@ describe("router.navigate() - promise reject", () => {
 
         router.useMiddleware(() => rejectingMiddleware);
 
-        let err: any;
+        const state = await router.navigate("profile", {}, {});
 
-        try {
-          await router.navigate("profile", {}, {});
-        } catch (error: any) {
-          err = error;
-        }
-
-        expect(err?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(err).toBeInstanceOf(Error);
-        // Object properties should be merged (avoiding conflicts)
-        expect(err?.status).toBe("failed");
-        expect(err?.reason).toBe("unauthorized");
-        expect(err?.level).toBe("critical");
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("profile");
         expect(rejectingMiddleware).toHaveBeenCalledTimes(1);
       });
     });

@@ -9,14 +9,13 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
   router.useMiddleware((_router) => (toState) => {
     if (toState.name === "about") {
       const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
     }
-
-    return toState;
   });
   router.start("/");
 
@@ -30,18 +29,15 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
   router.useMiddleware((_router) => (toState, fromState) => {
     if (fromState?.name === "about") {
       const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
+    } else if (toState.name !== "about" && fromState?.name !== "about") {
+      void _router.makeState("about", {}, "/about");
     }
-
-    if (toState.name !== "about" && fromState?.name !== "about") {
-      return _router.makeState("about", {}, "/about");
-    }
-
-    return toState;
   });
   router.start("/");
   router.navigate("about");
@@ -59,14 +55,13 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
+  // Middleware runs post-navigation (fire-and-forget), return value ignored
   router.useMiddleware((_router) => (toState) => {
     if (toState.name === "user" && toState.params.id === "protected") {
       const target = redirectCount++ % 2 === 0 ? "home" : "about";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
+      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
     }
-
-    return toState;
   });
   router.start("/");
 

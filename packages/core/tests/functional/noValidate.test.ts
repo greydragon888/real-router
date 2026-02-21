@@ -168,9 +168,7 @@ describe("core/noValidate option", () => {
       it("should skip validation in useMiddleware", () => {
         // Valid middleware
         expect(() =>
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return true;
-          }),
+          router.useMiddleware(() => (_toState, _fromState) => {}),
         ).not.toThrowError();
       });
     });

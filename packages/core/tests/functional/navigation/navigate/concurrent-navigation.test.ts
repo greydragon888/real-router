@@ -51,8 +51,12 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should cancel navigation via router.stop() and reject with TRANSITION_CANCELLED error", async () => {
       vi.useFakeTimers();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("users", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
       });
 
       const promise = router.navigate("users");
@@ -67,7 +71,6 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -77,8 +80,12 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("profile", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
       });
 
       const unsubCancel = router.addEventListener(
@@ -107,7 +114,6 @@ describe("router.navigate() - concurrent navigation", () => {
       );
 
       unsubCancel();
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -144,19 +150,18 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should cancel navigation during multiple async middleware", async () => {
+    it("should cancel navigation during async guard execution on settings", async () => {
       vi.useFakeTimers();
 
-      const middleware1 = vi.fn().mockImplementation(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30));
+      const guard = vi.fn().mockImplementation(() => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 30);
+        });
       });
 
-      const middleware2 = vi.fn().mockImplementation(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30));
-      });
-
-      const unsub1 = router.useMiddleware(middleware1);
-      const unsub2 = router.useMiddleware(middleware2);
+      router.addActivateGuard("settings", guard);
 
       const promise = router.navigate("settings");
 
@@ -170,10 +175,8 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      expect(middleware1).toHaveBeenCalledTimes(1);
+      expect(guard).toHaveBeenCalledTimes(1);
 
-      unsub1();
-      unsub2();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -211,10 +214,6 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should not affect already completed navigation when router stops", async () => {
       vi.useFakeTimers();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      });
-
       const promise = router.navigate("users");
 
       await vi.runAllTimersAsync();
@@ -224,18 +223,20 @@ describe("router.navigate() - concurrent navigation", () => {
       expect(state).toBeDefined();
       expect(state.name).toBe("users");
 
-      // State was set before stop
       expect(router.getState()?.name).toBe("users");
 
-      unsub();
       vi.useRealTimers();
     });
 
     it("should handle router.stop() called multiple times", async () => {
       vi.useFakeTimers();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("profile", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
       });
 
       const promise = router.navigate("profile");
@@ -252,7 +253,6 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -263,8 +263,12 @@ describe("router.navigate() - concurrent navigation", () => {
       const onSuccess = vi.fn();
       const onCancel = vi.fn();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 60));
+      router.addActivateGuard("orders", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 60);
+        });
       });
 
       const unsubSuccess = router.addEventListener(
@@ -294,7 +298,6 @@ describe("router.navigate() - concurrent navigation", () => {
 
       unsubSuccess();
       unsubCancel();
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -304,8 +307,12 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("profile", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
       });
 
       const unsubCancel = router.addEventListener(
@@ -337,7 +344,6 @@ describe("router.navigate() - concurrent navigation", () => {
       );
 
       unsubCancel();
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -345,8 +351,12 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should handle cancellation when router is stopped during navigation", async () => {
       vi.useFakeTimers();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
+      router.addActivateGuard("users", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 50);
+        });
       });
 
       const promise = router.navigate("users");
@@ -361,7 +371,6 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });
@@ -371,8 +380,19 @@ describe("router.navigate() - concurrent navigation", () => {
 
       vi.useFakeTimers();
 
-      const unsub = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 100));
+      router.addActivateGuard("users", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 100);
+        });
+      });
+      router.addActivateGuard("profile", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 100);
+        });
       });
 
       const promise1 = router.navigate("users");
@@ -395,7 +415,6 @@ describe("router.navigate() - concurrent navigation", () => {
         code: errorCodes.TRANSITION_CANCELLED,
       });
 
-      unsub();
       await router.start("/home");
       vi.useRealTimers();
     });

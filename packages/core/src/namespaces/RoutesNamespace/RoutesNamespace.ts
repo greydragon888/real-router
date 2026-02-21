@@ -1327,24 +1327,23 @@ export class RoutesNamespace<
     route: Route<Dependencies>,
     fullName: string,
   ): void {
-    // Store custom (non-standard) route fields for getRouteConfig()
-    const {
-      name: _name,
-      path: _path,
-      children: _children,
-      canActivate: _ca,
-      canDeactivate: _cd,
-      forwardTo: _ft,
-      encodeParams: _ep,
-      decodeParams: _dp,
-      defaultParams: _defP,
-      ...customFields
-    } = route;
+    const standardKeys = new Set([
+      "name",
+      "path",
+      "children",
+      "canActivate",
+      "canDeactivate",
+      "forwardTo",
+      "encodeParams",
+      "decodeParams",
+      "defaultParams",
+    ]);
+    const customFields = Object.fromEntries(
+      Object.entries(route).filter(([k]) => !standardKeys.has(k)),
+    );
+
     if (Object.keys(customFields).length > 0) {
-      this.#routeCustomFields[fullName] = customFields as Record<
-        string,
-        unknown
-      >;
+      this.#routeCustomFields[fullName] = customFields;
     }
 
     // Register canActivate via deps.canActivate (allows tests to spy on router.canActivate)

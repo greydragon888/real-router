@@ -265,11 +265,11 @@ describe("dispose", () => {
 
     it("useMiddleware() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.useMiddleware(() => () => true);
+        router.useMiddleware(() => () => {});
       }).toThrowError();
 
       try {
-        router.useMiddleware(() => () => true);
+        router.useMiddleware(() => () => {});
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }

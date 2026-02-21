@@ -217,11 +217,11 @@ describe("navigateToDefault", () => {
       }
     });
 
-    it("should handle middleware blocking defaultRoute navigation", async () => {
-      const blockingMiddleware = vi.fn().mockReturnValue(false);
+    it("should handle guard blocking defaultRoute navigation", async () => {
+      const blockingGuard = vi.fn().mockReturnValue(false);
 
       await withDefault("users");
-      router.useMiddleware(() => blockingMiddleware);
+      router.addActivateGuard("users", () => blockingGuard);
 
       try {
         await router.navigateToDefault();
@@ -230,11 +230,11 @@ describe("navigateToDefault", () => {
       } catch (error) {
         expect(error).toStrictEqual(
           expect.objectContaining({
-            code: errorCodes.TRANSITION_ERR,
-            message: "TRANSITION_ERR",
+            code: errorCodes.CANNOT_ACTIVATE,
+            message: "CANNOT_ACTIVATE",
           }),
         );
-        expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+        expect(blockingGuard).toHaveBeenCalledTimes(1);
       }
     });
 
@@ -826,12 +826,11 @@ describe("navigateToDefault", () => {
     it("should propagate navigation errors to callback", async () => {
       vi.useFakeTimers();
 
-      const customError = new RouterError(errorCodes.TRANSITION_ERR, {
+      const customError = new RouterError(errorCodes.CANNOT_ACTIVATE, {
         message: "Custom navigation error",
       });
 
-      // Add middleware that causes an error
-      router.useMiddleware(() => () => {
+      router.addActivateGuard("users", () => () => {
         return new Promise((_resolve, reject) => {
           setTimeout(() => {
             reject(customError);
@@ -841,7 +840,6 @@ describe("navigateToDefault", () => {
 
       const promise = router.navigateToDefault();
 
-      // Advance time to trigger error propagation
       await vi.advanceTimersByTimeAsync(10);
 
       try {
@@ -849,7 +847,7 @@ describe("navigateToDefault", () => {
 
         expect.fail("Should have thrown an error");
       } catch (error) {
-        expect(error).toStrictEqual(customError);
+        expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
       }
 
       vi.useRealTimers();

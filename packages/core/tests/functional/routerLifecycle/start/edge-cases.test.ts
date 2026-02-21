@@ -79,8 +79,6 @@ describe("router.start() - edge cases", () => {
 
       router.useMiddleware(() => async () => {
         await middlewarePromise;
-
-        return true;
       });
 
       const startPromise = router.start("/users/list");

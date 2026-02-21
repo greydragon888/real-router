@@ -144,13 +144,12 @@ describe("router.start() - lifecycle events", () => {
 
     // "NO_START_PATH_OR_STATE should emit TRANSITION_ERROR" tests removed in Task 6 — start() now requires path
 
-    describe("TRANSITION_ERR should emit TRANSITION_ERROR", () => {
-      it("should emit TRANSITION_ERROR when middleware blocks transition", async () => {
+    describe("CANNOT_ACTIVATE should emit TRANSITION_ERROR", () => {
+      it("should emit TRANSITION_ERROR when guard blocks transition", async () => {
         const transitionErrorListener = vi.fn();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         router.addEventListener(
@@ -168,15 +167,14 @@ describe("router.start() - lifecycle events", () => {
 
         const error = transitionErrorListener.mock.calls[0][2];
 
-        expect(error.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
 
       it("should emit TRANSITION_ERROR with toState information", async () => {
         const transitionErrorListener = vi.fn();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.view"; // Block users.view
+        router.addActivateGuard("users.view", () => () => {
+          throw new Error("Blocked");
         });
 
         router.addEventListener(
@@ -195,20 +193,18 @@ describe("router.start() - lifecycle events", () => {
         const [toState, fromState, error] =
           transitionErrorListener.mock.calls[0];
 
-        // toState should be provided when available
         expect(toState).toBeDefined();
         expect(toState.name).toBe("users.view");
         expect(toState.params).toStrictEqual({ id: "123" });
         expect(fromState).toBeUndefined();
-        expect(error.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
 
       it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         router.addEventListener(
@@ -222,13 +218,11 @@ describe("router.start() - lifecycle events", () => {
           // Expected to fail
         }
 
-        // Event should be triggered
         expect(transitionErrorListener).toHaveBeenCalledTimes(1);
 
-        // Check the error
         const eventError = transitionErrorListener.mock.calls[0][2];
 
-        expect(eventError.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(eventError.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
     });
 
@@ -269,12 +263,11 @@ describe("router.start() - lifecycle events", () => {
 
       // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
 
-      it("should have consistent event signature (toState, fromState, error) for TRANSITION_ERR", async () => {
+      it("should have consistent event signature (toState, fromState, error) for CANNOT_ACTIVATE", async () => {
         const transitionErrorListener = vi.fn();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         router.addEventListener(
@@ -294,12 +287,11 @@ describe("router.start() - lifecycle events", () => {
 
         const [toState, fromState, error] = args;
 
-        // TRANSITION_ERR has toState (route exists but transition failed)
         expect(toState).toBeDefined();
         expect(toState.name).toBe("users.list");
         expect(fromState).toBeUndefined();
         expect(error).toBeInstanceOf(Error);
-        expect(error.code).toBe(errorCodes.TRANSITION_ERR);
+        expect(error.code).toBe(errorCodes.CANNOT_ACTIVATE);
       });
     });
 
@@ -331,13 +323,12 @@ describe("router.start() - lifecycle events", () => {
 
       // NO_START_PATH_OR_STATE test removed in Task 6 — start() now requires path
 
-      it("should NOT emit TRANSITION_SUCCESS for TRANSITION_ERR", async () => {
+      it("should NOT emit TRANSITION_SUCCESS for CANNOT_ACTIVATE", async () => {
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();
 
-        // Add middleware that blocks the transition
-        router.useMiddleware(() => (toState) => {
-          return toState.name !== "users.list"; // Block users.list
+        router.addActivateGuard("users.list", () => () => {
+          throw new Error("Blocked");
         });
 
         router.addEventListener(

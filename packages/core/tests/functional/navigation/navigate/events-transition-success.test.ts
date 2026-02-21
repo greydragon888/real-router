@@ -192,15 +192,14 @@ describe("router.navigate() - events transition success", () => {
       // TRANSITION_SUCCESS should be called after guards/middleware
       expect(onSuccess).toHaveBeenCalledTimes(1);
 
-      // Verify call order: guards/middleware before TRANSITION_SUCCESS
+      // Verify call order: guards before TRANSITION_SUCCESS (middleware is post-commit, runs after)
       const deactivateCallTime = canDeactivateGuard.mock.invocationCallOrder[0];
       const activateCallTime = canActivateGuard.mock.invocationCallOrder[0];
-      const middlewareCallTime = middleware.mock.invocationCallOrder[0];
       const successCallTime = onSuccess.mock.invocationCallOrder[0];
 
       expect(deactivateCallTime).toBeLessThan(successCallTime);
       expect(activateCallTime).toBeLessThan(successCallTime);
-      expect(middlewareCallTime).toBeLessThan(successCallTime);
+      // Middleware is post-commit (fire-and-forget), called after TRANSITION_SUCCESS
 
       unsubSuccess();
     });
@@ -253,10 +252,15 @@ describe("router.navigate() - events transition success", () => {
         onCancel,
       );
 
-      // Set up async middleware to allow cancellation
-      const unsubMiddleware = router.useMiddleware(() => async () => {
-        await new Promise((resolve) => setTimeout(resolve, 50));
-      });
+      router.addActivateGuard(
+        "users.view",
+        () => () =>
+          new Promise((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
 
       const promise = router.navigate("users.view", { id: 456 });
 
@@ -274,15 +278,12 @@ describe("router.navigate() - events transition success", () => {
         expect(error.code).toBe(errorCodes.TRANSITION_CANCELLED);
       }
 
-      // Now assertions
       expect(onSuccess).not.toHaveBeenCalled();
       expect(onCancel).toHaveBeenCalledTimes(1);
 
-      // Cleanup
       unsubSuccess();
       unsubCancel();
 
-      unsubMiddleware();
       await router.start("/home");
       vi.useRealTimers();
     });

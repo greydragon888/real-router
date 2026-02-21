@@ -51,23 +51,17 @@ describe("router.navigate() - middleware execution", () => {
       expect(middleware3).toHaveBeenCalledTimes(1);
     });
 
-    it("should respect blocking middleware", async () => {
-      const allowingMiddleware = vi.fn().mockReturnValue(true);
-      const blockingMiddleware = vi.fn().mockReturnValue(false);
+    it("should call all middleware even if one returns a value", async () => {
+      const middleware1 = vi.fn();
+      const middleware2 = vi.fn();
 
-      router.useMiddleware(() => allowingMiddleware);
-      router.useMiddleware(() => blockingMiddleware);
+      router.useMiddleware(() => middleware1);
+      router.useMiddleware(() => middleware2);
 
-      try {
-        await router.navigate("orders", {}, {});
+      await router.navigate("orders", {}, {});
 
-        expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-      }
-
-      expect(allowingMiddleware).toHaveBeenCalledTimes(1);
-      expect(blockingMiddleware).toHaveBeenCalledTimes(1);
+      expect(middleware1).toHaveBeenCalledTimes(1);
+      expect(middleware2).toHaveBeenCalledTimes(1);
     });
 
     it("should call middleware for nested routes", async () => {
@@ -170,49 +164,36 @@ describe("router.navigate() - middleware execution", () => {
       freshRouter.stop();
     });
 
-    it("should block start() transition when middleware returns false", async () => {
-      const blockingMiddleware = vi.fn().mockReturnValue(false);
+    it("should call middleware during start() transition", async () => {
+      const middlewareFn = vi.fn();
 
       const freshRouter = createTestRouter();
 
-      freshRouter.useMiddleware(() => blockingMiddleware);
+      freshRouter.useMiddleware(() => middlewareFn);
 
-      try {
-        await freshRouter.start("/");
+      await freshRouter.start("/");
 
-        expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (error: any) {
-        expect(blockingMiddleware).toHaveBeenCalled();
-        expect(error).toBeDefined();
-        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-      }
+      expect(middlewareFn).toHaveBeenCalled();
+      expect(freshRouter.getState()?.name).toBe("index");
 
       freshRouter.stop();
     });
 
-    it("should block navigate() when middleware returns false", async () => {
-      const selectiveMiddleware = vi.fn().mockImplementation((toState) => {
-        return toState.name === "index";
-      });
+    it("should call middleware during navigate() after start()", async () => {
+      const middlewareFn = vi.fn();
 
       const freshRouter = createTestRouter();
 
-      freshRouter.useMiddleware(() => selectiveMiddleware);
+      freshRouter.useMiddleware(() => middlewareFn);
 
       await freshRouter.start("/");
 
-      expect(freshRouter.getState()?.name).toBe("index");
+      middlewareFn.mockClear();
 
-      try {
-        await freshRouter.navigate("users");
+      await freshRouter.navigate("users");
 
-        expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-      }
-
-      expect(freshRouter.getState()?.name).toBe("index");
+      expect(middlewareFn).toHaveBeenCalled();
+      expect(freshRouter.getState()?.name).toBe("users");
 
       freshRouter.stop();
     });
@@ -247,9 +228,9 @@ describe("router.navigate() - middleware execution", () => {
       freshRouter.stop();
     });
 
-    it("should allow middleware to block navigation with custom error", async () => {
+    it("should not block start() when middleware throws (fire-and-forget)", async () => {
       const errorMessage = "Custom middleware error";
-      const blockingMiddleware = vi.fn().mockImplementation(() => {
+      const throwingMiddleware = vi.fn().mockImplementation(() => {
         throw new RouterError(errorCodes.TRANSITION_ERR, {
           message: errorMessage,
         });
@@ -257,18 +238,12 @@ describe("router.navigate() - middleware execution", () => {
 
       const freshRouter = createRouter([{ name: "index", path: "/" }]);
 
-      freshRouter.useMiddleware(() => blockingMiddleware);
+      freshRouter.useMiddleware(() => throwingMiddleware);
 
-      try {
-        await freshRouter.start("/");
+      const state = await freshRouter.start("/");
 
-        expect.fail("Should have thrown TRANSITION_ERR");
-      } catch (error: any) {
-        expect(blockingMiddleware).toHaveBeenCalledTimes(1);
-        expect(error).toBeDefined();
-        expect((error as RouterError).code).toBe(errorCodes.TRANSITION_ERR);
-        expect((error as RouterError).message).toBe(errorMessage);
-      }
+      expect(throwingMiddleware).toHaveBeenCalledTimes(1);
+      expect(state?.name).toBe("index");
 
       freshRouter.stop();
     });

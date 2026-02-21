@@ -95,8 +95,6 @@ describe("core/observable/addEventListener", () => {
       // Add slow middleware to allow cancellation
       router.useMiddleware(() => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
-
-        return true;
       });
 
       router.addEventListener(events.TRANSITION_CANCEL, cb);

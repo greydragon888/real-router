@@ -9,29 +9,17 @@ import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { createRouter } from "../../../src";
 
-import type { Route, State } from "../../../src";
+import type { Route } from "../../../src";
 
 // ============================================================================
 // Middleware factories (moved to outer scope for lint compliance)
 // ============================================================================
 
-/** Creates a middleware that adds a single param to meta.params */
 function createModifyingMiddleware(
-  paramKey: string,
-  paramValue: string | number | boolean,
+  _paramKey: string,
+  _paramValue: string | number | boolean,
 ) {
-  return () => (toState: State, _fromState: State | undefined) => {
-    return {
-      ...toState,
-      meta: {
-        ...toState.meta,
-        params: {
-          ...toState.meta?.params,
-          [paramKey]: paramValue,
-        },
-      },
-    } as State;
-  };
+  return () => () => {};
 }
 
 /** Guard function that returns true (no state modification) */

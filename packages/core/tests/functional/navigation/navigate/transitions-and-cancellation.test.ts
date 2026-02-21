@@ -24,10 +24,8 @@ describe("router.navigate() - transitions and cancellation", () => {
   });
 
   it("should be able to handle multiple cancellations", async () => {
-    const middleware = async (): Promise<boolean> => {
+    const middleware = async (): Promise<void> => {
       await new Promise((resolve) => setTimeout(resolve, 10));
-
-      return true;
     };
 
     router.useMiddleware(() => middleware);
@@ -115,25 +113,25 @@ describe("router.navigate() - transitions and cancellation", () => {
       it("should handle multiple stop() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        const middleware2 = async (): Promise<boolean> => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-
-          return true;
-        };
-
-        freshRouter.useMiddleware(() => middleware2);
+        freshRouter.addActivateGuard(
+          "users",
+          () => () =>
+            new Promise((resolve) =>
+              setTimeout(() => {
+                resolve(true);
+              }, 100),
+            ),
+        );
         await freshRouter.start("/home");
 
         const promise = freshRouter.navigate("users");
 
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        // Stop navigation multiple times
         freshRouter.stop();
         freshRouter.stop();
         freshRouter.stop();
 
-        // Navigation should be cancelled
         try {
           await promise;
 

@@ -184,32 +184,27 @@ describe("router.navigate() - auto cleanup", () => {
     });
 
     describe("autoCleanUp with transition errors", () => {
-      it("should not remove canDeactivate when middleware blocks transition", async () => {
+      it("should not remove canDeactivate when activate guard blocks transition", async () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        // Navigate to users first (before adding blocking middleware)
         await router.navigate("users", {}, {});
 
-        // Set up guard
         router.addDeactivateGuard("users", () => usersDeactivateGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
 
-        // Add blocking middleware
-        const blockingMiddleware = vi.fn().mockReturnValue(false);
+        const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.useMiddleware(() => blockingMiddleware);
+        router.addActivateGuard("orders", () => blockingActivateGuard);
 
-        // Try to navigate away (should be blocked)
         try {
           await router.navigate("orders", {}, {});
 
           expect.fail("Should have thrown error");
         } catch (error) {
-          expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
+          expect((error as any)?.code).toBe(errorCodes.CANNOT_ACTIVATE);
         }
 
-        // Guard should NOT be removed (transition failed)
         expect(hasCanDeactivate("users")).toBe(true);
       });
 
@@ -291,38 +286,23 @@ describe("router.navigate() - auto cleanup", () => {
         expect(hasCanDeactivate("users")).toBe(true);
       });
 
-      it("should handle autoCleanUp with redirect scenarios", async () => {
+      it("should handle autoCleanUp when navigating away from guarded route", async () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
         const profileDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        // Navigate to users first
         await router.navigate("users", {}, {});
 
-        // Set up guards and redirect after initial navigation
         router.addDeactivateGuard("users", () => usersDeactivateGuard);
         router.addDeactivateGuard("profile", () => profileDeactivateGuard);
-
-        // Set up redirect from orders to profile using middleware
-        router.useMiddleware(() => (toState) => {
-          if (toState.name === "orders") {
-            return { name: "profile", params: {}, path: "/profile" };
-          }
-
-          return; // Pass through for other routes
-        });
 
         expect(hasCanDeactivate("users")).toBe(true);
         expect(hasCanDeactivate("profile")).toBe(true);
 
-        // Navigate to orders (will redirect to profile)
         const state = await router.navigate("orders", {}, {});
 
-        expect(state.name).toBe("profile");
+        expect(state.name).toBe("orders");
 
-        // users should be removed (was active, now not active in final state)
         expect(hasCanDeactivate("users")).toBe(false);
-
-        // profile should remain (it's the final active route)
         expect(hasCanDeactivate("profile")).toBe(true);
       });
 

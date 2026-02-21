@@ -130,14 +130,12 @@ describe("router.navigate() - events transition start", () => {
       );
 
       // Set up async middleware that only delays specific route
-      router.useMiddleware(() => (toState) => {
+      router.useMiddleware(() => async (toState) => {
         if (toState.name === "users.view") {
-          return new Promise((resolve) => {
+          await new Promise((resolve) => {
             setTimeout(resolve, 50);
           });
         }
-
-        return true;
       });
 
       const firstNav = router.navigate("users.view", { id: 456 });

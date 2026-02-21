@@ -1,11 +1,9 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi } from "vitest";
 
-import { RouterError } from "@real-router/core";
-
 import { executeMiddleware } from "../../../src/namespaces/NavigationNamespace/transition/executeMiddleware";
 
-import type { State, ActivationFn } from "@real-router/types";
+import type { MiddlewareFn, State } from "@real-router/types";
 
 describe("transition/executeMiddleware", () => {
   const createState = (name: string): State => ({
@@ -15,147 +13,144 @@ describe("transition/executeMiddleware", () => {
     meta: { id: 1, params: {}, options: {} },
   });
 
-  describe("safeCallback error handling", () => {
-    it("should catch and log error when callback throws with no middleware", async () => {
-      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-      const toState = createState("users");
-      const fromState = createState("home");
-      const middlewareFunctions: ActivationFn[] = [];
+  it("should call all middleware with correct args", () => {
+    const toState = createState("users");
+    const fromState = createState("home");
+    const middleware1 = vi.fn().mockReturnValue(true);
+    const middleware2 = vi.fn().mockReturnValue(true);
 
-      try {
-        const result = await executeMiddleware(
-          middlewareFunctions,
-          toState,
-          fromState,
-          () => false,
-        );
+    executeMiddleware([middleware1, middleware2], toState, fromState);
 
-        expect(result).toBe(toState);
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
+    expect(middleware1).toHaveBeenCalledWith(toState, fromState);
+    expect(middleware2).toHaveBeenCalledWith(toState, fromState);
+  });
 
-      loggerSpy.mockRestore();
-    });
+  it("should be a no-op with empty array", () => {
+    const toState = createState("users");
 
-    it("should catch and log error when callback throws after middleware", async () => {
-      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-      const toState = createState("users");
-      const fromState = createState("home");
+    expect(() => {
+      executeMiddleware([], toState, undefined);
+    }).not.toThrowError();
+  });
 
-      // Middleware that passes through
-      const passMiddleware: ActivationFn = (_toState) => {
-        return _toState;
-      };
+  it("should return toState when middleware returns true", () => {
+    const toState = createState("users");
+    const middleware: MiddlewareFn = vi.fn().mockReturnValue(true);
 
-      const middlewareFunctions: ActivationFn[] = [passMiddleware];
+    expect(() => {
+      executeMiddleware([middleware], toState, undefined);
+    }).not.toThrowError();
+    expect(middleware).toHaveBeenCalledTimes(1);
+  });
 
-      try {
-        const result = await executeMiddleware(
-          middlewareFunctions,
-          toState,
-          fromState,
-          () => false,
-        );
+  it("should return toState when middleware returns void", () => {
+    const toState = createState("users");
+    const middleware: MiddlewareFn = vi.fn().mockReturnValue(undefined);
 
-        expect(result).toBe(toState);
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
+    expect(() => {
+      executeMiddleware([middleware], toState, undefined);
+    }).not.toThrowError();
+    expect(middleware).toHaveBeenCalledTimes(1);
+  });
 
-      loggerSpy.mockRestore();
-    });
+  it("should not throw when middleware returns false (fire-and-forget)", () => {
+    const toState = createState("users");
+    const middleware: MiddlewareFn = vi.fn().mockReturnValue(false);
 
-    it("should catch and log error when callback throws on cancellation", async () => {
-      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-      const toState = createState("users");
-      const fromState = createState("home");
+    expect(() => {
+      executeMiddleware([middleware], toState, undefined);
+    }).not.toThrowError();
+    expect(middleware).toHaveBeenCalledTimes(1);
+  });
 
-      // Middleware that simulates async operation
-      const asyncMiddleware: ActivationFn = (_toState) => {
-        return new Promise<State>((resolve) => {
-          setTimeout(() => {
-            resolve(_toState);
-          }, 0);
-        });
-      };
+  it("should log error and continue when middleware throws synchronously", () => {
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const toState = createState("users");
+    const error = new Error("sync error");
+    const errorMiddleware: MiddlewareFn = () => {
+      throw error;
+    };
 
-      const middlewareFunctions: ActivationFn[] = [asyncMiddleware];
+    expect(() => {
+      executeMiddleware([errorMiddleware], toState, undefined);
+    }).not.toThrowError();
 
-      let cancelled = false;
+    expect(errorSpy).toHaveBeenCalledWith(
+      "core:middleware",
+      "Middleware error:",
+      error,
+    );
 
-      try {
-        const promise = executeMiddleware(
-          middlewareFunctions,
-          toState,
-          fromState,
-          () => cancelled,
-        );
+    errorSpy.mockRestore();
+  });
 
-        // Cancel before middleware completes
-        cancelled = true;
+  it("should attach catch handler when middleware returns Promise.reject", async () => {
+    const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
+    const toState = createState("users");
+    const error = new Error("async error");
+    const asyncMiddleware: MiddlewareFn = () => Promise.reject(error);
 
-        const result = await promise;
+    expect(() => {
+      executeMiddleware([asyncMiddleware], toState, undefined);
+    }).not.toThrowError();
 
-        expect(result).toBe(toState);
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-      }
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
-      loggerSpy.mockRestore();
-    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "core:middleware",
+      "Async middleware error:",
+      error,
+    );
 
-    it("should re-throw RouterError with TRANSITION_ERR code when middleware throws RouterError", async () => {
-      const toState = createState("users");
-      const fromState = createState("home");
+    errorSpy.mockRestore();
+  });
 
-      // Middleware that throws a RouterError directly
-      const routerErrorMiddleware: ActivationFn = () => {
-        throw new RouterError("CANNOT_ACTIVATE");
-      };
+  it("should call all middleware even when one throws (fire-and-forget chain)", () => {
+    const toState = createState("users");
+    const fromState = createState("home");
+    const errorMiddleware: MiddlewareFn = () => {
+      throw new Error("fail");
+    };
+    const middleware2 = vi.fn().mockReturnValue(true);
 
-      const middlewareFunctions: ActivationFn[] = [routerErrorMiddleware];
+    expect(() => {
+      executeMiddleware([errorMiddleware, middleware2], toState, fromState);
+    }).not.toThrowError();
 
-      try {
-        await executeMiddleware(
-          middlewareFunctions,
-          toState,
-          fromState,
-          () => false,
-        );
+    expect(middleware2).toHaveBeenCalledTimes(1);
+  });
 
-        expect.fail("Should have thrown");
-      } catch (error) {
-        expect(error).toBeInstanceOf(RouterError);
-        expect((error as RouterError).code).toBe("TRANSITION_ERR");
-      }
-    });
+  it("should call middleware even when it returns a State (return value ignored)", () => {
+    const toState = createState("users");
+    const redirectState = createState("home");
+    const middleware: MiddlewareFn = vi.fn().mockReturnValue(redirectState);
 
-    it("should catch and log error when callback throws on middleware error", async () => {
-      const loggerSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
-      const toState = createState("users");
-      const fromState = createState("home");
+    expect(() => {
+      executeMiddleware([middleware], toState, undefined);
+    }).not.toThrowError();
+    expect(middleware).toHaveBeenCalledTimes(1);
+  });
 
-      // Middleware that throws
-      const errorMiddleware: ActivationFn = () => {
-        throw new Error("Middleware error");
-      };
+  it("should work when fromState is undefined", () => {
+    const toState = createState("users");
+    const middleware = vi.fn().mockReturnValue(true);
 
-      const middlewareFunctions: ActivationFn[] = [errorMiddleware];
+    expect(() => {
+      executeMiddleware([middleware], toState, undefined);
+    }).not.toThrowError();
 
-      try {
-        await executeMiddleware(
-          middlewareFunctions,
-          toState,
-          fromState,
-          () => false,
-        );
-      } catch (error) {
-        expect(error).toBeInstanceOf(Error);
-        expect((error as Error).message).toBe("Middleware error");
-      }
+    expect(middleware).toHaveBeenCalledWith(toState, undefined);
+  });
 
-      loggerSpy.mockRestore();
-    });
+  it("should call all middleware with same toState (no redirect chaining)", () => {
+    const toState = createState("users");
+    const redirectState = createState("admin");
+    const fromState = createState("home");
+    const middleware1: MiddlewareFn = vi.fn().mockReturnValue(redirectState);
+    const middleware2 = vi.fn().mockReturnValue(true);
+
+    executeMiddleware([middleware1, middleware2], toState, fromState);
+
+    expect(middleware2).toHaveBeenCalledWith(toState, fromState);
   });
 });

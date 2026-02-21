@@ -171,19 +171,13 @@ describe("BaseLink - Integration Tests", () => {
       }
     });
 
-    it("should handle navigation with middleware that modifies state", async () => {
-      const modifyingMiddleware = () => (toState: State) => {
-        // Add timestamp to all navigations
-        return {
-          ...toState,
-          params: {
-            ...toState.params,
-            timestamp: Date.now(),
-          },
-        };
+    it("should handle navigation with middleware as fire-and-forget side effect", async () => {
+      const sideEffects: string[] = [];
+      const trackingMiddleware = () => (toState: State) => {
+        sideEffects.push(toState.name);
       };
 
-      router.useMiddleware(modifyingMiddleware);
+      router.useMiddleware(trackingMiddleware);
 
       render(
         <BaseLink router={router} routeName="one-more-test" data-testid="link">
@@ -195,9 +189,8 @@ describe("BaseLink - Integration Tests", () => {
       await user.click(screen.getByTestId("link"));
 
       await waitFor(() => {
-        const state = router.getState();
-
-        expect(state?.params.timestamp).toBeDefined();
+        expect(router.getState()?.name).toBe("one-more-test");
+        expect(sideEffects).toContain("one-more-test");
       });
     });
   });

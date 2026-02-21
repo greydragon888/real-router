@@ -1,4 +1,5 @@
 import { logger } from "@real-router/logger";
+
 import type { MiddlewareFn, State } from "@real-router/types";
 
 export const executeMiddleware = (
@@ -9,6 +10,7 @@ export const executeMiddleware = (
   for (const middlewareFn of middlewareFunctions) {
     try {
       const result = middlewareFn(toState, fromState);
+
       if (result instanceof Promise) {
         result.catch((error: unknown) => {
           logger.error("core:middleware", "Async middleware error:", error);

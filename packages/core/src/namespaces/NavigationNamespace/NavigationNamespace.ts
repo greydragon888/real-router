@@ -2,8 +2,8 @@
 
 import { logger } from "@real-router/logger";
 
-import { executeMiddleware } from "./transition/executeMiddleware";
 import { transition } from "./transition";
+import { executeMiddleware } from "./transition/executeMiddleware";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
@@ -200,6 +200,7 @@ export class NavigationNamespace {
         deps.sendTransitionDone(stateWithTransition, fromState, opts);
 
         const middlewareFunctions = this.#deps.getMiddlewareFunctions();
+
         if (middlewareFunctions.length > 0) {
           executeMiddleware(
             middlewareFunctions,
@@ -306,6 +307,7 @@ export class NavigationNamespace {
       return;
     }
 
+    /* v8 ignore next 7 -- @preserve: defensive guard for unexpected error codes (e.g. future error types); else branch unreachable after middleware became fire-and-forget */
     if (
       routerError.code === errorCodes.CANNOT_ACTIVATE ||
       routerError.code === errorCodes.CANNOT_DEACTIVATE
