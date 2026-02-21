@@ -20,14 +20,6 @@ export interface LimitsConfig {
   maxPlugins: number;
 
   /**
-   * Maximum number of middleware functions in the navigation pipeline.
-   * Controls middleware chain length to prevent stack overflow and performance issues.
-   *
-   * @default 50
-   */
-  maxMiddleware: number;
-
-  /**
    * Maximum number of event listeners per event type.
    * Prevents memory leaks from excessive listener registration.
    *

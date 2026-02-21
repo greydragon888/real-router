@@ -78,7 +78,7 @@ export async function transition(
   return {
     state: toState,
     meta: {
-      phase: "middleware",
+      phase: "activating",
       segments: {
         deactivated: toDeactivate,
         activated: toActivate,

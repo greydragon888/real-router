@@ -90,7 +90,6 @@ export const validEventNames = new Set<EventName>([
 export const DEFAULT_LIMITS = {
   maxDependencies: 100,
   maxPlugins: 50,
-  maxMiddleware: 50,
   maxListeners: 10_000,
   warnListeners: 1000,
   maxEventDepth: 5,
@@ -104,7 +103,6 @@ export const DEFAULT_LIMITS = {
 export const LIMIT_BOUNDS = {
   maxDependencies: { min: 0, max: 10_000 },
   maxPlugins: { min: 0, max: 1000 },
-  maxMiddleware: { min: 0, max: 1000 },
   maxListeners: { min: 0, max: 100_000 },
   warnListeners: { min: 0, max: 100_000 },
   maxEventDepth: { min: 0, max: 100 },

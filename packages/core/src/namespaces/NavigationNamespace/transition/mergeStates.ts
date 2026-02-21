@@ -31,7 +31,7 @@ export const mergeStates = (toState: State, fromState: State): State => {
       : (toParams ?? fromParams ?? {});
 
   // Optimization #2: Build meta with defaults, then apply fromMeta, then toMeta
-  // Note: StateMeta can have custom fields added by guards/middleware, so we preserve them
+  // Note: StateMeta can have custom fields added by guards, so we preserve them
   const resultMeta: StateMeta = {
     // Defaults first
     id: 1,
@@ -46,7 +46,7 @@ export const mergeStates = (toState: State, fromState: State): State => {
 
   // Optimization #4: Copy all toState fields (including custom ones)
   // then explicitly set meta to our merged version
-  // Note: State can have custom fields added by middleware, so we must preserve them
+  // Note: State can have custom fields added by guards, so we must preserve them
   return {
     ...toState,
     meta: resultMeta,

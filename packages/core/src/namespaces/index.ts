@@ -12,8 +12,6 @@ export {
 
 export { StateNamespace } from "./StateNamespace";
 
-export { MiddlewareNamespace } from "./MiddlewareNamespace";
-
 export {
   PluginsNamespace,
   EVENTS_MAP,

@@ -18,7 +18,6 @@ import {
   CloneNamespace,
   DependenciesNamespace,
   EventBusNamespace,
-  MiddlewareNamespace,
   NavigationNamespace,
   OptionsNamespace,
   PluginsNamespace,
@@ -37,7 +36,6 @@ import type {
   EventMethodMap,
   GuardFnFactory,
   Limits,
-  MiddlewareFactory,
   PluginFactory,
   Route,
   RouteConfigUpdate,
@@ -69,7 +67,6 @@ import type { CreateMatcherOptions } from "route-tree";
  * - StateNamespace: state storage (getState, setState, getPreviousState)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
- * - MiddlewareNamespace: middleware chain
  * - PluginsNamespace: plugin lifecycle
  * - NavigationNamespace: navigate, navigateToState
  * - RouterLifecycleNamespace: start, stop, isStarted
@@ -92,7 +89,6 @@ export class Router<
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
   readonly #routeLifecycle: RouteLifecycleNamespace<Dependencies>;
-  readonly #middleware: MiddlewareNamespace<Dependencies>;
   readonly #plugins: PluginsNamespace<Dependencies>;
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
@@ -165,7 +161,6 @@ export class Router<
       deriveMatcherOptions(this.#options.get()),
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
-    this.#middleware = new MiddlewareNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
     this.#navigation = new NavigationNamespace();
     this.#lifecycle = new RouterLifecycleNamespace();
@@ -204,7 +199,6 @@ export class Router<
         state: this.#state,
         routes: this.#routes,
         routeLifecycle: this.#routeLifecycle,
-        middleware: this.#middleware,
         plugins: this.#plugins,
         navigation: this.#navigation,
         lifecycle: this.#lifecycle,
@@ -266,8 +260,6 @@ export class Router<
     // Plugins
     this.usePlugin = this.usePlugin.bind(this);
 
-    // Middleware
-    this.useMiddleware = this.useMiddleware.bind(this);
     // Dependencies
     this.setDependency = this.setDependency.bind(this);
     this.setDependencies = this.setDependencies.bind(this);
@@ -720,7 +712,6 @@ export class Router<
     this.#eventBus.clearAll();
 
     this.#plugins.disposeAll();
-    this.#middleware.clearAll();
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();
@@ -861,48 +852,6 @@ export class Router<
 
     // 4. Execute (warnings, deduplication, initialization, commit)
     return this.#plugins.use(...plugins);
-  }
-
-  // ============================================================================
-  // Middleware
-  // ============================================================================
-
-  useMiddleware(
-    ...middlewares: MiddlewareFactory<Dependencies>[]
-  ): Unsubscribe {
-    if (!this.#noValidate) {
-      // 1. Validate input arguments
-      MiddlewareNamespace.validateUseMiddlewareArgs<Dependencies>(middlewares);
-
-      // 2. Validate no duplicates
-      MiddlewareNamespace.validateNoDuplicates<Dependencies>(
-        middlewares,
-        this.#middleware.has.bind(this.#middleware),
-      );
-
-      // 3. Validate limit
-      MiddlewareNamespace.validateMiddlewareLimit(
-        this.#middleware.count(),
-        middlewares.length,
-        this.#limits.maxMiddleware,
-      );
-    }
-
-    // 4. Initialize (without committing)
-    const initialized = this.#middleware.initialize(...middlewares);
-
-    // 5. Validate results
-    if (!this.#noValidate) {
-      for (const { middleware, factory } of initialized) {
-        MiddlewareNamespace.validateMiddleware<Dependencies>(
-          middleware,
-          factory,
-        );
-      }
-    }
-
-    // 6. Commit
-    return this.#middleware.commit(initialized);
   }
 
   // ============================================================================
@@ -1149,7 +1098,6 @@ export class Router<
     this.removeActivateGuard = throwDisposed as never;
     this.removeDeactivateGuard = throwDisposed as never;
     this.usePlugin = throwDisposed as never;
-    this.useMiddleware = throwDisposed as never;
     this.setDependency = throwDisposed as never;
     this.setDependencies = throwDisposed as never;
     this.removeDependency = throwDisposed as never;

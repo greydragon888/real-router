@@ -1,12 +1,7 @@
 // packages/core/src/namespaces/CloneNamespace/types.ts
 
 import type { Router } from "../../Router";
-import type {
-  GuardFnFactory,
-  MiddlewareFactory,
-  PluginFactory,
-  Route,
-} from "../../types";
+import type { GuardFnFactory, PluginFactory, Route } from "../../types";
 import type { RouteConfig } from "../RoutesNamespace";
 import type { DefaultDependencies, Options } from "@real-router/types";
 
@@ -19,7 +14,6 @@ export interface CloneData<Dependencies extends DefaultDependencies> {
   dependencies: Partial<Dependencies>;
   canDeactivateFactories: Record<string, GuardFnFactory<Dependencies>>;
   canActivateFactories: Record<string, GuardFnFactory<Dependencies>>;
-  middlewareFactories: MiddlewareFactory<Dependencies>[];
   pluginFactories: PluginFactory<Dependencies>[];
   routeConfig: RouteConfig;
   resolvedForwardMap: Record<string, string>;

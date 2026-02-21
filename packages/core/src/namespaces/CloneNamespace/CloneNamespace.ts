@@ -102,11 +102,6 @@ export class CloneNamespace<
       newRouter.addActivateGuard(name, handler);
     }
 
-    // Copy middleware factories
-    if (data.middlewareFactories.length > 0) {
-      newRouter.useMiddleware(...data.middlewareFactories);
-    }
-
     // Copy plugin factories
     if (data.pluginFactories.length > 0) {
       newRouter.usePlugin(...data.pluginFactories);

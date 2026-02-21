@@ -3,7 +3,6 @@
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
   GuardFn,
-  MiddlewareFn,
   NavigationOptions,
   Options,
   Params,
@@ -91,9 +90,6 @@ export interface NavigationDependencies {
     fromState: State | undefined,
     error: unknown,
   ) => void;
-
-  /** Get snapshot of middleware functions for post-commit execution */
-  getMiddlewareFunctions: () => MiddlewareFn[];
 }
 
 export interface TransitionOutput {

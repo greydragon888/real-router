@@ -19,7 +19,6 @@ export function wireRouter<Dependencies extends DefaultDependencies>(
   builder.wireLimits();
   builder.wireRouteLifecycleDeps();
   builder.wireRoutesDeps();
-  builder.wireMiddlewareDeps();
   builder.wirePluginsDeps();
   builder.wireNavigationDeps();
   builder.wireLifecycleDeps();
