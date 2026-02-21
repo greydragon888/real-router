@@ -1,5 +1,28 @@
 # @real-router/core
 
+## 0.24.0
+
+### Minor Changes
+
+- [#134](https://github.com/greydragon888/real-router/pull/134) [`089d863`](https://github.com/greydragon888/real-router/commit/089d863936e610335a2dad0d653a9be5e0f0b4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Introduce `GuardFn` type, remove `ActivationFn` from guards (#130)
+
+  **Breaking Change:** Guards now must return `boolean | Promise<boolean>` only.
+  Returning `State`, `void`, or `undefined` from guards is no longer supported.
+
+  **Migration:**
+  - Guards returning `true`/`false` → no changes needed
+  - Guards returning `undefined`/`void` → add explicit `return true`
+  - Guards returning `State` → move logic to middleware
+
+- [#134](https://github.com/greydragon888/real-router/pull/134) [`089d863`](https://github.com/greydragon888/real-router/commit/089d863936e610335a2dad0d653a9be5e0f0b4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `isPromise` re-export (#130)
+
+  `isPromise` type guard is no longer exported from `@real-router/core`.
+
+### Patch Changes
+
+- Updated dependencies [[`089d863`](https://github.com/greydragon888/real-router/commit/089d863936e610335a2dad0d653a9be5e0f0b4bc)]:
+  - @real-router/types@0.14.0
+
 ## 0.23.1
 
 ### Patch Changes

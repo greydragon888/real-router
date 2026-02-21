@@ -1,5 +1,14 @@
 # @real-router/types
 
+## 0.14.0
+
+### Minor Changes
+
+- [#134](https://github.com/greydragon888/real-router/pull/134) [`089d863`](https://github.com/greydragon888/real-router/commit/089d863936e610335a2dad0d653a9be5e0f0b4bc) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `GuardFn` type for dedicated guard signatures (#130)
+
+  New `GuardFn` type narrows guard return type to `boolean | Promise<boolean>`.
+  `ActivationFn` remains available for middleware.
+
 ## 0.13.0
 
 ### Minor Changes

@@ -1,5 +1,12 @@
 # type-guards
 
+## 0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`089d863`](https://github.com/greydragon888/real-router/commit/089d863936e610335a2dad0d653a9be5e0f0b4bc)]:
+  - @real-router/types@0.14.0
+
 ## 0.2.0
 
 ### Minor Changes
