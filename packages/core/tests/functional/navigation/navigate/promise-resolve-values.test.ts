@@ -245,7 +245,9 @@ describe("router.navigate() - promise resolve values", () => {
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
-        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: redirectingMiddleware,
+        }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -270,7 +272,9 @@ describe("router.navigate() - promise resolve values", () => {
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
         router.usePlugin(() => ({ onTransitionSuccess: firstMiddleware }));
-        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: redirectingMiddleware,
+        }));
 
         await router.navigate("orders", {}, {});
 
@@ -293,7 +297,9 @@ describe("router.navigate() - promise resolve values", () => {
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
         router.addActivateGuard("profile", () => guard);
-        router.usePlugin(() => ({ onTransitionSuccess: redirectingMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: redirectingMiddleware,
+        }));
 
         await router.navigate("profile", {}, {});
 
@@ -428,7 +434,9 @@ describe("router.navigate() - promise resolve values", () => {
           .fn()
           .mockResolvedValue(redirectState);
 
-        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: promiseRedirectMiddleware,
+        }));
 
         await router.navigate("orders.pending", {}, {});
 
@@ -454,8 +462,12 @@ describe("router.navigate() - promise resolve values", () => {
           .fn()
           .mockResolvedValue(redirectState);
 
-        router.usePlugin(() => ({ onTransitionSuccess: firstPromiseMiddleware }));
-        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: firstPromiseMiddleware,
+        }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: promiseRedirectMiddleware,
+        }));
 
         await router.navigate("orders", {}, {});
 
@@ -480,7 +492,9 @@ describe("router.navigate() - promise resolve values", () => {
           .mockResolvedValue(redirectState);
 
         router.addActivateGuard("profile", () => promiseGuard);
-        router.usePlugin(() => ({ onTransitionSuccess: promiseRedirectMiddleware }));
+        router.usePlugin(() => ({
+          onTransitionSuccess: promiseRedirectMiddleware,
+        }));
 
         await router.navigate("profile", {}, {});
 

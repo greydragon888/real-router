@@ -338,9 +338,9 @@ describe("router.navigate() - navigation meta and options", () => {
       const cancelLog: string[] = [];
 
       freshRouter.usePlugin(() => ({
-        onTransitionSuccess: async (toState) => {
+        onTransitionSuccess: (toState) => {
           if (toState.name !== "home") {
-            await new Promise((resolve) => setTimeout(resolve, 50));
+            void new Promise((resolve) => setTimeout(resolve, 50));
           }
         },
       }));

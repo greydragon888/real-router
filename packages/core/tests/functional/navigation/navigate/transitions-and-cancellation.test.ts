@@ -28,7 +28,11 @@ describe("router.navigate() - transitions and cancellation", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     };
 
-    router.usePlugin(() => ({ onTransitionSuccess: middleware }));
+    router.usePlugin(() => ({
+      onTransitionSuccess: () => {
+        void middleware();
+      },
+    }));
 
     const promises = Array.from({ length: 5 })
       .fill(null)

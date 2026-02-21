@@ -97,9 +97,9 @@ describe("core/observable", () => {
         const cb = vi.fn();
 
         router.usePlugin(() => ({
-          onTransitionSuccess: async (toState) => {
+          onTransitionSuccess: (toState) => {
             if (toState.name === "users") {
-              await new Promise((resolve) => setTimeout(resolve, 50));
+              void new Promise((resolve) => setTimeout(resolve, 50));
             }
           },
         }));

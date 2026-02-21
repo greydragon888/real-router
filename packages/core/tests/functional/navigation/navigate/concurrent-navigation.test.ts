@@ -487,7 +487,9 @@ describe("router.navigate() - concurrent navigation", () => {
 
       router.addActivateGuard("orders.pending", () => () => {
         return new Promise<boolean>((resolve) =>
-          setTimeout(() => resolve(true), 50),
+          setTimeout(() => {
+            resolve(true);
+          }, 50),
         );
       });
 

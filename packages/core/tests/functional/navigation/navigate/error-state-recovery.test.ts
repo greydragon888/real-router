@@ -156,12 +156,13 @@ describe("router.navigate() - error state recovery", () => {
 
     it("should handle Promise rejection in middleware", async () => {
       router.usePlugin(() => ({
-        onTransitionSuccess: () =>
+        onTransitionSuccess: () => {
           new Promise((_resolve, reject) =>
             setTimeout(() => {
               reject(new Error("Async middleware error"));
             }, 10),
-          ),
+          ).catch(() => {});
+        },
       }));
 
       const state = await router.navigate("users");

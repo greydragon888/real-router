@@ -219,25 +219,24 @@ describe("router.start() - path string scenarios", () => {
       }
     });
 
-    it("should not attempt defaultRoute when guard fails for unknown route", async () => {
+    it("should not attempt defaultRoute when navigating to unknown route", async () => {
       router = createTestRouter({ allowNotFound: true, defaultRoute: "home" });
 
       const invalidPath = "/non/existent/path";
-      let guardCallCount = 0;
+      let pluginCallCount = 0;
 
-      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
-        guardCallCount++;
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState) => {
+          pluginCallCount++;
 
-        return false;
-      });
+          expect(toState.name).toBe(constants.UNKNOWN_ROUTE); // only UNKNOWN_ROUTE, not defaultRoute
+        },
+      }));
 
-      try {
-        await router.start(invalidPath);
+      const state = await router.start(invalidPath);
 
-        expect.fail("Should have thrown");
-      } catch {
-        expect(guardCallCount).toBe(1); // only for UNKNOWN_ROUTE
-      }
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(pluginCallCount).toBe(1); // only for UNKNOWN_ROUTE, not defaultRoute
     });
 
     it("should successfully transition to UNKNOWN_ROUTE when middleware succeeds", async () => {

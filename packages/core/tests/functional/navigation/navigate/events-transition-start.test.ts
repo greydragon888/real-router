@@ -131,9 +131,9 @@ describe("router.navigate() - events transition start", () => {
 
       // Set up async plugin that only delays specific route
       router.usePlugin(() => ({
-        onTransitionSuccess: async (toState) => {
+        onTransitionSuccess: (toState) => {
           if (toState.name === "users.view") {
-            await new Promise((resolve) => {
+            void new Promise((resolve) => {
               setTimeout(resolve, 50);
             });
           }

@@ -79,6 +79,7 @@ describe("router.start() - edge cases", () => {
 
       router.addActivateGuard("users.list", () => async () => {
         await guardPromise;
+
         return true;
       });
 

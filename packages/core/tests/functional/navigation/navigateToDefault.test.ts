@@ -932,12 +932,12 @@ describe("navigateToDefault", () => {
 
       // Add middleware that could potentially cause circular navigation
       router.usePlugin(() => ({
-        onTransitionSuccess: async (toState) => {
+        onTransitionSuccess: (toState) => {
           if (
             toState.name === "users" &&
             toState.params.redirect === "default"
           ) {
-            await new Promise((resolve) => setTimeout(resolve, 10));
+            void new Promise((resolve) => setTimeout(resolve, 10));
           }
         },
       }));

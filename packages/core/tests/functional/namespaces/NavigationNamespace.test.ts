@@ -49,7 +49,6 @@ describe("NavigationNamespace - routeTransitionError else branch", () => {
       sendTransitionBlocked,
       sendTransitionError,
       emitTransitionError: vi.fn(),
-      getMiddlewareFunctions: vi.fn().mockReturnValue([]),
     };
 
     const transDeps: TransitionDependencies = {

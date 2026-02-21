@@ -261,6 +261,7 @@ describe("router.start() - error handling", () => {
         // Add async guard that delays the transition
         router.addActivateGuard("home", () => async () => {
           await middlewarePromise;
+
           return true;
         });
 
