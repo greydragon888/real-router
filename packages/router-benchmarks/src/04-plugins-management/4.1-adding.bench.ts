@@ -54,7 +54,9 @@ const BATCH = 50;
 
   bench(`4.1.4 Adding single middleware with cleanup (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      const unsubscribe = router.useMiddleware(() => () => {});
+      const unsubscribe = router.usePlugin(() => ({
+        onTransitionSuccess: () => {},
+      }));
 
       unsubscribe();
     }
@@ -69,13 +71,13 @@ const BATCH = 50;
     `4.1.5 Adding multiple middleware in single call with cleanup (×${BATCH})`,
     () => {
       for (let i = 0; i < BATCH; i++) {
-        const unsubscribe = router.useMiddleware(
-          () => () => {},
-          () => () => {},
-          () => () => {},
-        );
+        const u1 = router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
+        const u2 = router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
+        const u3 = router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
 
-        unsubscribe();
+        u1();
+        u2();
+        u3();
       }
     },
   ).gc("inner");

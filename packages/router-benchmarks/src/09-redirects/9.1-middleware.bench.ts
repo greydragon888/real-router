@@ -8,14 +8,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.1 Simple redirect from middleware", () => {
@@ -27,14 +28,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "user") {
-      const target = fromState?.name === "home" ? "about" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "user") {
+        const target = fromState?.name === "home" ? "about" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.2 Redirect with parameters", () => {
@@ -46,14 +48,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.3 Redirect by returning State object", () => {
@@ -67,23 +70,26 @@ import { createSimpleRouter } from "../helpers";
   // Track redirect count to alternate final destination
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      void _router.makeState("users", {}, "/users");
-    }
-  });
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "users") {
-      // Alternate final destination to avoid SAME_STATES
-      const target = redirectCount++ % 2 === 0 ? "home" : "user";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        void router.makeState("users", {}, "/users");
+      }
+    },
+  }));
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "users") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "user";
 
-      void _router.makeState(
-        target,
-        target === "user" ? { id: "1" } : {},
-        target === "home" ? "/" : "/users/1",
-      );
-    }
-  });
+        void router.makeState(
+          target,
+          target === "user" ? { id: "1" } : {},
+          target === "home" ? "/" : "/users/1",
+        );
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.4 Chain of redirects", () => {
@@ -95,14 +101,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "user" && toState.params.id === "admin") {
-      const target = fromState?.name === "home" ? "about" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "user" && toState.params.id === "admin") {
+        const target = fromState?.name === "home" ? "about" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.5 Conditional redirect", () => {
@@ -114,14 +121,15 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.6 Redirect with replace flag", () => {
@@ -133,15 +141,16 @@ import { createSimpleRouter } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  // Middleware runs post-navigation (fire-and-forget), return value ignored
-  router.useMiddleware((_router) => async (toState, fromState) => {
-    if (toState.name === "about") {
-      await Promise.resolve();
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: async (toState, fromState) => {
+      if (toState.name === "about") {
+        await Promise.resolve();
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.7 Async redirect", async () => {

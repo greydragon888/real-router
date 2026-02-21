@@ -68,9 +68,11 @@ const BATCH = 50;
   const routes = ["about", "users"];
   let index = 0;
 
-  router.useMiddleware(() => (toState) => {
-    void toState;
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      void toState;
+    },
+  }));
   router.start("/users");
 
   bench("4.2.6 Middleware redirect", () => {
@@ -113,12 +115,15 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware(() => () => {
-    const unsubscribe = router.useMiddleware(() => () => {});
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      const unsubscribe = router.usePlugin(() => ({
+        onTransitionSuccess: () => {},
+      }));
 
-    // Cleanup to prevent accumulation
-    unsubscribe();
-  });
+      unsubscribe();
+    },
+  }));
   router.start("/");
   const routes = ["about", "home"];
   let index = 0;
@@ -133,17 +138,20 @@ const BATCH = 50;
   const router = createSimpleRouter();
   let unsubscribeMiddleware: (() => void) | null = null;
 
-  // First middleware that will be removed during navigation
-  unsubscribeMiddleware = router.useMiddleware(() => () => {});
+  unsubscribeMiddleware = router.usePlugin(() => ({
+    onTransitionSuccess: () => {},
+  }));
 
-  // Second middleware that removes the first
-  router.useMiddleware(() => () => {
-    if (unsubscribeMiddleware) {
-      unsubscribeMiddleware();
-      // Re-add to prevent "removing nothing" after first run
-      unsubscribeMiddleware = router.useMiddleware(() => () => {});
-    }
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      if (unsubscribeMiddleware) {
+        unsubscribeMiddleware();
+        unsubscribeMiddleware = router.usePlugin(() => ({
+          onTransitionSuccess: () => {},
+        }));
+      }
+    },
+  }));
 
   router.start("/");
   const routes = ["about", "home"];
@@ -182,7 +190,9 @@ const BATCH_MIDDLEWARE = 200;
     `4.2.13 Multiple middleware removal (idempotent) (×${BATCH_MIDDLEWARE})`,
     () => {
       for (let b = 0; b < BATCH_MIDDLEWARE; b++) {
-        const unsubscribe = router.useMiddleware(() => () => {});
+        const unsubscribe = router.usePlugin(() => ({
+          onTransitionSuccess: () => {},
+        }));
 
         unsubscribe();
         unsubscribe();

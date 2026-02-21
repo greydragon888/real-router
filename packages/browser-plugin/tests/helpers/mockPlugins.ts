@@ -280,5 +280,8 @@ export interface AsyncPluginOptions {
 export const createAsyncPlugin = (
   _options: AsyncPluginOptions = {},
 ): PluginFactory => {
-  return () => ({});
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const factory: PluginFactory = () => ({});
+
+  return factory;
 };

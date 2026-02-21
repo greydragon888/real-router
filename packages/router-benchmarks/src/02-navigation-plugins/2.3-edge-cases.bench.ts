@@ -12,9 +12,9 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  // Add 50 middleware (max limit)
+  // Add 50 plugins (max limit)
   for (let i = 0; i < 50; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   }
 
   router.start("/");
@@ -68,7 +68,7 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => () => {});
+  router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   router.start("/");
 
   bench("2.3.4 Empty middleware (calling done without logic)", () => {
@@ -95,7 +95,7 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => () => {});
+  router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   router.start("/");
 
   bench("2.3.6 Middleware with immediate done call", () => {
@@ -128,9 +128,11 @@ const alternatingRoutes = ["about", "home"];
   const targets = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware((_router) => () => {
-    void _router.makeState("users", {});
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      void router.makeState("users", {});
+    },
+  }));
   router.start("/");
 
   bench("2.3.9 Middleware returning state", () => {
@@ -145,9 +147,11 @@ if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async () => {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    },
+  }));
   router.start("/");
 
   bench("2.3.11 Cancelling navigation during middleware execution", () => {
@@ -176,16 +180,17 @@ if (!IS_ROUTER5) {
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => () => {
-    // Heavy computation
-    let sum = 0;
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      let sum = 0;
 
-    for (let i = 0; i < 1000; i++) {
-      sum += i;
-    }
+      for (let i = 0; i < 1000; i++) {
+        sum += i;
+      }
 
-    void sum;
-  });
+      void sum;
+    },
+  }));
   router.start("/");
 
   bench("2.3.13 Middleware with heavy computation", () => {

@@ -10,11 +10,13 @@ import type { Route } from "../helpers";
 {
   const router = createSimpleRouter();
 
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      void _router.makeState("about", {}, "/about");
-    }
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        void router.makeState("about", {}, "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.1 Redirect to the same route", () => {
@@ -27,20 +29,22 @@ import type { Route } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  // First middleware wins - redirect to alternating destinations
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      const target = redirectCount++ % 2 === 0 ? "home" : "users";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      // This won't execute since first middleware already redirected
-      void _router.makeState("users", {}, "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        void router.makeState("users", {}, "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.2 Multiple middleware with redirects", () => {
@@ -88,13 +92,15 @@ import type { Route } from "../helpers";
   let redirectCount = 0;
 
   // Redirect to alternating destinations (though cancel prevents completion)
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      const target = redirectCount++ % 2 === 0 ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        const target = redirectCount++ % 2 === 0 ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.5 Canceling navigation during redirect", () => {
@@ -110,13 +116,15 @@ import type { Route } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.6 Redirect with meta.options preservation", () => {
@@ -134,17 +142,19 @@ import type { Route } from "../helpers";
   }
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      void _router.makeState(
-        target,
-        params,
-        target === "home" ? "/" : "/users",
-      );
-    }
-  });
+        void router.makeState(
+          target,
+          params,
+          target === "home" ? "/" : "/users",
+        );
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.8 Redirect with very long parameter chain", () => {
@@ -157,21 +167,23 @@ import type { Route } from "../helpers";
   const router = createSimpleRouter();
 
   // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (toState.name === "user" && toState.params.id === "admin") {
-      const target = fromState?.name === "home" ? "about" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "user" && toState.params.id === "admin") {
+        const target = fromState?.name === "home" ? "about" : "home";
 
-      void _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    } else if (toState.name === "user") {
-      const target = fromState?.name === "about" ? "users" : "about";
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      } else if (toState.name === "user") {
+        const target = fromState?.name === "about" ? "users" : "about";
 
-      void _router.makeState(
-        target,
-        {},
-        target === "about" ? "/about" : "/users",
-      );
-    }
-  });
+        void router.makeState(
+          target,
+          {},
+          target === "about" ? "/about" : "/users",
+        );
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.5.9 Conditional redirect depending on parameters", () => {

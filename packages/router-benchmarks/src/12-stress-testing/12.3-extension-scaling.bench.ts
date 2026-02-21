@@ -10,9 +10,8 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   const alternatingRoutes = ["about", "home"];
   let index = 0;
 
-  // Add 50 middleware (max limit)
   for (let i = 0; i < 50; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   }
 
   router.start("/");
@@ -27,7 +26,7 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
   const router = createSimpleRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   }
 
   router.start("/");

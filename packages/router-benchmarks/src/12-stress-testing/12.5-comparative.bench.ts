@@ -177,7 +177,7 @@ if (IS_ROUTER5) {
   }
 
   for (let i = 0; i < 20; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   }
 
   for (let i = 0; i < 30; i++) {
@@ -205,7 +205,7 @@ if (IS_ROUTER5) {
   }
 
   for (let i = 0; i < 20; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   }
 
   for (let i = 0; i < 30; i++) {
