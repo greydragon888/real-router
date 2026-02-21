@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import {
   describe,
   beforeEach,
@@ -16,7 +15,6 @@ import { createTestRouter } from "../../../helpers";
 import type { Router, State } from "@real-router/core";
 
 let router: Router;
-const noop = () => undefined;
 
 describe("router.navigate() - concurrent navigation", () => {
   beforeEach(async () => {
@@ -402,14 +400,13 @@ describe("router.navigate() - concurrent navigation", () => {
       vi.useRealTimers();
     });
 
-    it("should handle cancellation during redirect scenarios", async () => {
-      vi.spyOn(logger, "error").mockImplementation(noop);
+    it("should handle cancellation during slow guard scenarios", async () => {
       vi.useFakeTimers();
 
       router.addActivateGuard("orders", () => () => {
-        return new Promise((resolve) => {
+        return new Promise<boolean>((resolve) => {
           setTimeout(() => {
-            resolve({ name: "profile", params: {}, path: "/profile" });
+            resolve(false);
           }, 40);
         });
       });

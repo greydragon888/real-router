@@ -4,52 +4,52 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
-// 9.2.1 Redirect from canActivate guard
+// 9.2.1 Redirect from middleware
 {
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.addActivateGuard("about", (_router) => () => {
-    const target = redirectCount++ % 2 === 0 ? "home" : "users";
+  router.useMiddleware((_router) => (toState) => {
+    if (toState.name === "about") {
+      const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-    return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+    }
+
+    return toState;
   });
   router.start("/");
 
-  bench("9.2.1 Redirect from canActivate guard", () => {
+  bench("9.2.1 Redirect from middleware (canActivate)", () => {
     router.navigate("about");
   }).gc("inner");
 }
 
-// 9.2.2 Redirect from canDeactivate guard
+// 9.2.2 Redirect from middleware
 {
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  // Setup guards for both routes so we can alternate
-  router.addDeactivateGuard("about", (_router) => () => {
-    const target = redirectCount++ % 2 === 0 ? "home" : "users";
+  router.useMiddleware((_router) => (toState, fromState) => {
+    if (fromState?.name === "about") {
+      const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-    return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
+    }
+
+    if (toState.name !== "about" && fromState?.name !== "about") {
+      return _router.makeState("about", {}, "/about");
+    }
+
+    return toState;
   });
-  router.addDeactivateGuard(
-    "home",
-    (_router) => () => _router.makeState("about", {}, "/about"),
-  );
-  router.addDeactivateGuard(
-    "users",
-    (_router) => () => _router.makeState("about", {}, "/about"),
-  );
   router.start("/");
   router.navigate("about");
 
-  // Navigate away from current route to trigger canDeactivate
   const routes = ["users", "home"];
   let index = 0;
 
-  bench("9.2.2 Redirect from canDeactivate guard", () => {
+  bench("9.2.2 Redirect from middleware (canDeactivate)", () => {
     router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }
@@ -59,24 +59,15 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.addActivateGuard(
-    "user",
+  router.useMiddleware((_router) => (toState) => {
+    if (toState.name === "user" && toState.params.id === "protected") {
+      const target = redirectCount++ % 2 === 0 ? "home" : "about";
 
-    (_router) => (toState) => {
-      if (toState.params.id === "protected") {
-        const target = redirectCount++ % 2 === 0 ? "home" : "about";
+      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
+    }
 
-        return _router.makeState(
-          target,
-          {},
-          target === "home" ? "/" : "/about",
-        );
-      }
-
-      return true;
-    },
-  );
+    return toState;
+  });
   router.start("/");
 
   bench("9.2.3 Redirect with context preservation", () => {

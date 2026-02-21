@@ -20,7 +20,6 @@ import "./guards/params.bench";
 import "./guards/params-strict.bench";
 import "./guards/primitives-boolean.bench";
 import "./guards/primitives-objkey.bench";
-import "./guards/primitives-promise.bench";
 import "./guards/primitives-string.bench";
 import "./guards/primitives-value.bench";
 import "./guards/routes-name.bench";

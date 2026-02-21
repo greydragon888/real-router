@@ -11,7 +11,6 @@ export {
   isState,
   isParams,
   isNavigationOptions,
-  isPromise,
   isBoolean,
   validateRouteName,
 } from "type-guards";

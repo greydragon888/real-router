@@ -161,6 +161,11 @@ export type ActivationFn = (
   // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
 ) => boolean | Promise<boolean | State | void> | State | void;
 
+export type GuardFn = (
+  toState: State,
+  fromState: State | undefined,
+) => boolean | Promise<boolean>;
+
 export type DefaultDependencies = object;
 
 export interface Config {
@@ -241,9 +246,9 @@ export interface Navigator {
  * Defines the contract for router implementations. The actual Router class in
  * @real-router/core implements this interface with full functionality.
  *
- * This interface uses `ActivationFn | boolean` for guard types to avoid circular
+ * This interface uses `GuardFn | boolean` for guard types to avoid circular
  * dependencies. The concrete Router class in @real-router/core narrows this to
- * `ActivationFnFactory | boolean` for more precise type checking.
+ * `GuardFnFactory | boolean` for more precise type checking.
  */
 export interface Router {
   /**
@@ -253,7 +258,7 @@ export interface Router {
    * @param guard - Guard function or boolean
    * @returns this for method chaining
    */
-  addActivateGuard: (name: string, guard: ActivationFn | boolean) => this;
+  addActivateGuard: (name: string, guard: GuardFn | boolean) => this;
 
   /**
    * Register a deactivation guard for a route.
@@ -262,7 +267,7 @@ export interface Router {
    * @param guard - Guard function or boolean
    * @returns this for method chaining
    */
-  addDeactivateGuard: (name: string, guard: ActivationFn | boolean) => this;
+  addDeactivateGuard: (name: string, guard: GuardFn | boolean) => this;
 
   /**
    * Remove an activation guard from a route.

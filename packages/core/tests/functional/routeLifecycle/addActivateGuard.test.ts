@@ -58,25 +58,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     expect(router.getState()?.name).toBe("admin");
   });
 
-  it("should block navigation if canActivate returns an Error", async () => {
-    // @ts-expect-error: for testing purposes
-    router.addActivateGuard("admin", () => () => new Error("Access denied"));
-
-    try {
-      await router.navigate("admin");
-    } catch (error: any) {
-      expect(error?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    }
-
-    expect(router.isActiveRoute("admin")).toBe(false);
-  });
-
-  it("should return error when canActivate returns a different route (guards cannot redirect)", async () => {
-    router.addActivateGuard("sign-in", () => () => ({
-      name: "index",
-      params: {},
-      path: "/",
-    }));
+  it("should return error when canActivate returns false", async () => {
+    router.addActivateGuard("sign-in", () => () => false);
 
     let err: any;
 
@@ -86,16 +69,8 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       err = error;
     }
 
-    // Guards cannot redirect - should return CANNOT_ACTIVATE error
     expect(err?.code).toBe(errorCodes.CANNOT_ACTIVATE);
-    expect(err?.attemptedRedirect).toStrictEqual({
-      name: "index",
-      params: {},
-      path: "/",
-    });
-
-    // Should remain on previous state, not redirect to index
-    expect(router.getState()?.name).not.toBe("index");
+    expect(router.getState()?.name).not.toBe("sign-in");
   });
 
   describe("validation and edge cases", () => {

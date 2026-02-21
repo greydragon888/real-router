@@ -39,8 +39,8 @@ import { getTransitionPath } from "../../transitionPath";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type {
-  ActivationFnFactory,
   BuildStateResultWithSegments,
+  GuardFnFactory,
   Route,
   RouteConfigUpdate,
 } from "../../types";
@@ -85,14 +85,14 @@ export class RoutesNamespace<
   // Key: route name, Value: canActivate factory
   readonly #pendingCanActivate = new Map<
     string,
-    ActivationFnFactory<Dependencies>
+    GuardFnFactory<Dependencies>
   >();
 
   // Pending canDeactivate handlers that need to be registered after router is set
   // Key: route name, Value: canDeactivate factory
   readonly #pendingCanDeactivate = new Map<
     string,
-    ActivationFnFactory<Dependencies>
+    GuardFnFactory<Dependencies>
   >();
 
   #rootPath = "";

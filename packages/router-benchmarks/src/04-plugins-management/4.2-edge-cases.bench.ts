@@ -62,22 +62,22 @@ const BATCH = 50;
   ).gc("inner");
 }
 
-// 4.2.6 Guard returning State
+// 4.2.6 Middleware redirect
 {
   const router = createSimpleRouter();
-  // Alternate: "about" (redirects to "home") and "users"
-  // Start at "users" so redirect to "home" is always a real navigation
   const routes = ["about", "users"];
   let index = 0;
 
-  router.addActivateGuard("about", () => () => ({
-    name: "home",
-    params: {},
-    path: "/",
-  }));
+  router.useMiddleware(() => (toState) => {
+    if (toState.name === "about") {
+      return { name: "home", params: {}, path: "/" };
+    }
+
+    return toState;
+  });
   router.start("/users");
 
-  bench("4.2.6 Guard returning State", () => {
+  bench("4.2.6 Middleware redirect", () => {
     router.navigate(routes[index++ % 2]);
   }).gc("inner");
 }

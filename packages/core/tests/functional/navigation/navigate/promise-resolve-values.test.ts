@@ -22,9 +22,9 @@ describe("router.navigate() - promise resolve values", () => {
   });
 
   describe("promise-based guards and middleware", () => {
-    describe("canDeactivate returns Promise.resolve(undefined)", () => {
-      it("should continue transition when canDeactivate returns Promise.resolve(undefined)", async () => {
-        const promiseDeactivateGuard = vi.fn().mockResolvedValue(undefined);
+    describe("canDeactivate returns Promise.resolve(true)", () => {
+      it("should continue transition when canDeactivate returns Promise.resolve(true)", async () => {
+        const promiseDeactivateGuard = vi.fn().mockResolvedValue(true);
 
         router.addDeactivateGuard(
           "orders.pending",
@@ -43,8 +43,8 @@ describe("router.navigate() - promise resolve values", () => {
       });
 
       it("should handle multiple promise-based canDeactivate guards", async () => {
-        const promiseGuard1 = vi.fn().mockResolvedValue(undefined);
-        const promiseGuard2 = vi.fn().mockResolvedValue(undefined);
+        const promiseGuard1 = vi.fn().mockResolvedValue(true);
+        const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
         router.addDeactivateGuard("orders", () => promiseGuard1);
         router.addDeactivateGuard("orders.pending", () => promiseGuard2);
@@ -61,9 +61,9 @@ describe("router.navigate() - promise resolve values", () => {
       });
     });
 
-    describe("canActivate returns Promise.resolve(undefined)", () => {
-      it("should continue transition when canActivate returns Promise.resolve(undefined)", async () => {
-        const promiseActivateGuard = vi.fn().mockResolvedValue(undefined);
+    describe("canActivate returns Promise.resolve(true)", () => {
+      it("should continue transition when canActivate returns Promise.resolve(true)", async () => {
+        const promiseActivateGuard = vi.fn().mockResolvedValue(true);
 
         router.addActivateGuard("profile", () => promiseActivateGuard);
 
@@ -73,8 +73,8 @@ describe("router.navigate() - promise resolve values", () => {
       });
 
       it("should handle multiple promise-based canActivate guards", async () => {
-        const promiseGuard1 = vi.fn().mockResolvedValue(undefined);
-        const promiseGuard2 = vi.fn().mockResolvedValue(undefined);
+        const promiseGuard1 = vi.fn().mockResolvedValue(true);
+        const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
         router.addActivateGuard("settings", () => promiseGuard1);
         router.addActivateGuard("settings.account", () => promiseGuard2);

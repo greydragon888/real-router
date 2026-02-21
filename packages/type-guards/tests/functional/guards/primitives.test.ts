@@ -1,14 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  isString,
-  isBoolean,
-  isPromise,
-  isObjKey,
-  isPrimitiveValue,
-} from "type-guards";
-
-const noop = () => undefined;
+import { isString, isBoolean, isObjKey, isPrimitiveValue } from "type-guards";
 
 describe("Primitive Type Guards", () => {
   describe("isString", () => {
@@ -36,39 +28,6 @@ describe("Primitive Type Guards", () => {
       expect(isBoolean("true")).toBe(false);
       expect(isBoolean(1)).toBe(false);
       expect(isBoolean(null)).toBe(false);
-    });
-  });
-
-  describe("isPromise", () => {
-    it("returns true for promises", () => {
-      expect(isPromise(Promise.resolve())).toBe(true);
-      expect(isPromise(new Promise(noop))).toBe(true);
-    });
-
-    it("returns true for thenable objects", () => {
-      // eslint-disable-next-line unicorn/no-thenable
-      const thenable = { then: noop };
-
-      expect(isPromise(thenable)).toBe(true);
-    });
-
-    it("returns false for non-promises", () => {
-      expect(isPromise({})).toBe(false);
-      expect(isPromise(null)).toBe(false);
-      expect(isPromise("promise")).toBe(false);
-    });
-
-    it("returns false for objects with non-function then (kills typeof mutant)", () => {
-      // This ensures typeof value.then === "function" is necessary
-      // If mutated to just "true", this would incorrectly pass
-      // eslint-disable-next-line unicorn/no-thenable
-      expect(isPromise({ then: "not a function" })).toBe(false);
-      // eslint-disable-next-line unicorn/no-thenable
-      expect(isPromise({ then: 123 })).toBe(false);
-      // eslint-disable-next-line unicorn/no-thenable
-      expect(isPromise({ then: null })).toBe(false);
-      // eslint-disable-next-line unicorn/no-thenable
-      expect(isPromise({ then: {} })).toBe(false);
     });
   });
 

@@ -17,7 +17,6 @@ export {
   // Primitives
   isString,
   isBoolean,
-  isPromise,
   isObjKey,
   isPrimitiveValue,
   // Params

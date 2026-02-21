@@ -27,7 +27,6 @@ Type guards return `boolean` and narrow TypeScript types.
 ```typescript
 isString(value: unknown): value is string
 isBoolean(value: unknown): value is boolean
-isPromise(value: unknown): value is Promise<unknown>
 isObjKey(key: string, obj: object): key is keyof typeof obj
 isPrimitiveValue(value: unknown): value is string | number | boolean
 ```

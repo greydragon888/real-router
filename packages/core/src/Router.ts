@@ -34,8 +34,8 @@ import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
 import type {
-  ActivationFnFactory,
   EventMethodMap,
+  GuardFnFactory,
   Limits,
   MiddlewareFactory,
   PluginFactory,
@@ -730,7 +730,7 @@ export class Router<
 
   addDeactivateGuard(
     name: string,
-    canDeactivateHandler: ActivationFnFactory<Dependencies> | boolean,
+    canDeactivateHandler: GuardFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
       validateRouteName(name, "addDeactivateGuard");
@@ -751,7 +751,7 @@ export class Router<
 
   addActivateGuard(
     name: string,
-    canActivateHandler: ActivationFnFactory<Dependencies> | boolean,
+    canActivateHandler: GuardFnFactory<Dependencies> | boolean,
   ): this {
     if (!this.#noValidate) {
       validateRouteName(name, "addActivateGuard");

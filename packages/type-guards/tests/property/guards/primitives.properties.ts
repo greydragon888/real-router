@@ -1,13 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import {
-  isString,
-  isBoolean,
-  isPromise,
-  isObjKey,
-  isPrimitiveValue,
-} from "type-guards";
+import { isString, isBoolean, isObjKey, isPrimitiveValue } from "type-guards";
 
 import { primitiveValueArbitrary, invalidPrimitiveArbitrary } from "../helpers";
 
@@ -70,52 +64,6 @@ describe("Primitive Type Guards Properties", () => {
 
       return true;
     });
-  });
-
-  describe("isPromise", () => {
-    it("always returns true for real Promise", () => {
-      expect(isPromise(Promise.resolve())).toBe(true);
-      expect(
-        isPromise(
-          Promise.reject(new Error("test error")).catch(() => undefined),
-        ),
-      ).toBe(true);
-      expect(isPromise(new Promise(() => undefined))).toBe(true);
-
-      return true;
-    });
-
-    test.prop([fc.func(fc.anything())], { numRuns: 1000 })(
-      "returns true for thenable objects",
-      (thenFunc) => {
-        // eslint-disable-next-line unicorn/no-thenable
-        const thenable = { then: thenFunc };
-
-        expect(isPromise(thenable)).toBe(true);
-
-        return true;
-      },
-    );
-
-    test.prop([fc.oneof(fc.string(), fc.integer(), fc.constant(null))], {
-      numRuns: 10_000,
-    })("always returns false for non-promise", (value) => {
-      expect(isPromise(value)).toBe(false);
-
-      return true;
-    });
-
-    test.prop([fc.dictionary(fc.string(), fc.anything())], { numRuns: 2000 })(
-      "returns false for objects without then",
-      (obj) => {
-        // Remove then if present
-        delete obj.then;
-
-        expect(isPromise(obj)).toBe(false);
-
-        return true;
-      },
-    );
   });
 
   describe("isObjKey", () => {

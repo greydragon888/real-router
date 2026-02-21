@@ -234,10 +234,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(false);
   });
 
-  it("should return true when guard returns void", async () => {
-    router.addActivateGuard("admin", () => () => {
-      // intentionally void — no return
-    });
+  it("should return true when guard returns true (shorthand)", async () => {
+    router.addActivateGuard("admin", () => () => true);
     await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(true);

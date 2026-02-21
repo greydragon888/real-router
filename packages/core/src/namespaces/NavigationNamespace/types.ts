@@ -2,7 +2,7 @@
 
 import type { BuildStateResultWithSegments } from "../../types";
 import type {
-  ActivationFn,
+  GuardFn,
   Middleware,
   NavigationOptions,
   Options,
@@ -110,10 +110,7 @@ export interface TransitionOutput {
  */
 export interface TransitionDependencies {
   /** Get lifecycle functions (canDeactivate, canActivate maps) */
-  getLifecycleFunctions: () => [
-    Map<string, ActivationFn>,
-    Map<string, ActivationFn>,
-  ];
+  getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
 
   /** Get middleware functions array */
   getMiddlewareFunctions: () => Middleware[];

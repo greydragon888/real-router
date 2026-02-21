@@ -39,7 +39,7 @@ export async function transition(
   let currentState = toState;
 
   if (shouldDeactivate) {
-    currentState = await executeLifecycleHooks(
+    await executeLifecycleHooks(
       canDeactivateFunctions,
       toState,
       fromState,
@@ -54,9 +54,9 @@ export async function transition(
   }
 
   if (shouldActivate) {
-    currentState = await executeLifecycleHooks(
+    await executeLifecycleHooks(
       canActivateFunctions,
-      currentState,
+      toState,
       fromState,
       toActivate,
       errorCodes.CANNOT_ACTIVATE,

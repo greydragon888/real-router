@@ -2,12 +2,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createTestRouter } from "../../../helpers";
 
-import type {
-  Router,
-  Route,
-  ActivationFnFactory,
-  Params,
-} from "@real-router/core";
+import type { Router, Route, GuardFnFactory, Params } from "@real-router/core";
 
 let router: Router;
 
@@ -158,7 +153,7 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should return route with canActivate", () => {
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guardFactory: GuardFnFactory = () => () => true;
 
       router.addRoute({
         name: "gr-protected",
@@ -181,7 +176,7 @@ describe("core/routes/routeTree/getRoute", () => {
 
         return { ...params, id: `v${idValue}` };
       };
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guardFactory: GuardFnFactory = () => () => true;
 
       router.addRoute({ name: "gr-dest", path: "/gr-dest" });
       router.addRoute({
@@ -211,7 +206,7 @@ describe("core/routes/routeTree/getRoute", () => {
 
   describe("children enrichment", () => {
     it("should enrich children with their configuration", () => {
-      const childGuard: ActivationFnFactory = () => () => true;
+      const childGuard: GuardFnFactory = () => () => true;
 
       router.addRoute({
         name: "gr-staff",
