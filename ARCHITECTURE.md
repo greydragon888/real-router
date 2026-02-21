@@ -253,7 +253,7 @@ interface State {
   };
   transition?: {
     // Set after every successful navigation (deeply frozen)
-    phase: TransitionPhase; // "deactivating" | "activating" | "middleware"
+    phase: TransitionPhase; // "deactivating" | "activating"
     from?: string; // Previous route name (undefined on start())
     reason: TransitionReason; // "success" | "blocked" | "cancelled" | "error"
     segments: {
