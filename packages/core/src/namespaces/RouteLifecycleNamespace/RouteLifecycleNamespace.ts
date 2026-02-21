@@ -1,7 +1,7 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
 import { logger } from "@real-router/logger";
-import { isBoolean, isPromise, getTypeDescription } from "type-guards";
+import { isBoolean, getTypeDescription } from "type-guards";
 
 import {
   validateHandler,
@@ -337,19 +337,11 @@ export class RouteLifecycleNamespace<
         return result;
       }
 
-      /* v8 ignore next -- @preserve: isPromise false branch only reachable via runtime type violation (GuardFn type prevents non-boolean non-promise values) */
-      if (isPromise(result)) {
-        logger.warn(
-          `router.${methodName}`,
-          `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
-        );
+      logger.warn(
+        `router.${methodName}`,
+        `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
+      );
 
-        return false;
-      }
-
-      // GuardFn should always return boolean | Promise<boolean>
-      // If we get here, the guard returned an unexpected type at runtime
-      /* v8 ignore next 2 -- @preserve: defensive guard against runtime type violations not enforceable by TypeScript */
       return false;
     } catch {
       return false;

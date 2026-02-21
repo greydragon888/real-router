@@ -1,5 +1,11 @@
 # type-guards
 
+## 0.2.0
+
+### Minor Changes
+
+- Remove unused `isPromise` guard
+
 ## 0.1.12
 
 ### Patch Changes

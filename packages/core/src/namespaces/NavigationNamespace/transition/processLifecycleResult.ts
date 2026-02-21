@@ -1,6 +1,6 @@
 // packages/real-router/modules/transition/processLifecycleResult.ts
 
-import { isPromise, isState } from "type-guards";
+import { isState } from "type-guards";
 
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
@@ -13,22 +13,22 @@ import type { State, ActivationFn } from "@real-router/types";
  * Extracts message, stack, and cause from Error instances.
  */
 function buildErrorMetadata(
-  error_: unknown,
+  error: unknown,
   errorData: SyncErrorMetadata,
 ): SyncErrorMetadata {
-  if (error_ instanceof Error) {
+  if (error instanceof Error) {
     return {
       ...errorData,
-      message: error_.message,
-      stack: error_.stack,
+      message: error.message,
+      stack: error.stack,
       // Error.cause requires ES2022+ - safely access it if present
-      ...("cause" in error_ &&
-        error_.cause !== undefined && { cause: error_.cause }),
+      ...("cause" in error &&
+        error.cause !== undefined && { cause: error.cause }),
     };
   }
 
-  if (error_ && typeof error_ === "object") {
-    return { ...errorData, ...error_ };
+  if (error && typeof error === "object") {
+    return { ...errorData, ...error };
   }
 
   return errorData;
@@ -38,11 +38,7 @@ function buildErrorMetadata(
 export const processLifecycleResult = async (
   result: ReturnType<ActivationFn>,
   currentState: State,
-  segment?: string,
 ): Promise<State> => {
-  /* v8 ignore next -- @preserve: ternary false branch (no segment) only reachable via middleware path, not guard path */
-  const errorData = segment ? { segment } : {};
-
   if (result === undefined) {
     return currentState;
   }
@@ -51,7 +47,7 @@ export const processLifecycleResult = async (
     if (result) {
       return currentState;
     } else {
-      throw new RouterError(errorCodes.TRANSITION_ERR, errorData);
+      throw new RouterError(errorCodes.TRANSITION_ERR, {});
     }
   }
 
@@ -59,26 +55,15 @@ export const processLifecycleResult = async (
     return result;
   }
 
-  /* v8 ignore next -- @preserve: isPromise false branch only reachable via runtime type violation (ActivationFn type prevents non-promise non-state non-boolean non-undefined values) */
-  if (isPromise<State | boolean | undefined>(result)) {
-    // Optimization: single try/catch instead of .then(onFulfill, onReject)
-    try {
-      const resVal = await result;
+  // Optimization: single try/catch instead of .then(onFulfill, onReject)
+  try {
+    const resVal = await (result as Promise<State | boolean | undefined>);
 
-      return await processLifecycleResult(resVal, currentState, segment);
-    } catch (error_: unknown) {
-      throw new RouterError(
-        errorCodes.TRANSITION_ERR,
-        buildErrorMetadata(error_, errorData),
-      );
-    }
+    return await processLifecycleResult(resVal, currentState);
+  } catch (error: unknown) {
+    throw new RouterError(
+      errorCodes.TRANSITION_ERR,
+      buildErrorMetadata(error, {}),
+    );
   }
-
-  // This should never be reached - all valid ActivationFn return types are handled above
-  // If we get here, it means the activation function returned an unexpected type
-  /* v8 ignore next 5 -- @preserve: defensive guard against runtime type violations not enforceable by TypeScript (ActivationFn type prevents non-promise non-state non-boolean non-undefined values) */
-  throw new RouterError(errorCodes.TRANSITION_ERR, {
-    ...errorData,
-    message: `Invalid lifecycle result type: ${typeof result}`,
-  });
 };

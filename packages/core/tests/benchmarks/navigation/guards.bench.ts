@@ -21,7 +21,7 @@ function createModifyingMiddleware(
   paramValue: string | number | boolean,
 ) {
   return () => (toState: State, _fromState: State | undefined) => {
-    const modifiedState = {
+    return {
       ...toState,
       meta: {
         ...toState.meta,
@@ -31,8 +31,6 @@ function createModifyingMiddleware(
         },
       },
     } as State;
-
-    return modifiedState;
   };
 }
 

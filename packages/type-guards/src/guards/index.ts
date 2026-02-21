@@ -9,12 +9,6 @@ export { isRouteName } from "./routes";
 export { isState, isStateStrict, isHistoryState } from "./state";
 
 // Re-export from primitives and params (now in guards/ directory)
-export {
-  isString,
-  isBoolean,
-  isPromise,
-  isObjKey,
-  isPrimitiveValue,
-} from "./primitives";
+export { isString, isBoolean, isObjKey, isPrimitiveValue } from "./primitives";
 
 export { isParams, isParamsStrict } from "./params";

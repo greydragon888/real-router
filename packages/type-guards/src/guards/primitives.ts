@@ -21,21 +21,6 @@ export function isBoolean(value: unknown): value is boolean {
 }
 
 /**
- * Type guard for Promise type.
- *
- * @param value - Value to check
- * @returns true if value is a Promise
- */
-export function isPromise<T = unknown>(value: unknown): value is Promise<T> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "then" in value &&
-    typeof value.then === "function"
-  );
-}
-
-/**
  * Type guard for object key existence.
  * Narrows the key type to a valid key of the object.
  *
