@@ -222,8 +222,8 @@ export class PluginsNamespace<
   /**
    * Disposes all registered plugins by running their teardown callbacks
    * and removing event listener subscriptions.
-   * Unlike {@link MiddlewareNamespace.clearAll}, active disposal is required —
-   * plugins have an active lifecycle (event subscriptions, teardown hooks).
+   * Active disposal is required because plugins have an active lifecycle
+   * (event subscriptions, teardown hooks).
    * Named "dispose" (not "clear") because there is active cleanup to perform.
    */
   disposeAll(): void {
