@@ -826,7 +826,7 @@ describe("core/plugins", () => {
         // Logger format: logger.warn(context, message)
         expect(warnSpy).toHaveBeenCalledWith(
           "router.usePlugin",
-          "10 plugins registered",
+          "10 plugins registered. Consider if all are necessary.",
         );
 
         warnSpy.mockRestore();
@@ -843,7 +843,7 @@ describe("core/plugins", () => {
         // Logger format: logger.error(context, message)
         expect(errorSpy).toHaveBeenCalledWith(
           "router.usePlugin",
-          "25 plugins registered!",
+          "25 plugins registered! This is excessive and will impact performance. Hard limit at 50.",
         );
 
         errorSpy.mockRestore();

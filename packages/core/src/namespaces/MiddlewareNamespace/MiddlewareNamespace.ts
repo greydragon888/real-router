@@ -2,6 +2,7 @@
 
 import { logger } from "@real-router/logger";
 
+import { LOGGER_CONTEXT } from "./constants";
 import {
   validateMiddleware,
   validateMiddlewareLimit,
@@ -59,9 +60,9 @@ export class MiddlewareNamespace<
 
   static validateNoDuplicates<D extends DefaultDependencies>(
     newFactories: MiddlewareFactory<D>[],
-    existingFactories: MiddlewareFactory<D>[],
+    has: (factory: MiddlewareFactory<D>) => boolean,
   ): void {
-    validateNoDuplicates<D>(newFactories, existingFactories);
+    validateNoDuplicates<D>(newFactories, has);
   }
 
   static validateMiddlewareLimit(
@@ -162,12 +163,26 @@ export class MiddlewareNamespace<
   }
 
   /**
+   * Checks if a middleware factory is registered.
+   * Used internally by validation to avoid array allocation.
+   */
+  has(factory: MiddlewareFactory<Dependencies>): boolean {
+    return this.#factories.has(factory);
+  }
+
+  /**
    * Returns the actual middleware functions in execution order.
    */
   getFunctions(): Middleware[] {
     return [...this.#factoryToMiddleware.values()];
   }
 
+  /**
+   * Clears all registered middleware factories and their initialized functions.
+   * Unlike {@link disposeAll} in PluginsNamespace, no teardown is needed —
+   * middleware are pure functions with no event subscriptions or lifecycle.
+   * Named "clear" (not "dispose") because there is nothing active to dispose.
+   */
   clearAll(): void {
     this.#factories.clear();
     this.#factoryToMiddleware.clear();
@@ -190,14 +205,14 @@ export class MiddlewareNamespace<
 
     if (totalSize >= error) {
       logger.error(
-        "router.useMiddleware",
+        LOGGER_CONTEXT,
         `${totalSize} middleware registered! ` +
           `This is excessive and will impact performance. ` +
           `Hard limit at ${maxMiddleware}.`,
       );
     } else if (totalSize >= warn) {
       logger.warn(
-        "router.useMiddleware",
+        LOGGER_CONTEXT,
         `${totalSize} middleware registered. ` +
           `Consider if all are necessary.`,
       );

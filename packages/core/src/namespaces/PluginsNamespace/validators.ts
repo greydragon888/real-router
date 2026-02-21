@@ -19,10 +19,10 @@ import type { DefaultDependencies, Plugin } from "@real-router/types";
 export function validateUsePluginArgs<D extends DefaultDependencies>(
   plugins: unknown[],
 ): asserts plugins is PluginFactory<D>[] {
-  for (const plugin of plugins) {
+  for (const [i, plugin] of plugins.entries()) {
     if (typeof plugin !== "function") {
       throw new TypeError(
-        `[router.usePlugin] Expected plugin factory function, got ${typeof plugin}`,
+        `[router.usePlugin] Expected plugin factory function at index ${i}, got ${getTypeDescription(plugin)}`,
       );
     }
   }
@@ -74,6 +74,10 @@ export function validatePluginLimit(
   const totalCount = currentCount + newCount;
 
   if (totalCount > maxPlugins) {
-    throw new Error(`[router.usePlugin] Plugin limit exceeded (${maxPlugins})`);
+    throw new Error(
+      `[router.usePlugin] Plugin limit exceeded (${maxPlugins}). ` +
+        `Current: ${currentCount}, Attempting to add: ${newCount}. ` +
+        `This indicates an architectural problem. Consider consolidating plugins.`,
+    );
   }
 }
