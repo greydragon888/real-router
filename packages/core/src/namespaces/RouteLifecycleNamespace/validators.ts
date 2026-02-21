@@ -9,7 +9,7 @@ import { isBoolean, getTypeDescription } from "type-guards";
 
 import { DEFAULT_LIMITS } from "../../constants";
 
-import type { ActivationFnFactory } from "../../types";
+import type { GuardFnFactory } from "../../types";
 import type { DefaultDependencies } from "@real-router/types";
 
 /**
@@ -18,7 +18,7 @@ import type { DefaultDependencies } from "@real-router/types";
 export function validateHandler<D extends DefaultDependencies>(
   handler: unknown,
   methodName: string,
-): asserts handler is ActivationFnFactory<D> | boolean {
+): asserts handler is GuardFnFactory<D> | boolean {
   if (!isBoolean(handler) && typeof handler !== "function") {
     throw new TypeError(
       `[router.${methodName}] Handler must be a boolean or factory function, ` +

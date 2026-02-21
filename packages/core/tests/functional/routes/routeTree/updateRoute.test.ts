@@ -6,7 +6,7 @@ import { createTestRouter } from "../../../helpers";
 
 import type {
   Router,
-  ActivationFnFactory,
+  GuardFnFactory,
   Params,
   RouterError,
 } from "@real-router/core";
@@ -451,7 +451,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   describe("canActivate", () => {
     it("should add canActivate", async () => {
       const guard = vi.fn().mockReturnValue(true);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       router.addRoute({ name: "ur-secure", path: "/ur-secure" });
       router.updateRoute("ur-secure", { canActivate: guardFactory });
@@ -518,7 +518,7 @@ describe("core/routes/routeTree/updateRoute", () => {
   describe("canDeactivate", () => {
     it("should add canDeactivate", async () => {
       const guard = vi.fn().mockReturnValue(false);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       router.addRoute({ name: "ur-editor", path: "/ur-editor" });
       router.updateRoute("ur-editor", { canDeactivate: guardFactory });
@@ -892,7 +892,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should update multiple properties at once", async () => {
       const decoder = (params: Params): Params => params;
       const guard = vi.fn().mockReturnValue(true);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       router.addRoute({ name: "ur-multi", path: "/ur-multi" });
       router.updateRoute("ur-multi", {

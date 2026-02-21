@@ -32,6 +32,7 @@ export type {
   ForwardToCallback,
   DefaultParamsCallback,
   ActivationFn,
+  GuardFn,
   DefaultDependencies,
   Config,
   Plugin,

@@ -6,7 +6,7 @@ import { createRouter } from "@real-router/core";
 import { createTestRouter } from "../../../helpers";
 
 import type {
-  ActivationFnFactory,
+  GuardFnFactory,
   Params,
   Route,
   Router,
@@ -1711,7 +1711,7 @@ describe("core/routes/addRoute", () => {
   describe("canDeactivate", () => {
     it("should add canDeactivate that blocks navigation", async () => {
       const guard = vi.fn().mockReturnValue(false);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       router.addRoute({
         name: "editor",
@@ -1740,7 +1740,7 @@ describe("core/routes/addRoute", () => {
 
     it("should add canDeactivate that allows navigation", async () => {
       const guard = vi.fn().mockReturnValue(true);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       router.addRoute({
         name: "form",
@@ -1824,7 +1824,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should return canDeactivate from getRoute() after addRoute", async () => {
-      const guardFactory: ActivationFnFactory = () => () => true;
+      const guardFactory: GuardFnFactory = () => () => true;
 
       router.addRoute({
         name: "account-settings",
@@ -1840,7 +1840,7 @@ describe("core/routes/addRoute", () => {
 
     it("should register canDeactivate from constructor routes (pending flush)", async () => {
       const guard = vi.fn().mockReturnValue(false);
-      const guardFactory: ActivationFnFactory = () => guard;
+      const guardFactory: GuardFnFactory = () => guard;
 
       // Create router with canDeactivate in constructor
       const testRouter = createRouter([

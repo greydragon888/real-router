@@ -1,30 +1,22 @@
-// packages/real-router/modules/transition/executeLifecycleHooks.ts
-
-import { logger } from "@real-router/logger";
-import { isState } from "type-guards";
-
 import { rethrowAsRouterError } from "./makeError";
-import { mergeStates } from "./mergeStates";
-import { processLifecycleResult } from "./processLifecycleResult";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
-import type { State, ActivationFn } from "@real-router/types";
+import type { GuardFn, State } from "@real-router/types";
 
 // Helper: execution of the Lifecycle Hooks group
 export const executeLifecycleHooks = async (
-  hooks: Map<string, ActivationFn>,
+  hooks: Map<string, GuardFn>,
   toState: State,
   fromState: State | undefined,
   segments: string[],
   errorCode: string,
   isCancelled: () => boolean,
-): Promise<State> => {
-  let currentState = toState;
+): Promise<void> => {
   const segmentsToProcess = segments.filter((name) => hooks.has(name));
 
   if (segmentsToProcess.length === 0) {
-    return currentState;
+    return;
   }
 
   for (const segment of segmentsToProcess) {
@@ -36,49 +28,16 @@ export const executeLifecycleHooks = async (
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by filter
     const hookFn = hooks.get(segment)!;
 
+    let result: boolean | undefined;
+
     try {
-      const result = hookFn(currentState, fromState);
-      const newState = await processLifecycleResult(
-        result,
-        currentState,
-        segment,
-      );
-
-      // Optimization: Early return for undefined newState (most common case ~90%+)
-      // This avoids isState() call and subsequent checks
-      if (newState !== currentState && isState(newState)) {
-        // Guards cannot redirect to a different route
-        if (newState.name !== currentState.name) {
-          throw new RouterError(errorCode, {
-            message:
-              "Guards cannot redirect to different route. Use middleware.",
-            attemptedRedirect: {
-              name: newState.name,
-              params: newState.params,
-              path: newState.path,
-            },
-          });
-        }
-
-        // Same route - safe to merge (param modifications, meta changes)
-        const hasChanged =
-          newState.params !== currentState.params ||
-          newState.path !== currentState.path;
-
-        if (hasChanged) {
-          logger.error(
-            "core:transition",
-            "Warning: State mutated during transition",
-            { from: currentState, to: newState },
-          );
-        }
-
-        currentState = mergeStates(newState, currentState);
-      }
+      result = await hookFn(toState, fromState);
     } catch (error: unknown) {
       rethrowAsRouterError(error, errorCode, segment);
     }
-  }
 
-  return currentState;
+    if (!result) {
+      throw new RouterError(errorCode, { segment });
+    }
+  }
 };

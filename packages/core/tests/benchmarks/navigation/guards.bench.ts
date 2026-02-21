@@ -12,26 +12,8 @@ import { createRouter } from "../../../src";
 import type { Route, State } from "../../../src";
 
 // ============================================================================
-// Guard/middleware factories (moved to outer scope for lint compliance)
+// Middleware factories (moved to outer scope for lint compliance)
 // ============================================================================
-
-/** Creates a guard that adds a single param to meta.params */
-function createModifyingGuard(
-  paramKey: string,
-  paramValue: string | number | boolean,
-) {
-  return () => (toState: State) =>
-    ({
-      ...toState,
-      meta: {
-        ...toState.meta,
-        params: {
-          ...toState.meta?.params,
-          [paramKey]: paramValue,
-        },
-      },
-    }) as State;
-}
 
 /** Creates a middleware that adds a single param to meta.params */
 function createModifyingMiddleware(
@@ -59,90 +41,6 @@ const passthroughGuardFn = () => true;
 
 /** Factory that returns passthrough guard */
 const passthroughGuardFactory = () => passthroughGuardFn;
-
-// ============================================================================
-// Guards that modify state (trigger mergeStates)
-// ============================================================================
-
-boxplot(() => {
-  summary(() => {
-    // Navigation with canActivate guard that adds meta.params
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "about", path: "/about" },
-        { name: "users", path: "/users" },
-      ];
-      const router = createRouter(routes);
-
-      router.addActivateGuard(
-        "about",
-        createModifyingGuard("timestamp", Date.now()),
-      );
-
-      void router.start("/");
-
-      const targetRoutes = ["about", "users", "home"] as const;
-      let i = 0;
-
-      bench("navigate: 1 guard modifies state", () => {
-        do_not_optimize(
-          void router.navigate(targetRoutes[i++ % targetRoutes.length]),
-        );
-      }).gc("inner");
-    }
-
-    // Navigation with multiple guards modifying state
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "dashboard", path: "/dashboard" },
-      ];
-      const router = createRouter(routes);
-
-      router.addActivateGuard(
-        "dashboard",
-        createModifyingGuard("guard1", "done"),
-      );
-      router.addActivateGuard(
-        "dashboard",
-        createModifyingGuard("guard2", "done"),
-      );
-      router.addActivateGuard(
-        "dashboard",
-        createModifyingGuard("guard3", "done"),
-      );
-
-      void router.start("/");
-
-      bench("navigate: 3 guards modify state", () => {
-        do_not_optimize(router.navigate("dashboard"));
-      }).gc("inner");
-    }
-
-    // Navigation with 5 guards modifying state
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "admin", path: "/admin" },
-      ];
-      const router = createRouter(routes);
-
-      for (let g = 1; g <= 5; g++) {
-        router.addActivateGuard(
-          "admin",
-          createModifyingGuard(`guard${g}`, "done"),
-        );
-      }
-
-      void router.start("/");
-
-      bench("navigate: 5 guards modify state", () => {
-        do_not_optimize(router.navigate("admin"));
-      }).gc("inner");
-    }
-  });
-});
 
 // ============================================================================
 // Middleware that modifies state
@@ -215,85 +113,7 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Mixed guards + middleware
-// ============================================================================
-
-boxplot(() => {
-  summary(() => {
-    // Combined guards and middleware
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "secure", path: "/secure" },
-      ];
-      const router = createRouter(routes);
-
-      // 2 guards
-      router.addActivateGuard(
-        "secure",
-        createModifyingGuard("authGuard", "passed"),
-      );
-      router.addActivateGuard(
-        "secure",
-        createModifyingGuard("roleGuard", "passed"),
-      );
-
-      // 2 middleware
-      router.useMiddleware(createModifyingMiddleware("loggingMw", "done"));
-      router.useMiddleware(createModifyingMiddleware("analyticsMw", "done"));
-
-      void router.start("/");
-
-      bench("navigate: 2 guards + 2 middleware modify state", () => {
-        do_not_optimize(router.navigate("secure"));
-      }).gc("inner");
-    }
-
-    // Real-world scenario: auth + validation + logging
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "order", path: "/order/:id" },
-      ];
-      const router = createRouter(routes);
-
-      // Auth guard (adds multiple params)
-      router.addActivateGuard(
-        "order",
-        createModifyingGuard("userId", "user_123"),
-      );
-      router.addActivateGuard(
-        "order",
-        createModifyingGuard("authenticated", true),
-      );
-
-      // Permission guard
-      router.addActivateGuard(
-        "order",
-        createModifyingGuard("canViewOrder", true),
-      );
-
-      // Logging middleware
-      router.useMiddleware(createModifyingMiddleware("timestamp", Date.now()));
-
-      void router.start("/");
-
-      const orderIds = ["order1", "order2", "order3", "order4"];
-      let i = 0;
-
-      bench("navigate: real-world auth flow (3g + 1mw)", () => {
-        do_not_optimize(
-          void router.navigate("order", {
-            id: orderIds[i++ % orderIds.length],
-          }),
-        );
-      }).gc("inner");
-    }
-  });
-});
-
-// ============================================================================
-// Comparison: with vs without state modification
+// Guards that return boolean (no state modification)
 // ============================================================================
 
 boxplot(() => {
@@ -312,29 +132,7 @@ boxplot(() => {
 
       void router.start("/");
 
-      bench("navigate: 3 guards (no state mod)", () => {
-        do_not_optimize(router.navigate("page"));
-      }).gc("inner");
-    }
-
-    // Same setup but guards modify state
-    {
-      const routes: Route[] = [
-        { name: "home", path: "/" },
-        { name: "page", path: "/page" },
-      ];
-      const router = createRouter(routes);
-
-      for (let g = 1; g <= 3; g++) {
-        router.addActivateGuard(
-          "page",
-          createModifyingGuard(`guard${g}`, "done"),
-        );
-      }
-
-      void router.start("/");
-
-      bench("navigate: 3 guards (with state mod)", () => {
+      bench("navigate: 3 guards (return true)", () => {
         do_not_optimize(router.navigate("page"));
       }).gc("inner");
     }

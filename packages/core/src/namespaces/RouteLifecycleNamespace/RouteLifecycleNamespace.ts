@@ -13,23 +13,19 @@ import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { Router } from "../../Router";
-import type { ActivationFnFactory, Limits } from "../../types";
-import type {
-  ActivationFn,
-  DefaultDependencies,
-  State,
-} from "@real-router/types";
+import type { GuardFnFactory, Limits } from "../../types";
+import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
 /**
- * Converts a boolean value to an activation function factory.
+ * Converts a boolean value to a guard function factory.
  * Used for the shorthand syntax where true/false is passed instead of a function.
  */
 function booleanToFactory<Dependencies extends DefaultDependencies>(
   value: boolean,
-): ActivationFnFactory<Dependencies> {
-  const activationFn: ActivationFn = () => value;
+): GuardFnFactory<Dependencies> {
+  const guardFn: GuardFn = () => value;
 
-  return () => activationFn;
+  return () => guardFn;
 }
 
 /**
@@ -43,14 +39,14 @@ export class RouteLifecycleNamespace<
 > {
   readonly #canDeactivateFactories = new Map<
     string,
-    ActivationFnFactory<Dependencies>
+    GuardFnFactory<Dependencies>
   >();
   readonly #canActivateFactories = new Map<
     string,
-    ActivationFnFactory<Dependencies>
+    GuardFnFactory<Dependencies>
   >();
-  readonly #canDeactivateFunctions = new Map<string, ActivationFn>();
-  readonly #canActivateFunctions = new Map<string, ActivationFn>();
+  readonly #canDeactivateFunctions = new Map<string, GuardFn>();
+  readonly #canActivateFunctions = new Map<string, GuardFn>();
 
   readonly #registering = new Set<string>();
 
@@ -65,7 +61,7 @@ export class RouteLifecycleNamespace<
   static validateHandler<D extends DefaultDependencies>(
     handler: unknown,
     methodName: string,
-  ): asserts handler is ActivationFnFactory<D> | boolean {
+  ): asserts handler is GuardFnFactory<D> | boolean {
     validateHandler<D>(handler, methodName);
   }
 
@@ -95,7 +91,7 @@ export class RouteLifecycleNamespace<
    */
   addCanActivate(
     name: string,
-    handler: ActivationFnFactory<Dependencies> | boolean,
+    handler: GuardFnFactory<Dependencies> | boolean,
     skipValidation: boolean,
   ): void {
     if (!skipValidation) {
@@ -137,7 +133,7 @@ export class RouteLifecycleNamespace<
    */
   addCanDeactivate(
     name: string,
-    handler: ActivationFnFactory<Dependencies> | boolean,
+    handler: GuardFnFactory<Dependencies> | boolean,
     skipValidation: boolean,
   ): void {
     if (!skipValidation) {
@@ -208,17 +204,11 @@ export class RouteLifecycleNamespace<
    * @returns Tuple of [canDeactivateFactories, canActivateFactories]
    */
   getFactories(): [
-    Record<string, ActivationFnFactory<Dependencies>>,
-    Record<string, ActivationFnFactory<Dependencies>>,
+    Record<string, GuardFnFactory<Dependencies>>,
+    Record<string, GuardFnFactory<Dependencies>>,
   ] {
-    const deactivateRecord: Record<
-      string,
-      ActivationFnFactory<Dependencies>
-    > = {};
-    const activateRecord: Record<
-      string,
-      ActivationFnFactory<Dependencies>
-    > = {};
+    const deactivateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
+    const activateRecord: Record<string, GuardFnFactory<Dependencies>> = {};
 
     for (const [name, factory] of this.#canDeactivateFactories) {
       deactivateRecord[name] = factory;
@@ -236,7 +226,7 @@ export class RouteLifecycleNamespace<
    *
    * @returns Tuple of [canDeactivateFunctions, canActivateFunctions] as Maps
    */
-  getFunctions(): [Map<string, ActivationFn>, Map<string, ActivationFn>] {
+  getFunctions(): [Map<string, GuardFn>, Map<string, GuardFn>] {
     return [this.#canDeactivateFunctions, this.#canActivateFunctions];
   }
 
@@ -279,9 +269,9 @@ export class RouteLifecycleNamespace<
   #registerHandler(
     type: "activate" | "deactivate",
     name: string,
-    handler: ActivationFnFactory<Dependencies> | boolean,
-    factories: Map<string, ActivationFnFactory<Dependencies>>,
-    functions: Map<string, ActivationFn>,
+    handler: GuardFnFactory<Dependencies> | boolean,
+    factories: Map<string, GuardFnFactory<Dependencies>>,
+    functions: Map<string, GuardFn>,
     methodName: string,
     isOverwrite: boolean,
   ): void {
@@ -328,7 +318,7 @@ export class RouteLifecycleNamespace<
   }
 
   #checkGuardSync(
-    functions: Map<string, ActivationFn>,
+    functions: Map<string, GuardFn>,
     name: string,
     toState: State,
     fromState: State | undefined,
@@ -347,6 +337,7 @@ export class RouteLifecycleNamespace<
         return result;
       }
 
+      /* v8 ignore next -- @preserve: isPromise false branch only reachable via runtime type violation (GuardFn type prevents non-boolean non-promise values) */
       if (isPromise(result)) {
         logger.warn(
           `router.${methodName}`,
@@ -356,8 +347,10 @@ export class RouteLifecycleNamespace<
         return false;
       }
 
-      // Guard returned void/State — permissive default
-      return true;
+      // GuardFn should always return boolean | Promise<boolean>
+      // If we get here, the guard returned an unexpected type at runtime
+      /* v8 ignore next 2 -- @preserve: defensive guard against runtime type violations not enforceable by TypeScript */
+      return false;
     } catch {
       return false;
     }

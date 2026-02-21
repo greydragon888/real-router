@@ -14,6 +14,7 @@ import type {
   DefaultDependencies,
   EventsKeys,
   ForwardToCallback,
+  GuardFn,
   LimitsConfig,
   Middleware,
   NavigationOptions,
@@ -81,9 +82,9 @@ export interface Route<
   /** URL path pattern for this route. */
   path: string;
   /** Factory function that returns a guard for route activation. */
-  canActivate?: ActivationFnFactory<Dependencies>;
+  canActivate?: GuardFnFactory<Dependencies>;
   /** Factory function that returns a guard for route deactivation. */
-  canDeactivate?: ActivationFnFactory<Dependencies>;
+  canDeactivate?: GuardFnFactory<Dependencies>;
   /**
    * Redirects navigation to another route.
    *
@@ -155,9 +156,9 @@ export interface RouteConfigUpdate<
   /** Set to null to remove encoder */
   encodeParams?: ((params: Params) => Params) | null;
   /** Set to null to remove canActivate */
-  canActivate?: ActivationFnFactory<Dependencies> | null;
+  canActivate?: GuardFnFactory<Dependencies> | null;
   /** Set to null to remove canDeactivate */
-  canDeactivate?: ActivationFnFactory<Dependencies> | null;
+  canDeactivate?: GuardFnFactory<Dependencies> | null;
 }
 
 /**
@@ -170,6 +171,17 @@ export type ActivationFnFactory<
   router: Router<Dependencies>,
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
 ) => ActivationFn;
+
+/**
+ * Factory function for creating guards.
+ * Receives the router instance and a dependency getter.
+ */
+export type GuardFnFactory<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = (
+  router: Router<Dependencies>,
+  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
+) => GuardFn;
 
 /**
  * Factory function for creating middleware.

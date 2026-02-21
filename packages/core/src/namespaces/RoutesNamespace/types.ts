@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/RoutesNamespace/types.ts
 
-import type { ActivationFnFactory } from "../../types";
+import type { GuardFnFactory } from "../../types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
@@ -22,13 +22,13 @@ export interface RoutesDependencies<
   /** Register canActivate handler for a route */
   addActivateGuard: (
     name: string,
-    handler: ActivationFnFactory<Dependencies>,
+    handler: GuardFnFactory<Dependencies>,
   ) => void;
 
   /** Register canDeactivate handler for a route */
   addDeactivateGuard: (
     name: string,
-    handler: ActivationFnFactory<Dependencies>,
+    handler: GuardFnFactory<Dependencies>,
   ) => void;
 
   /** Create state object */

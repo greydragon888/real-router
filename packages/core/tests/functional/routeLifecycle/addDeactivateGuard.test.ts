@@ -81,28 +81,17 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
     }
   });
 
-  it("should return error when canDeactivate returns a different route (guards cannot redirect)", async () => {
-    router.addDeactivateGuard("sign-in", () => () => ({
-      name: "index",
-      params: {},
-      path: "/",
-    }));
+  it("should return error when canDeactivate returns false", async () => {
+    router.addDeactivateGuard("sign-in", () => () => false);
 
     await router.navigate("sign-in");
 
     try {
       await router.navigate("users");
     } catch (error: any) {
-      // Guards cannot redirect - should return CANNOT_DEACTIVATE error
       expect(error?.code).toBe(errorCodes.CANNOT_DEACTIVATE);
-      expect(error?.attemptedRedirect).toStrictEqual({
-        name: "index",
-        params: {},
-        path: "/",
-      });
     }
 
-    // Should remain on sign-in, not redirect to index
     expect(router.getState()?.name).toBe("sign-in");
   });
 

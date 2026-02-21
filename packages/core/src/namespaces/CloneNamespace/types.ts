@@ -2,7 +2,7 @@
 
 import type { Router } from "../../Router";
 import type {
-  ActivationFnFactory,
+  GuardFnFactory,
   MiddlewareFactory,
   PluginFactory,
   Route,
@@ -17,8 +17,8 @@ export interface CloneData<Dependencies extends DefaultDependencies> {
   routes: Route<Dependencies>[];
   options: Options;
   dependencies: Partial<Dependencies>;
-  canDeactivateFactories: Record<string, ActivationFnFactory<Dependencies>>;
-  canActivateFactories: Record<string, ActivationFnFactory<Dependencies>>;
+  canDeactivateFactories: Record<string, GuardFnFactory<Dependencies>>;
+  canActivateFactories: Record<string, GuardFnFactory<Dependencies>>;
   middlewareFactories: MiddlewareFactory<Dependencies>[];
   pluginFactories: PluginFactory<Dependencies>[];
   routeConfig: RouteConfig;

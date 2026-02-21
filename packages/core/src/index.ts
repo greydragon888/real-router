@@ -4,6 +4,7 @@
 export type {
   ActivationFnFactory,
   BuildStateResultWithSegments,
+  GuardFnFactory,
   MiddlewareFactory,
   PluginFactory,
   Route,
@@ -18,6 +19,7 @@ export type {
   ActivationFn,
   Config,
   DefaultDependencies,
+  GuardFn,
   Listener,
   Middleware,
   Navigator,
