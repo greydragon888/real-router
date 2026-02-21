@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-21]
+
+### @real-router/core@0.23.1
+
+### Patch Changes
+
+- [#131](https://github.com/greydragon888/real-router/pull/131) [`50d2dc7`](https://github.com/greydragon888/real-router/commit/50d2dc7a6e885aa83af0a96489bfbf6ca735d806) Thanks [@greydragon888](https://github.com/greydragon888)! - Align PluginsNamespace and MiddlewareNamespace patterns (#129)
+
+  Internal consistency refactoring across the two extension namespaces:
+  - **`validateNoDuplicates`**: Middleware now uses callback pattern (`has`) instead of allocating a `Set` from array on every call
+  - **Error messages**: Plugins now include index in args validation and counts in limit errors, using `getTypeDescription()` instead of raw `typeof`
+  - **Threshold warnings**: Plugin warnings now include actionable context (hard limit value, guidance), matching middleware style
+  - **Logger context**: Middleware logger context extracted to a `LOGGER_CONTEXT` constant in `constants.ts`
+  - **`disposeAll` / `clearAll`**: Added JSDoc documenting the semantic distinction between the two operations
+
 ## [2026-02-20]
 
 ### @real-router/core@0.23.0
