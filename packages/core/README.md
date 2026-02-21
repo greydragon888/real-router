@@ -193,21 +193,6 @@ const unsubscribe = router.usePlugin(browserPluginFactory());
 
 ---
 
-### Middleware
-
-#### `router.useMiddleware(middlewareFactory)`
-
-Registers middleware for the navigation pipeline. [Wiki](https://github.com/greydragon888/real-router/wiki/useMiddleware)
-
-```typescript
-router.useMiddleware((router) => (toState, fromState, done) => {
-  console.log("Navigating:", toState.name);
-  done();
-});
-```
-
----
-
 ## Advanced API
 
 ### Routes

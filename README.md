@@ -48,7 +48,6 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 - **Nested routes**: Full support for hierarchical route structures
 - **Lifecycle guards**: `addActivateGuard` / `addDeactivateGuard` for navigation control
 - **Observable state**: Compatible with RxJS and other observable libraries
-- **Middleware support**: Extensible navigation pipeline
 - **Plugin architecture**: Modular functionality
 
 ## Installation
@@ -168,7 +167,6 @@ Full documentation is available in the repository wiki.
 - **Navigation** — Programmatic navigation API
 - **State** — Router state management
 - **Plugins** — Extending router functionality
-- **Middleware** — Navigation pipeline customization
 
 ### API Reference
 

@@ -85,7 +85,6 @@ Router.ts (facade) ────────────────────�
     ├── DependenciesNamespace  — dependency injection container
     ├── EventBusNamespace     — FSM + EventEmitter encapsulation, events, subscribe
     ├── PluginsNamespace       — plugin lifecycle management
-    ├── MiddlewareNamespace    — middleware chain execution
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards
     ├── RouterLifecycleNamespace — start/stop operations
     └── CloneNamespace         — SSR cloning support
@@ -136,46 +135,40 @@ All navigation methods return `Promise<State>` (async/await):
 
 ```
 const state = await router.navigate(name, params, options)
-                    │
-                    ▼
-            ┌───────────────┐
-            │ Build target  │  RoutesNamespace.buildState()
-            │    state      │  + forwardState() resolution
-            └───────┬───────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │  Deactivation │  canDeactivate guards
-            │    guards     │  (innermost → outermost)
-            └───────┬───────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │  Activation   │  canActivate guards
-            │    guards     │  (outermost → innermost)
-            └───────┬───────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │  Middleware   │  Transform/redirect/block
-            │    chain      │
-            └───────┬───────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │  setState()   │  Freeze & store state
-            │  + FSM send   │  COMPLETE → emitTransitionSuccess
-            └───────┬───────┘
-                    │
-                    ▼
-            ┌───────────────┐
-            │   Plugins     │  onTransitionSuccess()
-            │               │
-            └───────┬───────┘
-                    │
-                    ▼
-              Promise resolves with state
-              (or rejects with RouterError)
+                     │
+                     ▼
+             ┌───────────────┐
+             │ Build target  │  RoutesNamespace.buildState()
+             │    state      │  + forwardState() resolution
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │  Deactivation │  canDeactivate guards
+             │    guards     │  (innermost → outermost)
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │  Activation   │  canActivate guards
+             │    guards     │  (outermost → innermost)
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │  setState()   │  Freeze & store state
+             │  + FSM send   │  COMPLETE → emitTransitionSuccess
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │   Plugins     │  onTransitionSuccess()
+             │               │
+             └───────┬───────┘
+                     │
+                     ▼
+               Promise resolves with state
+               (or rejects with RouterError)
 ```
 
 On error at any step: FSM sends `FAIL` → `emitTransitionError()`, Promise rejects with `RouterError`.
@@ -217,15 +210,6 @@ router.dispose();
 ```typescript
 router.addActivateGuard("admin", () => (toState, fromState) => {
   return isAuthenticated; // true = allow, false = block
-});
-```
-
-**Middleware** returns the same way:
-
-```typescript
-router.useMiddleware(() => (toState, fromState) => {
-  if (!auth) return router.makeState("login"); // redirect
-  return true; // allow
 });
 ```
 
@@ -283,16 +267,14 @@ interface State {
 
 ## Extension Points
 
-| Extension      | Purpose                        | Scope     | Can Block |
-| -------------- | ------------------------------ | --------- | --------- |
-| **Guards**     | Route access control           | Per-route | Yes       |
-| **Middleware** | Transform/redirect navigation  | Global    | Yes       |
-| **Plugins**    | React to events, extend router | Global    | No        |
+| Extension   | Purpose                        | Scope     | Can Block |
+| ----------- | ------------------------------ | --------- | --------- |
+| **Guards**  | Route access control           | Per-route | Yes       |
+| **Plugins** | React to events, extend router | Global    | No        |
 
-### Guard vs Middleware Decision
+### Guard vs Plugin Decision
 
 - Need to **block** a specific route? → Guard (`addActivateGuard`/`addDeactivateGuard`)
-- Need to **redirect** or **transform** state? → Middleware
 - Need to **observe** without modifying? → Plugin
 
 ## Resource Limits
@@ -303,7 +285,6 @@ Router enforces configurable limits to prevent resource exhaustion:
 createRouter(routes, {
   limits: {
     maxPlugins: 100, // Default: 50
-    maxMiddleware: 100, // Default: 50
     maxDependencies: 200, // Default: 100
   },
 });
@@ -312,7 +293,6 @@ createRouter(routes, {
 | Limit                  | Default | Protects Against                            |
 | ---------------------- | ------- | ------------------------------------------- |
 | `maxPlugins`           | 50      | Plugin stack overflow                       |
-| `maxMiddleware`        | 50      | Middleware chain overflow                   |
 | `maxDependencies`      | 100     | Circular/excessive dependencies             |
 | `maxListeners`         | 10,000  | Event listener memory leaks                 |
 | `warnListeners`        | 1,000   | Warn threshold for possible leaks (0 = off) |
