@@ -59,7 +59,7 @@ export function validateHandlerLimit(
     throw new Error(
       `[router.${methodName}] Lifecycle handler limit exceeded (${maxLifecycleHandlers}). ` +
         `This indicates too many routes with individual handlers. ` +
-        `Consider using middleware for cross-cutting concerns.`,
+        `Consider using plugins for cross-cutting concerns.`,
     );
   }
 }
