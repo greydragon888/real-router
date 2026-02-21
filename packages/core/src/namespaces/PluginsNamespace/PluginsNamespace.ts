@@ -219,6 +219,13 @@ export class PluginsNamespace<
     return this.#plugins.has(factory);
   }
 
+  /**
+   * Disposes all registered plugins by running their teardown callbacks
+   * and removing event listener subscriptions.
+   * Unlike {@link MiddlewareNamespace.clearAll}, active disposal is required —
+   * plugins have an active lifecycle (event subscriptions, teardown hooks).
+   * Named "dispose" (not "clear") because there is active cleanup to perform.
+   */
   disposeAll(): void {
     for (const unsubscribe of this.#unsubscribes) {
       unsubscribe();
@@ -244,9 +251,17 @@ export class PluginsNamespace<
     const { warn, error } = computeThresholds(maxPlugins);
 
     if (totalCount >= error) {
-      logger.error(LOGGER_CONTEXT, `${totalCount} plugins registered!`);
+      logger.error(
+        LOGGER_CONTEXT,
+        `${totalCount} plugins registered! ` +
+          `This is excessive and will impact performance. ` +
+          `Hard limit at ${maxPlugins}.`,
+      );
     } else if (totalCount >= warn) {
-      logger.warn(LOGGER_CONTEXT, `${totalCount} plugins registered`);
+      logger.warn(
+        LOGGER_CONTEXT,
+        `${totalCount} plugins registered. ` + `Consider if all are necessary.`,
+      );
     }
   }
 

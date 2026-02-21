@@ -7,6 +7,7 @@
 
 import { getTypeDescription } from "type-guards";
 
+import { LOGGER_CONTEXT } from "./constants";
 import { DEFAULT_LIMITS } from "../../constants";
 
 import type { MiddlewareFactory } from "../../types";
@@ -29,7 +30,7 @@ export function validateUseMiddlewareArgs<D extends DefaultDependencies>(
   for (const [i, middleware] of middlewares.entries()) {
     if (typeof middleware !== "function") {
       throw new TypeError(
-        `[router.useMiddleware] Expected middleware factory function at index ${i}, ` +
+        `[${LOGGER_CONTEXT}] Expected middleware factory function at index ${i}, ` +
           `got ${getTypeDescription(middleware)}`,
       );
     }
@@ -45,7 +46,7 @@ export function validateMiddleware<D extends DefaultDependencies>(
 ): asserts middleware is Middleware {
   if (typeof middleware !== "function") {
     throw new TypeError(
-      `[router.useMiddleware] Middleware factory must return a function, ` +
+      `[${LOGGER_CONTEXT}] Middleware factory must return a function, ` +
         `got ${getTypeDescription(middleware)}. ` +
         `Factory: ${getFactoryName(factory)}`,
     );
@@ -57,14 +58,12 @@ export function validateMiddleware<D extends DefaultDependencies>(
  */
 export function validateNoDuplicates<D extends DefaultDependencies>(
   newFactories: MiddlewareFactory<D>[],
-  existingFactories: MiddlewareFactory<D>[],
+  has: (factory: MiddlewareFactory<D>) => boolean,
 ): void {
-  const existingSet = new Set(existingFactories);
-
   for (const factory of newFactories) {
-    if (existingSet.has(factory)) {
+    if (has(factory)) {
       throw new Error(
-        `[router.useMiddleware] Middleware factory already registered. ` +
+        `[${LOGGER_CONTEXT}] Middleware factory already registered. ` +
           `To re-register, first unsubscribe the existing middleware. ` +
           `Factory: ${getFactoryName(factory)}`,
       );
@@ -88,7 +87,7 @@ export function validateMiddlewareLimit(
 
   if (totalSize > maxMiddleware) {
     throw new Error(
-      `[router.useMiddleware] Middleware limit exceeded (${maxMiddleware}). ` +
+      `[${LOGGER_CONTEXT}] Middleware limit exceeded (${maxMiddleware}). ` +
         `Current: ${currentCount}, Attempting to add: ${newCount}. ` +
         `This indicates an architectural problem. Consider consolidating middleware.`,
     );

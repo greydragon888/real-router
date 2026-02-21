@@ -872,7 +872,7 @@ export class Router<
       // 2. Validate no duplicates
       MiddlewareNamespace.validateNoDuplicates<Dependencies>(
         middlewares,
-        this.#middleware.getFactories(),
+        this.#middleware.has.bind(this.#middleware),
       );
 
       // 3. Validate limit
