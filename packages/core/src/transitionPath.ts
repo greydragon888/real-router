@@ -82,9 +82,9 @@ function nameToIDsGeneral(name: string): string[] {
 }
 
 function isPrimitive(value: unknown): value is PrimitiveParam {
-  const t = typeof value;
+  const type = typeof value;
 
-  return t === "string" || t === "number" || t === "boolean";
+  return type === "string" || type === "number" || type === "boolean";
 }
 
 /**
