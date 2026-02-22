@@ -6,7 +6,7 @@ import type { State } from "@real-router/types";
  * Parameters extracted from a route segment.
  * Maps parameter names to their string values.
  */
-type SegmentParams = Record<string, string>;
+type PrimitiveParam = string | number | boolean;
 
 /**
  * Represents a transition path between two router states.
@@ -81,46 +81,41 @@ function nameToIDsGeneral(name: string): string[] {
   return ids;
 }
 
+function isPrimitive(value: unknown): value is PrimitiveParam {
+  const t = typeof value;
+
+  return t === "string" || t === "number" || t === "boolean";
+}
+
 /**
- * Extracts segment-specific parameters from a state object.
- * Only includes parameters that are valid for serialization (primitives).
- *
- * @param name - Segment name to extract parameters for
- * @param state - State containing the parameters
- * @returns Object with extracted segment parameters
+ * Compares segment parameters between two states without creating intermediate objects.
+ * Returns true if all primitive params for the given segment are equal in both states.
  */
-function extractSegmentParams(name: string, state: State): SegmentParams {
-  const keys = state.meta?.params[name];
+function segmentParamsEqual(
+  name: string,
+  toState: State,
+  fromState: State,
+): boolean {
+  const keys = toState.meta?.params[name];
 
-  // No parameters defined for this segment
   if (!keys || typeof keys !== "object") {
-    return {};
+    return true;
   }
-
-  const result: SegmentParams = {};
 
   for (const key of Object.keys(keys)) {
-    const value = state.params[key];
+    const toVal = toState.params[key];
+    const fromVal = fromState.params[key];
 
-    // Skip null/undefined values
-    if (value == null) {
-      continue;
-    }
-
-    // Only include primitives in segment params comparison.
-    // Complex types (arrays, nested objects) are handled by query param serialization.
-    // Note: symbol/function/bigint are rejected by isParams validation before reaching this code.
     if (
-      typeof value === "string" ||
-      typeof value === "number" ||
-      typeof value === "boolean"
+      isPrimitive(toVal) &&
+      isPrimitive(fromVal) &&
+      String(toVal) !== String(fromVal)
     ) {
-      result[key] = String(value);
+      return false;
     }
-    // Complex types silently skipped - they're serialized as query params elsewhere
   }
 
-  return result;
+  return true;
 }
 
 /**
@@ -150,17 +145,8 @@ function pointOfDifference(
       return i;
     }
 
-    // Same segment name - check parameters
-    const toParams = extractSegmentParams(toSegment, toState);
-    const fromParams = extractSegmentParams(fromSegment, fromState);
-
-    // Compare parameter values
-    const toKeys = Object.keys(toParams);
-
-    for (const key of toKeys) {
-      if (toParams[key] !== fromParams[key]) {
-        return i;
-      }
+    if (!segmentParamsEqual(toSegment, toState, fromState)) {
+      return i;
     }
   }
 
