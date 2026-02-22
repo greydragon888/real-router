@@ -312,7 +312,14 @@ export function nameToIDs(name: string): string[] {
  * //   toDeactivate: ['users.profile', 'users']
  * // }
  */
-export function getTransitionPath(
+// Single-entry cache: shouldUpdateNode calls getTransitionPath N times per
+// navigation with the same state objects (once per subscribed node).
+// Cache by reference eliminates N-1 redundant computations.
+let cachedToState: State | undefined;
+let cachedFromState: State | undefined;
+let cachedResult: TransitionPath | null = null;
+
+function computeTransitionPath(
   toState: State,
   fromState?: State,
 ): TransitionPath {
@@ -380,7 +387,6 @@ export function getTransitionPath(
   const toActivate = toStateIds.slice(i);
 
   // Determine intersection point (common ancestor)
-  // Note: fromState is guaranteed to be defined here (early return on line 366)
   const intersection = i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION;
 
   return {
@@ -388,4 +394,25 @@ export function getTransitionPath(
     toDeactivate,
     toActivate,
   };
+}
+
+export function getTransitionPath(
+  toState: State,
+  fromState?: State,
+): TransitionPath {
+  if (
+    cachedResult !== null &&
+    toState === cachedToState &&
+    fromState === cachedFromState
+  ) {
+    return cachedResult;
+  }
+
+  const result = computeTransitionPath(toState, fromState);
+
+  cachedToState = toState;
+  cachedFromState = fromState;
+  cachedResult = result;
+
+  return result;
 }
