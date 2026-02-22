@@ -107,6 +107,26 @@ describe("router.navigate() - transitions and cancellation", () => {
     });
   });
 
+  it("should cancel transition between guard iterations when router.stop() is called in a guard", async () => {
+    const parentGuard = vi.fn().mockImplementation(() => {
+      router.stop();
+
+      return true;
+    });
+
+    const childGuard = vi.fn().mockReturnValue(true);
+
+    router.addActivateGuard("settings", () => parentGuard);
+    router.addActivateGuard("settings.account", () => childGuard);
+
+    await expect(router.navigate("settings.account")).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
+
+    expect(parentGuard).toHaveBeenCalledTimes(1);
+    expect(childGuard).not.toHaveBeenCalled();
+  });
+
   describe("Issue #51: Concurrent Navigation Handling", () => {
     // Issue #51: When navigation is cancelled, Promise handlers continue executing
     // and resolve after cancellation, leading to race conditions.

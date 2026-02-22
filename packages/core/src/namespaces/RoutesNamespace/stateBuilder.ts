@@ -1,4 +1,4 @@
-// packages/real-router/modules/core/stateBuilder.ts
+// packages/core/src/namespaces/RoutesNamespace/stateBuilder.ts
 
 /**
  * State Builder Utilities.

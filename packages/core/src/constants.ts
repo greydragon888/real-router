@@ -1,4 +1,4 @@
-// packages/real-router/modules/constants.ts
+// packages/core/src/constants.ts
 
 import type {
   EventName,

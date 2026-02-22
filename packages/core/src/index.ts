@@ -1,4 +1,4 @@
-// packages/real-router/modules/index.ts
+// packages/core/src/index.ts
 
 // Router-dependent types (defined in core)
 export type {

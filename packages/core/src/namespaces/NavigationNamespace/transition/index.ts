@@ -1,4 +1,4 @@
-// packages/real-router/modules/transition/index.ts
+// packages/core/src/namespaces/NavigationNamespace/transition/index.ts
 
 import { executeLifecycleHooks } from "./executeLifecycleHooks";
 import { constants, errorCodes } from "../../../constants";
