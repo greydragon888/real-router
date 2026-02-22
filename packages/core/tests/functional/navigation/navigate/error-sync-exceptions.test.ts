@@ -126,67 +126,51 @@ describe("router.navigate() - error sync exceptions", () => {
 
     describe("error in middleware", () => {
       it("should handle synchronous error in middleware", async () => {
-        const errorMessage = "Middleware error";
         const errorMiddleware = vi.fn().mockImplementation(() => {
-          throw new Error(errorMessage);
+          throw new Error("Middleware error");
         });
 
-        router.useMiddleware(() => errorMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
 
-        try {
-          await router.navigate("orders.pending");
+        const state = await router.navigate("orders.pending");
 
-          expect.fail("Should have thrown error");
-        } catch (error) {
-          expect(error).toBeDefined();
-          expect((error as any)?.message).toBe(errorMessage);
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders.pending");
+        expect(errorMiddleware).toHaveBeenCalledTimes(1);
       });
 
-      it("should stop middleware chain on error", async () => {
-        const errorMessage = "First middleware error";
-
+      it("should call all middleware even when one throws (fire-and-forget chain continues)", async () => {
         const errorMiddleware = vi.fn().mockImplementation(() => {
-          throw new Error(errorMessage);
+          throw new Error("First middleware error");
         });
         const nextMiddleware = vi.fn().mockReturnValue(true);
 
-        router.useMiddleware(() => errorMiddleware);
-        router.useMiddleware(() => nextMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
+        router.usePlugin(() => ({ onTransitionSuccess: nextMiddleware }));
 
-        try {
-          await router.navigate("profile");
+        const state = await router.navigate("profile");
 
-          expect.fail("Should have thrown error");
-        } catch (error) {
-          expect(error).toBeDefined();
-          expect((error as any)?.message).toBe(errorMessage);
-        }
-
+        expect(state).toBeDefined();
+        expect(state.name).toBe("profile");
         expect(errorMiddleware).toHaveBeenCalledTimes(1);
-        // Next middleware should not be called due to error
-        expect(nextMiddleware).not.toHaveBeenCalled();
+        expect(nextMiddleware).toHaveBeenCalledTimes(1);
       });
 
       it("should handle middleware error even with guards present", async () => {
-        const errorMessage = "Middleware failed";
-
         const activateGuard = vi.fn().mockReturnValue(true);
         const errorMiddleware = vi.fn().mockImplementation(() => {
-          throw new Error(errorMessage);
+          throw new Error("Middleware failed");
         });
 
         router.addActivateGuard("orders", () => activateGuard);
-        router.useMiddleware(() => errorMiddleware);
+        router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
 
-        try {
-          await router.navigate("orders");
+        const state = await router.navigate("orders");
 
-          expect.fail("Should have thrown error");
-        } catch (error) {
-          expect(error).toBeDefined();
-          expect((error as any)?.message).toBe(errorMessage);
-        }
+        expect(state).toBeDefined();
+        expect(state.name).toBe("orders");
+        expect(activateGuard).toHaveBeenCalledTimes(1);
+        expect(errorMiddleware).toHaveBeenCalledTimes(1);
       });
     });
   });
@@ -239,24 +223,19 @@ describe("router.navigate() - error sync exceptions", () => {
       }
     });
 
-    // Test 3: Middleware throws synchronous exception
     it("should catch synchronous exception from middleware", async () => {
-      // Factory returns function that throws
       const throwingMiddlewareFactory = () => () => {
         throw new Error("Middleware failed synchronously");
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
-      try {
-        await router.navigate("users");
+      const state = await router.navigate("users");
 
-        expect.fail("Should have thrown error");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((error as any)?.message).toBe("Middleware failed synchronously");
-      }
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
 
     // Test 4: Segment name is preserved in error metadata for lifecycle hooks
@@ -343,25 +322,20 @@ describe("router.navigate() - error sync exceptions", () => {
       }
     });
 
-    // Test 8: Handling plain object instead of Error (middleware)
     it("should handle plain object thrown from middleware", async () => {
       const throwingMiddlewareFactory = () => () => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw { custom: "middleware error", data: 123 };
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
-      try {
-        await router.navigate("users");
+      const state = await router.navigate("users");
 
-        expect.fail("Should have thrown error");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((error as any).custom).toBe("middleware error");
-        expect((error as any).data).toBe(123);
-      }
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
 
     // Test 9: Handling string instead of Error (canDeactivate)
@@ -386,26 +360,22 @@ describe("router.navigate() - error sync exceptions", () => {
       }
     });
 
-    // Test 10: Handling number instead of Error (middleware)
     it("should handle number thrown from middleware", async () => {
       const throwingMiddlewareFactory = () => () => {
         // eslint-disable-next-line @typescript-eslint/only-throw-error
         throw 42;
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
-      try {
-        await router.navigate("users");
+      const state = await router.navigate("users");
 
-        expect.fail("Should have thrown error");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-      }
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
 
-    // Test 11: Error.cause is preserved for middleware
     it("should preserve Error.cause in metadata for middleware", async () => {
       const rootCause = new Error("Root cause in middleware");
       const throwingMiddlewareFactory = () => () => {
@@ -416,18 +386,14 @@ describe("router.navigate() - error sync exceptions", () => {
         throw error;
       };
 
-      router.useMiddleware(throwingMiddlewareFactory);
+      router.usePlugin(() => ({
+        onTransitionSuccess: throwingMiddlewareFactory(),
+      }));
 
-      try {
-        await router.navigate("users");
+      const state = await router.navigate("users");
 
-        expect.fail("Should have thrown error");
-      } catch (error) {
-        expect(error).toBeDefined();
-        expect((error as any)?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect((error as any).cause).toBe(rootCause);
-        expect((error as any).message).toBe("Middleware error with cause");
-      }
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
   });
 });

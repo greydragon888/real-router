@@ -12,9 +12,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async () => {
-    await Promise.resolve();
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      await Promise.resolve();
+    },
+  }));
   router.start("/");
 
   bench("2.2.1 Navigation with single asynchronous middleware", async () => {
@@ -28,9 +30,11 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   for (let i = 0; i < 5; i++) {
-    router.useMiddleware(() => async () => {
-      await Promise.resolve();
-    });
+    router.usePlugin(() => ({
+      onTransitionSuccess: async () => {
+        await Promise.resolve();
+      },
+    }));
   }
 
   router.start("/");
@@ -89,11 +93,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => () => {});
-  router.useMiddleware(() => async () => {
-    await Promise.resolve();
-  });
-  router.useMiddleware(() => () => {});
+  router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      await Promise.resolve();
+    },
+  }));
+  router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   router.start("/");
 
   bench(
@@ -109,9 +115,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async () => {
-    await Promise.all([Promise.resolve(), Promise.resolve()]);
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      await Promise.all([Promise.resolve(), Promise.resolve()]);
+    },
+  }));
   router.start("/");
 
   bench(
@@ -127,9 +135,11 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async () => {
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    },
+  }));
   router.start("/");
 
   bench("2.2.7 Navigation with long-running async operations", async () => {
@@ -162,10 +172,12 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.useMiddleware(() => async () => {
-    // Simulate data fetching
-    await Promise.resolve({ user: "test" });
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: async () => {
+      // Simulate data fetching
+      await Promise.resolve({ user: "test" });
+    },
+  }));
   router.start("/");
 
   bench("2.2.9 Navigation with async data loading in middleware", async () => {

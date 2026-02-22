@@ -4,7 +4,7 @@
  * Base router types without Router class dependency.
  *
  * Router-dependent types (Route, RouteConfigUpdate, ActivationFnFactory,
- * MiddlewareFactory, PluginFactory) are defined in @real-router/core
+ * PluginFactory) are defined in @real-router/core
  * to avoid circular dependencies.
  */
 
@@ -193,9 +193,6 @@ export interface Plugin {
   teardown?: () => void;
 }
 
-// eslint-disable-next-line sonarjs/redundant-type-aliases
-export type Middleware = ActivationFn;
-
 export interface SubscribeState {
   route: State;
   previousRoute?: State | undefined;
@@ -299,7 +296,7 @@ export interface Router {
    * Dispose the router and release all resources.
    *
    * Stops the router if active, calls plugin teardown, clears all event
-   * listeners, middleware, routes, and dependencies. After disposal, all
+   * listeners, routes, and dependencies. After disposal, all
    * mutating methods throw a ROUTER_DISPOSED error. Idempotent — safe to
    * call multiple times.
    */

@@ -30,7 +30,6 @@ describe("core/limits (integration via public API)", () => {
         createRouter([], {
           limits: {
             maxPlugins: 10,
-            maxMiddleware: 20,
             maxDependencies: 50,
             maxListeners: 30,
             maxEventDepth: 5,
@@ -121,24 +120,6 @@ describe("core/limits (integration via public API)", () => {
       }).toThrowError("Plugin limit exceeded");
     });
 
-    it("should enforce custom maxMiddleware limit", () => {
-      const router = createRouter([], { limits: { maxMiddleware: 1 } });
-
-      // Register 1 middleware - should succeed
-      expect(() => {
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return;
-        });
-      }).not.toThrowError();
-
-      // 2nd middleware should throw
-      expect(() => {
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return;
-        });
-      }).toThrowError("Middleware limit exceeded");
-    });
-
     it("should enforce custom maxDependencies limit", () => {
       const router = createRouter<{ dep1?: number; dep2?: number }>([], {
         limits: { maxDependencies: 1 },
@@ -179,19 +160,6 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         for (let i = 0; i < 10; i++) {
           router.usePlugin(() => ({}));
-        }
-      }).not.toThrowError();
-    });
-
-    it("should allow unlimited middleware when maxMiddleware = 0", () => {
-      const router = createRouter([], { limits: { maxMiddleware: 0 } });
-
-      // Register many middleware - should not throw
-      expect(() => {
-        for (let i = 0; i < 10; i++) {
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return;
-          });
         }
       }).not.toThrowError();
     });
@@ -279,26 +247,6 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         router.usePlugin(() => ({}));
       }).toThrowError("Plugin limit exceeded");
-    });
-
-    it("should enforce default maxMiddleware limit (50)", () => {
-      const router = createRouter([]);
-
-      // Register 50 middleware - should succeed
-      expect(() => {
-        for (let i = 0; i < 50; i++) {
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return;
-          });
-        }
-      }).not.toThrowError();
-
-      // 51st middleware should throw
-      expect(() => {
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return;
-        });
-      }).toThrowError("Middleware limit exceeded");
     });
 
     it("should enforce default maxDependencies limit (100)", () => {
@@ -501,12 +449,10 @@ describe("core/limits (integration via public API)", () => {
     it("should handle mixed custom and default limits", () => {
       const router = createRouter([], {
         limits: {
-          maxPlugins: 5, // Custom
-          // maxMiddleware uses default (50)
+          maxPlugins: 5,
         },
       });
 
-      // Custom limit enforced
       expect(() => {
         for (let i = 0; i < 5; i++) {
           router.usePlugin(() => ({}));
@@ -516,21 +462,6 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         router.usePlugin(() => ({}));
       }).toThrowError("Plugin limit exceeded");
-
-      // Default limit still enforced for middleware
-      expect(() => {
-        for (let i = 0; i < 50; i++) {
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return;
-          });
-        }
-      }).not.toThrowError();
-
-      expect(() => {
-        router.useMiddleware(() => (_toState, _fromState) => {
-          return;
-        });
-      }).toThrowError("Middleware limit exceeded");
     });
 
     it("should handle limit of 1 (minimum non-zero)", () => {
@@ -579,7 +510,6 @@ describe("core/limits (integration via public API)", () => {
       const router = createRouter([], {
         limits: {
           maxPlugins: 0,
-          maxMiddleware: 0,
           maxDependencies: 0,
           maxListeners: 0,
           maxEventDepth: 0,
@@ -587,13 +517,9 @@ describe("core/limits (integration via public API)", () => {
         },
       });
 
-      // All operations should succeed without limits
       expect(() => {
         for (let i = 0; i < 20; i++) {
           router.usePlugin(() => ({}));
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return;
-          });
         }
       }).not.toThrowError();
     });
@@ -604,7 +530,6 @@ describe("core/limits (integration via public API)", () => {
         createRouter([], {
           limits: {
             maxPlugins: undefined,
-            maxMiddleware: 50,
           } as any,
         });
       }).not.toThrowError();

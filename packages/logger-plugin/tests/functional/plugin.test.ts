@@ -110,16 +110,15 @@ describe("@real-router/logger-plugin", () => {
       await router.start("/");
       warnSpy.mockClear();
 
-      // Add async middleware to keep transition in-progress (after start)
-      router.useMiddleware(() => (_toState, _fromState) => {
-        return new Promise((resolve) =>
+      router.addActivateGuard("users", () => (_toState, _fromState) => {
+        return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
           }, 200),
         );
       });
 
-      // Start navigation (middleware keeps it pending)
+      // Start navigation (guard keeps it pending)
       const navPromise = router.navigate("users");
 
       // Stop router after transition starts
@@ -208,19 +207,16 @@ describe("@real-router/logger-plugin", () => {
 
       await router.start("/");
 
-      // Use async middleware to keep transition in-progress (group stays open, after start)
-      router.useMiddleware(() => (_toState, _fromState) => {
-        return new Promise((resolve) =>
+      router.addActivateGuard("users", () => (_toState, _fromState) => {
+        return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
           }, 200),
         );
       });
 
-      // Start navigation but don't wait for it to complete
       const navPromise = router.navigate("users");
 
-      // Stop after transition starts (group opened)
       setTimeout(() => {
         consoleGroupEndSpy.mockClear();
         router.stop();
@@ -332,19 +328,16 @@ describe("@real-router/logger-plugin", () => {
 
       await router.start("/");
 
-      // Use async middleware to keep transition in-progress (group stays open, after start)
-      router.useMiddleware(() => (_toState, _fromState) => {
-        return new Promise((resolve) =>
+      router.addActivateGuard("users", () => (_toState, _fromState) => {
+        return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
           }, 200),
         );
       });
 
-      // Start navigation but don't wait for it to complete
       const navPromise = router.navigate("users");
 
-      // Teardown after transition starts (group opened)
       setTimeout(() => {
         consoleGroupEndSpy.mockClear();
         unsubscribe();
@@ -557,15 +550,13 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        const unsubMiddleware = router.useMiddleware(
-          () => (_toState, _fromState) => {
-            return new Promise((resolve) =>
-              setTimeout(() => {
-                resolve(true);
-              }, 200),
-            );
-          },
-        );
+        router.addActivateGuard("users", () => (_toState, _fromState) => {
+          return new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 200),
+          );
+        });
 
         const navPromise = router.navigate("users");
 
@@ -583,7 +574,6 @@ describe("@real-router/logger-plugin", () => {
 
         expect(warnSpy).not.toHaveBeenCalled();
 
-        unsubMiddleware();
         await router.start("/");
         vi.useRealTimers();
       });
@@ -595,15 +585,13 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        const unsubMiddleware = router.useMiddleware(
-          () => (_toState, _fromState) => {
-            return new Promise((resolve) =>
-              setTimeout(() => {
-                resolve(true);
-              }, 200),
-            );
-          },
-        );
+        router.addActivateGuard("users", () => (_toState, _fromState) => {
+          return new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 200),
+          );
+        });
 
         const navPromise = router.navigate("users");
 
@@ -621,7 +609,6 @@ describe("@real-router/logger-plugin", () => {
 
         expect(warnSpy).not.toHaveBeenCalled();
 
-        unsubMiddleware();
         await router.start("/");
         vi.useRealTimers();
       });

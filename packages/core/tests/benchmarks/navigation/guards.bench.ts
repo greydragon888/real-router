@@ -9,29 +9,17 @@ import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
 import { createRouter } from "../../../src";
 
-import type { Route, State } from "../../../src";
+import type { Route } from "../../../src";
 
 // ============================================================================
-// Middleware factories (moved to outer scope for lint compliance)
+// Plugin factories (moved to outer scope for lint compliance)
 // ============================================================================
 
-/** Creates a middleware that adds a single param to meta.params */
-function createModifyingMiddleware(
-  paramKey: string,
-  paramValue: string | number | boolean,
+function createModifyingPlugin(
+  _paramKey: string,
+  _paramValue: string | number | boolean,
 ) {
-  return () => (toState: State, _fromState: State | undefined) => {
-    return {
-      ...toState,
-      meta: {
-        ...toState.meta,
-        params: {
-          ...toState.meta?.params,
-          [paramKey]: paramValue,
-        },
-      },
-    } as State;
-  };
+  return () => ({ onTransitionSuccess: () => {} });
 }
 
 /** Guard function that returns true (no state modification) */
@@ -41,12 +29,11 @@ const passthroughGuardFn = () => true;
 const passthroughGuardFactory = () => passthroughGuardFn;
 
 // ============================================================================
-// Middleware that modifies state
+// Plugin overhead during navigation
 // ============================================================================
 
 boxplot(() => {
   summary(() => {
-    // Middleware that adds meta.params
     {
       const routes: Route[] = [
         { name: "home", path: "/" },
@@ -54,23 +41,20 @@ boxplot(() => {
       ];
       const router = createRouter(routes);
 
-      router.useMiddleware(
-        createModifyingMiddleware("middlewareProcessed", true),
-      );
+      router.usePlugin(createModifyingPlugin("pluginProcessed", true));
 
       void router.start("/");
 
       const targetRoutes = ["profile", "home"] as const;
       let i = 0;
 
-      bench("navigate: 1 middleware modifies state", () => {
+      bench("navigate: 1 plugin onTransitionSuccess", () => {
         do_not_optimize(
           void router.navigate(targetRoutes[i++ % targetRoutes.length]),
         );
       }).gc("inner");
     }
 
-    // Multiple middleware modifying state
     {
       const routes: Route[] = [
         { name: "home", path: "/" },
@@ -79,17 +63,16 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let m = 1; m <= 3; m++) {
-        router.useMiddleware(createModifyingMiddleware(`mw${m}`, "processed"));
+        router.usePlugin(createModifyingPlugin(`plugin${m}`, "processed"));
       }
 
       void router.start("/");
 
-      bench("navigate: 3 middleware modify state", () => {
+      bench("navigate: 3 plugins onTransitionSuccess", () => {
         do_not_optimize(router.navigate("settings"));
       }).gc("inner");
     }
 
-    // Heavy middleware chain (5 middleware)
     {
       const routes: Route[] = [
         { name: "home", path: "/" },
@@ -98,12 +81,12 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let m = 1; m <= 5; m++) {
-        router.useMiddleware(createModifyingMiddleware(`mw${m}`, "processed"));
+        router.usePlugin(createModifyingPlugin(`plugin${m}`, "processed"));
       }
 
       void router.start("/");
 
-      bench("navigate: 5 middleware modify state", () => {
+      bench("navigate: 5 plugins onTransitionSuccess", () => {
         do_not_optimize(router.navigate("checkout"));
       }).gc("inner");
     }

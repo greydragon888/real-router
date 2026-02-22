@@ -1,7 +1,7 @@
 // Mock plugin factories for integration testing
 // These synthetic plugins allow testing various edge cases without external dependencies
 
-import type { PluginFactory, State } from "@real-router/core";
+import type { Params, PluginFactory, State } from "@real-router/core";
 
 /**
  * Options for creating a tracking plugin that records hook calls
@@ -78,22 +78,6 @@ export interface StateModifierPluginOptions {
  *   modifyState: (state) => { state.params.modified = true; }
  * }));
  */
-// Helper to create state modifier middleware
-const createStateModifierMiddleware =
-  (modifyState: (state: State) => void) => (toState: State) => {
-    // Create mutable copy of state with new params object
-    const newState = {
-      ...toState,
-      params: { ...toState.params },
-    };
-
-    // Allow modifier to mutate the copy
-    modifyState(newState);
-
-    // Return the modified state
-    return newState;
-  };
-
 export const createStateModifierPlugin = (
   options: StateModifierPluginOptions = {},
 ): PluginFactory => {
@@ -104,12 +88,24 @@ export const createStateModifierPlugin = (
   } = options;
 
   return (router) => {
-    // Use middleware to modify state during transition
-    router.useMiddleware(() => createStateModifierMiddleware(modifyState));
+    const originalForwardState = router.forwardState.bind(router);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    (router as any).forwardState = (name: string, params: Params) => {
+      const result = originalForwardState(name, params);
+      const modifiedParams: Params = { ...result.params };
+
+      modifyState({ params: modifiedParams } as unknown as State);
+
+      return { name: result.name, params: modifiedParams };
+    };
 
     return {
       ...(modifyOnStart && { onStart: () => {} }),
       ...(modifyOnSuccess && { onTransitionSuccess: () => {} }),
+      teardown() {
+        router.forwardState = originalForwardState;
+      },
     };
   };
 };
@@ -183,57 +179,6 @@ export interface PersistentParamsPluginOptions {
  * @example
  * router.usePlugin(createPersistentParamsPlugin({ params: ["lang", "theme"] }));
  */
-// Helper middleware for storing persistent params
-const createStorePersistentParamsMiddleware =
-  (
-    persistentParams: string[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    persistentParamsValues: Record<string, any>,
-  ) =>
-  (toState: State) => {
-    persistentParams.forEach((param) => {
-      if (toState.params[param] !== undefined) {
-        persistentParamsValues[param] = toState.params[param];
-      }
-    });
-
-    return true;
-  };
-
-// Helper middleware for restoring persistent params
-const createRestorePersistentParamsMiddleware =
-  (
-    persistentParams: string[],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    persistentParamsValues: Record<string, any>,
-  ) =>
-  // eslint-disable-next-line sonarjs/function-return-type
-  (toState: State): State | true => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const missingParams: Record<string, any> = {};
-    let needsUpdate = false;
-
-    persistentParams.forEach((param) => {
-      if (
-        toState.params[param] === undefined &&
-        persistentParamsValues[param] !== undefined
-      ) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-        missingParams[param] = persistentParamsValues[param];
-        needsUpdate = true;
-      }
-    });
-
-    // Return new state object with restored params
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    return needsUpdate
-      ? {
-          ...toState,
-          params: { ...toState.params, ...missingParams },
-        }
-      : true;
-  };
-
 export const createPersistentParamsPlugin = (
   options: PersistentParamsPluginOptions,
 ): PluginFactory => {
@@ -242,31 +187,30 @@ export const createPersistentParamsPlugin = (
   const persistentParamsValues: Record<string, any> = {};
 
   return (router) => {
-    // Store middleware that captures persistent params
-    router.useMiddleware(() =>
-      createStorePersistentParamsMiddleware(
-        persistentParams,
-        persistentParamsValues,
-      ),
-    );
+    const originalForwardState = router.forwardState.bind(router);
 
-    // Restore middleware that restores persistent params
-    // Returns a new state object instead of mutating
-    router.useMiddleware(() =>
-      createRestorePersistentParamsMiddleware(
-        persistentParams,
-        persistentParamsValues,
-      ),
-    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
+    (router as any).forwardState = (name: string, params: Params) => {
+      const result = originalForwardState(name, params);
+
+      const mergedParams: Params = {
+        ...persistentParamsValues,
+        ...result.params,
+      };
+
+      return { name: result.name, params: mergedParams };
+    };
 
     return {
       onTransitionSuccess: (toState: State) => {
-        // Update stored values on successful transition
         persistentParams.forEach((param) => {
           if (toState.params[param] !== undefined) {
             persistentParamsValues[param] = toState.params[param];
           }
         });
+      },
+      teardown() {
+        router.forwardState = originalForwardState;
       },
     };
   };
@@ -324,34 +268,20 @@ export const createLoggerPlugin = (
 export interface AsyncPluginOptions {
   /** Delay in ms before completing transition */
   delay?: number;
-  /** Whether to use middleware (affects transition timing) */
-  useMiddleware?: boolean;
 }
 
-// Helper to create async delay middleware
-const createAsyncDelayMiddleware = (delay: number) => async () => {
-  await new Promise((resolve) => setTimeout(resolve, delay));
-
-  return true;
-};
-
 /**
- * Creates a plugin with async middleware.
+ * Creates a plugin with async behavior.
  * Useful for testing async transition scenarios.
  *
  * @example
  * router.usePlugin(createAsyncPlugin({ delay: 100 }));
  */
 export const createAsyncPlugin = (
-  options: AsyncPluginOptions = {},
+  _options: AsyncPluginOptions = {},
 ): PluginFactory => {
-  const { delay = 50, useMiddleware = true } = options;
+  // eslint-disable-next-line unicorn/consistent-function-scoping
+  const factory: PluginFactory = () => ({});
 
-  return (router) => {
-    if (useMiddleware) {
-      router.useMiddleware(() => createAsyncDelayMiddleware(delay));
-    }
-
-    return {};
-  };
+  return factory;
 };

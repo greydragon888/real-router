@@ -72,10 +72,12 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware(() => () => {
-    // Clone during middleware execution
-    do_not_optimize(cloneRouter(router));
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      // Clone during plugin execution
+      do_not_optimize(cloneRouter(router));
+    },
+  }));
   router.start("/");
 
   bench("13.6.3 Cloning during original navigation", () => {
@@ -86,10 +88,12 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.useMiddleware(() => () => {
-    // Clone during middleware execution
-    do_not_optimize(router.clone());
-  });
+  router.usePlugin(() => ({
+    onTransitionSuccess: () => {
+      // Clone during plugin execution
+      do_not_optimize(router.clone());
+    },
+  }));
   router.start("/");
 
   bench("13.6.3 Cloning during original navigation", () => {

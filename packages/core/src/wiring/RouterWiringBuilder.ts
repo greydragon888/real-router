@@ -2,7 +2,6 @@
 
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
-import type { MiddlewareDependencies } from "../namespaces/MiddlewareNamespace";
 import type {
   NavigationDependencies,
   TransitionDependencies,
@@ -23,7 +22,6 @@ export class RouterWiringBuilder<
   private readonly state: WiringOptions<Dependencies>["state"];
   private readonly routes: WiringOptions<Dependencies>["routes"];
   private readonly routeLifecycle: WiringOptions<Dependencies>["routeLifecycle"];
-  private readonly middleware: WiringOptions<Dependencies>["middleware"];
   private readonly plugins: WiringOptions<Dependencies>["plugins"];
   private readonly navigation: WiringOptions<Dependencies>["navigation"];
   private readonly lifecycle: WiringOptions<Dependencies>["lifecycle"];
@@ -38,7 +36,6 @@ export class RouterWiringBuilder<
     this.state = wiringOptions.state;
     this.routes = wiringOptions.routes;
     this.routeLifecycle = wiringOptions.routeLifecycle;
-    this.middleware = wiringOptions.middleware;
     this.plugins = wiringOptions.plugins;
     this.navigation = wiringOptions.navigation;
     this.lifecycle = wiringOptions.lifecycle;
@@ -49,7 +46,6 @@ export class RouterWiringBuilder<
   wireLimits(): void {
     this.dependencies.setLimits(this.limits);
     this.plugins.setLimits(this.limits);
-    this.middleware.setLimits(this.limits);
     this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
       warnListeners: this.limits.warnListeners,
@@ -88,17 +84,6 @@ export class RouterWiringBuilder<
 
     this.routes.setDependencies(routesDeps);
     this.routes.setLifecycleNamespace(this.routeLifecycle);
-  }
-
-  wireMiddlewareDeps(): void {
-    this.middleware.setRouter(this.router);
-
-    const middlewareDeps: MiddlewareDependencies<Dependencies> = {
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependencies.get(dependencyName),
-    };
-
-    this.middleware.setDependencies(middlewareDeps);
   }
 
   wirePluginsDeps(): void {
@@ -166,7 +151,6 @@ export class RouterWiringBuilder<
 
     const transitionDeps: TransitionDependencies = {
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
-      getMiddlewareFunctions: () => this.middleware.getFunctions(),
       isActive: () => this.router.isActive(),
       isTransitioning: () => this.eventBus.isTransitioning(),
       clearCanDeactivate: (name) => {
@@ -217,10 +201,10 @@ export class RouterWiringBuilder<
         dependencies: this.dependencies.getAll(),
         canDeactivateFactories,
         canActivateFactories,
-        middlewareFactories: this.middleware.getFactories(),
         pluginFactories: this.plugins.getAll(),
         routeConfig: this.routes.getConfig(),
         resolvedForwardMap: this.routes.getResolvedForwardMap(),
+        routeCustomFields: this.routes.getRouteCustomFields(),
       };
     });
   }

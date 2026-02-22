@@ -123,10 +123,12 @@ if (!IS_ROUTER5) {
   router.setDependency("shared", { value: 42 });
 
   for (let i = 0; i < 5; i++) {
-    router.useMiddleware((_router, getDependency) => () => {
-      // @ts-expect-error - test dependency
-      do_not_optimize(getDependency("shared"));
-    });
+    router.usePlugin((_router, getDependency) => ({
+      onTransitionSuccess: () => {
+        // @ts-expect-error - test dependency
+        do_not_optimize(getDependency("shared"));
+      },
+    }));
   }
 
   router.start("/");

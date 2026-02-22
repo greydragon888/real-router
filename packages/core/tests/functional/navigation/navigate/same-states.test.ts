@@ -165,6 +165,47 @@ describe("router.navigate() - same states", () => {
       });
     });
 
+    describe("force navigation with non-string param types", () => {
+      it("should handle numeric query params in transition path calculation", async () => {
+        await router.navigate("section.query", {
+          section: "section1",
+          param1: "a",
+          param2: "b",
+          param3: "c",
+        });
+
+        const state = await router.navigate(
+          "section.query",
+          { section: "section1", param1: 42, param2: "b", param3: "c" },
+          { force: true },
+        );
+
+        expect(state.name).toBe("section.query");
+      });
+
+      it("should skip array query params in transition path comparison", async () => {
+        await router.navigate("section.query", {
+          section: "section1",
+          param1: "a",
+          param2: "b",
+          param3: "c",
+        });
+
+        const state = await router.navigate(
+          "section.query",
+          {
+            section: "section1",
+            param1: ["x", "y"],
+            param2: "b",
+            param3: "c",
+          },
+          { force: true },
+        );
+
+        expect(state.name).toBe("section.query");
+      });
+    });
+
     describe("Edge cases", () => {
       it("should handle complex nested routes correctly", async () => {
         await router.navigate("orders.pending");

@@ -1,6 +1,6 @@
-// packages/real-router/modules/transitionPath.ts
+// packages/core/src/transitionPath.ts
 
-import type { Params, State } from "@real-router/types";
+import type { State } from "@real-router/types";
 
 /**
  * Parameters extracted from a route segment.
@@ -99,19 +99,7 @@ function extractSegmentParams(name: string, state: State): SegmentParams {
 
   const result: SegmentParams = {};
 
-  for (const key in keys as Params) {
-    // Skip inherited properties
-    if (!Object.hasOwn(keys, key)) {
-      continue;
-    }
-
-    // Skip undefined values for consistent behavior (treat { key: undefined } same as missing key)
-    // Edge case: can appear from manual State creation or object merging
-    // @ts-expect-error Params type doesn't allow undefined, but it can appear at runtime
-    if (keys[key] === undefined) {
-      continue;
-    }
-
+  for (const key of Object.keys(keys)) {
     const value = state.params[key];
 
     // Skip null/undefined values
@@ -166,15 +154,9 @@ function pointOfDifference(
     const toParams = extractSegmentParams(toSegment, toState);
     const fromParams = extractSegmentParams(fromSegment, fromState);
 
-    // Fast check: different number of parameters
+    // Compare parameter values
     const toKeys = Object.keys(toParams);
-    const fromKeys = Object.keys(fromParams);
 
-    if (toKeys.length !== fromKeys.length) {
-      return i;
-    }
-
-    // Detailed check: compare parameter values
     for (const key of toKeys) {
       if (toParams[key] !== fromParams[key]) {
         return i;
@@ -382,24 +364,6 @@ export function getTransitionPath(
       toActivate: nameToIDs(toState.name),
       toDeactivate: reverseArray(nameToIDs(fromState.name)),
     };
-  }
-
-  // ===== FAST PATH 4: Same routes with empty meta.params =====
-  // If both have empty meta.params {}, no parameter checking needed
-  if (toState.name === fromState.name && toHasMeta && fromHasMeta) {
-    const toParamsEmpty =
-      toState.meta && Object.keys(toState.meta.params).length === 0;
-    const fromParamsEmpty =
-      fromState.meta && Object.keys(fromState.meta.params).length === 0;
-
-    if (toParamsEmpty && fromParamsEmpty) {
-      // Both have empty params - no transition needed
-      return {
-        intersection: toState.name,
-        toActivate: [],
-        toDeactivate: [],
-      };
-    }
   }
 
   // ===== STANDARD PATH: Routes with parameters =====

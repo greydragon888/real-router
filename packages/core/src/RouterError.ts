@@ -1,4 +1,4 @@
-// packages/real-router/modules/RouterError.ts
+// packages/core/src/RouterError.ts
 
 import { errorCodes } from "./constants";
 import { deepFreezeState } from "./helpers";

@@ -29,11 +29,6 @@ import { createSimpleRouter } from "./helpers";
 const JIT_WARMUP_ITERATIONS = 300;
 
 // Warmup helper functions (defined outside to satisfy eslint consistent-function-scoping)
-function warmupMiddlewareHandler(): void {
-  // pass-through middleware
-}
-const warmupMiddleware = () => warmupMiddlewareHandler;
-
 function warmupGuardHandler(): boolean {
   return true;
 }
@@ -57,7 +52,6 @@ function warmupJIT(): void {
       onStop: () => {},
       onTransitionSuccess: () => {},
     }));
-    router.useMiddleware(warmupMiddleware);
     router.addActivateGuard("home", warmupGuard);
 
     // Warm up ALL start() variants (critical for sections 10-11)

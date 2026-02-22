@@ -24,13 +24,15 @@ describe("router.navigate() - transitions and cancellation", () => {
   });
 
   it("should be able to handle multiple cancellations", async () => {
-    const middleware = async (): Promise<boolean> => {
+    const middleware = async (): Promise<void> => {
       await new Promise((resolve) => setTimeout(resolve, 10));
-
-      return true;
     };
 
-    router.useMiddleware(() => middleware);
+    router.usePlugin(() => ({
+      onTransitionSuccess: () => {
+        void middleware();
+      },
+    }));
 
     const promises = Array.from({ length: 5 })
       .fill(null)
@@ -67,10 +69,8 @@ describe("router.navigate() - transitions and cancellation", () => {
     const activateMock = vi.fn().mockReturnValue(true);
     const deactivateMock = vi.fn().mockReturnValue(true);
 
-    router.useMiddleware(
-      () => middlewareMock1 as any,
-      () => middlewareMock2 as any,
-    );
+    router.usePlugin(() => ({ onTransitionSuccess: middlewareMock1 as any }));
+    router.usePlugin(() => ({ onTransitionSuccess: middlewareMock2 as any }));
     router.addActivateGuard("users", () => activateMock as any);
     router.addDeactivateGuard("users", () => deactivateMock as any);
 
@@ -107,6 +107,26 @@ describe("router.navigate() - transitions and cancellation", () => {
     });
   });
 
+  it("should cancel transition between guard iterations when router.stop() is called in a guard", async () => {
+    const parentGuard = vi.fn().mockImplementation(() => {
+      router.stop();
+
+      return true;
+    });
+
+    const childGuard = vi.fn().mockReturnValue(true);
+
+    router.addActivateGuard("settings", () => parentGuard);
+    router.addActivateGuard("settings.account", () => childGuard);
+
+    await expect(router.navigate("settings.account")).rejects.toMatchObject({
+      code: errorCodes.TRANSITION_CANCELLED,
+    });
+
+    expect(parentGuard).toHaveBeenCalledTimes(1);
+    expect(childGuard).not.toHaveBeenCalled();
+  });
+
   describe("Issue #51: Concurrent Navigation Handling", () => {
     // Issue #51: When navigation is cancelled, Promise handlers continue executing
     // and resolve after cancellation, leading to race conditions.
@@ -115,25 +135,25 @@ describe("router.navigate() - transitions and cancellation", () => {
       it("should handle multiple stop() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        const middleware2 = async (): Promise<boolean> => {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-
-          return true;
-        };
-
-        freshRouter.useMiddleware(() => middleware2);
+        freshRouter.addActivateGuard(
+          "users",
+          () => () =>
+            new Promise((resolve) =>
+              setTimeout(() => {
+                resolve(true);
+              }, 100),
+            ),
+        );
         await freshRouter.start("/home");
 
         const promise = freshRouter.navigate("users");
 
         await new Promise((resolve) => setTimeout(resolve, 10));
 
-        // Stop navigation multiple times
         freshRouter.stop();
         freshRouter.stop();
         freshRouter.stop();
 
-        // Navigation should be cancelled
         try {
           await promise;
 

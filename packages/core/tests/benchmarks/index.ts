@@ -6,7 +6,7 @@
  *
  * Categories:
  * 1. navigation - Route navigation performance
- * 2. transition/mergeStates - State merging performance
+ * 2. helpers - Helper function benchmarks
  * 3. (commented) transitionPath - Transition path calculation
  * 4. (commented) routes - Route operations
  */
@@ -20,7 +20,6 @@ import { run } from "mitata";
 import "./navigation/basic.bench";
 import "./navigation/options.bench";
 import "./navigation/guards.bench";
-import "./transition/mergeStates.bench";
 import "./helpers/freezeStateInPlace.bench";
 import "./validation/isNavigationOptions.bench";
 // import "./transitionPath/getTransitionPath.bench";

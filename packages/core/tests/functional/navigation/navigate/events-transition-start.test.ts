@@ -89,7 +89,7 @@ describe("router.navigate() - events transition start", () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       router.addActivateGuard("users.view", () => canActivateGuard);
-      router.useMiddleware(() => middleware);
+      router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
       const unsubStart = router.addEventListener(
         events.TRANSITION_START,
@@ -129,16 +129,16 @@ describe("router.navigate() - events transition start", () => {
         onCancel,
       );
 
-      // Set up async middleware that only delays specific route
-      router.useMiddleware(() => (toState) => {
-        if (toState.name === "users.view") {
-          return new Promise((resolve) => {
-            setTimeout(resolve, 50);
-          });
-        }
-
-        return true;
-      });
+      // Set up async plugin that only delays specific route
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState) => {
+          if (toState.name === "users.view") {
+            void new Promise((resolve) => {
+              setTimeout(resolve, 50);
+            });
+          }
+        },
+      }));
 
       const firstNav = router.navigate("users.view", { id: 456 });
 

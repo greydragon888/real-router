@@ -54,22 +54,23 @@ describe("router.navigate() - error state recovery", () => {
       expect(router.getState()?.name).toBe("users");
     });
 
-    it("should not change state when middleware throws", async () => {
+    it("should change state even when middleware throws (fire-and-forget)", async () => {
       await router.navigate("users");
 
       expect(router.getState()?.name).toBe("users");
 
-      router.useMiddleware(() => () => {
-        throw new Error("Middleware error");
-      });
-      try {
-        await router.navigate("home");
-      } catch (error: any) {
-        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-      }
+      router.usePlugin(() => ({
+        onTransitionSuccess: () => {
+          throw new Error("Middleware error");
+        },
+      }));
 
-      // State should NOT have changed
-      expect(router.getState()?.name).toBe("users");
+      const state = await router.navigate("home");
+
+      expect(state).toBeDefined();
+      expect(state.name).toBe("home");
+
+      expect(router.getState()?.name).toBe("home");
     });
 
     it("should allow new navigation after guard error", async () => {
@@ -154,22 +155,20 @@ describe("router.navigate() - error state recovery", () => {
     });
 
     it("should handle Promise rejection in middleware", async () => {
-      router.useMiddleware(
-        () => () =>
+      router.usePlugin(() => ({
+        onTransitionSuccess: () => {
           new Promise((_resolve, reject) =>
             setTimeout(() => {
               reject(new Error("Async middleware error"));
             }, 10),
-          ),
-      );
+          ).catch(() => {});
+        },
+      }));
 
-      try {
-        await router.navigate("users");
-      } catch (error: any) {
-        expect(error).toBeDefined();
-        expect(error?.code).toBe(errorCodes.TRANSITION_ERR);
-        expect(error?.message).toBe("Async middleware error");
-      }
+      const state = await router.navigate("users");
+
+      expect(state).toBeDefined();
+      expect(state.name).toBe("users");
     });
 
     it("should cancel transition when router.stop() called during async guard", async () => {

@@ -1,4 +1,4 @@
-// packages/real-router/modules/transition/wrapSyncError.ts
+import { RouterError } from "../../../RouterError";
 
 /**
  * Error metadata structure for transition errors.
@@ -12,8 +12,25 @@ export interface SyncErrorMetadata {
   segment?: string;
 }
 
-// Reserved properties that conflict with RouterError constructor
-// Issue #39: Filter these when wrapping sync errors to avoid TypeError
+/**
+ * Re-throws a caught error as a RouterError with the given error code.
+ * If the error is already a RouterError, sets the code directly.
+ * Otherwise wraps it with wrapSyncError metadata.
+ */
+export function rethrowAsRouterError(
+  error: unknown,
+  errorCode: string,
+  segment: string,
+): never {
+  if (error instanceof RouterError) {
+    error.setCode(errorCode);
+
+    throw error;
+  }
+
+  throw new RouterError(errorCode, wrapSyncError(error, segment));
+}
+
 const reservedRouterErrorProps = new Set([
   "code",
   "segment",
@@ -30,25 +47,14 @@ const reservedRouterErrorProps = new Set([
  * - Primitives (string, number, etc.): returns minimal metadata
  *
  * @param thrown - The value caught in a try-catch block
- * @param segment - Optional route segment name (for lifecycle hooks)
+ * @param segment - Route segment name (for lifecycle hooks)
  * @returns Structured error metadata for RouterError
- *
- * @example
- * ```typescript
- * try {
- *   hookFn();
- * } catch (error) {
- *   const metadata = wrapSyncError(error, "users.profile");
- *   throw new RouterError(errorCodes.TRANSITION_ERR, metadata);
- * }
- * ```
  */
 export function wrapSyncError(
   thrown: unknown,
-  segment?: string,
+  segment: string,
 ): SyncErrorMetadata {
-  // Base metadata - always include segment if provided
-  const base: SyncErrorMetadata = segment ? { segment } : {};
+  const base: SyncErrorMetadata = { segment };
 
   // Handle Error instances - extract all useful properties
   if (thrown instanceof Error) {

@@ -74,7 +74,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
     router.usePlugin(() => ({
       onTransitionStart: () => {},
     }));
@@ -102,7 +102,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.useMiddleware(() => () => {});
+    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
     router.usePlugin(() => ({
       onTransitionStart: () => {},
     }));

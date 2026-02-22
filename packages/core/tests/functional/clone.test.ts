@@ -4,7 +4,7 @@ import { errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router, State, RouterError } from "@real-router/core";
+import type { Router, RouterError } from "@real-router/core";
 
 /**
  * Creates a trackable plugin that records when its hooks are called.
@@ -40,26 +40,6 @@ function createTrackingPlugin(id: string, orderTracker?: string[]) {
   };
 }
 
-/**
- * Creates a trackable middleware that records when it's called.
- */
-function createTrackingMiddleware(id: string, orderTracker?: string[]) {
-  let callCount = 0;
-
-  return {
-    factory: () => (_toState: State, _fromState: State | undefined) => {
-      callCount++;
-      orderTracker?.push(id);
-
-      return;
-    },
-    getCallCount: () => callCount,
-    reset: () => {
-      callCount = 0;
-    },
-  };
-}
-
 describe("router.clone()", () => {
   it("should share the route tree with original router", async () => {
     const router = createTestRouter();
@@ -84,25 +64,6 @@ describe("router.clone()", () => {
     await clonedRouter.start("/home");
 
     expect(tracker.getCalls().onStart).toBe(1);
-
-    clonedRouter.stop();
-  });
-
-  it("should clone middleware functions", async () => {
-    const router = createTestRouter();
-    const tracker = createTrackingMiddleware("mw");
-
-    router.useMiddleware(tracker.factory);
-
-    const clonedRouter = router.clone();
-
-    // Verify middleware is cloned by checking it executes on cloned router
-    await clonedRouter.start("/");
-
-    const state = await clonedRouter.navigate("users");
-
-    expect(state).toBeDefined();
-    expect(tracker.getCallCount()).toBeGreaterThan(0);
 
     clonedRouter.stop();
   });
@@ -200,36 +161,6 @@ describe("router.clone()", () => {
     // Plugin should only respond on cloned router (2 starts: router + clonedRouter)
     // But we added plugin only to clonedRouter, so only 1 start
     expect(tracker.getCalls().onStart).toBe(1);
-
-    router.stop();
-    clonedRouter.stop();
-  });
-
-  it("should make independent router clone: middleware", async () => {
-    const router = createTestRouter();
-    const tracker = createTrackingMiddleware("mw");
-    const clonedRouter = router.clone();
-
-    // Add middleware only to cloned router
-    clonedRouter.useMiddleware(tracker.factory);
-
-    // Navigate on original router
-    await router.start("/");
-
-    const state1 = await router.navigate("users");
-
-    expect(state1).toBeDefined();
-    // Middleware should NOT execute on original router
-    expect(tracker.getCallCount()).toBe(0);
-
-    // Navigate on cloned router
-    await clonedRouter.start("/");
-
-    const state2 = await clonedRouter.navigate("users");
-
-    expect(state2).toBeDefined();
-    // Middleware should execute on cloned router
-    expect(tracker.getCallCount()).toBeGreaterThan(0);
 
     router.stop();
     clonedRouter.stop();
@@ -518,31 +449,6 @@ describe("router.clone()", () => {
       });
     });
 
-    it("should clone multiple middleware in correct order", async () => {
-      const router = createTestRouter();
-      const orderTracker: string[] = [];
-      const mw1 = createTrackingMiddleware("mw1", orderTracker);
-      const mw2 = createTrackingMiddleware("mw2", orderTracker);
-      const mw3 = createTrackingMiddleware("mw3", orderTracker);
-
-      router.useMiddleware(mw1.factory, mw2.factory, mw3.factory);
-
-      const clonedRouter = router.clone();
-
-      await clonedRouter.start("/");
-
-      // Clear tracker after start to only track navigate calls
-      orderTracker.length = 0;
-
-      const state = await clonedRouter.navigate("users");
-
-      expect(state).toBeDefined();
-      // Verify order is preserved
-      expect(orderTracker).toStrictEqual(["mw1", "mw2", "mw3"]);
-
-      clonedRouter.stop();
-    });
-
     it("should clone multiple plugins in correct order", async () => {
       const router = createTestRouter();
       const orderTracker: string[] = [];
@@ -605,64 +511,24 @@ describe("router.clone()", () => {
 
     it("should support chain cloning (clone of clone) with proper isolation", async () => {
       const router = createTestRouter();
-      const mw1Tracker = createTrackingMiddleware("mw1");
       const plugin1Tracker = createTrackingPlugin("p1");
-
-      router.useMiddleware(mw1Tracker.factory);
-
-      // First level clone
-      const clone1 = router.clone();
-      const mw2Tracker = createTrackingMiddleware("mw2");
       const plugin2Tracker = createTrackingPlugin("p2");
 
-      clone1.useMiddleware(mw2Tracker.factory);
+      const clone1 = router.clone();
+
       clone1.usePlugin(plugin1Tracker.factory);
 
-      // Second level clone (clone of clone)
       const clone2 = clone1.clone();
-      const mw3Tracker = createTrackingMiddleware("mw3");
 
-      clone2.useMiddleware(mw3Tracker.factory);
       clone2.usePlugin(plugin2Tracker.factory);
 
-      // Test middleware isolation - navigate on each router
       await router.start("/");
-
-      await router.navigate("users");
-
-      // Only mw1 should execute on original router
-      expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
-      expect(mw2Tracker.getCallCount()).toBe(0);
-      expect(mw3Tracker.getCallCount()).toBe(0);
-
-      mw1Tracker.reset();
       await clone1.start("/");
-
-      await clone1.navigate("users");
-
-      // mw1 and mw2 should execute on clone1
-      expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
-      expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
-      expect(mw3Tracker.getCallCount()).toBe(0);
-
-      mw1Tracker.reset();
-      mw2Tracker.reset();
       await clone2.start("/");
 
-      await clone2.navigate("users");
+      expect(plugin1Tracker.getCalls().onStart).toBe(2);
+      expect(plugin2Tracker.getCalls().onStart).toBe(1);
 
-      // All three should execute on clone2
-      expect(mw1Tracker.getCallCount()).toBeGreaterThan(0);
-      expect(mw2Tracker.getCallCount()).toBeGreaterThan(0);
-      expect(mw3Tracker.getCallCount()).toBeGreaterThan(0);
-
-      // Test plugin isolation
-      // plugin1 is on clone1 and clone2
-      expect(plugin1Tracker.getCalls().onStart).toBe(2); // clone1.start + clone2.start
-      // plugin2 is only on clone2
-      expect(plugin2Tracker.getCalls().onStart).toBe(1); // clone2.start
-
-      // Verify routes are still shared across all levels
       expect(router.buildPath("home")).toBe(clone1.buildPath("home"));
       expect(clone1.buildPath("home")).toBe(clone2.buildPath("home"));
 

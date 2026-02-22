@@ -24,7 +24,7 @@ export type {
 } from "./base";
 
 // Router types (base types without Router dependency)
-// Note: Route, RouteConfigUpdate, ActivationFnFactory, MiddlewareFactory,
+// Note: Route, RouteConfigUpdate, ActivationFnFactory,
 // PluginFactory, BuildStateResultWithSegments are in @real-router/core
 export type {
   Options,
@@ -36,7 +36,6 @@ export type {
   DefaultDependencies,
   Config,
   Plugin,
-  Middleware,
   SubscribeState,
   SubscribeFn,
   Listener,

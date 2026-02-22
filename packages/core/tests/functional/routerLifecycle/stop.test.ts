@@ -332,22 +332,24 @@ describe("stop", () => {
   });
 
   describe("stop with middleware and plugins", () => {
-    it("should not trigger middleware on stop", async () => {
-      const middlewareSpy = vi.fn();
+    it("should not trigger plugin onTransitionSuccess on stop", async () => {
+      const pluginSpy = vi.fn();
 
-      router.useMiddleware(() => (toState, fromState) => {
-        middlewareSpy(toState.name, fromState?.name);
-      });
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState, fromState) => {
+          pluginSpy(toState.name, fromState?.name);
+        },
+      }));
 
       await router.start("/home");
 
-      expect(middlewareSpy).toHaveBeenCalledTimes(1);
+      expect(pluginSpy).toHaveBeenCalledTimes(1);
 
-      middlewareSpy.mockClear();
+      pluginSpy.mockClear();
 
       router.stop();
 
-      expect(middlewareSpy).not.toHaveBeenCalled();
+      expect(pluginSpy).not.toHaveBeenCalled();
     });
 
     it("should not trigger plugins on stop", async () => {
@@ -367,21 +369,23 @@ describe("stop", () => {
       expect(pluginSpy).not.toHaveBeenCalled();
     });
 
-    it("should maintain middleware and plugins after stop for next start", async () => {
-      const middlewareSpy = vi.fn();
+    it("should maintain plugins after stop for next start", async () => {
+      const pluginSpy = vi.fn();
 
-      router.useMiddleware(() => (toState, _fromState) => {
-        middlewareSpy(toState.name);
-      });
+      router.usePlugin(() => ({
+        onTransitionSuccess: (toState) => {
+          pluginSpy(toState.name);
+        },
+      }));
 
       await router.start("/home");
       router.stop();
 
-      middlewareSpy.mockClear();
+      pluginSpy.mockClear();
 
       await router.start("/users");
 
-      expect(middlewareSpy).toHaveBeenCalledExactlyOnceWith("users");
+      expect(pluginSpy).toHaveBeenCalledExactlyOnceWith("users");
     });
   });
 

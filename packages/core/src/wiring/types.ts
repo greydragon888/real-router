@@ -4,7 +4,6 @@ import type {
   CloneNamespace,
   DependenciesNamespace,
   EventBusNamespace,
-  MiddlewareNamespace,
   NavigationNamespace,
   OptionsNamespace,
   PluginsNamespace,
@@ -38,8 +37,6 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   routes: RoutesNamespace<Dependencies>;
   /** Route lifecycle namespace (canActivate/canDeactivate guards) */
   routeLifecycle: RouteLifecycleNamespace<Dependencies>;
-  /** Middleware namespace */
-  middleware: MiddlewareNamespace<Dependencies>;
   /** Plugins namespace */
   plugins: PluginsNamespace<Dependencies>;
   /** Navigation namespace */

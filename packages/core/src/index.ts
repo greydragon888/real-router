@@ -1,11 +1,10 @@
-// packages/real-router/modules/index.ts
+// packages/core/src/index.ts
 
 // Router-dependent types (defined in core)
 export type {
   ActivationFnFactory,
   BuildStateResultWithSegments,
   GuardFnFactory,
-  MiddlewareFactory,
   PluginFactory,
   Route,
   RouteConfigUpdate,
@@ -21,7 +20,6 @@ export type {
   DefaultDependencies,
   GuardFn,
   Listener,
-  Middleware,
   Navigator,
   NavigationOptions,
   Options,

@@ -4,23 +4,19 @@ import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
 
-import type { State } from "@real-router/core";
-
-// eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-type RedirectResult = State | void;
-
 // 9.1.1 Simple redirect from middleware
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.1 Simple redirect from middleware", () => {
@@ -32,14 +28,15 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "user") {
-      const target = fromState?.name === "home" ? "about" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "user") {
+        const target = fromState?.name === "home" ? "about" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.2 Redirect with parameters", () => {
@@ -51,19 +48,15 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
-      const redirectState = _router.makeState(
-        target,
-        {},
-        target === "home" ? "/" : "/users",
-      );
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      return redirectState;
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.3 Redirect by returning State object", () => {
@@ -77,23 +70,26 @@ type RedirectResult = State | void;
   // Track redirect count to alternate final destination
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState): RedirectResult => {
-    if (toState.name === "about") {
-      return _router.makeState("users", {}, "/users");
-    }
-  });
-  router.useMiddleware((_router) => (toState): RedirectResult => {
-    if (toState.name === "users") {
-      // Alternate final destination to avoid SAME_STATES
-      const target = redirectCount++ % 2 === 0 ? "home" : "user";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        void router.makeState("users", {}, "/users");
+      }
+    },
+  }));
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "users") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "user";
 
-      return _router.makeState(
-        target,
-        target === "user" ? { id: "1" } : {},
-        target === "home" ? "/" : "/users/1",
-      );
-    }
-  });
+        void router.makeState(
+          target,
+          target === "user" ? { id: "1" } : {},
+          target === "home" ? "/" : "/users/1",
+        );
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.4 Chain of redirects", () => {
@@ -105,14 +101,15 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "user" && toState.params.id === "admin") {
-      const target = fromState?.name === "home" ? "about" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "user" && toState.params.id === "admin") {
+        const target = fromState?.name === "home" ? "about" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.5 Conditional redirect", () => {
@@ -124,14 +121,15 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware((_router) => (toState, fromState): RedirectResult => {
-    if (toState.name === "about") {
-      const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (toState.name === "about") {
+        const target = fromState?.name === "home" ? "users" : "home";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.6 Redirect with replace flag", () => {
@@ -143,22 +141,16 @@ type RedirectResult = State | void;
 {
   const router = createSimpleRouter();
 
-  // Redirect to alternating destinations to avoid SAME_STATES
-  router.useMiddleware(
-    (_router) =>
-      async (toState, fromState): Promise<RedirectResult> => {
-        if (toState.name === "about") {
-          await Promise.resolve();
-          const target = fromState?.name === "home" ? "users" : "home";
+  router.usePlugin(() => ({
+    onTransitionSuccess: async (toState, fromState) => {
+      if (toState.name === "about") {
+        await Promise.resolve();
+        const target = fromState?.name === "home" ? "users" : "home";
 
-          return _router.makeState(
-            target,
-            {},
-            target === "home" ? "/" : "/users",
-          );
-        }
-      },
-  );
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.1.7 Async redirect", async () => {

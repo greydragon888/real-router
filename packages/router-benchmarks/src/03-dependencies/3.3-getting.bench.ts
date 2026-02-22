@@ -79,10 +79,12 @@ if (!IS_ROUTER5) {
 
   // @ts-expect-error - test dependency
   router.setDependency("service", { check: () => true });
-  router.useMiddleware((_router, getDependency) => () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(getDependency("service"));
-  });
+  router.usePlugin((_router, getDependency) => ({
+    onTransitionSuccess: () => {
+      // @ts-expect-error - test dependency
+      do_not_optimize(getDependency("service"));
+    },
+  }));
   router.start("/");
   const routes = ["about", "home"];
   let index = 0;

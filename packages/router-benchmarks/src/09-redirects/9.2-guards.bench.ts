@@ -9,15 +9,15 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "about") {
-      const target = redirectCount++ % 2 === 0 ? "home" : "users";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "about") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-
-    return toState;
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.2.1 Redirect from middleware (canActivate)", () => {
@@ -30,19 +30,17 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState, fromState) => {
-    if (fromState?.name === "about") {
-      const target = redirectCount++ % 2 === 0 ? "home" : "users";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState, fromState) => {
+      if (fromState?.name === "about") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "users";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/users");
-    }
-
-    if (toState.name !== "about" && fromState?.name !== "about") {
-      return _router.makeState("about", {}, "/about");
-    }
-
-    return toState;
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/users");
+      } else if (toState.name !== "about" && fromState?.name !== "about") {
+        void router.makeState("about", {}, "/about");
+      }
+    },
+  }));
   router.start("/");
   router.navigate("about");
 
@@ -59,15 +57,15 @@ import { createSimpleRouter } from "../helpers";
   const router = createSimpleRouter();
   let redirectCount = 0;
 
-  router.useMiddleware((_router) => (toState) => {
-    if (toState.name === "user" && toState.params.id === "protected") {
-      const target = redirectCount++ % 2 === 0 ? "home" : "about";
+  router.usePlugin(() => ({
+    onTransitionSuccess: (toState) => {
+      if (toState.name === "user" && toState.params.id === "protected") {
+        const target = redirectCount++ % 2 === 0 ? "home" : "about";
 
-      return _router.makeState(target, {}, target === "home" ? "/" : "/about");
-    }
-
-    return toState;
-  });
+        void router.makeState(target, {}, target === "home" ? "/" : "/about");
+      }
+    },
+  }));
   router.start("/");
 
   bench("9.2.3 Redirect with context preservation", () => {

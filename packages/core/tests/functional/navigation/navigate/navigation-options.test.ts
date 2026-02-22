@@ -337,15 +337,13 @@ describe("router.navigate() - navigation meta and options", () => {
       const successLog: string[] = [];
       const cancelLog: string[] = [];
 
-      // Add async middleware that delays transitions
-      freshRouter.useMiddleware(() => async (toState) => {
-        // Allow start transition to "home" to complete immediately
-        if (toState.name !== "home") {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-
-        return true;
-      });
+      freshRouter.usePlugin(() => ({
+        onTransitionSuccess: (toState) => {
+          if (toState.name !== "home") {
+            void new Promise((resolve) => setTimeout(resolve, 50));
+          }
+        },
+      }));
 
       await freshRouter.start("/home");
 

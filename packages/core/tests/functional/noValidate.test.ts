@@ -164,15 +164,6 @@ describe("core/noValidate option", () => {
         // Valid plugin
         expect(() => router.usePlugin(() => ({}))).not.toThrowError();
       });
-
-      it("should skip validation in useMiddleware", () => {
-        // Valid middleware
-        expect(() =>
-          router.useMiddleware(() => (_toState, _fromState) => {
-            return true;
-          }),
-        ).not.toThrowError();
-      });
     });
 
     // Dependencies

@@ -149,13 +149,12 @@ describe("core/options", () => {
       const customRouter = createRouter([{ name: "test", path: "/test" }], {
         limits: {
           maxPlugins: 50,
-          maxMiddleware: 100,
         },
       });
 
       const opts = customRouter.getOptions();
 
-      expect(opts.limits).toStrictEqual({ maxPlugins: 50, maxMiddleware: 100 });
+      expect(opts.limits).toStrictEqual({ maxPlugins: 50 });
 
       customRouter.stop();
     });

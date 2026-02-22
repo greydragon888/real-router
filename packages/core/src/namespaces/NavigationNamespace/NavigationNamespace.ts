@@ -296,6 +296,7 @@ export class NavigationNamespace {
       return;
     }
 
+    /* v8 ignore next 7 -- @preserve: defensive guard for unexpected error codes (e.g. future error types); else branch unreachable after middleware became fire-and-forget */
     if (
       routerError.code === errorCodes.CANNOT_ACTIVATE ||
       routerError.code === errorCodes.CANNOT_DEACTIVATE

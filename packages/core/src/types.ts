@@ -16,7 +16,6 @@ import type {
   ForwardToCallback,
   GuardFn,
   LimitsConfig,
-  Middleware,
   NavigationOptions,
   Params,
   Plugin,
@@ -182,17 +181,6 @@ export type GuardFnFactory<
   router: Router<Dependencies>,
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
 ) => GuardFn;
-
-/**
- * Factory function for creating middleware.
- * Receives the router instance and a dependency getter.
- */
-export type MiddlewareFactory<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> = (
-  router: Router<Dependencies>,
-  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
-) => Middleware;
 
 /**
  * Factory function for creating plugins.

@@ -1164,11 +1164,8 @@ describe("Persistent params plugin", () => {
       expect(state2?.path).toBe("/route/2?mode=dev");
     });
 
-    it("should remove persistent param in onTransitionSuccess when middleware redirects without it", async () => {
-      const routes = [
-        { name: "route", path: "/route/:id" },
-        { name: "other", path: "/other/:id" },
-      ];
+    it("should remove persistent param in onTransitionSuccess when navigateToState commits state without it", async () => {
+      const routes = [{ name: "route", path: "/route/:id" }];
 
       const router = createRouter(routes, {
         queryParamsMode: "default",
@@ -1176,34 +1173,22 @@ describe("Persistent params plugin", () => {
 
       router.usePlugin(persistentParamsPlugin({ mode: "dev" }));
 
-      // Middleware redirects to a state created via makeState (bypasses forwardState)
-      router.useMiddleware(() => (toState) => {
-        if (toState.name === "other") {
-          return router.makeState("route", { id: "99" });
-        }
-
-        return true;
-      });
-
       await router.start("/route/1");
 
-      // Verify mode is injected during start
       expect(router.getState()?.params).toStrictEqual({
         id: "1",
         mode: "dev",
       });
 
-      // Navigate to "other" — middleware redirects to makeState("route", { id: "99" })
-      // The redirected state has no persistent params (makeState bypasses forwardState)
-      // onTransitionSuccess sees mode is missing and removes it from persistentParams
-      await router.navigate("other", { id: "1" });
+      const stateWithoutMode = router.makeState("route", { id: "99" });
+
+      await router.navigateToState(stateWithoutMode, router.getState(), {});
 
       const state = router.getState();
 
       expect(state?.path).toBe("/route/99");
       expect(state?.params).toStrictEqual({ id: "99" });
 
-      // After removal, subsequent navigations won't include mode
       await router.navigate("route", { id: "2" });
       const state2 = router.getState();
 

@@ -30,10 +30,10 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
       expect(state.transition?.reason).toBe("success");
     });
 
-    it("should set phase to 'middleware' after successful navigate()", async () => {
+    it("should set phase to 'activating' after successful navigate()", async () => {
       const state = await router.navigate("users");
 
-      expect(state.transition?.phase).toBe("middleware");
+      expect(state.transition?.phase).toBe("activating");
     });
   });
 

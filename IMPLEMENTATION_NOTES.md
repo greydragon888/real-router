@@ -647,11 +647,13 @@ Issues: manual sync required, already out-of-sync (`@real-router/rx` and `path-m
 TypeScript 5.0+ `customConditions` with `"development"` export condition:
 
 **Root tsconfig.json:**
+
 ```json
 { "customConditions": ["development"] }
 ```
 
 **Each package.json exports:**
+
 ```json
 "exports": {
   ".": {
@@ -1073,7 +1075,7 @@ buildStateResolved(resolvedName, resolvedParams) {
 
 Router supports permanent disposal via `router.dispose()`. RouterFSM transitions to terminal `DISPOSED` state. All mutating methods throw `ROUTER_DISPOSED` after disposal.
 
-**Cleanup order:** plugins → middleware → eventBus → routes+lifecycle → state → deps → currentToState → markDisposed
+**Cleanup order:** plugins → eventBus → routes+lifecycle → state → deps → currentToState → markDisposed
 
 **Idempotency:** Second call is a no-op (FSM state check prevents double-cleanup).
 
@@ -1081,7 +1083,7 @@ Router supports permanent disposal via `router.dispose()`. RouterFSM transitions
 
 After each navigation, `state.transition` contains `TransitionMeta` with:
 
-- `phase` — last pipeline phase reached (`"deactivating"` | `"activating"` | `"middleware"`)
+- `phase` — last pipeline phase reached (`"deactivating"` | `"activating"`)
 - `from` — previous route name (undefined on first navigation)
 - `reason` — always `"success"` for resolved navigations
 - `segments` — `{ deactivated, activated, intersection }` (all deeply frozen arrays)

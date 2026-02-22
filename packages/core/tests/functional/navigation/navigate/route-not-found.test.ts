@@ -198,7 +198,11 @@ describe("router.navigate() - route not found", () => {
       const middleware = vi.fn();
 
       router.addActivateGuard("users", () => guard);
-      router.useMiddleware(() => middleware);
+      router.usePlugin(() => ({
+        onTransitionSuccess: () => {
+          middleware();
+        },
+      }));
 
       try {
         await router.navigate("invalid.route");
