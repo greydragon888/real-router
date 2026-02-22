@@ -77,12 +77,14 @@ export class RoutesNamespace<
 
   readonly #definitions: RouteDefinition[] = [];
   readonly #config: RouteConfig = createEmptyConfig();
-  readonly #resolvedForwardMap: Record<string, string> = Object.create(
-    null,
-  ) as Record<string, string>;
+  #resolvedForwardMap: Record<string, string> = Object.create(null) as Record<
+    string,
+    string
+  >;
 
-  readonly #routeCustomFields: Record<string, Record<string, unknown>> =
-    Object.create(null) as Record<string, Record<string, unknown>>;
+  #routeCustomFields: Record<string, Record<string, unknown>> = Object.create(
+    null,
+  ) as Record<string, Record<string, unknown>>;
 
   // Pending canActivate handlers that need to be registered after router is set
   // Key: route name, Value: canActivate factory
@@ -488,35 +490,15 @@ export class RoutesNamespace<
   clearRoutes(): void {
     this.#definitions.length = 0;
 
-    // Clear all config entries
-    for (const key in this.#config.decoders) {
-      delete this.#config.decoders[key];
-    }
-
-    for (const key in this.#config.encoders) {
-      delete this.#config.encoders[key];
-    }
-
-    for (const key in this.#config.defaultParams) {
-      delete this.#config.defaultParams[key];
-    }
-
-    for (const key in this.#config.forwardMap) {
-      delete this.#config.forwardMap[key];
-    }
-
-    for (const key in this.#config.forwardFnMap) {
-      delete this.#config.forwardFnMap[key];
-    }
+    // Reset config to empty null-prototype objects
+    Object.assign(this.#config, createEmptyConfig());
 
     // Clear forward cache
-    for (const key in this.#resolvedForwardMap) {
-      delete this.#resolvedForwardMap[key];
-    }
-
-    for (const key in this.#routeCustomFields) {
-      delete this.#routeCustomFields[key];
-    }
+    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
+    this.#routeCustomFields = Object.create(null) as Record<
+      string,
+      Record<string, unknown>
+    >;
 
     // Rebuild empty tree
     this.#rebuildTree();
@@ -1240,9 +1222,7 @@ export class RoutesNamespace<
 
   #validateAndCacheForwardMap(): void {
     // Clear existing cache
-    for (const key in this.#resolvedForwardMap) {
-      delete this.#resolvedForwardMap[key];
-    }
+    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
 
     // Resolve all chains
     for (const fromRoute of Object.keys(this.#config.forwardMap)) {
@@ -1259,9 +1239,7 @@ export class RoutesNamespace<
    */
   #cacheForwardMap(): void {
     // Clear existing cache
-    for (const key in this.#resolvedForwardMap) {
-      delete this.#resolvedForwardMap[key];
-    }
+    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
 
     // Resolve chains without validation
     for (const fromRoute of Object.keys(this.#config.forwardMap)) {

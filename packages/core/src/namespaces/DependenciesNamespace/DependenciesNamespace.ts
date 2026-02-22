@@ -25,7 +25,7 @@ import type { DefaultDependencies } from "@real-router/types";
 export class DependenciesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  readonly #dependencies: Partial<Dependencies> = Object.create(
+  #dependencies: Partial<Dependencies> = Object.create(
     null,
   ) as Partial<Dependencies>;
 
@@ -207,9 +207,7 @@ export class DependenciesNamespace<
    * Removes all dependencies.
    */
   reset(): void {
-    for (const key in this.#dependencies) {
-      delete this.#dependencies[key];
-    }
+    this.#dependencies = Object.create(null) as Partial<Dependencies>;
   }
 
   // =========================================================================
