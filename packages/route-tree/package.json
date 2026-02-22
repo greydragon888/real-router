@@ -1,6 +1,6 @@
 {
   "name": "route-tree",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "Named route tree with matching and path building",
   "main": "./dist/cjs/index.js",

@@ -1,5 +1,15 @@
 # @real-router/types
 
+## 0.15.0
+
+### Minor Changes
+
+- [#136](https://github.com/greydragon888/real-router/pull/136) [`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove middleware types (#133)
+
+  **Breaking Change:** Middleware types removed following middleware layer removal in `@real-router/core`.
+  - Removed `MiddlewareFn`, `Middleware`, `MiddlewareFactory` types
+  - `TransitionPhase` narrowed from `"deactivating" | "activating" | "middleware"` to `"deactivating" | "activating"`
+
 ## 0.14.0
 
 ### Minor Changes

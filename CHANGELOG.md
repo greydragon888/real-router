@@ -5,6 +5,120 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-22]
+
+### @real-router/core@0.25.0
+
+### Minor Changes
+
+- [#136](https://github.com/greydragon888/real-router/pull/136) [`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove middleware layer (#133)
+
+  **Breaking Change:** Middleware has been removed as an architectural concept.
+  - Removed `router.useMiddleware()`
+  - Removed `maxMiddleware` from `Limits`
+
+  **Migration:**
+
+  Side effects → `plugin.onTransitionSuccess` + `router.getRouteConfig()`:
+
+  ```typescript
+  // Before
+  router.useMiddleware((router) => (toState) => {
+    const config = router.getRouteConfig(toState.name);
+    if (config?.title) document.title = config.title;
+  });
+
+  // After
+  router.usePlugin((router) => ({
+    onTransitionSuccess: (toState) => {
+      const config = router.getRouteConfig(toState.name);
+      if (config?.title) document.title = config.title;
+    },
+  }));
+  ```
+
+  Redirects → `forwardTo` in route config:
+
+  ```typescript
+  // Before
+  router.useMiddleware((router) => (toState) => {
+    if (toState.name === "old") return router.makeState("new");
+  });
+
+  // After
+  const routes = [{ name: "old", path: "/old", forwardTo: "new" }];
+  ```
+
+  Cancellation → `canActivate` / `canDeactivate` guards:
+
+  ```typescript
+  // Before
+  router.useMiddleware(() => (toState) => {
+    if (!isAuthenticated()) return false;
+  });
+
+  // After
+  router.addActivateGuard("admin", () => () => isAuthenticated());
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/types@0.15.0
+
+### @real-router/types@0.15.0
+
+### Minor Changes
+
+- [#136](https://github.com/greydragon888/real-router/pull/136) [`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove middleware types (#133)
+
+  **Breaking Change:** Middleware types removed following middleware layer removal in `@real-router/core`.
+  - Removed `MiddlewareFn`, `Middleware`, `MiddlewareFactory` types
+  - `TransitionPhase` narrowed from `"deactivating" | "activating" | "middleware"` to `"deactivating" | "activating"`
+
+### @real-router/browser-plugin@0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+
+### @real-router/helpers@0.1.28
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+
+### @real-router/logger-plugin@0.2.28
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+
+### @real-router/persistent-params-plugin@0.1.28
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+
+### @real-router/react@0.4.7
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+  - @real-router/helpers@0.1.28
+
+### @real-router/rx@0.1.17
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/core@0.25.0
+
 ## [2026-02-21]
 
 ### @real-router/core@0.24.0
