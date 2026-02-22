@@ -1,5 +1,64 @@
 # @real-router/core
 
+## 0.25.0
+
+### Minor Changes
+
+- [#136](https://github.com/greydragon888/real-router/pull/136) [`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove middleware layer (#133)
+
+  **Breaking Change:** Middleware has been removed as an architectural concept.
+  - Removed `router.useMiddleware()`
+  - Removed `maxMiddleware` from `Limits`
+
+  **Migration:**
+
+  Side effects → `plugin.onTransitionSuccess` + `router.getRouteConfig()`:
+
+  ```typescript
+  // Before
+  router.useMiddleware((router) => (toState) => {
+    const config = router.getRouteConfig(toState.name);
+    if (config?.title) document.title = config.title;
+  });
+
+  // After
+  router.usePlugin((router) => ({
+    onTransitionSuccess: (toState) => {
+      const config = router.getRouteConfig(toState.name);
+      if (config?.title) document.title = config.title;
+    },
+  }));
+  ```
+
+  Redirects → `forwardTo` in route config:
+
+  ```typescript
+  // Before
+  router.useMiddleware((router) => (toState) => {
+    if (toState.name === "old") return router.makeState("new");
+  });
+
+  // After
+  const routes = [{ name: "old", path: "/old", forwardTo: "new" }];
+  ```
+
+  Cancellation → `canActivate` / `canDeactivate` guards:
+
+  ```typescript
+  // Before
+  router.useMiddleware(() => (toState) => {
+    if (!isAuthenticated()) return false;
+  });
+
+  // After
+  router.addActivateGuard("admin", () => () => isAuthenticated());
+  ```
+
+### Patch Changes
+
+- Updated dependencies [[`08c39e9`](https://github.com/greydragon888/real-router/commit/08c39e9042b5bd4ae87696da9957bdde83dc94f2)]:
+  - @real-router/types@0.15.0
+
 ## 0.24.0
 
 ### Minor Changes
