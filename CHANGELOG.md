@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-22]
 
+### @real-router/helpers@0.1.29
+
+### Patch Changes
+
+- [#156](https://github.com/greydragon888/real-router/pull/156) [`57bc77d`](https://github.com/greydragon888/real-router/commit/57bc77dd783fa75c00f7c58c2c2606392d036a50) Thanks [@greydragon888](https://github.com/greydragon888)! - Cache compiled RegExp in segment tester functions (#147)
+
+  Add per-tester `Map<string, RegExp>` cache inside `makeSegmentTester` so that repeated calls with the same segment string reuse the compiled regex instead of creating a new one each time. Typical improvement: ×15–23 faster, ×17–5,316 less heap on repeated segment checks.
+
+
 ### @real-router/core@0.25.4
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@real-router/helpers",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "type": "commonjs",
   "description": "Helper utilities for comparing and checking routes",
   "main": "./dist/cjs/index.js",
