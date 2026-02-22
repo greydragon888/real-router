@@ -3,7 +3,7 @@
 import { executeLifecycleHooks } from "./executeLifecycleHooks";
 import { constants, errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
-import { getTransitionPath, nameToIDs } from "../../../transitionPath";
+import { getTransitionPath } from "../../../transitionPath";
 
 import type { TransitionDependencies, TransitionOutput } from "../types";
 import type { NavigationOptions, State } from "@real-router/types";
@@ -65,11 +65,8 @@ export async function transition(
 
   // Automatic cleaning of inactive segments
   if (fromState) {
-    const activeSegments = nameToIDs(toState.name);
-    const previousActiveSegments = nameToIDs(fromState.name);
-
-    for (const name of previousActiveSegments) {
-      if (!activeSegments.includes(name) && canDeactivateFunctions.has(name)) {
+    for (const name of toDeactivate) {
+      if (!toActivate.includes(name) && canDeactivateFunctions.has(name)) {
         deps.clearCanDeactivate(name);
       }
     }
