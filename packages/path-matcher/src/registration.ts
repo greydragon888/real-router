@@ -141,6 +141,7 @@ function compileAndRegisterRoute(
     hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
+    buildParamNamesSet: new Set(buildParamSlots.map((s) => s.paramName)),
   };
 
   state.routesByName.set(node.fullName, compiled);

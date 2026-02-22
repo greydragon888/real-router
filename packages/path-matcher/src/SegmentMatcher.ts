@@ -262,33 +262,30 @@ export class SegmentMatcher {
       return "";
     }
 
-    const queryParamNames = [...route.declaredQueryParams];
+    const queryObj: Record<string, unknown> = {};
+    let hasKeys = false;
+
+    for (const name of route.declaredQueryParams) {
+      if (name in params) {
+        queryObj[name] = params[name];
+        hasKeys = true;
+      }
+    }
 
     if (queryParamsMode === "loose") {
-      const urlParamNames = new Set(
-        route.buildParamSlots.map((s) => s.paramName),
-      );
-
       for (const p in params) {
         if (
           Object.hasOwn(params, p) &&
           !route.declaredQueryParamsSet.has(p) &&
-          !urlParamNames.has(p)
+          !route.buildParamNamesSet.has(p)
         ) {
-          queryParamNames.push(p);
+          queryObj[p] = params[p];
+          hasKeys = true;
         }
       }
     }
 
-    const queryObj: Record<string, unknown> = {};
-
-    for (const name of queryParamNames) {
-      if (name in params) {
-        queryObj[name] = params[name];
-      }
-    }
-
-    if (Object.keys(queryObj).length === 0) {
+    if (!hasKeys) {
       return "";
     }
 
