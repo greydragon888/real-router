@@ -1,5 +1,14 @@
 # @real-router/core
 
+## 0.25.1
+
+### Patch Changes
+
+- [#148](https://github.com/greydragon888/real-router/pull/148) [`a431100`](https://github.com/greydragon888/real-router/commit/a431100935bcd1eefa8991b58a0ca4f828d4c431) Thanks [@greydragon888](https://github.com/greydragon888)! - Eliminate duplicate `nameToIDs()` calls in transition cleanup phase (#138)
+
+  Reuse `toDeactivate`/`toActivate` arrays from `getTransitionPath()` result instead of calling `nameToIDs()` again during guard cleanup.
+  Removes redundant code and 2 array allocations per navigation.
+
 ## 0.25.0
 
 ### Minor Changes
