@@ -30,6 +30,8 @@ const escapeRegExp = (str: string): string =>
  * @internal
  */
 const makeSegmentTester = (start: string, end: string) => {
+  const regexCache = new Map<string, RegExp>();
+
   /**
    * Builds a RegExp for testing segment matches.
    * Validates length and character pattern. Type and empty checks are done by caller.
@@ -44,6 +46,12 @@ const makeSegmentTester = (start: string, end: string) => {
    * @internal
    */
   const buildRegex = (segment: string): RegExp => {
+    const cached = regexCache.get(segment);
+
+    if (cached) {
+      return cached;
+    }
+
     // Type and empty checks are SKIPPED - caller already verified these
 
     // Length check
@@ -60,7 +68,11 @@ const makeSegmentTester = (start: string, end: string) => {
       );
     }
 
-    return new RegExp(start + escapeRegExp(segment) + end);
+    const regex = new RegExp(start + escapeRegExp(segment) + end);
+
+    regexCache.set(segment, regex);
+
+    return regex;
   };
 
   // TypeScript cannot infer conditional return type for curried function with union return.
