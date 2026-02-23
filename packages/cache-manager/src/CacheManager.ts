@@ -3,7 +3,7 @@ import { KeyIndexCache } from "./KeyIndexCache.js";
 import type { CacheMetrics, CacheOptions } from "./types.js";
 
 export class CacheManager {
-  #caches = new Map<
+  readonly #caches = new Map<
     string,
     { cache: KeyIndexCache<unknown>; options: CacheOptions<unknown> }
   >();

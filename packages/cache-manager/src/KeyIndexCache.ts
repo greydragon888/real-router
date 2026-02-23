@@ -3,7 +3,8 @@ import type { CacheInstance, CacheMetrics } from "./types.js";
 export class KeyIndexCache<T> implements CacheInstance<T> {
   readonly #cache = new Map<string, T>();
   readonly #maxSize: number;
-  #stats: { hits: number; misses: number } = { hits: 0, misses: 0 };
+  #hits = 0;
+  #misses = 0;
 
   constructor(maxSize: number) {
     if (maxSize <= 0 || !Number.isInteger(maxSize)) {
@@ -18,26 +19,39 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
   /**
    * Retrieve a cached value or compute and store it.
    *
-   * On hit: refreshes LRU position (Map delete+set moves entry to end).
-   * On miss: calls `compute()`, stores result with LRU eviction if full.
+   * On hit: returns cached value directly (no reordering — FIFO eviction).
+   * On miss: calls `compute()`, stores result with FIFO eviction if full.
    *
    * Consumers: transitionPath (path cache), RouteUtils (nodeState cache), plugins.
    */
   get(key: string, compute: () => T): T {
-    if (this.#cache.has(key)) {
-      this.#stats.hits++;
-      const value = this.#cache.get(key) as T;
+    const cached = this.#cache.get(key);
 
-      this.#cache.delete(key);
-      this.#cache.set(key, value);
+    if (cached !== undefined) {
+      this.#hits++;
 
-      return value;
+      return cached;
     }
 
-    this.#stats.misses++;
+    // Disambiguate undefined-as-value from cache miss
+    if (this.#cache.has(key)) {
+      this.#hits++;
+
+      return undefined as T;
+    }
+
+    this.#misses++;
     const value = compute();
 
-    this.#store(key, value);
+    if (this.#cache.size >= this.#maxSize) {
+      const { value: oldestKey } = this.#cache
+        .keys()
+        .next() as IteratorYieldResult<string>;
+
+      this.#cache.delete(oldestKey);
+    }
+
+    this.#cache.set(key, value);
 
     return value;
   }
@@ -62,12 +76,12 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
    * Consumer: CacheManager.getMetrics() aggregates these for DevTools.
    */
   getMetrics(): CacheMetrics {
-    const total = this.#stats.hits + this.#stats.misses;
+    const total = this.#hits + this.#misses;
 
     return {
-      hits: this.#stats.hits,
-      misses: this.#stats.misses,
-      hitRate: total > 0 ? this.#stats.hits / total : 0,
+      hits: this.#hits,
+      misses: this.#misses,
+      hitRate: total > 0 ? this.#hits / total : 0,
       size: this.#cache.size,
       maxSize: this.#maxSize,
     };
@@ -81,19 +95,7 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
    */
   clear(): void {
     this.#cache.clear();
-    this.#stats = { hits: 0, misses: 0 };
-  }
-
-  #store(key: string, value: T): void {
-    if (this.#cache.size >= this.#maxSize) {
-      // size >= maxSize > 0, so the iterator always yields a value
-      const { value: oldest } = this.#cache
-        .keys()
-        .next() as IteratorYieldResult<string>;
-
-      this.#cache.delete(oldest);
-    }
-
-    this.#cache.set(key, value);
+    this.#hits = 0;
+    this.#misses = 0;
   }
 }
