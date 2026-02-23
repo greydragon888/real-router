@@ -50,6 +50,12 @@ export default [
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
+    name: "@real-router/cache-manager (ESM)",
+    path: "packages/cache-manager/dist/esm/index.mjs",
+    limit: "1 kB",
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
     name: "@real-router/logger (ESM)",
     path: "packages/logger/dist/esm/index.mjs",
     limit: "0.5 kB",
