@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-23]
 
+### @real-router/cache-manager@0.2.1
+
+### Patch Changes
+
+- [#167](https://github.com/greydragon888/real-router/pull/167) [`649c251`](https://github.com/greydragon888/real-router/commit/649c251af331b2b2986c7b8781969904122673dc) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace LRU with FIFO eviction in KeyIndexCache (#165)
+
+  FIFO eliminates `Map.delete()` + `Map.set()` on every cache hit (LRU refresh).
+  Hit path is now a single `Map.get()` — 2–3.4× faster than LRU in benchmarks.
+
+  Other optimizations:
+  - Inline `#store()` into `get()` (one fewer function call on miss)
+  - Replace `#stats` object with separate `#hits`/`#misses` counters (no object allocation on `clear()`)
+  - Handle `undefined` as a valid cached value (disambiguate from cache miss)
+
+
 ### @real-router/cache-manager@0.2.0
 
 ### Minor Changes
