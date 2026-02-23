@@ -76,30 +76,84 @@ describe("KeyIndexCache", () => {
       expect(cache.get("x", () => 99)).toBe(1); // cached
       expect(cache.get("y", () => 99)).toBe(2); // cached
     });
-  });
 
-  describe("LRU eviction", () => {
-    it("evicts LRU entry when full (not recently used)", () => {
-      const cache = new KeyIndexCache<string>(2);
+    it("returns undefined from cache when compute returned undefined", () => {
+      const cache = new KeyIndexCache<string | undefined>(10);
+      const compute = vi.fn(() => undefined);
 
-      cache.get("A", () => "a"); // insert A
-      cache.get("B", () => "b"); // insert B
-      cache.get("A", () => "a"); // refresh A (A is now newest, B is LRU)
-      cache.get("C", () => "c"); // insert C → B evicted
+      cache.get("key", compute); // miss → stores undefined
+      const result = cache.get("key", compute); // hit on undefined value
 
-      // A should still be cached (verify before fetching B, which would evict A)
-      const computeA = vi.fn(() => "a2");
+      expect(result).toBeUndefined();
+      expect(compute).toHaveBeenCalledTimes(1); // only first call computes
+    });
+
+    it("counts hit correctly when cached value is undefined", () => {
+      const cache = new KeyIndexCache<undefined>(10);
+
+      cache.get("key", () => undefined); // miss
+      cache.get("key", () => undefined); // hit
+
+      const m = cache.getMetrics();
+
+      expect(m.hits).toBe(1);
+      expect(m.misses).toBe(1);
+    });
+
+    it("does not refresh position for undefined-value entry (FIFO)", () => {
+      const cache = new KeyIndexCache<number | undefined>(3);
+
+      cache.get("A", () => undefined); // insert A=undefined
+      cache.get("B", () => 2); // insert B (cache: [A, B])
+      cache.get("C", () => 3); // insert C (cache full: [A, B, C])
+      cache.get("A", () => undefined); // hit A (no position refresh — FIFO)
+      cache.get("D", () => 4); // insert D → A evicted (oldest, despite recent hit)
+
+      // Verify A was evicted by checking size and that B survived
+      expect(cache.getMetrics().size).toBe(3); // [B, C, D]
+
+      // B should still be cached (was inserted after A)
+      const computeB = vi.fn(() => 99);
+
+      cache.get("B", computeB);
+
+      expect(computeB).not.toHaveBeenCalled(); // B still in cache
+
+      // A should be a miss (was evicted)
+      const computeA = vi.fn(() => undefined);
 
       cache.get("A", computeA);
 
-      expect(computeA).not.toHaveBeenCalled(); // A still in cache
+      expect(computeA).toHaveBeenCalledTimes(1); // A was evicted
+    });
+  });
 
-      // B should be evicted
+  describe("FIFO eviction", () => {
+    it("evicts oldest entry when full (insertion order, not access order)", () => {
+      const cache = new KeyIndexCache<string>(3);
+
+      cache.get("A", () => "a"); // insert A
+      cache.get("B", () => "b"); // insert B (cache: [A, B])
+      cache.get("C", () => "c"); // insert C (cache full: [A, B, C])
+      cache.get("A", () => "a"); // hit A (no position change — FIFO)
+      cache.get("D", () => "d"); // insert D → A evicted (oldest, despite recent hit)
+
+      // Verify A was evicted by checking size and that B survived
+      expect(cache.getMetrics().size).toBe(3); // [B, C, D]
+
+      // B should still be cached (was inserted after A)
       const computeB = vi.fn(() => "b2");
 
       cache.get("B", computeB);
 
-      expect(computeB).toHaveBeenCalledTimes(1); // B was evicted → miss
+      expect(computeB).not.toHaveBeenCalled(); // B still in cache
+
+      // A should be a miss (was evicted)
+      const computeA = vi.fn(() => "a2");
+
+      cache.get("A", computeA);
+
+      expect(computeA).toHaveBeenCalledTimes(1); // A was evicted
     });
 
     it("maxSize=1: each new entry evicts previous", () => {
