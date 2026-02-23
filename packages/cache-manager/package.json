@@ -1,6 +1,6 @@
 {
   "name": "@real-router/cache-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "commonjs",
   "description": "Centralized cache registry with LRU eviction for real-router",
   "main": "./dist/cjs/index.js",
