@@ -136,9 +136,10 @@ pnpm publish --provenance --access public --no-git-checks
 Packages are published in dependency order:
 
 1. `@real-router/logger` (no @real-router deps)
-2. `@real-router/types` (no deps)
-3. `@real-router/core` (depends on types, logger)
-4. All other packages
+2. `@real-router/cache-manager` (no @real-router deps)
+3. `@real-router/types` (no deps)
+4. `@real-router/core` (depends on types, logger)
+5. All other packages
 
 **Important:** The `publish_package` function must return `0` even when package is already published:
 
@@ -848,6 +849,34 @@ For high-precision timing in Node.js without global `performance`:
 import { performance } from "perf_hooks";
 globalThis.performance = performance;
 ```
+
+## Cache Manager Package
+
+### Why?
+
+Centralized cache registry for hot paths in the router (transition path computation, node state lookups, path building). Follows the same singleton pattern as `@real-router/logger`.
+
+### Design Decisions
+
+**Single `Map<string, T>` LRU:** Initial design used 3 Maps (`dict`, `cache`, `reverseDict`) for numeric index keys. After analysis, the 3-Map approach added ~3x memory overhead with no benefit for string-only keys. Simplified to native `Map<string, T>` using insertion-order for LRU semantics.
+
+**LRU via Map insertion order:** `delete(key)` then `set(key, value)` moves entry to end. `keys().next().value` gives oldest (first) entry for eviction. No external LRU library needed.
+
+**Cache hit via `Map.has()`:** Using `has()` instead of checking `get() !== undefined` correctly handles `T = undefined` as a cached value.
+
+**Module-level singleton:** `export const cacheManager = new CacheManager()` — same pattern as logger. For tests/SSR: `cacheManager.clear()` resets all caches.
+
+**Coordinated invalidation:** `invalidateForNewRoutes()` notifies all registered caches when routes change. Caches with `onInvalidate` get targeted invalidation; others are fully cleared (safe default).
+
+### Property-Based Tests
+
+14 property tests via `@fast-check/vitest` verify invariants:
+
+- Capacity: `size <= maxSize` always holds under arbitrary operations
+- LRU order: touched entries survive eviction, oldest untouched are evicted
+- Metrics: `hits + misses === total get() calls`, `0 <= hitRate <= 1`
+- Invalidation: matching keys evicted, non-matching preserved
+- Clear: resets size and stats to zero, idempotent
 
 ## Dependencies
 

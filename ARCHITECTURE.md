@@ -16,6 +16,7 @@ real-router/
 │   ├── persistent-params-plugin/  # Parameter persistence
 │   ├── helpers/              # Route comparison utilities
 │   ├── logger/               # @real-router/logger — isomorphic logging
+│   ├── cache-manager/        # @real-router/cache-manager — centralized LRU cache registry
 │   ├── fsm/                  # @real-router/fsm — finite state machine engine (internal)
 │   ├── event-emitter/        # Generic typed event emitter (internal)
 │   ├── route-tree/           # Route tree building, validation, matcher factory (internal)
@@ -51,7 +52,7 @@ real-router/
              │              @real-router/core                  │
              │  ┌─────────────────────────────────────────┐    │
              │  │  Bundles: route-tree, path-matcher,     │    │
-             │  │  search-params, type-guards, fsm,      │    │
+             │  │  search-params, type-guards, fsm,       │    │
              │  │  event-emitter                          │    │
              │  └─────────────────────────────────────────┘    │
              └──────────────────────┬──────────────────────────┘
@@ -63,9 +64,15 @@ real-router/
   │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent-│
   │              │ │          │ │          │ │          │ │plugin    │ │params     │
   └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └───────────┘
+
+
+  ┌─────────────────┐
+  │  @real-router/  │  Standalone (no @real-router deps).
+  │  cache-manager  │  Will be consumed by core in future phases.
+  └─────────────────┘
 ```
 
-**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`
+**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`, `@real-router/cache-manager`
 
 **Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `@real-router/logger`, `@real-router/fsm`
 
