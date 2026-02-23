@@ -196,6 +196,8 @@ importers:
         specifier: workspace:^
         version: link:../type-guards
 
+  packages/cache-manager: {}
+
   packages/core:
     dependencies:
       '@real-router/fsm':
