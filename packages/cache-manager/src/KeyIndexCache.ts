@@ -1,12 +1,9 @@
 import type { CacheInstance, CacheMetrics } from "./types.js";
 
 export class KeyIndexCache<T> implements CacheInstance<T> {
-  #dict = new Map<string, number>();
-  #cache = new Map<number, T>();
-  #reverseDict = new Map<number, string>();
+  readonly #cache = new Map<string, T>();
+  readonly #maxSize: number;
   #stats: { hits: number; misses: number } = { hits: 0, misses: 0 };
-  #maxSize: number;
-  #nextId = 0;
 
   constructor(maxSize: number) {
     if (maxSize <= 0 || !Number.isInteger(maxSize)) {
@@ -18,16 +15,21 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
     this.#maxSize = maxSize;
   }
 
+  /**
+   * Retrieve a cached value or compute and store it.
+   *
+   * On hit: refreshes LRU position (Map delete+set moves entry to end).
+   * On miss: calls `compute()`, stores result with LRU eviction if full.
+   *
+   * Consumers: transitionPath (path cache), RouteUtils (nodeState cache), plugins.
+   */
   get(key: string, compute: () => T): T {
-    const id = this.#dict.get(key);
-
-    if (id !== undefined) {
+    if (this.#cache.has(key)) {
       this.#stats.hits++;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const value = this.#cache.get(id)!;
+      const value = this.#cache.get(key) as T;
 
-      this.#cache.delete(id);
-      this.#cache.set(id, value);
+      this.#cache.delete(key);
+      this.#cache.set(key, value);
 
       return value;
     }
@@ -40,16 +42,25 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
     return value;
   }
 
+  /**
+   * Remove all entries whose key matches the predicate.
+   *
+   * Consumer: transitionPath `onInvalidate` — smart invalidation that removes
+   * only entries referencing newly added route names instead of clearing all.
+   */
   invalidateMatching(predicate: (key: string) => boolean): void {
-    for (const [key, id] of this.#dict) {
+    for (const key of this.#cache.keys()) {
       if (predicate(key)) {
-        this.#cache.delete(id);
-        this.#reverseDict.delete(id);
-        this.#dict.delete(key);
+        this.#cache.delete(key);
       }
     }
   }
 
+  /**
+   * Return hit/miss statistics and current cache utilization.
+   *
+   * Consumer: CacheManager.getMetrics() aggregates these for DevTools.
+   */
   getMetrics(): CacheMetrics {
     const total = this.#stats.hits + this.#stats.misses;
 
@@ -62,30 +73,27 @@ export class KeyIndexCache<T> implements CacheInstance<T> {
     };
   }
 
+  /**
+   * Remove all entries and reset statistics.
+   *
+   * Consumers: CacheManager.clear() (router.dispose, tests/SSR setup),
+   * CacheManager.invalidateForNewRoutes() (default when no onInvalidate).
+   */
   clear(): void {
     this.#cache.clear();
-    this.#dict.clear();
-    this.#reverseDict.clear();
     this.#stats = { hits: 0, misses: 0 };
-    this.#nextId = 0;
   }
 
   #store(key: string, value: T): void {
     if (this.#cache.size >= this.#maxSize) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const lruId = this.#cache.keys().next().value!;
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const lruKey = this.#reverseDict.get(lruId)!;
+      // size >= maxSize > 0, so the iterator always yields a value
+      const { value: oldest } = this.#cache
+        .keys()
+        .next() as IteratorYieldResult<string>;
 
-      this.#cache.delete(lruId);
-      this.#dict.delete(lruKey);
-      this.#reverseDict.delete(lruId);
+      this.#cache.delete(oldest);
     }
 
-    const id = this.#nextId++;
-
-    this.#dict.set(key, id);
-    this.#cache.set(id, value);
-    this.#reverseDict.set(id, key);
+    this.#cache.set(key, value);
   }
 }
