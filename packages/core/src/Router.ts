@@ -965,13 +965,6 @@ export class Router<
   // Navigation
   // ============================================================================
 
-  navigate(routeName: string): Promise<State>;
-  navigate(routeName: string, routeParams: Params): Promise<State>;
-  navigate(
-    routeName: string,
-    routeParams: Params,
-    options: NavigationOptions,
-  ): Promise<State>;
   navigate(
     routeName: string,
     routeParams?: Params,
