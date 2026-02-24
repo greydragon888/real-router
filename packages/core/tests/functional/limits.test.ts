@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   createRouter,
+  cloneRouter,
   events,
   getDependenciesApi,
   getPluginApi,
@@ -507,7 +508,7 @@ describe("core/limits (integration via public API)", () => {
     it("should preserve limits in cloned router", () => {
       const router = createRouter([], { limits: { maxPlugins: 3 } });
 
-      const cloned = router.clone();
+      const cloned = cloneRouter(router);
 
       // Cloned router should have same limits
       expect(() => {

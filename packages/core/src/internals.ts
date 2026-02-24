@@ -1,5 +1,11 @@
+import type { RouteConfig } from "./namespaces/RoutesNamespace";
 import type { Router } from "./Router";
-import type { EventMethodMap } from "./types";
+import type {
+  EventMethodMap,
+  GuardFnFactory,
+  PluginFactory,
+  Route,
+} from "./types";
 import type {
   EventName,
   NavigationOptions,
@@ -71,6 +77,24 @@ export interface RouterInternals {
   readonly dependencyHas: (name: string) => boolean;
   readonly dependencyReset: () => void;
   readonly maxDependencies: number;
+
+  // Clone support (issue #173)
+  readonly cloneRoutes: () => Route[];
+  readonly cloneOptions: () => Options;
+  readonly cloneDependencies: () => Record<string, unknown>;
+  readonly getLifecycleFactories: () => [
+    Record<string, GuardFnFactory>,
+    Record<string, GuardFnFactory>,
+  ];
+  readonly getPluginFactories: () => PluginFactory[];
+  readonly getRouteConfig: () => RouteConfig;
+  readonly getResolvedForwardMap: () => Record<string, string>;
+  readonly getRouteCustomFields: () => Record<string, Record<string, unknown>>;
+  readonly applyClonedConfig: (
+    config: RouteConfig,
+    resolvedForwardMap: Record<string, string>,
+    routeCustomFields: Record<string, Record<string, unknown>>,
+  ) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Router<any> needed to accept all generic instantiations

@@ -16,7 +16,6 @@ import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import { getInternals, registerInternals } from "./internals";
 import {
-  CloneNamespace,
   DependenciesNamespace,
   EventBusNamespace,
   NavigationNamespace,
@@ -91,7 +90,6 @@ export class Router<
   readonly #plugins: PluginsNamespace<Dependencies>;
   readonly #navigation: NavigationNamespace;
   readonly #lifecycle: RouterLifecycleNamespace;
-  readonly #clone: CloneNamespace<Dependencies>;
 
   readonly #eventBus: EventBusNamespace;
 
@@ -163,7 +161,6 @@ export class Router<
     this.#plugins = new PluginsNamespace<Dependencies>();
     this.#navigation = new NavigationNamespace();
     this.#lifecycle = new RouterLifecycleNamespace();
-    this.#clone = new CloneNamespace<Dependencies>();
     this.#noValidate = noValidate;
 
     // =========================================================================
@@ -201,7 +198,6 @@ export class Router<
         plugins: this.#plugins,
         navigation: this.#navigation,
         lifecycle: this.#lifecycle,
-        clone: this.#clone,
         eventBus: this.#eventBus,
       }),
     );
@@ -252,6 +248,28 @@ export class Router<
         this.#dependencies.reset();
       },
       maxDependencies: this.#limits.maxDependencies,
+      // Clone support (issue #173)
+      cloneRoutes: () => this.#routes.cloneRoutes() as unknown as Route[],
+      cloneOptions: () => ({ ...this.#options.get() }),
+      cloneDependencies: () =>
+        this.#dependencies.getAll() as Record<string, unknown>,
+      getLifecycleFactories: () =>
+        this.#routeLifecycle.getFactories() as unknown as [
+          Record<string, GuardFnFactory>,
+          Record<string, GuardFnFactory>,
+        ],
+      getPluginFactories: () =>
+        this.#plugins.getAll() as unknown as PluginFactory[],
+      getRouteConfig: () => this.#routes.getConfig(),
+      getResolvedForwardMap: () => this.#routes.getResolvedForwardMap(),
+      getRouteCustomFields: () => this.#routes.getRouteCustomFields(),
+      applyClonedConfig: (config, resolvedForwardMap, routeCustomFields) => {
+        this.#routes.applyClonedConfig(
+          config,
+          resolvedForwardMap,
+          routeCustomFields,
+        );
+      },
     });
 
     // =========================================================================
@@ -307,9 +325,6 @@ export class Router<
 
     // Subscription
     this.subscribe = this.subscribe.bind(this);
-
-    // Cloning
-    this.clone = this.clone.bind(this);
   }
 
   // ============================================================================
@@ -895,31 +910,6 @@ export class Router<
     return promiseState;
   }
 
-  // ============================================================================
-  // Cloning
-  // ============================================================================
-
-  clone(dependencies?: Dependencies): Router<Dependencies> {
-    if (!this.#noValidate) {
-      CloneNamespace.validateCloneArgs(dependencies);
-    }
-
-    return this.#clone.clone(
-      dependencies,
-      (routes, options, deps) =>
-        new Router<Dependencies>(routes, options, deps),
-      (newRouter, config, resolvedForwardMap, routeCustomFields) => {
-        const typedRouter = newRouter as unknown as Router<Dependencies>;
-
-        typedRouter.#routes.applyClonedConfig(
-          config,
-          resolvedForwardMap,
-          routeCustomFields,
-        );
-      },
-    );
-  }
-
   /**
    * Pre-allocated callback for #suppressUnhandledRejection.
    * Avoids creating a new closure on every navigate() call.
@@ -964,7 +954,6 @@ export class Router<
 
     this.addEventListener = throwDisposed as never;
     this.subscribe = throwDisposed as never;
-    this.clone = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;
   }
 }

@@ -1,7 +1,6 @@
 // packages/core/src/wiring/types.ts
 
 import type {
-  CloneNamespace,
   DependenciesNamespace,
   EventBusNamespace,
   NavigationNamespace,
@@ -43,8 +42,6 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   navigation: NavigationNamespace;
   /** Router lifecycle namespace (start/stop) */
   lifecycle: RouterLifecycleNamespace;
-  /** Clone namespace (SSR cloning) */
-  clone: CloneNamespace<Dependencies>;
   /** EventBus namespace — unified FSM + EventEmitter abstraction */
   eventBus: EventBusNamespace;
 }
