@@ -44,3 +44,13 @@ export { RouterError } from "./RouterError";
 export { createRouter } from "./createRouter";
 
 export { getNavigator } from "./getNavigator";
+
+// Factory API (Phase 0: parallel API for modular architecture)
+export {
+  getPluginApi,
+  getRoutesApi,
+  getDependenciesApi,
+  cloneRouter,
+} from "./api";
+
+export type { PluginApi, RoutesApi, DependenciesApi } from "./api";

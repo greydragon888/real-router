@@ -1,4 +1,4 @@
-import { events } from "@real-router/core";
+import { events, getPluginApi } from "@real-router/core";
 
 import { RxObservable } from "./RxObservable";
 
@@ -29,22 +29,23 @@ export type RouterEvent =
 
 export function events$(router: Router): RxObservable<RouterEvent> {
   return new RxObservable<RouterEvent>((observer) => {
+    const api = getPluginApi(router);
     const unsubscribes: (() => void)[] = [];
 
     /* eslint-disable unicorn/prefer-single-call -- individual pushes for partial registration safety */
     try {
       unsubscribes.push(
-        router.addEventListener(events.ROUTER_START, () => {
+        api.addEventListener(events.ROUTER_START, () => {
           observer.next?.({ type: "ROUTER_START" });
         }),
       );
       unsubscribes.push(
-        router.addEventListener(events.ROUTER_STOP, () => {
+        api.addEventListener(events.ROUTER_STOP, () => {
           observer.next?.({ type: "ROUTER_STOP" });
         }),
       );
       unsubscribes.push(
-        router.addEventListener(
+        api.addEventListener(
           events.TRANSITION_START,
           (toState: State, fromState: State | undefined) => {
             observer.next?.({ type: "TRANSITION_START", toState, fromState });
@@ -52,7 +53,7 @@ export function events$(router: Router): RxObservable<RouterEvent> {
         ),
       );
       unsubscribes.push(
-        router.addEventListener(
+        api.addEventListener(
           events.TRANSITION_SUCCESS,
           (
             toState: State,
@@ -69,7 +70,7 @@ export function events$(router: Router): RxObservable<RouterEvent> {
         ),
       );
       unsubscribes.push(
-        router.addEventListener(
+        api.addEventListener(
           events.TRANSITION_ERROR,
           (
             toState: State | undefined,
@@ -86,7 +87,7 @@ export function events$(router: Router): RxObservable<RouterEvent> {
         ),
       );
       unsubscribes.push(
-        router.addEventListener(
+        api.addEventListener(
           events.TRANSITION_CANCEL,
           (toState: State, fromState: State | undefined) => {
             observer.next?.({ type: "TRANSITION_CANCEL", toState, fromState });
