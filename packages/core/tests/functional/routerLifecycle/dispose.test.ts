@@ -1,6 +1,7 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
 import {
+  cloneRouter,
   errorCodes,
   events,
   getDependenciesApi,
@@ -365,13 +366,13 @@ describe("dispose", () => {
       }
     });
 
-    it("clone() throws ROUTER_DISPOSED after dispose()", () => {
+    it("cloneRouter() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.clone();
+        cloneRouter(router);
       }).toThrowError();
 
       try {
-        router.clone();
+        cloneRouter(router);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }

@@ -2,6 +2,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
   createRouter,
+  cloneRouter,
   getDependenciesApi,
   getPluginApi,
 } from "@real-router/core";
@@ -272,7 +273,7 @@ describe("core/noValidate option", () => {
     // Cloning
     describe("cloning", () => {
       it("should skip validation in clone", () => {
-        expect(() => router.clone()).not.toThrowError();
+        expect(() => cloneRouter(router)).not.toThrowError();
       });
     });
   });

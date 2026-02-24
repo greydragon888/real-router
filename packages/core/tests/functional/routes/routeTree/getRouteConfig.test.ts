@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, cloneRouter } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -112,7 +112,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Clonable",
       } as never);
 
-      const clone = router.clone();
+      const clone = cloneRouter(router);
 
       expect(clone.getRouteConfig("gc-clonable")).toStrictEqual({
         title: "Clonable",

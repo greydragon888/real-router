@@ -28,7 +28,6 @@ export class RouterWiringBuilder<
   private readonly plugins: WiringOptions<Dependencies>["plugins"];
   private readonly navigation: WiringOptions<Dependencies>["navigation"];
   private readonly lifecycle: WiringOptions<Dependencies>["lifecycle"];
-  private readonly clone: WiringOptions<Dependencies>["clone"];
   private readonly eventBus: EventBusNamespace;
 
   constructor(wiringOptions: WiringOptions<Dependencies>) {
@@ -42,7 +41,6 @@ export class RouterWiringBuilder<
     this.plugins = wiringOptions.plugins;
     this.navigation = wiringOptions.navigation;
     this.lifecycle = wiringOptions.lifecycle;
-    this.clone = wiringOptions.clone;
     this.eventBus = wiringOptions.eventBus;
   }
 
@@ -209,25 +207,6 @@ export class RouterWiringBuilder<
       buildPath: (name, params) =>
         this.routes.buildPath(name, params, this.options.get()),
       getUrlParams: (name) => this.routes.getUrlParams(name),
-    });
-  }
-
-  wireCloneCallbacks(): void {
-    this.clone.setGetCloneData(() => {
-      const [canDeactivateFactories, canActivateFactories] =
-        this.routeLifecycle.getFactories();
-
-      return {
-        routes: this.routes.cloneRoutes(),
-        options: { ...this.options.get() },
-        dependencies: this.dependencies.getAll(),
-        canDeactivateFactories,
-        canActivateFactories,
-        pluginFactories: this.plugins.getAll(),
-        routeConfig: this.routes.getConfig(),
-        resolvedForwardMap: this.routes.getResolvedForwardMap(),
-        routeCustomFields: this.routes.getRouteCustomFields(),
-      };
     });
   }
 

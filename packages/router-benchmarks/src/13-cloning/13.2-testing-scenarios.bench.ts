@@ -2,10 +2,10 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import { createSimpleRouter, cloneRouter } from "../helpers";
 
 // 13.2.1 Cloning with mock dependencies
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
 
   // JIT warmup for stable memory measurements
@@ -21,27 +21,6 @@ if (IS_ROUTER5) {
   bench("13.2.1 Cloning with mock dependencies", () => {
     do_not_optimize(
       cloneRouter(router, {
-        api: { fetch: () => Promise.resolve({}) },
-        auth: { isAuthenticated: () => true },
-      }),
-    );
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  // JIT warmup for stable memory measurements
-  for (let i = 0; i < 100; i++) {
-    do_not_optimize(
-      router.clone({
-        api: { fetch: () => Promise.resolve({}) },
-        auth: { isAuthenticated: () => true },
-      }),
-    );
-  }
-
-  bench("13.2.1 Cloning with mock dependencies", () => {
-    do_not_optimize(
-      router.clone({
         api: { fetch: () => Promise.resolve({}) },
         auth: { isAuthenticated: () => true },
       }),
@@ -51,7 +30,7 @@ if (IS_ROUTER5) {
 
 // 13.2.2 Cloning in beforeEach (test isolation)
 // Note: Has internal loop of 1000 iterations, serves as warmup
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
 
   bench("13.2.2 Cloning in beforeEach (test isolation)", () => {
@@ -59,18 +38,10 @@ if (IS_ROUTER5) {
       do_not_optimize(cloneRouter(router));
     }
   }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  bench("13.2.2 Cloning in beforeEach (test isolation)", () => {
-    for (let i = 0; i < 1000; i++) {
-      do_not_optimize(router.clone());
-    }
-  }).gc("inner");
 }
 
 // 13.2.3 Clone preserves middleware and plugins
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
 
   for (let i = 0; i < 10; i++) {
@@ -91,34 +62,6 @@ if (IS_ROUTER5) {
 
   bench("13.2.3 Clone preserves middleware and plugins", () => {
     const cloned = cloneRouter(router);
-
-    cloned.start("/");
-    cloned.navigate("about");
-
-    // Fallback: stop started clone
-    cloned.stop();
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  for (let i = 0; i < 10; i++) {
-    router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
-    router.usePlugin(() => ({
-      onTransitionStart: () => {},
-    }));
-  }
-
-  // JIT warmup for stable memory measurements
-  for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
-
-    cloned.start("/");
-    cloned.navigate("about");
-    cloned.stop();
-  }
-
-  bench("13.2.3 Clone preserves middleware and plugins", () => {
-    const cloned = router.clone();
 
     cloned.start("/");
     cloned.navigate("about");

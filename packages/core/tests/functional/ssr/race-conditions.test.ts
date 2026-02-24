@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, cloneRouter } from "@real-router/core";
 
 import type { Route, Router } from "@real-router/core";
 import type { LogCallback } from "@real-router/logger";
@@ -23,8 +23,8 @@ describe("SSR race conditions", () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       // Two isolated clones (simulating two SSR requests)
-      const routerA = baseRouter.clone();
-      const routerB = baseRouter.clone();
+      const routerA = cloneRouter(baseRouter);
+      const routerB = cloneRouter(baseRouter);
 
       await routerA.start("/home");
       await routerB.start("/home");
@@ -47,8 +47,8 @@ describe("SSR race conditions", () => {
     it("should return correct route from cloned instance", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // getRoute on clones returns correct data
       expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
@@ -62,8 +62,8 @@ describe("SSR race conditions", () => {
     it("should isolate route configuration updates between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Modify one clone's route configuration
       clone1.updateRoute("about", { defaultParams: { tab: "changed" } });
@@ -84,8 +84,8 @@ describe("SSR race conditions", () => {
       const guardCallsClone1: string[] = [];
       const guardCallsClone2: string[] = [];
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Add different guards to each clone
       clone1.addActivateGuard("admin", () => () => {
@@ -240,7 +240,7 @@ describe("SSR race conditions", () => {
 
     it("should not leak state from clone to base router", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
-      const clone = baseRouter.clone();
+      const clone = cloneRouter(baseRouter);
 
       await clone.start("/home");
       await clone.navigate("admin");
@@ -256,8 +256,8 @@ describe("SSR race conditions", () => {
     it("should maintain route tree independence between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Add route to clone1 only
       clone1.addRoute({ name: "clone1only", path: "/clone1only" });

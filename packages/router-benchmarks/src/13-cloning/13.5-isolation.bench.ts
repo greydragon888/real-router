@@ -5,7 +5,7 @@ import { bench, do_not_optimize } from "mitata";
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
 
 // 13.5.1 Clone state changes do not affect the original
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
 
   router.start("/");
@@ -23,33 +23,6 @@ if (IS_ROUTER5) {
 
   bench("13.5.1 Clone state changes do not affect the original", () => {
     const cloned = cloneRouter(router);
-
-    cloned.start("/");
-    cloned.navigate("about");
-
-    do_not_optimize(router.getState());
-    do_not_optimize(cloned.getState());
-
-    cloned.stop();
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  router.start("/");
-
-  // JIT warmup for stable memory measurements
-  for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
-
-    cloned.start("/");
-    cloned.navigate("about");
-    do_not_optimize(router.getState());
-    do_not_optimize(cloned.getState());
-    cloned.stop();
-  }
-
-  bench("13.5.1 Clone state changes do not affect the original", () => {
-    const cloned = router.clone();
 
     cloned.start("/");
     cloned.navigate("about");
@@ -70,7 +43,7 @@ if (!IS_ROUTER5) {
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
     const routeName = `warmup-route-${i}`;
 
     cloned.addRoute({ name: routeName, path: `/${routeName}` });
@@ -79,7 +52,7 @@ if (!IS_ROUTER5) {
   }
 
   bench("13.5.2 Adding routes to clone does not affect the original", () => {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
     const routeName = `new-route-${routeIndex++}`;
 
     cloned.addRoute({ name: routeName, path: `/${routeName}` });
@@ -152,7 +125,7 @@ if (IS_ROUTER5) {
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
     let clonedCalled = false;
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
     const unsub = cloned.addEventListener("$$success", () => {
       clonedCalled = true;
     });
@@ -168,7 +141,7 @@ if (IS_ROUTER5) {
   bench("13.5.3 Adding listeners to clone does not affect the original", () => {
     let clonedCalled = false;
 
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     const unsub = cloned.addEventListener("$$success", () => {
       clonedCalled = true;

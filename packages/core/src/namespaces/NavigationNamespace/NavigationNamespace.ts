@@ -161,7 +161,7 @@ export class NavigationNamespace {
       logger.warn(
         "router.navigate",
         "Concurrent navigation detected on shared router instance. " +
-          "For SSR, use router.clone() to create isolated instance per request.",
+          "For SSR, use cloneRouter() to create isolated instance per request.",
       );
       deps.cancelNavigation();
     }
