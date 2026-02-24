@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/03-dependencies/3.2-adding.bench.ts
 
+import { getDependenciesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
@@ -26,8 +27,8 @@ if (!IS_ROUTER5) {
   };
 
   bench("3.2.2 Batch adding dependencies with cleanup", () => {
-    router.setDependencies(deps);
-    router.resetDependencies();
+    getDependenciesApi(router).setAll(deps);
+    getDependenciesApi(router).reset();
   }).gc("inner");
 }
 

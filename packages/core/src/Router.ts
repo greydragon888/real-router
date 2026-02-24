@@ -27,6 +27,7 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
+import { validateListenerArgs } from "./namespaces/EventBusNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
@@ -34,6 +35,7 @@ import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
 import type {
+  EventMethodMap,
   GuardFnFactory,
   Limits,
   PluginFactory,
@@ -43,9 +45,11 @@ import type {
 } from "./types";
 import type {
   DefaultDependencies,
+  EventName,
   NavigationOptions,
   Options,
   Params,
+  Plugin,
   State,
   SubscribeFn,
   Unsubscribe,
@@ -226,6 +230,28 @@ export class Router<
       getTree: () => this.#routes.getTree(),
       isDisposed: () => this.#eventBus.isDisposed(),
       noValidate,
+      // Dependencies (issue #172)
+      dependencyGet: (key) => this.#dependencies.get(key as keyof Dependencies),
+      dependencyGetAll: () =>
+        this.#dependencies.getAll() as Record<string, unknown>,
+      dependencySet: (name, value) =>
+        this.#dependencies.set(
+          name as keyof Dependencies & string,
+          value as Dependencies[keyof Dependencies & string],
+        ),
+      dependencySetMultiple: (deps) => {
+        this.#dependencies.setMultiple(deps as Partial<Dependencies>);
+      },
+      dependencyCount: () => this.#dependencies.count(),
+      dependencyRemove: (name) => {
+        this.#dependencies.remove(name as keyof Dependencies);
+      },
+      dependencyHas: (name) =>
+        this.#dependencies.has(name as keyof Dependencies),
+      dependencyReset: () => {
+        this.#dependencies.reset();
+      },
+      maxDependencies: this.#limits.maxDependencies,
     });
 
     // =========================================================================
@@ -272,14 +298,8 @@ export class Router<
     // Plugins
     this.usePlugin = this.usePlugin.bind(this);
 
-    // Dependencies
-    this.setDependency = this.setDependency.bind(this);
-    this.setDependencies = this.setDependencies.bind(this);
-    this.getDependency = this.getDependency.bind(this);
-    this.getDependencies = this.getDependencies.bind(this);
-    this.removeDependency = this.removeDependency.bind(this);
-    this.hasDependency = this.hasDependency.bind(this);
-    this.resetDependencies = this.resetDependencies.bind(this);
+    // Events
+    this.addEventListener = this.addEventListener.bind(this);
 
     // Navigation
     this.navigate = this.navigate.bind(this);
@@ -793,78 +813,18 @@ export class Router<
   }
 
   // ============================================================================
-  // Dependencies (backed by DependenciesNamespace)
+  // Events (backed by EventEmitter)
   // ============================================================================
 
-  setDependency<K extends keyof Dependencies & string>(
-    dependencyName: K,
-    dependency: Dependencies[K],
-  ): this {
+  addEventListener<E extends EventName>(
+    eventName: E,
+    cb: Plugin[EventMethodMap[E]],
+  ): Unsubscribe {
     if (!this.#noValidate) {
-      DependenciesNamespace.validateSetDependencyArgs(dependencyName);
+      validateListenerArgs(eventName, cb);
     }
 
-    this.#dependencies.set(dependencyName, dependency);
-
-    return this;
-  }
-
-  setDependencies(deps: Dependencies): this {
-    if (!this.#noValidate) {
-      DependenciesNamespace.validateDependenciesObject(deps, "setDependencies");
-      DependenciesNamespace.validateDependencyLimit(
-        this.#dependencies.count(),
-        Object.keys(deps).length,
-        "setDependencies",
-        this.#limits.maxDependencies,
-      );
-    }
-
-    this.#dependencies.setMultiple(deps);
-
-    return this;
-  }
-
-  getDependency<K extends keyof Dependencies>(key: K): Dependencies[K] {
-    if (!this.#noValidate) {
-      DependenciesNamespace.validateName(key, "getDependency");
-    }
-
-    const value = this.#dependencies.get(key);
-
-    if (!this.#noValidate) {
-      DependenciesNamespace.validateDependencyExists(value, key as string);
-    }
-
-    return value;
-  }
-
-  getDependencies(): Partial<Dependencies> {
-    return this.#dependencies.getAll();
-  }
-
-  removeDependency(dependencyName: keyof Dependencies): this {
-    if (!this.#noValidate) {
-      DependenciesNamespace.validateName(dependencyName, "removeDependency");
-    }
-
-    this.#dependencies.remove(dependencyName);
-
-    return this;
-  }
-
-  hasDependency(dependencyName: keyof Dependencies): boolean {
-    if (!this.#noValidate) {
-      DependenciesNamespace.validateName(dependencyName, "hasDependency");
-    }
-
-    return this.#dependencies.has(dependencyName);
-  }
-
-  resetDependencies(): this {
-    this.#dependencies.reset();
-
-    return this;
+    return this.#eventBus.addEventListener(eventName, cb);
   }
 
   // ============================================================================
@@ -1001,10 +961,8 @@ export class Router<
     this.removeActivateGuard = throwDisposed as never;
     this.removeDeactivateGuard = throwDisposed as never;
     this.usePlugin = throwDisposed as never;
-    this.setDependency = throwDisposed as never;
-    this.setDependencies = throwDisposed as never;
-    this.removeDependency = throwDisposed as never;
-    this.resetDependencies = throwDisposed as never;
+
+    this.addEventListener = throwDisposed as never;
     this.subscribe = throwDisposed as never;
     this.clone = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;

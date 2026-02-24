@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes, getPluginApi } from "@real-router/core";
+import {
+  errorCodes,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -176,7 +180,9 @@ describe("router.clone()", () => {
     const router = createTestRouter() as unknown as Router<{ foo: string }>;
     const clonedRouter = router.clone({ foo: "bar" });
 
-    expect(clonedRouter.getDependency("foo")).toBe("bar");
+    const deps = getDependenciesApi(clonedRouter);
+
+    expect(deps.get("foo")).toBe("bar");
   });
 
   it("should not share state with original router", async () => {
@@ -337,7 +343,10 @@ describe("router.clone()", () => {
       const clonedRouter = router.clone();
 
       expect(clonedRouter).toBeDefined();
-      expect(clonedRouter.getDependencies()).toStrictEqual({});
+
+      const deps = getDependenciesApi(clonedRouter);
+
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should work with explicit empty object dependencies", async () => {
@@ -345,7 +354,10 @@ describe("router.clone()", () => {
       const clonedRouter = router.clone({});
 
       expect(clonedRouter).toBeDefined();
-      expect(clonedRouter.getDependencies()).toStrictEqual({});
+
+      const deps = getDependenciesApi(clonedRouter);
+
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should work when router has no middleware", async () => {

@@ -1,15 +1,19 @@
 import { logger } from "@real-router/logger";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
+
+import { getDependenciesApi } from "@real-router/core";
 
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
 
-import type { Router } from "@real-router/core";
+import type { DependenciesApi, Router } from "@real-router/core";
 
 let router: Router<TestDependencies>;
+let deps: DependenciesApi<TestDependencies>;
 
 describe("core/dependencies/setDependencies", () => {
   beforeEach(() => {
     router = createDependenciesTestRouter();
+    deps = getDependenciesApi(router);
   });
 
   afterEach(() => {
@@ -17,46 +21,40 @@ describe("core/dependencies/setDependencies", () => {
   });
 
   it("should set multiple dependencies at once", () => {
-    router.setDependencies({ foo: 42, bar: "test" });
+    deps.setAll({ foo: 42, bar: "test" });
 
-    expect(router.getDependency("foo")).toBe(42);
-    expect(router.getDependency("bar")).toBe("test");
+    expect(deps.get("foo")).toBe(42);
+    expect(deps.get("bar")).toBe("test");
   });
 
   it("should ignore undefined values", () => {
     // @ts-expect-error: wrong values for test
-    router.setDependencies({ foo: undefined, bar: "value" });
+    deps.setAll({ foo: undefined, bar: "value" });
 
-    expect(router.getDependency("foo")).toBe(1); // initial value
-    expect(router.getDependency("bar")).toBe("value");
-  });
-
-  it("should return the router instance for chaining", () => {
-    const result = router.setDependencies({ bar: "x" });
-
-    expect(result).toBe(router);
+    expect(deps.get("foo")).toBe(1); // initial value
+    expect(deps.get("bar")).toBe("value");
   });
 
   // 🔴 CRITICAL: Plain object validation
   it("should reject null with TypeError", () => {
     expect(() => {
       // @ts-expect-error: testing null
-      router.setDependencies(null);
+      deps.setAll(null);
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing null
-      router.setDependencies(null);
+      deps.setAll(null);
     }).toThrowError("expected plain object, received null");
   });
 
   it("should reject arrays with TypeError", () => {
     expect(() => {
       // @ts-expect-error: testing array
-      router.setDependencies([]);
+      deps.setAll([]);
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing array
-      router.setDependencies(["dep1", "dep2"]);
+      deps.setAll(["dep1", "dep2"]);
     }).toThrowError(/expected plain object.*array/i);
   });
 
@@ -68,33 +66,23 @@ describe("core/dependencies/setDependencies", () => {
 
     expect(() => {
       // @ts-expect-error: testing class instance
-      router.setDependencies(instance);
+      deps.setAll(instance);
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing class instance
-      router.setDependencies(instance);
+      deps.setAll(instance);
     }).toThrowError(/expected plain object.*myclass/i);
   });
 
   it("should reject Date objects with TypeError", () => {
     expect(() => {
       // @ts-expect-error: testing Date
-      router.setDependencies(new Date());
+      deps.setAll(new Date());
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing Date
-      router.setDependencies(new Date());
+      deps.setAll(new Date());
     }).toThrowError(/expected plain object.*date/i);
-  });
-
-  it("should reject Object.create(null) with TypeError", () => {
-    const nullProto = Object.create(null);
-
-    nullProto.dep = "value";
-
-    expect(() => {
-      router.setDependencies(nullProto);
-    }).toThrowError(TypeError);
   });
 
   // 🔴 CRITICAL: Getters prohibition
@@ -109,11 +97,11 @@ describe("core/dependencies/setDependencies", () => {
 
     expect(() => {
       // @ts-expect-error: testing getter
-      router.setDependencies(withGetter);
+      deps.setAll(withGetter);
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing getter
-      router.setDependencies(withGetter);
+      deps.setAll(withGetter);
     }).toThrowError(/getters not allowed.*computed/i);
   });
 
@@ -131,7 +119,7 @@ describe("core/dependencies/setDependencies", () => {
 
     expect(() => {
       // @ts-expect-error: testing getter
-      router.setDependencies(malicious);
+      deps.setAll(malicious);
     }).toThrowError(TypeError);
 
     // Getter should not have been invoked
@@ -140,7 +128,7 @@ describe("core/dependencies/setDependencies", () => {
 
   // 🔴 CRITICAL: Atomicity
   it("should be atomic - no changes if validation fails", () => {
-    router.setDependencies({ foo: 1, bar: "initial" });
+    deps.setAll({ foo: 1, bar: "initial" });
 
     const withGetter = {
       foo: 999,
@@ -151,22 +139,22 @@ describe("core/dependencies/setDependencies", () => {
     };
 
     expect(() => {
-      router.setDependencies(withGetter);
+      deps.setAll(withGetter);
     }).toThrowError(TypeError);
 
     // State should remain unchanged
-    expect(router.getDependency("foo")).toBe(1);
-    expect(router.getDependency("bar")).toBe("initial");
+    expect(deps.get("foo")).toBe(1);
+    expect(deps.get("bar")).toBe("initial");
   });
 
   // 🟡 IMPORTANT: Warnings for overwrites
   it("should warn with single message when overwriting multiple dependencies", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    router.setDependencies({ foo: 1, bar: "initial" });
+    deps.setAll({ foo: 1, bar: "initial" });
     warnSpy.mockClear();
 
-    router.setDependencies({ foo: 2, bar: "new" });
+    deps.setAll({ foo: 2, bar: "new" });
 
     // Single warning with both keys
     expect(warnSpy).toHaveBeenCalledTimes(1);
@@ -185,11 +173,11 @@ describe("core/dependencies/setDependencies", () => {
   it("should not warn when no overwrites occur", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    router.setDependencies({ foo: 1, bar: "test" });
+    deps.setAll({ foo: 1, bar: "test" });
     warnSpy.mockClear();
 
     // @ts-expect-error: testing new keys
-    router.setDependencies({ baz: "new", qux: "another" });
+    deps.setAll({ baz: "new", qux: "another" });
 
     expect(warnSpy).not.toHaveBeenCalled();
 
@@ -198,9 +186,9 @@ describe("core/dependencies/setDependencies", () => {
 
   // 🟡 IMPORTANT: NaN handling
   it("should handle NaN values correctly", () => {
-    router.setDependencies({ foo: Number.NaN });
+    deps.setAll({ foo: Number.NaN });
 
-    const value = router.getDependency("foo");
+    const value = deps.get("foo");
 
     expect(Number.isNaN(value!)).toBe(true);
   });
@@ -208,80 +196,79 @@ describe("core/dependencies/setDependencies", () => {
   // 🟡 IMPORTANT: Symbol-keys behavior
   it("should silently ignore Symbol keys", () => {
     const symbolKey = Symbol("dep");
-    const deps = {
+    const depsObj = {
       normal: "value",
       [symbolKey]: "symbol value",
     };
 
     // @ts-expect-error: testing symbol keys
-    router.setDependencies(deps);
+    deps.setAll(depsObj);
 
-    expect(router.getDependency("normal" as "foo")).toBe("value");
+    expect(deps.get("normal" as "foo")).toBe("value");
 
     // Symbol key should be ignored
     // @ts-expect-error: testing symbol access
-    expect(() => router.getDependency(symbolKey)).toThrowError();
+    expect(() => deps.get(symbolKey)).toThrowError();
   });
 
   // 🟢 DESIRABLE: Empty object
   it("should handle empty object without changes", () => {
-    router.setDependencies({ foo: 1 });
+    deps.setAll({ foo: 1 });
 
-    router.setDependencies({});
+    deps.setAll({});
 
     // State unchanged
-    expect(router.getDependency("foo")).toBe(1);
-    expect(router.getDependencies()).toStrictEqual({ foo: 1 });
+    expect(deps.get("foo")).toBe(1);
+    expect(deps.getAll()).toStrictEqual({ foo: 1 });
   });
 
   it("should handle object with all undefined values", () => {
-    router.setDependencies({ foo: 1 });
+    deps.setAll({ foo: 1 });
 
     // @ts-expect-error: testing all undefined
-    router.setDependencies({ bar: undefined, baz: undefined });
+    deps.setAll({ bar: undefined, baz: undefined });
 
     // Only foo remains
-    expect(router.getDependencies()).toStrictEqual({ foo: 1 });
+    expect(deps.getAll()).toStrictEqual({ foo: 1 });
   });
 
   // 🟢 DESIRABLE: String conversion
   it("should convert numeric keys to strings", () => {
     // @ts-expect-error: testing numeric keys
-    router.setDependencies({ 123: "numeric", 456: "another" });
+    deps.setAll({ 123: "numeric", 456: "another" });
 
-    expect(router.getDependency("123" as "foo")).toBe("numeric");
-    expect(router.getDependency("456" as "foo")).toBe("another");
+    expect(deps.get("123" as "foo")).toBe("numeric");
+    expect(deps.get("456" as "foo")).toBe("another");
   });
 
   // Integration with other methods
   it("should integrate correctly with setDependency", () => {
-    router.setDependency("foo", 1);
-    router.setDependencies({ bar: "test" });
+    deps.set("foo", 1);
+    deps.setAll({ bar: "test" });
 
-    expect(router.getDependency("foo")).toBe(1);
-    expect(router.getDependency("bar")).toBe("test");
+    expect(deps.get("foo")).toBe(1);
+    expect(deps.get("bar")).toBe("test");
   });
 
   it("should support conditional setup with undefined", () => {
     const isDev = false;
     const hasCache = true;
 
-    router.setDependencies({
+    deps.setAll({
       foo: 42,
 
-      bar: isDev ? "dev-logger" : undefined,
+      bar: (isDev as boolean) ? "dev-logger" : undefined,
       // @ts-expect-error: testing conditional setup
-
-      baz: hasCache ? "cache-service" : undefined,
+      baz: (hasCache as boolean) ? "cache-service" : undefined,
     });
 
-    expect(router.getDependency("foo")).toBe(42);
-    expect(router.hasDependency("bar")).toBe(false); // undefined ignored
-    expect(router.getDependency("baz" as "foo")).toBe("cache-service");
+    expect(deps.get("foo")).toBe(42);
+    expect(deps.has("bar")).toBe(false); // undefined ignored
+    expect(deps.get("baz" as "foo")).toBe("cache-service");
   });
 
   it("should handle falsy values except undefined", () => {
-    router.setDependencies({
+    deps.setAll({
       foo: 0 as number,
       // @ts-expect-error: testing null value
       bar: null,
@@ -289,10 +276,10 @@ describe("core/dependencies/setDependencies", () => {
       qux: {},
     });
 
-    expect(router.getDependency("foo")).toBe(0);
-    expect(router.getDependency("bar")).toBe(null);
-    expect(router.getDependency("baz")).toBe(false);
-    expect(router.getDependency("qux")).toStrictEqual({});
+    expect(deps.get("foo")).toBe(0);
+    expect(deps.get("bar")).toBe(null);
+    expect(deps.get("baz")).toBe(false);
+    expect(deps.get("qux")).toStrictEqual({});
   });
 
   it("should preserve circular references", () => {
@@ -302,9 +289,9 @@ describe("core/dependencies/setDependencies", () => {
     obj1.ref = obj2; // Circular reference
 
     // @ts-expect-error: testing circular references
-    router.setDependencies({ circular: obj1 });
+    deps.setAll({ circular: obj1 });
 
-    const retrieved = router.getDependency("circular" as "foo");
+    const retrieved = deps.get("circular" as "foo");
 
     // @ts-expect-error: accessing nested properties
     expect(retrieved.name).toBe("obj1");

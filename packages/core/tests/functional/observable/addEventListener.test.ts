@@ -1,7 +1,11 @@
 import { logger } from "@real-router/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { errorCodes, getPluginApi } from "@real-router/core";
+import {
+  errorCodes,
+  events as coreEvents,
+  getPluginApi,
+} from "@real-router/core";
 
 import { events } from "./setup";
 import { createTestRouter } from "../../helpers";
@@ -544,6 +548,48 @@ describe("core/observable/addEventListener", () => {
       await router.start("/home");
 
       expect(cb).toHaveBeenCalled();
+    });
+  });
+
+  describe("facade method (router.addEventListener)", () => {
+    it("should work as a direct method on router", async () => {
+      const cb = vi.fn();
+
+      await router.start("/home");
+      router.addEventListener(coreEvents.TRANSITION_SUCCESS, cb);
+      await router.navigate("users");
+
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it("should validate event name when noValidate is false", () => {
+      expect(() => {
+        // @ts-expect-error: testing invalid event name
+        router.addEventListener("INVALID_EVENT", vi.fn());
+      }).toThrowError("Invalid event name");
+    });
+
+    it("should validate callback type when noValidate is false", () => {
+      expect(() => {
+        router.addEventListener(
+          coreEvents.TRANSITION_SUCCESS,
+          // @ts-expect-error: testing invalid callback
+          "not-a-function",
+        );
+      }).toThrowError(TypeError);
+    });
+
+    it("should return unsubscribe function", async () => {
+      const cb = vi.fn();
+
+      const unsub = router.addEventListener(coreEvents.TRANSITION_SUCCESS, cb);
+
+      unsub();
+
+      await router.start("/home");
+      await router.navigate("users");
+
+      expect(cb).not.toHaveBeenCalled();
     });
   });
 });

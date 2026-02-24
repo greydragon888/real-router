@@ -1,10 +1,14 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import {
+  createRouter,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, DependenciesApi } from "@real-router/core";
 import type { EventName } from "@real-router/types";
 
 describe("core/noValidate option", () => {
@@ -31,7 +35,9 @@ describe("core/noValidate option", () => {
     });
 
     it("should validate dependencies", () => {
-      expect(() => (router as any).getDependency("nonexistent")).toThrowError(
+      const deps = getDependenciesApi(router);
+
+      expect(() => deps.get("nonexistent" as never)).toThrowError(
         ReferenceError,
       );
     });
@@ -170,46 +176,60 @@ describe("core/noValidate option", () => {
       });
     });
 
-    // Dependencies
+    // Dependencies (via getDependenciesApi)
     describe("dependencies", () => {
-      it("should skip validation in setDependency", () => {
-        expect(() =>
-          (router as any).setDependency("testDep", "value"),
-        ).not.toThrowError();
+      let deps: DependenciesApi;
+
+      beforeEach(() => {
+        deps = getDependenciesApi(router);
       });
 
-      it("should skip validation in setDependencies", () => {
-        expect(() =>
-          (router as any).setDependencies({ testDep: "value" }),
-        ).not.toThrowError();
+      it("should skip validation in set", () => {
+        expect(() => {
+          (deps as DependenciesApi<{ testDep: string }>).set(
+            "testDep",
+            "value",
+          );
+        }).not.toThrowError();
       });
 
-      it("should skip validation in getDependency for nonexistent", () => {
-        // Would throw ReferenceError with noValidate: false
-        expect(() =>
-          (router as any).getDependency("nonexistent"),
-        ).not.toThrowError();
+      it("should skip validation in setAll", () => {
+        expect(() => {
+          deps.setAll({ testDep: "value" } as object);
+        }).not.toThrowError();
       });
 
-      it("should skip validation in removeDependency", () => {
-        expect(() =>
-          (router as any).removeDependency("testDep"),
-        ).not.toThrowError();
+      it("should skip validation in get for nonexistent", () => {
+        expect(() => deps.get("nonexistent" as never)).not.toThrowError();
       });
 
-      it("should skip validation in hasDependency", () => {
-        expect(() =>
-          (router as any).hasDependency("testDep"),
-        ).not.toThrowError();
+      it("should skip validation in remove", () => {
+        expect(() => {
+          deps.remove("testDep" as never);
+        }).not.toThrowError();
+      });
+
+      it("should skip validation in has", () => {
+        expect(() => deps.has("testDep" as never)).not.toThrowError();
       });
     });
 
     // Events
     describe("events", () => {
-      it("should skip validation in addEventListener", () => {
+      it("should skip validation in addEventListener (via getPluginApi)", () => {
         // Invalid event name would throw with noValidate: false
         expect(() =>
           getPluginApi(router).addEventListener(
+            "invalidEvent" as unknown as EventName,
+            () => {},
+          ),
+        ).not.toThrowError();
+      });
+
+      it("should skip validation in addEventListener (facade)", () => {
+        // Invalid event name would throw with noValidate: false
+        expect(() =>
+          router.addEventListener(
             "invalidEvent" as unknown as EventName,
             () => {},
           ),

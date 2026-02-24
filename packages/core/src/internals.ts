@@ -60,6 +60,17 @@ export interface RouterInternals {
   readonly isDisposed: () => boolean;
 
   readonly noValidate: boolean;
+
+  // Dependencies (issue #172)
+  readonly dependencyGet: (key: string) => unknown;
+  readonly dependencyGetAll: () => Record<string, unknown>;
+  readonly dependencySet: (name: string, value: unknown) => boolean;
+  readonly dependencySetMultiple: (deps: Record<string, unknown>) => void;
+  readonly dependencyCount: () => number;
+  readonly dependencyRemove: (name: string) => void;
+  readonly dependencyHas: (name: string) => boolean;
+  readonly dependencyReset: () => void;
+  readonly maxDependencies: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Router<any> needed to accept all generic instantiations

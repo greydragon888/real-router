@@ -1,14 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getDependenciesApi } from "@real-router/core";
+
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
 
-import type { Router } from "@real-router/core";
+import type { DependenciesApi, Router } from "@real-router/core";
 
 let router: Router<TestDependencies>;
+let deps: DependenciesApi<TestDependencies>;
 
 describe("core/dependencies/getDependency", () => {
   beforeEach(() => {
     router = createDependenciesTestRouter();
+    deps = getDependenciesApi(router);
   });
 
   afterEach(() => {
@@ -16,15 +20,15 @@ describe("core/dependencies/getDependency", () => {
   });
 
   it("should return dependency by name", () => {
-    expect(router.getDependency("foo")).toBe(1);
+    expect(deps.get("foo")).toBe(1);
   });
 
   it("should throw ReferenceError if dependency not found", () => {
     expect(() => {
-      router.getDependency("nonexistent" as "foo");
+      deps.get("nonexistent" as "foo");
     }).toThrowError(ReferenceError);
     expect(() => {
-      router.getDependency("nonexistent" as "foo");
+      deps.get("nonexistent" as "foo");
     }).toThrowError(
       '[router.getDependency]: dependency "nonexistent" not found',
     );
@@ -33,30 +37,30 @@ describe("core/dependencies/getDependency", () => {
   it("should throw TypeError if name is not a string", () => {
     expect(() => {
       // @ts-expect-error: testing invalid input
-      router.getDependency(123);
+      deps.get(123);
     }).toThrowError(TypeError);
     expect(() => {
       // @ts-expect-error: testing invalid input
-      router.getDependency(123);
+      deps.get(123);
     }).toThrowError(
       "[router.getDependency]: dependency name must be a string, got number",
     );
   });
 
   it("should return falsy values correctly", () => {
-    router.setDependency("foo", 0 as number);
+    deps.set("foo", 0 as number);
 
-    expect(router.getDependency("foo")).toBe(0);
+    expect(deps.get("foo")).toBe(0);
 
     // @ts-expect-error: testing null value
-    router.setDependency("bar", null);
+    deps.set("bar", null);
 
-    expect(router.getDependency("bar")).toBe(null);
+    expect(deps.get("bar")).toBe(null);
 
     // @ts-expect-error: testing false value
-    router.setDependency("foo", false);
+    deps.set("foo", false);
 
-    expect(router.getDependency("foo")).toBe(false);
+    expect(deps.get("foo")).toBe(false);
   });
 
   it("should return live references, not copies", () => {
@@ -64,10 +68,10 @@ describe("core/dependencies/getDependency", () => {
     const service = { baseUrl: "http://api.com", count: 0 };
 
     // @ts-expect-error: testing object value
-    router.setDependency("foo", service);
+    deps.set("foo", service);
 
-    const ref1 = router.getDependency("foo");
-    const ref2 = router.getDependency("foo");
+    const ref1 = deps.get("foo");
+    const ref2 = deps.get("foo");
 
     // Same reference
     expect(ref1).toBe(ref2);
@@ -97,24 +101,24 @@ describe("core/dependencies/getDependency", () => {
     const api2 = { name: "API2" };
 
     // @ts-expect-error: testing different case keys
-    router.setDependency("API", api1);
+    deps.set("API", api1);
     // @ts-expect-error: testing different case keys
-    router.setDependency("api", api2);
+    deps.set("api", api2);
 
     // @ts-expect-error: testing different case keys
-    expect(router.getDependency("API")).toBe(api1);
+    expect(deps.get("API")).toBe(api1);
     // @ts-expect-error: testing different case keys
-    expect(router.getDependency("api")).toBe(api2);
+    expect(deps.get("api")).toBe(api2);
     // @ts-expect-error: testing different case keys
-    expect(router.getDependency("API")).not.toBe(api2);
+    expect(deps.get("API")).not.toBe(api2);
   });
 
   it("should accept empty string as valid key", () => {
     // @ts-expect-error: testing empty string key
-    router.setDependency("", "empty-key-value");
+    deps.set("", "empty-key-value");
 
     // @ts-expect-error: testing empty string key
-    expect(router.getDependency("")).toBe("empty-key-value");
+    expect(deps.get("")).toBe("empty-key-value");
   });
 
   it("should handle exotic objects with throwing toString", () => {
@@ -126,30 +130,30 @@ describe("core/dependencies/getDependency", () => {
 
     expect(() => {
       // @ts-expect-error: testing exotic object
-      router.getDependency(exoticKey);
+      deps.get(exoticKey);
     }).toThrowError(TypeError);
   });
 
   it("should throw ReferenceError even for undefined value", () => {
     // undefined means "not set", even if explicitly set
     expect(() => {
-      router.getDependency("notSet" as "foo");
+      deps.get("notSet" as "foo");
     }).toThrowError(ReferenceError);
   });
 
   it("should work after setDependency and fail after removeDependency", () => {
     // @ts-expect-error: testing new key
-    router.setDependency("temp", "value");
+    deps.set("temp", "value");
 
     // @ts-expect-error: testing new key
-    expect(router.getDependency("temp")).toBe("value");
+    expect(deps.get("temp")).toBe("value");
 
     // @ts-expect-error: testing new key
-    router.removeDependency("temp");
+    deps.remove("temp");
 
     expect(() => {
       // @ts-expect-error: testing new key
-      router.getDependency("temp");
+      deps.get("temp");
     }).toThrowError(ReferenceError);
   });
 
@@ -157,69 +161,69 @@ describe("core/dependencies/getDependency", () => {
 
   it("should handle Unicode keys", () => {
     // @ts-expect-error: testing Unicode key
-    router.setDependency("日本語キー", "japanese");
+    deps.set("日本語キー", "japanese");
     // @ts-expect-error: testing Unicode key
-    router.setDependency("émoji🚀", "rocket");
+    deps.set("émoji🚀", "rocket");
     // @ts-expect-error: testing Unicode key
-    router.setDependency("кириллица", "cyrillic");
+    deps.set("кириллица", "cyrillic");
 
     // @ts-expect-error: testing Unicode key
-    expect(router.getDependency("日本語キー")).toBe("japanese");
+    expect(deps.get("日本語キー")).toBe("japanese");
     // @ts-expect-error: testing Unicode key
-    expect(router.getDependency("émoji🚀")).toBe("rocket");
+    expect(deps.get("émoji🚀")).toBe("rocket");
     // @ts-expect-error: testing Unicode key
-    expect(router.getDependency("кириллица")).toBe("cyrillic");
+    expect(deps.get("кириллица")).toBe("cyrillic");
   });
 
   it("should handle very long string keys", () => {
     const longKey = "a".repeat(10_000);
 
     // @ts-expect-error: testing long key
-    router.setDependency(longKey, "long-key-value");
+    deps.set(longKey, "long-key-value");
 
     // @ts-expect-error: testing long key
-    expect(router.getDependency(longKey)).toBe("long-key-value");
+    expect(deps.get(longKey)).toBe("long-key-value");
   });
 
   it("should handle keys with whitespace characters", () => {
     // @ts-expect-error: testing whitespace key
-    router.setDependency("key with spaces", "spaces");
+    deps.set("key with spaces", "spaces");
     // @ts-expect-error: testing whitespace key
-    router.setDependency("key\twith\ttabs", "tabs");
+    deps.set("key\twith\ttabs", "tabs");
     // @ts-expect-error: testing whitespace key
-    router.setDependency("key\nwith\nnewlines", "newlines");
+    deps.set("key\nwith\nnewlines", "newlines");
 
     // @ts-expect-error: testing whitespace key
-    expect(router.getDependency("key with spaces")).toBe("spaces");
+    expect(deps.get("key with spaces")).toBe("spaces");
     // @ts-expect-error: testing whitespace key
-    expect(router.getDependency("key\twith\ttabs")).toBe("tabs");
+    expect(deps.get("key\twith\ttabs")).toBe("tabs");
     // @ts-expect-error: testing whitespace key
-    expect(router.getDependency("key\nwith\nnewlines")).toBe("newlines");
+    expect(deps.get("key\nwith\nnewlines")).toBe("newlines");
   });
 
   it("should safely handle prototype-related keys (Object.create(null) protection)", () => {
     // These keys would be dangerous on regular objects, but safe with null-prototype
 
     // @ts-expect-error: testing prototype key
-    router.setDependency("__proto__", "proto-value");
+    deps.set("__proto__", "proto-value");
     // @ts-expect-error: testing prototype key
-    router.setDependency("constructor", "constructor-value");
+    deps.set("constructor", "constructor-value");
     // @ts-expect-error: testing prototype key
-    router.setDependency("hasOwnProperty", "hasOwn-value");
+    deps.set("hasOwnProperty", "hasOwn-value");
     // @ts-expect-error: testing prototype key
-    router.setDependency("toString", "toString-value");
+    deps.set("toString", "toString-value");
     // @ts-expect-error: testing prototype key
-    router.setDependency("valueOf", "valueOf-value");
+    deps.set("valueOf", "valueOf-value");
 
     // @ts-expect-error: testing prototype key
-    expect(router.getDependency("__proto__")).toBe("proto-value");
+    expect(deps.get("__proto__")).toBe("proto-value");
     // @ts-expect-error: testing prototype key
-    expect(router.getDependency("constructor")).toBe("constructor-value");
+    expect(deps.get("constructor")).toBe("constructor-value");
     // @ts-expect-error: testing prototype key
-    expect(router.getDependency("hasOwnProperty")).toBe("hasOwn-value");
+    expect(deps.get("hasOwnProperty")).toBe("hasOwn-value");
     // @ts-expect-error: testing prototype key
-    expect(router.getDependency("toString")).toBe("toString-value");
+    expect(deps.get("toString")).toBe("toString-value");
     // @ts-expect-error: testing prototype key
-    expect(router.getDependency("valueOf")).toBe("valueOf-value");
+    expect(deps.get("valueOf")).toBe("valueOf-value");
   });
 });

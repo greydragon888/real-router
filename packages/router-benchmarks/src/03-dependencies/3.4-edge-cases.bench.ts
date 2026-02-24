@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/03-dependencies/3.4-edge-cases.bench.ts
 
+import { getDependenciesApi } from "@real-router/core";
 import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
@@ -35,8 +36,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.4.2 Adding dependency with undefined value (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies(depsWithUndefined);
-      router.resetDependencies();
+      getDependenciesApi(router).setAll(depsWithUndefined);
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -54,8 +55,8 @@ if (!IS_ROUTER5) {
     `3.4.3 Working with dependencies at warning threshold (×${BATCH})`,
     () => {
       for (let i = 0; i < BATCH; i++) {
-        router.setDependencies(deps);
-        router.resetDependencies();
+        getDependenciesApi(router).setAll(deps);
+        getDependenciesApi(router).reset();
       }
     },
   ).gc("inner");
@@ -74,8 +75,8 @@ if (!IS_ROUTER5) {
     `3.4.4 Working with dependencies at error threshold (×${BATCH})`,
     () => {
       for (let i = 0; i < BATCH; i++) {
-        router.setDependencies(deps);
-        router.resetDependencies();
+        getDependenciesApi(router).setAll(deps);
+        getDependenciesApi(router).reset();
       }
     },
   ).gc("inner");
@@ -168,7 +169,7 @@ if (!IS_ROUTER5) {
   const serviceB = { name: "B", dependency: serviceA };
   const serviceC = { name: "C", dependency: serviceB };
 
-  router.setDependencies({
+  getDependenciesApi(router).setAll({
     serviceA,
     serviceB,
     serviceC,

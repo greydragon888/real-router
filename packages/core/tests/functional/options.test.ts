@@ -7,7 +7,12 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { createRouter, errorCodes, getPluginApi } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -762,8 +767,10 @@ describe("core/options", () => {
           getDep("routeName")) as Options["defaultRoute"],
       });
 
+      const deps = getDependenciesApi(customRouter);
+
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
-      customRouter.setDependency("routeName", "home");
+      deps.set("routeName", "home");
       await customRouter.start("/users");
 
       const state = await customRouter.navigateToDefault();
@@ -779,8 +786,10 @@ describe("core/options", () => {
           getDep("routeName")) as Options["defaultRoute"],
       });
 
+      const deps = getDependenciesApi(customRouter);
+
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
-      customRouter.setDependency("routeName", "home");
+      deps.set("routeName", "home");
 
       const state = await customRouter.start("/home");
 

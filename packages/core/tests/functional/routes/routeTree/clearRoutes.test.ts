@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events, getPluginApi } from "@real-router/core";
+import { events, getDependenciesApi, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -313,11 +313,13 @@ describe("core/routes/clearRoutes", () => {
       }
       const typedRouter = router as Router<TestDeps>;
 
-      typedRouter.setDependency("api", { fetch: () => {} });
+      const deps = getDependenciesApi(typedRouter);
+
+      deps.set("api", { fetch: () => {} });
 
       typedRouter.clearRoutes();
 
-      expect(typedRouter.hasDependency("api")).toBe(true);
+      expect(deps.has("api")).toBe(true);
     });
 
     it("should preserve options", async () => {
