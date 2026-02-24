@@ -4,7 +4,7 @@ import {
   getPluginApi,
   RouterError,
 } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createSafeBrowser } from "../../src/browser";
 import { browserPluginFactory } from "../../src/plugin";
@@ -218,7 +218,11 @@ describe("Utils", () => {
     it("returns false when no default route is configured (line 159)", () => {
       const routerWithoutDefault = createRouter(routerConfig);
 
-      const result = handleMissingState(routerWithoutDefault, {});
+      const result = handleMissingState(
+        routerWithoutDefault,
+        getPluginApi(routerWithoutDefault),
+        {},
+      );
 
       expect(result).toBe(false);
     });
@@ -227,7 +231,9 @@ describe("Utils", () => {
       await router.start("/home");
       const navigateSpy = vi.spyOn(router, "navigateToDefault");
 
-      const result = handleMissingState(router, { replace: true });
+      const result = handleMissingState(router, getPluginApi(router), {
+        replace: true,
+      });
 
       expect(result).toBe(true);
       expect(navigateSpy).toHaveBeenCalledWith({

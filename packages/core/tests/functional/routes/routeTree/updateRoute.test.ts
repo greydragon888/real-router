@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -31,7 +31,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-source", { forwardTo: "ur-target" });
 
       // Verify forward works via behavior
-      expect(router.forwardState("ur-source", {}).name).toBe("ur-target");
+      expect(getPluginApi(router).forwardState("ur-source", {}).name).toBe(
+        "ur-target",
+      );
     });
 
     it("should update existing forwardTo", () => {
@@ -43,7 +45,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-src", { forwardTo: "ur-target2" });
 
       // Verify updated forward works
-      expect(router.forwardState("ur-src", {}).name).toBe("ur-target2");
+      expect(getPluginApi(router).forwardState("ur-src", {}).name).toBe(
+        "ur-target2",
+      );
     });
 
     it("should remove forwardTo when null", () => {
@@ -57,7 +61,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-origin", { forwardTo: null });
 
       // Forward should no longer redirect
-      expect(router.forwardState("ur-origin", {}).name).toBe("ur-origin");
+      expect(getPluginApi(router).forwardState("ur-origin", {}).name).toBe(
+        "ur-origin",
+      );
     });
 
     it("should throw if target does not exist", () => {
@@ -98,7 +104,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       ).not.toThrowError();
 
       // Verify forward works via behavior
-      expect(router.forwardState("ur-old", { id: "1" }).name).toBe("ur-new");
+      expect(
+        getPluginApi(router).forwardState("ur-old", { id: "1" }).name,
+      ).toBe("ur-new");
     });
 
     it("should work with matchPath after update", () => {
@@ -106,7 +114,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.addRoute({ name: "ur-real", path: "/ur-real/:id" });
       router.updateRoute("ur-alias", { forwardTo: "ur-real" });
 
-      const state = router.matchPath("/ur-alias/123");
+      const state = getPluginApi(router).matchPath("/ur-alias/123");
 
       expect(state?.name).toBe("ur-real");
       expect(state?.params.id).toBe("123");
@@ -127,9 +135,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain clean (without ur-c) - verify via behavior
-        expect(router.forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
-        expect(router.forwardState("ur-b", {}).name).toBe("ur-c"); // ur-b → ur-c
-        expect(router.forwardState("ur-c", {}).name).toBe("ur-c"); // ur-c stays (no forward)
+        expect(getPluginApi(router).forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
+        expect(getPluginApi(router).forwardState("ur-b", {}).name).toBe("ur-c"); // ur-b → ur-c
+        expect(getPluginApi(router).forwardState("ur-c", {}).name).toBe("ur-c"); // ur-c stays (no forward)
       });
 
       it("should not corrupt forwardMap on longer indirect cycle (A → B → C → D → A)", () => {
@@ -147,7 +155,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain without ur-w → ur-x - verify via behavior
-        expect(router.forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
+        expect(getPluginApi(router).forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
       });
 
       it("should preserve resolvedForwardMap consistency after cycle rejection", () => {
@@ -164,7 +172,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).toThrowError();
 
         // matchPath should work correctly with existing redirects
-        const state = router.matchPath("/ur-p");
+        const state = getPluginApi(router).matchPath("/ur-p");
 
         expect(state?.name).toBe("ur-r"); // ur-p → ur-q → ur-r
       });
@@ -207,10 +215,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify via makeState
-      expect(router.makeState("ur-members").params).toStrictEqual({
-        page: 1,
-        limit: 10,
-      });
+      expect(getPluginApi(router).makeState("ur-members").params).toStrictEqual(
+        {
+          page: 1,
+          limit: 10,
+        },
+      );
     });
 
     it("should update existing defaultParams", () => {
@@ -225,7 +235,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify via makeState
-      expect(router.makeState("ur-accounts").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("ur-accounts").params,
+      ).toStrictEqual({
         page: 2,
         limit: 20,
       });
@@ -241,7 +253,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-teams", { defaultParams: null });
 
       // Verify via makeState - no defaults
-      expect(router.makeState("ur-teams").params).toStrictEqual({});
+      expect(getPluginApi(router).makeState("ur-teams").params).toStrictEqual(
+        {},
+      );
     });
   });
 
@@ -258,7 +272,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-items", { decodeParams: decoder });
 
       // Verify via matchPath
-      const state = router.matchPath("/ur-items/123");
+      const state = getPluginApi(router).matchPath("/ur-items/123");
 
       expect(decoder).toHaveBeenCalled();
       expect(state?.params.id).toBe(123);
@@ -281,7 +295,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-products", { decodeParams: decoder2 });
 
       // Verify new decoder is used
-      const state = router.matchPath("/ur-products/456");
+      const state = getPluginApi(router).matchPath("/ur-products/456");
 
       expect(decoder2).toHaveBeenCalled();
       expect(state?.params.id).toBe(456);
@@ -302,7 +316,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify decoder works before removal
-      router.matchPath("/ur-assets/1");
+      getPluginApi(router).matchPath("/ur-assets/1");
 
       expect(decoder).toHaveBeenCalled();
 
@@ -311,7 +325,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       router.updateRoute("ur-assets", { decodeParams: null });
 
       // Verify decoder is no longer called
-      const state = router.matchPath("/ur-assets/2");
+      const state = getPluginApi(router).matchPath("/ur-assets/2");
 
       expect(decoder).not.toHaveBeenCalled();
       expect(state?.params.id).toBe("2"); // String, not decoded
@@ -326,7 +340,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         decodeParams: (params) => ({ ...params, id: Number(params.id) }),
       });
 
-      const state = router.matchPath("/ur-decode-test/123");
+      const state = getPluginApi(router).matchPath("/ur-decode-test/123");
 
       expect(state?.params.id).toBe(123);
       expect(typeof state?.params.id).toBe("number");
@@ -343,7 +357,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Should fallback to original params
-      const state = router.matchPath("/ur-decode-undef/123");
+      const state = getPluginApi(router).matchPath("/ur-decode-undef/123");
 
       expect(state?.params.id).toBe("123");
     });
@@ -902,7 +916,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify defaultParams via behavior
-      expect(router.makeState("ur-multi").params).toStrictEqual({ page: 1 });
+      expect(getPluginApi(router).makeState("ur-multi").params).toStrictEqual({
+        page: 1,
+      });
 
       // Verify canActivate via navigation
       await router.navigate("ur-multi");
@@ -918,7 +934,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         .updateRoute("ur-chain", { defaultParams: { page: 2, limit: 10 } });
 
       // Verify via behavior
-      expect(router.makeState("ur-chain").params).toStrictEqual({
+      expect(getPluginApi(router).makeState("ur-chain").params).toStrictEqual({
         page: 2,
         limit: 10,
       });
@@ -938,7 +954,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       // Verify via behavior
-      expect(router.makeState("ur-parent.child").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("ur-parent.child").params,
+      ).toStrictEqual({
         tab: "info",
       });
     });
@@ -991,7 +1009,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       );
 
       // Config should be updated (we only log error, don't block)
-      expect(router.makeState("ur-async").params).toStrictEqual({
+      expect(getPluginApi(router).makeState("ur-async").params).toStrictEqual({
         page: 1,
       });
 
@@ -1053,7 +1071,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(() => router.updateRoute("ur-empty", {})).not.toThrowError();
 
         // No defaults should be applied
-        expect(router.makeState("ur-empty").params).toStrictEqual({});
+        expect(getPluginApi(router).makeState("ur-empty").params).toStrictEqual(
+          {},
+        );
       });
 
       it("should treat missing properties as no-op", () => {
@@ -1067,9 +1087,11 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-undef", {});
 
         // Existing config should be preserved
-        expect(router.makeState("ur-undef").params).toStrictEqual({
-          existing: 1,
-        });
+        expect(getPluginApi(router).makeState("ur-undef").params).toStrictEqual(
+          {
+            existing: 1,
+          },
+        );
       });
     });
 
@@ -1084,7 +1106,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(
           () => void router.updateRoute("ur-frozen", frozenUpdates),
         ).not.toThrowError();
-        expect(router.makeState("ur-frozen").params).toStrictEqual({
+        expect(
+          getPluginApi(router).makeState("ur-frozen").params,
+        ).toStrictEqual({
           page: 1,
         });
       });
@@ -1101,7 +1125,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         });
 
         // Verify behavior - params should work
-        const state = router.makeState("ur-nullproto");
+        const state = getPluginApi(router).makeState("ur-nullproto");
 
         expect(state.params).toMatchObject({ page: 1 });
       });
@@ -1120,7 +1144,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         });
 
         // Verify behavior
-        const state = router.makeState("ur-class");
+        const state = getPluginApi(router).makeState("ur-class");
 
         expect(state.params).toMatchObject({ page: 1, limit: 10 });
       });
@@ -1138,7 +1162,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         ).not.toThrowError();
 
         // Verify behavior - page should be accessible
-        const state = router.makeState("ur-circular");
+        const state = getPluginApi(router).makeState("ur-circular");
 
         expect(state.params.page).toBe(1);
       });
@@ -1152,7 +1176,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-symbol", { defaultParams: params });
 
         // Verify behavior - page should be accessible
-        const state = router.makeState("ur-symbol");
+        const state = getPluginApi(router).makeState("ur-symbol");
 
         expect(state.params.page).toBe(1);
       });
@@ -1173,7 +1197,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           decodeParams: decoder.decode.bind(decoder),
         });
 
-        const state = router.matchPath("/ur-bound/123");
+        const state = getPluginApi(router).matchPath("/ur-bound/123");
 
         expect(state?.params).toStrictEqual({ id: "123", tag: "decoded_123" });
       });
@@ -1261,7 +1285,9 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // forwardTo should NOT be applied due to validation-first approach
         // Verify by checking forwardState returns same route (no forward)
-        expect(router.forwardState("ur-atom-src", {}).name).toBe("ur-atom-src");
+        expect(getPluginApi(router).forwardState("ur-atom-src", {}).name).toBe(
+          "ur-atom-src",
+        );
       });
 
       it("should rollback forwardTo if forwardTo validation fails after mutation", () => {
@@ -1278,9 +1304,13 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Both should NOT be applied
         // No forward configured - forwardState returns same route
-        expect(router.forwardState("ur-atom-fwd", {}).name).toBe("ur-atom-fwd");
+        expect(getPluginApi(router).forwardState("ur-atom-fwd", {}).name).toBe(
+          "ur-atom-fwd",
+        );
         // No defaultParams - makeState returns empty params
-        expect(router.makeState("ur-atom-fwd").params).toStrictEqual({});
+        expect(
+          getPluginApi(router).makeState("ur-atom-fwd").params,
+        ).toStrictEqual({});
       });
     });
 
@@ -1291,7 +1321,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         router.updateRoute("ur-seq", { defaultParams: { a: 1, b: 2 } });
         router.updateRoute("ur-seq", { defaultParams: { c: 3 } });
 
-        const state = router.makeState("ur-seq");
+        const state = getPluginApi(router).makeState("ur-seq");
 
         // Should be replaced, not merged
         expect(state.params).toStrictEqual({ c: 3 });
@@ -1308,12 +1338,14 @@ describe("core/routes/routeTree/updateRoute", () => {
         });
 
         // defaultParams should still be set
-        expect(router.makeState("ur-indep").params).toStrictEqual({
-          page: 1,
-        });
+        expect(getPluginApi(router).makeState("ur-indep").params).toStrictEqual(
+          {
+            page: 1,
+          },
+        );
 
         // Decoder should be active - verify via matchPath
-        const state = router.matchPath("/ur-indep");
+        const state = getPluginApi(router).matchPath("/ur-indep");
 
         expect(state?.params).toHaveProperty("decoded", true);
       });
@@ -1336,7 +1368,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Getter is called exactly once during destructuring
         // This protects against mutating getters returning different values
-        const state = router.makeState("ur-getter");
+        const state = getPluginApi(router).makeState("ur-getter");
 
         expect(state.params).toStrictEqual({ page: 1 });
         expect(callCount).toBe(1); // Called only once during caching
@@ -1362,7 +1394,9 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         // Config remains unchanged - exception happens during destructuring,
         // before any mutations
-        expect(router.makeState("ur-throwing").params).toStrictEqual({
+        expect(
+          getPluginApi(router).makeState("ur-throwing").params,
+        ).toStrictEqual({
           original: true,
         });
       });
@@ -1384,9 +1418,11 @@ describe("core/routes/routeTree/updateRoute", () => {
         expect(
           () => void router.updateRoute("ur-proxy", updates),
         ).not.toThrowError();
-        expect(router.makeState("ur-proxy").params).toStrictEqual({
-          page: 1,
-        });
+        expect(getPluginApi(router).makeState("ur-proxy").params).toStrictEqual(
+          {
+            page: 1,
+          },
+        );
       });
     });
   });
@@ -1399,13 +1435,15 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       router.updateRoute("source", { forwardTo: "target-a" });
 
-      expect(router.forwardState("source", {}).name).toBe("target-a");
+      expect(getPluginApi(router).forwardState("source", {}).name).toBe(
+        "target-a",
+      );
 
       router.updateRoute("source", {
         forwardTo: () => "target-b",
       });
 
-      const result = router.forwardState("source", {});
+      const result = getPluginApi(router).forwardState("source", {});
 
       expect(result.name).toBe("target-b");
     });
@@ -1419,11 +1457,15 @@ describe("core/routes/routeTree/updateRoute", () => {
         forwardTo: () => "dest-1",
       });
 
-      expect(router.forwardState("dynamic-source", {}).name).toBe("dest-1");
+      expect(getPluginApi(router).forwardState("dynamic-source", {}).name).toBe(
+        "dest-1",
+      );
 
       router.updateRoute("dynamic-source", { forwardTo: "dest-2" });
 
-      expect(router.forwardState("dynamic-source", {}).name).toBe("dest-2");
+      expect(getPluginApi(router).forwardState("dynamic-source", {}).name).toBe(
+        "dest-2",
+      );
     });
 
     it("should clear both maps when updating function to null", () => {
@@ -1434,11 +1476,15 @@ describe("core/routes/routeTree/updateRoute", () => {
         forwardTo: () => "some-target",
       });
 
-      expect(router.forwardState("clear-test", {}).name).toBe("some-target");
+      expect(getPluginApi(router).forwardState("clear-test", {}).name).toBe(
+        "some-target",
+      );
 
       router.updateRoute("clear-test", { forwardTo: null });
 
-      expect(router.forwardState("clear-test", {}).name).toBe("clear-test");
+      expect(getPluginApi(router).forwardState("clear-test", {}).name).toBe(
+        "clear-test",
+      );
     });
 
     it("should handle function → null → string sequence", () => {
@@ -1449,15 +1495,21 @@ describe("core/routes/routeTree/updateRoute", () => {
         forwardTo: () => "final-dest",
       });
 
-      expect(router.forwardState("seq-test", {}).name).toBe("final-dest");
+      expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
+        "final-dest",
+      );
 
       router.updateRoute("seq-test", { forwardTo: null });
 
-      expect(router.forwardState("seq-test", {}).name).toBe("seq-test");
+      expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
+        "seq-test",
+      );
 
       router.updateRoute("seq-test", { forwardTo: "final-dest" });
 
-      expect(router.forwardState("seq-test", {}).name).toBe("final-dest");
+      expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
+        "final-dest",
+      );
     });
   });
 });

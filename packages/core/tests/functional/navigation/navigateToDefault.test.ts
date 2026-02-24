@@ -1,6 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getPluginApi,
+  RouterError,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -243,7 +248,7 @@ describe("navigateToDefault", () => {
 
       await withDefault("profile");
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -289,11 +294,11 @@ describe("navigateToDefault", () => {
 
       await withDefault("settings");
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -571,7 +576,7 @@ describe("navigateToDefault", () => {
       }).toThrowError(TypeError);
 
       // Verify the router still has original values
-      expect(router.getOptions().defaultParams).toStrictEqual({
+      expect(getPluginApi(router).getOptions().defaultParams).toStrictEqual({
         id: 100,
         mutable: "original",
       });
@@ -630,7 +635,7 @@ describe("navigateToDefault", () => {
       const onSuccess = vi.fn();
       const options = { replace: true, silent: false };
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );

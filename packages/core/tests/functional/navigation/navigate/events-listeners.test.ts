@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes } from "@real-router/core";
+import { events, errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -30,7 +30,7 @@ describe("router.navigate() - events listeners", () => {
         await freshRouter.start("/home");
 
         // Side-effect listener (analytics) - should ideally fire once
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             analyticsLog.push(`analytics:${toState.name}`);
@@ -38,7 +38,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Guard listener that triggers redirect
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             if (toState.name === "admin") {
@@ -68,7 +68,7 @@ describe("router.navigate() - events listeners", () => {
         await freshRouter.start("/home");
 
         // Side-effect listener
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             callLog.push(`effect:${toState.name}`);
@@ -76,7 +76,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Chain of redirects: admin -> profile -> users
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             if (toState.name === "admin") {
@@ -109,7 +109,7 @@ describe("router.navigate() - events listeners", () => {
         await freshRouter.start("/home");
 
         // Side-effect listener on success
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_SUCCESS,
           (toState: State) => {
             successLog.push(`success:${toState.name}`);
@@ -137,7 +137,7 @@ describe("router.navigate() - events listeners", () => {
         await freshRouter.start("/home");
 
         // Error listener
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_ERROR,
           (
             _toState: State | undefined,
@@ -175,7 +175,7 @@ describe("router.navigate() - events listeners", () => {
         await freshRouter.start("/home");
 
         // Listener 1: analytics
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             listener1Calls.push(toState.name);
@@ -183,7 +183,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Listener 2: UI update
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             listener2Calls.push(toState.name);
@@ -191,7 +191,7 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Listener 3: redirect guard
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             listener3Calls.push(toState.name);
@@ -220,14 +220,14 @@ describe("router.navigate() - events listeners", () => {
 
         await freshRouter.start("/home");
 
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             executionOrder.push(`first:${toState.name}`);
           },
         );
 
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             executionOrder.push(`second:${toState.name}`);
@@ -238,7 +238,7 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             executionOrder.push(`third:${toState.name}`);
@@ -270,7 +270,7 @@ describe("router.navigate() - events listeners", () => {
 
         await freshRouter.start("/home");
 
-        freshRouter.addEventListener(
+        getPluginApi(freshRouter).addEventListener(
           events.TRANSITION_START,
           (toState: State) => {
             redirects.push(toState.name);

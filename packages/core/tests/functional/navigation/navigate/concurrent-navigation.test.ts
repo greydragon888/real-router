@@ -8,7 +8,7 @@ import {
   vi,
 } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -88,7 +88,7 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -271,11 +271,11 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -315,7 +315,7 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -493,11 +493,11 @@ describe("router.navigate() - concurrent navigation", () => {
         );
       });
 
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );

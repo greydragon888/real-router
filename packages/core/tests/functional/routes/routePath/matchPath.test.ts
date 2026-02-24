@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getPluginApi } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Route, Router } from "@real-router/core";
@@ -18,7 +20,7 @@ describe("core/routes/routePath/matchPath", () => {
 
   describe("rootNode", () => {
     it("should resolve rootNode paths correctly", () => {
-      const state = router.matchPath("/home");
+      const state = getPluginApi(router).matchPath("/home");
 
       expect(state?.name).toBe("home");
     });
@@ -26,60 +28,66 @@ describe("core/routes/routePath/matchPath", () => {
 
   describe("input validation", () => {
     it("should throw TypeError for null path", () => {
-      expect(() => router.matchPath(null as unknown as string)).toThrowError(
-        TypeError,
-      );
-      expect(() => router.matchPath(null as unknown as string)).toThrowError(
+      expect(() =>
+        getPluginApi(router).matchPath(null as unknown as string),
+      ).toThrowError(TypeError);
+      expect(() =>
+        getPluginApi(router).matchPath(null as unknown as string),
+      ).toThrowError(
         "[real-router] matchPath: path must be a string, got object",
       );
     });
 
     it("should throw TypeError for undefined path", () => {
       expect(() =>
-        router.matchPath(undefined as unknown as string),
+        getPluginApi(router).matchPath(undefined as unknown as string),
       ).toThrowError(TypeError);
       expect(() =>
-        router.matchPath(undefined as unknown as string),
+        getPluginApi(router).matchPath(undefined as unknown as string),
       ).toThrowError(
         "[real-router] matchPath: path must be a string, got undefined",
       );
     });
 
     it("should throw TypeError for number path", () => {
-      expect(() => router.matchPath(123 as unknown as string)).toThrowError(
-        TypeError,
-      );
-      expect(() => router.matchPath(123 as unknown as string)).toThrowError(
+      expect(() =>
+        getPluginApi(router).matchPath(123 as unknown as string),
+      ).toThrowError(TypeError);
+      expect(() =>
+        getPluginApi(router).matchPath(123 as unknown as string),
+      ).toThrowError(
         "[real-router] matchPath: path must be a string, got number",
       );
     });
 
     it("should throw TypeError for object path", () => {
-      expect(() => router.matchPath({} as unknown as string)).toThrowError(
-        TypeError,
-      );
-      expect(() => router.matchPath({} as unknown as string)).toThrowError(
+      expect(() =>
+        getPluginApi(router).matchPath({} as unknown as string),
+      ).toThrowError(TypeError);
+      expect(() =>
+        getPluginApi(router).matchPath({} as unknown as string),
+      ).toThrowError(
         "[real-router] matchPath: path must be a string, got object",
       );
     });
 
     it("should accept empty string (matches root route)", () => {
       // Empty string is a valid string input, matches "/" (root)
-      expect(() => router.matchPath("")).not.toThrowError();
+      expect(() => getPluginApi(router).matchPath("")).not.toThrowError();
       // Empty string matches index route (path: "/")
-      expect(router.matchPath("")?.name).toBe("index");
+      expect(getPluginApi(router).matchPath("")?.name).toBe("index");
     });
   });
 
   describe("matchPath", () => {
     it("should return state for matched path", () => {
-      const state = router.matchPath("/home");
+      const state = getPluginApi(router).matchPath("/home");
 
       expect(state?.name).toBe("home");
     });
 
     it("should return undefined for unmatched path", () => {
-      const state = router.matchPath("/unknown");
+      const state = getPluginApi(router).matchPath("/unknown");
 
       expect(state).toBe(undefined);
     });
@@ -89,14 +97,14 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "static", path: "/static" });
 
-      const state = customRouter.matchPath("/static");
+      const state = getPluginApi(customRouter).matchPath("/static");
 
       expect(state?.path).toBe("/static");
     });
 
     it("should match path with query params", () => {
       router.addRoute({ name: "search", path: "/search?q" });
-      const state = router.matchPath("/search?q=test");
+      const state = getPluginApi(router).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
@@ -106,7 +114,7 @@ describe("core/routes/routePath/matchPath", () => {
       // This tests the fix for search-params bug where first param
       // with ? prefix was not properly parsed
       router.addRoute({ name: "search", path: "/search?first&second" });
-      const state = router.matchPath("/search?first=1&second=2");
+      const state = getPluginApi(router).matchPath("/search?first=1&second=2");
 
       expect(state?.name).toBe("search");
       expect(state?.params.first).toBe("1");
@@ -119,7 +127,9 @@ describe("core/routes/routePath/matchPath", () => {
       router.addRoute({ name: "user", path: "/user/:name" });
 
       // 日本語 URL-encoded
-      const state = router.matchPath("/user/%E6%97%A5%E6%9C%AC%E8%AA%9E");
+      const state = getPluginApi(router).matchPath(
+        "/user/%E6%97%A5%E6%9C%AC%E8%AA%9E",
+      );
 
       expect(state?.name).toBe("user");
       expect(state?.params.name).toBe("日本語");
@@ -129,7 +139,7 @@ describe("core/routes/routePath/matchPath", () => {
       router.addRoute({ name: "article", path: "/article/:title" });
 
       // "Привет" URL-encoded
-      const state = router.matchPath(
+      const state = getPluginApi(router).matchPath(
         "/article/%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82",
       );
 
@@ -141,7 +151,7 @@ describe("core/routes/routePath/matchPath", () => {
       router.addRoute({ name: "emoji", path: "/emoji/:icon" });
 
       // 🚀 URL-encoded
-      const state = router.matchPath("/emoji/%F0%9F%9A%80");
+      const state = getPluginApi(router).matchPath("/emoji/%F0%9F%9A%80");
 
       expect(state?.name).toBe("emoji");
       expect(state?.params.icon).toBe("🚀");
@@ -151,7 +161,9 @@ describe("core/routes/routePath/matchPath", () => {
       router.addRoute({ name: "mixed", path: "/mixed/:text" });
 
       // hello世界 URL-encoded (only unicode part)
-      const state = router.matchPath("/mixed/hello%E4%B8%96%E7%95%8C");
+      const state = getPluginApi(router).matchPath(
+        "/mixed/hello%E4%B8%96%E7%95%8C",
+      );
 
       expect(state?.name).toBe("mixed");
       expect(state?.params.text).toBe("hello世界");
@@ -163,7 +175,7 @@ describe("core/routes/routePath/matchPath", () => {
       // uses regex patterns that expect ASCII or URL-encoded input
       router.addRoute({ name: "raw", path: "/raw/:text" });
 
-      const state = router.matchPath("/raw/日本語");
+      const state = getPluginApi(router).matchPath("/raw/日本語");
 
       // Raw unicode doesn't match - this documents actual behavior
       expect(state).toBeUndefined();
@@ -174,7 +186,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should decode URL-encoded space (%20)", () => {
       router.addRoute({ name: "search", path: "/search/:query" });
 
-      const state = router.matchPath("/search/hello%20world");
+      const state = getPluginApi(router).matchPath("/search/hello%20world");
 
       expect(state?.name).toBe("search");
       expect(state?.params.query).toBe("hello world");
@@ -183,7 +195,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should decode URL-encoded special characters", () => {
       router.addRoute({ name: "file", path: "/file/:name" });
 
-      const state = router.matchPath("/file/test%26data%3Dvalue");
+      const state = getPluginApi(router).matchPath("/file/test%26data%3Dvalue");
 
       expect(state?.name).toBe("file");
       expect(state?.params.name).toBe("test&data=value");
@@ -192,7 +204,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should decode URL-encoded slash (%2F)", () => {
       router.addRoute({ name: "path", path: "/path/:segment" });
 
-      const state = router.matchPath("/path/a%2Fb%2Fc");
+      const state = getPluginApi(router).matchPath("/path/a%2Fb%2Fc");
 
       expect(state?.name).toBe("path");
       expect(state?.params.segment).toBe("a/b/c");
@@ -201,7 +213,9 @@ describe("core/routes/routePath/matchPath", () => {
     it("should decode URL-encoded unicode", () => {
       router.addRoute({ name: "unicode", path: "/unicode/:text" });
 
-      const state = router.matchPath("/unicode/%E6%97%A5%E6%9C%AC");
+      const state = getPluginApi(router).matchPath(
+        "/unicode/%E6%97%A5%E6%9C%AC",
+      );
 
       expect(state?.name).toBe("unicode");
       expect(state?.params.text).toBe("日本");
@@ -210,7 +224,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle plus sign as literal (not space)", () => {
       router.addRoute({ name: "plus", path: "/plus/:value" });
 
-      const state = router.matchPath("/plus/a+b");
+      const state = getPluginApi(router).matchPath("/plus/a+b");
 
       expect(state?.name).toBe("plus");
       // Plus is NOT decoded to space in path segments (only in query strings in some contexts)
@@ -224,8 +238,8 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "page", path: "/page" });
 
-      const withSlash = customRouter.matchPath("/page/");
-      const withoutSlash = customRouter.matchPath("/page");
+      const withSlash = getPluginApi(customRouter).matchPath("/page/");
+      const withoutSlash = getPluginApi(customRouter).matchPath("/page");
 
       // Both should match with default behavior
       expect(withSlash?.name).toBe("page");
@@ -239,8 +253,8 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "page", path: "/page" });
 
-      const withSlash = customRouter.matchPath("/page/");
-      const withoutSlash = customRouter.matchPath("/page");
+      const withSlash = getPluginApi(customRouter).matchPath("/page/");
+      const withoutSlash = getPluginApi(customRouter).matchPath("/page");
 
       // Both match - trailingSlash option affects buildPath output, not matchPath strictness
       expect(withSlash?.name).toBe("page");
@@ -256,8 +270,8 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "page", path: "/page" });
 
-      const withSlash = customRouter.matchPath("/page/");
-      const withoutSlash = customRouter.matchPath("/page");
+      const withSlash = getPluginApi(customRouter).matchPath("/page/");
+      const withoutSlash = getPluginApi(customRouter).matchPath("/page");
 
       // Both match
       expect(withSlash?.name).toBe("page");
@@ -276,11 +290,15 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.addRoute({ name: "withSlash", path: "/with/" });
       customRouter.addRoute({ name: "withoutSlash", path: "/without" });
 
-      expect(customRouter.matchPath("/with/")?.name).toBe("withSlash");
-      expect(customRouter.matchPath("/with")).toBeUndefined();
+      expect(getPluginApi(customRouter).matchPath("/with/")?.name).toBe(
+        "withSlash",
+      );
+      expect(getPluginApi(customRouter).matchPath("/with")).toBeUndefined();
 
-      expect(customRouter.matchPath("/without")?.name).toBe("withoutSlash");
-      expect(customRouter.matchPath("/without/")).toBeUndefined();
+      expect(getPluginApi(customRouter).matchPath("/without")?.name).toBe(
+        "withoutSlash",
+      );
+      expect(getPluginApi(customRouter).matchPath("/without/")).toBeUndefined();
 
       customRouter.stop();
     });
@@ -290,7 +308,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "user", path: "/user/:id" });
 
-      const state = customRouter.matchPath("/user/123/");
+      const state = getPluginApi(customRouter).matchPath("/user/123/");
 
       expect(state?.name).toBe("user");
       expect(state?.params.id).toBe("123");
@@ -305,7 +323,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       // Double leading slash: //test1
       // Path is NOT normalized - searched as-is
-      const state = customRouter.matchPath("//test1");
+      const state = getPluginApi(customRouter).matchPath("//test1");
 
       // No match - route-tree doesn't normalize double slashes
       expect(state).toBeUndefined();
@@ -321,7 +339,7 @@ describe("core/routes/routePath/matchPath", () => {
       });
 
       // Double slash in middle: /parent//child
-      const state = customRouter.matchPath("/parent//child");
+      const state = getPluginApi(customRouter).matchPath("/parent//child");
 
       // No match - double slashes break path matching
       expect(state).toBeUndefined();
@@ -343,7 +361,9 @@ describe("core/routes/routePath/matchPath", () => {
       });
 
       // Multiple double slashes: //api//v1//items//123
-      const state = customRouter.matchPath("//api//v1//items//123");
+      const state = getPluginApi(customRouter).matchPath(
+        "//api//v1//items//123",
+      );
 
       expect(state).toBeUndefined();
     });
@@ -353,7 +373,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "triple", path: "/triple" });
 
-      const state = customRouter.matchPath("///triple");
+      const state = getPluginApi(customRouter).matchPath("///triple");
 
       expect(state).toBeUndefined();
     });
@@ -364,7 +384,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.addRoute({ name: "normal", path: "/normal" });
 
       // For comparison - single slashes work
-      const state = customRouter.matchPath("/normal");
+      const state = getPluginApi(customRouter).matchPath("/normal");
 
       expect(state?.name).toBe("normal");
     });
@@ -377,7 +397,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.addRoute({ name: "noslash-test", path: "/noslash" });
 
       // Path without leading slash
-      const state = customRouter.matchPath("noslash");
+      const state = getPluginApi(customRouter).matchPath("noslash");
 
       // No match - route-tree requires absolute paths starting with /
       expect(state).toBeUndefined();
@@ -392,7 +412,7 @@ describe("core/routes/routePath/matchPath", () => {
         children: [{ name: "data", path: "/data" }],
       });
 
-      const state = customRouter.matchPath("apitest/data");
+      const state = getPluginApi(customRouter).matchPath("apitest/data");
 
       expect(state).toBeUndefined();
     });
@@ -402,7 +422,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "person", path: "/person/:id" });
 
-      const state = customRouter.matchPath("person/123");
+      const state = getPluginApi(customRouter).matchPath("person/123");
 
       expect(state).toBeUndefined();
     });
@@ -416,7 +436,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       // Very long path that doesn't match any route
       const longPath = `/${"a".repeat(10_000)}`;
-      const state = customRouter.matchPath(longPath);
+      const state = getPluginApi(customRouter).matchPath(longPath);
 
       expect(state).toBeUndefined();
     });
@@ -428,7 +448,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       // Long path with splat
       const longSegment = "a".repeat(5000);
-      const state = customRouter.matchPath(`/files/${longSegment}/file.txt`);
+      const state = getPluginApi(customRouter).matchPath(
+        `/files/${longSegment}/file.txt`,
+      );
 
       expect(state?.name).toBe("files");
       expect(state?.params.path).toBe(`${longSegment}/file.txt`);
@@ -449,7 +471,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute(route);
 
-      const state = customRouter.matchPath("/l1/l2/l3/l4/l5/l6/l7/l8/l9/l10");
+      const state = getPluginApi(customRouter).matchPath(
+        "/l1/l2/l3/l4/l5/l6/l7/l8/l9/l10",
+      );
 
       expect(state?.name).toBe("l1.l2.l3.l4.l5.l6.l7.l8.l9.l10");
     });
@@ -461,7 +485,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "search", path: "/search" }); // No ?q declared
 
-      const state = customRouter.matchPath("/search?q=test&limit=10");
+      const state = getPluginApi(customRouter).matchPath(
+        "/search?q=test&limit=10",
+      );
 
       expect(state?.name).toBe("search");
       // Undeclared query params are included in default mode
@@ -476,7 +502,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "search", path: "/search" });
 
-      expect(customRouter.matchPath("/search?q=test")).toBeUndefined();
+      expect(
+        getPluginApi(customRouter).matchPath("/search?q=test"),
+      ).toBeUndefined();
 
       customRouter.stop();
     });
@@ -487,7 +515,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.addRoute({ name: "search", path: "/search" });
 
       // Path without query params matches
-      const state = customRouter.matchPath("/search");
+      const state = getPluginApi(customRouter).matchPath("/search");
 
       expect(state?.name).toBe("search");
     });
@@ -497,7 +525,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "search", path: "/search?q" }); // ?q declared
 
-      const state = customRouter.matchPath("/search?q=test");
+      const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
@@ -511,7 +539,7 @@ describe("core/routes/routePath/matchPath", () => {
       customRouter.addRoute({ name: "search", path: "/search?q" });
 
       expect(
-        customRouter.matchPath("/search?q=test&extra=ignored"),
+        getPluginApi(customRouter).matchPath("/search?q=test&extra=ignored"),
       ).toBeUndefined();
 
       customRouter.stop();
@@ -522,7 +550,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "search", path: "/search?q&page" });
 
-      const state = customRouter.matchPath("/search?q=test&page=2&sort=name");
+      const state = getPluginApi(customRouter).matchPath(
+        "/search?q=test&page=2&sort=name",
+      );
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
@@ -545,7 +575,7 @@ describe("core/routes/routePath/matchPath", () => {
         }),
       });
 
-      const state = customRouter.matchPath("/user/123");
+      const state = getPluginApi(customRouter).matchPath("/user/123");
 
       expect(state?.name).toBe("user");
       expect(state?.params.id).toBe(123);
@@ -565,9 +595,9 @@ describe("core/routes/routePath/matchPath", () => {
 
       // Decoder exceptions are NOT caught - they propagate up (by design)
       // This is documented behavior: decoder is user code, user is responsible for error handling
-      expect(() => customRouter.matchPath("/user/123")).toThrowError(
-        "Decoder intentionally failed",
-      );
+      expect(() =>
+        getPluginApi(customRouter).matchPath("/user/123"),
+      ).toThrowError("Decoder intentionally failed");
     });
   });
 
@@ -582,7 +612,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should include defaultParams in matched state params", () => {
       // Route "withDefaultParam" is defined in testRouters.ts:
       // { name: "withDefaultParam", path: "/with-default/:param", defaultParams: { param: "hello" } }
-      const state = router.matchPath("/with-default/world");
+      const state = getPluginApi(router).matchPath("/with-default/world");
 
       expect(state?.name).toBe("withDefaultParam");
       expect(state?.params.param).toBe("world");
@@ -597,7 +627,7 @@ describe("core/routes/routePath/matchPath", () => {
         defaultParams: { sort: "name", limit: "10" },
       });
 
-      const state = customRouter.matchPath("/page");
+      const state = getPluginApi(customRouter).matchPath("/page");
 
       expect(state?.name).toBe("page");
       // defaultParams are merged into state.params
@@ -614,7 +644,7 @@ describe("core/routes/routePath/matchPath", () => {
         defaultParams: { sort: "date" },
       });
 
-      const state = customRouter.matchPath("/search?q=test");
+      const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
@@ -639,7 +669,7 @@ describe("core/routes/routePath/matchPath", () => {
         },
       });
 
-      customRouter.matchPath("/enc/123");
+      getPluginApi(customRouter).matchPath("/enc/123");
 
       // Encoder IS called during matchPath rewrite because decoder may rename
       // params, requiring encoder to reverse the transformation for buildPath
@@ -662,7 +692,7 @@ describe("core/routes/routePath/matchPath", () => {
         },
       });
 
-      customRouter.matchPath("/enc/123");
+      getPluginApi(customRouter).matchPath("/enc/123");
 
       // With rewritePathOnMatch=false, buildPath is never called so encoder is skipped
       expect(encoderCalled).toBe(false);
@@ -672,7 +702,7 @@ describe("core/routes/routePath/matchPath", () => {
       // Route "withEncoder" is defined in testRouters.ts:
       // encodeParams: ({one, two}) => ({param1: one, param2: two})
       // decodeParams: ({param1, param2}) => ({one: param1, two: param2})
-      const state = router.matchPath("/encoded/hello/world");
+      const state = getPluginApi(router).matchPath("/encoded/hello/world");
 
       expect(state?.name).toBe("withEncoder");
       // Decoder transforms URL params to state params
@@ -687,7 +717,7 @@ describe("core/routes/routePath/matchPath", () => {
       // 3. rewritePathOnMatch → buildPath("withEncoder", {one, two})
       //    → encoder({one, two}) → {param1: "hello", param2: "world"}
       //    → "/encoded/hello/world"
-      const state = router.matchPath("/encoded/hello/world");
+      const state = getPluginApi(router).matchPath("/encoded/hello/world");
 
       expect(state?.path).toBe("/encoded/hello/world");
     });
@@ -702,7 +732,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "new", path: "/new" },
       ]);
 
-      const state = customRouter.matchPath("/old");
+      const state = getPluginApi(customRouter).matchPath("/old");
 
       expect(state?.name).toBe("new");
     });
@@ -715,7 +745,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "new-page", path: "/new-page" },
       ]);
 
-      const state = customRouter.matchPath("/old-page");
+      const state = getPluginApi(customRouter).matchPath("/old-page");
 
       expect(state?.name).toBe("new-page");
       // Path is rebuilt for the target route
@@ -734,7 +764,7 @@ describe("core/routes/routePath/matchPath", () => {
         },
       ]);
 
-      const state = customRouter.matchPath("/inbox");
+      const state = getPluginApi(customRouter).matchPath("/inbox");
 
       expect(state?.name).toBe("mail.inbox");
       expect(state?.path).toBe("/mail/inbox");
@@ -748,7 +778,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "user", path: "/user/:id" },
       ]);
 
-      const state = customRouter.matchPath("/old-user/42");
+      const state = getPluginApi(customRouter).matchPath("/old-user/42");
 
       expect(state?.name).toBe("user");
       expect(state?.params.id).toBe("42");
@@ -773,7 +803,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "new-item", path: "/new-item/:id" },
       ]);
 
-      const state = customRouter.matchPath("/old-item/99");
+      const state = getPluginApi(customRouter).matchPath("/old-item/99");
 
       expect(state?.name).toBe("new-item");
       expect(state?.params.id).toBe(99);
@@ -792,7 +822,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "new-list", path: "/new-list" },
       ]);
 
-      const state = customRouter.matchPath("/old-list");
+      const state = getPluginApi(customRouter).matchPath("/old-list");
 
       expect(state?.name).toBe("new-list");
       expect(state?.params.page).toBe("1");
@@ -806,7 +836,7 @@ describe("core/routes/routePath/matchPath", () => {
         { name: "target", path: "/target" },
       ]);
 
-      const state = customRouter.matchPath("/alias");
+      const state = getPluginApi(customRouter).matchPath("/alias");
 
       expect(state?.name).toBe("target");
       // With rewritePathOnMatch=false, path is the original input
@@ -818,7 +848,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       customRouter.addRoute({ name: "item", path: "/item/:id" });
 
-      const state = customRouter.matchPath("/item/42/");
+      const state = getPluginApi(customRouter).matchPath("/item/42/");
 
       expect(state?.name).toBe("item");
       expect(state?.params.id).toBe("42");
@@ -836,7 +866,7 @@ describe("core/routes/routePath/matchPath", () => {
         forwardTo: () => "match-target",
       });
 
-      const state = router.matchPath("/match-forward");
+      const state = getPluginApi(router).matchPath("/match-forward");
 
       expect(state?.name).toBe("match-target");
       expect(state?.path).toBe("/match-target");

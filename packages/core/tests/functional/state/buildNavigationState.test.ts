@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events } from "@real-router/core";
+import { events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -186,12 +186,18 @@ describe("router.buildNavigationState()", () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
 
-      const unsub1 = router.addEventListener(events.TRANSITION_START, onStart);
-      const unsub2 = router.addEventListener(
+      const unsub1 = getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        onStart,
+      );
+      const unsub2 = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsub3 = router.addEventListener(events.TRANSITION_ERROR, onError);
+      const unsub3 = getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        onError,
+      );
 
       router.buildNavigationState("home");
       router.buildNavigationState("nonexistent");

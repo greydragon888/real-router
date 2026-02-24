@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getPluginApi } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
 import type { Route, Router } from "@real-router/core";
@@ -65,7 +67,7 @@ describe("core/routes/routePath/buildPath", () => {
 
   describe("setRootPath", () => {
     it("should update root path for all routes", () => {
-      router.setRootPath("/base");
+      getPluginApi(router).setRootPath("/base");
       const path = router.buildPath("home");
 
       expect(path).toBe("/base/home");
@@ -73,10 +75,10 @@ describe("core/routes/routePath/buildPath", () => {
 
     it("should throw TypeError for non-string rootPath", () => {
       expect(() => {
-        router.setRootPath(123 as unknown as string);
+        getPluginApi(router).setRootPath(123 as unknown as string);
       }).toThrowError(TypeError);
       expect(() => {
-        router.setRootPath(123 as unknown as string);
+        getPluginApi(router).setRootPath(123 as unknown as string);
       }).toThrowError(
         "[router.setRootPath] rootPath must be a string, got number",
       );
@@ -84,7 +86,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     it("should throw TypeError for null rootPath", () => {
       expect(() => {
-        router.setRootPath(null as unknown as string);
+        getPluginApi(router).setRootPath(null as unknown as string);
       }).toThrowError(
         "[router.setRootPath] rootPath must be a string, got null",
       );
@@ -93,11 +95,11 @@ describe("core/routes/routePath/buildPath", () => {
 
   describe("getRootPath", () => {
     it("should return current root path", () => {
-      expect(router.getRootPath()).toBe("");
+      expect(getPluginApi(router).getRootPath()).toBe("");
 
-      router.setRootPath("/base");
+      getPluginApi(router).setRootPath("/base");
 
-      expect(router.getRootPath()).toBe("/base");
+      expect(getPluginApi(router).getRootPath()).toBe("/base");
     });
   });
 

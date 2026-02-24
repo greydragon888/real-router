@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -35,7 +35,7 @@ describe("router.start() - error handling", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws
-        router.addEventListener(events.ROUTER_START, () => {
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {
           throw new Error("Listener crashed");
         });
 
@@ -60,7 +60,7 @@ describe("router.start() - error handling", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws on TRANSITION_SUCCESS
-        router.addEventListener(events.TRANSITION_SUCCESS, () => {
+        getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, () => {
           throw new Error("Success listener crashed");
         });
 
@@ -86,7 +86,7 @@ describe("router.start() - error handling", () => {
         router = createTestRouter({ allowNotFound: false });
 
         // Add listener that throws on TRANSITION_ERROR
-        router.addEventListener(events.TRANSITION_ERROR, () => {
+        getPluginApi(router).addEventListener(events.TRANSITION_ERROR, () => {
           throw new Error("Error listener crashed");
         });
 
@@ -185,7 +185,7 @@ describe("router.start() - error handling", () => {
       it("should maintain consistent state during concurrent start attempts", async () => {
         const startListeners: number[] = [];
 
-        router.addEventListener(events.ROUTER_START, () => {
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {
           startListeners.push(Date.now());
         });
 
@@ -344,7 +344,7 @@ describe("router.start() - error handling", () => {
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -366,7 +366,7 @@ describe("router.start() - error handling", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -392,7 +392,7 @@ describe("router.start() - error handling", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -416,7 +416,10 @@ describe("router.start() - error handling", () => {
 
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         try {
           await router.start("/users/list");

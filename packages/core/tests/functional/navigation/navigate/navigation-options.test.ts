@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events } from "@real-router/core";
+import { events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -132,7 +132,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
       await freshRouter.start("/home");
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_SUCCESS,
         (toState: State) => {
           stateLog.push({
@@ -294,21 +294,21 @@ describe("router.navigate() - navigation meta and options", () => {
 
       await freshRouter.start("/home");
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_START,
         (toState: State) => {
           startLog.push(toState.name);
         },
       );
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_SUCCESS,
         (toState: State) => {
           successLog.push(toState.name);
         },
       );
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_CANCEL,
         (toState: State) => {
           cancelLog.push(toState.name);
@@ -347,14 +347,14 @@ describe("router.navigate() - navigation meta and options", () => {
 
       await freshRouter.start("/home");
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_SUCCESS,
         (toState: State) => {
           successLog.push(toState.name);
         },
       );
 
-      freshRouter.addEventListener(
+      getPluginApi(freshRouter).addEventListener(
         events.TRANSITION_CANCEL,
         (toState: State) => {
           cancelLog.push(toState.name);

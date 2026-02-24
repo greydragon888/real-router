@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -23,12 +23,14 @@ describe("core/routes/removeRoute", () => {
       router.addRoute({ name: "temporary", path: "/temporary" });
 
       // Route exists before removal
-      expect(router.matchPath("/temporary")?.name).toBe("temporary");
+      expect(getPluginApi(router).matchPath("/temporary")?.name).toBe(
+        "temporary",
+      );
 
       router.removeRoute("temporary");
 
       // Route should not match after removal
-      expect(router.matchPath("/temporary")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/temporary")).toBeUndefined();
     });
 
     it("should remove route so buildPath throws", async () => {
@@ -52,8 +54,10 @@ describe("core/routes/removeRoute", () => {
         router.addRoute({ name: "reusable", path: "/new-path" });
       }).not.toThrowError();
 
-      expect(router.matchPath("/new-path")?.name).toBe("reusable");
-      expect(router.matchPath("/old-path")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/new-path")?.name).toBe(
+        "reusable",
+      );
+      expect(getPluginApi(router).matchPath("/old-path")).toBeUndefined();
     });
 
     it("should remove route with children", async () => {
@@ -66,13 +70,15 @@ describe("core/routes/removeRoute", () => {
         ],
       });
 
-      expect(router.matchPath("/parent/child1")?.name).toBe("parent.child1");
+      expect(getPluginApi(router).matchPath("/parent/child1")?.name).toBe(
+        "parent.child1",
+      );
 
       router.removeRoute("parent");
 
-      expect(router.matchPath("/parent")).toBeUndefined();
-      expect(router.matchPath("/parent/child1")).toBeUndefined();
-      expect(router.matchPath("/parent/child2")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/parent")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/parent/child1")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/parent/child2")).toBeUndefined();
     });
 
     it("should remove only specified child route", async () => {
@@ -88,11 +94,17 @@ describe("core/routes/removeRoute", () => {
       router.removeRoute("category.remove");
 
       // Parent and sibling should still exist
-      expect(router.matchPath("/category")?.name).toBe("category");
-      expect(router.matchPath("/category/keep")?.name).toBe("category.keep");
+      expect(getPluginApi(router).matchPath("/category")?.name).toBe(
+        "category",
+      );
+      expect(getPluginApi(router).matchPath("/category/keep")?.name).toBe(
+        "category.keep",
+      );
 
       // Removed child should not exist
-      expect(router.matchPath("/category/remove")).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/category/remove"),
+      ).toBeUndefined();
     });
 
     it("should handle removal of non-existent route gracefully", async () => {
@@ -100,20 +112,22 @@ describe("core/routes/removeRoute", () => {
       expect(() => router.removeRoute("nonexistent")).not.toThrowError();
 
       // Router should still function normally
-      expect(router.matchPath("/")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should handle multiple removals of the same route gracefully (12.13)", async () => {
       // Add a route
       router.addRoute({ name: "temporary", path: "/temporary" });
 
-      expect(router.matchPath("/temporary")?.name).toBe("temporary");
+      expect(getPluginApi(router).matchPath("/temporary")?.name).toBe(
+        "temporary",
+      );
 
       // First removal - should succeed
       const result1 = router.removeRoute("temporary");
 
       expect(result1).toBe(router);
-      expect(router.matchPath("/temporary")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/temporary")).toBeUndefined();
 
       // Second removal - should be graceful (warning, no throw)
       const result2 = router.removeRoute("temporary");
@@ -126,7 +140,7 @@ describe("core/routes/removeRoute", () => {
       expect(result3).toBe(router);
 
       // Router should still function normally
-      expect(router.matchPath("/")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should handle removal of non-existent child route gracefully", async () => {
@@ -142,8 +156,10 @@ describe("core/routes/removeRoute", () => {
       ).not.toThrowError();
 
       // Parent and existing child should remain
-      expect(router.matchPath("/wrapper")?.name).toBe("wrapper");
-      expect(router.matchPath("/wrapper/exists")?.name).toBe("wrapper.exists");
+      expect(getPluginApi(router).matchPath("/wrapper")?.name).toBe("wrapper");
+      expect(getPluginApi(router).matchPath("/wrapper/exists")?.name).toBe(
+        "wrapper.exists",
+      );
     });
   });
 
@@ -171,7 +187,7 @@ describe("core/routes/removeRoute", () => {
 
       // After removal, route no longer exists
       expect(router.hasRoute("protected")).toBe(false);
-      expect(router.matchPath("/protected")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/protected")).toBeUndefined();
     });
 
     it("should clear canDeactivate handler on removeRoute", async () => {
@@ -243,7 +259,7 @@ describe("core/routes/removeRoute", () => {
 
       // After removal, route no longer exists
       expect(router.hasRoute("dashboard")).toBe(false);
-      expect(router.matchPath("/dashboard")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/dashboard")).toBeUndefined();
     });
 
     it("should not throw when route has no lifecycle handlers", async () => {
@@ -277,13 +293,17 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify decoder works before removal
-      expect(router.matchPath("/with-decoder/123")?.params.id).toBe(123);
+      expect(
+        getPluginApi(router).matchPath("/with-decoder/123")?.params.id,
+      ).toBe(123);
 
       router.removeRoute("withDecoder");
 
       // Route no longer exists
       expect(router.hasRoute("withDecoder")).toBe(false);
-      expect(router.matchPath("/with-decoder/123")).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/with-decoder/123"),
+      ).toBeUndefined();
     });
 
     it("should clear encoders on removeRoute", async () => {
@@ -317,7 +337,9 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify defaults work before removal
-      expect(router.makeState("withdefaults").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("withdefaults").params,
+      ).toStrictEqual({
         page: 1,
       });
 
@@ -336,7 +358,9 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify forward works before removal
-      expect(router.forwardState("redirect", {}).name).toBe("target");
+      expect(getPluginApi(router).forwardState("redirect", {}).name).toBe(
+        "target",
+      );
 
       router.removeRoute("redirect");
 
@@ -350,14 +374,14 @@ describe("core/routes/removeRoute", () => {
       router.addRoute({ name: "fwd2", path: "/fwd2", forwardTo: "dest" });
 
       // Both forward rules work
-      expect(router.forwardState("fwd1", {}).name).toBe("dest");
-      expect(router.forwardState("fwd2", {}).name).toBe("dest");
+      expect(getPluginApi(router).forwardState("fwd1", {}).name).toBe("dest");
+      expect(getPluginApi(router).forwardState("fwd2", {}).name).toBe("dest");
 
       router.removeRoute("fwd1");
 
       // fwd1 is removed, fwd2 still works
       expect(router.hasRoute("fwd1")).toBe(false);
-      expect(router.forwardState("fwd2", {}).name).toBe("dest");
+      expect(getPluginApi(router).forwardState("fwd2", {}).name).toBe("dest");
     });
 
     it("should clear child route forwardMap when parent removed", async () => {
@@ -369,7 +393,9 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify child forward works
-      expect(router.forwardState("container.fwd", {}).name).toBe("dest");
+      expect(getPluginApi(router).forwardState("container.fwd", {}).name).toBe(
+        "dest",
+      );
 
       router.removeRoute("container");
 
@@ -419,7 +445,9 @@ describe("core/routes/removeRoute", () => {
         forwardTo: () => "fn-target",
       });
 
-      expect(router.forwardState("fn-forward", {}).name).toBe("fn-target");
+      expect(getPluginApi(router).forwardState("fn-forward", {}).name).toBe(
+        "fn-target",
+      );
 
       const fnForwardRoute = router.getRoute("fn-forward");
 
@@ -438,14 +466,18 @@ describe("core/routes/removeRoute", () => {
         forwardTo: () => "re-target",
       });
 
-      expect(router.forwardState("re-forward", {}).name).toBe("re-target");
+      expect(getPluginApi(router).forwardState("re-forward", {}).name).toBe(
+        "re-target",
+      );
 
       router.removeRoute("re-forward");
 
       // Re-add without forwardTo — should NOT have old dynamic forward
       router.addRoute({ name: "re-forward", path: "/re-forward" });
 
-      expect(router.forwardState("re-forward", {}).name).toBe("re-forward");
+      expect(getPluginApi(router).forwardState("re-forward", {}).name).toBe(
+        "re-forward",
+      );
     });
 
     it("should clear child forwardFnMap when parent removed", async () => {
@@ -459,7 +491,9 @@ describe("core/routes/removeRoute", () => {
       });
 
       // Verify child forward works
-      expect(router.forwardState("fn-parent.child", {}).name).toBe("fn-dest");
+      expect(
+        getPluginApi(router).forwardState("fn-parent.child", {}).name,
+      ).toBe("fn-dest");
 
       // Remove parent — child forwardFnMap should be cleared
       router.removeRoute("fn-parent");
@@ -471,9 +505,9 @@ describe("core/routes/removeRoute", () => {
         children: [{ name: "child", path: "/child" }],
       });
 
-      expect(router.forwardState("fn-parent.child", {}).name).toBe(
-        "fn-parent.child",
-      );
+      expect(
+        getPluginApi(router).forwardState("fn-parent.child", {}).name,
+      ).toBe("fn-parent.child");
     });
   });
 
@@ -538,9 +572,11 @@ describe("core/routes/removeRoute", () => {
       router.removeRoute("nonexistent");
 
       // Verify route still works (behavioral test)
-      expect(router.matchPath("/existing/42")?.name).toBe("existing");
+      expect(getPluginApi(router).matchPath("/existing/42")?.name).toBe(
+        "existing",
+      );
       expect(router.buildPath("existing", { id: 99 })).toBe("/existing/99");
-      expect(router.makeState("existing").params).toStrictEqual({
+      expect(getPluginApi(router).makeState("existing").params).toStrictEqual({
         id: "1",
       });
 
@@ -603,7 +639,9 @@ describe("core/routes/removeRoute", () => {
       );
 
       // Route should still exist
-      expect(router.matchPath("/dashboard")?.name).toBe("dashboard");
+      expect(getPluginApi(router).matchPath("/dashboard")?.name).toBe(
+        "dashboard",
+      );
 
       warnSpy.mockRestore();
     });
@@ -632,8 +670,10 @@ describe("core/routes/removeRoute", () => {
       );
 
       // Parent and child should still exist
-      expect(router.matchPath("/parent-route")?.name).toBe("parentRoute");
-      expect(router.matchPath("/parent-route/child")?.name).toBe(
+      expect(getPluginApi(router).matchPath("/parent-route")?.name).toBe(
+        "parentRoute",
+      );
+      expect(getPluginApi(router).matchPath("/parent-route/child")?.name).toBe(
         "parentRoute.childRoute",
       );
 
@@ -649,8 +689,8 @@ describe("core/routes/removeRoute", () => {
       router.removeRoute("inactive");
 
       // Active route still exists, inactive removed
-      expect(router.matchPath("/active")?.name).toBe("active");
-      expect(router.matchPath("/inactive")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/active")?.name).toBe("active");
+      expect(getPluginApi(router).matchPath("/inactive")).toBeUndefined();
     });
 
     it("should allow removal of sibling route when on different branch", async () => {
@@ -668,10 +708,10 @@ describe("core/routes/removeRoute", () => {
       router.removeRoute("sectionTest.pageB");
 
       // pageA still exists, pageB removed
-      expect(router.matchPath("/section-test/a")?.name).toBe(
+      expect(getPluginApi(router).matchPath("/section-test/a")?.name).toBe(
         "sectionTest.pageA",
       );
-      expect(router.matchPath("/section-test/b")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/section-test/b")).toBeUndefined();
     });
 
     it("should allow removal when router has no active state", async () => {
@@ -683,7 +723,7 @@ describe("core/routes/removeRoute", () => {
       // Should work - no active state
       router.removeRoute("test");
 
-      expect(router.matchPath("/test")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/test")).toBeUndefined();
     });
 
     it("should allow removal when router not started", async () => {
@@ -695,7 +735,7 @@ describe("core/routes/removeRoute", () => {
       // Should work - router not started
       freshRouter.removeRoute("temp");
 
-      expect(freshRouter.matchPath("/temp")).toBeUndefined();
+      expect(getPluginApi(freshRouter).matchPath("/temp")).toBeUndefined();
     });
 
     it("should return router for chaining when removal blocked", async () => {
@@ -731,7 +771,7 @@ describe("core/routes/removeRoute", () => {
         });
 
         // Verify forward works
-        expect(router.forwardState("oldDashboard", {}).name).toBe(
+        expect(getPluginApi(router).forwardState("oldDashboard", {}).name).toBe(
           "newDashboard",
         );
 
@@ -739,7 +779,7 @@ describe("core/routes/removeRoute", () => {
         router.removeRoute("newDashboard");
 
         // Forward should no longer redirect (target removed)
-        expect(router.forwardState("oldDashboard", {}).name).toBe(
+        expect(getPluginApi(router).forwardState("oldDashboard", {}).name).toBe(
           "oldDashboard",
         );
       });
@@ -755,7 +795,9 @@ describe("core/routes/removeRoute", () => {
         router.removeRoute("targetRoute");
 
         // Source route should still exist and be matchable
-        expect(router.matchPath("/source")?.name).toBe("sourceRoute");
+        expect(getPluginApi(router).matchPath("/source")?.name).toBe(
+          "sourceRoute",
+        );
       });
 
       it("should allow navigation to source route after target removal", async () => {
@@ -791,18 +833,24 @@ describe("core/routes/removeRoute", () => {
         });
 
         // Verify chain works: start -> middle -> final
-        expect(router.forwardState("start", {}).name).toBe("final");
-        expect(router.forwardState("middle", {}).name).toBe("final");
+        expect(getPluginApi(router).forwardState("start", {}).name).toBe(
+          "final",
+        );
+        expect(getPluginApi(router).forwardState("middle", {}).name).toBe(
+          "final",
+        );
 
         // Remove middle route
         router.removeRoute("middle");
 
         // start's forward to middle should be cleared (middle no longer exists)
-        expect(router.forwardState("start", {}).name).toBe("start");
+        expect(getPluginApi(router).forwardState("start", {}).name).toBe(
+          "start",
+        );
         // middle route no longer exists
         expect(router.hasRoute("middle")).toBe(false);
         // final route should still exist
-        expect(router.matchPath("/final")?.name).toBe("final");
+        expect(getPluginApi(router).matchPath("/final")?.name).toBe("final");
       });
 
       it("should clear forwardMap when source route is removed", async () => {
@@ -814,7 +862,9 @@ describe("core/routes/removeRoute", () => {
         });
 
         // Verify forward works
-        expect(router.forwardState("removeSource", {}).name).toBe("keepTarget");
+        expect(getPluginApi(router).forwardState("removeSource", {}).name).toBe(
+          "keepTarget",
+        );
 
         // Remove the source route
         router.removeRoute("removeSource");
@@ -822,7 +872,9 @@ describe("core/routes/removeRoute", () => {
         // Source route no longer exists
         expect(router.hasRoute("removeSource")).toBe(false);
         // Target should still exist
-        expect(router.matchPath("/keep-target")?.name).toBe("keepTarget");
+        expect(getPluginApi(router).matchPath("/keep-target")?.name).toBe(
+          "keepTarget",
+        );
       });
     });
 
@@ -862,7 +914,7 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Route should be removed (we only warn, don't block)
-        expect(router.matchPath("/async-route")).toBeUndefined();
+        expect(getPluginApi(router).matchPath("/async-route")).toBeUndefined();
 
         // Resolve the canActivate
         resolveCanActivate!();
@@ -908,7 +960,9 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Route should still exist
-        expect(router.matchPath("/async-complete")?.name).toBe("asyncComplete");
+        expect(getPluginApi(router).matchPath("/async-complete")?.name).toBe(
+          "asyncComplete",
+        );
 
         warnSpy.mockRestore();
       });
@@ -948,7 +1002,7 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Route should be removed (we only warn, don't block)
-        expect(router.matchPath("/unrelated")).toBeUndefined();
+        expect(getPluginApi(router).matchPath("/unrelated")).toBeUndefined();
 
         // Complete navigation
         resolveCanActivate!();
@@ -971,7 +1025,7 @@ describe("core/routes/removeRoute", () => {
         // Remove rapid2 (not current) - should work
         router.removeRoute("rapid2");
 
-        expect(router.matchPath("/rapid2")).toBeUndefined();
+        expect(getPluginApi(router).matchPath("/rapid2")).toBeUndefined();
 
         // Navigate to rapid3
         await router.navigate("rapid3");
@@ -979,7 +1033,7 @@ describe("core/routes/removeRoute", () => {
         // Now rapid1 can be removed (not current anymore)
         router.removeRoute("rapid1");
 
-        expect(router.matchPath("/rapid1")).toBeUndefined();
+        expect(getPluginApi(router).matchPath("/rapid1")).toBeUndefined();
         expect(router.getState()?.name).toBe("rapid3");
       });
     });
@@ -1096,18 +1150,18 @@ describe("core/routes/removeRoute", () => {
       const deepName =
         "level14.level13.level12.level11.level10.level9.level8.level7.level6.level5.level4.level3.level2.level1.leaf";
 
-      expect(router.matchPath(deepPath)?.name).toBe(deepName);
+      expect(getPluginApi(router).matchPath(deepPath)?.name).toBe(deepName);
 
       // Remove the deepest leaf
       router.removeRoute(deepName);
 
-      expect(router.matchPath(deepPath)).toBeUndefined();
+      expect(getPluginApi(router).matchPath(deepPath)).toBeUndefined();
 
       // Parent should still exist
       const parentPath =
         "/level14/level13/level12/level11/level10/level9/level8/level7/level6/level5/level4/level3/level2/level1";
 
-      expect(router.matchPath(parentPath)).toBeDefined();
+      expect(getPluginApi(router).matchPath(parentPath)).toBeDefined();
     });
 
     it("should remove entire deep tree when removing root", async () => {
@@ -1133,9 +1187,9 @@ describe("core/routes/removeRoute", () => {
       router.addRoute(deepRoute as Parameters<typeof router.addRoute>[0]);
 
       // Verify routes exist
-      expect(router.matchPath("/deep10")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/deep10")).toBeDefined();
       expect(
-        router.matchPath(
+        getPluginApi(router).matchPath(
           "/deep10/deep9/deep8/deep7/deep6/deep5/deep4/deep3/deep2/deep1/leaf",
         ),
       ).toBeDefined();
@@ -1143,9 +1197,9 @@ describe("core/routes/removeRoute", () => {
       // Remove root - all children should be removed
       router.removeRoute("deep10");
 
-      expect(router.matchPath("/deep10")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/deep10")).toBeUndefined();
       expect(
-        router.matchPath(
+        getPluginApi(router).matchPath(
           "/deep10/deep9/deep8/deep7/deep6/deep5/deep4/deep3/deep2/deep1/leaf",
         ),
       ).toBeUndefined();
@@ -1159,27 +1213,27 @@ describe("core/routes/removeRoute", () => {
         { name: "routeC", path: "/route-c" },
       ]);
 
-      expect(router.matchPath("/route-a")).toBeDefined();
-      expect(router.matchPath("/route-b")).toBeDefined();
-      expect(router.matchPath("/route-c")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-a")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-b")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
       router.removeRoute("routeA");
 
-      expect(router.matchPath("/route-a")).toBeUndefined();
-      expect(router.matchPath("/route-b")).toBeDefined();
-      expect(router.matchPath("/route-c")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-b")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
       router.removeRoute("routeB");
 
-      expect(router.matchPath("/route-a")).toBeUndefined();
-      expect(router.matchPath("/route-b")).toBeUndefined();
-      expect(router.matchPath("/route-c")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-b")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
       router.removeRoute("routeC");
 
-      expect(router.matchPath("/route-a")).toBeUndefined();
-      expect(router.matchPath("/route-b")).toBeUndefined();
-      expect(router.matchPath("/route-c")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-b")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/route-c")).toBeUndefined();
     });
 
     it("should allow adding routes after removing all custom routes", async () => {
@@ -1192,7 +1246,7 @@ describe("core/routes/removeRoute", () => {
       // Should be able to add new routes after clearing
       router.addRoute({ name: "new", path: "/new" });
 
-      expect(router.matchPath("/new")?.name).toBe("new");
+      expect(getPluginApi(router).matchPath("/new")?.name).toBe("new");
     });
   });
 
@@ -1325,7 +1379,7 @@ describe("core/routes/removeRoute", () => {
       ).toThrowError(TypeError);
 
       // Original route should remain untouched
-      expect(router.matchPath("/")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should throw TypeError for String wrapper object (12.16)", async () => {
@@ -1339,7 +1393,7 @@ describe("core/routes/removeRoute", () => {
       ).toThrowError(TypeError);
 
       // Original route should remain untouched
-      expect(router.matchPath("/")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should throw TypeError for whitespace-only name", async () => {

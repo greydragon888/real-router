@@ -1,8 +1,16 @@
 import { describe, it, expect } from "vitest";
 
-import { cloneRouter } from "@real-router/core";
+import {
+  cloneRouter,
+  createRouter,
+  getDependenciesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
+
+interface TestDeps {
+  token?: string;
+}
 
 describe("cloneRouter()", () => {
   it("should return a new Router instance", () => {
@@ -19,11 +27,16 @@ describe("cloneRouter()", () => {
     expect(router.buildPath("home")).toBe(clone.buildPath("home"));
   });
 
-  it("should accept custom dependencies", () => {
-    const router = createTestRouter();
-    const clone = cloneRouter(router, { customDep: "value" } as never);
+  it("should accept custom dependencies and make them accessible", () => {
+    const router = createRouter<TestDeps>(
+      [{ name: "home", path: "/home" }],
+      {},
+      { token: "original" },
+    );
+    const clone = cloneRouter(router, { token: "cloned" });
+    const deps = getDependenciesApi(clone);
 
-    expect(clone).toBeDefined();
+    expect(deps.get("token")).toBe("cloned");
   });
 
   it("should work without dependencies argument", () => {

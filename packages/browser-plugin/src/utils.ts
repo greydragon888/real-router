@@ -105,14 +105,16 @@ export function shouldSkipTransition(
  * Handles missing state by navigating to default route
  *
  * @param router - Router instance
+ * @param api - Plugin API instance
  * @param transitionOptions - Options for transition
  * @returns true if handled, false if no default route
  */
 export function handleMissingState(
   router: Router,
+  api: PluginApi,
   transitionOptions: NavigationOptions,
 ): boolean {
-  const routerOptions = router.getOptions();
+  const routerOptions = api.getOptions();
   const { defaultRoute } = routerOptions;
 
   if (!defaultRoute) {

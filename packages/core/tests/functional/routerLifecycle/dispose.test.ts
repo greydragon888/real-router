@@ -1,6 +1,6 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -76,7 +76,7 @@ describe("dispose", () => {
     it("dispose() emits ROUTER_STOP when router was started (READY → DISPOSED)", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.dispose();
@@ -87,7 +87,7 @@ describe("dispose", () => {
     it("dispose() does NOT emit ROUTER_STOP on never-started router (IDLE → DISPOSED)", () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       router.dispose();
 
@@ -127,7 +127,10 @@ describe("dispose", () => {
     it("dispose() clears event listeners", async () => {
       const listener = vi.fn();
 
-      router.addEventListener(events.TRANSITION_SUCCESS, listener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_SUCCESS,
+        listener,
+      );
       await router.start("/home");
 
       listener.mockClear();
@@ -267,11 +270,17 @@ describe("dispose", () => {
 
     it("addEventListener() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addEventListener(events.TRANSITION_SUCCESS, vi.fn());
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_SUCCESS,
+          vi.fn(),
+        );
       }).toThrowError();
 
       try {
-        router.addEventListener(events.TRANSITION_SUCCESS, vi.fn());
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_SUCCESS,
+          vi.fn(),
+        );
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -377,7 +386,7 @@ describe("dispose", () => {
 
     it("getOptions() still works after dispose()", () => {
       router.dispose();
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       expect(opts).toBeDefined();
     });

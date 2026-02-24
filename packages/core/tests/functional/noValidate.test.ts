@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -96,18 +96,18 @@ describe("core/noValidate option", () => {
 
       it("should skip validation in matchPath", () => {
         // Empty string would fail validation with noValidate: false
-        expect(() => router.matchPath("")).not.toThrowError();
+        expect(() => getPluginApi(router).matchPath("")).not.toThrowError();
       });
 
       it("should skip validation in setRootPath", () => {
         expect(() => {
-          router.setRootPath("");
+          getPluginApi(router).setRootPath("");
         }).not.toThrowError();
       });
 
       it("should skip validation in makeState", () => {
         // Valid route name - tests that validation doesn't throw
-        expect(() => router.makeState("home")).not.toThrowError();
+        expect(() => getPluginApi(router).makeState("home")).not.toThrowError();
       });
 
       it("should skip validation in areStatesEqual", () => {
@@ -117,11 +117,15 @@ describe("core/noValidate option", () => {
       });
 
       it("should skip validation in forwardState", () => {
-        expect(() => router.forwardState("home", {})).not.toThrowError();
+        expect(() =>
+          getPluginApi(router).forwardState("home", {}),
+        ).not.toThrowError();
       });
 
       it("should skip validation in buildState", () => {
-        expect(() => router.buildState("home", {})).not.toThrowError();
+        expect(() =>
+          getPluginApi(router).buildState("home", {}),
+        ).not.toThrowError();
       });
 
       it("should skip validation in shouldUpdateNode", () => {
@@ -205,7 +209,7 @@ describe("core/noValidate option", () => {
       it("should skip validation in addEventListener", () => {
         // Invalid event name would throw with noValidate: false
         expect(() =>
-          router.addEventListener(
+          getPluginApi(router).addEventListener(
             "invalidEvent" as unknown as EventName,
             () => {},
           ),
@@ -237,10 +241,10 @@ describe("core/noValidate option", () => {
       it("should skip validation in navigateToState", async () => {
         await router.start("/home");
 
-        const state = router.makeState("home", {}, "/home");
+        const state = getPluginApi(router).makeState("home", {}, "/home");
 
         expect(() =>
-          router.navigateToState(state, undefined, {}),
+          getPluginApi(router).navigateToState(state, undefined, {}),
         ).not.toThrowError();
       });
     });
@@ -280,7 +284,7 @@ describe("core/noValidate option", () => {
     it("should default to false", () => {
       const testRouter = createRouter([{ name: "test", path: "/test" }]);
 
-      expect(testRouter.getOptions().noValidate).toBe(false);
+      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(false);
 
       testRouter.stop();
     });
@@ -290,7 +294,7 @@ describe("core/noValidate option", () => {
         noValidate: true,
       });
 
-      expect(testRouter.getOptions().noValidate).toBe(true);
+      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(true);
 
       testRouter.stop();
     });
@@ -300,7 +304,7 @@ describe("core/noValidate option", () => {
         noValidate: false,
       });
 
-      expect(testRouter.getOptions().noValidate).toBe(false);
+      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(false);
 
       testRouter.stop();
     });
@@ -319,7 +323,7 @@ describe("core/noValidate option", () => {
       );
 
       // forwardState should resolve through chain a → b → c
-      const result = router.forwardState("a", {});
+      const result = getPluginApi(router).forwardState("a", {});
 
       expect(result.name).toBe("c");
 
@@ -337,13 +341,13 @@ describe("core/noValidate option", () => {
       );
 
       // Verify initial forwardTo works
-      expect(router.forwardState("a", {}).name).toBe("b");
+      expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
       // Add another route with forwardTo - this triggers cache refresh
       router.addRoute({ name: "d", path: "/d", forwardTo: "a" });
 
       // d → a → b
-      expect(router.forwardState("d", {}).name).toBe("b");
+      expect(getPluginApi(router).forwardState("d", {}).name).toBe("b");
 
       router.stop();
     });
@@ -361,14 +365,14 @@ describe("core/noValidate option", () => {
       );
 
       // Verify initial chains work
-      expect(router.forwardState("a", {}).name).toBe("c");
-      expect(router.forwardState("d", {}).name).toBe("c");
+      expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
+      expect(getPluginApi(router).forwardState("d", {}).name).toBe("c");
 
       // Remove route 'd' - triggers cache refresh
       router.removeRoute("d");
 
       // Remaining chain should still work
-      expect(router.forwardState("a", {}).name).toBe("c");
+      expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
 
       router.stop();
     });
@@ -384,13 +388,13 @@ describe("core/noValidate option", () => {
       );
 
       // Initial: a → b
-      expect(router.forwardState("a", {}).name).toBe("b");
+      expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
       // Update forwardTo: a → c (triggers cache refresh)
       router.updateRoute("a", { forwardTo: "c" });
 
       // Now: a → c
-      expect(router.forwardState("a", {}).name).toBe("c");
+      expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
 
       router.stop();
     });

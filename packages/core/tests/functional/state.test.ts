@@ -1,7 +1,7 @@
 import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getPluginApi } from "@real-router/core";
 
 import {
   buildNameFromSegments,
@@ -84,7 +84,11 @@ describe("core/state", () => {
 
   describe("makeState", () => {
     it("returns valid state object", () => {
-      const state = router.makeState("home", { foo: "bar" }, "/home");
+      const state = getPluginApi(router).makeState(
+        "home",
+        { foo: "bar" },
+        "/home",
+      );
 
       expect(state).toMatchObject({
         name: "home",
@@ -101,7 +105,7 @@ describe("core/state", () => {
         path: "/with-defaults",
         defaultParams: { lang: "en" },
       });
-      const state = router.makeState(
+      const state = getPluginApi(router).makeState(
         "withDefaults",
         { id: 123 },
         "/with-defaults",
@@ -113,13 +117,17 @@ describe("core/state", () => {
     it("uses empty params when no params and no defaultParams (line 328)", () => {
       // home route has no defaultParams defined
       // Call makeState with undefined params (no params, no defaults)
-      const state = router.makeState("home", undefined as never, "/home");
+      const state = getPluginApi(router).makeState(
+        "home",
+        undefined as never,
+        "/home",
+      );
 
       expect(state.params).toStrictEqual({});
     });
 
     it("uses forced ID if provided", () => {
-      const state = router.makeState(
+      const state = getPluginApi(router).makeState(
         "home",
         {},
         "/home",
@@ -133,34 +141,34 @@ describe("core/state", () => {
     describe("argument validation", () => {
       it("throws TypeError for non-string name", () => {
         expect(() =>
-          router.makeState(123 as unknown as string, {}),
+          getPluginApi(router).makeState(123 as unknown as string, {}),
         ).toThrowError(TypeError);
         expect(() =>
-          router.makeState(null as unknown as string, {}),
+          getPluginApi(router).makeState(null as unknown as string, {}),
         ).toThrowError(/Invalid name/);
       });
 
       it("throws TypeError for invalid params", () => {
-        expect(() => router.makeState("home", "invalid" as never)).toThrowError(
-          TypeError,
-        );
         expect(() =>
-          router.makeState("home", (() => {}) as never),
+          getPluginApi(router).makeState("home", "invalid" as never),
+        ).toThrowError(TypeError);
+        expect(() =>
+          getPluginApi(router).makeState("home", (() => {}) as never),
         ).toThrowError(/Invalid params/);
       });
 
       it("throws TypeError for non-string path", () => {
         expect(() =>
-          router.makeState("home", {}, 123 as unknown as string),
+          getPluginApi(router).makeState("home", {}, 123 as unknown as string),
         ).toThrowError(TypeError);
         expect(() =>
-          router.makeState("home", {}, {} as unknown as string),
+          getPluginApi(router).makeState("home", {}, {} as unknown as string),
         ).toThrowError(/Invalid path/);
       });
 
       it("throws TypeError for non-number forceId", () => {
         expect(() =>
-          router.makeState(
+          getPluginApi(router).makeState(
             "home",
             {},
             "/home",
@@ -169,7 +177,7 @@ describe("core/state", () => {
           ),
         ).toThrowError(TypeError);
         expect(() =>
-          router.makeState(
+          getPluginApi(router).makeState(
             "home",
             {},
             "/home",
@@ -183,45 +191,53 @@ describe("core/state", () => {
 
   describe("areStatesEqual", () => {
     it("returns true for same name and params", () => {
-      const s1 = router.makeState("home", { id: 1 }, "/home");
-      const s2 = router.makeState("home", { id: 1 }, "/home");
+      const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
+      const s2 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
 
       expect(router.areStatesEqual(s1, s2)).toBe(true);
     });
 
     it("returns false for different names", () => {
-      const s1 = router.makeState("home", {}, "/home");
-      const s2 = router.makeState("admin", {}, "/admin");
+      const s1 = getPluginApi(router).makeState("home", {}, "/home");
+      const s2 = getPluginApi(router).makeState("admin", {}, "/admin");
 
       expect(router.areStatesEqual(s1, s2)).toBe(false);
     });
 
     it("returns false for different params", () => {
-      const s1 = router.makeState("items", { id: 1 }, "/home");
-      const s2 = router.makeState("items", { id: 2 }, "/home");
+      const s1 = getPluginApi(router).makeState("items", { id: 1 }, "/home");
+      const s2 = getPluginApi(router).makeState("items", { id: 2 }, "/home");
 
       // `id` is not query param
       expect(router.areStatesEqual(s1, s2, true)).toBe(false);
     });
 
     it("returns true for different params with ignore query params", () => {
-      const s1 = router.makeState("home", { id: 1 }, "/home");
-      const s2 = router.makeState("home", { id: 2 }, "/home");
+      const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
+      const s2 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
 
       // `id` is query param
       expect(router.areStatesEqual(s1, s2)).toBe(true);
     });
 
     it("returns true for different params without ignore query params", () => {
-      const s1 = router.makeState("items", { id: 1 }, "/home");
-      const s2 = router.makeState("items", { id: 2 }, "/home");
+      const s1 = getPluginApi(router).makeState("items", { id: 1 }, "/home");
+      const s2 = getPluginApi(router).makeState("items", { id: 2 }, "/home");
 
       expect(router.areStatesEqual(s1, s2, false)).toBe(false);
     });
 
     it("compares query params when ignoreQueryParams is false", () => {
-      const s1 = router.makeState("home", { foo: "bar", q: "1" }, "/home");
-      const s2 = router.makeState("home", { foo: "bar", q: "1" }, "/home");
+      const s1 = getPluginApi(router).makeState(
+        "home",
+        { foo: "bar", q: "1" },
+        "/home",
+      );
+      const s2 = getPluginApi(router).makeState(
+        "home",
+        { foo: "bar", q: "1" },
+        "/home",
+      );
 
       expect(router.areStatesEqual(s1, s2, false)).toBe(true);
     });
@@ -232,20 +248,20 @@ describe("core/state", () => {
 
     it("should use cached urlParams on second call (line 118 cache hit)", () => {
       // First call computes and caches urlParams for "home"
-      const s1 = router.makeState("home", { id: 1 }, "/home");
-      const s2 = router.makeState("home", { id: 1 }, "/home");
+      const s1 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
+      const s2 = getPluginApi(router).makeState("home", { id: 1 }, "/home");
 
       expect(router.areStatesEqual(s1, s2, true)).toBe(true);
 
       // Second call uses cached urlParams (line 118 returns early)
-      const s3 = router.makeState("home", { id: 2 }, "/home");
-      const s4 = router.makeState("home", { id: 2 }, "/home");
+      const s3 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
+      const s4 = getPluginApi(router).makeState("home", { id: 2 }, "/home");
 
       expect(router.areStatesEqual(s3, s4, true)).toBe(true);
     });
 
     it("should return false when one state is undefined", () => {
-      const state = router.makeState("home", {}, "/home");
+      const state = getPluginApi(router).makeState("home", {}, "/home");
 
       expect(router.areStatesEqual(state, undefined)).toBe(false);
       expect(router.areStatesEqual(undefined, state)).toBe(false);
@@ -254,12 +270,12 @@ describe("core/state", () => {
     it("should handle non-existent route names with ignoreQueryParams (line 28)", () => {
       // getSegmentsByName returns null for non-existent routes
       // The ?? [] fallback should handle this case
-      const s1 = router.makeState(
+      const s1 = getPluginApi(router).makeState(
         "nonexistent.route",
         { id: 1 },
         "/nonexistent",
       );
-      const s2 = router.makeState(
+      const s2 = getPluginApi(router).makeState(
         "nonexistent.route",
         { id: 1 },
         "/nonexistent",
@@ -271,8 +287,16 @@ describe("core/state", () => {
     });
 
     it("should return false for non-existent routes with different params", () => {
-      const s1 = router.makeState("unknown.route", { x: 1 }, "/unknown");
-      const s2 = router.makeState("unknown.route", { x: 2 }, "/unknown");
+      const s1 = getPluginApi(router).makeState(
+        "unknown.route",
+        { x: 1 },
+        "/unknown",
+      );
+      const s2 = getPluginApi(router).makeState(
+        "unknown.route",
+        { x: 2 },
+        "/unknown",
+      );
 
       // With ignoreQueryParams=true, urlParams is empty (from ?? [])
       // So no params are compared, states are equal by name only
@@ -284,7 +308,7 @@ describe("core/state", () => {
 
     describe("argument validation", () => {
       it("does not throw for null/undefined states", () => {
-        const validState = router.makeState("home", {}, "/home");
+        const validState = getPluginApi(router).makeState("home", {}, "/home");
 
         // null/undefined are valid inputs (represent "no state")
         // Using 'as never' to test runtime behavior with null values
@@ -303,7 +327,7 @@ describe("core/state", () => {
       });
 
       it("throws TypeError for invalid state1", () => {
-        const validState = router.makeState("home", {}, "/home");
+        const validState = getPluginApi(router).makeState("home", {}, "/home");
 
         expect(() =>
           router.areStatesEqual("invalid" as never, validState),
@@ -314,7 +338,7 @@ describe("core/state", () => {
       });
 
       it("throws TypeError for invalid state2", () => {
-        const validState = router.makeState("home", {}, "/home");
+        const validState = getPluginApi(router).makeState("home", {}, "/home");
 
         expect(() =>
           router.areStatesEqual(validState, "invalid" as never),
@@ -325,8 +349,8 @@ describe("core/state", () => {
       });
 
       it("throws TypeError for invalid ignoreQueryParams", () => {
-        const s1 = router.makeState("home", {}, "/home");
-        const s2 = router.makeState("home", {}, "/home");
+        const s1 = getPluginApi(router).makeState("home", {}, "/home");
+        const s2 = getPluginApi(router).makeState("home", {}, "/home");
 
         expect(() =>
           router.areStatesEqual(s1, s2, "true" as never),
@@ -341,30 +365,42 @@ describe("core/state", () => {
       it("returns false when params have different keys (undefined value case)", () => {
         // Original router5 bug: {a: 1, b: undefined} vs {a: 1, c: 2}
         // Same length but different keys - should be false
-        const s1 = router.makeState(
+        const s1 = getPluginApi(router).makeState(
           "home",
           { a: 1, b: undefined } as never,
           "/home",
         );
-        const s2 = router.makeState("home", { a: 1, c: 2 } as never, "/home");
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { a: 1, c: 2 } as never,
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(false);
       });
 
       it("returns false when state1 has key that state2 lacks", () => {
-        const s1 = router.makeState("home", { x: 1, y: 2 }, "/home");
-        const s2 = router.makeState("home", { x: 1, z: 2 }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { x: 1, y: 2 },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { x: 1, z: 2 },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(false);
       });
 
       it("returns true when both have same keys with undefined values", () => {
-        const s1 = router.makeState(
+        const s1 = getPluginApi(router).makeState(
           "home",
           { a: 1, b: undefined } as never,
           "/home",
         );
-        const s2 = router.makeState(
+        const s2 = getPluginApi(router).makeState(
           "home",
           { a: 1, b: undefined } as never,
           "/home",
@@ -376,8 +412,16 @@ describe("core/state", () => {
 
     describe("edge cases - issue #478 (array params comparison)", () => {
       it("returns true for equal array params (deep equality)", () => {
-        const s1 = router.makeState("home", { tags: ["a", "b", "c"] }, "/home");
-        const s2 = router.makeState("home", { tags: ["a", "b", "c"] }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { tags: ["a", "b", "c"] },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { tags: ["a", "b", "c"] },
+          "/home",
+        );
 
         // Different array references but same content
         expect(s1.params.tags).not.toBe(s2.params.tags);
@@ -385,21 +429,37 @@ describe("core/state", () => {
       });
 
       it("returns false for different array lengths", () => {
-        const s1 = router.makeState("home", { ids: [1, 2, 3] }, "/home");
-        const s2 = router.makeState("home", { ids: [1, 2] }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { ids: [1, 2, 3] },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { ids: [1, 2] },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(false);
       });
 
       it("returns false for different array content", () => {
-        const s1 = router.makeState("home", { ids: [1, 2, 3] }, "/home");
-        const s2 = router.makeState("home", { ids: [1, 2, 4] }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { ids: [1, 2, 3] },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { ids: [1, 2, 4] },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(false);
       });
 
       it("returns true for nested arrays with same content", () => {
-        const s1 = router.makeState(
+        const s1 = getPluginApi(router).makeState(
           "home",
           {
             matrix: [
@@ -409,7 +469,7 @@ describe("core/state", () => {
           } as never,
           "/home",
         );
-        const s2 = router.makeState(
+        const s2 = getPluginApi(router).makeState(
           "home",
           {
             matrix: [
@@ -424,7 +484,7 @@ describe("core/state", () => {
       });
 
       it("returns false for nested arrays with different content", () => {
-        const s1 = router.makeState(
+        const s1 = getPluginApi(router).makeState(
           "home",
           {
             matrix: [
@@ -434,7 +494,7 @@ describe("core/state", () => {
           } as never,
           "/home",
         );
-        const s2 = router.makeState(
+        const s2 = getPluginApi(router).makeState(
           "home",
           {
             matrix: [
@@ -449,23 +509,47 @@ describe("core/state", () => {
       });
 
       it("returns false when comparing array to non-array", () => {
-        const s1 = router.makeState("home", { data: [1, 2, 3] }, "/home");
-        const s2 = router.makeState("home", { data: "1,2,3" }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { data: [1, 2, 3] },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { data: "1,2,3" },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(false);
       });
 
       it("handles empty arrays correctly", () => {
-        const s1 = router.makeState("home", { items: [] }, "/home");
-        const s2 = router.makeState("home", { items: [] }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { items: [] },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { items: [] },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(true);
       });
 
       it("returns true for same array reference", () => {
         const sharedArray = ["x", "y"];
-        const s1 = router.makeState("home", { tags: sharedArray }, "/home");
-        const s2 = router.makeState("home", { tags: sharedArray }, "/home");
+        const s1 = getPluginApi(router).makeState(
+          "home",
+          { tags: sharedArray },
+          "/home",
+        );
+        const s2 = getPluginApi(router).makeState(
+          "home",
+          { tags: sharedArray },
+          "/home",
+        );
 
         expect(router.areStatesEqual(s1, s2, false)).toBe(true);
       });
@@ -474,7 +558,7 @@ describe("core/state", () => {
 
   describe("forwardState", () => {
     it("returns same state if no forward defined", () => {
-      const state = router.forwardState("home", { id: 1 });
+      const state = getPluginApi(router).forwardState("home", { id: 1 });
 
       expect(state.name).toBe("home");
       expect(state.params.id).toBe(1);
@@ -488,7 +572,7 @@ describe("core/state", () => {
       ]);
       router.updateRoute("srcRoute", { forwardTo: "dstRoute" });
 
-      const state = router.forwardState("srcRoute", { c: 3 });
+      const state = getPluginApi(router).forwardState("srcRoute", { c: 3 });
 
       expect(state.name).toBe("dstRoute");
       expect(state.params).toStrictEqual({ a: 1, b: 2, c: 3 });
@@ -508,7 +592,9 @@ describe("core/state", () => {
         forwardTo: "dstNoDefaults",
       });
 
-      const state = router.forwardState("srcWithDefaults", { c: 3 });
+      const state = getPluginApi(router).forwardState("srcWithDefaults", {
+        c: 3,
+      });
 
       expect(state.name).toBe("dstNoDefaults");
       expect(state.params).toStrictEqual({ a: 1, c: 3 });
@@ -528,7 +614,9 @@ describe("core/state", () => {
         forwardTo: "dstWithDefaults",
       });
 
-      const state = router.forwardState("srcNoDefaults", { c: 3 });
+      const state = getPluginApi(router).forwardState("srcNoDefaults", {
+        c: 3,
+      });
 
       expect(state.name).toBe("dstWithDefaults");
       expect(state.params).toStrictEqual({ b: 2, c: 3 });
@@ -537,19 +625,19 @@ describe("core/state", () => {
     describe("argument validation", () => {
       it("throws TypeError for non-string routeName", () => {
         expect(() =>
-          router.forwardState(123 as unknown as string, {}),
+          getPluginApi(router).forwardState(123 as unknown as string, {}),
         ).toThrowError(TypeError);
         expect(() =>
-          router.forwardState(null as unknown as string, {}),
+          getPluginApi(router).forwardState(null as unknown as string, {}),
         ).toThrowError(/Invalid routeName/);
       });
 
       it("throws TypeError for invalid routeParams", () => {
         expect(() =>
-          router.forwardState("home", "invalid" as never),
+          getPluginApi(router).forwardState("home", "invalid" as never),
         ).toThrowError(TypeError);
         expect(() =>
-          router.forwardState("home", (() => {}) as never),
+          getPluginApi(router).forwardState("home", (() => {}) as never),
         ).toThrowError(/Invalid routeParams/);
       });
     });
@@ -557,14 +645,14 @@ describe("core/state", () => {
 
   describe("buildState", () => {
     it("returns state if route exists", () => {
-      const state = router.buildState("home", {});
+      const state = getPluginApi(router).buildState("home", {});
 
       expect(state?.name).toBe("home");
       expect(state?.params).toStrictEqual({});
     });
 
     it("returns undefined if route is unknown", () => {
-      const state = router.buildState("unknown.route", {});
+      const state = getPluginApi(router).buildState("unknown.route", {});
 
       expect(state).toBe(undefined);
     });
@@ -572,19 +660,19 @@ describe("core/state", () => {
     describe("argument validation", () => {
       it("throws TypeError for non-string routeName", () => {
         expect(() =>
-          router.buildState(123 as unknown as string, {}),
+          getPluginApi(router).buildState(123 as unknown as string, {}),
         ).toThrowError(TypeError);
         expect(() =>
-          router.buildState(null as unknown as string, {}),
+          getPluginApi(router).buildState(null as unknown as string, {}),
         ).toThrowError(/Invalid routeName/);
       });
 
       it("throws TypeError for invalid routeParams", () => {
         expect(() =>
-          router.buildState("home", "invalid" as never),
+          getPluginApi(router).buildState("home", "invalid" as never),
         ).toThrowError(TypeError);
         expect(() =>
-          router.buildState("home", (() => {}) as never),
+          getPluginApi(router).buildState("home", (() => {}) as never),
         ).toThrowError(/Invalid routeParams/);
       });
     });
@@ -738,7 +826,7 @@ describe("core/stateBuilder", () => {
 
       await testRouter.start("").catch(() => {});
 
-      const result = testRouter.forwardState("dash", {});
+      const result = getPluginApi(testRouter).forwardState("dash", {});
 
       expect(result.name).toBe("admin");
 
@@ -763,7 +851,9 @@ describe("core/stateBuilder", () => {
 
       await testRouter.start("").catch(() => {});
 
-      const result = testRouter.forwardState("item", { type: "book" });
+      const result = getPluginApi(testRouter).forwardState("item", {
+        type: "book",
+      });
 
       expect(result.name).toBe("book-viewer");
 
@@ -782,9 +872,9 @@ describe("core/stateBuilder", () => {
 
       testRouter.start("").catch(() => {});
 
-      expect(() => testRouter.forwardState("cycle-a", {})).toThrowError(
-        /Circular forwardTo/,
-      );
+      expect(() =>
+        getPluginApi(testRouter).forwardState("cycle-a", {}),
+      ).toThrowError(/Circular forwardTo/);
 
       testRouter.stop();
     });
@@ -800,7 +890,7 @@ describe("core/stateBuilder", () => {
         { name: "final-dest", path: "/final-dest" },
       ]);
 
-      const result = router.forwardState("static-start", {});
+      const result = getPluginApi(router).forwardState("static-start", {});
 
       expect(result.name).toBe("final-dest");
     });
@@ -816,7 +906,7 @@ describe("core/stateBuilder", () => {
         { name: "end", path: "/end" },
       ]);
 
-      const result = router.forwardState("dynamic-start", {});
+      const result = getPluginApi(router).forwardState("dynamic-start", {});
 
       expect(result.name).toBe("end");
     });
@@ -828,7 +918,7 @@ describe("core/stateBuilder", () => {
         { name: "dyn-3", path: "/dyn-3" },
       ]);
 
-      const result = router.forwardState("dyn-1", {});
+      const result = getPluginApi(router).forwardState("dyn-1", {});
 
       expect(result.name).toBe("dyn-3");
     });
@@ -840,9 +930,9 @@ describe("core/stateBuilder", () => {
         forwardTo: () => "nonexistent",
       });
 
-      expect(() => router.forwardState("bad-fn", {})).toThrowError(
-        /does not exist/,
-      );
+      expect(() =>
+        getPluginApi(router).forwardState("bad-fn", {}),
+      ).toThrowError(/does not exist/);
     });
 
     it("should bubble errors from forwardTo callback naturally", () => {
@@ -854,9 +944,9 @@ describe("core/stateBuilder", () => {
         },
       });
 
-      expect(() => router.forwardState("error-fn", {})).toThrowError(
-        "Custom callback error",
-      );
+      expect(() =>
+        getPluginApi(router).forwardState("error-fn", {}),
+      ).toThrowError("Custom callback error");
     });
 
     it("should throw TypeError for non-string return from callback", () => {
@@ -866,9 +956,9 @@ describe("core/stateBuilder", () => {
         forwardTo: (() => 123) as any,
       });
 
-      expect(() => router.forwardState("bad-return", {})).toThrowError(
-        TypeError,
-      );
+      expect(() =>
+        getPluginApi(router).forwardState("bad-return", {}),
+      ).toThrowError(TypeError);
     });
 
     it("should throw when exceeding max depth (100 hops)", () => {
@@ -891,7 +981,7 @@ describe("core/stateBuilder", () => {
 
       router.addRoute(routes);
 
-      expect(() => router.forwardState("hop-0", {})).toThrowError(
+      expect(() => getPluginApi(router).forwardState("hop-0", {})).toThrowError(
         /exceeds maximum depth/,
       );
     });
@@ -902,7 +992,7 @@ describe("core/stateBuilder", () => {
         { name: "build-dest", path: "/build-dest" },
       ]);
 
-      const state = router.buildState("build-fn", {});
+      const state = getPluginApi(router).buildState("build-fn", {});
 
       expect(state?.name).toBe("build-dest");
     });
@@ -921,7 +1011,7 @@ describe("core/stateBuilder", () => {
 
       await testRouter.start("").catch(() => {});
 
-      const state = testRouter.matchPath("/rewrite-fn");
+      const state = getPluginApi(testRouter).matchPath("/rewrite-fn");
 
       expect(state?.name).toBe("rewrite-target");
       expect(state?.path).toBe("/rewrite-target");
@@ -950,9 +1040,9 @@ describe("core/stateBuilder", () => {
         forwardTo: () => "self-fn",
       });
 
-      expect(() => router.forwardState("self-fn", {})).toThrowError(
-        /Circular forwardTo/,
-      );
+      expect(() =>
+        getPluginApi(router).forwardState("self-fn", {}),
+      ).toThrowError(/Circular forwardTo/);
     });
 
     it("should throw for empty string returned from callback", () => {
@@ -962,9 +1052,9 @@ describe("core/stateBuilder", () => {
         forwardTo: () => "",
       });
 
-      expect(() => router.forwardState("empty-return", {})).toThrowError(
-        /does not exist/,
-      );
+      expect(() =>
+        getPluginApi(router).forwardState("empty-return", {}),
+      ).toThrowError(/does not exist/);
     });
 
     it("should not affect pure static forward chains", () => {
@@ -974,7 +1064,7 @@ describe("core/stateBuilder", () => {
         { name: "pure-c", path: "/pure-c" },
       ]);
 
-      const result = router.forwardState("pure-a", {});
+      const result = getPluginApi(router).forwardState("pure-a", {});
 
       expect(result.name).toBe("pure-c");
     });

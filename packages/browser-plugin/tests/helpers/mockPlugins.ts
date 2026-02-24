@@ -1,6 +1,8 @@
 // Mock plugin factories for integration testing
 // These synthetic plugins allow testing various edge cases without external dependencies
 
+import { getPluginApi } from "@real-router/core";
+
 import type { Params, PluginFactory, State } from "@real-router/core";
 
 /**
@@ -88,23 +90,23 @@ export const createStateModifierPlugin = (
   } = options;
 
   return (router) => {
-    const originalForwardState = router.forwardState.bind(router);
+    const api = getPluginApi(router);
+    const originalForwardState = api.getForwardState();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    (router as any).forwardState = (name: string, params: Params) => {
+    api.setForwardState(((name: string, params: Params) => {
       const result = originalForwardState(name, params);
       const modifiedParams: Params = { ...result.params };
 
       modifyState({ params: modifiedParams } as unknown as State);
 
       return { name: result.name, params: modifiedParams };
-    };
+    }) as typeof originalForwardState);
 
     return {
       ...(modifyOnStart && { onStart: () => {} }),
       ...(modifyOnSuccess && { onTransitionSuccess: () => {} }),
       teardown() {
-        router.forwardState = originalForwardState;
+        api.setForwardState(originalForwardState);
       },
     };
   };
@@ -187,10 +189,10 @@ export const createPersistentParamsPlugin = (
   const persistentParamsValues: Record<string, any> = {};
 
   return (router) => {
-    const originalForwardState = router.forwardState.bind(router);
+    const api = getPluginApi(router);
+    const originalForwardState = api.getForwardState();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
-    (router as any).forwardState = (name: string, params: Params) => {
+    api.setForwardState(((name: string, params: Params) => {
       const result = originalForwardState(name, params);
 
       const mergedParams: Params = {
@@ -199,7 +201,7 @@ export const createPersistentParamsPlugin = (
       };
 
       return { name: result.name, params: mergedParams };
-    };
+    }) as typeof originalForwardState);
 
     return {
       onTransitionSuccess: (toState: State) => {
@@ -210,7 +212,7 @@ export const createPersistentParamsPlugin = (
         });
       },
       teardown() {
-        router.forwardState = originalForwardState;
+        api.setForwardState(originalForwardState);
       },
     };
   };

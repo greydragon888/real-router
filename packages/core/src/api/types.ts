@@ -60,6 +60,18 @@ export interface PluginApi {
   getOptions: () => Options;
 
   getTree: () => RouteTree;
+
+  getForwardState: () => <P extends Params = Params>(
+    routeName: string,
+    routeParams: P,
+  ) => SimpleState<P>;
+
+  setForwardState: (
+    fn: <P extends Params = Params>(
+      routeName: string,
+      routeParams: P,
+    ) => SimpleState<P>,
+  ) => void;
 }
 
 /**
