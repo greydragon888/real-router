@@ -1,14 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getDependenciesApi } from "@real-router/core";
+
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
 
-import type { Router } from "@real-router/core";
+import type { Router, DependenciesApi } from "@real-router/core";
 
 let router: Router<TestDependencies>;
+let deps: DependenciesApi<TestDependencies>;
 
 describe("core/dependencies/getDependencies", () => {
   beforeEach(() => {
     router = createDependenciesTestRouter();
+    deps = getDependenciesApi(router);
   });
 
   afterEach(() => {
@@ -16,36 +20,36 @@ describe("core/dependencies/getDependencies", () => {
   });
 
   it("should return shallow copy of all dependencies", () => {
-    const deps = router.getDependencies();
+    const depsObj = deps.getAll();
 
-    expect(deps).toStrictEqual({ foo: 1 });
-    expect(deps).not.toBe(router.getDependencies()); // different objects
+    expect(depsObj).toStrictEqual({ foo: 1 });
+    expect(depsObj).not.toBe(deps.getAll()); // different objects
   });
 
   it("should return new object on each call", () => {
-    const deps1 = router.getDependencies();
-    const deps2 = router.getDependencies();
+    const deps1 = deps.getAll();
+    const deps2 = deps.getAll();
 
     expect(deps1).toStrictEqual(deps2);
     expect(deps1).not.toBe(deps2);
   });
 
   it("should return empty object when no dependencies", () => {
-    router.resetDependencies();
-    const deps = router.getDependencies();
+    deps.reset();
+    const depsObj = deps.getAll();
 
-    expect(deps).toStrictEqual({});
+    expect(depsObj).toStrictEqual({});
   });
 
   it("should copy falsy values correctly", () => {
-    router.setDependency("foo", 0 as number);
+    deps.set("foo", 0 as number);
     // @ts-expect-error: testing null value
-    router.setDependency("bar", null);
+    deps.set("bar", null);
 
-    const deps = router.getDependencies();
+    const depsObj = deps.getAll();
 
-    expect(deps.foo).toBe(0);
-    expect(deps.bar).toBe(null);
+    expect(depsObj.foo).toBe(0);
+    expect(depsObj.bar).toBe(null);
   });
 
   it("should protect structure but not content (shallow copy)", () => {
@@ -53,22 +57,22 @@ describe("core/dependencies/getDependencies", () => {
     const service = { baseUrl: "http://api.com" };
 
     // @ts-expect-error: testing object value
-    router.setDependency("foo", service);
+    deps.set("foo", service);
 
-    const deps = router.getDependencies();
+    const depsObj = deps.getAll();
 
     // Modifying structure does NOT affect router
     // @ts-expect-error: testing adding new key
-    deps.newKey = "value";
+    depsObj.newKey = "value";
 
-    expect(router.hasDependency("newKey" as "foo")).toBe(false);
+    expect(deps.has("newKey" as "foo")).toBe(false);
 
-    delete deps.foo;
+    delete depsObj.foo;
 
-    expect(router.hasDependency("foo")).toBe(true);
+    expect(deps.has("foo")).toBe(true);
 
     // But modifying content DOES affect original (shallow copy)
-    const depsAgain = router.getDependencies();
+    const depsAgain = deps.getAll();
     // @ts-expect-error: accessing object property
 
     // eslint-disable-next-line sonarjs/no-clear-text-protocols
@@ -79,16 +83,16 @@ describe("core/dependencies/getDependencies", () => {
   });
 
   it("should integrate with setDependency", () => {
-    router.setDependency("bar", "new value");
-    const deps = router.getDependencies();
+    deps.set("bar", "new value");
+    const depsObj = deps.getAll();
 
-    expect(deps.bar).toBe("new value");
+    expect(depsObj.bar).toBe("new value");
   });
 
   it("should integrate with removeDependency", () => {
-    router.removeDependency("foo");
-    const deps = router.getDependencies();
+    deps.remove("foo");
+    const depsObj = deps.getAll();
 
-    expect(deps.foo).toBeUndefined();
+    expect(depsObj.foo).toBeUndefined();
   });
 });

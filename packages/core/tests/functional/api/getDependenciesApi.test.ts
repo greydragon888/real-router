@@ -1,80 +1,143 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, beforeEach, it, expect } from "vitest";
 
-import { createRouter, getDependenciesApi } from "@real-router/core";
+import {
+  createRouter,
+  getDependenciesApi,
+  errorCodes,
+} from "@real-router/core";
 
 import type { Router, DependenciesApi } from "@real-router/core";
 
-interface TestDeps {
+interface Deps {
   foo?: number;
   bar?: string;
 }
 
-let router: Router<TestDeps>;
-let depsApi: DependenciesApi<TestDeps>;
+let router: Router<Deps>;
+let deps: DependenciesApi<Deps>;
 
-describe("getDependenciesApi()", () => {
+describe("getDependenciesApi", () => {
   beforeEach(() => {
-    router = createRouter<TestDeps>([], {}, { foo: 1 });
-    depsApi = getDependenciesApi(router);
+    router = createRouter<Deps>([], {}, { foo: 1 });
+    deps = getDependenciesApi(router);
   });
 
-  afterEach(() => {
-    router.stop();
+  describe("invalid router", () => {
+    it("should throw TypeError for non-router object", () => {
+      expect(() => getDependenciesApi({} as Router)).toThrowError(TypeError);
+      expect(() => getDependenciesApi({} as Router)).toThrowError(
+        "not found in internals registry",
+      );
+    });
   });
 
-  it("should return an object with all expected methods", () => {
-    expect(typeof depsApi.get).toBe("function");
-    expect(typeof depsApi.getAll).toBe("function");
-    expect(typeof depsApi.set).toBe("function");
-    expect(typeof depsApi.setAll).toBe("function");
-    expect(typeof depsApi.remove).toBe("function");
-    expect(typeof depsApi.reset).toBe("function");
-    expect(typeof depsApi.has).toBe("function");
+  describe("get", () => {
+    it("should return existing dependency", () => {
+      expect(deps.get("foo")).toBe(1);
+    });
+
+    it("should throw ReferenceError for missing dependency", () => {
+      expect(() => deps.get("bar")).toThrowError(ReferenceError);
+    });
   });
 
-  it("should return a new object on each call", () => {
-    const depsApi2 = getDependenciesApi(router);
+  describe("getAll", () => {
+    it("should return shallow copy of all dependencies", () => {
+      const all = deps.getAll();
 
-    expect(depsApi).not.toBe(depsApi2);
+      expect(all).toStrictEqual({ foo: 1 });
+      expect(all).not.toBe(deps.getAll());
+    });
   });
 
-  it("get should return dependency value", () => {
-    expect(depsApi.get("foo")).toBe(1);
+  describe("set", () => {
+    it("should set a dependency", () => {
+      deps.set("bar", "hello");
+
+      expect(deps.get("bar")).toBe("hello");
+    });
+
+    it("should return void", () => {
+      deps.set("bar", "hello");
+
+      expect(deps.get("bar")).toBe("hello");
+    });
+
+    it("should throw TypeError for invalid name", () => {
+      expect(() => {
+        // @ts-expect-error: testing invalid key type
+        deps.set(123, "value");
+      }).toThrowError(TypeError);
+    });
   });
 
-  it("getAll should return all dependencies", () => {
-    const all = depsApi.getAll();
+  describe("setAll", () => {
+    it("should set multiple dependencies", () => {
+      deps.setAll({ foo: 42, bar: "test" });
 
-    expect(all).toStrictEqual({ foo: 1 });
+      expect(deps.get("foo")).toBe(42);
+      expect(deps.get("bar")).toBe("test");
+    });
+
+    it("should throw TypeError for invalid argument", () => {
+      expect(() => {
+        // @ts-expect-error: testing invalid input
+        deps.setAll([]);
+      }).toThrowError(TypeError);
+    });
   });
 
-  it("set should set a dependency", () => {
-    depsApi.set("bar", "hello");
+  describe("remove", () => {
+    it("should remove a dependency", () => {
+      deps.remove("foo");
 
-    expect(router.getDependency("bar")).toBe("hello");
+      expect(deps.has("foo")).toBe(false);
+    });
   });
 
-  it("setAll should set multiple dependencies", () => {
-    depsApi.setAll({ foo: 2, bar: "world" });
+  describe("reset", () => {
+    it("should clear all dependencies", () => {
+      deps.reset();
 
-    expect(router.getDependency("foo")).toBe(2);
-    expect(router.getDependency("bar")).toBe("world");
+      expect(deps.getAll()).toStrictEqual({});
+    });
   });
 
-  it("remove should remove a dependency", () => {
-    depsApi.remove("foo");
+  describe("has", () => {
+    it("should return true for existing dependency", () => {
+      expect(deps.has("foo")).toBe(true);
+    });
 
-    expect(router.hasDependency("foo")).toBe(false);
+    it("should return false for missing dependency", () => {
+      expect(deps.has("bar")).toBe(false);
+    });
   });
 
-  it("reset should clear all dependencies", () => {
-    depsApi.reset();
+  describe("after dispose", () => {
+    it("should throw ROUTER_DISPOSED for mutating methods", () => {
+      router.dispose();
+      const depsAfterDispose = getDependenciesApi(router);
 
-    expect(router.hasDependency("foo")).toBe(false);
-  });
+      expect(() => {
+        depsAfterDispose.set("bar", "x");
+      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      expect(() => {
+        depsAfterDispose.setAll({ foo: 2 });
+      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      expect(() => {
+        depsAfterDispose.remove("foo");
+      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      expect(() => {
+        depsAfterDispose.reset();
+      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+    });
 
-  it("has should check if dependency exists", () => {
-    expect(depsApi.has("foo")).toBe(true);
-    expect(depsApi.has("bar")).toBe(false);
+    it("should still allow read-only methods after dispose", () => {
+      router.dispose();
+      const depsAfterDispose = getDependenciesApi(router);
+
+      expect(depsAfterDispose.has("foo")).toBe(false);
+      expect(depsAfterDispose.getAll()).toStrictEqual({});
+    });
   });
 });

@@ -1,6 +1,8 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getDependenciesApi } from "@real-router/core";
+
 import {
   createLifecycleTestRouter,
   errorCodes,
@@ -302,9 +304,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       let receivedRouter: unknown;
       let receivedGetDependency: unknown;
 
-      // Set up a test dependency
-      // @ts-expect-error: testing with custom dependency
-      router.setDependency("testValue", "hello");
+      const deps = getDependenciesApi(router);
+
+      (deps as any).set("testValue", "hello");
 
       router.addActivateGuard("testRoute", (r, getDep) => {
         receivedRouter = r;
@@ -314,7 +316,6 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       });
 
       expect(receivedRouter).toBe(router);
-      // Check behavior: getDependency should work correctly
       expect(typeof receivedGetDependency).toBe("function");
       // @ts-expect-error: testing function call
       expect(receivedGetDependency("testValue")).toBe("hello");
@@ -323,9 +324,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     it("should allow factory to access dependencies via getDependency", async () => {
       const apiService = { fetch: () => {} };
 
-      // Set up dependency first
-      // @ts-expect-error: testing with custom dependency
-      router.setDependency("testApi", apiService);
+      const deps = getDependenciesApi(router);
+
+      (deps as any).set("testApi", apiService);
 
       let accessedDependency: unknown;
 

@@ -1,14 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getDependenciesApi } from "@real-router/core";
+
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
 
-import type { Router } from "@real-router/core";
+import type { Router, DependenciesApi } from "@real-router/core";
 
 let router: Router<TestDependencies>;
+let deps: DependenciesApi<TestDependencies>;
 
 describe("core/dependencies/resetDependencies", () => {
   beforeEach(() => {
     router = createDependenciesTestRouter();
+    deps = getDependenciesApi(router);
   });
 
   afterEach(() => {
@@ -16,157 +20,148 @@ describe("core/dependencies/resetDependencies", () => {
   });
 
   it("should remove all dependencies", () => {
-    router.setDependencies({ foo: 5, bar: "test" });
-    router.resetDependencies();
+    deps.setAll({ foo: 5, bar: "test" });
+    deps.reset();
 
-    const deps = router.getDependencies();
+    const depsObj = deps.getAll();
 
-    expect(deps).toStrictEqual({});
-  });
-
-  it("should return router instance for chaining", () => {
-    const result = router.resetDependencies();
-
-    expect(result).toBe(router);
+    expect(depsObj).toStrictEqual({});
   });
 
   it("should allow setting dependencies after reset", () => {
-    router.resetDependencies();
-    router.setDependency("foo", 42);
+    deps.reset();
+    deps.set("foo", 42);
 
-    expect(router.getDependency("foo")).toBe(42);
+    expect(deps.get("foo")).toBe(42);
   });
 
   it("should make hasDependency return false for all previous dependencies", () => {
-    router.setDependencies({ foo: 1, bar: "value" });
-    router.resetDependencies();
+    deps.setAll({ foo: 1, bar: "value" });
+    deps.reset();
 
-    expect(router.hasDependency("foo")).toBe(false);
-    expect(router.hasDependency("bar")).toBe(false);
+    expect(deps.has("foo")).toBe(false);
+    expect(deps.has("bar")).toBe(false);
   });
 
   it("should be idempotent - safe to call multiple times", () => {
-    router.setDependencies({ foo: 1, bar: "test" });
+    deps.setAll({ foo: 1, bar: "test" });
 
     // First reset
-    router.resetDependencies();
+    deps.reset();
 
-    expect(router.getDependencies()).toStrictEqual({});
+    expect(deps.getAll()).toStrictEqual({});
 
     // Second reset - should not throw
     expect(() => {
-      router.resetDependencies();
+      deps.reset();
     }).not.toThrowError();
-    expect(router.getDependencies()).toStrictEqual({});
+    expect(deps.getAll()).toStrictEqual({});
 
     // Third reset - still safe
     expect(() => {
-      router.resetDependencies();
+      deps.reset();
     }).not.toThrowError();
-    expect(router.getDependencies()).toStrictEqual({});
+    expect(deps.getAll()).toStrictEqual({});
   });
 
   it("should work safely on empty container", () => {
-    router.resetDependencies(); // Already empty from beforeEach
+    deps.reset(); // Already empty from beforeEach
 
     // Should not throw even if container is already empty
     expect(() => {
-      router.resetDependencies();
+      deps.reset();
     }).not.toThrowError();
 
-    expect(router.getDependencies()).toStrictEqual({});
+    expect(deps.getAll()).toStrictEqual({});
   });
 
   it("should cause getDependency to throw after reset", () => {
-    router.setDependencies({ foo: 1, bar: "test" });
+    deps.setAll({ foo: 1, bar: "test" });
 
-    router.resetDependencies();
+    deps.reset();
 
     // All previous dependencies should throw when accessed
     expect(() => {
-      router.getDependency("foo");
+      deps.get("foo");
     }).toThrowError(ReferenceError);
 
     expect(() => {
-      router.getDependency("bar");
+      deps.get("bar");
     }).toThrowError(ReferenceError);
   });
 
   it("should handle special keys correctly", () => {
     // @ts-expect-error: testing special keys
-    router.setDependency("", "empty");
+    deps.set("", "empty");
     // @ts-expect-error: testing special keys
-    router.setDependency("api:v2", "colon");
+    deps.set("api:v2", "colon");
     // @ts-expect-error: testing special keys
-    router.setDependency("用户", "unicode");
+    deps.set("用户", "unicode");
 
-    router.resetDependencies();
+    deps.reset();
 
     // @ts-expect-error: testing special keys
-    expect(router.hasDependency("")).toBe(false);
+    expect(deps.has("")).toBe(false);
     // @ts-expect-error: testing special keys
-    expect(router.hasDependency("api:v2")).toBe(false);
+    expect(deps.has("api:v2")).toBe(false);
     // @ts-expect-error: testing special keys
-    expect(router.hasDependency("用户")).toBe(false);
+    expect(deps.has("用户")).toBe(false);
   });
 
   it("should support full reinitialization pattern", () => {
     // Initial setup
-    router.setDependencies({ foo: 1, bar: "old" });
+    deps.setAll({ foo: 1, bar: "old" });
 
     // Full reinitialization
-    const result = router
-      .resetDependencies()
-      // @ts-expect-error: testing new keys after reset
-      .setDependency("baz", "new1")
-      // @ts-expect-error: testing new keys after reset
-      .setDependency("qux", "new2");
-
-    expect(result).toBe(router);
+    deps.reset();
+    // @ts-expect-error: testing new keys after reset
+    deps.set("baz", "new1");
+    // @ts-expect-error: testing new keys after reset
+    deps.set("qux", "new2");
 
     // Old dependencies should be gone
-    expect(router.hasDependency("foo")).toBe(false);
-    expect(router.hasDependency("bar")).toBe(false);
+    expect(deps.has("foo")).toBe(false);
+    expect(deps.has("bar")).toBe(false);
 
     // New dependencies should exist
-    expect(router.getDependency("baz" as "foo")).toBe("new1");
-    expect(router.getDependency("qux" as "foo")).toBe("new2");
+    expect(deps.get("baz" as "foo")).toBe("new1");
+    expect(deps.get("qux" as "foo")).toBe("new2");
   });
 
   it("should remove falsy values as well", () => {
-    router.setDependency("foo", 0 as number);
+    deps.set("foo", 0 as number);
     // @ts-expect-error: testing null value
-    router.setDependency("bar", null);
-    router.setDependency("baz", false);
+    deps.set("bar", null);
+    deps.set("baz", false);
 
-    router.resetDependencies();
+    deps.reset();
 
-    expect(router.hasDependency("foo")).toBe(false);
-    expect(router.hasDependency("bar")).toBe(false);
-    expect(router.hasDependency("baz")).toBe(false);
+    expect(deps.has("foo")).toBe(false);
+    expect(deps.has("bar")).toBe(false);
+    expect(deps.has("baz")).toBe(false);
   });
 
   it("should integrate correctly in test isolation pattern", () => {
     // Simulate test 1
     // @ts-expect-error: testing new keys
-    router.setDependency("testDep1", "value1");
+    deps.set("testDep1", "value1");
 
-    expect(router.hasDependency("testDep1" as "foo")).toBe(true);
+    expect(deps.has("testDep1" as "foo")).toBe(true);
 
     // Cleanup between tests
-    router.resetDependencies();
+    deps.reset();
 
     // Simulate test 2 - should not see test 1 dependencies
-    expect(router.hasDependency("testDep1" as "foo")).toBe(false);
+    expect(deps.has("testDep1" as "foo")).toBe(false);
 
     // @ts-expect-error: testing new keys
-    router.setDependency("testDep2", "value2");
+    deps.set("testDep2", "value2");
 
-    expect(router.hasDependency("testDep2" as "foo")).toBe(true);
+    expect(deps.has("testDep2" as "foo")).toBe(true);
 
     // Cleanup
-    router.resetDependencies();
+    deps.reset();
 
-    expect(router.hasDependency("testDep2" as "foo")).toBe(false);
+    expect(deps.has("testDep2" as "foo")).toBe(false);
   });
 });

@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/02-navigation-plugins/2.1-sync-extensions.bench.ts
 
+import { getDependenciesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createSimpleRouter } from "../helpers";
@@ -102,8 +103,7 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router // @ts-expect-error - test dependency
-    .setDependency("service", { check: () => true });
+  (getDependenciesApi(router) as any).set("service", { check: () => true });
   router.usePlugin(() => ({ onTransitionSuccess: () => {} }));
   router.start("/");
 
@@ -117,8 +117,7 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router // @ts-expect-error - test dependency
-    .setDependency("auth", { isAllowed: () => true });
+  (getDependenciesApi(router) as any).set("auth", { isAllowed: () => true });
   router.addActivateGuard("about", () => () => true);
   router.addActivateGuard("home", () => () => true);
   router.start("/");

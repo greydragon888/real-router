@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, events, getPluginApi } from "@real-router/core";
+import {
+  createRouter,
+  events,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import type { Router } from "@real-router/core";
 
@@ -125,14 +130,16 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 1 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 1 dependency - should succeed
       expect(() => {
-        router.setDependency("dep1", 1);
+        deps.set("dep1", 1);
       }).not.toThrowError();
 
       // 2nd dependency should throw
       expect(() => {
-        router.setDependency("dep2", 2);
+        deps.set("dep2", 2);
       }).toThrowError("Dependency limit exceeded");
     });
 
@@ -169,6 +176,8 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 0 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set many dependencies at once via setDependencies - should not throw
       // This covers validateDependencyLimit with maxDependencies === 0
       const manyDeps: Record<string, number> = {};
@@ -178,12 +187,12 @@ describe("core/limits (integration via public API)", () => {
       }
 
       expect(() => {
-        router.setDependencies(manyDeps);
+        deps.setAll(manyDeps);
       }).not.toThrowError();
 
-      // Also test setDependency to cover #checkDependencyCount early return
+      // Also test set to cover #checkDependencyCount early return
       expect(() => {
-        router.setDependency("extraDep", 999);
+        deps.set("extraDep", 999);
       }).not.toThrowError();
     });
 
@@ -252,6 +261,8 @@ describe("core/limits (integration via public API)", () => {
     it("should enforce default maxDependencies limit (100)", () => {
       const router = createRouter<Record<string, number>>([]);
 
+      const deps = getDependenciesApi(router);
+
       // Set 99 dependencies first
       const deps99: Record<string, number> = {};
 
@@ -260,13 +271,13 @@ describe("core/limits (integration via public API)", () => {
       }
 
       expect(() => {
-        router.setDependencies(deps99);
+        deps.setAll(deps99);
       }).not.toThrowError();
 
-      // Adding 2 more via setDependencies should throw (would be 101 total)
+      // Adding 2 more via setAll should throw (would be 101 total)
       // This tests validateDependencyLimit throw path
       expect(() => {
-        router.setDependencies({ dep99: 99, dep100: 100 });
+        deps.setAll({ dep99: 99, dep100: 100 });
       }).toThrowError("Dependency limit exceeded");
     });
 
@@ -321,15 +332,17 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 100 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 20 dependencies - no warning yet (count is checked before add)
       for (let i = 0; i < 20; i++) {
-        router.setDependency(`dep${i}`, i);
+        deps.set(`dep${i}`, i);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
       // 21st dependency should trigger warning (count === 20 at check time)
-      router.setDependency("dep20", 20);
+      deps.set("dep20", 20);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -350,15 +363,17 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 100 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 50 dependencies - no error yet (count is checked before add)
       for (let i = 0; i < 50; i++) {
-        router.setDependency(`dep${i}`, i);
+        deps.set(`dep${i}`, i);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
 
       // 51st dependency should trigger error log (count === 50 at check time)
-      router.setDependency("dep50", 50);
+      deps.set("dep50", 50);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.setDependency",

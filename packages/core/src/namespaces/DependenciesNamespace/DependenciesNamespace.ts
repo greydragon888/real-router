@@ -3,13 +3,7 @@
 import { logger } from "@real-router/logger";
 import { getTypeDescription } from "type-guards";
 
-import {
-  validateDependencyExists,
-  validateDependencyLimit,
-  validateDependencyName,
-  validateDependenciesObject,
-  validateSetDependencyArgs,
-} from "./validators";
+import { validateDependenciesObject } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
@@ -36,47 +30,14 @@ export class DependenciesNamespace<
   }
 
   // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // Proxy to functions in validators.ts for separation of concerns
+  // Static validation methods (called by facade)
   // =========================================================================
-
-  static validateName(
-    name: unknown,
-    methodName: string,
-  ): asserts name is string {
-    validateDependencyName(name, methodName);
-  }
-
-  static validateSetDependencyArgs(name: unknown): asserts name is string {
-    validateSetDependencyArgs(name);
-  }
 
   static validateDependenciesObject(
     deps: unknown,
     methodName: string,
   ): asserts deps is Record<string, unknown> {
     validateDependenciesObject(deps, methodName);
-  }
-
-  static validateDependencyExists(
-    value: unknown,
-    dependencyName: string,
-  ): asserts value is NonNullable<unknown> {
-    validateDependencyExists(value, dependencyName);
-  }
-
-  static validateDependencyLimit(
-    currentCount: number,
-    newCount: number,
-    methodName: string,
-    maxDependencies?: number,
-  ): void {
-    validateDependencyLimit(
-      currentCount,
-      newCount,
-      methodName,
-      maxDependencies,
-    );
   }
 
   setLimits(limits: Limits): void {

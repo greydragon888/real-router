@@ -1,6 +1,11 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -168,15 +173,16 @@ describe("dispose", () => {
 
     it("dispose() clears dependencies", async () => {
       const r = router as Router<{ myDep: string }>;
+      const deps = getDependenciesApi(r);
 
-      r.setDependency("myDep", "value");
+      deps.set("myDep", "value");
 
-      expect(r.hasDependency("myDep")).toBe(true);
+      expect(deps.has("myDep")).toBe(true);
 
       await router.start("/home");
       router.dispose();
 
-      expect(r.hasDependency("myDep")).toBe(false);
+      expect(deps.has("myDep")).toBe(false);
     });
   });
 
@@ -344,15 +350,16 @@ describe("dispose", () => {
       }
     });
 
-    it("setDependency() throws ROUTER_DISPOSED after dispose()", () => {
+    it("getDependenciesApi set() throws ROUTER_DISPOSED after dispose()", () => {
       const r = router as Router<{ key: string }>;
+      const deps = getDependenciesApi(r);
 
       expect(() => {
-        r.setDependency("key", "value");
+        deps.set("key", "value");
       }).toThrowError();
 
       try {
-        r.setDependency("key", "value");
+        deps.set("key", "value");
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
