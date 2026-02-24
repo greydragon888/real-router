@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/EventBusNamespace/EventBusNamespace.ts
 
-import { events, validEventNames } from "../../constants";
+import { events } from "../../constants";
 import { routerEvents, routerStates } from "../../fsm";
 
 import type { EventBusOptions } from "./types";
@@ -29,25 +29,6 @@ export class EventBusNamespace {
     this.#emitter = options.emitter;
     this.#currentToState = undefined;
     this.#setupFSMActions();
-  }
-
-  static validateEventName(eventName: unknown): void {
-    if (!validEventNames.has(eventName as EventName)) {
-      throw new Error(`Invalid event name: ${String(eventName)}`);
-    }
-  }
-
-  static validateListenerArgs<E extends EventName>(
-    eventName: E,
-    cb: Plugin[EventMethodMap[E]],
-  ): void {
-    EventBusNamespace.validateEventName(eventName);
-
-    if (typeof cb !== "function") {
-      throw new TypeError(
-        `Expected callback to be a function for event ${eventName}`,
-      );
-    }
   }
 
   static validateSubscribeListener(listener: unknown): void {
