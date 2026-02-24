@@ -1,4 +1,9 @@
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  getPluginApi,
+  RouterError,
+} from "@real-router/core";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createSafeBrowser } from "../../src/browser";
@@ -54,7 +59,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       // Note: id is overwritten by makeState with ++stateId (value 2 after router.start)
@@ -79,7 +89,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.params).toStrictEqual({});
@@ -102,7 +117,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.options).toStrictEqual({});
@@ -120,7 +140,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.id).toBeGreaterThanOrEqual(1);
@@ -136,7 +161,12 @@ describe("Utils", () => {
         state: null,
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.name).toBe("home");

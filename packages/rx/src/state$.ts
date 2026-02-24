@@ -1,4 +1,4 @@
-import { events } from "@real-router/core";
+import { events, getPluginApi } from "@real-router/core";
 
 import { RxObservable } from "./RxObservable";
 
@@ -13,7 +13,8 @@ export function state$(
   const { replay = true } = options ?? {};
 
   return new RxObservable<SubscribeState>((observer) => {
-    const unsubscribe = router.addEventListener(
+    const api = getPluginApi(router);
+    const unsubscribe = api.addEventListener(
       events.TRANSITION_SUCCESS,
       (toState: State, fromState: State | undefined) => {
         observer.next?.({ route: toState, previousRoute: fromState });

@@ -7,6 +7,7 @@ import { type DefaultBrowserPluginOptions, LOGGER_CONTEXT } from "./constants";
 
 import type { BrowserPluginOptions, HistoryState, Browser } from "./types";
 import type {
+  PluginApi,
   Router,
   NavigationOptions,
   RouterError,
@@ -48,24 +49,24 @@ export const escapeRegExp = (str: string): string => {
  * Creates state from popstate event
  *
  * @param evt - PopStateEvent from browser
- * @param router - Router instance
+ * @param api - PluginApi instance
  * @param browser - Browser API instance
  * @param options - Browser plugin options
  * @returns Router state or undefined
  */
 export function createStateFromEvent(
   evt: PopStateEvent,
-  router: Router,
+  api: PluginApi,
   browser: Browser,
   options: BrowserPluginOptions,
 ): State | undefined {
   const isNewState = !isState(evt.state);
 
   if (isNewState) {
-    return router.matchPath(browser.getLocation(options));
+    return api.matchPath(browser.getLocation(options));
   }
 
-  return router.makeState(
+  return api.makeState(
     evt.state.name,
     evt.state.params,
     evt.state.path,

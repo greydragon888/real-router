@@ -55,7 +55,7 @@ import type {
   SubscribeFn,
   Unsubscribe,
 } from "@real-router/types";
-import type { CreateMatcherOptions } from "route-tree";
+import type { CreateMatcherOptions, RouteTree } from "route-tree";
 
 /**
  * Router class with integrated namespace architecture.
@@ -230,6 +230,7 @@ export class Router<
     this.matchPath = this.matchPath.bind(this);
     this.setRootPath = this.setRootPath.bind(this);
     this.getRootPath = this.getRootPath.bind(this);
+    this.getTree = this.getTree.bind(this);
 
     // State Management
     this.makeState = this.makeState.bind(this);
@@ -528,6 +529,10 @@ export class Router<
 
   getRootPath(): string {
     return this.#routes.getRootPath();
+  }
+
+  getTree(): RouteTree {
+    return this.#routes.getTree();
   }
 
   // ============================================================================
@@ -960,13 +965,6 @@ export class Router<
   // Navigation
   // ============================================================================
 
-  navigate(routeName: string): Promise<State>;
-  navigate(routeName: string, routeParams: Params): Promise<State>;
-  navigate(
-    routeName: string,
-    routeParams: Params,
-    options: NavigationOptions,
-  ): Promise<State>;
   navigate(
     routeName: string,
     routeParams?: Params,

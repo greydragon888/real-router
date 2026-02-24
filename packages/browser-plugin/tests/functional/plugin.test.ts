@@ -9,6 +9,7 @@ import {
   afterAll,
   it,
   expect,
+  type MockInstance,
 } from "vitest";
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
@@ -324,7 +325,10 @@ describe("Browser Plugin", async () => {
   });
 
   describe("Popstate Handling", () => {
+    let navigateToStateSpy: MockInstance;
+
     beforeEach(async () => {
+      navigateToStateSpy = vi.spyOn(router, "navigateToState");
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
       await router.start();
     });
@@ -359,19 +363,18 @@ describe("Browser Plugin", async () => {
 
     it("skips transition for equal states", async () => {
       const currentState = router.getState();
-      const transitionSpy = vi.spyOn(router, "navigateToState");
 
       globalThis.dispatchEvent(
         new PopStateEvent("popstate", { state: currentState }),
       );
 
-      expect(transitionSpy).not.toHaveBeenCalled();
+      expect(navigateToStateSpy).not.toHaveBeenCalled();
     });
 
     it("restores state on CANNOT_DEACTIVATE", async () => {
       await router.navigate("users.list");
 
-      vi.spyOn(router, "navigateToState").mockRejectedValue(
+      navigateToStateSpy.mockRejectedValue(
         new RouterError(errorCodes.CANNOT_DEACTIVATE, {}),
       );
 
@@ -387,7 +390,10 @@ describe("Browser Plugin", async () => {
 
   describe("Edge Cases", () => {
     describe("Race Condition Protection", () => {
+      let navigateToStateSpy: MockInstance;
+
       beforeEach(async () => {
+        navigateToStateSpy = vi.spyOn(router, "navigateToState");
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
         await router.start();
       });
@@ -396,7 +402,7 @@ describe("Browser Plugin", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
         // Mock slow transition that returns a delayed Promise
-        vi.spyOn(router, "navigateToState").mockImplementation((_to) => {
+        navigateToStateSpy.mockImplementation((_to) => {
           return new Promise<State>((resolve) => {
             setTimeout(() => {
               resolve(_to);
@@ -441,7 +447,7 @@ describe("Browser Plugin", async () => {
         let resolveTransition: TransitionResolver | null = null;
 
         // Mock slow transition that returns a Promise we can resolve externally
-        vi.spyOn(router, "navigateToState").mockImplementation((_to: State) => {
+        navigateToStateSpy.mockImplementation((_to: State) => {
           return new Promise<State>((resolve) => {
             resolveTransition = resolve;
           });
@@ -512,25 +518,24 @@ describe("Browser Plugin", async () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Verify: we made 2 transitions (state1, then state3), skipping state2
-        expect(vi.mocked(router.navigateToState)).toHaveBeenCalledTimes(2);
+        expect(navigateToStateSpy).toHaveBeenCalledTimes(2);
         // First call was for state1
-        expect(
-          vi.mocked(router.navigateToState).mock.calls[0][0],
-        ).toMatchObject({
+        expect(navigateToStateSpy.mock.calls[0][0]).toMatchObject({
           name: "users.view",
           params: { id: "1" },
         });
         // Second call was for state3 (skipped state2!)
-        expect(
-          vi.mocked(router.navigateToState).mock.calls[1][0],
-        ).toMatchObject({
+        expect(navigateToStateSpy.mock.calls[1][0]).toMatchObject({
           name: "users.list",
         });
       });
     });
 
     describe("Error Recovery", () => {
+      let makeStateSpy: MockInstance;
+
       beforeEach(async () => {
+        makeStateSpy = vi.spyOn(router, "makeState");
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
         await router.start();
       });
@@ -565,8 +570,8 @@ describe("Browser Plugin", async () => {
         await router.navigate("users.list");
 
         // Mock makeState to throw - this triggers the outer catch in onPopState
-        // createStateFromEvent calls router.makeState for existing history states
-        vi.spyOn(router, "makeState").mockImplementation(() => {
+        // createStateFromEvent calls api.makeState for existing history states
+        makeStateSpy.mockImplementation(() => {
           throw new Error("Critical makeState error");
         });
 
@@ -604,7 +609,7 @@ describe("Browser Plugin", async () => {
         await router.navigate("users.list");
 
         // Mock makeState to throw - this triggers the outer catch in onPopState
-        vi.spyOn(router, "makeState").mockImplementation(() => {
+        makeStateSpy.mockImplementation(() => {
           throw new Error("Critical makeState error");
         });
 
@@ -709,6 +714,8 @@ describe("Browser Plugin", async () => {
     describe("null state handling in onPopState (lines 346-350)", () => {
       it("handles null state from matchPath when no default route", async () => {
         // Create router without default route
+        // Config has only "/home" — browser is at "/" (from outer beforeEach),
+        // so matchPath("/") naturally returns undefined (no matching route)
         const noDefaultRouter = createRouter(
           [{ name: "home", path: "/home" }],
           {},
@@ -717,10 +724,8 @@ describe("Browser Plugin", async () => {
         noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
         await noDefaultRouter.start("/home");
 
-        // Mock matchPath to return undefined (simulates unknown route)
-        vi.spyOn(noDefaultRouter, "matchPath").mockReturnValue(undefined);
-
         // Trigger popstate with no state (new URL, not from history)
+        // Browser is at "/", which doesn't match any route → matchPath returns undefined
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: null }),
         );
@@ -1535,7 +1540,10 @@ describe("Browser Plugin", async () => {
     });
 
     describe("Transition Error Recovery", () => {
+      let navigateToStateSpy: MockInstance;
+
       beforeEach(async () => {
+        navigateToStateSpy = vi.spyOn(router, "navigateToState");
         router.usePlugin(browserPluginFactory({}, mockedBrowser));
         await router.start();
       });
@@ -1549,9 +1557,7 @@ describe("Browser Plugin", async () => {
         await router.navigate("users.list");
 
         // Mock transition error - navigateToState returns a rejected Promise
-        vi.spyOn(router, "navigateToState").mockRejectedValue(
-          new Error("Transition failed"),
-        );
+        navigateToStateSpy.mockRejectedValue(new Error("Transition failed"));
 
         vi.spyOn(mockedBrowser, "replaceState");
 
@@ -1687,7 +1693,10 @@ describe("Browser Plugin", async () => {
   });
 
   describe("replaceHistoryState", () => {
+    let buildStateSpy: MockInstance;
+
     beforeEach(async () => {
+      buildStateSpy = vi.spyOn(router, "buildState");
       router.usePlugin(browserPluginFactory({}, mockedBrowser));
     });
 
@@ -1713,7 +1722,7 @@ describe("Browser Plugin", async () => {
     });
 
     it("throws if buildState returns undefined", async () => {
-      router.buildState = () => undefined;
+      buildStateSpy.mockReturnValue(undefined);
 
       expect(() => {
         router.replaceHistoryState("nonexistent");
