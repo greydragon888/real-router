@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events } from "@real-router/core";
+import { constants, errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
@@ -22,8 +22,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -47,8 +47,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -71,8 +71,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -96,8 +96,11 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start("/invalid/path");
@@ -120,8 +123,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -145,8 +148,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -170,8 +173,11 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start("/invalid/path");
@@ -194,8 +200,8 @@ describe("router.start() - arguments validation", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -230,7 +236,7 @@ describe("router state check", () => {
 
       const startListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
 
       try {
         await router.start("/home");
@@ -251,8 +257,11 @@ describe("router state check", () => {
       const transitionStartListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.TRANSITION_START, transitionStartListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        transitionStartListener,
+      );
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );

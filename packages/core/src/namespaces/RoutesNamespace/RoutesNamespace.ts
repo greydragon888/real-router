@@ -22,7 +22,6 @@ import {
 import { createRouteState } from "./stateBuilder";
 import {
   validateRemoveRouteArgs,
-  validateSetRootPathArgs,
   validateAddRouteArgs,
   validateParentOption,
   validateIsActiveRouteArgs,
@@ -30,7 +29,6 @@ import {
   validateUpdateRouteBasicArgs,
   validateUpdateRoutePropertyTypes,
   validateBuildPathArgs,
-  validateMatchPathArgs,
   validateShouldUpdateNodeArgs,
   validateRoutes,
 } from "./validators";
@@ -179,12 +177,6 @@ export class RoutesNamespace<
     validateRemoveRouteArgs(name);
   }
 
-  static validateSetRootPathArgs(
-    rootPath: unknown,
-  ): asserts rootPath is string {
-    validateSetRootPathArgs(rootPath);
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
   static validateAddRouteArgs(routes: readonly Route<any>[]): void {
     validateAddRouteArgs(routes);
@@ -234,10 +226,6 @@ export class RoutesNamespace<
 
   static validateBuildPathArgs(route: unknown): asserts route is string {
     validateBuildPathArgs(route);
-  }
-
-  static validateMatchPathArgs(path: unknown): asserts path is string {
-    validateMatchPathArgs(path);
   }
 
   static validateShouldUpdateNodeArgs(

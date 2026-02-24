@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -123,8 +123,12 @@ describe("router.clone()", () => {
     const router = createTestRouter();
     const clonedRouter = router.clone();
 
-    expect(clonedRouter.getOptions()).toStrictEqual(router.getOptions());
-    expect(clonedRouter.getOptions()).not.toBe(router.getOptions());
+    expect(getPluginApi(clonedRouter).getOptions()).toStrictEqual(
+      getPluginApi(router).getOptions(),
+    );
+    expect(getPluginApi(clonedRouter).getOptions()).not.toBe(
+      getPluginApi(router).getOptions(),
+    );
   });
 
   it("should clone config by value", async () => {
@@ -141,7 +145,9 @@ describe("router.clone()", () => {
 
     // Clone has same routes and behavior as original
     expect(clonedRouter.hasRoute("cloneTest")).toBe(true);
-    expect(clonedRouter.makeState("cloneTest").params).toStrictEqual({
+    expect(
+      getPluginApi(clonedRouter).makeState("cloneTest").params,
+    ).toStrictEqual({
       id: "default",
     });
   });
@@ -208,7 +214,7 @@ describe("router.clone()", () => {
     const clonedRouter = router.clone();
 
     // Clone inherits forward rules from original
-    expect(clonedRouter.forwardState("original", {}).name).toBe(
+    expect(getPluginApi(clonedRouter).forwardState("original", {}).name).toBe(
       "redirectTarget",
     );
 
@@ -217,9 +223,13 @@ describe("router.clone()", () => {
     clonedRouter.updateRoute("original", { forwardTo: "newTarget" });
 
     // Original should NOT be affected
-    expect(router.forwardState("original", {}).name).toBe("redirectTarget");
+    expect(getPluginApi(router).forwardState("original", {}).name).toBe(
+      "redirectTarget",
+    );
     // Clone uses new forward rule
-    expect(clonedRouter.forwardState("original", {}).name).toBe("newTarget");
+    expect(getPluginApi(clonedRouter).forwardState("original", {}).name).toBe(
+      "newTarget",
+    );
   });
 
   it("should deep clone defaultParams (nested objects are independent)", async () => {
@@ -235,11 +245,13 @@ describe("router.clone()", () => {
     const clonedRouter = router.clone();
 
     // Both have same defaults initially
-    expect(router.makeState("paginated").params).toStrictEqual({
+    expect(getPluginApi(router).makeState("paginated").params).toStrictEqual({
       page: 1,
       sort: "name",
     });
-    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+    expect(
+      getPluginApi(clonedRouter).makeState("paginated").params,
+    ).toStrictEqual({
       page: 1,
       sort: "name",
     });
@@ -250,12 +262,14 @@ describe("router.clone()", () => {
     });
 
     // Original should NOT be affected
-    expect(router.makeState("paginated").params).toStrictEqual({
+    expect(getPluginApi(router).makeState("paginated").params).toStrictEqual({
       page: 1,
       sort: "name",
     });
     // Clone has updated defaults
-    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+    expect(
+      getPluginApi(clonedRouter).makeState("paginated").params,
+    ).toStrictEqual({
       page: 2,
       sort: "name",
     });
@@ -424,12 +438,17 @@ describe("router.clone()", () => {
 
       // Clone should have same behavior
       expect(clonedRouter.hasRoute("complexRoute")).toBe(true);
-      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+      expect(
+        getPluginApi(clonedRouter).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 1,
       });
       expect(
-        clonedRouter.forwardState("complexRoute", { id: "1", page: 1 }).name,
+        getPluginApi(clonedRouter).forwardState("complexRoute", {
+          id: "1",
+          page: 1,
+        }).name,
       ).toBe("targetRoute");
 
       // Modify clone
@@ -438,12 +457,16 @@ describe("router.clone()", () => {
       });
 
       // Original should NOT be affected
-      expect(router.makeState("complexRoute").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 1,
       });
       // Clone has updated defaults
-      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+      expect(
+        getPluginApi(clonedRouter).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 2,
       });
@@ -641,7 +664,10 @@ describe("router.clone()", () => {
       expect(originalRoute?.forwardTo).toBe(forwardFn);
       expect(clonedRoute?.forwardTo).toBe(forwardFn);
 
-      const clonedResult = clonedRouter.forwardState("clone-forward", {});
+      const clonedResult = getPluginApi(clonedRouter).forwardState(
+        "clone-forward",
+        {},
+      );
 
       expect(clonedResult.name).toBe("clone-target");
     });

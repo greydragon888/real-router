@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import { errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -198,7 +198,7 @@ describe("router.navigate() - edge cases callback", () => {
       it("should apply opts when provided after params", async () => {
         const successListener = vi.fn();
 
-        const unsubscribe = router.addEventListener(
+        const unsubscribe = getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           successListener,
         );
@@ -218,7 +218,7 @@ describe("router.navigate() - edge cases callback", () => {
       it("should use default empty opts when undefined is passed", async () => {
         const successListener = vi.fn();
 
-        const unsubscribe = router.addEventListener(
+        const unsubscribe = getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           successListener,
         );
@@ -272,7 +272,7 @@ describe("router.navigate() - edge cases callback", () => {
       it("should work: navigate(name, params, opts)", async () => {
         const successListener = vi.fn();
 
-        const unsubscribe = router.addEventListener(
+        const unsubscribe = getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           successListener,
         );

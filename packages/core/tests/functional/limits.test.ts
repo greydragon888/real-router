@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, events } from "@real-router/core";
+import { createRouter, events, getPluginApi } from "@real-router/core";
 
 import type { Router } from "@real-router/core";
 
@@ -141,12 +141,12 @@ describe("core/limits (integration via public API)", () => {
 
       // Add 1 listener - should succeed
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).not.toThrowError();
 
       // 2nd listener should throw
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrowError("Listener limit");
     });
   });
@@ -193,7 +193,7 @@ describe("core/limits (integration via public API)", () => {
       // Add many listeners - should not throw
       expect(() => {
         for (let i = 0; i < 10; i++) {
-          router.addEventListener(events.ROUTER_START, () => {});
+          getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrowError();
     });
@@ -207,7 +207,7 @@ describe("core/limits (integration via public API)", () => {
       // Add listener BEFORE start to ensure event is emitted
       let startEventReceived = false;
 
-      router.addEventListener(events.ROUTER_START, () => {
+      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
         startEventReceived = true;
       });
 
@@ -276,13 +276,13 @@ describe("core/limits (integration via public API)", () => {
       // Add 10000 listeners - should succeed
       expect(() => {
         for (let i = 0; i < 10_000; i++) {
-          router.addEventListener(events.ROUTER_START, () => {});
+          getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrowError();
 
       // 10001st listener should throw
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrowError("Listener limit");
     });
 

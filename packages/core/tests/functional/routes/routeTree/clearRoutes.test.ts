@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events } from "@real-router/core";
+import { events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -22,12 +22,12 @@ describe("core/routes/clearRoutes", () => {
   describe("basic functionality", () => {
     it("should clear all routes from tree", async () => {
       // createTestRouter adds default routes (home, etc.)
-      expect(router.matchPath("/")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/")).toBeDefined();
 
       router.clearRoutes();
 
       // All routes should be gone
-      expect(router.matchPath("/")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/")).toBeUndefined();
     });
 
     it("should return router for chaining", async () => {
@@ -41,7 +41,7 @@ describe("core/routes/clearRoutes", () => {
 
       router.addRoute({ name: "newHome", path: "/new-home" });
 
-      expect(router.matchPath("/new-home")?.name).toBe("newHome");
+      expect(getPluginApi(router).matchPath("/new-home")?.name).toBe("newHome");
     });
 
     it("should clear nested routes", async () => {
@@ -57,15 +57,17 @@ describe("core/routes/clearRoutes", () => {
         ],
       });
 
-      expect(router.matchPath("/parent/child/grandchild")?.name).toBe(
-        "parent.child.grandchild",
-      );
+      expect(
+        getPluginApi(router).matchPath("/parent/child/grandchild")?.name,
+      ).toBe("parent.child.grandchild");
 
       router.clearRoutes();
 
-      expect(router.matchPath("/parent")).toBeUndefined();
-      expect(router.matchPath("/parent/child")).toBeUndefined();
-      expect(router.matchPath("/parent/child/grandchild")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/parent")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/parent/child")).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/parent/child/grandchild"),
+      ).toBeUndefined();
     });
 
     it("should work when called multiple times", async () => {
@@ -76,7 +78,7 @@ describe("core/routes/clearRoutes", () => {
       // Should still be functional
       router.addRoute({ name: "test", path: "/test" });
 
-      expect(router.matchPath("/test")?.name).toBe("test");
+      expect(getPluginApi(router).matchPath("/test")?.name).toBe("test");
     });
 
     it("should work when router has no routes", async () => {
@@ -103,7 +105,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.hasRoute("withDecoder")).toBe(true);
 
       // Verify decoder works before clear
-      const result = router.matchPath("/with-decoder/123");
+      const result = getPluginApi(router).matchPath("/with-decoder/123");
 
       expect(result?.name).toBe("withDecoder");
       expect(result?.params.id).toBe(123);
@@ -112,7 +114,9 @@ describe("core/routes/clearRoutes", () => {
 
       // Route no longer exists after clear
       expect(router.hasRoute("withDecoder")).toBe(false);
-      expect(router.matchPath("/with-decoder/123")).toBeUndefined();
+      expect(
+        getPluginApi(router).matchPath("/with-decoder/123"),
+      ).toBeUndefined();
     });
 
     it("should clear encoders", async () => {
@@ -146,7 +150,9 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Verify defaults work before clear
-      expect(router.makeState("withDefaults").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("withDefaults").params,
+      ).toStrictEqual({
         page: 1,
         limit: 10,
       });
@@ -166,7 +172,9 @@ describe("core/routes/clearRoutes", () => {
       });
 
       // Verify forward works before clear
-      expect(router.forwardState("redirect", {}).name).toBe("target");
+      expect(getPluginApi(router).forwardState("redirect", {}).name).toBe(
+        "target",
+      );
 
       router.clearRoutes();
 
@@ -314,18 +322,20 @@ describe("core/routes/clearRoutes", () => {
 
     it("should preserve options", async () => {
       // Options set before start are preserved
-      const options = router.getOptions();
+      const options = getPluginApi(router).getOptions();
 
       router.clearRoutes();
 
       // Options should be the same after clearRoutes
-      expect(router.getOptions().trailingSlash).toBe(options.trailingSlash);
+      expect(getPluginApi(router).getOptions().trailingSlash).toBe(
+        options.trailingSlash,
+      );
     });
 
     it("should preserve event listeners", async () => {
       const eventLog: string[] = [];
 
-      router.addEventListener(events.TRANSITION_SUCCESS, () => {
+      getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, () => {
         eventLog.push("success");
       });
 
@@ -354,7 +364,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()).toBeUndefined();
 
       // Route doesn't exist in tree anymore
-      expect(router.matchPath("/home")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/home")).toBeUndefined();
     });
 
     it("should have consistent state - both state and matchPath are undefined", async () => {
@@ -371,7 +381,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()).toBeUndefined();
 
       // matchPath also returns undefined - consistent!
-      expect(router.matchPath("/users/list")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/users/list")).toBeUndefined();
     });
 
     it("should return cancel function when navigating to non-existent route", async () => {
@@ -418,9 +428,9 @@ describe("core/routes/clearRoutes", () => {
         { name: "contact", path: "/contact" },
       ]);
 
-      expect(router.matchPath("/")?.name).toBe("home");
-      expect(router.matchPath("/about")?.name).toBe("about");
-      expect(router.matchPath("/contact")?.name).toBe("contact");
+      expect(getPluginApi(router).matchPath("/")?.name).toBe("home");
+      expect(getPluginApi(router).matchPath("/about")?.name).toBe("about");
+      expect(getPluginApi(router).matchPath("/contact")?.name).toBe("contact");
     });
 
     it("should support complete route replacement", async () => {
@@ -430,8 +440,8 @@ describe("core/routes/clearRoutes", () => {
       // Replace all routes
       router.clearRoutes().addRoute({ name: "newRoute", path: "/new" });
 
-      expect(router.matchPath("/old")).toBeUndefined();
-      expect(router.matchPath("/new")?.name).toBe("newRoute");
+      expect(getPluginApi(router).matchPath("/old")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/new")?.name).toBe("newRoute");
     });
   });
 
@@ -479,8 +489,8 @@ describe("core/routes/clearRoutes", () => {
       );
 
       // Routes should NOT be cleared (operation was blocked)
-      expect(router.matchPath("/home")).toBeDefined();
-      expect(router.matchPath("/async-route")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/home")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/async-route")).toBeDefined();
 
       // Resolve the canActivate to complete navigation
       resolveCanActivate!();
@@ -549,7 +559,7 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
 
       expect(errorSpy).toHaveBeenCalled();
-      expect(router.matchPath("/temp")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/temp")).toBeDefined();
 
       // Complete navigation
       resolveCanActivate!();
@@ -565,7 +575,7 @@ describe("core/routes/clearRoutes", () => {
       expect(errorSpy).not.toHaveBeenCalled();
 
       // Routes should be cleared
-      expect(router.matchPath("/temp")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/temp")).toBeUndefined();
       expect(router.getState()).toBeUndefined();
     });
 
@@ -600,7 +610,7 @@ describe("core/routes/clearRoutes", () => {
       router2.clearRoutes();
 
       // router2 should be cleared
-      expect(router2.matchPath("/home")).toBeUndefined();
+      expect(getPluginApi(router2).matchPath("/home")).toBeUndefined();
 
       // router1 should be blocked
       router.clearRoutes();
@@ -611,7 +621,7 @@ describe("core/routes/clearRoutes", () => {
       );
 
       // router1 routes should NOT be cleared
-      expect(router.matchPath("/home")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/home")).toBeDefined();
 
       // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
@@ -629,13 +639,15 @@ describe("core/routes/clearRoutes", () => {
       unstartedRouter.clearRoutes();
 
       // All routes should be cleared
-      expect(unstartedRouter.matchPath("/")).toBeUndefined();
-      expect(unstartedRouter.matchPath("/home")).toBeUndefined();
+      expect(getPluginApi(unstartedRouter).matchPath("/")).toBeUndefined();
+      expect(getPluginApi(unstartedRouter).matchPath("/home")).toBeUndefined();
 
       // Should still be able to add new routes
       unstartedRouter.addRoute({ name: "fresh", path: "/fresh" });
 
-      expect(unstartedRouter.matchPath("/fresh")?.name).toBe("fresh");
+      expect(getPluginApi(unstartedRouter).matchPath("/fresh")?.name).toBe(
+        "fresh",
+      );
     });
 
     it("should work on stopped router", async () => {
@@ -651,14 +663,14 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
 
       // All routes should be cleared
-      expect(router.matchPath("/")).toBeUndefined();
-      expect(router.matchPath("/home")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/home")).toBeUndefined();
       expect(router.getState()).toBeUndefined();
 
       // Should still be able to add new routes
       router.addRoute({ name: "newRoute", path: "/new" });
 
-      expect(router.matchPath("/new")?.name).toBe("newRoute");
+      expect(getPluginApi(router).matchPath("/new")?.name).toBe("newRoute");
     });
 
     it("should work correctly with stop-start-stop cycle", async () => {
@@ -671,7 +683,7 @@ describe("core/routes/clearRoutes", () => {
       router.clearRoutes();
 
       // Routes cleared
-      expect(router.matchPath("/home")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/home")).toBeUndefined();
 
       // Can add new routes and restart with new defaultRoute
       // Issue #50: With two-phase start, we need a new router with new defaultRoute
@@ -686,7 +698,7 @@ describe("core/routes/clearRoutes", () => {
       router.stop();
       router.clearRoutes();
 
-      expect(router.matchPath("/dashboard")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/dashboard")).toBeUndefined();
     });
   });
 
@@ -699,7 +711,9 @@ describe("core/routes/clearRoutes", () => {
         forwardTo: () => "fn-dest",
       });
 
-      expect(router.forwardState("fn-src", {}).name).toBe("fn-dest");
+      expect(getPluginApi(router).forwardState("fn-src", {}).name).toBe(
+        "fn-dest",
+      );
 
       router.clearRoutes();
 
@@ -709,7 +723,9 @@ describe("core/routes/clearRoutes", () => {
         { name: "fn-src", path: "/fn-src" },
       ]);
 
-      expect(router.forwardState("fn-src", {}).name).toBe("fn-src");
+      expect(getPluginApi(router).forwardState("fn-src", {}).name).toBe(
+        "fn-src",
+      );
     });
   });
 });

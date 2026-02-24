@@ -14,6 +14,7 @@ import { validateRouteName } from "type-guards";
 import { errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
+import { getInternals, registerInternals } from "./internals";
 import {
   CloneNamespace,
   DependenciesNamespace,
@@ -33,7 +34,6 @@ import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
 import type {
-  EventMethodMap,
   GuardFnFactory,
   Limits,
   PluginFactory,
@@ -43,19 +43,14 @@ import type {
 } from "./types";
 import type {
   DefaultDependencies,
-  EventName,
   NavigationOptions,
   Options,
   Params,
-  Plugin,
-  RouteTreeState,
-  SimpleState,
   State,
-  StateMetaInput,
   SubscribeFn,
   Unsubscribe,
 } from "@real-router/types";
-import type { CreateMatcherOptions, RouteTree } from "route-tree";
+import type { CreateMatcherOptions } from "route-tree";
 
 /**
  * Router class with integrated namespace architecture.
@@ -208,6 +203,32 @@ export class Router<
     );
 
     // =========================================================================
+    // Register Internals (WeakMap for plugin/infrastructure access)
+    // =========================================================================
+
+    registerInternals(this, {
+      makeState: (name, params, path, meta, forceId) =>
+        this.#state.makeState(name, params, path, meta, forceId),
+      forwardState: (name, params) => this.#routes.forwardState(name, params),
+      buildStateResolved: (name, params) =>
+        this.#routes.buildStateResolved(name, params),
+      matchPath: (path, matchOptions) =>
+        this.#routes.matchPath(path, matchOptions),
+      getOptions: () => this.#options.get(),
+      navigateToState: (toState, fromState, opts) =>
+        this.#navigation.navigateToState(toState, fromState, opts),
+      addEventListener: (eventName, cb) =>
+        this.#eventBus.addEventListener(eventName, cb),
+      setRootPath: (rootPath) => {
+        this.#routes.setRootPath(rootPath);
+      },
+      getRootPath: () => this.#routes.getRootPath(),
+      getTree: () => this.#routes.getTree(),
+      isDisposed: () => this.#eventBus.isDisposed(),
+      noValidate,
+    });
+
+    // =========================================================================
     // Bind Public Methods
     // =========================================================================
     // All public methods that access private fields must be bound to preserve
@@ -227,23 +248,13 @@ export class Router<
     // Path & State Building
     this.isActiveRoute = this.isActiveRoute.bind(this);
     this.buildPath = this.buildPath.bind(this);
-    this.matchPath = this.matchPath.bind(this);
-    this.setRootPath = this.setRootPath.bind(this);
-    this.getRootPath = this.getRootPath.bind(this);
-    this.getTree = this.getTree.bind(this);
 
     // State Management
-    this.makeState = this.makeState.bind(this);
     this.getState = this.getState.bind(this);
     this.getPreviousState = this.getPreviousState.bind(this);
     this.areStatesEqual = this.areStatesEqual.bind(this);
-    this.forwardState = this.forwardState.bind(this);
-    this.buildState = this.buildState.bind(this);
     this.buildNavigationState = this.buildNavigationState.bind(this);
     this.shouldUpdateNode = this.shouldUpdateNode.bind(this);
-
-    // Options
-    this.getOptions = this.getOptions.bind(this);
 
     // Router Lifecycle
     this.isActive = this.isActive.bind(this);
@@ -270,13 +281,9 @@ export class Router<
     this.hasDependency = this.hasDependency.bind(this);
     this.resetDependencies = this.resetDependencies.bind(this);
 
-    // Events
-    this.addEventListener = this.addEventListener.bind(this);
-
     // Navigation
     this.navigate = this.navigate.bind(this);
     this.navigateToDefault = this.navigateToDefault.bind(this);
-    this.navigateToState = this.navigateToState.bind(this);
 
     // Subscription
     this.subscribe = this.subscribe.bind(this);
@@ -509,49 +516,9 @@ export class Router<
     return this.#routes.buildPath(route, params, this.#options.get());
   }
 
-  matchPath<P extends Params = Params, MP extends Params = Params>(
-    path: string,
-  ): State<P, MP> | undefined {
-    if (!this.#noValidate) {
-      RoutesNamespace.validateMatchPathArgs(path);
-    }
-
-    return this.#routes.matchPath<P, MP>(path, this.#options.get());
-  }
-
-  setRootPath(rootPath: string): void {
-    if (!this.#noValidate) {
-      RoutesNamespace.validateSetRootPathArgs(rootPath);
-    }
-
-    this.#routes.setRootPath(rootPath);
-  }
-
-  getRootPath(): string {
-    return this.#routes.getRootPath();
-  }
-
-  getTree(): RouteTree {
-    return this.#routes.getTree();
-  }
-
   // ============================================================================
   // State Management (delegated to StateNamespace)
   // ============================================================================
-
-  makeState<P extends Params = Params, MP extends Params = Params>(
-    name: string,
-    params?: P,
-    path?: string,
-    meta?: StateMetaInput<MP>,
-    forceId?: number,
-  ): State<P, MP> {
-    if (!this.#noValidate) {
-      StateNamespace.validateMakeStateArgs(name, params, path, forceId);
-    }
-
-    return this.#state.makeState<P, MP>(name, params, path, meta, forceId);
-  }
 
   getState<P extends Params = Params, MP extends Params = Params>():
     | State<P, MP>
@@ -579,39 +546,6 @@ export class Router<
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
 
-  forwardState<P extends Params = Params>(
-    routeName: string,
-    routeParams: P,
-  ): SimpleState<P> {
-    if (!this.#noValidate) {
-      RoutesNamespace.validateStateBuilderArgs(
-        routeName,
-        routeParams,
-        "forwardState",
-      );
-    }
-
-    return this.#routes.forwardState<P>(routeName, routeParams);
-  }
-
-  buildState(
-    routeName: string,
-    routeParams: Params,
-  ): RouteTreeState | undefined {
-    if (!this.#noValidate) {
-      RoutesNamespace.validateStateBuilderArgs(
-        routeName,
-        routeParams,
-        "buildState",
-      );
-    }
-
-    // Call forwardState at facade level to allow plugin interception
-    const { name, params } = this.forwardState(routeName, routeParams);
-
-    return this.#routes.buildStateResolved(name, params);
-  }
-
   buildNavigationState(name: string, params: Params = {}): State | undefined {
     if (!this.#noValidate) {
       RoutesNamespace.validateStateBuilderArgs(
@@ -621,13 +555,19 @@ export class Router<
       );
     }
 
-    const routeInfo = this.buildState(name, params);
+    const { name: resolvedName, params: resolvedParams } = getInternals(
+      this,
+    ).forwardState(name, params);
+    const routeInfo = this.#routes.buildStateResolved(
+      resolvedName,
+      resolvedParams,
+    );
 
     if (!routeInfo) {
       return undefined;
     }
 
-    return this.makeState(
+    return this.#state.makeState(
       routeInfo.name,
       routeInfo.params,
       this.buildPath(routeInfo.name, routeInfo.params),
@@ -646,14 +586,6 @@ export class Router<
     }
 
     return this.#routes.shouldUpdateNode(nodeName);
-  }
-
-  // ============================================================================
-  // Options (backed by OptionsNamespace)
-  // ============================================================================
-
-  getOptions(): Options {
-    return this.#options.get();
   }
 
   // ============================================================================
@@ -796,12 +728,13 @@ export class Router<
       return false;
     }
 
-    const { name: resolvedName, params: resolvedParams } = this.forwardState(
+    const ctx = getInternals(this);
+    const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
       name,
       params ?? {},
     );
-    const toState = this.makeState(resolvedName, resolvedParams);
-    const fromState = this.getState();
+    const toState = this.#state.makeState(resolvedName, resolvedParams);
+    const fromState = this.#state.get();
 
     const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
 
@@ -935,21 +868,6 @@ export class Router<
   }
 
   // ============================================================================
-  // Events (backed by EventEmitter)
-  // ============================================================================
-
-  addEventListener<E extends EventName>(
-    eventName: E,
-    cb: Plugin[EventMethodMap[E]],
-  ): Unsubscribe {
-    if (!this.#noValidate) {
-      EventBusNamespace.validateListenerArgs(eventName, cb);
-    }
-
-    return this.#eventBus.addEventListener(eventName, cb);
-  }
-
-  // ============================================================================
   // Subscription (backed by EventEmitter)
   // ============================================================================
 
@@ -1017,18 +935,6 @@ export class Router<
     return promiseState;
   }
 
-  navigateToState(
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ): Promise<State> {
-    if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateToStateArgs(toState, fromState, opts);
-    }
-
-    return this.#navigation.navigateToState(toState, fromState, opts);
-  }
-
   // ============================================================================
   // Cloning
   // ============================================================================
@@ -1084,7 +990,6 @@ export class Router<
   #markDisposed(): void {
     this.navigate = throwDisposed as never;
     this.navigateToDefault = throwDisposed as never;
-    this.navigateToState = throwDisposed as never;
     this.start = throwDisposed as never;
     this.stop = throwDisposed as never;
     this.addRoute = throwDisposed as never;
@@ -1100,9 +1005,7 @@ export class Router<
     this.setDependencies = throwDisposed as never;
     this.removeDependency = throwDisposed as never;
     this.resetDependencies = throwDisposed as never;
-    this.addEventListener = throwDisposed as never;
     this.subscribe = throwDisposed as never;
-    this.setRootPath = throwDisposed as never;
     this.clone = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;
   }

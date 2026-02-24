@@ -6,7 +6,6 @@ import { transition } from "./transition";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
-  validateNavigateToStateArgs,
   validateNavigationOptions,
 } from "./validators";
 import { errorCodes, constants } from "../../constants";
@@ -47,14 +46,6 @@ export class NavigationNamespace {
 
   static validateNavigateArgs(name: unknown): asserts name is string {
     validateNavigateArgs(name);
-  }
-
-  static validateNavigateToStateArgs(
-    toState: unknown,
-    fromState: unknown,
-    opts: unknown,
-  ): void {
-    validateNavigateToStateArgs(toState, fromState, opts);
   }
 
   static validateNavigateToDefaultArgs(opts: unknown): void {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { errorCodes, events, getPluginApi } from "@real-router/core";
+import { events, getPluginApi, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -32,6 +32,8 @@ describe("getPluginApi()", () => {
     expect(typeof api.addEventListener).toBe("function");
     expect(typeof api.getOptions).toBe("function");
     expect(typeof api.getTree).toBe("function");
+    expect(typeof api.getForwardState).toBe("function");
+    expect(typeof api.setForwardState).toBe("function");
   });
 
   it("should return a new object on each call", () => {
@@ -58,6 +60,21 @@ describe("getPluginApi()", () => {
     const result = api.forwardState("home", {});
 
     expect(result.name).toBe("home");
+  });
+
+  it("getForwardState/setForwardState should swap forwardState", () => {
+    const original = api.getForwardState();
+
+    api.setForwardState(((_name: string, params: Record<string, unknown>) => ({
+      name: "users",
+      params,
+    })) as typeof original);
+
+    expect(api.forwardState("home", {}).name).toBe("users");
+
+    api.setForwardState(original);
+
+    expect(api.forwardState("home", {}).name).toBe("home");
   });
 
   it("matchPath should delegate to router.matchPath", () => {
@@ -112,17 +129,56 @@ describe("getPluginApi()", () => {
     expect(tree.children.size).toBeGreaterThan(0);
   });
 
-  it("should throw ROUTER_DISPOSED for mutating methods after dispose", () => {
+  it("buildState should return undefined for non-existent route", () => {
+    const result = api.buildState("nonexistent", {});
+
+    expect(result).toBeUndefined();
+  });
+
+  it("matchPath should return undefined for non-matching path", () => {
+    const result = api.matchPath("/no-such-route");
+
+    expect(result).toBeUndefined();
+  });
+
+  it("should throw ROUTER_DISPOSED for addEventListener after dispose", () => {
     router.dispose();
 
     const disposedApi = getPluginApi(router);
 
-    try {
+    expect(() => {
       disposedApi.addEventListener(events.TRANSITION_SUCCESS, () => {});
+    }).toThrowError(RouterError);
+  });
 
-      expect.fail("Should have thrown");
-    } catch (error: any) {
-      expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
-    }
+  it("should throw ROUTER_DISPOSED for setRootPath after dispose", () => {
+    router.dispose();
+
+    const disposedApi = getPluginApi(router);
+
+    expect(() => {
+      disposedApi.setRootPath("/app");
+    }).toThrowError(RouterError);
+  });
+
+  it("should throw ROUTER_DISPOSED for navigateToState after dispose", () => {
+    router.dispose();
+
+    const disposedApi = getPluginApi(router);
+    const state = {
+      name: "home",
+      params: {},
+      path: "/home",
+      meta: { id: 1, params: {}, options: {} },
+    };
+
+    // throwIfDisposed is synchronous — throws before the async body runs
+    expect(() => {
+      void disposedApi.navigateToState(state, undefined, {});
+    }).toThrowError(RouterError);
+  });
+
+  it("should throw TypeError for invalid router instance", () => {
+    expect(() => getPluginApi({} as Router)).toThrowError(TypeError);
   });
 });

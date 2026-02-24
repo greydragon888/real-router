@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes } from "@real-router/core";
+import { events, errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -25,7 +25,7 @@ describe("router.navigate() - events transition success", () => {
     it("should emit TRANSITION_SUCCESS with correct newState and fromState parameters", async () => {
       const onSuccess = vi.fn();
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -71,7 +71,7 @@ describe("router.navigate() - events transition success", () => {
       // Navigate to parent route first
       const fromState = await router.navigate("orders");
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -88,7 +88,7 @@ describe("router.navigate() - events transition success", () => {
     it("should emit TRANSITION_SUCCESS with navigation options in newState meta", async () => {
       const onSuccess = vi.fn();
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -128,7 +128,7 @@ describe("router.navigate() - events transition success", () => {
       await router.navigate("profile");
 
       const onSuccess = vi.fn();
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -170,7 +170,7 @@ describe("router.navigate() - events transition success", () => {
       // Navigate to users first
       await router.navigate("users");
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -211,11 +211,11 @@ describe("router.navigate() - events transition success", () => {
 
       router.addActivateGuard("users.view", () => blockingGuard);
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -243,11 +243,11 @@ describe("router.navigate() - events transition success", () => {
       const onSuccess = vi.fn();
       const onCancel = vi.fn();
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -294,7 +294,7 @@ describe("router.navigate() - events transition success", () => {
       // Navigate to route first
       await router.navigate("orders", {}, {});
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
@@ -317,7 +317,7 @@ describe("router.navigate() - events transition success", () => {
       router.stop();
 
       const onSuccess = vi.fn();
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );

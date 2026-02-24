@@ -320,7 +320,7 @@ export function browserPluginFactory(
         const isNewState = !isState(evt.state);
 
         // Handle missing state
-        if (!state && handleMissingState(router, transitionOptions)) {
+        if (!state && handleMissingState(router, api, transitionOptions)) {
           return;
         }
 

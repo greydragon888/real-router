@@ -1,5 +1,8 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
+import { getInternals } from "../internals";
+import { RoutesNamespace } from "../namespaces";
+
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
 import type {
@@ -79,7 +82,19 @@ export class RouterWiringBuilder<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name) => this.dependencies.get(name),
-      forwardState: (name, params) => this.router.forwardState(name, params),
+      forwardState: (name, params) => {
+        const ctx = getInternals(this.router);
+
+        if (!ctx.noValidate) {
+          RoutesNamespace.validateStateBuilderArgs(
+            name,
+            params,
+            "forwardState",
+          );
+        }
+
+        return ctx.forwardState(name, params);
+      },
     };
 
     this.routes.setDependencies(routesDeps);
@@ -109,10 +124,17 @@ export class RouterWiringBuilder<
         this.state.set(state);
       },
       buildStateWithSegments: (routeName, routeParams) => {
-        const { name, params } = this.router.forwardState(
-          routeName,
-          routeParams,
-        );
+        const ctx = getInternals(this.router);
+
+        if (!ctx.noValidate) {
+          RoutesNamespace.validateStateBuilderArgs(
+            routeName,
+            routeParams,
+            "navigate",
+          );
+        }
+
+        const { name, params } = ctx.forwardState(routeName, routeParams);
 
         return this.routes.buildStateWithSegmentsResolved(name, params);
       },

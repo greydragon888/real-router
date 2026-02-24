@@ -1,5 +1,7 @@
 // packages/persistent-params-plugin/modules/plugin.ts
 
+import { getPluginApi } from "@real-router/core";
+
 import { PLUGIN_MARKER } from "./constants";
 import {
   buildQueryString,
@@ -123,30 +125,27 @@ export function persistentParamsPluginFactory(
       Array.isArray(params) ? [...params] : Object.keys(params),
     );
 
+    const api = getPluginApi(router);
+
     // Store original router methods for restoration
     const originalBuildPath = router.buildPath.bind(router);
-    const originalForwardState = router.forwardState.bind(router);
-    const originalRootPath = router.getRootPath();
+    const originalForwardState = api.getForwardState();
+    const originalRootPath = api.getRootPath();
 
     // Update router root path to include query parameters for persistent params
     try {
       const { basePath, queryString } = parseQueryString(originalRootPath);
-      // Note: newQueryString is always non-empty here because:
-      // - Empty params are handled by early returns at lines 94-100
-      // - So paramNamesSet always has at least one element
-      // - So buildQueryString always returns a non-empty string
       const newQueryString = buildQueryString(queryString, [...paramNamesSet]);
 
-      router.setRootPath(`${basePath}?${newQueryString}`);
-    } catch (error) {
-      // Rollback initialization marker on error
+      api.setRootPath(`${basePath}?${newQueryString}`);
+    } /* v8 ignore start -- @preserve: defensive error wrapping for setRootPath failure */ catch (error) {
       delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
 
       throw new Error(
         `[@real-router/persistent-params-plugin] Failed to update root path: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       );
-    }
+    } /* v8 ignore stop */
 
     /**
      * Merges persistent parameters with current navigation parameters.
@@ -202,19 +201,16 @@ export function persistentParamsPluginFactory(
     router.buildPath = (routeName, buildPathParams = {}) =>
       originalBuildPath(routeName, withPersistentParams(buildPathParams));
 
-    // forwardState: intercepts params normalization for buildState, buildStateWithSegments, and navigate
-    // This is the central point where params are normalized before state creation
-    router.forwardState = <P extends Params = Params>(
-      routeName: string,
-      routeParams: P,
-    ) => {
-      const result = originalForwardState(routeName, routeParams);
+    api.setForwardState(
+      <P extends Params = Params>(routeName: string, routeParams: P) => {
+        const result = originalForwardState(routeName, routeParams);
 
-      return {
-        ...result,
-        params: withPersistentParams(result.params) as P,
-      };
-    };
+        return {
+          ...result,
+          params: withPersistentParams(result.params) as P,
+        };
+      },
+    );
 
     return {
       /**
@@ -235,7 +231,7 @@ export function persistentParamsPluginFactory(
 
             // If parameter is not in state params or is undefined, mark for removal
             if (!Object.hasOwn(toState.params, key) || value === undefined) {
-              // Only mark as removal if it currently exists in persistentParams
+              /* v8 ignore next 6 -- @preserve: defensive removal for states committed via navigateToState bypassing forwardState */
               if (
                 Object.hasOwn(persistentParams, key) &&
                 persistentParams[key] !== undefined
@@ -261,7 +257,7 @@ export function persistentParamsPluginFactory(
           if (hasChanges) {
             const newParams: Params = { ...persistentParams, ...updates };
 
-            // Remove parameters that were set to undefined
+            /* v8 ignore next 3 -- @preserve: removals only populated by defensive navigateToState path above */
             for (const key of removals) {
               delete newParams[key];
             }
@@ -286,22 +282,18 @@ export function persistentParamsPluginFactory(
        */
       teardown() {
         try {
-          // Restore original methods
           router.buildPath = originalBuildPath;
-          router.forwardState = originalForwardState;
+          api.setForwardState(originalForwardState);
+          api.setRootPath(originalRootPath);
 
-          // Restore original root path
-          router.setRootPath(originalRootPath);
-
-          // Remove initialization marker
           delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
-        } catch (error) {
+        } /* v8 ignore start -- @preserve: defensive error logging for teardown failure */ catch (error) {
           console.error(
             "persistent-params-plugin",
             "Error during teardown:",
             error,
           );
-        }
+        } /* v8 ignore stop */
       },
     };
   };

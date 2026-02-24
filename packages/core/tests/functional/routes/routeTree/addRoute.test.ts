@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -41,9 +41,9 @@ describe("core/routes/addRoute", () => {
     ]);
 
     // Verify all routes are accessible (sorting is automatic)
-    expect(router.matchPath("/a")?.name).toBe("a");
-    expect(router.matchPath("/b")?.name).toBe("b");
-    expect(router.matchPath("/c")?.name).toBe("c");
+    expect(getPluginApi(router).matchPath("/a")?.name).toBe("a");
+    expect(getPluginApi(router).matchPath("/b")?.name).toBe("b");
+    expect(getPluginApi(router).matchPath("/c")?.name).toBe("c");
   });
 
   it("should match routes after add and navigate", async () => {
@@ -98,7 +98,7 @@ describe("core/routes/addRoute", () => {
     ]);
 
     // forwardState follows the forward rule and returns the resolved state
-    const state = router.forwardState("old-route", {});
+    const state = getPluginApi(router).forwardState("old-route", {});
 
     expect(state.name).toBe("new-route"); // Redirect happened
   });
@@ -114,7 +114,7 @@ describe("core/routes/addRoute", () => {
       },
     ]);
 
-    const state = router.matchPath("/item/123");
+    const state = getPluginApi(router).matchPath("/item/123");
 
     // Test behavior: decodeParams was called and transformed the params
     expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
@@ -149,7 +149,7 @@ describe("core/routes/addRoute", () => {
       },
     ]);
 
-    const state = router.matchPath("/decode-fallback/123");
+    const state = getPluginApi(router).matchPath("/decode-fallback/123");
 
     expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
     // Falls back to original params when decodeParams returns undefined
@@ -410,7 +410,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // forwardState follows the forward rule for nested routes
-      const state = router.forwardState("container.redirect", {});
+      const state = getPluginApi(router).forwardState("container.redirect", {});
 
       expect(state.name).toBe("target");
     });
@@ -433,7 +433,7 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      const state = router.matchPath("/api/resource/123");
+      const state = getPluginApi(router).matchPath("/api/resource/123");
 
       expect(childDecoder).toHaveBeenCalledWith({ id: "123" });
       expect(state?.params).toStrictEqual({ id: "123", childDecoded: true });
@@ -476,7 +476,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // Default params should be applied when creating state without params
-      const state = router.makeState("search.results");
+      const state = getPluginApi(router).makeState("search.results");
 
       expect(state.params).toStrictEqual({ page: 1, limit: 10 });
     });
@@ -516,8 +516,8 @@ describe("core/routes/addRoute", () => {
 
       // Default params should be applied when creating state without params
       // Note: makeState only applies the route's OWN defaultParams, not ancestors'
-      const wrapperState = router.makeState("wrapper");
-      const innerState = router.makeState("wrapper.inner");
+      const wrapperState = getPluginApi(router).makeState("wrapper");
+      const innerState = getPluginApi(router).makeState("wrapper.inner");
 
       expect(wrapperState.params).toStrictEqual({ parentParam: "value" });
       expect(innerState.params).toStrictEqual({ childParam: "value" });
@@ -751,7 +751,7 @@ describe("core/routes/addRoute", () => {
       expect(route).toHaveProperty("children");
       expect(route.children).toStrictEqual([]);
       // But the route should work correctly
-      expect(router.matchPath("/parent")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/parent")).toBeDefined();
     });
 
     it("should preserve empty children in nested routes", async () => {
@@ -773,7 +773,7 @@ describe("core/routes/addRoute", () => {
       expect(nestedRoute).toHaveProperty("children");
       expect(nestedRoute.children).toStrictEqual([]);
       // But routes should work correctly
-      expect(router.matchPath("/root/nested")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/root/nested")).toBeDefined();
     });
 
     it("should preserve undefined children in route object", async () => {
@@ -788,7 +788,7 @@ describe("core/routes/addRoute", () => {
       // undefined children should be preserved
       expect(route.children).toBeUndefined();
       // But route should work correctly
-      expect(router.matchPath("/no-children")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/no-children")).toBeDefined();
     });
 
     it("should work with frozen routes with empty children", async () => {
@@ -804,7 +804,7 @@ describe("core/routes/addRoute", () => {
       }).not.toThrowError();
 
       // Route should work correctly
-      expect(router.matchPath("/frozen")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/frozen")).toBeDefined();
       // Original object unchanged
       expect(frozenRoute.children).toStrictEqual([]);
     });
@@ -820,7 +820,7 @@ describe("core/routes/addRoute", () => {
 
       expect(route).toHaveProperty("children");
       expect(route.children).toHaveLength(1);
-      expect(router.matchPath("/parent-ok/child")).toBeDefined();
+      expect(getPluginApi(router).matchPath("/parent-ok/child")).toBeDefined();
     });
   });
 
@@ -833,7 +833,7 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // forwardState should resolve the full chain to C
-      const state = router.forwardState("A", {});
+      const state = getPluginApi(router).forwardState("A", {});
 
       expect(state.name).toBe("C");
     });
@@ -841,7 +841,7 @@ describe("core/routes/addRoute", () => {
     it("should handle route without forwardTo", async () => {
       router.addRoute({ name: "no-forward", path: "/no-forward" });
 
-      const state = router.forwardState("no-forward", {});
+      const state = getPluginApi(router).forwardState("no-forward", {});
 
       expect(state.name).toBe("no-forward");
     });
@@ -877,7 +877,7 @@ describe("core/routes/addRoute", () => {
         { name: "target", path: "/target" },
       ]);
 
-      const state = router.forwardState("redirect", {});
+      const state = getPluginApi(router).forwardState("redirect", {});
 
       expect(state.name).toBe("target");
     });
@@ -891,7 +891,7 @@ describe("core/routes/addRoute", () => {
         forwardTo: "existing",
       });
 
-      const state = router.forwardState("new-redirect", {});
+      const state = getPluginApi(router).forwardState("new-redirect", {});
 
       expect(state.name).toBe("existing");
     });
@@ -903,13 +903,13 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // A forwards to B
-      expect(router.forwardState("A", {}).name).toBe("B");
+      expect(getPluginApi(router).forwardState("A", {}).name).toBe("B");
 
       // Remove B - now A has dangling forwardTo
       router.removeRoute("B");
 
       // forwardState should return A itself since B no longer exists
-      expect(router.forwardState("A", {}).name).toBe("A");
+      expect(getPluginApi(router).forwardState("A", {}).name).toBe("A");
     });
 
     it("should resolve forwardTo chains correctly", async () => {
@@ -922,10 +922,18 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // All levels should resolve to "final"
-      expect(router.forwardState("level1", {}).name).toBe("final");
-      expect(router.forwardState("level2", {}).name).toBe("final");
-      expect(router.forwardState("level3", {}).name).toBe("final");
-      expect(router.forwardState("level4", {}).name).toBe("final");
+      expect(getPluginApi(router).forwardState("level1", {}).name).toBe(
+        "final",
+      );
+      expect(getPluginApi(router).forwardState("level2", {}).name).toBe(
+        "final",
+      );
+      expect(getPluginApi(router).forwardState("level3", {}).name).toBe(
+        "final",
+      );
+      expect(getPluginApi(router).forwardState("level4", {}).name).toBe(
+        "final",
+      );
     });
 
     it("should handle very long chains without stack overflow", async () => {
@@ -949,7 +957,7 @@ describe("core/routes/addRoute", () => {
       router.addRoute(routes);
 
       // First route should resolve to last route
-      const state = router.forwardState("route1", {});
+      const state = getPluginApi(router).forwardState("route1", {});
 
       expect(state.name).toBe("route50");
     });
@@ -987,7 +995,7 @@ describe("core/routes/addRoute", () => {
         },
       ]);
 
-      const state = router.forwardState("old", {});
+      const state = getPluginApi(router).forwardState("old", {});
 
       expect(state.name).toBe("new.page");
     });
@@ -998,7 +1006,9 @@ describe("core/routes/addRoute", () => {
         { name: "target", path: "/target/:id" },
       ]);
 
-      const state = router.forwardState("redirect", { id: "123" });
+      const state = getPluginApi(router).forwardState("redirect", {
+        id: "123",
+      });
 
       expect(state.name).toStrictEqual("target");
       expect(state.params).toStrictEqual({ id: "123" });
@@ -1015,7 +1025,7 @@ describe("core/routes/addRoute", () => {
         forwardTo: "newfiles",
       });
 
-      const state = router.forwardState("files", {
+      const state = getPluginApi(router).forwardState("files", {
         filepath: "docs/readme.md",
       });
 
@@ -1045,7 +1055,7 @@ describe("core/routes/addRoute", () => {
       router.updateRoute("oldRoute", { forwardTo: "newRoute" });
 
       // Verify behavior: forwardState should follow the new rule
-      const state = router.forwardState("oldRoute", {});
+      const state = getPluginApi(router).forwardState("oldRoute", {});
 
       expect(state.name).toBe("newRoute");
     });
@@ -1113,7 +1123,9 @@ describe("core/routes/addRoute", () => {
       // Route should be registered
       await router.start("/home");
 
-      expect(router.matchPath("/after-stop")?.name).toBe("after-stop");
+      expect(getPluginApi(router).matchPath("/after-stop")?.name).toBe(
+        "after-stop",
+      );
     });
 
     it("should handle child route with forwardTo to sibling", async () => {
@@ -1130,7 +1142,7 @@ describe("core/routes/addRoute", () => {
         ],
       });
 
-      const state = router.forwardState("container.sibling1", {});
+      const state = getPluginApi(router).forwardState("container.sibling1", {});
 
       expect(state.name).toBe("container.sibling2");
     });
@@ -1141,7 +1153,9 @@ describe("core/routes/addRoute", () => {
         path: "/search?q&page&sort",
       });
 
-      const state = router.matchPath("/search?q=test&page=1&sort=asc");
+      const state = getPluginApi(router).matchPath(
+        "/search?q=test&page=1&sort=asc",
+      );
 
       expect(state?.name).toBe("search");
       expect(state?.params.q).toBe("test");
@@ -1180,7 +1194,7 @@ describe("core/routes/addRoute", () => {
       expect(nestedCanActivate).toHaveBeenCalled();
 
       // Verify decodeParams works
-      const matchedState = router.matchPath("/complete/123");
+      const matchedState = getPluginApi(router).matchPath("/complete/123");
 
       expect(decodeParams).toHaveBeenCalledWith({ id: "123" });
       expect(matchedState?.params).toStrictEqual({ id: "123", decoded: true });
@@ -1191,12 +1205,14 @@ describe("core/routes/addRoute", () => {
       expect(encodeParams).toHaveBeenCalledWith({ id: "456" });
 
       // Verify defaultParams works
-      const defaultState = router.makeState("complete");
+      const defaultState = getPluginApi(router).makeState("complete");
 
       expect(defaultState.params).toStrictEqual({ id: "default" });
 
       // Verify forwardTo works
-      const forwardedState = router.forwardState("complete", { id: "789" });
+      const forwardedState = getPluginApi(router).forwardState("complete", {
+        id: "789",
+      });
 
       expect(forwardedState.name).toBe("target");
     });
@@ -1228,9 +1244,9 @@ describe("core/routes/addRoute", () => {
         { parent: "level1.level2.level3" },
       );
 
-      expect(router.matchPath("/level1/level2/level3/level4")?.name).toBe(
-        "level1.level2.level3.level4",
-      );
+      expect(
+        getPluginApi(router).matchPath("/level1/level2/level3/level4")?.name,
+      ).toBe("level1.level2.level3.level4");
     });
 
     it("should handle route path with optional query params", async () => {
@@ -1240,13 +1256,15 @@ describe("core/routes/addRoute", () => {
       });
 
       // With query param
-      expect(router.matchPath("/docs?section=intro")?.name).toBe("docs");
-      expect(router.matchPath("/docs?section=intro")?.params.section).toBe(
-        "intro",
+      expect(getPluginApi(router).matchPath("/docs?section=intro")?.name).toBe(
+        "docs",
       );
+      expect(
+        getPluginApi(router).matchPath("/docs?section=intro")?.params.section,
+      ).toBe("intro");
 
       // Without query param
-      expect(router.matchPath("/docs")?.name).toBe("docs");
+      expect(getPluginApi(router).matchPath("/docs")?.name).toBe("docs");
     });
 
     it("should handle route path with splat/wildcard", async () => {
@@ -1255,7 +1273,7 @@ describe("core/routes/addRoute", () => {
         path: "/files/*path",
       });
 
-      const state = router.matchPath("/files/docs/readme.md");
+      const state = getPluginApi(router).matchPath("/files/docs/readme.md");
 
       expect(state?.name).toBe("files");
       expect(state?.params.path).toBe("docs/readme.md");
@@ -1268,9 +1286,15 @@ describe("core/routes/addRoute", () => {
         { name: "products-detail", path: "/products/:id" },
       ]);
 
-      expect(router.matchPath("/products")?.name).toBe("products");
-      expect(router.matchPath("/products/list")?.name).toBe("products-list");
-      expect(router.matchPath("/products/123")?.name).toBe("products-detail");
+      expect(getPluginApi(router).matchPath("/products")?.name).toBe(
+        "products",
+      );
+      expect(getPluginApi(router).matchPath("/products/list")?.name).toBe(
+        "products-list",
+      );
+      expect(getPluginApi(router).matchPath("/products/123")?.name).toBe(
+        "products-detail",
+      );
     });
 
     it("should handle forwardTo chain added in multiple batches", async () => {
@@ -1287,8 +1311,10 @@ describe("core/routes/addRoute", () => {
       });
 
       // Chain resolves correctly: start → middle → final
-      expect(router.forwardState("start", {}).name).toBe("final");
-      expect(router.forwardState("middle", {}).name).toBe("final");
+      expect(getPluginApi(router).forwardState("start", {}).name).toBe("final");
+      expect(getPluginApi(router).forwardState("middle", {}).name).toBe(
+        "final",
+      );
     });
   });
 
@@ -1580,9 +1606,9 @@ describe("core/routes/addRoute", () => {
       routes.push({ name: "proxy-c", path: "/proxy-c" });
 
       // Only first two routes should be added
-      expect(router.matchPath("/proxy-a")?.name).toBe("proxy-a");
-      expect(router.matchPath("/proxy-b")?.name).toBe("proxy-b");
-      expect(router.matchPath("/proxy-c")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/proxy-a")?.name).toBe("proxy-a");
+      expect(getPluginApi(router).matchPath("/proxy-b")?.name).toBe("proxy-b");
+      expect(getPluginApi(router).matchPath("/proxy-c")).toBeUndefined();
     });
 
     it("should protect against mutations between validation and registration", async () => {
@@ -1612,9 +1638,9 @@ describe("core/routes/addRoute", () => {
       routes.push({ name: "injected", path: "/injected" });
 
       // Only original routes should be in router
-      expect(router.matchPath("/valid-a")?.name).toBe("valid-a");
-      expect(router.matchPath("/valid-b")?.name).toBe("valid-b");
-      expect(router.matchPath("/injected")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/valid-a")?.name).toBe("valid-a");
+      expect(getPluginApi(router).matchPath("/valid-b")?.name).toBe("valid-b");
+      expect(getPluginApi(router).matchPath("/injected")).toBeUndefined();
 
       // Original array was mutated but router is unaffected
       expect(routes).toHaveLength(3);
@@ -1633,8 +1659,10 @@ describe("core/routes/addRoute", () => {
       // Router should have the original route (shallow copy protects array structure)
       // Note: shallow copy doesn't protect against object property mutations
       // but it does protect against array structure changes
-      expect(router.matchPath("/original")?.name).toBe("original");
-      expect(router.matchPath("/added")).toBeUndefined();
+      expect(getPluginApi(router).matchPath("/original")?.name).toBe(
+        "original",
+      );
+      expect(getPluginApi(router).matchPath("/added")).toBeUndefined();
     });
   });
 
@@ -1657,7 +1685,7 @@ describe("core/routes/addRoute", () => {
 
       await routerWithDeps.start("").catch(() => {});
 
-      const result = routerWithDeps.forwardState("dashboard", {});
+      const result = getPluginApi(routerWithDeps).forwardState("dashboard", {});
 
       expect(result.name).toBe("admin-dash");
 

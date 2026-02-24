@@ -55,6 +55,7 @@ describe("getRoutesApi()", () => {
     routesApi.update("home", { defaultParams: { page: "1" } });
 
     expect(router.hasRoute("home")).toBe(true);
+    expect(router.buildPath("home")).toBe("/home?page=1");
   });
 
   it("clear should clear all routes", () => {

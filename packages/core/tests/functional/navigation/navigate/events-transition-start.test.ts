@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes } from "@real-router/core";
+import { events, errorCodes, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -25,7 +25,7 @@ describe("router.navigate() - events transition start", () => {
     it("should emit TRANSITION_START with correct toState and fromState parameters", async () => {
       const onStart = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -59,7 +59,7 @@ describe("router.navigate() - events transition start", () => {
     it("should emit TRANSITION_START with correct fromState on navigation from initial state", async () => {
       const onStart = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -91,7 +91,7 @@ describe("router.navigate() - events transition start", () => {
       router.addActivateGuard("users.view", () => canActivateGuard);
       router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -120,11 +120,11 @@ describe("router.navigate() - events transition start", () => {
       const onStart = vi.fn();
       const onCancel = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -177,11 +177,11 @@ describe("router.navigate() - events transition start", () => {
 
       router.addActivateGuard("users.view", () => blockingGuard);
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -219,7 +219,7 @@ describe("router.navigate() - events transition start", () => {
     it("should emit TRANSITION_START for nested route navigation", async () => {
       const onStart = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -250,7 +250,7 @@ describe("router.navigate() - events transition start", () => {
     it("should emit TRANSITION_START with navigation options in toState meta", async () => {
       const onStart = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -281,7 +281,7 @@ describe("router.navigate() - events transition start", () => {
       // Navigate to route first
       await router.navigate("profile", {}, {});
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -311,7 +311,7 @@ describe("router.navigate() - events transition start", () => {
       // Navigate to route first
       await router.navigate("orders", {}, {});
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
@@ -335,7 +335,7 @@ describe("router.navigate() - events transition start", () => {
       router.stop();
 
       const onStart = vi.fn();
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
