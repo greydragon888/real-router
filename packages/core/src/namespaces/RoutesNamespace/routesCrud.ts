@@ -10,7 +10,7 @@ import {
   sanitizeRoute,
 } from "./helpers";
 import {
-  rebuildTree,
+  commitTreeChanges,
   refreshForwardMap,
   registerAllRouteHandlers,
 } from "./routeTreeOps";
@@ -281,17 +281,8 @@ export function addRoutesCrud<
     parentName ?? "",
   );
 
-  // Rebuild tree
-  const addResult = rebuildTree(
-    ctx.definitions,
-    ctx.getRootPath(),
-    ctx.matcherOptions,
-  );
-
-  ctx.setTreeAndMatcher(addResult.tree, addResult.matcher);
-
-  // Validate and cache forwardTo chains
-  ctx.setResolvedForwardMap(refreshForwardMap(ctx.config, ctx.noValidate));
+  // Rebuild tree + refresh forward map
+  commitTreeChanges(ctx);
 }
 
 /**
@@ -318,17 +309,8 @@ export function removeRouteCrud<
     ctx.getLifecycleNamespace(),
   );
 
-  // Rebuild tree
-  const removeResult = rebuildTree(
-    ctx.definitions,
-    ctx.getRootPath(),
-    ctx.matcherOptions,
-  );
-
-  ctx.setTreeAndMatcher(removeResult.tree, removeResult.matcher);
-
-  // Revalidate forward chains
-  ctx.setResolvedForwardMap(refreshForwardMap(ctx.config, ctx.noValidate));
+  // Rebuild tree + revalidate forward chains
+  commitTreeChanges(ctx);
 
   return true;
 }

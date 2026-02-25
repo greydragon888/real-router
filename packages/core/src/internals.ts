@@ -115,7 +115,6 @@ export interface RouterInternals {
   readonly routeDefinitions: RouteDefinition[];
   readonly routeConfig: RouteConfig;
   readonly routeMatcherOptions: CreateMatcherOptions | undefined;
-  readonly routeNoValidate: boolean;
   readonly routeSetCustomFields: (
     fields: Record<string, Record<string, unknown>>,
   ) => void;

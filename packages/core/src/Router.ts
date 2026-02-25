@@ -28,6 +28,14 @@ import {
 } from "./namespaces";
 import { validateListenerArgs } from "./namespaces/EventBusNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import {
+  validateAddRouteArgs,
+  validateBuildPathArgs,
+  validateIsActiveRouteArgs,
+  validateRoutes,
+  validateShouldUpdateNodeArgs,
+  validateStateBuilderArgs,
+} from "./namespaces/RoutesNamespace/validators";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
@@ -139,8 +147,8 @@ export class Router<
     // Conditional validation for initial routes - structure and batch duplicates
     // Validation happens BEFORE tree is built, so tree is not passed
     if (!noValidate && routes.length > 0) {
-      RoutesNamespace.validateAddRouteArgs(routes);
-      RoutesNamespace.validateRoutes(routes);
+      validateAddRouteArgs(routes);
+      validateRoutes(routes);
     }
 
     // =========================================================================
@@ -286,7 +294,6 @@ export class Router<
       routeDefinitions: this.#routes.getDefinitions(),
       routeConfig: this.#routes.getConfigInternal(),
       routeMatcherOptions: this.#routes.getMatcherOptions(),
-      routeNoValidate: noValidate,
       /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
       routeSetCustomFields: (fields) => {
         this.#routes.setRouteCustomFields(fields);
@@ -407,7 +414,7 @@ export class Router<
     ignoreQueryParams?: boolean,
   ): boolean {
     if (!this.#noValidate) {
-      RoutesNamespace.validateIsActiveRouteArgs(
+      validateIsActiveRouteArgs(
         name,
         params,
         strictEquality,
@@ -435,7 +442,7 @@ export class Router<
 
   buildPath(route: string, params?: Params): string {
     if (!this.#noValidate) {
-      RoutesNamespace.validateBuildPathArgs(route);
+      validateBuildPathArgs(route);
     }
 
     return this.#routes.buildPath(route, params, this.#options.get());
@@ -473,11 +480,7 @@ export class Router<
 
   buildNavigationState(name: string, params: Params = {}): State | undefined {
     if (!this.#noValidate) {
-      RoutesNamespace.validateStateBuilderArgs(
-        name,
-        params,
-        "buildNavigationState",
-      );
+      validateStateBuilderArgs(name, params, "buildNavigationState");
     }
 
     const { name: resolvedName, params: resolvedParams } = getInternals(
@@ -507,7 +510,7 @@ export class Router<
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
     if (!this.#noValidate) {
-      RoutesNamespace.validateShouldUpdateNodeArgs(nodeName);
+      validateShouldUpdateNodeArgs(nodeName);
     }
 
     return this.#routes.shouldUpdateNode(nodeName);

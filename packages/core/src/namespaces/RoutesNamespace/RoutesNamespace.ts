@@ -17,14 +17,6 @@ import {
   validateAndCacheForwardMap,
 } from "./routeTreeOps";
 import { createRouteState } from "./stateBuilder";
-import {
-  validateAddRouteArgs,
-  validateIsActiveRouteArgs,
-  validateStateBuilderArgs,
-  validateBuildPathArgs,
-  validateShouldUpdateNodeArgs,
-  validateRoutes,
-} from "./validators";
 import { constants } from "../../constants";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -158,52 +150,6 @@ export class RoutesNamespace<
     this.#resolvedForwardMap = noValidate
       ? cacheForwardMap(this.#config)
       : validateAndCacheForwardMap(this.#config);
-  }
-
-  // =========================================================================
-  // Static validation methods (delegated to validators.ts)
-  // TypeScript requires explicit method declarations for assertion functions
-  // =========================================================================
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
-  static validateAddRouteArgs(routes: readonly Route<any>[]): void {
-    validateAddRouteArgs(routes);
-  }
-
-  static validateIsActiveRouteArgs(
-    name: unknown,
-    params: unknown,
-    strictEquality: unknown,
-    ignoreQueryParams: unknown,
-  ): void {
-    validateIsActiveRouteArgs(name, params, strictEquality, ignoreQueryParams);
-  }
-
-  static validateStateBuilderArgs(
-    routeName: unknown,
-    routeParams: unknown,
-    methodName: string,
-  ): void {
-    validateStateBuilderArgs(routeName, routeParams, methodName);
-  }
-
-  static validateBuildPathArgs(route: unknown): asserts route is string {
-    validateBuildPathArgs(route);
-  }
-
-  static validateShouldUpdateNodeArgs(
-    nodeName: unknown,
-  ): asserts nodeName is string {
-    validateShouldUpdateNodeArgs(nodeName);
-  }
-
-  static validateRoutes<Deps extends DefaultDependencies>(
-    routes: Route<Deps>[],
-    tree?: RouteTree,
-    forwardMap?: Record<string, string>,
-    parentName?: string,
-  ): void {
-    validateRoutes(routes, tree, forwardMap, parentName);
   }
 
   // =========================================================================

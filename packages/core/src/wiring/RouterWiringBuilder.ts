@@ -1,7 +1,7 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
 import { getInternals } from "../internals";
-import { RoutesNamespace } from "../namespaces";
+import { validateStateBuilderArgs } from "../namespaces/RoutesNamespace/validators";
 
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
@@ -84,11 +84,7 @@ export class RouterWiringBuilder<
         const ctx = getInternals(this.router);
 
         if (!ctx.noValidate) {
-          RoutesNamespace.validateStateBuilderArgs(
-            name,
-            params,
-            "forwardState",
-          );
+          validateStateBuilderArgs(name, params, "forwardState");
         }
 
         return ctx.forwardState(name, params);
@@ -125,11 +121,7 @@ export class RouterWiringBuilder<
         const ctx = getInternals(this.router);
 
         if (!ctx.noValidate) {
-          RoutesNamespace.validateStateBuilderArgs(
-            routeName,
-            routeParams,
-            "navigate",
-          );
+          validateStateBuilderArgs(routeName, routeParams, "navigate");
         }
 
         const { name, params } = ctx.forwardState(routeName, routeParams);

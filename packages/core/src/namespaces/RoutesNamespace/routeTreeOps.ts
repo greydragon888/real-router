@@ -17,6 +17,19 @@ import type {
 } from "route-tree";
 
 /**
+ * Context for commitTreeChanges — subset of RoutesDataContext.
+ */
+interface TreeCommitContext {
+  readonly definitions: RouteDefinition[];
+  readonly config: RouteConfig;
+  readonly noValidate: boolean;
+  readonly matcherOptions: CreateMatcherOptions | undefined;
+  getRootPath: () => string;
+  setTreeAndMatcher: (tree: RouteTree, matcher: Matcher) => void;
+  setResolvedForwardMap: (map: Record<string, string>) => void;
+}
+
+/**
  * Rebuilds the route tree and matcher from definitions.
  */
 export function rebuildTree(
@@ -30,6 +43,21 @@ export function rebuildTree(
   matcher.registerTree(tree);
 
   return { tree, matcher };
+}
+
+/**
+ * Rebuilds tree+matcher and refreshes forward map in one atomic step.
+ * Replaces the repeated 3-line pattern in CRUD functions.
+ */
+export function commitTreeChanges(ctx: TreeCommitContext): void {
+  const result = rebuildTree(
+    ctx.definitions,
+    ctx.getRootPath(),
+    ctx.matcherOptions,
+  );
+
+  ctx.setTreeAndMatcher(result.tree, result.matcher);
+  ctx.setResolvedForwardMap(refreshForwardMap(ctx.config, ctx.noValidate));
 }
 
 /**
