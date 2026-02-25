@@ -6,17 +6,20 @@ import {
   events,
   getDependenciesApi,
   getPluginApi,
+  getRoutesApi,
 } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router, PluginFactory } from "@real-router/core";
+import type { Router, PluginFactory, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("dispose", () => {
   beforeEach(() => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
   });
 
   describe("basic dispose functionality", () => {
@@ -165,7 +168,7 @@ describe("dispose", () => {
     it("dispose() clears routes", async () => {
       await router.start("/home");
 
-      expect(router.hasRoute("home")).toBe(true);
+      expect(routesApi.has("home")).toBe(true);
 
       router.dispose();
 
@@ -295,11 +298,11 @@ describe("dispose", () => {
 
     it("addRoute() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addRoute({ name: "newRoute", path: "/new" });
+        routesApi.add({ name: "newRoute", path: "/new" });
       }).toThrowError();
 
       try {
-        router.addRoute({ name: "newRoute", path: "/new" });
+        routesApi.add({ name: "newRoute", path: "/new" });
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }

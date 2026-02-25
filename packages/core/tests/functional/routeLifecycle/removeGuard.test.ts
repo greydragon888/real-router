@@ -1,12 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getRoutesApi } from "@real-router/core";
+
 import { createLifecycleTestRouter, type Router } from "./setup";
 
+import type { RoutesApi } from "@real-router/core";
+
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/route-lifecycle/removeGuard", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
+    routesApi = getRoutesApi(router);
   });
 
   afterEach(() => {
@@ -116,10 +122,7 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing nested route guards independently", async () => {
-    router.addRoute(
-      { name: "settings", path: "/settings" },
-      { parent: "admin" },
-    );
+    routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.settings", () => () => false);
@@ -133,10 +136,7 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing parent guard but keeping child guard", async () => {
-    router.addRoute(
-      { name: "settings", path: "/settings" },
-      { parent: "admin" },
-    );
+    routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.settings", () => () => false);

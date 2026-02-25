@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getRoutesApi } from "@real-router/core";
+
 import {
   createLifecycleTestRouter,
   createTestRouter,
@@ -7,11 +9,15 @@ import {
   type Router,
 } from "./setup";
 
+import type { RoutesApi } from "@real-router/core";
+
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/route-lifecycle/guard-api", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
+    routesApi = getRoutesApi(router);
   });
 
   afterEach(() => {
@@ -167,7 +173,7 @@ describe("core/route-lifecycle/guard-api", () => {
 
     it("should handle forwarded routes", async () => {
       await router.navigate("admin");
-      router.addRoute({ name: "old", path: "/old", forwardTo: "home" });
+      routesApi.add({ name: "old", path: "/old", forwardTo: "home" });
       router.addActivateGuard("home", false);
 
       expect(router.canNavigateTo("old")).toBe(false);

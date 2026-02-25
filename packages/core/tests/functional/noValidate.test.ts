@@ -5,19 +5,22 @@ import {
   cloneRouter,
   getDependenciesApi,
   getPluginApi,
+  getRoutesApi,
 } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router, DependenciesApi } from "@real-router/core";
+import type { Router, DependenciesApi, RoutesApi } from "@real-router/core";
 import type { EventName } from "@real-router/types";
 
 describe("core/noValidate option", () => {
   describe("default behavior (noValidate: false)", () => {
     let router: Router;
+    let routesApi: RoutesApi;
 
     beforeEach(() => {
       router = createTestRouter();
+      routesApi = getRoutesApi(router);
     });
 
     afterEach(() => {
@@ -26,13 +29,13 @@ describe("core/noValidate option", () => {
 
     it("should validate by default", () => {
       // getRoute with invalid type throws TypeError
-      expect(() => router.getRoute(123 as any)).toThrowError(TypeError);
+      expect(() => routesApi.get(123 as any)).toThrowError(TypeError);
     });
 
     it("should validate route names", () => {
-      expect(() => router.getRoute(123 as any)).toThrowError(TypeError);
+      expect(() => routesApi.get(123 as any)).toThrowError(TypeError);
 
-      expect(() => router.hasRoute(123 as any)).toThrowError(TypeError);
+      expect(() => routesApi.has(123 as any)).toThrowError(TypeError);
     });
 
     it("should validate dependencies", () => {
@@ -46,9 +49,11 @@ describe("core/noValidate option", () => {
 
   describe("noValidate: true", () => {
     let router: Router;
+    let routesApi: RoutesApi;
 
     beforeEach(() => {
       router = createTestRouter({ noValidate: true });
+      routesApi = getRoutesApi(router);
     });
 
     afterEach(() => {
@@ -59,33 +64,35 @@ describe("core/noValidate option", () => {
     describe("route management", () => {
       it("should skip validation in addRoute", () => {
         // Empty name would fail validation with noValidate: false
-        expect(
-          () => void router.addRoute({ name: "a", path: "/test-new" }),
-        ).not.toThrowError();
+        expect(() => {
+          routesApi.add({ name: "a", path: "/test-new" });
+        }).not.toThrowError();
       });
 
       it("should skip validation in removeRoute", () => {
         // Empty string would fail validation with noValidate: false
-        expect(() => router.removeRoute("")).not.toThrowError();
+        expect(() => {
+          routesApi.remove("");
+        }).not.toThrowError();
       });
 
       it("should skip validation in getRoute", () => {
         // Empty string would fail validation with noValidate: false
-        expect(() => router.getRoute("")).not.toThrowError();
+        expect(() => routesApi.get("")).not.toThrowError();
       });
 
       it("should skip validation in hasRoute", () => {
         // Empty string would fail validation with noValidate: false
-        expect(() => router.hasRoute("")).not.toThrowError();
+        expect(() => routesApi.has("")).not.toThrowError();
       });
 
       it("should skip validation in updateRoute", () => {
-        router.addRoute({ name: "test", path: "/test" });
+        routesApi.add({ name: "test", path: "/test" });
 
         // Empty forwardTo would fail validation with noValidate: false
-        expect(
-          () => void router.updateRoute("test", { forwardTo: "" }),
-        ).not.toThrowError();
+        expect(() => {
+          routesApi.update("test", { forwardTo: "" });
+        }).not.toThrowError();
       });
     });
 
@@ -360,12 +367,13 @@ describe("core/noValidate option", () => {
         ],
         { noValidate: true },
       );
+      const routesApi = getRoutesApi(router);
 
       // Verify initial forwardTo works
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
       // Add another route with forwardTo - this triggers cache refresh
-      router.addRoute({ name: "d", path: "/d", forwardTo: "a" });
+      routesApi.add({ name: "d", path: "/d", forwardTo: "a" });
 
       // d → a → b
       expect(getPluginApi(router).forwardState("d", {}).name).toBe("b");
@@ -384,13 +392,14 @@ describe("core/noValidate option", () => {
         ],
         { noValidate: true },
       );
+      const routesApi = getRoutesApi(router);
 
       // Verify initial chains work
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
       expect(getPluginApi(router).forwardState("d", {}).name).toBe("c");
 
       // Remove route 'd' - triggers cache refresh
-      router.removeRoute("d");
+      routesApi.remove("d");
 
       // Remaining chain should still work
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
@@ -407,12 +416,13 @@ describe("core/noValidate option", () => {
         ],
         { noValidate: true },
       );
+      const routesApi = getRoutesApi(router);
 
       // Initial: a → b
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
       // Update forwardTo: a → c (triggers cache refresh)
-      router.updateRoute("a", { forwardTo: "c" });
+      routesApi.update("a", { forwardTo: "c" });
 
       // Now: a → c
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
@@ -427,16 +437,19 @@ describe("core/noValidate option", () => {
 
       // navigate doesn't throw directly, but validation happens internally
       // Test getRoute instead which does throw for validation errors
-      expect(() => testRouter.getRoute(123 as any)).toThrowError(TypeError);
+      expect(() => getRoutesApi(testRouter).get(123 as any)).toThrowError(
+        TypeError,
+      );
 
       testRouter.stop();
     });
 
     it("should reject async forwardTo even with noValidate: true", () => {
       const testRouter = createTestRouter({ noValidate: true });
+      const testRoutesApi = getRoutesApi(testRouter);
 
       expect(() => {
-        testRouter.addRoute({
+        testRoutesApi.add({
           name: "async-no-validate",
           path: "/async-no-validate",
           forwardTo: (async () => "target") as any,
@@ -444,7 +457,7 @@ describe("core/noValidate option", () => {
       }).toThrowError(TypeError);
 
       expect(() => {
-        testRouter.addRoute({
+        testRoutesApi.add({
           name: "async-no-validate",
           path: "/async-no-validate",
           forwardTo: (async () => "target") as any,

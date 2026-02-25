@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -11,13 +11,16 @@ import type {
   Route,
   Router,
   RouterError,
+  RoutesApi,
 } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/addRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -26,7 +29,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should sort routes correctly on add", async () => {
-    router.addRoute([{ name: "setting", path: "/setting" }]);
+    routesApi.add([{ name: "setting", path: "/setting" }]);
 
     const path = router.buildPath("setting");
 
@@ -34,7 +37,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should sort routes correctly for batch add", async () => {
-    router.addRoute([
+    routesApi.add([
       { name: "c", path: "/c" },
       { name: "a", path: "/a" },
       { name: "b", path: "/b" },
@@ -47,7 +50,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should match routes after add and navigate", async () => {
-    router.addRoute([{ name: "new-route", path: "/new" }]);
+    routesApi.add([{ name: "new-route", path: "/new" }]);
 
     // navigate works correctly
     await router.navigate("new-route");
@@ -56,7 +59,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should check isActiveRoute after add", async () => {
-    router.addRoute([{ name: "check-route", path: "/check" }]);
+    routesApi.add([{ name: "check-route", path: "/check" }]);
 
     // Navigate to the route first
     await router.navigate("check-route");
@@ -66,7 +69,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should register canActivate function if defined on route", async () => {
-    router.addRoute([
+    routesApi.add([
       {
         name: "secure",
         path: "/secure",
@@ -85,7 +88,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should register forwardTo and redirect during navigation", async () => {
-    router.addRoute([
+    routesApi.add([
       {
         name: "old-route",
         path: "/old",
@@ -106,7 +109,7 @@ describe("core/routes/addRoute", () => {
   it("should register decodeParams and call it during matchPath", async () => {
     const decodeParams = vi.fn((params) => ({ ...params, decoded: true }));
 
-    router.addRoute([
+    routesApi.add([
       {
         name: "item",
         path: "/item/:id",
@@ -124,7 +127,7 @@ describe("core/routes/addRoute", () => {
   it("should register encodeParams and call it during buildPath", async () => {
     const encodeParams = vi.fn((params) => ({ ...params, encoded: true }));
 
-    router.addRoute([
+    routesApi.add([
       {
         name: "item",
         path: "/item/:id",
@@ -141,7 +144,7 @@ describe("core/routes/addRoute", () => {
   it("should use fallback params when decodeParams returns undefined (line 100)", async () => {
     const decodeParams = vi.fn(() => undefined as any);
 
-    router.addRoute([
+    routesApi.add([
       {
         name: "decode-fallback",
         path: "/decode-fallback/:id",
@@ -159,7 +162,7 @@ describe("core/routes/addRoute", () => {
   it("should use fallback params when encodeParams returns undefined (line 105)", async () => {
     const encodeParams = vi.fn(() => undefined as any);
 
-    router.addRoute([
+    routesApi.add([
       {
         name: "encode-fallback",
         path: "/encode-fallback/:id",
@@ -176,7 +179,7 @@ describe("core/routes/addRoute", () => {
 
   it("should validate nested children before adding (invalid name type)", async () => {
     expect(() => {
-      router.addRoute({
+      routesApi.add({
         name: "parent-test-1",
         path: "/parent-test-1",
         children: [{ name: 123 as unknown as string, path: "/invalid" }],
@@ -186,7 +189,7 @@ describe("core/routes/addRoute", () => {
 
   it("should throw when route name is empty string", async () => {
     expect(() => {
-      router.addRoute({
+      routesApi.add({
         name: "",
         path: "/empty-name",
       });
@@ -195,7 +198,7 @@ describe("core/routes/addRoute", () => {
 
   it("should validate deeply nested children", async () => {
     expect(() => {
-      router.addRoute({
+      routesApi.add({
         name: "deep-a",
         path: "/deep-a",
         children: [
@@ -211,17 +214,17 @@ describe("core/routes/addRoute", () => {
 
   it("should throw if route is not an object", async () => {
     expect(() => {
-      router.addRoute(null as unknown as []);
+      routesApi.add(null as unknown as []);
     }).toThrowError("[router.addRoute] Route must be an object, got null");
 
     expect(() => {
-      router.addRoute("string-route" as unknown as []);
+      routesApi.add("string-route" as unknown as []);
     }).toThrowError("[router.addRoute] Route must be an object, got string");
   });
 
   it("should throw if children is not an array", async () => {
     expect(() => {
-      router.addRoute({
+      routesApi.add({
         name: "parent-test-2",
         path: "/parent-test-2",
         children: "not-an-array" as unknown as [],
@@ -232,7 +235,7 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should add route with valid children successfully", async () => {
-    router.addRoute({
+    routesApi.add({
       name: "valid-section",
       path: "/valid-section",
       children: [
@@ -247,16 +250,16 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should throw on duplicate route name", async () => {
-    router.addRoute({ name: "dup-test", path: "/dup-test" });
+    routesApi.add({ name: "dup-test", path: "/dup-test" });
 
     expect(() => {
-      router.addRoute({ name: "dup-test", path: "/other" });
+      routesApi.add({ name: "dup-test", path: "/other" });
     }).toThrowError('[router.addRoute] Route "dup-test" already exists');
   });
 
   it("should throw on duplicate name within same batch (cross-batch detection)", async () => {
     expect(() => {
-      router.addRoute([
+      routesApi.add([
         { name: "batch-dup", path: "/batch-dup-1" },
         { name: "batch-dup", path: "/batch-dup-2" },
       ]);
@@ -264,10 +267,10 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should throw on duplicate before modifying config (atomicity)", async () => {
-    router.addRoute({ name: "first-dup", path: "/first-dup" });
+    routesApi.add({ name: "first-dup", path: "/first-dup" });
 
     expect(() => {
-      router.addRoute([
+      routesApi.add([
         {
           name: "new-before-dup",
           path: "/new-before-dup",
@@ -278,18 +281,18 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('[router.addRoute] Route "first-dup" already exists');
 
     // new-before-dup should NOT be registered (atomicity preserved)
-    expect(router.hasRoute("new-before-dup")).toBe(false);
+    expect(routesApi.has("new-before-dup")).toBe(false);
   });
 
   it("should throw on duplicate nested child route", async () => {
-    router.addRoute({
+    routesApi.add({
       name: "dup-parent",
       path: "/dup-parent",
       children: [{ name: "child", path: "/child" }],
     });
 
     expect(() => {
-      router.addRoute(
+      routesApi.add(
         { name: "child", path: "/other" },
         { parent: "dup-parent" },
       );
@@ -299,13 +302,13 @@ describe("core/routes/addRoute", () => {
   });
 
   it("should reject batch on path conflict (pre-validation atomicity)", async () => {
-    router.addRoute({
+    routesApi.add({
       name: "path-conflict-existing",
       path: "/path-conflict",
     });
 
     expect(() => {
-      router.addRoute([
+      routesApi.add([
         {
           name: "pre-validation-test",
           path: "/pre-validation-test",
@@ -319,12 +322,12 @@ describe("core/routes/addRoute", () => {
     );
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
-    expect(router.hasRoute("pre-validation-test")).toBe(false);
+    expect(routesApi.has("pre-validation-test")).toBe(false);
   });
 
   it("should throw on duplicate path within same batch", async () => {
     expect(() => {
-      router.addRoute([
+      routesApi.add([
         { name: "batch-path-a", path: "/same-path" },
         { name: "batch-path-b", path: "/same-path" },
       ]);
@@ -333,7 +336,7 @@ describe("core/routes/addRoute", () => {
 
   describe("children handlers registration", () => {
     it("should register canActivate for children routes", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "parent",
         path: "/parent",
         children: [
@@ -356,7 +359,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should register canActivate for deeply nested children", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "level1",
         path: "/level1",
         children: [
@@ -395,9 +398,9 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should register forwardTo for children routes", async () => {
-      router.addRoute({ name: "target", path: "/target" });
+      routesApi.add({ name: "target", path: "/target" });
 
-      router.addRoute({
+      routesApi.add({
         name: "container",
         path: "/container",
         children: [
@@ -421,7 +424,7 @@ describe("core/routes/addRoute", () => {
         childDecoded: true,
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "api",
         path: "/api",
         children: [
@@ -445,7 +448,7 @@ describe("core/routes/addRoute", () => {
         childEncoded: true,
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "api",
         path: "/api",
         children: [
@@ -463,7 +466,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should register defaultParams for children routes", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "search",
         path: "/search",
         children: [
@@ -485,7 +488,7 @@ describe("core/routes/addRoute", () => {
       let parentGuardCalled = false;
       let childGuardCalled = false;
 
-      router.addRoute({
+      routesApi.add({
         name: "wrapper",
         path: "/wrapper",
         canActivate: () => () => {
@@ -526,11 +529,11 @@ describe("core/routes/addRoute", () => {
 
   describe("{ parent } option", () => {
     it("should add route with { parent } option when parent exists", () => {
-      router.addRoute({ name: "products", path: "/products" });
+      routesApi.add({ name: "products", path: "/products" });
 
-      router.addRoute({ name: "detail", path: "/:id" }, { parent: "products" });
+      routesApi.add({ name: "detail", path: "/:id" }, { parent: "products" });
 
-      expect(router.hasRoute("products.detail")).toBe(true);
+      expect(routesApi.has("products.detail")).toBe(true);
       expect(router.buildPath("products.detail", { id: "123" })).toBe(
         "/products/123",
       );
@@ -538,7 +541,7 @@ describe("core/routes/addRoute", () => {
 
     it("should throw when { parent } option references non-existent parent", () => {
       expect(() => {
-        router.addRoute(
+        routesApi.add(
           { name: "orphan", path: "/orphan" },
           { parent: "nonexistent" },
         );
@@ -548,9 +551,9 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should add multiple routes with same { parent } in batch", () => {
-      router.addRoute({ name: "dashboard", path: "/dashboard" });
+      routesApi.add({ name: "dashboard", path: "/dashboard" });
 
-      router.addRoute(
+      routesApi.add(
         [
           { name: "widgets", path: "/widgets" },
           { name: "charts", path: "/charts" },
@@ -558,32 +561,32 @@ describe("core/routes/addRoute", () => {
         { parent: "dashboard" },
       );
 
-      expect(router.hasRoute("dashboard.widgets")).toBe(true);
-      expect(router.hasRoute("dashboard.charts")).toBe(true);
+      expect(routesApi.has("dashboard.widgets")).toBe(true);
+      expect(routesApi.has("dashboard.charts")).toBe(true);
     });
 
     it("should support nested parent names (fullName) in { parent } option", () => {
-      router.addRoute({
+      routesApi.add({
         name: "shop",
         path: "/shop",
         children: [{ name: "category", path: "/:category" }],
       });
 
-      router.addRoute(
+      routesApi.add(
         { name: "items", path: "/items" },
         { parent: "shop.category" },
       );
 
-      expect(router.hasRoute("shop.category.items")).toBe(true);
+      expect(routesApi.has("shop.category.items")).toBe(true);
       expect(
         router.buildPath("shop.category.items", { category: "books" }),
       ).toBe("/shop/books/items");
     });
 
     it("should correctly resolve navigation after adding route with { parent }", async () => {
-      router.addRoute({ name: "products", path: "/products" });
+      routesApi.add({ name: "products", path: "/products" });
 
-      router.addRoute({ name: "detail", path: "/:id" }, { parent: "products" });
+      routesApi.add({ name: "detail", path: "/:id" }, { parent: "products" });
 
       const state = await router.navigate("products.detail", { id: "42" });
 
@@ -593,9 +596,9 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should correctly build path after adding route with { parent }", () => {
-      router.addRoute({ name: "api", path: "/api" });
+      routesApi.add({ name: "api", path: "/api" });
 
-      router.addRoute({ name: "v1", path: "/v1" }, { parent: "api" });
+      routesApi.add({ name: "v1", path: "/v1" }, { parent: "api" });
 
       const path = router.buildPath("api.v1");
 
@@ -604,14 +607,11 @@ describe("core/routes/addRoute", () => {
 
     it("should validate { parent } option value", () => {
       expect(() => {
-        router.addRoute(
-          { name: "child", path: "/child" },
-          { parent: "" as any },
-        );
+        routesApi.add({ name: "child", path: "/child" }, { parent: "" as any });
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.addRoute(
+        routesApi.add(
           { name: "child", path: "/child" },
           { parent: 123 as any },
         );
@@ -622,13 +622,13 @@ describe("core/routes/addRoute", () => {
   describe("dot-notation rejection", () => {
     it("should throw TypeError when route name contains dots", () => {
       expect(() => {
-        router.addRoute({ name: "users.profile", path: "/:id" });
+        routesApi.add({ name: "users.profile", path: "/:id" });
       }).toThrowError(TypeError);
     });
 
     it("should include helpful error message for dot-notation", () => {
       expect(() => {
-        router.addRoute({ name: "users.profile", path: "/:id" });
+        routesApi.add({ name: "users.profile", path: "/:id" });
       }).toThrowError(
         '[router.addRoute] Route name "users.profile" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
       );
@@ -636,11 +636,11 @@ describe("core/routes/addRoute", () => {
 
     it("should reject multi-level dot-notation", () => {
       expect(() => {
-        router.addRoute({ name: "a.b.c", path: "/c" });
+        routesApi.add({ name: "a.b.c", path: "/c" });
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.addRoute({ name: "a.b.c", path: "/c" });
+        routesApi.add({ name: "a.b.c", path: "/c" });
       }).toThrowError(/cannot contain dots/);
     });
   });
@@ -648,7 +648,7 @@ describe("core/routes/addRoute", () => {
   describe("encodeParams/decodeParams validation", () => {
     it("should throw when decodeParams is not a function", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "bad-decoder",
           path: "/bad-decoder",
 
@@ -659,7 +659,7 @@ describe("core/routes/addRoute", () => {
 
     it("should throw when encodeParams is not a function", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "bad-encoder",
           path: "/bad-encoder",
 
@@ -670,7 +670,7 @@ describe("core/routes/addRoute", () => {
 
     it("should throw when decodeParams is null", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "null-decoder",
           path: "/null-decoder",
 
@@ -681,7 +681,7 @@ describe("core/routes/addRoute", () => {
 
     it("should accept valid function for decodeParams", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "valid-decoder",
           path: "/valid-decoder/:id",
           decodeParams: (params) => ({ ...params, decoded: true }),
@@ -691,7 +691,7 @@ describe("core/routes/addRoute", () => {
 
     it("should accept valid function for encodeParams", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "valid-encoder",
           path: "/valid-encoder/:id",
           encodeParams: (params) => ({ ...params, encoded: true }),
@@ -701,7 +701,7 @@ describe("core/routes/addRoute", () => {
 
     it("should validate encodeParams/decodeParams in children", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "parent-with-bad-child",
           path: "/parent",
           children: [
@@ -718,7 +718,7 @@ describe("core/routes/addRoute", () => {
 
     it("should throw when decodeParams is an async function", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "async-decoder",
           path: "/async-decoder/:id",
           decodeParams: (async (params: Params) => params) as any,
@@ -728,7 +728,7 @@ describe("core/routes/addRoute", () => {
 
     it("should throw when encodeParams is an async function", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "async-encoder",
           path: "/async-encoder/:id",
           encodeParams: (async (params: Params) => params) as any,
@@ -745,7 +745,7 @@ describe("core/routes/addRoute", () => {
         children: [] as Route[],
       };
 
-      router.addRoute(route);
+      routesApi.add(route);
 
       // Empty children should be preserved in the route object
       expect(route).toHaveProperty("children");
@@ -767,7 +767,7 @@ describe("core/routes/addRoute", () => {
         children: [nestedRoute],
       };
 
-      router.addRoute(route);
+      routesApi.add(route);
 
       // Empty children should be preserved
       expect(nestedRoute).toHaveProperty("children");
@@ -783,7 +783,7 @@ describe("core/routes/addRoute", () => {
         children: undefined,
       } as any;
 
-      router.addRoute(route);
+      routesApi.add(route);
 
       // undefined children should be preserved
       expect(route.children).toBeUndefined();
@@ -800,7 +800,7 @@ describe("core/routes/addRoute", () => {
 
       // Should not throw when adding frozen route
       expect(() => {
-        router.addRoute(frozenRoute);
+        routesApi.add(frozenRoute);
       }).not.toThrowError();
 
       // Route should work correctly
@@ -816,7 +816,7 @@ describe("core/routes/addRoute", () => {
         children: [{ name: "child", path: "/child" }],
       };
 
-      router.addRoute(route);
+      routesApi.add(route);
 
       expect(route).toHaveProperty("children");
       expect(route.children).toHaveLength(1);
@@ -826,7 +826,7 @@ describe("core/routes/addRoute", () => {
 
   describe("forwardTo chain resolution", () => {
     it("should resolve simple forwardTo chain (A → B → C)", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "A", path: "/a", forwardTo: "B" },
         { name: "B", path: "/b", forwardTo: "C" },
         { name: "C", path: "/c" },
@@ -839,7 +839,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle route without forwardTo", async () => {
-      router.addRoute({ name: "no-forward", path: "/no-forward" });
+      routesApi.add({ name: "no-forward", path: "/no-forward" });
 
       const state = getPluginApi(router).forwardState("no-forward", {});
 
@@ -848,7 +848,7 @@ describe("core/routes/addRoute", () => {
 
     it("should detect circular forwardTo (A → B → A)", async () => {
       expect(() => {
-        router.addRoute([
+        routesApi.add([
           { name: "A", path: "/a", forwardTo: "B" },
           { name: "B", path: "/b", forwardTo: "A" },
         ]);
@@ -857,7 +857,7 @@ describe("core/routes/addRoute", () => {
 
     it("should detect circular forwardTo (A → B → C → B)", async () => {
       expect(() => {
-        router.addRoute([
+        routesApi.add([
           { name: "A", path: "/a", forwardTo: "B" },
           { name: "B", path: "/b", forwardTo: "C" },
           { name: "C", path: "/c", forwardTo: "B" },
@@ -867,12 +867,12 @@ describe("core/routes/addRoute", () => {
 
     it("should detect self-referencing forwardTo (A → A)", async () => {
       expect(() => {
-        router.addRoute({ name: "A", path: "/a", forwardTo: "A" });
+        routesApi.add({ name: "A", path: "/a", forwardTo: "A" });
       }).toThrowError(/Circular forwardTo: A → A/);
     });
 
     it("should allow forwardTo if target exists in same batch", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "redirect", path: "/redirect", forwardTo: "target" },
         { name: "target", path: "/target" },
       ]);
@@ -883,9 +883,9 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should allow forwardTo if target already exists", async () => {
-      router.addRoute({ name: "existing", path: "/existing" });
+      routesApi.add({ name: "existing", path: "/existing" });
 
-      router.addRoute({
+      routesApi.add({
         name: "new-redirect",
         path: "/new",
         forwardTo: "existing",
@@ -897,7 +897,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle forwardTo after removeRoute target", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "A", path: "/a", forwardTo: "B" },
         { name: "B", path: "/b" },
       ]);
@@ -906,14 +906,14 @@ describe("core/routes/addRoute", () => {
       expect(getPluginApi(router).forwardState("A", {}).name).toBe("B");
 
       // Remove B - now A has dangling forwardTo
-      router.removeRoute("B");
+      routesApi.remove("B");
 
       // forwardState should return A itself since B no longer exists
       expect(getPluginApi(router).forwardState("A", {}).name).toBe("A");
     });
 
     it("should resolve forwardTo chains correctly", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "level1", path: "/1", forwardTo: "level2" },
         { name: "level2", path: "/2", forwardTo: "level3" },
         { name: "level3", path: "/3", forwardTo: "level4" },
@@ -954,7 +954,7 @@ describe("core/routes/addRoute", () => {
         path: "/route50",
       });
 
-      router.addRoute(routes);
+      routesApi.add(routes);
 
       // First route should resolve to last route
       const state = getPluginApi(router).forwardState("route1", {});
@@ -981,12 +981,12 @@ describe("core/routes/addRoute", () => {
       });
 
       expect(() => {
-        router.addRoute(routes);
+        routesApi.add(routes);
       }).toThrowError(/forwardTo chain exceeds maximum depth/);
     });
 
     it("should handle forwardTo with nested routes", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "old", path: "/old", forwardTo: "new.page" },
         {
           name: "new",
@@ -1001,7 +1001,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should preserve params when forwarding", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "redirect", path: "/redirect/:id", forwardTo: "target" },
         { name: "target", path: "/target/:id" },
       ]);
@@ -1016,10 +1016,10 @@ describe("core/routes/addRoute", () => {
 
     it("should preserve splat params when forwarding", async () => {
       // First add target route with splat param to tree
-      router.addRoute({ name: "newfiles", path: "/newfiles/*filepath" });
+      routesApi.add({ name: "newfiles", path: "/newfiles/*filepath" });
 
       // Then add source route with forwardTo - this triggers getRequiredParams on existing tree
-      router.addRoute({
+      routesApi.add({
         name: "files",
         path: "/files/*filepath",
         forwardTo: "newfiles",
@@ -1036,7 +1036,7 @@ describe("core/routes/addRoute", () => {
     it("should throw if forwardTo target is missing required params", async () => {
       // Target route requires :id param, but source has no params
       expect(() => {
-        router.addRoute([
+        routesApi.add([
           { name: "noparams", path: "/noparams", forwardTo: "withparams" },
           { name: "withparams", path: "/withparams/:id" },
         ]);
@@ -1046,13 +1046,13 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should allow adding forwards dynamically via updateRoute()", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "oldRoute", path: "/old" },
         { name: "newRoute", path: "/new" },
       ]);
 
       // Use updateRoute() API to dynamically add a redirect
-      router.updateRoute("oldRoute", { forwardTo: "newRoute" });
+      routesApi.update("oldRoute", { forwardTo: "newRoute" });
 
       // Verify behavior: forwardState should follow the new rule
       const state = getPluginApi(router).forwardState("oldRoute", {});
@@ -1064,7 +1064,7 @@ describe("core/routes/addRoute", () => {
       // Spy on console.warn
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute([
+      routesApi.add([
         {
           name: "redirectWithGuard",
           path: "/redirect",
@@ -1093,7 +1093,7 @@ describe("core/routes/addRoute", () => {
     it("should not warn when route has only forwardTo without canActivate", async () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute([
+      routesApi.add([
         { name: "redirect", path: "/redirect", forwardTo: "target" },
         { name: "target", path: "/target" },
       ]);
@@ -1108,7 +1108,7 @@ describe("core/routes/addRoute", () => {
     it("should handle empty batch addRoute([])", async () => {
       // Should not throw when adding empty array
       expect(() => {
-        router.addRoute([]);
+        routesApi.add([]);
       }).not.toThrowError();
     });
 
@@ -1117,7 +1117,7 @@ describe("core/routes/addRoute", () => {
 
       // Should not throw
       expect(() => {
-        router.addRoute({ name: "after-stop", path: "/after-stop" });
+        routesApi.add({ name: "after-stop", path: "/after-stop" });
       }).not.toThrowError();
 
       // Route should be registered
@@ -1129,7 +1129,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle child route with forwardTo to sibling", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "container",
         path: "/container",
         children: [
@@ -1148,7 +1148,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle route with query parameters in path", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "search",
         path: "/search?q&page&sort",
       });
@@ -1169,9 +1169,9 @@ describe("core/routes/addRoute", () => {
       const decodeParams = vi.fn((p) => ({ ...p, decoded: true }));
       const encodeParams = vi.fn((p) => ({ ...p, encoded: true }));
 
-      router.addRoute({ name: "target", path: "/target/:id" });
+      routesApi.add({ name: "target", path: "/target/:id" });
 
-      router.addRoute({
+      routesApi.add({
         name: "complete",
         path: "/complete/:id",
         canActivate,
@@ -1218,7 +1218,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle adding route to deeply nested parent via { parent } option", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "level1",
         path: "/level1",
         children: [
@@ -1236,7 +1236,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // Add a child to level3 via { parent } option with nested fullName
-      router.addRoute(
+      routesApi.add(
         {
           name: "level4",
           path: "/level4",
@@ -1250,7 +1250,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle route path with optional query params", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "docs",
         path: "/docs?section",
       });
@@ -1268,7 +1268,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle route path with splat/wildcard", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "files",
         path: "/files/*path",
       });
@@ -1280,7 +1280,7 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle multiple routes with same prefix", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "products", path: "/products" },
         { name: "products-list", path: "/products/list" },
         { name: "products-detail", path: "/products/:id" },
@@ -1298,13 +1298,13 @@ describe("core/routes/addRoute", () => {
     });
 
     it("should handle forwardTo chain added in multiple batches", async () => {
-      router.addRoute({ name: "final", path: "/final" });
-      router.addRoute({
+      routesApi.add({ name: "final", path: "/final" });
+      routesApi.add({
         name: "middle",
         path: "/middle",
         forwardTo: "final",
       });
-      router.addRoute({
+      routesApi.add({
         name: "start",
         path: "/start",
         forwardTo: "middle",
@@ -1324,7 +1324,7 @@ describe("core/routes/addRoute", () => {
         // Current behavior: route is added but forwardTo is invalid
         // Expected behavior: should throw during addRoute
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "redirect",
             path: "/redirect",
             forwardTo: "nonexistent-target",
@@ -1334,7 +1334,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if forwardTo target does not exist in batch", async () => {
         expect(() => {
-          router.addRoute([
+          routesApi.add([
             { name: "a", path: "/a", forwardTo: "ghost" },
             { name: "b", path: "/b" },
           ]);
@@ -1345,7 +1345,7 @@ describe("core/routes/addRoute", () => {
     describe("Problem 2: canActivate type validation", () => {
       it("should throw if canActivate is not a function", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "bad-guard",
             path: "/bad-guard",
             canActivate: "not a function" as any,
@@ -1355,7 +1355,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if canActivate is null", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "null-guard",
             path: "/null-guard",
             canActivate: null as any,
@@ -1365,7 +1365,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if canActivate is an object", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "object-guard",
             path: "/object-guard",
             canActivate: { handler: () => true } as any,
@@ -1377,7 +1377,7 @@ describe("core/routes/addRoute", () => {
     describe("canDeactivate type validation", () => {
       it("should throw if canDeactivate is not a function", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "bad-deactivate-guard",
             path: "/bad-deactivate-guard",
             canDeactivate: "not a function" as any,
@@ -1387,7 +1387,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if canDeactivate is null", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "null-deactivate-guard",
             path: "/null-deactivate-guard",
             canDeactivate: null as any,
@@ -1397,7 +1397,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if canDeactivate is an object", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "object-deactivate-guard",
             path: "/object-deactivate-guard",
             canDeactivate: { handler: () => true } as any,
@@ -1409,7 +1409,7 @@ describe("core/routes/addRoute", () => {
     describe("Problem 3: defaultParams type validation", () => {
       it("should throw if defaultParams is not an object", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "bad-defaults",
             path: "/bad-defaults",
             defaultParams: "not an object" as any,
@@ -1419,7 +1419,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if defaultParams is null", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "null-defaults",
             path: "/null-defaults",
             defaultParams: null as any,
@@ -1429,7 +1429,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if defaultParams is an array", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "array-defaults",
             path: "/array-defaults",
             defaultParams: ["a", "b"] as any,
@@ -1441,7 +1441,7 @@ describe("core/routes/addRoute", () => {
     describe("Problem 5: invalid path type", () => {
       it("should throw if path is not a string (number)", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "bad-path",
             path: 123 as unknown as string,
           });
@@ -1450,7 +1450,7 @@ describe("core/routes/addRoute", () => {
 
       it("should throw if path is null", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "null-path",
             path: null as unknown as string,
           });
@@ -1461,7 +1461,7 @@ describe("core/routes/addRoute", () => {
     describe("Problem 6: forwardTo to self", () => {
       it("should detect self-referencing forwardTo as cycle", async () => {
         expect(() => {
-          router.addRoute({
+          routesApi.add({
             name: "self-ref",
             path: "/self",
             forwardTo: "self-ref",
@@ -1473,20 +1473,20 @@ describe("core/routes/addRoute", () => {
     describe("Problem 4: atomicity on Phase 4 errors", () => {
       it("should not add routes to definitions if forwardTo cycle is detected", async () => {
         expect(() => {
-          router.addRoute([
+          routesApi.add([
             { name: "cycle-a", path: "/cycle-a", forwardTo: "cycle-b" },
             { name: "cycle-b", path: "/cycle-b", forwardTo: "cycle-a" },
           ]);
         }).toThrowError(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
-        expect(router.hasRoute("cycle-a")).toBe(false);
-        expect(router.hasRoute("cycle-b")).toBe(false);
+        expect(routesApi.has("cycle-a")).toBe(false);
+        expect(routesApi.has("cycle-b")).toBe(false);
       });
 
       it("should not register handlers if forwardTo cycle is detected", async () => {
         expect(() => {
-          router.addRoute([
+          routesApi.add([
             {
               name: "cycle-with-guard-a",
               path: "/cycle-guard-a",
@@ -1502,8 +1502,8 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
-        expect(router.hasRoute("cycle-with-guard-a")).toBe(false);
-        expect(router.hasRoute("cycle-with-guard-b")).toBe(false);
+        expect(routesApi.has("cycle-with-guard-a")).toBe(false);
+        expect(routesApi.has("cycle-with-guard-b")).toBe(false);
       });
     });
   });
@@ -1511,25 +1511,25 @@ describe("core/routes/addRoute", () => {
   describe("path validation", () => {
     it("should throw on path with spaces", async () => {
       expect(() => {
-        router.addRoute({ name: "spacey", path: "/with space" });
+        routesApi.add({ name: "spacey", path: "/with space" });
       }).toThrowError(/whitespace not allowed/);
     });
 
     it("should throw on path with tabs", async () => {
       expect(() => {
-        router.addRoute({ name: "tabby", path: "/with\ttab" });
+        routesApi.add({ name: "tabby", path: "/with\ttab" });
       }).toThrowError(/whitespace not allowed/);
     });
 
     it("should throw on path with newlines", async () => {
       expect(() => {
-        router.addRoute({ name: "newline", path: "/with\nnewline" });
+        routesApi.add({ name: "newline", path: "/with\nnewline" });
       }).toThrowError(/whitespace not allowed/);
     });
 
     it("should allow path without whitespace", async () => {
       expect(() => {
-        router.addRoute({ name: "clean", path: "/clean-path" });
+        routesApi.add({ name: "clean", path: "/clean-path" });
       }).not.toThrowError();
     });
   });
@@ -1544,7 +1544,7 @@ describe("core/routes/addRoute", () => {
       };
 
       expect(() => {
-        router.addRoute(routeWithGetter as Route);
+        routesApi.add(routeWithGetter as Route);
       }).toThrowError(/must not have getters or setters/);
     });
 
@@ -1561,7 +1561,7 @@ describe("core/routes/addRoute", () => {
       };
 
       expect(() => {
-        router.addRoute(routeWithSetter as Route);
+        routesApi.add(routeWithSetter as Route);
       }).toThrowError(/must not have getters or setters/);
     });
 
@@ -1572,7 +1572,7 @@ describe("core/routes/addRoute", () => {
       }
 
       expect(() => {
-        router.addRoute(new RouteClass() as Route);
+        routesApi.add(new RouteClass() as Route);
       }).toThrowError(/must be a plain object/);
     });
 
@@ -1583,13 +1583,13 @@ describe("core/routes/addRoute", () => {
       nullProtoRoute.path = "/null-proto";
 
       expect(() => {
-        router.addRoute(nullProtoRoute);
+        routesApi.add(nullProtoRoute);
       }).not.toThrowError();
     });
 
     it("should allow plain object route", async () => {
       expect(() => {
-        router.addRoute({ name: "plain", path: "/plain" });
+        routesApi.add({ name: "plain", path: "/plain" });
       }).not.toThrowError();
     });
   });
@@ -1602,7 +1602,7 @@ describe("core/routes/addRoute", () => {
       ];
 
       // Verify routes are added correctly even if original array is mutated after
-      router.addRoute(routes);
+      routesApi.add(routes);
       routes.push({ name: "proxy-c", path: "/proxy-c" });
 
       // Only first two routes should be added
@@ -1632,7 +1632,7 @@ describe("core/routes/addRoute", () => {
         return originalPush(...items);
       };
 
-      router.addRoute(routes);
+      routesApi.add(routes);
 
       // Now mutate the original array
       routes.push({ name: "injected", path: "/injected" });
@@ -1650,7 +1650,7 @@ describe("core/routes/addRoute", () => {
       // Verify that spread operator creates independent copy
       const routes = [{ name: "original", path: "/original" }];
 
-      router.addRoute(routes);
+      routesApi.add(routes);
 
       // Mutate original
       routes[0] = { name: "mutated", path: "/mutated" };
@@ -1694,7 +1694,7 @@ describe("core/routes/addRoute", () => {
 
     it("should reject async forwardTo callback (native async)", async () => {
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "async-forward",
           path: "/async-forward",
           forwardTo: (async () => "target") as any,
@@ -1702,7 +1702,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "async-forward",
           path: "/async-forward",
           forwardTo: (async () => "target") as any,
@@ -1719,7 +1719,7 @@ describe("core/routes/addRoute", () => {
       )();
 
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "transpiled-async-forward",
           path: "/transpiled-async-forward",
           forwardTo: transpiledAsync,
@@ -1727,7 +1727,7 @@ describe("core/routes/addRoute", () => {
       }).toThrowError(TypeError);
 
       expect(() => {
-        router.addRoute({
+        routesApi.add({
           name: "transpiled-async-forward",
           path: "/transpiled-async-forward",
           forwardTo: transpiledAsync,
@@ -1741,7 +1741,7 @@ describe("core/routes/addRoute", () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: GuardFnFactory = () => guard;
 
-      router.addRoute({
+      routesApi.add({
         name: "editor",
         path: "/editor",
         canDeactivate: guardFactory,
@@ -1770,7 +1770,7 @@ describe("core/routes/addRoute", () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: GuardFnFactory = () => guard;
 
-      router.addRoute({
+      routesApi.add({
         name: "form",
         path: "/form",
         canDeactivate: guardFactory,
@@ -1792,7 +1792,7 @@ describe("core/routes/addRoute", () => {
       const parentGuard = vi.fn().mockReturnValue(true);
       const childGuard = vi.fn().mockReturnValue(true);
 
-      router.addRoute({
+      routesApi.add({
         name: "dashboard",
         path: "/dashboard",
         canDeactivate: () => parentGuard,
@@ -1829,7 +1829,7 @@ describe("core/routes/addRoute", () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
-      router.addRoute({
+      routesApi.add({
         name: "workspace",
         path: "/workspace",
         canDeactivate: () => guard1,
@@ -1854,13 +1854,13 @@ describe("core/routes/addRoute", () => {
     it("should return canDeactivate from getRoute() after addRoute", async () => {
       const guardFactory: GuardFnFactory = () => () => true;
 
-      router.addRoute({
+      routesApi.add({
         name: "account-settings",
         path: "/account-settings",
         canDeactivate: guardFactory,
       });
 
-      const route = router.getRoute("account-settings");
+      const route = routesApi.get("account-settings");
 
       expect(route).toBeDefined();
       expect(route?.canDeactivate).toBe(guardFactory);
@@ -1905,7 +1905,7 @@ describe("core/routes/addRoute", () => {
     it("should warn when route has both forwardTo and canDeactivate", async () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute([
+      routesApi.add([
         {
           name: "old-page",
           path: "/old-page",

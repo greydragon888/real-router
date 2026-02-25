@@ -1,16 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, getPluginApi } from "@real-router/core";
+import { errorCodes, getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, RouterError } from "@real-router/core";
+import type { Router, RouterError, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/removeRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -20,38 +22,38 @@ describe("core/routes/removeRoute", () => {
 
   describe("full route removal", () => {
     it("should remove route from tree (matchPath returns undefined)", async () => {
-      router.addRoute({ name: "temporary", path: "/temporary" });
+      routesApi.add({ name: "temporary", path: "/temporary" });
 
       // Route exists before removal
       expect(getPluginApi(router).matchPath("/temporary")?.name).toBe(
         "temporary",
       );
 
-      router.removeRoute("temporary");
+      routesApi.remove("temporary");
 
       // Route should not match after removal
       expect(getPluginApi(router).matchPath("/temporary")).toBeUndefined();
     });
 
     it("should remove route so buildPath throws", async () => {
-      router.addRoute({ name: "removable", path: "/removable" });
+      routesApi.add({ name: "removable", path: "/removable" });
 
       // Route exists before removal
       expect(router.buildPath("removable")).toBe("/removable");
 
-      router.removeRoute("removable");
+      routesApi.remove("removable");
 
       // buildPath should throw for non-existent route
       expect(() => router.buildPath("removable")).toThrowError(/not defined/);
     });
 
     it("should allow re-adding route with same name after removal", async () => {
-      router.addRoute({ name: "reusable", path: "/old-path" });
-      router.removeRoute("reusable");
+      routesApi.add({ name: "reusable", path: "/old-path" });
+      routesApi.remove("reusable");
 
       // Should not throw - route was fully removed
       expect(() => {
-        router.addRoute({ name: "reusable", path: "/new-path" });
+        routesApi.add({ name: "reusable", path: "/new-path" });
       }).not.toThrowError();
 
       expect(getPluginApi(router).matchPath("/new-path")?.name).toBe(
@@ -61,7 +63,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should remove route with children", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "parent",
         path: "/parent",
         children: [
@@ -74,7 +76,7 @@ describe("core/routes/removeRoute", () => {
         "parent.child1",
       );
 
-      router.removeRoute("parent");
+      routesApi.remove("parent");
 
       expect(getPluginApi(router).matchPath("/parent")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/parent/child1")).toBeUndefined();
@@ -82,7 +84,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should remove only specified child route", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "category",
         path: "/category",
         children: [
@@ -91,7 +93,7 @@ describe("core/routes/removeRoute", () => {
         ],
       });
 
-      router.removeRoute("category.remove");
+      routesApi.remove("category.remove");
 
       // Parent and sibling should still exist
       expect(getPluginApi(router).matchPath("/category")?.name).toBe(
@@ -108,8 +110,10 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should handle removal of non-existent route gracefully", async () => {
-      // Route doesn't exist - removeRoute should not throw
-      expect(() => router.removeRoute("nonexistent")).not.toThrowError();
+      // Route doesn't exist - remove should not throw
+      expect(() => {
+        routesApi.remove("nonexistent");
+      }).not.toThrowError();
 
       // Router should still function normally
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
@@ -117,43 +121,38 @@ describe("core/routes/removeRoute", () => {
 
     it("should handle multiple removals of the same route gracefully (12.13)", async () => {
       // Add a route
-      router.addRoute({ name: "temporary", path: "/temporary" });
+      routesApi.add({ name: "temporary", path: "/temporary" });
 
       expect(getPluginApi(router).matchPath("/temporary")?.name).toBe(
         "temporary",
       );
 
       // First removal - should succeed
-      const result1 = router.removeRoute("temporary");
+      routesApi.remove("temporary");
 
-      expect(result1).toBe(router);
       expect(getPluginApi(router).matchPath("/temporary")).toBeUndefined();
 
       // Second removal - should be graceful (warning, no throw)
-      const result2 = router.removeRoute("temporary");
-
-      expect(result2).toBe(router);
+      routesApi.remove("temporary");
 
       // Third removal - still graceful
-      const result3 = router.removeRoute("temporary");
-
-      expect(result3).toBe(router);
+      routesApi.remove("temporary");
 
       // Router should still function normally
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should handle removal of non-existent child route gracefully", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "wrapper",
         path: "/wrapper",
         children: [{ name: "exists", path: "/exists" }],
       });
 
       // Child doesn't exist - should not throw
-      expect(
-        () => void router.removeRoute("wrapper.nonexistent"),
-      ).not.toThrowError();
+      expect(() => {
+        routesApi.remove("wrapper.nonexistent");
+      }).not.toThrowError();
 
       // Parent and existing child should remain
       expect(getPluginApi(router).matchPath("/wrapper")?.name).toBe("wrapper");
@@ -167,7 +166,7 @@ describe("core/routes/removeRoute", () => {
     it("should clear canActivate handler on removeRoute", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      routesApi.add({
         name: "protected",
         path: "/protected",
         canActivate: () => guard,
@@ -183,17 +182,17 @@ describe("core/routes/removeRoute", () => {
         expect(guard).toHaveBeenCalled();
       }
 
-      router.removeRoute("protected");
+      routesApi.remove("protected");
 
       // After removal, route no longer exists
-      expect(router.hasRoute("protected")).toBe(false);
+      expect(routesApi.has("protected")).toBe(false);
       expect(getPluginApi(router).matchPath("/protected")).toBeUndefined();
     });
 
     it("should clear canDeactivate handler on removeRoute", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({ name: "editor", path: "/editor" });
+      routesApi.add({ name: "editor", path: "/editor" });
       router.addDeactivateGuard("editor", () => guard);
 
       // Navigate to editor first
@@ -214,25 +213,25 @@ describe("core/routes/removeRoute", () => {
       await router.navigate("home");
       guard.mockClear();
 
-      router.removeRoute("editor");
+      routesApi.remove("editor");
 
       // After removal, route no longer exists
-      expect(router.hasRoute("editor")).toBe(false);
+      expect(routesApi.has("editor")).toBe(false);
     });
 
     it("should only clear canDeactivate for removed route", async () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(false);
 
-      router.addRoute({ name: "form1", path: "/form1" });
-      router.addRoute({ name: "form2", path: "/form2" });
+      routesApi.add({ name: "form1", path: "/form1" });
+      routesApi.add({ name: "form2", path: "/form2" });
       router.addDeactivateGuard("form1", () => guard1);
       router.addDeactivateGuard("form2", () => guard2);
 
-      router.removeRoute("form1");
+      routesApi.remove("form1");
 
       // form1 no longer exists
-      expect(router.hasRoute("form1")).toBe(false);
+      expect(routesApi.has("form1")).toBe(false);
 
       // form2 guard should still work - verify by navigation
       await router.navigate("form2");
@@ -248,34 +247,38 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should clear both canActivate and canDeactivate handlers", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "dashboard",
         path: "/dashboard",
         canActivate: () => () => true,
       });
       router.addDeactivateGuard("dashboard", () => () => true);
 
-      router.removeRoute("dashboard");
+      routesApi.remove("dashboard");
 
       // After removal, route no longer exists
-      expect(router.hasRoute("dashboard")).toBe(false);
+      expect(routesApi.has("dashboard")).toBe(false);
       expect(getPluginApi(router).matchPath("/dashboard")).toBeUndefined();
     });
 
     it("should not throw when route has no lifecycle handlers", async () => {
-      router.addRoute({ name: "simple", path: "/simple" });
+      routesApi.add({ name: "simple", path: "/simple" });
 
-      expect(() => router.removeRoute("simple")).not.toThrowError();
+      expect(() => {
+        routesApi.remove("simple");
+      }).not.toThrowError();
     });
 
     it("should not emit warning when clearing non-existent lifecycle handlers", async () => {
-      router.addRoute({ name: "nohandlers", path: "/nohandlers" });
+      routesApi.add({ name: "nohandlers", path: "/nohandlers" });
 
       // The silent parameter should suppress warnings
-      expect(() => router.removeRoute("nohandlers")).not.toThrowError();
+      expect(() => {
+        routesApi.remove("nohandlers");
+      }).not.toThrowError();
 
       // Route should be removed
-      expect(router.hasRoute("nohandlers")).toBe(false);
+      expect(routesApi.has("nohandlers")).toBe(false);
     });
   });
 
@@ -286,7 +289,7 @@ describe("core/routes/removeRoute", () => {
         id: Number(params.id),
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "withDecoder",
         path: "/with-decoder/:id",
         decodeParams,
@@ -297,10 +300,10 @@ describe("core/routes/removeRoute", () => {
         getPluginApi(router).matchPath("/with-decoder/123")?.params.id,
       ).toBe(123);
 
-      router.removeRoute("withDecoder");
+      routesApi.remove("withDecoder");
 
       // Route no longer exists
-      expect(router.hasRoute("withDecoder")).toBe(false);
+      expect(routesApi.has("withDecoder")).toBe(false);
       expect(
         getPluginApi(router).matchPath("/with-decoder/123"),
       ).toBeUndefined();
@@ -312,7 +315,7 @@ describe("core/routes/removeRoute", () => {
         id: `${params.id as number}`,
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "decoded",
         path: "/decoded/:id",
         encodeParams,
@@ -323,14 +326,14 @@ describe("core/routes/removeRoute", () => {
 
       expect(encodeParams).toHaveBeenCalled();
 
-      router.removeRoute("decoded");
+      routesApi.remove("decoded");
 
       // Route no longer exists
-      expect(router.hasRoute("decoded")).toBe(false);
+      expect(routesApi.has("decoded")).toBe(false);
     });
 
     it("should clear defaultParams on removeRoute", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "withdefaults",
         path: "/withdefaults",
         defaultParams: { page: 1 },
@@ -343,15 +346,15 @@ describe("core/routes/removeRoute", () => {
         page: 1,
       });
 
-      router.removeRoute("withdefaults");
+      routesApi.remove("withdefaults");
 
       // Route no longer exists
-      expect(router.hasRoute("withdefaults")).toBe(false);
+      expect(routesApi.has("withdefaults")).toBe(false);
     });
 
     it("should clear forwardMap on removeRoute", async () => {
-      router.addRoute({ name: "target", path: "/target" });
-      router.addRoute({
+      routesApi.add({ name: "target", path: "/target" });
+      routesApi.add({
         name: "redirect",
         path: "/redirect",
         forwardTo: "target",
@@ -362,31 +365,31 @@ describe("core/routes/removeRoute", () => {
         "target",
       );
 
-      router.removeRoute("redirect");
+      routesApi.remove("redirect");
 
       // Route no longer exists
-      expect(router.hasRoute("redirect")).toBe(false);
+      expect(routesApi.has("redirect")).toBe(false);
     });
 
     it("should only clear forwardMap for removed route", async () => {
-      router.addRoute({ name: "dest", path: "/dest" });
-      router.addRoute({ name: "fwd1", path: "/fwd1", forwardTo: "dest" });
-      router.addRoute({ name: "fwd2", path: "/fwd2", forwardTo: "dest" });
+      routesApi.add({ name: "dest", path: "/dest" });
+      routesApi.add({ name: "fwd1", path: "/fwd1", forwardTo: "dest" });
+      routesApi.add({ name: "fwd2", path: "/fwd2", forwardTo: "dest" });
 
       // Both forward rules work
       expect(getPluginApi(router).forwardState("fwd1", {}).name).toBe("dest");
       expect(getPluginApi(router).forwardState("fwd2", {}).name).toBe("dest");
 
-      router.removeRoute("fwd1");
+      routesApi.remove("fwd1");
 
       // fwd1 is removed, fwd2 still works
-      expect(router.hasRoute("fwd1")).toBe(false);
+      expect(routesApi.has("fwd1")).toBe(false);
       expect(getPluginApi(router).forwardState("fwd2", {}).name).toBe("dest");
     });
 
     it("should clear child route forwardMap when parent removed", async () => {
-      router.addRoute({ name: "dest", path: "/dest" });
-      router.addRoute({
+      routesApi.add({ name: "dest", path: "/dest" });
+      routesApi.add({
         name: "container",
         path: "/container",
         children: [{ name: "fwd", path: "/fwd", forwardTo: "dest" }],
@@ -397,17 +400,17 @@ describe("core/routes/removeRoute", () => {
         "dest",
       );
 
-      router.removeRoute("container");
+      routesApi.remove("container");
 
       // Parent and child routes no longer exist
-      expect(router.hasRoute("container")).toBe(false);
-      expect(router.hasRoute("container.fwd")).toBe(false);
+      expect(routesApi.has("container")).toBe(false);
+      expect(routesApi.has("container.fwd")).toBe(false);
     });
 
     it("should clear child route handlers when parent removed", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      routesApi.add({
         name: "area",
         path: "/area",
         children: [{ name: "page", path: "/page" }],
@@ -430,16 +433,16 @@ describe("core/routes/removeRoute", () => {
       guard.mockReturnValue(true);
       await router.navigate("home");
 
-      router.removeRoute("area");
+      routesApi.remove("area");
 
       // Parent and child no longer exist
-      expect(router.hasRoute("area")).toBe(false);
-      expect(router.hasRoute("area.page")).toBe(false);
+      expect(routesApi.has("area")).toBe(false);
+      expect(routesApi.has("area.page")).toBe(false);
     });
 
     it("should remove route with dynamic forwardTo", async () => {
-      router.addRoute({ name: "fn-target", path: "/fn-target" });
-      router.addRoute({
+      routesApi.add({ name: "fn-target", path: "/fn-target" });
+      routesApi.add({
         name: "fn-forward",
         path: "/fn-forward",
         forwardTo: () => "fn-target",
@@ -449,18 +452,18 @@ describe("core/routes/removeRoute", () => {
         "fn-target",
       );
 
-      const fnForwardRoute = router.getRoute("fn-forward");
+      const fnForwardRoute = routesApi.get("fn-forward");
 
       expect(typeof fnForwardRoute?.forwardTo).toBe("function");
 
-      router.removeRoute("fn-forward");
+      routesApi.remove("fn-forward");
 
-      expect(router.hasRoute("fn-forward")).toBe(false);
+      expect(routesApi.has("fn-forward")).toBe(false);
     });
 
     it("should not leak forwardFnMap entry after removeRoute and re-add", async () => {
-      router.addRoute({ name: "re-target", path: "/re-target" });
-      router.addRoute({
+      routesApi.add({ name: "re-target", path: "/re-target" });
+      routesApi.add({
         name: "re-forward",
         path: "/re-forward",
         forwardTo: () => "re-target",
@@ -470,10 +473,10 @@ describe("core/routes/removeRoute", () => {
         "re-target",
       );
 
-      router.removeRoute("re-forward");
+      routesApi.remove("re-forward");
 
       // Re-add without forwardTo — should NOT have old dynamic forward
-      router.addRoute({ name: "re-forward", path: "/re-forward" });
+      routesApi.add({ name: "re-forward", path: "/re-forward" });
 
       expect(getPluginApi(router).forwardState("re-forward", {}).name).toBe(
         "re-forward",
@@ -481,8 +484,8 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should clear child forwardFnMap when parent removed", async () => {
-      router.addRoute({ name: "fn-dest", path: "/fn-dest" });
-      router.addRoute({
+      routesApi.add({ name: "fn-dest", path: "/fn-dest" });
+      routesApi.add({
         name: "fn-parent",
         path: "/fn-parent",
         children: [
@@ -496,10 +499,10 @@ describe("core/routes/removeRoute", () => {
       ).toBe("fn-dest");
 
       // Remove parent — child forwardFnMap should be cleared
-      router.removeRoute("fn-parent");
+      routesApi.remove("fn-parent");
 
       // Re-add without forwardTo
-      router.addRoute({
+      routesApi.add({
         name: "fn-parent",
         path: "/fn-parent",
         children: [{ name: "child", path: "/child" }],
@@ -523,7 +526,7 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.removeRoute("nonexistent");
+      routesApi.remove("nonexistent");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -537,13 +540,13 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute({
+      routesApi.add({
         name: "parent",
         path: "/parent",
         children: [{ name: "exists", path: "/exists" }],
       });
 
-      router.removeRoute("parent.nonexistent");
+      routesApi.remove("parent.nonexistent");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -558,7 +561,7 @@ describe("core/routes/removeRoute", () => {
       const deactivateGuard = vi.fn().mockReturnValue(false);
 
       // Setup: add routes with various configurations
-      router.addRoute({
+      routesApi.add({
         name: "existing",
         path: "/existing/:id",
         defaultParams: { id: "1" },
@@ -569,7 +572,7 @@ describe("core/routes/removeRoute", () => {
       router.addDeactivateGuard("existing", () => deactivateGuard);
 
       // Attempt to remove non-existent route
-      router.removeRoute("nonexistent");
+      routesApi.remove("nonexistent");
 
       // Verify route still works (behavioral test)
       expect(getPluginApi(router).matchPath("/existing/42")?.name).toBe(
@@ -606,10 +609,10 @@ describe("core/routes/removeRoute", () => {
       }
     });
 
-    it("should return router for chaining even when route not found", async () => {
-      const result = router.removeRoute("nonexistent");
+    it("should handle removal of nonexistent route gracefully", async () => {
+      routesApi.remove("nonexistent");
 
-      expect(result).toBe(router);
+      expect(routesApi.has("nonexistent")).toBe(false);
     });
   });
 
@@ -623,14 +626,14 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute({ name: "dashboard", path: "/dashboard" });
+      routesApi.add({ name: "dashboard", path: "/dashboard" });
       await router.navigate("dashboard");
 
       // Verify we're on the route
       expect(router.getState()?.name).toBe("dashboard");
 
       // Attempt to remove active route
-      router.removeRoute("dashboard");
+      routesApi.remove("dashboard");
 
       // Should warn and NOT remove
       expect(warnSpy).toHaveBeenCalledWith(
@@ -650,7 +653,7 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute({
+      routesApi.add({
         name: "parentRoute",
         path: "/parent-route",
         children: [{ name: "childRoute", path: "/child" }],
@@ -661,7 +664,7 @@ describe("core/routes/removeRoute", () => {
       expect(router.getState()?.name).toBe("parentRoute.childRoute");
 
       // Attempt to remove parent
-      router.removeRoute("parentRoute");
+      routesApi.remove("parentRoute");
 
       // Should warn with current route info
       expect(warnSpy).toHaveBeenCalledWith(
@@ -681,12 +684,12 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should allow removal of inactive route when another route is active", async () => {
-      router.addRoute({ name: "active", path: "/active" });
-      router.addRoute({ name: "inactive", path: "/inactive" });
+      routesApi.add({ name: "active", path: "/active" });
+      routesApi.add({ name: "inactive", path: "/inactive" });
       await router.navigate("active");
 
       // Should work - removing inactive route
-      router.removeRoute("inactive");
+      routesApi.remove("inactive");
 
       // Active route still exists, inactive removed
       expect(getPluginApi(router).matchPath("/active")?.name).toBe("active");
@@ -694,7 +697,7 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should allow removal of sibling route when on different branch", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "sectionTest",
         path: "/section-test",
         children: [
@@ -705,7 +708,7 @@ describe("core/routes/removeRoute", () => {
       await router.navigate("sectionTest.pageA");
 
       // Should work - removing sibling
-      router.removeRoute("sectionTest.pageB");
+      routesApi.remove("sectionTest.pageB");
 
       // pageA still exists, pageB removed
       expect(getPluginApi(router).matchPath("/section-test/a")?.name).toBe(
@@ -718,10 +721,10 @@ describe("core/routes/removeRoute", () => {
       // Stop router to clear state
       router.stop();
 
-      router.addRoute({ name: "test", path: "/test" });
+      routesApi.add({ name: "test", path: "/test" });
 
       // Should work - no active state
-      router.removeRoute("test");
+      routesApi.remove("test");
 
       expect(getPluginApi(router).matchPath("/test")).toBeUndefined();
     });
@@ -729,26 +732,30 @@ describe("core/routes/removeRoute", () => {
     it("should allow removal when router not started", async () => {
       // Create fresh router without starting
       const freshRouter = createTestRouter();
+      const freshRoutesApi = getRoutesApi(freshRouter);
 
-      freshRouter.addRoute({ name: "temp", path: "/temp" });
+      freshRoutesApi.add({ name: "temp", path: "/temp" });
 
       // Should work - router not started
-      freshRouter.removeRoute("temp");
+      freshRoutesApi.remove("temp");
 
       expect(getPluginApi(freshRouter).matchPath("/temp")).toBeUndefined();
     });
 
-    it("should return router for chaining when removal blocked", async () => {
+    it("should return undefined when removal blocked", async () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.addRoute({ name: "blocked", path: "/blocked" });
+      routesApi.add({ name: "blocked", path: "/blocked" });
       await router.navigate("blocked");
 
-      const result = router.removeRoute("blocked");
+      routesApi.remove("blocked");
 
-      // Should still return router for chaining
-      expect(result).toBe(router);
+      // Should warn when blocked
+      expect(warnSpy).toHaveBeenCalledWith(
+        "router.removeRoute",
+        expect.stringContaining("currently active"),
+      );
 
       warnSpy.mockRestore();
     });
@@ -763,8 +770,8 @@ describe("core/routes/removeRoute", () => {
     // 12.2: Removing forwardTo target route
     describe("forwardTo target removal (12.2)", () => {
       it("should clear forwardMap entry when target route is removed", async () => {
-        router.addRoute({ name: "newDashboard", path: "/new-dashboard" });
-        router.addRoute({
+        routesApi.add({ name: "newDashboard", path: "/new-dashboard" });
+        routesApi.add({
           name: "oldDashboard",
           path: "/old-dashboard",
           forwardTo: "newDashboard",
@@ -776,7 +783,7 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Remove the target route
-        router.removeRoute("newDashboard");
+        routesApi.remove("newDashboard");
 
         // Forward should no longer redirect (target removed)
         expect(getPluginApi(router).forwardState("oldDashboard", {}).name).toBe(
@@ -785,14 +792,14 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should keep source route functional after target removal", async () => {
-        router.addRoute({ name: "targetRoute", path: "/target" });
-        router.addRoute({
+        routesApi.add({ name: "targetRoute", path: "/target" });
+        routesApi.add({
           name: "sourceRoute",
           path: "/source",
           forwardTo: "targetRoute",
         });
 
-        router.removeRoute("targetRoute");
+        routesApi.remove("targetRoute");
 
         // Source route should still exist and be matchable
         expect(getPluginApi(router).matchPath("/source")?.name).toBe(
@@ -801,17 +808,17 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should allow navigation to source route after target removal", async () => {
-        router.addRoute({
+        routesApi.add({
           name: "forwardTarget",
           path: "/forward-target",
         });
-        router.addRoute({
+        routesApi.add({
           name: "forwardSource",
           path: "/forward-source",
           forwardTo: "forwardTarget",
         });
 
-        router.removeRoute("forwardTarget");
+        routesApi.remove("forwardTarget");
 
         // Navigation to source should work (no forward happens)
         await router.navigate("forwardSource");
@@ -820,13 +827,13 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should handle chain of forwardTo when middle target is removed", async () => {
-        router.addRoute({ name: "final", path: "/final" });
-        router.addRoute({
+        routesApi.add({ name: "final", path: "/final" });
+        routesApi.add({
           name: "middle",
           path: "/middle",
           forwardTo: "final",
         });
-        router.addRoute({
+        routesApi.add({
           name: "start",
           path: "/start",
           forwardTo: "middle",
@@ -841,21 +848,21 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Remove middle route
-        router.removeRoute("middle");
+        routesApi.remove("middle");
 
         // start's forward to middle should be cleared (middle no longer exists)
         expect(getPluginApi(router).forwardState("start", {}).name).toBe(
           "start",
         );
         // middle route no longer exists
-        expect(router.hasRoute("middle")).toBe(false);
+        expect(routesApi.has("middle")).toBe(false);
         // final route should still exist
         expect(getPluginApi(router).matchPath("/final")?.name).toBe("final");
       });
 
       it("should clear forwardMap when source route is removed", async () => {
-        router.addRoute({ name: "keepTarget", path: "/keep-target" });
-        router.addRoute({
+        routesApi.add({ name: "keepTarget", path: "/keep-target" });
+        routesApi.add({
           name: "removeSource",
           path: "/remove-source",
           forwardTo: "keepTarget",
@@ -867,10 +874,10 @@ describe("core/routes/removeRoute", () => {
         );
 
         // Remove the source route
-        router.removeRoute("removeSource");
+        routesApi.remove("removeSource");
 
         // Source route no longer exists
-        expect(router.hasRoute("removeSource")).toBe(false);
+        expect(routesApi.has("removeSource")).toBe(false);
         // Target should still exist
         expect(getPluginApi(router).matchPath("/keep-target")?.name).toBe(
           "keepTarget",
@@ -889,7 +896,7 @@ describe("core/routes/removeRoute", () => {
           resolveCanActivate = resolve;
         });
 
-        router.addRoute({
+        routesApi.add({
           name: "asyncRoute",
           path: "/async-route",
           canActivate: () => async () => {
@@ -906,7 +913,7 @@ describe("core/routes/removeRoute", () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Try to remove during navigation - should warn but proceed
-        router.removeRoute("asyncRoute");
+        routesApi.remove("asyncRoute");
 
         expect(warnSpy).toHaveBeenCalledWith(
           "router.removeRoute",
@@ -935,7 +942,7 @@ describe("core/routes/removeRoute", () => {
         const { logger } = await import("@real-router/logger");
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-        router.addRoute({
+        routesApi.add({
           name: "asyncComplete",
           path: "/async-complete",
           canActivate: () => async () => {
@@ -952,7 +959,7 @@ describe("core/routes/removeRoute", () => {
         expect(router.getState()?.name).toBe("asyncComplete");
 
         // Try to remove - should be blocked
-        router.removeRoute("asyncComplete");
+        routesApi.remove("asyncComplete");
 
         expect(warnSpy).toHaveBeenCalledWith(
           "router.removeRoute",
@@ -976,7 +983,7 @@ describe("core/routes/removeRoute", () => {
           resolveCanActivate = resolve;
         });
 
-        router.addRoute({
+        routesApi.add({
           name: "navigatingTo",
           path: "/navigating-to",
           canActivate: () => async () => {
@@ -985,7 +992,7 @@ describe("core/routes/removeRoute", () => {
             return true;
           },
         });
-        router.addRoute({ name: "unrelated", path: "/unrelated" });
+        routesApi.add({ name: "unrelated", path: "/unrelated" });
 
         // Start async navigation to navigatingTo
         const navigationPromise = router.navigate("navigatingTo");
@@ -994,7 +1001,7 @@ describe("core/routes/removeRoute", () => {
         await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Remove unrelated route during navigation - should warn but proceed
-        router.removeRoute("unrelated");
+        routesApi.remove("unrelated");
 
         expect(warnSpy).toHaveBeenCalledWith(
           "router.removeRoute",
@@ -1015,15 +1022,15 @@ describe("core/routes/removeRoute", () => {
       });
 
       it("should handle rapid navigation + removal sequence", async () => {
-        router.addRoute({ name: "rapid1", path: "/rapid1" });
-        router.addRoute({ name: "rapid2", path: "/rapid2" });
-        router.addRoute({ name: "rapid3", path: "/rapid3" });
+        routesApi.add({ name: "rapid1", path: "/rapid1" });
+        routesApi.add({ name: "rapid2", path: "/rapid2" });
+        routesApi.add({ name: "rapid3", path: "/rapid3" });
 
         // Navigate to rapid1
         await router.navigate("rapid1");
 
         // Remove rapid2 (not current) - should work
-        router.removeRoute("rapid2");
+        routesApi.remove("rapid2");
 
         expect(getPluginApi(router).matchPath("/rapid2")).toBeUndefined();
 
@@ -1031,7 +1038,7 @@ describe("core/routes/removeRoute", () => {
         await router.navigate("rapid3");
 
         // Now rapid1 can be removed (not current anymore)
-        router.removeRoute("rapid1");
+        routesApi.remove("rapid1");
 
         expect(getPluginApi(router).matchPath("/rapid1")).toBeUndefined();
         expect(router.getState()?.name).toBe("rapid3");
@@ -1049,9 +1056,9 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      // Empty string passes validation (represents root node)
+      // Empty string is technically a valid route name in the type system
       // but no route has empty name in definitions
-      router.removeRoute("");
+      routesApi.remove("");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -1066,10 +1073,12 @@ describe("core/routes/removeRoute", () => {
     it("should throw TypeError for name exceeding 10000 characters", async () => {
       const longName = "a".repeat(10_001);
 
-      expect(() => router.removeRoute(longName)).toThrowError(TypeError);
-      expect(() => router.removeRoute(longName)).toThrowError(
-        /exceeds maximum length/,
-      );
+      expect(() => {
+        routesApi.remove(longName);
+      }).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove(longName);
+      }).toThrowError(/exceeds maximum length/);
     });
 
     // 12.6: Exact boundary (10000 characters)
@@ -1080,7 +1089,9 @@ describe("core/routes/removeRoute", () => {
       const exactLimit = "a".repeat(10_000);
 
       // Should not throw - exactly 10000 is valid
-      expect(() => router.removeRoute(exactLimit)).not.toThrowError();
+      expect(() => {
+        routesApi.remove(exactLimit);
+      }).not.toThrowError();
 
       // Route doesn't exist, so graceful handling
       expect(warnSpy).toHaveBeenCalledWith(
@@ -1093,15 +1104,21 @@ describe("core/routes/removeRoute", () => {
 
     // 12.7: Unicode characters in name
     it("should throw TypeError for Cyrillic characters in name", async () => {
-      expect(() => router.removeRoute("маршрут")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("маршрут");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for emoji in name", async () => {
-      expect(() => router.removeRoute("route_🚀")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("route_🚀");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for CJK characters in name", async () => {
-      expect(() => router.removeRoute("route.日本語")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("route.日本語");
+      }).toThrowError(TypeError);
     });
 
     // 12.8: System routes (@@prefix)
@@ -1110,7 +1127,7 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // System routes bypass pattern validation but don't exist
-      router.removeRoute("@@real-router/UNKNOWN");
+      routesApi.remove("@@real-router/UNKNOWN");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -1142,7 +1159,7 @@ describe("core/routes/removeRoute", () => {
 
       const deepRoute = buildDeepRoute(14); // 15 levels total (0-14)
 
-      router.addRoute(deepRoute as Parameters<typeof router.addRoute>[0]);
+      routesApi.add(deepRoute as Parameters<typeof routesApi.add>[0]);
 
       // Verify deep route exists
       const deepPath =
@@ -1153,7 +1170,7 @@ describe("core/routes/removeRoute", () => {
       expect(getPluginApi(router).matchPath(deepPath)?.name).toBe(deepName);
 
       // Remove the deepest leaf
-      router.removeRoute(deepName);
+      routesApi.remove(deepName);
 
       expect(getPluginApi(router).matchPath(deepPath)).toBeUndefined();
 
@@ -1184,7 +1201,7 @@ describe("core/routes/removeRoute", () => {
 
       const deepRoute = buildDeepRoute(10);
 
-      router.addRoute(deepRoute as Parameters<typeof router.addRoute>[0]);
+      routesApi.add(deepRoute as Parameters<typeof routesApi.add>[0]);
 
       // Verify routes exist
       expect(getPluginApi(router).matchPath("/deep10")).toBeDefined();
@@ -1195,7 +1212,7 @@ describe("core/routes/removeRoute", () => {
       ).toBeDefined();
 
       // Remove root - all children should be removed
-      router.removeRoute("deep10");
+      routesApi.remove("deep10");
 
       expect(getPluginApi(router).matchPath("/deep10")).toBeUndefined();
       expect(
@@ -1207,7 +1224,7 @@ describe("core/routes/removeRoute", () => {
 
     // 12.10: Sequential removal of all routes
     it("should handle sequential removal of multiple routes", async () => {
-      router.addRoute([
+      routesApi.add([
         { name: "routeA", path: "/route-a" },
         { name: "routeB", path: "/route-b" },
         { name: "routeC", path: "/route-c" },
@@ -1217,19 +1234,19 @@ describe("core/routes/removeRoute", () => {
       expect(getPluginApi(router).matchPath("/route-b")).toBeDefined();
       expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
-      router.removeRoute("routeA");
+      routesApi.remove("routeA");
 
       expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/route-b")).toBeDefined();
       expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
-      router.removeRoute("routeB");
+      routesApi.remove("routeB");
 
       expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/route-b")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/route-c")).toBeDefined();
 
-      router.removeRoute("routeC");
+      routesApi.remove("routeC");
 
       expect(getPluginApi(router).matchPath("/route-a")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/route-b")).toBeUndefined();
@@ -1237,14 +1254,14 @@ describe("core/routes/removeRoute", () => {
     });
 
     it("should allow adding routes after removing all custom routes", async () => {
-      router.addRoute({ name: "temp1", path: "/temp1" });
-      router.addRoute({ name: "temp2", path: "/temp2" });
+      routesApi.add({ name: "temp1", path: "/temp1" });
+      routesApi.add({ name: "temp2", path: "/temp2" });
 
-      router.removeRoute("temp1");
-      router.removeRoute("temp2");
+      routesApi.remove("temp1");
+      routesApi.remove("temp2");
 
       // Should be able to add new routes after clearing
-      router.addRoute({ name: "new", path: "/new" });
+      routesApi.add({ name: "new", path: "/new" });
 
       expect(getPluginApi(router).matchPath("/new")?.name).toBe("new");
     });
@@ -1262,7 +1279,7 @@ describe("core/routes/removeRoute", () => {
 
       // __proto__ passes pattern validation [a-zA-Z_][a-zA-Z0-9_]*
       // but no such route exists in definitions
-      router.removeRoute("__proto__");
+      routesApi.remove("__proto__");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -1279,7 +1296,7 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.removeRoute("constructor");
+      routesApi.remove("constructor");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -1293,7 +1310,7 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      router.removeRoute("prototype");
+      routesApi.remove("prototype");
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.removeRoute",
@@ -1306,7 +1323,7 @@ describe("core/routes/removeRoute", () => {
     it("should not affect Object.prototype when removing __proto__", async () => {
       const originalKeys = Object.keys(Object.prototype);
 
-      router.removeRoute("__proto__");
+      routesApi.remove("__proto__");
 
       // Object.prototype should be unchanged
       expect(Object.keys(Object.prototype)).toStrictEqual(originalKeys);
@@ -1317,8 +1334,8 @@ describe("core/routes/removeRoute", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
       // Try various prototype pollution patterns
-      router.removeRoute("__proto__.polluted");
-      router.removeRoute("constructor.prototype");
+      routesApi.remove("__proto__.polluted");
+      routesApi.remove("constructor.prototype");
 
       // Should have warnings for not found (may also include navigation warnings)
       expect(warnSpy).toHaveBeenCalledWith(
@@ -1332,27 +1349,27 @@ describe("core/routes/removeRoute", () => {
 
   describe("input validation", () => {
     it("should throw TypeError for null name", async () => {
-      expect(() => router.removeRoute(null as unknown as string)).toThrowError(
-        TypeError,
-      );
+      expect(() => {
+        routesApi.remove(null as unknown as string);
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for undefined name", async () => {
-      expect(
-        () => void router.removeRoute(undefined as unknown as string),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove(undefined as unknown as string);
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for number name", async () => {
-      expect(() => router.removeRoute(123 as unknown as string)).toThrowError(
-        TypeError,
-      );
+      expect(() => {
+        routesApi.remove(123 as unknown as string);
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for object name", async () => {
-      expect(() => router.removeRoute({} as unknown as string)).toThrowError(
-        TypeError,
-      );
+      expect(() => {
+        routesApi.remove({} as unknown as string);
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for Proxy with overridden toString (12.14)", async () => {
@@ -1374,9 +1391,9 @@ describe("core/routes/removeRoute", () => {
       );
 
       // typeof Proxy === "object", so it should be rejected BEFORE any coercion
-      expect(
-        () => void router.removeRoute(maliciousProxy as unknown as string),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove(maliciousProxy as unknown as string);
+      }).toThrowError(TypeError);
 
       // Original route should remain untouched
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
@@ -1388,32 +1405,42 @@ describe("core/routes/removeRoute", () => {
       const stringWrapper = new String("home");
 
       // typeof stringWrapper === "object", not "string"
-      expect(
-        () => void router.removeRoute(stringWrapper as unknown as string),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove(stringWrapper as unknown as string);
+      }).toThrowError(TypeError);
 
       // Original route should remain untouched
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
     });
 
     it("should throw TypeError for whitespace-only name", async () => {
-      expect(() => router.removeRoute("   ")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("   ");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name with leading dot", async () => {
-      expect(() => router.removeRoute(".invalid")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove(".invalid");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name with trailing dot", async () => {
-      expect(() => router.removeRoute("invalid.")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("invalid.");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name starting with number", async () => {
-      expect(() => router.removeRoute("123invalid")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("123invalid");
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name with consecutive dots", async () => {
-      expect(() => router.removeRoute("invalid..name")).toThrowError(TypeError);
+      expect(() => {
+        routesApi.remove("invalid..name");
+      }).toThrowError(TypeError);
     });
   });
 });

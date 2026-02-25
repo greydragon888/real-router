@@ -1,7 +1,7 @@
 import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
 
 import {
   buildNameFromSegments,
@@ -9,13 +9,15 @@ import {
 } from "../../src/namespaces/RoutesNamespace/stateBuilder";
 import { createTestRouter } from "../helpers";
 
-import type { Router, Route } from "@real-router/core";
+import type { Router, Route, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/state", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -100,7 +102,7 @@ describe("core/state", () => {
 
     it("merges with defaultParams", () => {
       // Add a route with defaultParams
-      router.addRoute({
+      routesApi.add({
         name: "withDefaults",
         path: "/with-defaults",
         defaultParams: { lang: "en" },
@@ -566,11 +568,11 @@ describe("core/state", () => {
 
     it("forwards to another route with merged params", () => {
       // Add routes with defaultParams
-      router.addRoute([
+      routesApi.add([
         { name: "srcRoute", path: "/src", defaultParams: { a: 1 } },
         { name: "dstRoute", path: "/dst", defaultParams: { b: 2 } },
       ]);
-      router.updateRoute("srcRoute", { forwardTo: "dstRoute" });
+      routesApi.update("srcRoute", { forwardTo: "dstRoute" });
 
       const state = getPluginApi(router).forwardState("srcRoute", { c: 3 });
 
@@ -580,7 +582,7 @@ describe("core/state", () => {
 
     it("forwards with only source route defaults (line 595)", () => {
       // Add routes: source has defaults, target doesn't
-      router.addRoute([
+      routesApi.add([
         {
           name: "srcWithDefaults",
           path: "/src-with-defaults",
@@ -588,7 +590,7 @@ describe("core/state", () => {
         },
         { name: "dstNoDefaults", path: "/dst-no-defaults" },
       ]);
-      router.updateRoute("srcWithDefaults", {
+      routesApi.update("srcWithDefaults", {
         forwardTo: "dstNoDefaults",
       });
 
@@ -602,7 +604,7 @@ describe("core/state", () => {
 
     it("forwards with only target route defaults (line 598)", () => {
       // Add routes: source has no defaults, target has defaults
-      router.addRoute([
+      routesApi.add([
         { name: "srcNoDefaults", path: "/src-no-defaults" },
         {
           name: "dstWithDefaults",
@@ -610,7 +612,7 @@ describe("core/state", () => {
           defaultParams: { b: 2 },
         },
       ]);
-      router.updateRoute("srcNoDefaults", {
+      routesApi.update("srcNoDefaults", {
         forwardTo: "dstWithDefaults",
       });
 
@@ -880,7 +882,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should resolve mixed chain: static → dynamic", () => {
-      router.addRoute([
+      routesApi.add([
         { name: "static-start", path: "/static-start", forwardTo: "dynamic" },
         {
           name: "dynamic",
@@ -896,7 +898,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should resolve mixed chain: dynamic → static", () => {
-      router.addRoute([
+      routesApi.add([
         {
           name: "dynamic-start",
           path: "/dynamic-start",
@@ -912,7 +914,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should resolve dynamic → dynamic chain", () => {
-      router.addRoute([
+      routesApi.add([
         { name: "dyn-1", path: "/dyn-1", forwardTo: () => "dyn-2" },
         { name: "dyn-2", path: "/dyn-2", forwardTo: () => "dyn-3" },
         { name: "dyn-3", path: "/dyn-3" },
@@ -924,7 +926,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should throw for non-existent target returned by function", () => {
-      router.addRoute({
+      routesApi.add({
         name: "bad-fn",
         path: "/bad-fn",
         forwardTo: () => "nonexistent",
@@ -936,7 +938,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should bubble errors from forwardTo callback naturally", () => {
-      router.addRoute({
+      routesApi.add({
         name: "error-fn",
         path: "/error-fn",
         forwardTo: () => {
@@ -950,7 +952,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should throw TypeError for non-string return from callback", () => {
-      router.addRoute({
+      routesApi.add({
         name: "bad-return",
         path: "/bad-return",
         forwardTo: (() => 123) as any,
@@ -979,7 +981,7 @@ describe("core/stateBuilder", () => {
         }
       }
 
-      router.addRoute(routes);
+      routesApi.add(routes);
 
       expect(() => getPluginApi(router).forwardState("hop-0", {})).toThrowError(
         /exceeds maximum depth/,
@@ -987,7 +989,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should work with buildState after dynamic forward resolution", () => {
-      router.addRoute([
+      routesApi.add([
         { name: "build-fn", path: "/build-fn", forwardTo: () => "build-dest" },
         { name: "build-dest", path: "/build-dest" },
       ]);
@@ -999,8 +1001,9 @@ describe("core/stateBuilder", () => {
 
     it("should work with rewritePathOnMatch and dynamic forwardTo", async () => {
       const testRouter = createTestRouter({ rewritePathOnMatch: true });
+      const testRoutesApi = getRoutesApi(testRouter);
 
-      testRouter.addRoute([
+      testRoutesApi.add([
         {
           name: "rewrite-fn",
           path: "/rewrite-fn",
@@ -1022,19 +1025,19 @@ describe("core/stateBuilder", () => {
     it("should expose function in getRoute().forwardTo", () => {
       const forwardFn = () => "target";
 
-      router.addRoute({
+      routesApi.add({
         name: "get-fn",
         path: "/get-fn",
         forwardTo: forwardFn,
       });
 
-      const route = router.getRoute("get-fn");
+      const route = routesApi.get("get-fn");
 
       expect(route?.forwardTo).toBe(forwardFn);
     });
 
     it("should detect self-forward when function returns own name", () => {
-      router.addRoute({
+      routesApi.add({
         name: "self-fn",
         path: "/self-fn",
         forwardTo: () => "self-fn",
@@ -1046,7 +1049,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should throw for empty string returned from callback", () => {
-      router.addRoute({
+      routesApi.add({
         name: "empty-return",
         path: "/empty-return",
         forwardTo: () => "",
@@ -1058,7 +1061,7 @@ describe("core/stateBuilder", () => {
     });
 
     it("should not affect pure static forward chains", () => {
-      router.addRoute([
+      routesApi.add([
         { name: "pure-a", path: "/pure-a", forwardTo: "pure-b" },
         { name: "pure-b", path: "/pure-b", forwardTo: "pure-c" },
         { name: "pure-c", path: "/pure-c" },

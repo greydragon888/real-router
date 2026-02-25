@@ -1,16 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/routePath/buildPath", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -26,7 +28,7 @@ describe("core/routes/routePath/buildPath", () => {
     });
 
     it("should build path with params", () => {
-      router.addRoute({ name: "user", path: "/user/:id" });
+      routesApi.add({ name: "user", path: "/user/:id" });
       const path = router.buildPath("user", { id: "42" });
 
       expect(path).toBe("/user/42");
@@ -51,14 +53,14 @@ describe("core/routes/routePath/buildPath", () => {
 
   describe("buildPath with query params", () => {
     it("should build path with query params", () => {
-      router.addRoute({ name: "search", path: "/search?q" });
+      routesApi.add({ name: "search", path: "/search?q" });
       const path = router.buildPath("search", { q: "test" });
 
       expect(path).toBe("/search?q=test");
     });
 
     it("should build path with multiple query params", () => {
-      router.addRoute({ name: "search", path: "/search?q&page" });
+      routesApi.add({ name: "search", path: "/search?q&page" });
       const path = router.buildPath("search", { q: "test", page: "1" });
 
       expect(path).toBe("/search?q=test&page=1");
@@ -105,7 +107,7 @@ describe("core/routes/routePath/buildPath", () => {
 
   describe("buildPath with encoder (R8 freeze protection)", () => {
     it("should apply encoder to params", () => {
-      router.addRoute({
+      routesApi.add({
         name: "user",
         path: "/user/:id",
         encodeParams: (params) => ({
@@ -123,7 +125,7 @@ describe("core/routes/routePath/buildPath", () => {
       const originalParams = { id: "42", extra: "data" };
       let receivedParams: Record<string, unknown> | null = null;
 
-      router.addRoute({
+      routesApi.add({
         name: "user",
         path: "/user/:id",
         encodeParams: (params) => {
@@ -147,7 +149,7 @@ describe("core/routes/routePath/buildPath", () => {
     it("should not affect original params object", () => {
       const originalParams = { id: "42" };
 
-      router.addRoute({
+      routesApi.add({
         name: "user",
         path: "/user/:id",
         encodeParams: (params) => ({
@@ -265,7 +267,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("constraint violation", () => {
       it("should throw when param violates constraint", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: String.raw`/user/:id<\d+>`,
         });
@@ -276,7 +278,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should pass when param matches constraint", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: String.raw`/user/:id<\d+>`,
         });
@@ -289,7 +291,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("encoder errors", () => {
       it("should propagate custom errors from encoder", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: "/user/:id",
           encodeParams: () => {
@@ -307,7 +309,7 @@ describe("core/routes/routePath/buildPath", () => {
   describe("buildPath edge cases", () => {
     describe("numeric parameter values", () => {
       it("should convert number 0 to string", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: 0 });
 
@@ -315,7 +317,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert negative numbers to string", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: -1 });
 
@@ -323,7 +325,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert NaN to string 'NaN'", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: Number.NaN });
 
@@ -331,7 +333,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert Infinity to string 'Infinity'", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: Infinity });
 
@@ -339,7 +341,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert -Infinity to string '-Infinity'", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: -Infinity });
 
@@ -347,7 +349,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert -0 to string '0' (JavaScript behavior)", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: -0 });
 
@@ -358,7 +360,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("array parameter values", () => {
       it("should accept array with custom constraint", () => {
-        router.addRoute({ name: "user", path: "/user/:ids<.*>" });
+        routesApi.add({ name: "user", path: "/user/:ids<.*>" });
 
         const path = router.buildPath("user", { ids: ["1", "2", "3"] });
 
@@ -366,7 +368,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should handle array in query params", () => {
-        router.addRoute({ name: "filter", path: "/filter?tags" });
+        routesApi.add({ name: "filter", path: "/filter?tags" });
 
         const path = router.buildPath("filter", { tags: ["a", "b"] });
 
@@ -377,7 +379,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("empty string parameter values", () => {
       it("should URL-encode whitespace-only string", () => {
-        router.addRoute({ name: "user", path: "/user/:id" });
+        routesApi.add({ name: "user", path: "/user/:id" });
 
         const path = router.buildPath("user", { id: "   " });
 
@@ -387,7 +389,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("encoder + defaultParams combinations", () => {
       it("should apply encoder after merging defaultParams", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "0" },
@@ -404,7 +406,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should override defaultParams with provided params before encoding", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: "/user/:id",
           defaultParams: { id: "default" },
@@ -420,7 +422,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should work with encoder + defaultParams + constraint", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: String.raw`/user/:id<\d+>`,
           defaultParams: { id: "0" },
@@ -439,7 +441,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should fail constraint check after encoder transforms value", () => {
-        router.addRoute({
+        routesApi.add({
           name: "user",
           path: String.raw`/user/:id<\d+>`,
           encodeParams: () => ({ id: "not-a-number" }),
@@ -453,7 +455,7 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("boolean parameter values", () => {
       it("should convert true to string 'true'", () => {
-        router.addRoute({ name: "filter", path: "/filter/:active" });
+        routesApi.add({ name: "filter", path: "/filter/:active" });
 
         const path = router.buildPath("filter", { active: true });
 
@@ -461,7 +463,7 @@ describe("core/routes/routePath/buildPath", () => {
       });
 
       it("should convert false to string 'false'", () => {
-        router.addRoute({ name: "filter", path: "/filter/:active" });
+        routesApi.add({ name: "filter", path: "/filter/:active" });
 
         const path = router.buildPath("filter", { active: false });
 
@@ -472,7 +474,7 @@ describe("core/routes/routePath/buildPath", () => {
     describe("special characters in params", () => {
       describe("query params URL encoding", () => {
         it("should URL-encode spaces in query params", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "hello world" });
 
@@ -480,7 +482,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode ampersand and equals in query params", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "a&b=c" });
 
@@ -488,7 +490,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode forward slash in query params", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "path/to/file" });
 
@@ -496,7 +498,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode question mark in query params", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "what?" });
 
@@ -504,7 +506,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode hash in query params", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "section#1" });
 
@@ -514,7 +516,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       describe("unicode in query params", () => {
         it("should URL-encode Cyrillic characters", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "привет" });
 
@@ -522,7 +524,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode emoji characters", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "🎉" });
 
@@ -530,7 +532,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode Chinese characters", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", { q: "你好" });
 
@@ -540,7 +542,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       describe("URL path params encoding", () => {
         it("should URL-encode spaces in path params", () => {
-          router.addRoute({ name: "user", path: "/user/:name<.*>" });
+          routesApi.add({ name: "user", path: "/user/:name<.*>" });
 
           const path = router.buildPath("user", { name: "John Doe" });
 
@@ -548,7 +550,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode Cyrillic in path params", () => {
-          router.addRoute({ name: "user", path: "/user/:name<.*>" });
+          routesApi.add({ name: "user", path: "/user/:name<.*>" });
 
           const path = router.buildPath("user", { name: "Иван" });
 
@@ -556,7 +558,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode special URL characters in path params", () => {
-          router.addRoute({ name: "file", path: "/file/:path<.*>" });
+          routesApi.add({ name: "file", path: "/file/:path<.*>" });
 
           const path = router.buildPath("file", { path: "dir/file.txt" });
 
@@ -566,7 +568,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       describe("preserved characters (sub-delimiters)", () => {
         it("should preserve sub-delimiters in query params per RFC 3986", () => {
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           // Sub-delimiters: ! $ & ' ( ) * + , ; =
           // But & and = are query-specific, so they get encoded
@@ -576,7 +578,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should preserve colon in path params", () => {
-          router.addRoute({ name: "time", path: "/time/:value<.*>" });
+          routesApi.add({ name: "time", path: "/time/:value<.*>" });
 
           const path = router.buildPath("time", { value: "12:30:00" });
 
@@ -584,7 +586,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should URL-encode at-sign in path params (gen-delim per RFC 3986)", () => {
-          router.addRoute({ name: "user", path: "/user/:email<.*>" });
+          routesApi.add({ name: "user", path: "/user/:email<.*>" });
 
           const path = router.buildPath("user", { email: "user@example.com" });
 
@@ -597,25 +599,25 @@ describe("core/routes/routePath/buildPath", () => {
     describe("unusual but valid inputs", () => {
       describe("route name validation", () => {
         it("should reject Cyrillic route names (ASCII only)", () => {
-          expect(() =>
-            router.addRoute({ name: "пользователи", path: "/users" }),
-          ).toThrowError(/Invalid route name/);
+          expect(() => {
+            routesApi.add({ name: "пользователи", path: "/users" });
+          }).toThrowError(/Invalid route name/);
         });
 
         it("should reject emoji route names", () => {
-          expect(
-            () => void router.addRoute({ name: "🚀", path: "/launch" }),
-          ).toThrowError(/Invalid route name/);
+          expect(() => {
+            routesApi.add({ name: "🚀", path: "/launch" });
+          }).toThrowError(/Invalid route name/);
         });
 
         it("should reject route names with unicode characters", () => {
-          expect(
-            () => void router.addRoute({ name: "café", path: "/cafe" }),
-          ).toThrowError(/Invalid route name/);
+          expect(() => {
+            routesApi.add({ name: "café", path: "/cafe" });
+          }).toThrowError(/Invalid route name/);
         });
 
         it("should accept route names with underscores and hyphens", () => {
-          router.addRoute({ name: "user_profile", path: "/user-profile" });
+          routesApi.add({ name: "user_profile", path: "/user-profile" });
 
           const path = router.buildPath("user_profile");
 
@@ -623,7 +625,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should accept route names starting with underscore", () => {
-          router.addRoute({ name: "_private", path: "/private" });
+          routesApi.add({ name: "_private", path: "/private" });
 
           const path = router.buildPath("_private");
 
@@ -631,7 +633,7 @@ describe("core/routes/routePath/buildPath", () => {
         });
 
         it("should accept nested route names with dots", () => {
-          router.addRoute({
+          routesApi.add({
             name: "members",
             path: "/members",
             children: [{ name: "details", path: "/details" }],
@@ -658,7 +660,7 @@ describe("core/routes/routePath/buildPath", () => {
             };
           };
 
-          router.addRoute(buildDeepRoute(10));
+          routesApi.add(buildDeepRoute(10));
 
           const deepName =
             "level10.level9.level8.level7.level6.level5.level4.level3.level2.level1.leaf";
@@ -679,7 +681,7 @@ describe("core/routes/routePath/buildPath", () => {
             };
           }
 
-          router.addRoute(current);
+          routesApi.add(current);
 
           const deepName = `${Array.from(
             { length: 50 },
@@ -702,7 +704,7 @@ describe("core/routes/routePath/buildPath", () => {
 
           nullProtoParams.id = "42";
 
-          router.addRoute({ name: "user", path: "/user/:id" });
+          routesApi.add({ name: "user", path: "/user/:id" });
 
           const path = router.buildPath("user", nullProtoParams);
 
@@ -715,7 +717,7 @@ describe("core/routes/routePath/buildPath", () => {
           nullProtoParams.userId = "1";
           nullProtoParams.postId = "2";
 
-          router.addRoute({
+          routesApi.add({
             name: "post",
             path: "/user/:userId/post/:postId",
           });
@@ -730,7 +732,7 @@ describe("core/routes/routePath/buildPath", () => {
 
           nullProtoParams.q = "search";
 
-          router.addRoute({ name: "search", path: "/search?q" });
+          routesApi.add({ name: "search", path: "/search?q" });
 
           const path = router.buildPath("search", nullProtoParams);
 
@@ -746,7 +748,7 @@ describe("core/routes/routePath/buildPath", () => {
             id: "123",
           };
 
-          router.addRoute({ name: "user", path: "/user/:id" });
+          routesApi.add({ name: "user", path: "/user/:id" });
 
           const path = router.buildPath("user", paramsWithSymbol);
 
@@ -763,7 +765,7 @@ describe("core/routes/routePath/buildPath", () => {
             name: "test",
           };
 
-          router.addRoute({ name: "item", path: "/item/:id/:name" });
+          routesApi.add({ name: "item", path: "/item/:id/:name" });
 
           const path = router.buildPath("item", params);
 
@@ -773,7 +775,7 @@ describe("core/routes/routePath/buildPath", () => {
 
       describe("prototype pollution protection", () => {
         it("should not be affected by Object.prototype pollution", () => {
-          router.addRoute({ name: "user", path: "/user/:id" });
+          routesApi.add({ name: "user", path: "/user/:id" });
 
           // This test verifies that Object.hasOwn is used correctly
           // and doesn't rely on hasOwnProperty from prototype
@@ -792,7 +794,7 @@ describe("core/routes/routePath/buildPath", () => {
 
           params.id = "42";
 
-          router.addRoute({ name: "user", path: "/user/:id" });
+          routesApi.add({ name: "user", path: "/user/:id" });
 
           const path = router.buildPath("user", params);
 
@@ -807,7 +809,7 @@ describe("core/routes/routePath/buildPath", () => {
             extra: "value",
           };
 
-          router.addRoute({ name: "userX", path: "/user/:id" });
+          routesApi.add({ name: "userX", path: "/user/:id" });
 
           const path = router.buildPath("userX", params);
 
@@ -842,7 +844,7 @@ describe("core/routes/routePath/buildPath", () => {
             enumerable: false,
           });
 
-          router.addRoute({ name: "userY", path: "/user/:id" });
+          routesApi.add({ name: "userY", path: "/user/:id" });
 
           const path = router.buildPath("userY", params);
 

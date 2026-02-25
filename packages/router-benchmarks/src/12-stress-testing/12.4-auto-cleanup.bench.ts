@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.4-auto-cleanup.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createNestedRouter, IS_ROUTER5 } from "../helpers";
@@ -148,6 +149,7 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createNestedRouter();
+  const routesApi = getRoutesApi(router);
 
   // Add deep guards for nested router
   router.addDeactivateGuard("root.level1.level2", () => () => true);
@@ -189,7 +191,7 @@ if (IS_ROUTER5) {
     ],
   };
 
-  router.addRoute(deepRoute);
+  routesApi.add(deepRoute);
   router.addDeactivateGuard("deep.l1.l2.l3.l4.l5.l6", () => () => true);
   router.start("/");
 

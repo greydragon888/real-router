@@ -92,6 +92,10 @@ export interface RoutesApi<
   clear: () => void;
 
   has: (name: string) => boolean;
+
+  get: (name: string) => Route<Dependencies> | undefined;
+
+  getConfig: (name: string) => Record<string, unknown> | undefined;
 }
 
 /**

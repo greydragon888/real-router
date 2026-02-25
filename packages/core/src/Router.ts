@@ -28,6 +28,14 @@ import {
 } from "./namespaces";
 import { validateListenerArgs } from "./namespaces/EventBusNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
+import {
+  validateAddRouteArgs,
+  validateBuildPathArgs,
+  validateIsActiveRouteArgs,
+  validateRoutes,
+  validateShouldUpdateNodeArgs,
+  validateStateBuilderArgs,
+} from "./namespaces/RoutesNamespace/validators";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
@@ -39,7 +47,6 @@ import type {
   Limits,
   PluginFactory,
   Route,
-  RouteConfigUpdate,
   RouterEventMap,
 } from "./types";
 import type {
@@ -140,8 +147,8 @@ export class Router<
     // Conditional validation for initial routes - structure and batch duplicates
     // Validation happens BEFORE tree is built, so tree is not passed
     if (!noValidate && routes.length > 0) {
-      RoutesNamespace.validateAddRouteArgs(routes);
-      RoutesNamespace.validateRoutes(routes);
+      validateAddRouteArgs(routes);
+      validateRoutes(routes);
     }
 
     // =========================================================================
@@ -270,6 +277,84 @@ export class Router<
           routeCustomFields,
         );
       },
+      // Route tree access (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetTree: () => this.#routes.getTree(),
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetForwardRecord: () => this.#routes.getForwardRecord(),
+      // Route mutation (issue #174)
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeClearRoutes: () => {
+        this.#routes.clearRoutes();
+      },
+      // Route read (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeHasRoute: (name) => this.#routes.hasRoute(name),
+      // Raw route data (issue #174 Phase 2 — tree-shaking)
+      routeDefinitions: this.#routes.getDefinitions(),
+      routeConfig: this.#routes.getConfigInternal(),
+      routeMatcherOptions: this.#routes.getMatcherOptions(),
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeSetCustomFields: (fields) => {
+        this.#routes.setRouteCustomFields(fields);
+      },
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetMatcher: () => this.#routes.getMatcher(),
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeSetTreeAndMatcher: (tree, matcher) => {
+        this.#routes.setTreeAndMatcher(tree, matcher);
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeReplaceResolvedForwardMap: (map) => {
+        this.#routes.replaceResolvedForwardMap(map);
+      },
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetDepsStore: () => this.#routes.getDepsStore(),
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetPendingCanActivate: () => this.#routes.getPendingCanActivate(),
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetPendingCanDeactivate: () =>
+        this.#routes.getPendingCanDeactivate(),
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetLifecycleNamespace: () => this.#routes.getLifecycleNamespace(),
+      // Cross-namespace state (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      getStateName: () => this.#state.get()?.name,
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      isTransitioning: () => this.#eventBus.isTransitioning(),
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      clearState: () => {
+        this.#state.set(undefined);
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearAll: () => {
+        this.#routeLifecycle.clearAll();
+      },
+      // Lifecycle guard management (issue #174)
+      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleAddCanActivate: (name, handler, skipValidation) => {
+        this.#routeLifecycle.addCanActivate(
+          name,
+          handler as GuardFnFactory<Dependencies> | boolean,
+          skipValidation,
+        );
+      },
+      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleAddCanDeactivate: (name, handler, skipValidation) => {
+        this.#routeLifecycle.addCanDeactivate(
+          name,
+          handler as GuardFnFactory<Dependencies> | boolean,
+          skipValidation,
+        );
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearCanActivate: (name) => {
+        this.#routeLifecycle.clearCanActivate(name);
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearCanDeactivate: (name) => {
+        this.#routeLifecycle.clearCanDeactivate(name);
+      },
     });
 
     // =========================================================================
@@ -279,15 +364,6 @@ export class Router<
     // `this` context when methods are extracted as references.
     // See: https://github.com/nicolo-ribaudo/tc39-proposal-bind-operator
     // =========================================================================
-
-    // Route Management
-    this.addRoute = this.addRoute.bind(this);
-    this.removeRoute = this.removeRoute.bind(this);
-    this.clearRoutes = this.clearRoutes.bind(this);
-    this.getRoute = this.getRoute.bind(this);
-    this.getRouteConfig = this.getRouteConfig.bind(this);
-    this.hasRoute = this.hasRoute.bind(this);
-    this.updateRoute = this.updateRoute.bind(this);
 
     // Path & State Building
     this.isActiveRoute = this.isActiveRoute.bind(this);
@@ -328,185 +404,6 @@ export class Router<
   }
 
   // ============================================================================
-  // Route Management
-  // ============================================================================
-
-  addRoute(
-    routes: Route<Dependencies>[] | Route<Dependencies>,
-    options?: { parent?: string },
-  ): this {
-    const routeArray = Array.isArray(routes) ? routes : [routes];
-    const parentName = options?.parent;
-
-    if (!this.#noValidate) {
-      // 1. Validate parent option format
-      if (parentName !== undefined) {
-        RoutesNamespace.validateParentOption(parentName);
-      }
-
-      // 2. Static validation (route structure and properties)
-      RoutesNamespace.validateAddRouteArgs(routeArray);
-
-      // 3. State-dependent validation (parent exists, duplicates, forwardTo)
-      RoutesNamespace.validateRoutes(
-        routeArray,
-        this.#routes.getTree(),
-        this.#routes.getForwardRecord(),
-        parentName,
-      );
-    }
-
-    // 4. Execute (add definitions, register handlers, rebuild tree)
-    this.#routes.addRoutes(routeArray, parentName);
-
-    return this;
-  }
-
-  removeRoute(name: string): this {
-    // Static validation
-    if (!this.#noValidate) {
-      RoutesNamespace.validateRemoveRouteArgs(name);
-    }
-
-    // Instance validation (checks active route, navigation state)
-    const canRemove = this.#routes.validateRemoveRoute(
-      name,
-      this.#state.get()?.name,
-      this.#eventBus.isTransitioning(),
-    );
-
-    if (!canRemove) {
-      return this;
-    }
-
-    // Perform removal
-    const wasRemoved = this.#routes.removeRoute(name);
-
-    if (!wasRemoved) {
-      logger.warn(
-        "router.removeRoute",
-        `Route "${name}" not found. No changes made.`,
-      );
-    }
-
-    return this;
-  }
-
-  clearRoutes(): this {
-    const isNavigating = this.#eventBus.isTransitioning();
-
-    // Validate operation can proceed
-    const canClear = this.#routes.validateClearRoutes(isNavigating);
-
-    if (!canClear) {
-      return this;
-    }
-
-    // Clear routes config (definitions, decoders, encoders, defaultParams, forwardMap)
-    this.#routes.clearRoutes();
-
-    // Clear all lifecycle handlers
-    this.#routeLifecycle.clearAll();
-
-    // Clear router state since all routes are removed
-    this.#state.set(undefined);
-
-    return this;
-  }
-
-  getRoute(name: string): Route<Dependencies> | undefined {
-    if (!this.#noValidate) {
-      validateRouteName(name, "getRoute");
-    }
-
-    return this.#routes.getRoute(name);
-  }
-
-  getRouteConfig(name: string): Record<string, unknown> | undefined {
-    return this.#routes.getRouteConfig(name);
-  }
-
-  hasRoute(name: string): boolean {
-    if (!this.#noValidate) {
-      validateRouteName(name, "hasRoute");
-    }
-
-    return this.#routes.hasRoute(name);
-  }
-
-  updateRoute(name: string, updates: RouteConfigUpdate<Dependencies>): this {
-    // Validate name and updates object structure (basic checks only)
-    if (!this.#noValidate) {
-      RoutesNamespace.validateUpdateRouteBasicArgs(name, updates);
-    }
-
-    // Cache all property values upfront to protect against mutating getters.
-    // This ensures consistent behavior regardless of getter side effects.
-    // Must happen AFTER basic validation but BEFORE property type validation.
-    const {
-      forwardTo,
-      defaultParams,
-      decodeParams,
-      encodeParams,
-      canActivate,
-      canDeactivate,
-    } = updates;
-
-    // Validate cached property values
-    if (!this.#noValidate) {
-      RoutesNamespace.validateUpdateRoutePropertyTypes(
-        forwardTo,
-        defaultParams,
-        decodeParams,
-        encodeParams,
-      );
-    }
-
-    // Warn if navigation is in progress
-    if (this.#eventBus.isTransitioning()) {
-      logger.error(
-        "router.updateRoute",
-        `Updating route "${name}" while navigation is in progress. This may cause unexpected behavior.`,
-      );
-    }
-
-    // Instance validation (route existence, forwardTo checks) - use cached values
-    if (!this.#noValidate) {
-      this.#routes.validateUpdateRoute(name, forwardTo);
-    }
-
-    // Update route config
-    this.#routes.updateRouteConfig(name, {
-      forwardTo,
-      defaultParams,
-      decodeParams,
-      encodeParams,
-    });
-
-    // Handle canActivate separately (uses RouteLifecycleNamespace)
-    // Use facade method for proper validation
-    if (canActivate !== undefined) {
-      if (canActivate === null) {
-        this.#routeLifecycle.clearCanActivate(name);
-      } else {
-        this.addActivateGuard(name, canActivate);
-      }
-    }
-
-    // Handle canDeactivate separately (uses RouteLifecycleNamespace)
-    // Use facade method for proper validation
-    if (canDeactivate !== undefined) {
-      if (canDeactivate === null) {
-        this.#routeLifecycle.clearCanDeactivate(name);
-      } else {
-        this.addDeactivateGuard(name, canDeactivate);
-      }
-    }
-
-    return this;
-  }
-
-  // ============================================================================
   // Path & State Building
   // ============================================================================
 
@@ -517,7 +414,7 @@ export class Router<
     ignoreQueryParams?: boolean,
   ): boolean {
     if (!this.#noValidate) {
-      RoutesNamespace.validateIsActiveRouteArgs(
+      validateIsActiveRouteArgs(
         name,
         params,
         strictEquality,
@@ -545,7 +442,7 @@ export class Router<
 
   buildPath(route: string, params?: Params): string {
     if (!this.#noValidate) {
-      RoutesNamespace.validateBuildPathArgs(route);
+      validateBuildPathArgs(route);
     }
 
     return this.#routes.buildPath(route, params, this.#options.get());
@@ -583,11 +480,7 @@ export class Router<
 
   buildNavigationState(name: string, params: Params = {}): State | undefined {
     if (!this.#noValidate) {
-      RoutesNamespace.validateStateBuilderArgs(
-        name,
-        params,
-        "buildNavigationState",
-      );
+      validateStateBuilderArgs(name, params, "buildNavigationState");
     }
 
     const { name: resolvedName, params: resolvedParams } = getInternals(
@@ -617,7 +510,7 @@ export class Router<
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
     if (!this.#noValidate) {
-      RoutesNamespace.validateShouldUpdateNodeArgs(nodeName);
+      validateShouldUpdateNodeArgs(nodeName);
     }
 
     return this.#routes.shouldUpdateNode(nodeName);
@@ -759,7 +652,7 @@ export class Router<
       validateRouteName(name, "canNavigateTo");
     }
 
-    if (!this.hasRoute(name)) {
+    if (!this.#routes.hasRoute(name)) {
       return false;
     }
 
@@ -942,10 +835,6 @@ export class Router<
     this.navigateToDefault = throwDisposed as never;
     this.start = throwDisposed as never;
     this.stop = throwDisposed as never;
-    this.addRoute = throwDisposed as never;
-    this.removeRoute = throwDisposed as never;
-    this.clearRoutes = throwDisposed as never;
-    this.updateRoute = throwDisposed as never;
     this.addActivateGuard = throwDisposed as never;
     this.addDeactivateGuard = throwDisposed as never;
     this.removeActivateGuard = throwDisposed as never;

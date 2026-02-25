@@ -1,14 +1,24 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getRoutesApi } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, Route, GuardFnFactory, Params } from "@real-router/core";
+import type {
+  Router,
+  Route,
+  GuardFnFactory,
+  Params,
+  RoutesApi,
+} from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/routeTree/getRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -18,15 +28,15 @@ describe("core/routes/routeTree/getRoute", () => {
 
   describe("basic lookup", () => {
     it("should return undefined for non-existent route", () => {
-      const result = router.getRoute("nonexistent");
+      const result = routesApi.get("nonexistent");
 
       expect(result).toBeUndefined();
     });
 
     it("should return route with name and path", () => {
-      router.addRoute({ name: "gr-members", path: "/gr-members" });
+      routesApi.add({ name: "gr-members", path: "/gr-members" });
 
-      const route = router.getRoute("gr-members");
+      const route = routesApi.get("gr-members");
 
       expect(route).toStrictEqual({
         name: "gr-members",
@@ -35,13 +45,13 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should find nested route", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-team",
         path: "/gr-team",
         children: [{ name: "profile", path: "/:id" }],
       });
 
-      const route = router.getRoute("gr-team.profile");
+      const route = routesApi.get("gr-team.profile");
 
       expect(route).toStrictEqual({
         name: "profile",
@@ -50,7 +60,7 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should include reconstructed children", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-people",
         path: "/gr-people",
         children: [
@@ -59,7 +69,7 @@ describe("core/routes/routeTree/getRoute", () => {
         ],
       });
 
-      const route = router.getRoute("gr-people");
+      const route = routesApi.get("gr-people");
 
       expect(route?.children).toHaveLength(2);
       expect(route?.children?.[0]).toStrictEqual({
@@ -73,13 +83,13 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should reconstruct absolute path marker", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-parent",
         path: "/gr-parent",
         children: [{ name: "absolute", path: "~/absolute-child" }],
       });
 
-      const route = router.getRoute("gr-parent.absolute");
+      const route = routesApi.get("gr-parent.absolute");
 
       expect(route?.path).toBe("~/absolute-child");
     });
@@ -87,26 +97,26 @@ describe("core/routes/routeTree/getRoute", () => {
 
   describe("with configuration properties", () => {
     it("should return route with forwardTo", () => {
-      router.addRoute({ name: "gr-target", path: "/gr-target" });
-      router.addRoute({
+      routesApi.add({ name: "gr-target", path: "/gr-target" });
+      routesApi.add({
         name: "gr-source",
         path: "/gr-source",
         forwardTo: "gr-target",
       });
 
-      const route = router.getRoute("gr-source");
+      const route = routesApi.get("gr-source");
 
       expect(route?.forwardTo).toBe("gr-target");
     });
 
     it("should return route with defaultParams", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-accounts",
         path: "/gr-accounts",
         defaultParams: { page: 1, limit: 10 },
       });
 
-      const route = router.getRoute("gr-accounts");
+      const route = routesApi.get("gr-accounts");
 
       expect(route?.defaultParams).toStrictEqual({ page: 1, limit: 10 });
     });
@@ -117,13 +127,13 @@ describe("core/routes/routeTree/getRoute", () => {
         id: Number(params.id),
       });
 
-      router.addRoute({
+      routesApi.add({
         name: "gr-items",
         path: "/gr-items/:id",
         decodeParams: decoder,
       });
 
-      const route = router.getRoute("gr-items");
+      const route = routesApi.get("gr-items");
 
       // Verify decoder function works correctly (may be wrapped)
       expect(route?.decodeParams).toBeDefined();
@@ -137,13 +147,13 @@ describe("core/routes/routeTree/getRoute", () => {
         return { ...params, id: `encoded-${idValue}` };
       };
 
-      router.addRoute({
+      routesApi.add({
         name: "gr-products",
         path: "/gr-products/:id",
         encodeParams: encoder,
       });
 
-      const route = router.getRoute("gr-products");
+      const route = routesApi.get("gr-products");
 
       // Verify encoder function works correctly
       expect(route?.encodeParams).toBeDefined();
@@ -155,13 +165,13 @@ describe("core/routes/routeTree/getRoute", () => {
     it("should return route with canActivate", () => {
       const guardFactory: GuardFnFactory = () => () => true;
 
-      router.addRoute({
+      routesApi.add({
         name: "gr-protected",
         path: "/gr-protected",
         canActivate: guardFactory,
       });
 
-      const route = router.getRoute("gr-protected");
+      const route = routesApi.get("gr-protected");
 
       expect(route?.canActivate).toBe(guardFactory);
     });
@@ -178,8 +188,8 @@ describe("core/routes/routeTree/getRoute", () => {
       };
       const guardFactory: GuardFnFactory = () => () => true;
 
-      router.addRoute({ name: "gr-dest", path: "/gr-dest" });
-      router.addRoute({
+      routesApi.add({ name: "gr-dest", path: "/gr-dest" });
+      routesApi.add({
         name: "gr-full",
         path: "/gr-full/:id",
         forwardTo: "gr-dest",
@@ -189,7 +199,7 @@ describe("core/routes/routeTree/getRoute", () => {
         canActivate: guardFactory,
       });
 
-      const route = router.getRoute("gr-full");
+      const route = routesApi.get("gr-full");
 
       expect(route?.name).toBe("gr-full");
       expect(route?.path).toBe("/gr-full/:id");
@@ -208,7 +218,7 @@ describe("core/routes/routeTree/getRoute", () => {
     it("should enrich children with their configuration", () => {
       const childGuard: GuardFnFactory = () => () => true;
 
-      router.addRoute({
+      routesApi.add({
         name: "gr-staff",
         path: "/gr-staff",
         children: [
@@ -221,7 +231,7 @@ describe("core/routes/routeTree/getRoute", () => {
         ],
       });
 
-      const route = router.getRoute("gr-staff");
+      const route = routesApi.get("gr-staff");
 
       expect(route?.children?.[0]?.defaultParams).toStrictEqual({
         tab: "info",
@@ -230,7 +240,7 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should enrich deeply nested children", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-app",
         path: "/gr-app",
         children: [
@@ -249,7 +259,7 @@ describe("core/routes/routeTree/getRoute", () => {
         ],
       });
 
-      const route = router.getRoute("gr-app");
+      const route = routesApi.get("gr-app");
 
       expect(route?.children?.[0]?.defaultParams).toStrictEqual({
         usersPage: 1,
@@ -263,57 +273,55 @@ describe("core/routes/routeTree/getRoute", () => {
   describe("validation", () => {
     it("should return undefined for empty string (root node)", () => {
       // Empty string represents the root node, which is not a named route
-      expect(router.getRoute("")).toBeUndefined();
+      expect(routesApi.get("")).toBeUndefined();
     });
 
     it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() => router.getRoute(".gr-users")).toThrowError(TypeError);
+      expect(() => routesApi.get(".gr-users")).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid name (trailing dot)", () => {
-      expect(() => router.getRoute("gr-users.")).toThrowError(TypeError);
+      expect(() => routesApi.get("gr-users.")).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid name (consecutive dots)", () => {
-      expect(() => router.getRoute("gr-users..profile")).toThrowError(
-        TypeError,
-      );
+      expect(() => routesApi.get("gr-users..profile")).toThrowError(TypeError);
     });
 
     it("should throw TypeError for non-string argument (number)", () => {
-      expect(() => router.getRoute(123 as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(123 as never)).toThrowError(TypeError);
     });
 
     it("should throw TypeError for non-string argument (null)", () => {
-      expect(() => router.getRoute(null as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(null as never)).toThrowError(TypeError);
     });
 
     it("should throw TypeError for non-string argument (undefined)", () => {
-      expect(() => router.getRoute(undefined as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(undefined as never)).toThrowError(TypeError);
     });
 
     it("should throw TypeError for non-string argument (object)", () => {
-      expect(() => router.getRoute({} as never)).toThrowError(TypeError);
+      expect(() => routesApi.get({} as never)).toThrowError(TypeError);
     });
 
     it("should throw TypeError for whitespace-only string", () => {
-      expect(() => router.getRoute("   ")).toThrowError(TypeError);
+      expect(() => routesApi.get("   ")).toThrowError(TypeError);
     });
 
     it("should throw TypeError for segment starting with number", () => {
-      expect(() => router.getRoute("123users")).toThrowError(TypeError);
+      expect(() => routesApi.get("123users")).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name exceeding max length", () => {
       const longName = "a".repeat(10_001);
 
-      expect(() => router.getRoute(longName)).toThrowError(TypeError);
+      expect(() => routesApi.get(longName)).toThrowError(TypeError);
     });
   });
 
   describe("isolation", () => {
     it("should not include custom properties from original route", () => {
-      router.addRoute({
+      routesApi.add({
         name: "gr-custom",
         path: "/gr-custom",
         // Custom properties are stripped during addRoute
@@ -321,7 +329,7 @@ describe("core/routes/routeTree/getRoute", () => {
         meta: { auth: true },
       } as never);
 
-      const route = router.getRoute("gr-custom");
+      const route = routesApi.get("gr-custom");
 
       expect(route).toStrictEqual({
         name: "gr-custom",
@@ -335,19 +343,19 @@ describe("core/routes/routeTree/getRoute", () => {
   describe("edge cases", () => {
     describe("input validation edge cases", () => {
       it("should throw TypeError for Unicode characters in name", () => {
-        expect(() => router.getRoute("маршрут")).toThrowError(TypeError);
-        expect(() => router.getRoute("route-αβγ")).toThrowError(TypeError);
-        expect(() => router.getRoute("路由")).toThrowError(TypeError);
+        expect(() => routesApi.get("маршрут")).toThrowError(TypeError);
+        expect(() => routesApi.get("route-αβγ")).toThrowError(TypeError);
+        expect(() => routesApi.get("路由")).toThrowError(TypeError);
       });
 
       it("should work with boundary length name (10,000 characters)", () => {
         const boundaryName = "a".repeat(10_000);
 
         // Should not throw - validates successfully
-        expect(() => router.getRoute(boundaryName)).not.toThrowError();
+        expect(() => routesApi.get(boundaryName)).not.toThrowError();
 
         // Returns undefined since route doesn't exist
-        expect(router.getRoute(boundaryName)).toBeUndefined();
+        expect(routesApi.get(boundaryName)).toBeUndefined();
       });
 
       it("should throw TypeError for Object with toString method", () => {
@@ -355,7 +363,7 @@ describe("core/routes/routeTree/getRoute", () => {
           toString: () => "validroute",
         };
 
-        expect(() => router.getRoute(objWithToString as never)).toThrowError(
+        expect(() => routesApi.get(objWithToString as never)).toThrowError(
           TypeError,
         );
       });
@@ -371,16 +379,14 @@ describe("core/routes/routeTree/getRoute", () => {
           {},
         );
 
-        expect(() => router.getRoute(proxyObj as never)).toThrowError(
-          TypeError,
-        );
+        expect(() => routesApi.get(proxyObj as never)).toThrowError(TypeError);
       });
 
       it("should throw TypeError for String object (boxed string)", () => {
         // eslint-disable-next-line sonarjs/no-primitive-wrappers, unicorn/new-for-builtins -- Testing boxed string edge case
         const boxedString = new String("validroute");
 
-        expect(() => router.getRoute(boxedString as never)).toThrowError(
+        expect(() => routesApi.get(boxedString as never)).toThrowError(
           TypeError,
         );
       });
@@ -388,9 +394,9 @@ describe("core/routes/routeTree/getRoute", () => {
       it("should handle system prefix @@ routes", () => {
         // System routes with @@ prefix bypass pattern validation
         // This is documented behavior for internal router routes
-        router.addRoute({ name: "@@system", path: "/system" });
+        routesApi.add({ name: "@@system", path: "/system" });
 
-        const route = router.getRoute("@@system");
+        const route = routesApi.get("@@system");
 
         expect(route?.name).toBe("@@system");
         expect(route?.path).toBe("/system");
@@ -399,15 +405,15 @@ describe("core/routes/routeTree/getRoute", () => {
 
     describe("concurrent access edge cases", () => {
       it("should work correctly during active navigation", async () => {
-        router.addRoute({ name: "ec-target", path: "/ec-target" });
-        router.addRoute({ name: "ec-slow", path: "/ec-slow" });
+        routesApi.add({ name: "ec-target", path: "/ec-target" });
+        routesApi.add({ name: "ec-slow", path: "/ec-slow" });
 
-        let routeDuringNavigation: ReturnType<typeof router.getRoute>;
+        let routeDuringNavigation: ReturnType<typeof routesApi.get>;
 
         // Add async guard to make navigation async
         router.addActivateGuard("ec-slow", () => async () => {
           // Read route during active navigation
-          routeDuringNavigation = router.getRoute("ec-target");
+          routeDuringNavigation = routesApi.get("ec-target");
           await new Promise((resolve) => setTimeout(resolve, 10));
 
           return true;
@@ -421,16 +427,16 @@ describe("core/routes/routeTree/getRoute", () => {
       });
 
       it("should return undefined after removeRoute", () => {
-        router.addRoute({ name: "ec-temporary", path: "/ec-temporary" });
+        routesApi.add({ name: "ec-temporary", path: "/ec-temporary" });
 
         // Route exists
-        expect(router.getRoute("ec-temporary")).toBeDefined();
+        expect(routesApi.get("ec-temporary")).toBeDefined();
 
         // Remove route
-        router.removeRoute("ec-temporary");
+        routesApi.remove("ec-temporary");
 
         // Route no longer exists
-        expect(router.getRoute("ec-temporary")).toBeUndefined();
+        expect(routesApi.get("ec-temporary")).toBeUndefined();
       });
     });
 
@@ -441,13 +447,13 @@ describe("core/routes/routeTree/getRoute", () => {
           path: `/child${i}`,
         }));
 
-        router.addRoute({
+        routesApi.add({
           name: "ec-manychildren",
           path: "/ec-manychildren",
           children,
         });
 
-        const route = router.getRoute("ec-manychildren");
+        const route = routesApi.get("ec-manychildren");
 
         expect(route?.children).toHaveLength(150);
 
@@ -472,10 +478,10 @@ describe("core/routes/routeTree/getRoute", () => {
           };
         }
 
-        router.addRoute(current);
+        routesApi.add(current);
 
         // Access deepest level
-        const deepRoute = router.getRoute(
+        const deepRoute = routesApi.get(
           "level0.level1.level2.level3.level4.level5.level6.level7.level8.level9",
         );
 
@@ -483,7 +489,7 @@ describe("core/routes/routeTree/getRoute", () => {
         expect(deepRoute?.path).toBe("/l9");
 
         // Access middle level
-        const midRoute = router.getRoute("level0.level1.level2.level3.level4");
+        const midRoute = routesApi.get("level0.level1.level2.level3.level4");
 
         expect(midRoute?.name).toBe("level4");
         expect(midRoute?.children).toHaveLength(1);
@@ -493,14 +499,14 @@ describe("core/routes/routeTree/getRoute", () => {
 
     describe("result immutability edge cases", () => {
       it("should return new object on each call (no caching)", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ec-nocache",
           path: "/ec-nocache",
           defaultParams: { page: 1 },
         });
 
-        const route1 = router.getRoute("ec-nocache");
-        const route2 = router.getRoute("ec-nocache");
+        const route1 = routesApi.get("ec-nocache");
+        const route2 = routesApi.get("ec-nocache");
 
         // Different object references
         expect(route1).not.toBe(route2);
@@ -510,13 +516,13 @@ describe("core/routes/routeTree/getRoute", () => {
       });
 
       it("should not affect router state when mutating returned object", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ec-immutable",
           path: "/ec-immutable",
           defaultParams: { original: true },
         });
 
-        const route1 = router.getRoute("ec-immutable");
+        const route1 = routesApi.get("ec-immutable");
 
         // Mutate returned object
         (route1 as Record<string, unknown>).path = "/mutated";
@@ -524,7 +530,7 @@ describe("core/routes/routeTree/getRoute", () => {
         (route1 as Record<string, unknown>).customProp = "added";
 
         // Get fresh copy
-        const route2 = router.getRoute("ec-immutable");
+        const route2 = routesApi.get("ec-immutable");
 
         // Original values preserved
         expect(route2?.path).toBe("/ec-immutable");
@@ -533,7 +539,7 @@ describe("core/routes/routeTree/getRoute", () => {
       });
 
       it("should not affect router when mutating children array", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ec-children",
           path: "/ec-children",
           children: [
@@ -542,14 +548,14 @@ describe("core/routes/routeTree/getRoute", () => {
           ],
         });
 
-        const route1 = router.getRoute("ec-children");
+        const route1 = routesApi.get("ec-children");
 
         // Mutate children array
         route1?.children?.push({ name: "child3", path: "/c3" });
         route1?.children?.splice(0, 1);
 
         // Get fresh copy
-        const route2 = router.getRoute("ec-children");
+        const route2 = routesApi.get("ec-children");
 
         // Original children preserved
         expect(route2?.children).toHaveLength(2);
