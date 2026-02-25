@@ -3,6 +3,7 @@
 import { bench } from "mitata";
 
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import { getRoutesApi } from "@real-router/core";
 
 import type { Params } from "router5/dist/types/base";
 
@@ -39,9 +40,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 50; i++) {
-    router.addRoute({
+    routesApi.add({
       name: `route${i}`,
       path: `/route${i}`,
       defaultParams: { id: String(i), tab: "default" },
@@ -106,8 +108,9 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
-  router.addRoute({
+  routesApi.add({
     name: "custom",
     path: "/custom/:id",
     encodeParams: (params) => ({
@@ -169,9 +172,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
-  router.addRoute({ name: "old", path: "/old", forwardTo: "about" });
-  router.addRoute({ name: "old2", path: "/old2", forwardTo: "old" });
+  routesApi.add({ name: "old", path: "/old", forwardTo: "about" });
+  routesApi.add({ name: "old2", path: "/old2", forwardTo: "old" });
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {

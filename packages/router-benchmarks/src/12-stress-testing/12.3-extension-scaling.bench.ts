@@ -3,6 +3,7 @@
 import { bench } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import { getRoutesApi } from "@real-router/core";
 
 // 12.3.1 Navigation with 50 synchronous middleware
 {
@@ -103,6 +104,7 @@ if (IS_ROUTER5) {
   ).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = ["route50", "route51"];
   let index = 0;
 
@@ -110,7 +112,7 @@ if (IS_ROUTER5) {
   for (let i = 0; i < 100; i++) {
     const routeName = `route${i}`;
 
-    router.addRoute({ name: routeName, path: `/${routeName}` });
+    routesApi.add({ name: routeName, path: `/${routeName}` });
     router.addActivateGuard(routeName, () => () => true);
   }
 
@@ -144,11 +146,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 100; i++) {
     const routeName = `route${i}`;
 
-    router.addRoute({ name: routeName, path: `/${routeName}` });
+    routesApi.add({ name: routeName, path: `/${routeName}` });
     router.addDeactivateGuard(routeName, () => () => true);
   }
 

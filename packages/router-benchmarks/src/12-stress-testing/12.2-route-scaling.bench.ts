@@ -3,6 +3,7 @@
 import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import { getRoutesApi } from "@real-router/core";
 
 import type { Route } from "../helpers";
 
@@ -29,11 +30,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = ["route50", "route51"];
   let index = 0;
 
   for (let i = 0; i < 100; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   router.start("/");
@@ -61,11 +63,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = ["route250", "route251"];
   let index = 0;
 
   for (let i = 0; i < 500; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   router.start("/");
@@ -93,11 +96,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = ["route500", "route501"];
   let index = 0;
 
   for (let i = 0; i < 1000; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   router.start("/");
@@ -125,9 +129,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 100; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   router.start("/");
@@ -216,6 +221,7 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createNestedRouter();
+  const routesApi = getRoutesApi(router);
 
   // Build deep route structure to avoid TypeScript recursion limits
   const deepRoute: Route = {
@@ -274,7 +280,7 @@ if (IS_ROUTER5) {
     ],
   };
 
-  router.addRoute(deepRoute);
+  routesApi.add(deepRoute);
   router.start("/");
 
   // Alternate between two nested levels to avoid SAME_STATES
@@ -305,9 +311,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 500; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   bench(`12.2.6 BuildPath in router with 500 routes (×${BATCH})`, () => {

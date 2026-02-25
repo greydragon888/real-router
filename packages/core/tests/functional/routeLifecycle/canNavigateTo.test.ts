@@ -1,12 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getRoutesApi } from "@real-router/core";
+
 import { createLifecycleTestRouter, type Router } from "./setup";
 
+import type { RoutesApi } from "@real-router/core";
+
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/route-lifecycle/canNavigateTo", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
+    routesApi = getRoutesApi(router);
   });
 
   afterEach(() => {
@@ -48,7 +54,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should check nested route guards in correct order", async () => {
-    router.addRoute({ name: "users", path: "/users" }, { parent: "admin" });
+    routesApi.add({ name: "users", path: "/users" }, { parent: "admin" });
 
     const adminGuard = vi.fn(() => true);
     const usersGuard = vi.fn(() => true);
@@ -66,7 +72,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return false if any nested parent guard blocks", async () => {
-    router.addRoute({ name: "users", path: "/users" }, { parent: "admin" });
+    routesApi.add({ name: "users", path: "/users" }, { parent: "admin" });
 
     router.addActivateGuard("admin", () => () => false);
     router.addActivateGuard("admin.users", () => () => true);
@@ -86,7 +92,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should resolve forwarded route and check guards on target", async () => {
-    router.addRoute({
+    routesApi.add({
       name: "old-admin",
       path: "/old-admin",
       forwardTo: "admin",
@@ -139,10 +145,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should handle complex nested transitions with mixed guards", async () => {
-    router.addRoute(
-      { name: "settings", path: "/settings" },
-      { parent: "admin" },
-    );
+    routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
     router.addDeactivateGuard("users.list", () => () => true);
     router.addActivateGuard("admin", () => () => true);
@@ -178,11 +181,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should handle transition from deeply nested route", async () => {
-    router.addRoute(
-      { name: "settings", path: "/settings" },
-      { parent: "admin" },
-    );
-    router.addRoute(
+    routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
+    routesApi.add(
       { name: "profile", path: "/profile" },
       { parent: "admin.settings" },
     );
@@ -198,11 +198,8 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   });
 
   it("should return false if any guard in deeply nested path blocks", async () => {
-    router.addRoute(
-      { name: "settings", path: "/settings" },
-      { parent: "admin" },
-    );
-    router.addRoute(
+    routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
+    routesApi.add(
       { name: "profile", path: "/profile" },
       { parent: "admin.settings" },
     );
@@ -270,7 +267,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
   it("should respect canDeactivate from route config", async () => {
     const guard = vi.fn().mockReturnValue(false);
 
-    router.addRoute({
+    routesApi.add({
       name: "editor",
       path: "/editor",
       canDeactivate: () => guard,

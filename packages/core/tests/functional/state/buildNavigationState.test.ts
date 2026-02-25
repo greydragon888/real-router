@@ -1,16 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events, getPluginApi } from "@real-router/core";
+import { events, getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("router.buildNavigationState()", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -85,7 +87,7 @@ describe("router.buildNavigationState()", () => {
 
   describe("route forwarding (plugin interception)", () => {
     it("should resolve forwarded routes (forwardTo)", () => {
-      router.addRoute({
+      routesApi.add({
         name: "old-route",
         path: "/old",
         forwardTo: "home",
@@ -99,7 +101,7 @@ describe("router.buildNavigationState()", () => {
     });
 
     it("should apply default params from route definition", () => {
-      router.addRoute({
+      routesApi.add({
         name: "with-defaults",
         path: "/defaults/:id",
         defaultParams: { id: "default-id" },

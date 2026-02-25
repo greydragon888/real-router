@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, getPluginApi } from "@real-router/core";
+import { errorCodes, getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -9,13 +9,16 @@ import type {
   GuardFnFactory,
   Params,
   RouterError,
+  RoutesApi,
 } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/routeTree/updateRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -25,10 +28,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("forwardTo", () => {
     it("should add forwardTo", () => {
-      router.addRoute({ name: "ur-source", path: "/ur-source" });
-      router.addRoute({ name: "ur-target", path: "/ur-target" });
+      routesApi.add({ name: "ur-source", path: "/ur-source" });
+      routesApi.add({ name: "ur-target", path: "/ur-target" });
 
-      router.updateRoute("ur-source", { forwardTo: "ur-target" });
+      routesApi.update("ur-source", { forwardTo: "ur-target" });
 
       // Verify forward works via behavior
       expect(getPluginApi(router).forwardState("ur-source", {}).name).toBe(
@@ -37,12 +40,12 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should update existing forwardTo", () => {
-      router.addRoute({ name: "ur-src", path: "/ur-src" });
-      router.addRoute({ name: "ur-target1", path: "/ur-target1" });
-      router.addRoute({ name: "ur-target2", path: "/ur-target2" });
-      router.updateRoute("ur-src", { forwardTo: "ur-target1" });
+      routesApi.add({ name: "ur-src", path: "/ur-src" });
+      routesApi.add({ name: "ur-target1", path: "/ur-target1" });
+      routesApi.add({ name: "ur-target2", path: "/ur-target2" });
+      routesApi.update("ur-src", { forwardTo: "ur-target1" });
 
-      router.updateRoute("ur-src", { forwardTo: "ur-target2" });
+      routesApi.update("ur-src", { forwardTo: "ur-target2" });
 
       // Verify updated forward works
       expect(getPluginApi(router).forwardState("ur-src", {}).name).toBe(
@@ -51,14 +54,14 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should remove forwardTo when null", () => {
-      router.addRoute({ name: "ur-dest", path: "/ur-dest" });
-      router.addRoute({
+      routesApi.add({ name: "ur-dest", path: "/ur-dest" });
+      routesApi.add({
         name: "ur-origin",
         path: "/ur-origin",
         forwardTo: "ur-dest",
       });
 
-      router.updateRoute("ur-origin", { forwardTo: null });
+      routesApi.update("ur-origin", { forwardTo: null });
 
       // Forward should no longer redirect
       expect(getPluginApi(router).forwardState("ur-origin", {}).name).toBe(
@@ -67,41 +70,41 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should throw if target does not exist", () => {
-      router.addRoute({ name: "ur-from", path: "/ur-from" });
+      routesApi.add({ name: "ur-from", path: "/ur-from" });
 
-      expect(
-        () => void router.updateRoute("ur-from", { forwardTo: "nonexistent" }),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-from", { forwardTo: "nonexistent" });
+      }).toThrowError(
         '[real-router] updateRoute: forwardTo target "nonexistent" does not exist',
       );
     });
 
     it("should throw if creates direct cycle", () => {
-      router.addRoute({ name: "ur-self", path: "/ur-self" });
+      routesApi.add({ name: "ur-self", path: "/ur-self" });
 
-      expect(
-        () => void router.updateRoute("ur-self", { forwardTo: "ur-self" }),
-      ).toThrowError(/Circular forwardTo/);
+      expect(() => {
+        routesApi.update("ur-self", { forwardTo: "ur-self" });
+      }).toThrowError(/Circular forwardTo/);
     });
 
     it("should throw if target requires unavailable params", () => {
-      router.addRoute({ name: "ur-static", path: "/ur-static" });
-      router.addRoute({ name: "ur-param", path: "/ur-param/:id" });
+      routesApi.add({ name: "ur-static", path: "/ur-static" });
+      routesApi.add({ name: "ur-param", path: "/ur-param/:id" });
 
-      expect(
-        () => void router.updateRoute("ur-static", { forwardTo: "ur-param" }),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-static", { forwardTo: "ur-param" });
+      }).toThrowError(
         '[real-router] forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
       );
     });
 
     it("should allow forwardTo when params match", () => {
-      router.addRoute({ name: "ur-old", path: "/ur-old/:id" });
-      router.addRoute({ name: "ur-new", path: "/ur-new/:id" });
+      routesApi.add({ name: "ur-old", path: "/ur-old/:id" });
+      routesApi.add({ name: "ur-new", path: "/ur-new/:id" });
 
-      expect(
-        () => void router.updateRoute("ur-old", { forwardTo: "ur-new" }),
-      ).not.toThrowError();
+      expect(() => {
+        routesApi.update("ur-old", { forwardTo: "ur-new" });
+      }).not.toThrowError();
 
       // Verify forward works via behavior
       expect(
@@ -110,9 +113,9 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should work with matchPath after update", () => {
-      router.addRoute({ name: "ur-alias", path: "/ur-alias/:id" });
-      router.addRoute({ name: "ur-real", path: "/ur-real/:id" });
-      router.updateRoute("ur-alias", { forwardTo: "ur-real" });
+      routesApi.add({ name: "ur-alias", path: "/ur-alias/:id" });
+      routesApi.add({ name: "ur-real", path: "/ur-real/:id" });
+      routesApi.update("ur-alias", { forwardTo: "ur-real" });
 
       const state = getPluginApi(router).matchPath("/ur-alias/123");
 
@@ -122,17 +125,17 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("indirect cycle detection", () => {
       it("should not corrupt forwardMap on indirect cycle (A → B → C → A)", () => {
-        router.addRoute({ name: "ur-a", path: "/ur-a" });
-        router.addRoute({ name: "ur-b", path: "/ur-b" });
-        router.addRoute({ name: "ur-c", path: "/ur-c" });
+        routesApi.add({ name: "ur-a", path: "/ur-a" });
+        routesApi.add({ name: "ur-b", path: "/ur-b" });
+        routesApi.add({ name: "ur-c", path: "/ur-c" });
 
-        router.updateRoute("ur-a", { forwardTo: "ur-b" });
-        router.updateRoute("ur-b", { forwardTo: "ur-c" });
+        routesApi.update("ur-a", { forwardTo: "ur-b" });
+        routesApi.update("ur-b", { forwardTo: "ur-c" });
 
         // Should throw error AND NOT corrupt forwardMap
-        expect(
-          () => void router.updateRoute("ur-c", { forwardTo: "ur-a" }),
-        ).toThrowError(/Circular forwardTo/);
+        expect(() => {
+          routesApi.update("ur-c", { forwardTo: "ur-a" });
+        }).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain clean (without ur-c) - verify via behavior
         expect(getPluginApi(router).forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
@@ -141,35 +144,35 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should not corrupt forwardMap on longer indirect cycle (A → B → C → D → A)", () => {
-        router.addRoute({ name: "ur-x", path: "/ur-x" });
-        router.addRoute({ name: "ur-y", path: "/ur-y" });
-        router.addRoute({ name: "ur-z", path: "/ur-z" });
-        router.addRoute({ name: "ur-w", path: "/ur-w" });
+        routesApi.add({ name: "ur-x", path: "/ur-x" });
+        routesApi.add({ name: "ur-y", path: "/ur-y" });
+        routesApi.add({ name: "ur-z", path: "/ur-z" });
+        routesApi.add({ name: "ur-w", path: "/ur-w" });
 
-        router.updateRoute("ur-x", { forwardTo: "ur-y" });
-        router.updateRoute("ur-y", { forwardTo: "ur-z" });
-        router.updateRoute("ur-z", { forwardTo: "ur-w" });
+        routesApi.update("ur-x", { forwardTo: "ur-y" });
+        routesApi.update("ur-y", { forwardTo: "ur-z" });
+        routesApi.update("ur-z", { forwardTo: "ur-w" });
 
-        expect(
-          () => void router.updateRoute("ur-w", { forwardTo: "ur-x" }),
-        ).toThrowError(/Circular forwardTo/);
+        expect(() => {
+          routesApi.update("ur-w", { forwardTo: "ur-x" });
+        }).toThrowError(/Circular forwardTo/);
 
         // forwardMap should remain without ur-w → ur-x - verify via behavior
         expect(getPluginApi(router).forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
       });
 
       it("should preserve resolvedForwardMap consistency after cycle rejection", () => {
-        router.addRoute({ name: "ur-p", path: "/ur-p" });
-        router.addRoute({ name: "ur-q", path: "/ur-q" });
-        router.addRoute({ name: "ur-r", path: "/ur-r" });
+        routesApi.add({ name: "ur-p", path: "/ur-p" });
+        routesApi.add({ name: "ur-q", path: "/ur-q" });
+        routesApi.add({ name: "ur-r", path: "/ur-r" });
 
-        router.updateRoute("ur-p", { forwardTo: "ur-q" });
-        router.updateRoute("ur-q", { forwardTo: "ur-r" });
+        routesApi.update("ur-p", { forwardTo: "ur-q" });
+        routesApi.update("ur-q", { forwardTo: "ur-r" });
 
         // Attempt to create cycle
-        expect(
-          () => void router.updateRoute("ur-r", { forwardTo: "ur-p" }),
-        ).toThrowError();
+        expect(() => {
+          routesApi.update("ur-r", { forwardTo: "ur-p" });
+        }).toThrowError();
 
         // matchPath should work correctly with existing redirects
         const state = getPluginApi(router).matchPath("/ur-p");
@@ -185,32 +188,32 @@ describe("core/routes/routeTree/updateRoute", () => {
           routes.push({ name: `ur-chain-${i}`, path: `/ur-chain-${i}` });
         }
 
-        router.addRoute(routes);
+        routesApi.add(routes);
 
         // Create forward chain: chain-0 → chain-1 → ... → chain-99 (100 items, depth 100)
         // This creates 99 links (i=0..98)
         for (let i = 0; i < 99; i++) {
-          router.updateRoute(`ur-chain-${i}`, {
+          routesApi.update(`ur-chain-${i}`, {
             forwardTo: `ur-chain-${i + 1}`,
           });
         }
 
         // Adding the 100th link (chain-99 → chain-100) would make chain of 101 items
         // This should exceed max depth of 100
-        expect(() =>
-          router.updateRoute("ur-chain-99", {
+        expect(() => {
+          routesApi.update("ur-chain-99", {
             forwardTo: "ur-chain-100",
-          }),
-        ).toThrowError(/exceeds maximum depth/);
+          });
+        }).toThrowError(/exceeds maximum depth/);
       });
     });
   });
 
   describe("defaultParams", () => {
     it("should add defaultParams", () => {
-      router.addRoute({ name: "ur-members", path: "/ur-members" });
+      routesApi.add({ name: "ur-members", path: "/ur-members" });
 
-      router.updateRoute("ur-members", {
+      routesApi.update("ur-members", {
         defaultParams: { page: 1, limit: 10 },
       });
 
@@ -224,13 +227,13 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should update existing defaultParams", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-accounts",
         path: "/ur-accounts",
         defaultParams: { page: 1 },
       });
 
-      router.updateRoute("ur-accounts", {
+      routesApi.update("ur-accounts", {
         defaultParams: { page: 2, limit: 20 },
       });
 
@@ -244,13 +247,13 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should remove defaultParams when null", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-teams",
         path: "/ur-teams",
         defaultParams: { page: 1 },
       });
 
-      router.updateRoute("ur-teams", { defaultParams: null });
+      routesApi.update("ur-teams", { defaultParams: null });
 
       // Verify via makeState - no defaults
       expect(getPluginApi(router).makeState("ur-teams").params).toStrictEqual(
@@ -268,8 +271,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         }),
       );
 
-      router.addRoute({ name: "ur-items", path: "/ur-items/:id" });
-      router.updateRoute("ur-items", { decodeParams: decoder });
+      routesApi.add({ name: "ur-items", path: "/ur-items/:id" });
+      routesApi.update("ur-items", { decodeParams: decoder });
 
       // Verify via matchPath
       const state = getPluginApi(router).matchPath("/ur-items/123");
@@ -287,12 +290,12 @@ describe("core/routes/routeTree/updateRoute", () => {
         }),
       );
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-products",
         path: "/ur-products/:id",
         decodeParams: decoder1,
       });
-      router.updateRoute("ur-products", { decodeParams: decoder2 });
+      routesApi.update("ur-products", { decodeParams: decoder2 });
 
       // Verify new decoder is used
       const state = getPluginApi(router).matchPath("/ur-products/456");
@@ -309,7 +312,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         }),
       );
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-assets",
         path: "/ur-assets/:id",
         decodeParams: decoder,
@@ -322,7 +325,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       decoder.mockClear();
 
-      router.updateRoute("ur-assets", { decodeParams: null });
+      routesApi.update("ur-assets", { decodeParams: null });
 
       // Verify decoder is no longer called
       const state = getPluginApi(router).matchPath("/ur-assets/2");
@@ -332,11 +335,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should use updated decoder in matchPath", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-decode-test",
         path: "/ur-decode-test/:id",
       });
-      router.updateRoute("ur-decode-test", {
+      routesApi.update("ur-decode-test", {
         decodeParams: (params) => ({ ...params, id: Number(params.id) }),
       });
 
@@ -347,11 +350,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should fallback to original params when decoder returns undefined", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-decode-undef",
         path: "/ur-decode-undef/:id",
       });
-      router.updateRoute("ur-decode-undef", {
+      routesApi.update("ur-decode-undef", {
         // Decoder that returns undefined (bad user code)
         decodeParams: () => undefined as unknown as Params,
       });
@@ -372,8 +375,8 @@ describe("core/routes/routeTree/updateRoute", () => {
         }),
       );
 
-      router.addRoute({ name: "ur-goods", path: "/ur-goods/:id" });
-      router.updateRoute("ur-goods", { encodeParams: encoder });
+      routesApi.add({ name: "ur-goods", path: "/ur-goods/:id" });
+      routesApi.update("ur-goods", { encodeParams: encoder });
 
       // Verify via buildPath
       router.buildPath("ur-goods", { id: 123 });
@@ -390,12 +393,12 @@ describe("core/routes/routeTree/updateRoute", () => {
         }),
       );
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-things",
         path: "/ur-things/:id",
         encodeParams: encoder1,
       });
-      router.updateRoute("ur-things", { encodeParams: encoder2 });
+      routesApi.update("ur-things", { encodeParams: encoder2 });
 
       // Verify new encoder is used
       router.buildPath("ur-things", { id: 456 });
@@ -406,7 +409,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should remove encodeParams when null", () => {
       const encoder = vi.fn((params: Params): Params => params);
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-stuff",
         path: "/ur-stuff/:id",
         encodeParams: encoder,
@@ -419,7 +422,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       encoder.mockClear();
 
-      router.updateRoute("ur-stuff", { encodeParams: null });
+      routesApi.update("ur-stuff", { encodeParams: null });
 
       // Verify encoder is no longer called
       router.buildPath("ur-stuff", { id: 2 });
@@ -428,11 +431,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should use updated encoder in buildPath", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-encode-test",
         path: "/ur-encode-test/:id",
       });
-      router.updateRoute("ur-encode-test", {
+      routesApi.update("ur-encode-test", {
         encodeParams: (params) => {
           const idValue = params.id as string;
 
@@ -446,11 +449,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should fallback to original params when encoder returns undefined", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-encode-undef",
         path: "/ur-encode-undef/:id",
       });
-      router.updateRoute("ur-encode-undef", {
+      routesApi.update("ur-encode-undef", {
         // Encoder that returns undefined (bad user code)
         encodeParams: () => undefined as unknown as Params,
       });
@@ -467,8 +470,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: GuardFnFactory = () => guard;
 
-      router.addRoute({ name: "ur-secure", path: "/ur-secure" });
-      router.updateRoute("ur-secure", { canActivate: guardFactory });
+      routesApi.add({ name: "ur-secure", path: "/ur-secure" });
+      routesApi.update("ur-secure", { canActivate: guardFactory });
 
       // Verify canActivate works by navigating
       await router.navigate("ur-secure");
@@ -480,12 +483,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       const guard1 = vi.fn().mockReturnValue(true);
       const guard2 = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-guarded",
         path: "/ur-guarded",
         canActivate: () => guard1,
       });
-      router.updateRoute("ur-guarded", { canActivate: () => guard2 });
+      routesApi.update("ur-guarded", { canActivate: () => guard2 });
 
       // Verify new guard is used - navigation should be blocked
       try {
@@ -502,7 +505,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should remove canActivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-locked",
         path: "/ur-locked",
         canActivate: () => guard,
@@ -520,7 +523,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       guard.mockClear();
 
       // Remove canActivate
-      router.updateRoute("ur-locked", { canActivate: null });
+      routesApi.update("ur-locked", { canActivate: null });
 
       // Now navigation should succeed
       await router.navigate("ur-locked");
@@ -534,8 +537,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       const guard = vi.fn().mockReturnValue(false);
       const guardFactory: GuardFnFactory = () => guard;
 
-      router.addRoute({ name: "ur-editor", path: "/ur-editor" });
-      router.updateRoute("ur-editor", { canDeactivate: guardFactory });
+      routesApi.add({ name: "ur-editor", path: "/ur-editor" });
+      routesApi.update("ur-editor", { canDeactivate: guardFactory });
 
       // Navigate to route
       await router.navigate("ur-editor");
@@ -556,7 +559,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should remove canDeactivate when null", async () => {
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-form",
         path: "/ur-form",
         canDeactivate: () => guard,
@@ -577,7 +580,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       guard.mockClear();
 
       // Remove canDeactivate
-      router.updateRoute("ur-form", { canDeactivate: null });
+      routesApi.update("ur-form", { canDeactivate: null });
 
       // Now navigation should succeed
       await router.navigate("home");
@@ -589,12 +592,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       const guard1 = vi.fn().mockReturnValue(false);
       const guard2 = vi.fn().mockReturnValue(true);
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-page",
         path: "/ur-page",
         canDeactivate: () => guard1,
       });
-      router.updateRoute("ur-page", { canDeactivate: () => guard2 });
+      routesApi.update("ur-page", { canDeactivate: () => guard2 });
 
       // Navigate to route
       await router.navigate("ur-page");
@@ -612,293 +615,295 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("validation", () => {
     it("should throw ReferenceError for non-existent route", () => {
-      expect(() =>
-        router.updateRoute("nonexistent", { defaultParams: { x: 1 } }),
-      ).toThrowError(ReferenceError);
+      expect(() => {
+        routesApi.update("nonexistent", { defaultParams: { x: 1 } });
+      }).toThrowError(ReferenceError);
 
-      expect(() =>
-        router.updateRoute("nonexistent", { defaultParams: { x: 1 } }),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("nonexistent", { defaultParams: { x: 1 } });
+      }).toThrowError(
         '[real-router] updateRoute: route "nonexistent" does not exist',
       );
     });
 
     it("should throw ReferenceError for empty string (root node)", () => {
       // Empty string represents the root node, which is not a named route
-      expect(
-        () => void router.updateRoute("", { defaultParams: { x: 1 } }),
-      ).toThrowError(ReferenceError);
+      expect(() => {
+        routesApi.update("", { defaultParams: { x: 1 } });
+      }).toThrowError(ReferenceError);
     });
 
     it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(
-        () => void router.updateRoute(".invalid", { defaultParams: { x: 1 } }),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.update(".invalid", { defaultParams: { x: 1 } });
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for non-string name", () => {
       // Number
-      expect(() =>
-        router.updateRoute(123 as unknown as string, {
+      expect(() => {
+        routesApi.update(123 as unknown as string, {
           defaultParams: { x: 1 },
-        }),
-      ).toThrowError(TypeError);
+        });
+      }).toThrowError(TypeError);
 
       // Object
-      expect(() =>
-        router.updateRoute({} as unknown as string, {
+      expect(() => {
+        routesApi.update({} as unknown as string, {
           defaultParams: { x: 1 },
-        }),
-      ).toThrowError(TypeError);
+        });
+      }).toThrowError(TypeError);
 
       // Null
-      expect(() =>
-        router.updateRoute(null as unknown as string, {
+      expect(() => {
+        routesApi.update(null as unknown as string, {
           defaultParams: { x: 1 },
-        }),
-      ).toThrowError(TypeError);
+        });
+      }).toThrowError(TypeError);
 
       // Undefined
-      expect(() =>
-        router.updateRoute(undefined as unknown as string, {
+      expect(() => {
+        routesApi.update(undefined as unknown as string, {
           defaultParams: { x: 1 },
-        }),
-      ).toThrowError(TypeError);
+        });
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for whitespace-only name", () => {
-      expect(
-        () => void router.updateRoute("   ", { defaultParams: { x: 1 } }),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.update("   ", { defaultParams: { x: 1 } });
+      }).toThrowError(TypeError);
 
-      expect(
-        () => void router.updateRoute("\t\n", { defaultParams: { x: 1 } }),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.update("\t\n", { defaultParams: { x: 1 } });
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for name exceeding 10000 characters", () => {
       const longName = "a".repeat(10_001);
 
-      expect(
-        () => void router.updateRoute(longName, { defaultParams: { x: 1 } }),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.update(longName, { defaultParams: { x: 1 } });
+      }).toThrowError(TypeError);
 
-      expect(
-        () => void router.updateRoute(longName, { defaultParams: { x: 1 } }),
-      ).toThrowError(/exceeds maximum length/);
+      expect(() => {
+        routesApi.update(longName, { defaultParams: { x: 1 } });
+      }).toThrowError(/exceeds maximum length/);
     });
 
     it("should throw TypeError for null updates", () => {
-      router.addRoute({ name: "ur-null-test", path: "/ur-null-test" });
+      routesApi.add({ name: "ur-null-test", path: "/ur-null-test" });
 
-      expect(() =>
-        router.updateRoute("ur-null-test", null as unknown as object),
-      ).toThrowError(TypeError);
+      expect(() => {
+        routesApi.update("ur-null-test", null as unknown as object);
+      }).toThrowError(TypeError);
 
-      expect(() =>
-        router.updateRoute("ur-null-test", null as unknown as object),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-null-test", null as unknown as object);
+      }).toThrowError(
         "[real-router] updateRoute: updates must be an object, got null",
       );
     });
 
     it("should throw TypeError for primitive updates", () => {
-      router.addRoute({ name: "ur-prim-test", path: "/ur-prim-test" });
+      routesApi.add({ name: "ur-prim-test", path: "/ur-prim-test" });
 
-      expect(() =>
-        router.updateRoute("ur-prim-test", "string" as unknown as object),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-prim-test", "string" as unknown as object);
+      }).toThrowError(
         "[real-router] updateRoute: updates must be an object, got string",
       );
 
-      expect(
-        () => void router.updateRoute("ur-prim-test", 123 as unknown as object),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-prim-test", 123 as unknown as object);
+      }).toThrowError(
         "[real-router] updateRoute: updates must be an object, got number",
       );
     });
 
     it("should throw TypeError for array updates", () => {
-      router.addRoute({ name: "ur-arr-test", path: "/ur-arr-test" });
+      routesApi.add({ name: "ur-arr-test", path: "/ur-arr-test" });
 
-      expect(
-        () => void router.updateRoute("ur-arr-test", [] as unknown as object),
-      ).toThrowError(
+      expect(() => {
+        routesApi.update("ur-arr-test", [] as unknown as object);
+      }).toThrowError(
         "[real-router] updateRoute: updates must be an object, got array",
       );
     });
 
     it("should throw TypeError for invalid defaultParams", () => {
-      router.addRoute({ name: "ur-dp-test", path: "/ur-dp-test" });
+      routesApi.add({ name: "ur-dp-test", path: "/ur-dp-test" });
 
       // Not an object (string)
-      expect(() =>
-        router.updateRoute("ur-dp-test", {
+      expect(() => {
+        routesApi.update("ur-dp-test", {
           defaultParams: "string" as unknown as Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: defaultParams must be an object or null, got string",
       );
 
       // Not an object (number)
-      expect(() =>
-        router.updateRoute("ur-dp-test", {
+      expect(() => {
+        routesApi.update("ur-dp-test", {
           defaultParams: 123 as unknown as Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: defaultParams must be an object or null, got number",
       );
 
       // Array is not valid for defaultParams
-      expect(() =>
-        router.updateRoute("ur-dp-test", {
+      expect(() => {
+        routesApi.update("ur-dp-test", {
           defaultParams: [] as unknown as Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: defaultParams must be an object or null, got array",
       );
 
       // Function is not valid for defaultParams
-      expect(() =>
-        router.updateRoute("ur-dp-test", {
+      expect(() => {
+        routesApi.update("ur-dp-test", {
           defaultParams: (() => ({})) as unknown as Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: defaultParams must be an object or null, got function",
       );
     });
 
     it("should throw TypeError for invalid decodeParams", () => {
-      router.addRoute({ name: "ur-dec-test", path: "/ur-dec-test" });
+      routesApi.add({ name: "ur-dec-test", path: "/ur-dec-test" });
 
       // Not a function (string)
-      expect(() =>
-        router.updateRoute("ur-dec-test", {
+      expect(() => {
+        routesApi.update("ur-dec-test", {
           decodeParams: "string" as unknown as (params: Params) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: decodeParams must be a function or null, got string",
       );
 
       // Not a function (object)
-      expect(() =>
-        router.updateRoute("ur-dec-test", {
+      expect(() => {
+        routesApi.update("ur-dec-test", {
           decodeParams: {} as unknown as (params: Params) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: decodeParams must be a function or null, got object",
       );
 
       // Not a function (number)
-      expect(() =>
-        router.updateRoute("ur-dec-test", {
+      expect(() => {
+        routesApi.update("ur-dec-test", {
           decodeParams: 42 as unknown as (params: Params) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: decodeParams must be a function or null, got number",
       );
     });
 
     it("should throw TypeError for invalid encodeParams", () => {
-      router.addRoute({ name: "ur-enc-test", path: "/ur-enc-test" });
+      routesApi.add({ name: "ur-enc-test", path: "/ur-enc-test" });
 
       // Not a function (string)
-      expect(() =>
-        router.updateRoute("ur-enc-test", {
+      expect(() => {
+        routesApi.update("ur-enc-test", {
           encodeParams: "string" as unknown as (params: Params) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: encodeParams must be a function or null, got string",
       );
 
       // Not a function (array)
-      expect(() =>
-        router.updateRoute("ur-enc-test", {
+      expect(() => {
+        routesApi.update("ur-enc-test", {
           encodeParams: [] as unknown as (params: Params) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: encodeParams must be a function or null, got object",
       );
     });
 
     it("should throw TypeError for async decodeParams", () => {
-      router.addRoute({ name: "ur-async-dec", path: "/ur-async-dec" });
+      routesApi.add({ name: "ur-async-dec", path: "/ur-async-dec" });
 
       // Async function - cast needed because TS doesn't allow async for this type
-      expect(() =>
-        router.updateRoute("ur-async-dec", {
+      expect(() => {
+        routesApi.update("ur-async-dec", {
           decodeParams: (async (params: Params) => params) as unknown as (
             params: Params,
           ) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: decodeParams cannot be an async function",
       );
     });
 
     it("should throw TypeError for async encodeParams", () => {
-      router.addRoute({ name: "ur-async-enc", path: "/ur-async-enc" });
+      routesApi.add({ name: "ur-async-enc", path: "/ur-async-enc" });
 
       // Async function - cast needed because TS doesn't allow async for this type
-      expect(() =>
-        router.updateRoute("ur-async-enc", {
+      expect(() => {
+        routesApi.update("ur-async-enc", {
           encodeParams: (async (params: Params) => params) as unknown as (
             params: Params,
           ) => Params,
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         "[real-router] updateRoute: encodeParams cannot be an async function",
       );
     });
 
     it("should accept valid defaultParams, decodeParams, encodeParams", () => {
-      router.addRoute({ name: "ur-valid-test", path: "/ur-valid-test" });
+      routesApi.add({ name: "ur-valid-test", path: "/ur-valid-test" });
 
       // Valid object for defaultParams
-      expect(() =>
-        router.updateRoute("ur-valid-test", {
+      expect(() => {
+        routesApi.update("ur-valid-test", {
           defaultParams: { page: 1, sort: "name" },
-        }),
-      ).not.toThrowError();
+        });
+      }).not.toThrowError();
 
       // null is valid for defaultParams (remove)
-      expect(
-        () => void router.updateRoute("ur-valid-test", { defaultParams: null }),
-      ).not.toThrowError();
+      expect(() => {
+        routesApi.update("ur-valid-test", { defaultParams: null });
+      }).not.toThrowError();
 
       // Valid function for decodeParams
-      expect(() =>
-        router.updateRoute("ur-valid-test", {
+      expect(() => {
+        routesApi.update("ur-valid-test", {
           decodeParams: (params) => params,
-        }),
-      ).not.toThrowError();
+        });
+      }).not.toThrowError();
 
       // null is valid for decodeParams (remove)
-      expect(
-        () => void router.updateRoute("ur-valid-test", { decodeParams: null }),
-      ).not.toThrowError();
+      expect(() => {
+        routesApi.update("ur-valid-test", { decodeParams: null });
+      }).not.toThrowError();
 
       // Valid function for encodeParams
-      expect(() =>
-        router.updateRoute("ur-valid-test", {
+      expect(() => {
+        routesApi.update("ur-valid-test", {
           encodeParams: (params) => params,
-        }),
-      ).not.toThrowError();
+        });
+      }).not.toThrowError();
 
       // null is valid for encodeParams (remove)
-      expect(
-        () => void router.updateRoute("ur-valid-test", { encodeParams: null }),
-      ).not.toThrowError();
+      expect(() => {
+        routesApi.update("ur-valid-test", { encodeParams: null });
+      }).not.toThrowError();
     });
 
-    it("should return router for chaining", () => {
-      router.addRoute({ name: "ur-chainable", path: "/ur-chainable" });
+    it("should update route and return void", () => {
+      routesApi.add({ name: "ur-chainable", path: "/ur-chainable" });
 
-      const result = router.updateRoute("ur-chainable", {
+      routesApi.update("ur-chainable", {
         defaultParams: { page: 1 },
       });
 
-      expect(result).toBe(router);
+      const route = routesApi.get("ur-chainable");
+
+      expect(route?.defaultParams).toStrictEqual({ page: 1 });
     });
   });
 
@@ -908,8 +913,8 @@ describe("core/routes/routeTree/updateRoute", () => {
       const guard = vi.fn().mockReturnValue(true);
       const guardFactory: GuardFnFactory = () => guard;
 
-      router.addRoute({ name: "ur-multi", path: "/ur-multi" });
-      router.updateRoute("ur-multi", {
+      routesApi.add({ name: "ur-multi", path: "/ur-multi" });
+      routesApi.update("ur-multi", {
         defaultParams: { page: 1 },
         decodeParams: decoder,
         canActivate: guardFactory,
@@ -927,7 +932,7 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should chain multiple updateRoute calls", () => {
-      router.addRoute({ name: "ur-chain", path: "/ur-chain" });
+      routesApi.add({ name: "ur-chain", path: "/ur-chain" });
 
       router
         .updateRoute("ur-chain", { defaultParams: { page: 1 } })
@@ -943,13 +948,13 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("nested routes", () => {
     it("should update nested route configuration", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-parent",
         path: "/ur-parent",
         children: [{ name: "child", path: "/child" }],
       });
 
-      router.updateRoute("ur-parent.child", {
+      routesApi.update("ur-parent.child", {
         defaultParams: { tab: "info" },
       });
 
@@ -962,13 +967,13 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should throw for non-existent nested route", () => {
-      router.addRoute({ name: "ur-solo", path: "/ur-solo" });
+      routesApi.add({ name: "ur-solo", path: "/ur-solo" });
 
-      expect(() =>
-        router.updateRoute("ur-solo.missing", {
+      expect(() => {
+        routesApi.update("ur-solo.missing", {
           defaultParams: { x: 1 },
-        }),
-      ).toThrowError(
+        });
+      }).toThrowError(
         '[real-router] updateRoute: route "ur-solo.missing" does not exist',
       );
     });
@@ -984,7 +989,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         resolveCanActivate = resolve;
       });
 
-      router.addRoute({
+      routesApi.add({
         name: "ur-async",
         path: "/ur-async",
         canActivate: () => async () => {
@@ -1001,7 +1006,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Try to update during navigation - should log error but proceed
-      router.updateRoute("ur-async", { defaultParams: { page: 1 } });
+      routesApi.update("ur-async", { defaultParams: { page: 1 } });
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.updateRoute",
@@ -1024,10 +1029,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       const { logger } = await import("@real-router/logger");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-      router.addRoute({ name: "ur-no-warn", path: "/ur-no-warn" });
+      routesApi.add({ name: "ur-no-warn", path: "/ur-no-warn" });
 
       // Update should not log error (no navigation in progress)
-      router.updateRoute("ur-no-warn", { defaultParams: { page: 1 } });
+      routesApi.update("ur-no-warn", { defaultParams: { page: 1 } });
 
       expect(errorSpy).not.toHaveBeenCalledWith(
         "router.updateRoute",
@@ -1040,8 +1045,8 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("getRoute integration", () => {
     it("should reflect updates in getRoute", () => {
-      router.addRoute({ name: "ur-reflect", path: "/ur-reflect" });
-      router.updateRoute("ur-reflect", { defaultParams: { page: 1 } });
+      routesApi.add({ name: "ur-reflect", path: "/ur-reflect" });
+      routesApi.update("ur-reflect", { defaultParams: { page: 1 } });
 
       const route = router.getRoute("ur-reflect");
 
@@ -1049,12 +1054,12 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should reflect removed properties in getRoute", () => {
-      router.addRoute({
+      routesApi.add({
         name: "ur-remove",
         path: "/ur-remove",
         defaultParams: { page: 1 },
       });
-      router.updateRoute("ur-remove", { defaultParams: null });
+      routesApi.update("ur-remove", { defaultParams: null });
 
       const route = router.getRoute("ur-remove");
 
@@ -1065,10 +1070,12 @@ describe("core/routes/routeTree/updateRoute", () => {
   describe("edge cases", () => {
     describe("empty and no-op updates", () => {
       it("should accept empty object as no-op", () => {
-        router.addRoute({ name: "ur-empty", path: "/ur-empty" });
+        routesApi.add({ name: "ur-empty", path: "/ur-empty" });
 
         // Should not throw
-        expect(() => router.updateRoute("ur-empty", {})).not.toThrowError();
+        expect(() => {
+          routesApi.update("ur-empty", {});
+        }).not.toThrowError();
 
         // No defaults should be applied
         expect(getPluginApi(router).makeState("ur-empty").params).toStrictEqual(
@@ -1077,14 +1084,14 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should treat missing properties as no-op", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ur-undef",
           path: "/ur-undef",
           defaultParams: { existing: 1 },
         });
 
         // Empty object - no properties means no changes
-        router.updateRoute("ur-undef", {});
+        routesApi.update("ur-undef", {});
 
         // Existing config should be preserved
         expect(getPluginApi(router).makeState("ur-undef").params).toStrictEqual(
@@ -1097,15 +1104,15 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("exotic objects", () => {
       it("should accept Object.freeze updates", () => {
-        router.addRoute({ name: "ur-frozen", path: "/ur-frozen" });
+        routesApi.add({ name: "ur-frozen", path: "/ur-frozen" });
 
         const frozenUpdates = Object.freeze({
           defaultParams: Object.freeze({ page: 1 }),
         });
 
-        expect(
-          () => void router.updateRoute("ur-frozen", frozenUpdates),
-        ).not.toThrowError();
+        expect(() => {
+          routesApi.update("ur-frozen", frozenUpdates);
+        }).not.toThrowError();
         expect(
           getPluginApi(router).makeState("ur-frozen").params,
         ).toStrictEqual({
@@ -1114,13 +1121,13 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept null prototype defaultParams", () => {
-        router.addRoute({ name: "ur-nullproto", path: "/ur-nullproto" });
+        routesApi.add({ name: "ur-nullproto", path: "/ur-nullproto" });
 
         const nullProtoParams = Object.create(null) as Params;
 
         nullProtoParams.page = 1;
 
-        router.updateRoute("ur-nullproto", {
+        routesApi.update("ur-nullproto", {
           defaultParams: nullProtoParams,
         });
 
@@ -1131,7 +1138,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept class instance as defaultParams", () => {
-        router.addRoute({ name: "ur-class", path: "/ur-class" });
+        routesApi.add({ name: "ur-class", path: "/ur-class" });
 
         class PageParams {
           page = 1;
@@ -1139,7 +1146,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         }
 
         // Cast needed because class doesn't have index signature
-        router.updateRoute("ur-class", {
+        routesApi.update("ur-class", {
           defaultParams: new PageParams() as unknown as Params,
         });
 
@@ -1150,16 +1157,16 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept defaultParams with circular reference", () => {
-        router.addRoute({ name: "ur-circular", path: "/ur-circular" });
+        routesApi.add({ name: "ur-circular", path: "/ur-circular" });
 
         const circular: Params = { page: 1 };
 
         (circular as Record<string, unknown>).self = circular;
 
         // Should not throw on assignment
-        expect(() =>
-          router.updateRoute("ur-circular", { defaultParams: circular }),
-        ).not.toThrowError();
+        expect(() => {
+          routesApi.update("ur-circular", { defaultParams: circular });
+        }).not.toThrowError();
 
         // Verify behavior - page should be accessible
         const state = getPluginApi(router).makeState("ur-circular");
@@ -1168,12 +1175,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should preserve Symbol keys in defaultParams (but may lose on copy)", () => {
-        router.addRoute({ name: "ur-symbol", path: "/ur-symbol" });
+        routesApi.add({ name: "ur-symbol", path: "/ur-symbol" });
 
         const sym = Symbol("hidden");
         const params = { page: 1, [sym]: "secret" };
 
-        router.updateRoute("ur-symbol", { defaultParams: params });
+        routesApi.update("ur-symbol", { defaultParams: params });
 
         // Verify behavior - page should be accessible
         const state = getPluginApi(router).makeState("ur-symbol");
@@ -1184,7 +1191,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("function edge cases", () => {
       it("should accept bound function as decodeParams", () => {
-        router.addRoute({ name: "ur-bound", path: "/ur-bound/:id" });
+        routesApi.add({ name: "ur-bound", path: "/ur-bound/:id" });
 
         const decoder = {
           prefix: "decoded_",
@@ -1193,7 +1200,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           },
         };
 
-        router.updateRoute("ur-bound", {
+        routesApi.update("ur-bound", {
           decodeParams: decoder.decode.bind(decoder),
         });
 
@@ -1203,9 +1210,9 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should accept arrow function as encodeParams", () => {
-        router.addRoute({ name: "ur-arrow", path: "/ur-arrow/:id" });
+        routesApi.add({ name: "ur-arrow", path: "/ur-arrow/:id" });
 
-        router.updateRoute("ur-arrow", {
+        routesApi.update("ur-arrow", {
           encodeParams: (params) => ({
             ...params,
             id: (params.id as string).toUpperCase(),
@@ -1220,12 +1227,12 @@ describe("core/routes/routeTree/updateRoute", () => {
       it("should accept arrow function as canActivate factory", async () => {
         const guard = vi.fn().mockReturnValue(true);
 
-        router.addRoute({
+        routesApi.add({
           name: "ur-arrow-guard",
           path: "/ur-arrow-guard",
         });
 
-        router.updateRoute("ur-arrow-guard", {
+        routesApi.update("ur-arrow-guard", {
           canActivate: () => guard,
         });
 
@@ -1238,50 +1245,50 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("forwardTo edge cases", () => {
       it("should reject forwardTo empty string", () => {
-        router.addRoute({ name: "ur-fwd-empty", path: "/ur-fwd-empty" });
+        routesApi.add({ name: "ur-fwd-empty", path: "/ur-fwd-empty" });
 
-        expect(
-          () => void router.updateRoute("ur-fwd-empty", { forwardTo: "" }),
-        ).toThrowError();
+        expect(() => {
+          routesApi.update("ur-fwd-empty", { forwardTo: "" });
+        }).toThrowError();
       });
 
       it("should reject forwardTo to self (direct cycle)", () => {
-        router.addRoute({ name: "ur-self", path: "/ur-self" });
+        routesApi.add({ name: "ur-self", path: "/ur-self" });
 
-        expect(
-          () => void router.updateRoute("ur-self", { forwardTo: "ur-self" }),
-        ).toThrowError(/Circular forwardTo/);
+        expect(() => {
+          routesApi.update("ur-self", { forwardTo: "ur-self" });
+        }).toThrowError(/Circular forwardTo/);
       });
 
       it("should reject forwardTo with invalid type (not string or null)", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ur-invalid-fwd",
           path: "/ur-invalid-fwd",
         });
 
-        expect(() =>
-          router.updateRoute("ur-invalid-fwd", {
+        expect(() => {
+          routesApi.update("ur-invalid-fwd", {
             forwardTo: 123 as any,
-          }),
-        ).toThrowError(/forwardTo must be a string, function, or null/);
+          });
+        }).toThrowError(/forwardTo must be a string, function, or null/);
 
-        expect(() =>
-          router.updateRoute("ur-invalid-fwd", { forwardTo: {} as any }),
-        ).toThrowError(/forwardTo must be a string, function, or null/);
+        expect(() => {
+          routesApi.update("ur-invalid-fwd", { forwardTo: {} as any });
+        }).toThrowError(/forwardTo must be a string, function, or null/);
       });
     });
 
     describe("atomicity (partial update scenarios)", () => {
       it("should NOT apply forwardTo if later validation fails", () => {
-        router.addRoute({ name: "ur-atom-src", path: "/ur-atom-src" });
-        router.addRoute({ name: "ur-atom-tgt", path: "/ur-atom-tgt" });
+        routesApi.add({ name: "ur-atom-src", path: "/ur-atom-src" });
+        routesApi.add({ name: "ur-atom-tgt", path: "/ur-atom-tgt" });
 
-        expect(() =>
-          router.updateRoute("ur-atom-src", {
+        expect(() => {
+          routesApi.update("ur-atom-src", {
             forwardTo: "ur-atom-tgt",
             defaultParams: "invalid" as unknown as Params,
-          }),
-        ).toThrowError(/defaultParams must be an object/);
+          });
+        }).toThrowError(/defaultParams must be an object/);
 
         // forwardTo should NOT be applied due to validation-first approach
         // Verify by checking forwardState returns same route (no forward)
@@ -1293,14 +1300,14 @@ describe("core/routes/routeTree/updateRoute", () => {
       it("should rollback forwardTo if forwardTo validation fails after mutation", () => {
         // This test documents current behavior where forwardTo error
         // occurs during validation BEFORE mutation, so config stays clean
-        router.addRoute({ name: "ur-atom-fwd", path: "/ur-atom-fwd" });
+        routesApi.add({ name: "ur-atom-fwd", path: "/ur-atom-fwd" });
 
-        expect(() =>
-          router.updateRoute("ur-atom-fwd", {
+        expect(() => {
+          routesApi.update("ur-atom-fwd", {
             forwardTo: "nonexistent",
             defaultParams: { page: 1 },
-          }),
-        ).toThrowError(/forwardTo target.*does not exist/);
+          });
+        }).toThrowError(/forwardTo target.*does not exist/);
 
         // Both should NOT be applied
         // No forward configured - forwardState returns same route
@@ -1316,10 +1323,10 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("sequential updates", () => {
       it("should replace (not merge) defaultParams on multiple updates", () => {
-        router.addRoute({ name: "ur-seq", path: "/ur-seq" });
+        routesApi.add({ name: "ur-seq", path: "/ur-seq" });
 
-        router.updateRoute("ur-seq", { defaultParams: { a: 1, b: 2 } });
-        router.updateRoute("ur-seq", { defaultParams: { c: 3 } });
+        routesApi.update("ur-seq", { defaultParams: { a: 1, b: 2 } });
+        routesApi.update("ur-seq", { defaultParams: { c: 3 } });
 
         const state = getPluginApi(router).makeState("ur-seq");
 
@@ -1330,10 +1337,10 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should allow updating different properties independently", () => {
-        router.addRoute({ name: "ur-indep", path: "/ur-indep" });
+        routesApi.add({ name: "ur-indep", path: "/ur-indep" });
 
-        router.updateRoute("ur-indep", { defaultParams: { page: 1 } });
-        router.updateRoute("ur-indep", {
+        routesApi.update("ur-indep", { defaultParams: { page: 1 } });
+        routesApi.update("ur-indep", {
           decodeParams: (p) => ({ ...p, decoded: true }),
         });
 
@@ -1353,7 +1360,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("mutating getters (edge case)", () => {
       it("should cache getter value to ensure consistent behavior", () => {
-        router.addRoute({ name: "ur-getter", path: "/ur-getter" });
+        routesApi.add({ name: "ur-getter", path: "/ur-getter" });
 
         let callCount = 0;
         const mutatingUpdates = {
@@ -1364,7 +1371,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           },
         };
 
-        router.updateRoute("ur-getter", mutatingUpdates);
+        routesApi.update("ur-getter", mutatingUpdates);
 
         // Getter is called exactly once during destructuring
         // This protects against mutating getters returning different values
@@ -1375,7 +1382,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
 
       it("should propagate exception from throwing getter without modifying config", () => {
-        router.addRoute({
+        routesApi.add({
           name: "ur-throwing",
           path: "/ur-throwing",
           defaultParams: { original: true },
@@ -1388,9 +1395,9 @@ describe("core/routes/routeTree/updateRoute", () => {
         };
 
         // Exception propagates to caller
-        expect(
-          () => void router.updateRoute("ur-throwing", throwingUpdates),
-        ).toThrowError("Getter explosion!");
+        expect(() => {
+          routesApi.update("ur-throwing", throwingUpdates);
+        }).toThrowError("Getter explosion!");
 
         // Config remains unchanged - exception happens during destructuring,
         // before any mutations
@@ -1404,7 +1411,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
     describe("Proxy objects", () => {
       it("should work with Proxy that passes through values", () => {
-        router.addRoute({ name: "ur-proxy", path: "/ur-proxy" });
+        routesApi.add({ name: "ur-proxy", path: "/ur-proxy" });
 
         const updates = new Proxy(
           { defaultParams: { page: 1 } },
@@ -1415,9 +1422,9 @@ describe("core/routes/routeTree/updateRoute", () => {
           },
         );
 
-        expect(
-          () => void router.updateRoute("ur-proxy", updates),
-        ).not.toThrowError();
+        expect(() => {
+          routesApi.update("ur-proxy", updates);
+        }).not.toThrowError();
         expect(getPluginApi(router).makeState("ur-proxy").params).toStrictEqual(
           {
             page: 1,
@@ -1429,17 +1436,17 @@ describe("core/routes/routeTree/updateRoute", () => {
 
   describe("forwardTo function transitions", () => {
     it("should update string forwardTo to function", () => {
-      router.addRoute({ name: "source", path: "/source" });
-      router.addRoute({ name: "target-a", path: "/target-a" });
-      router.addRoute({ name: "target-b", path: "/target-b" });
+      routesApi.add({ name: "source", path: "/source" });
+      routesApi.add({ name: "target-a", path: "/target-a" });
+      routesApi.add({ name: "target-b", path: "/target-b" });
 
-      router.updateRoute("source", { forwardTo: "target-a" });
+      routesApi.update("source", { forwardTo: "target-a" });
 
       expect(getPluginApi(router).forwardState("source", {}).name).toBe(
         "target-a",
       );
 
-      router.updateRoute("source", {
+      routesApi.update("source", {
         forwardTo: () => "target-b",
       });
 
@@ -1449,11 +1456,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should update function forwardTo to string", () => {
-      router.addRoute({ name: "dynamic-source", path: "/dynamic-source" });
-      router.addRoute({ name: "dest-1", path: "/dest-1" });
-      router.addRoute({ name: "dest-2", path: "/dest-2" });
+      routesApi.add({ name: "dynamic-source", path: "/dynamic-source" });
+      routesApi.add({ name: "dest-1", path: "/dest-1" });
+      routesApi.add({ name: "dest-2", path: "/dest-2" });
 
-      router.updateRoute("dynamic-source", {
+      routesApi.update("dynamic-source", {
         forwardTo: () => "dest-1",
       });
 
@@ -1461,7 +1468,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         "dest-1",
       );
 
-      router.updateRoute("dynamic-source", { forwardTo: "dest-2" });
+      routesApi.update("dynamic-source", { forwardTo: "dest-2" });
 
       expect(getPluginApi(router).forwardState("dynamic-source", {}).name).toBe(
         "dest-2",
@@ -1469,10 +1476,10 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should clear both maps when updating function to null", () => {
-      router.addRoute({ name: "clear-test", path: "/clear-test" });
-      router.addRoute({ name: "some-target", path: "/some-target" });
+      routesApi.add({ name: "clear-test", path: "/clear-test" });
+      routesApi.add({ name: "some-target", path: "/some-target" });
 
-      router.updateRoute("clear-test", {
+      routesApi.update("clear-test", {
         forwardTo: () => "some-target",
       });
 
@@ -1480,7 +1487,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         "some-target",
       );
 
-      router.updateRoute("clear-test", { forwardTo: null });
+      routesApi.update("clear-test", { forwardTo: null });
 
       expect(getPluginApi(router).forwardState("clear-test", {}).name).toBe(
         "clear-test",
@@ -1488,10 +1495,10 @@ describe("core/routes/routeTree/updateRoute", () => {
     });
 
     it("should handle function → null → string sequence", () => {
-      router.addRoute({ name: "seq-test", path: "/seq-test" });
-      router.addRoute({ name: "final-dest", path: "/final-dest" });
+      routesApi.add({ name: "seq-test", path: "/seq-test" });
+      routesApi.add({ name: "final-dest", path: "/final-dest" });
 
-      router.updateRoute("seq-test", {
+      routesApi.update("seq-test", {
         forwardTo: () => "final-dest",
       });
 
@@ -1499,13 +1506,13 @@ describe("core/routes/routeTree/updateRoute", () => {
         "final-dest",
       );
 
-      router.updateRoute("seq-test", { forwardTo: null });
+      routesApi.update("seq-test", { forwardTo: null });
 
       expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
         "seq-test",
       );
 
-      router.updateRoute("seq-test", { forwardTo: "final-dest" });
+      routesApi.update("seq-test", { forwardTo: "final-dest" });
 
       expect(getPluginApi(router).forwardState("seq-test", {}).name).toBe(
         "final-dest",

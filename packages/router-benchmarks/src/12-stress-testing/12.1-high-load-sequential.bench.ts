@@ -3,6 +3,7 @@
 import { bench } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import { getRoutesApi } from "@real-router/core";
 
 // 12.1.1 Thousand sequential navigations between two routes
 {
@@ -132,11 +133,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = Array.from({ length: 20 }, (_, i) => `route${i}`);
 
   // Add 20 routes
   for (const route of routes) {
-    router.addRoute({ name: route, path: `/${route}` });
+    routesApi.add({ name: route, path: `/${route}` });
   }
 
   router.start("/");

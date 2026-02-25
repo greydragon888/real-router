@@ -1,17 +1,24 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { events, getDependenciesApi, getPluginApi } from "@real-router/core";
+import {
+  events,
+  getDependenciesApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/clearRoutes", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -24,28 +31,28 @@ describe("core/routes/clearRoutes", () => {
       // createTestRouter adds default routes (home, etc.)
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // All routes should be gone
       expect(getPluginApi(router).matchPath("/")).toBeUndefined();
     });
 
-    it("should return router for chaining", async () => {
-      const result = router.clearRoutes();
+    it("should clear routes and return void", async () => {
+      routesApi.clear();
 
-      expect(result).toBe(router);
+      expect(getPluginApi(router).matchPath("/")).toBeUndefined();
     });
 
     it("should allow adding routes after clearing", async () => {
-      router.clearRoutes();
+      routesApi.clear();
 
-      router.addRoute({ name: "newHome", path: "/new-home" });
+      routesApi.add({ name: "newHome", path: "/new-home" });
 
       expect(getPluginApi(router).matchPath("/new-home")?.name).toBe("newHome");
     });
 
     it("should clear nested routes", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "parent",
         path: "/parent",
         children: [
@@ -61,7 +68,7 @@ describe("core/routes/clearRoutes", () => {
         getPluginApi(router).matchPath("/parent/child/grandchild")?.name,
       ).toBe("parent.child.grandchild");
 
-      router.clearRoutes();
+      routesApi.clear();
 
       expect(getPluginApi(router).matchPath("/parent")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/parent/child")).toBeUndefined();
@@ -71,21 +78,23 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should work when called multiple times", async () => {
-      router.clearRoutes();
-      router.clearRoutes();
-      router.clearRoutes();
+      routesApi.clear();
+      routesApi.clear();
+      routesApi.clear();
 
       // Should still be functional
-      router.addRoute({ name: "test", path: "/test" });
+      routesApi.add({ name: "test", path: "/test" });
 
       expect(getPluginApi(router).matchPath("/test")?.name).toBe("test");
     });
 
     it("should work when router has no routes", async () => {
-      router.clearRoutes();
+      routesApi.clear();
 
       // Second clear should not throw
-      expect(() => router.clearRoutes()).not.toThrowError();
+      expect(() => {
+        routesApi.clear();
+      }).not.toThrowError();
     });
   });
 
@@ -96,13 +105,13 @@ describe("core/routes/clearRoutes", () => {
         id: Number(params.id),
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "withDecoder",
         path: "/with-decoder/:id",
         decodeParams,
       });
 
-      expect(router.hasRoute("withDecoder")).toBe(true);
+      expect(routesApi.has("withDecoder")).toBe(true);
 
       // Verify decoder works before clear
       const result = getPluginApi(router).matchPath("/with-decoder/123");
@@ -110,10 +119,10 @@ describe("core/routes/clearRoutes", () => {
       expect(result?.name).toBe("withDecoder");
       expect(result?.params.id).toBe(123);
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Route no longer exists after clear
-      expect(router.hasRoute("withDecoder")).toBe(false);
+      expect(routesApi.has("withDecoder")).toBe(false);
       expect(
         getPluginApi(router).matchPath("/with-decoder/123"),
       ).toBeUndefined();
@@ -125,7 +134,7 @@ describe("core/routes/clearRoutes", () => {
         id: `${params.id as number}`,
       }));
 
-      router.addRoute({
+      routesApi.add({
         name: "decoded",
         path: "/decoded/:id",
         encodeParams,
@@ -136,14 +145,14 @@ describe("core/routes/clearRoutes", () => {
 
       expect(encodeParams).toHaveBeenCalled();
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Route no longer exists after clear
-      expect(router.hasRoute("decoded")).toBe(false);
+      expect(routesApi.has("decoded")).toBe(false);
     });
 
     it("should clear defaultParams", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "withDefaults",
         path: "/with-defaults",
         defaultParams: { page: 1, limit: 10 },
@@ -157,15 +166,15 @@ describe("core/routes/clearRoutes", () => {
         limit: 10,
       });
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Route no longer exists after clear
-      expect(router.hasRoute("withDefaults")).toBe(false);
+      expect(routesApi.has("withDefaults")).toBe(false);
     });
 
     it("should clear forwardMap", async () => {
-      router.addRoute({ name: "target", path: "/target" });
-      router.addRoute({
+      routesApi.add({ name: "target", path: "/target" });
+      routesApi.add({
         name: "redirect",
         path: "/redirect",
         forwardTo: "target",
@@ -176,17 +185,17 @@ describe("core/routes/clearRoutes", () => {
         "target",
       );
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Routes no longer exist after clear
-      expect(router.hasRoute("redirect")).toBe(false);
-      expect(router.hasRoute("target")).toBe(false);
+      expect(routesApi.has("redirect")).toBe(false);
+      expect(routesApi.has("target")).toBe(false);
     });
   });
 
   describe("lifecycle cleanup", () => {
     it("should clear canActivate handlers", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "protected",
         path: "/protected",
         canActivate: () => () => false, // blocking guard
@@ -199,10 +208,10 @@ describe("core/routes/clearRoutes", () => {
         expect(error?.code).toBe("CANNOT_ACTIVATE");
       }
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Re-add route without guard
-      router.addRoute({ name: "protected", path: "/protected" });
+      routesApi.add({ name: "protected", path: "/protected" });
 
       // Navigation should succeed (no guard after clear)
       await router.navigate("protected");
@@ -211,7 +220,7 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should clear canDeactivate handlers", async () => {
-      router.addRoute({ name: "editor", path: "/editor" });
+      routesApi.add({ name: "editor", path: "/editor" });
       router.addDeactivateGuard("editor", () => () => false); // blocking guard
 
       await router.navigate("editor");
@@ -225,11 +234,11 @@ describe("core/routes/clearRoutes", () => {
 
       expect(router.getState()?.name).toBe("editor");
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Re-add routes without guards
-      router.addRoute({ name: "editor", path: "/editor" });
-      router.addRoute({ name: "home", path: "/home" });
+      routesApi.add({ name: "editor", path: "/editor" });
+      routesApi.add({ name: "home", path: "/home" });
       await router.navigate("editor");
 
       // Now leaving should work (guard was cleared)
@@ -239,24 +248,24 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should clear all lifecycle handlers for all routes", async () => {
-      router.addRoute({
+      routesApi.add({
         name: "route1",
         path: "/route1",
         canActivate: () => () => false,
       });
-      router.addRoute({
+      routesApi.add({
         name: "route2",
         path: "/route2",
         canActivate: () => () => false,
       });
       router.addDeactivateGuard("home", () => () => false);
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Re-add routes without guards
-      router.addRoute({ name: "home", path: "/home" });
-      router.addRoute({ name: "route1", path: "/route1" });
-      router.addRoute({ name: "route2", path: "/route2" });
+      routesApi.add({ name: "home", path: "/home" });
+      routesApi.add({ name: "route1", path: "/route1" });
+      routesApi.add({ name: "route2", path: "/route2" });
 
       // All navigations should work (all guards were cleared)
       await router.navigate("home");
@@ -278,10 +287,10 @@ describe("core/routes/clearRoutes", () => {
 
       router.usePlugin(plugin);
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Add route and navigate to verify plugin is still active
-      router.addRoute({ name: "test", path: "/test" });
+      routesApi.add({ name: "test", path: "/test" });
       await router.navigate("test");
 
       // Plugin should have been called (proving it's still registered)
@@ -297,10 +306,10 @@ describe("core/routes/clearRoutes", () => {
         },
       }));
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Add route and navigate to verify plugin is still active
-      router.addRoute({ name: "test", path: "/test" });
+      routesApi.add({ name: "test", path: "/test" });
       await router.navigate("test");
 
       // Plugin should have been called (proving it's still registered)
@@ -326,7 +335,7 @@ describe("core/routes/clearRoutes", () => {
       // Options set before start are preserved
       const options = getPluginApi(router).getOptions();
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Options should be the same after clearRoutes
       expect(getPluginApi(router).getOptions().trailingSlash).toBe(
@@ -341,10 +350,10 @@ describe("core/routes/clearRoutes", () => {
         eventLog.push("success");
       });
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Add a route and navigate to verify listener is preserved
-      router.addRoute({ name: "test", path: "/test" });
+      routesApi.add({ name: "test", path: "/test" });
       await router.navigate("test");
 
       // Listener should fire after navigation
@@ -360,7 +369,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()?.name).toBe("users.list");
 
       // Clear all routes
-      router.clearRoutes();
+      routesApi.clear();
 
       // State should be cleared to undefined
       expect(router.getState()).toBeUndefined();
@@ -377,7 +386,7 @@ describe("core/routes/clearRoutes", () => {
       expect(currentState?.name).toBe("users.list");
       expect(currentState?.path).toBe("/users/list");
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // State is cleared
       expect(router.getState()).toBeUndefined();
@@ -387,7 +396,7 @@ describe("core/routes/clearRoutes", () => {
     });
 
     it("should return cancel function when navigating to non-existent route", async () => {
-      router.clearRoutes();
+      routesApi.clear();
 
       // Navigation to non-existent route returns cancel function (noop)
       // This is current behavior - navigate returns cancel function when route not found
@@ -400,8 +409,8 @@ describe("core/routes/clearRoutes", () => {
     it("should transition to new route after clearRoutes + addRoute", async () => {
       await router.navigate("users.list");
 
-      router.clearRoutes();
-      router.addRoute({ name: "dashboard", path: "/dashboard" });
+      routesApi.clear();
+      routesApi.add({ name: "dashboard", path: "/dashboard" });
 
       // Navigate to new route - this works because addRoute registered the route
       // Note: navigate returns synchronously when state update is immediate
@@ -412,8 +421,8 @@ describe("core/routes/clearRoutes", () => {
 
     it("should successfully navigate to new route after clearRoutes + addRoute", async () => {
       // This is the intended workflow for route replacement
-      router.clearRoutes();
-      router.addRoute({ name: "newRoute", path: "/new" });
+      routesApi.clear();
+      routesApi.add({ name: "newRoute", path: "/new" });
 
       await router.navigate("newRoute");
 
@@ -424,7 +433,8 @@ describe("core/routes/clearRoutes", () => {
 
   describe("chaining patterns", () => {
     it("should support clear-then-add pattern", async () => {
-      router.clearRoutes().addRoute([
+      routesApi.clear();
+      routesApi.add([
         { name: "home", path: "/" },
         { name: "about", path: "/about" },
         { name: "contact", path: "/contact" },
@@ -437,10 +447,11 @@ describe("core/routes/clearRoutes", () => {
 
     it("should support complete route replacement", async () => {
       // Original routes
-      router.addRoute({ name: "oldRoute", path: "/old" });
+      routesApi.add({ name: "oldRoute", path: "/old" });
 
       // Replace all routes
-      router.clearRoutes().addRoute({ name: "newRoute", path: "/new" });
+      routesApi.clear();
+      routesApi.add({ name: "newRoute", path: "/new" });
 
       expect(getPluginApi(router).matchPath("/old")).toBeUndefined();
       expect(getPluginApi(router).matchPath("/new")?.name).toBe("newRoute");
@@ -461,7 +472,7 @@ describe("core/routes/clearRoutes", () => {
     it("should block clearRoutes during async navigation", async () => {
       let resolveCanActivate: () => void;
 
-      router.addRoute({
+      routesApi.add({
         name: "asyncRoute",
         path: "/async-route",
         canActivate: () => () =>
@@ -482,7 +493,7 @@ describe("core/routes/clearRoutes", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Try to clear during navigation - should be blocked
-      router.clearRoutes();
+      routesApi.clear();
 
       // Should log error
       expect(errorSpy).toHaveBeenCalledWith(
@@ -502,10 +513,10 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()?.name).toBe("asyncRoute");
     });
 
-    it("should return router for chaining even when blocked", async () => {
+    it("should clear routes even when blocked by pending navigation", async () => {
       let resolveCanActivate: () => void;
 
-      router.addRoute({
+      routesApi.add({
         name: "slowRoute",
         path: "/slow",
         canActivate: () => () =>
@@ -525,20 +536,20 @@ describe("core/routes/clearRoutes", () => {
       // Give time for navigation to start
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      // clearRoutes should return router for chaining even when blocked
-      const result = router.clearRoutes();
-
-      expect(result).toBe(router);
+      // clearRoutes should work even when blocked
+      routesApi.clear();
 
       // Cleanup — resolve guard and await navigation
       resolveCanActivate!();
-      await navigationPromise;
+      const result = await navigationPromise;
+
+      expect(result).toBe(true);
     });
 
     it("should allow clearRoutes after navigation completes", async () => {
       let resolveCanActivate: () => void;
 
-      router.addRoute({
+      routesApi.add({
         name: "tempRoute",
         path: "/temp",
         canActivate: () => () =>
@@ -558,7 +569,7 @@ describe("core/routes/clearRoutes", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // Navigation in progress - clearRoutes blocked
-      router.clearRoutes();
+      routesApi.clear();
 
       expect(errorSpy).toHaveBeenCalled();
       expect(getPluginApi(router).matchPath("/temp")).toBeDefined();
@@ -571,7 +582,7 @@ describe("core/routes/clearRoutes", () => {
       errorSpy.mockClear();
 
       // Now navigation is complete (callback was called) - clearRoutes should work
-      router.clearRoutes();
+      routesApi.clear();
 
       // Should NOT log error this time
       expect(errorSpy).not.toHaveBeenCalled();
@@ -588,7 +599,7 @@ describe("core/routes/clearRoutes", () => {
 
       let resolveCanActivate: () => void;
 
-      router.addRoute({
+      routesApi.add({
         name: "asyncRoute",
         path: "/async",
         canActivate: () => () =>
@@ -615,7 +626,7 @@ describe("core/routes/clearRoutes", () => {
       expect(getPluginApi(router2).matchPath("/home")).toBeUndefined();
 
       // router1 should be blocked
-      router.clearRoutes();
+      routesApi.clear();
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.clearRoutes",
@@ -662,7 +673,7 @@ describe("core/routes/clearRoutes", () => {
       router.stop();
 
       // clearRoutes should work after stop()
-      router.clearRoutes();
+      routesApi.clear();
 
       // All routes should be cleared
       expect(getPluginApi(router).matchPath("/")).toBeUndefined();
@@ -670,7 +681,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()).toBeUndefined();
 
       // Should still be able to add new routes
-      router.addRoute({ name: "newRoute", path: "/new" });
+      routesApi.add({ name: "newRoute", path: "/new" });
 
       expect(getPluginApi(router).matchPath("/new")?.name).toBe("newRoute");
     });
@@ -682,7 +693,7 @@ describe("core/routes/clearRoutes", () => {
       expect(router.getState()?.name).toBe("users.list");
 
       router.stop();
-      router.clearRoutes();
+      routesApi.clear();
 
       // Routes cleared
       expect(getPluginApi(router).matchPath("/home")).toBeUndefined();
@@ -691,14 +702,15 @@ describe("core/routes/clearRoutes", () => {
       // Issue #50: With two-phase start, we need a new router with new defaultRoute
       // since the old defaultRoute ("home") no longer exists and setOption is removed
       router = createTestRouter({ defaultRoute: "dashboard" });
-      router.addRoute({ name: "dashboard", path: "/dashboard" });
+      routesApi = getRoutesApi(router);
+      routesApi.add({ name: "dashboard", path: "/dashboard" });
       await router.start("/dashboard");
 
       expect(router.getState()?.name).toBe("dashboard");
 
       // Stop again and clear
       router.stop();
-      router.clearRoutes();
+      routesApi.clear();
 
       expect(getPluginApi(router).matchPath("/dashboard")).toBeUndefined();
     });
@@ -706,8 +718,8 @@ describe("core/routes/clearRoutes", () => {
 
   describe("forwardFnMap cleanup", () => {
     it("should clear forwardFnMap entries on clearRoutes", async () => {
-      router.addRoute({ name: "fn-dest", path: "/fn-dest" });
-      router.addRoute({
+      routesApi.add({ name: "fn-dest", path: "/fn-dest" });
+      routesApi.add({
         name: "fn-src",
         path: "/fn-src",
         forwardTo: () => "fn-dest",
@@ -717,10 +729,10 @@ describe("core/routes/clearRoutes", () => {
         "fn-dest",
       );
 
-      router.clearRoutes();
+      routesApi.clear();
 
       // Re-add routes without forwardTo — should NOT have old dynamic forward
-      router.addRoute([
+      routesApi.add([
         { name: "fn-dest", path: "/fn-dest" },
         { name: "fn-src", path: "/fn-src" },
       ]);

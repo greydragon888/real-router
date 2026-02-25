@@ -1,17 +1,19 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/routeQuery/isActiveRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -233,7 +235,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     describe("defaultParams in hierarchical check", () => {
       beforeEach(async () => {
         // Add a parent route with defaultParams and a child route
-        router.addRoute({
+        routesApi.add({
           name: "usersWithDefaults",
           path: "/users-with-defaults",
           defaultParams: { filter: "active" },
@@ -500,7 +502,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     describe("defaultParams interaction with undefined", () => {
       beforeEach(async () => {
         // Add a parent route with defaultParams and a child route
-        router.addRoute({
+        routesApi.add({
           name: "usersFiltered",
           path: "/users-filtered",
           defaultParams: { filter: "active" },

@@ -3,6 +3,7 @@
 import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import { getRoutesApi } from "@real-router/core";
 
 // 13.3.1 Cloning router with 10 routes
 if (IS_ROUTER5) {
@@ -23,9 +24,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 10; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   // JIT warmup for stable memory measurements
@@ -57,9 +59,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 100; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   // JIT warmup for stable memory measurements
@@ -91,9 +94,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 500; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   // JIT warmup for stable memory measurements

@@ -1,16 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Route, Router } from "@real-router/core";
+import type { Route, Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("core/routes/routePath/matchPath", () => {
   beforeEach(async () => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
     await router.start("/home");
   });
 
@@ -95,7 +97,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should return matched path as-is when rewritePathOnMatch is false", () => {
       const customRouter = createTestRouter({ rewritePathOnMatch: false });
 
-      customRouter.addRoute({ name: "static", path: "/static" });
+      getRoutesApi(customRouter).add({ name: "static", path: "/static" });
 
       const state = getPluginApi(customRouter).matchPath("/static");
 
@@ -103,7 +105,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should match path with query params", () => {
-      router.addRoute({ name: "search", path: "/search?q" });
+      routesApi.add({ name: "search", path: "/search?q" });
       const state = getPluginApi(router).matchPath("/search?q=test");
 
       expect(state?.name).toBe("search");
@@ -113,7 +115,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match first query param correctly (regression test)", () => {
       // This tests the fix for search-params bug where first param
       // with ? prefix was not properly parsed
-      router.addRoute({ name: "search", path: "/search?first&second" });
+      routesApi.add({ name: "search", path: "/search?first&second" });
       const state = getPluginApi(router).matchPath("/search?first=1&second=2");
 
       expect(state?.name).toBe("search");
@@ -124,7 +126,7 @@ describe("core/routes/routePath/matchPath", () => {
 
   describe("unicode", () => {
     it("should match URL-encoded unicode parameter (Japanese)", () => {
-      router.addRoute({ name: "user", path: "/user/:name" });
+      routesApi.add({ name: "user", path: "/user/:name" });
 
       // 日本語 URL-encoded
       const state = getPluginApi(router).matchPath(
@@ -136,7 +138,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should match URL-encoded unicode parameter (Cyrillic)", () => {
-      router.addRoute({ name: "article", path: "/article/:title" });
+      routesApi.add({ name: "article", path: "/article/:title" });
 
       // "Привет" URL-encoded
       const state = getPluginApi(router).matchPath(
@@ -148,7 +150,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should match URL-encoded emoji parameter", () => {
-      router.addRoute({ name: "emoji", path: "/emoji/:icon" });
+      routesApi.add({ name: "emoji", path: "/emoji/:icon" });
 
       // 🚀 URL-encoded
       const state = getPluginApi(router).matchPath("/emoji/%F0%9F%9A%80");
@@ -158,7 +160,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should match URL-encoded mixed unicode and ascii", () => {
-      router.addRoute({ name: "mixed", path: "/mixed/:text" });
+      routesApi.add({ name: "mixed", path: "/mixed/:text" });
 
       // hello世界 URL-encoded (only unicode part)
       const state = getPluginApi(router).matchPath(
@@ -173,7 +175,7 @@ describe("core/routes/routePath/matchPath", () => {
       // Note: Browsers automatically URL-encode unicode in URLs
       // Raw unicode in path segments doesn't match because route-tree
       // uses regex patterns that expect ASCII or URL-encoded input
-      router.addRoute({ name: "raw", path: "/raw/:text" });
+      routesApi.add({ name: "raw", path: "/raw/:text" });
 
       const state = getPluginApi(router).matchPath("/raw/日本語");
 
@@ -184,7 +186,7 @@ describe("core/routes/routePath/matchPath", () => {
 
   describe("url-encoded", () => {
     it("should decode URL-encoded space (%20)", () => {
-      router.addRoute({ name: "search", path: "/search/:query" });
+      routesApi.add({ name: "search", path: "/search/:query" });
 
       const state = getPluginApi(router).matchPath("/search/hello%20world");
 
@@ -193,7 +195,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should decode URL-encoded special characters", () => {
-      router.addRoute({ name: "file", path: "/file/:name" });
+      routesApi.add({ name: "file", path: "/file/:name" });
 
       const state = getPluginApi(router).matchPath("/file/test%26data%3Dvalue");
 
@@ -202,7 +204,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should decode URL-encoded slash (%2F)", () => {
-      router.addRoute({ name: "path", path: "/path/:segment" });
+      routesApi.add({ name: "path", path: "/path/:segment" });
 
       const state = getPluginApi(router).matchPath("/path/a%2Fb%2Fc");
 
@@ -211,7 +213,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should decode URL-encoded unicode", () => {
-      router.addRoute({ name: "unicode", path: "/unicode/:text" });
+      routesApi.add({ name: "unicode", path: "/unicode/:text" });
 
       const state = getPluginApi(router).matchPath(
         "/unicode/%E6%97%A5%E6%9C%AC",
@@ -222,7 +224,7 @@ describe("core/routes/routePath/matchPath", () => {
     });
 
     it("should handle plus sign as literal (not space)", () => {
-      router.addRoute({ name: "plus", path: "/plus/:value" });
+      routesApi.add({ name: "plus", path: "/plus/:value" });
 
       const state = getPluginApi(router).matchPath("/plus/a+b");
 
@@ -236,7 +238,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match with trailing slash when trailingSlash is preserve", () => {
       const customRouter = createTestRouter({ trailingSlash: "preserve" });
 
-      customRouter.addRoute({ name: "page", path: "/page" });
+      getRoutesApi(customRouter).add({ name: "page", path: "/page" });
 
       const withSlash = getPluginApi(customRouter).matchPath("/page/");
       const withoutSlash = getPluginApi(customRouter).matchPath("/page");
@@ -251,7 +253,7 @@ describe("core/routes/routePath/matchPath", () => {
       // During matching, trailing slashes are normalized
       const customRouter = createTestRouter({ trailingSlash: "never" });
 
-      customRouter.addRoute({ name: "page", path: "/page" });
+      getRoutesApi(customRouter).add({ name: "page", path: "/page" });
 
       const withSlash = getPluginApi(customRouter).matchPath("/page/");
       const withoutSlash = getPluginApi(customRouter).matchPath("/page");
@@ -268,7 +270,7 @@ describe("core/routes/routePath/matchPath", () => {
       // Note: "always" affects path building (buildPath), not matching
       const customRouter = createTestRouter({ trailingSlash: "always" });
 
-      customRouter.addRoute({ name: "page", path: "/page" });
+      getRoutesApi(customRouter).add({ name: "page", path: "/page" });
 
       const withSlash = getPluginApi(customRouter).matchPath("/page/");
       const withoutSlash = getPluginApi(customRouter).matchPath("/page");
@@ -287,8 +289,11 @@ describe("core/routes/routePath/matchPath", () => {
 
       await customRouter.start("").catch(() => {});
 
-      customRouter.addRoute({ name: "withSlash", path: "/with/" });
-      customRouter.addRoute({ name: "withoutSlash", path: "/without" });
+      getRoutesApi(customRouter).add({ name: "withSlash", path: "/with/" });
+      getRoutesApi(customRouter).add({
+        name: "withoutSlash",
+        path: "/without",
+      });
 
       expect(getPluginApi(customRouter).matchPath("/with/")?.name).toBe(
         "withSlash",
@@ -306,7 +311,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle trailing slash with parameters", () => {
       const customRouter = createTestRouter({ trailingSlash: "always" });
 
-      customRouter.addRoute({ name: "user", path: "/user/:id" });
+      getRoutesApi(customRouter).add({ name: "user", path: "/user/:id" });
 
       const state = getPluginApi(customRouter).matchPath("/user/123/");
 
@@ -319,7 +324,10 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match path with leading double slash", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "doubleslash-test1", path: "/test1" });
+      getRoutesApi(customRouter).add({
+        name: "doubleslash-test1",
+        path: "/test1",
+      });
 
       // Double leading slash: //test1
       // Path is NOT normalized - searched as-is
@@ -332,7 +340,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match path with double slashes in middle", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "parent",
         path: "/parent",
         children: [{ name: "child", path: "/child" }],
@@ -348,7 +356,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match deeply nested path with double slashes", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "api",
         path: "/api",
         children: [
@@ -371,7 +379,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match path with triple slash", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "triple", path: "/triple" });
+      getRoutesApi(customRouter).add({ name: "triple", path: "/triple" });
 
       const state = getPluginApi(customRouter).matchPath("///triple");
 
@@ -381,7 +389,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match normalized path correctly", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "normal", path: "/normal" });
+      getRoutesApi(customRouter).add({ name: "normal", path: "/normal" });
 
       // For comparison - single slashes work
       const state = getPluginApi(customRouter).matchPath("/normal");
@@ -394,7 +402,10 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match path without leading slash", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "noslash-test", path: "/noslash" });
+      getRoutesApi(customRouter).add({
+        name: "noslash-test",
+        path: "/noslash",
+      });
 
       // Path without leading slash
       const state = getPluginApi(customRouter).matchPath("noslash");
@@ -406,7 +417,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match nested path without leading slash", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "apitest",
         path: "/apitest",
         children: [{ name: "data", path: "/data" }],
@@ -420,7 +431,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should not match path with parameter without leading slash", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "person", path: "/person/:id" });
+      getRoutesApi(customRouter).add({ name: "person", path: "/person/:id" });
 
       const state = getPluginApi(customRouter).matchPath("person/123");
 
@@ -432,7 +443,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should return undefined for very long unmatched path", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "short", path: "/short" });
+      getRoutesApi(customRouter).add({ name: "short", path: "/short" });
 
       // Very long path that doesn't match any route
       const longPath = `/${"a".repeat(10_000)}`;
@@ -444,7 +455,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match very long path with splat parameter", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({ name: "files", path: "/files/*path" });
+      getRoutesApi(customRouter).add({ name: "files", path: "/files/*path" });
 
       // Long path with splat
       const longSegment = "a".repeat(5000);
@@ -469,7 +480,7 @@ describe("core/routes/routePath/matchPath", () => {
         route = { name: `l${i}`, path: `/l${i}`, children: [route] };
       }
 
-      customRouter.addRoute(route);
+      getRoutesApi(customRouter).add(route);
 
       const state = getPluginApi(customRouter).matchPath(
         "/l1/l2/l3/l4/l5/l6/l7/l8/l9/l10",
@@ -483,7 +494,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should include undeclared query params in default mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
-      customRouter.addRoute({ name: "search", path: "/search" }); // No ?q declared
+      getRoutesApi(customRouter).add({ name: "search", path: "/search" }); // No ?q declared
 
       const state = getPluginApi(customRouter).matchPath(
         "/search?q=test&limit=10",
@@ -500,7 +511,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       await customRouter.start("").catch(() => {});
 
-      customRouter.addRoute({ name: "search", path: "/search" });
+      getRoutesApi(customRouter).add({ name: "search", path: "/search" });
 
       expect(
         getPluginApi(customRouter).matchPath("/search?q=test"),
@@ -512,7 +523,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match path without query params in strict mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.addRoute({ name: "search", path: "/search" });
+      getRoutesApi(customRouter).add({ name: "search", path: "/search" });
 
       // Path without query params matches
       const state = getPluginApi(customRouter).matchPath("/search");
@@ -523,7 +534,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should match and include declared query params in strict mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "strict" });
 
-      customRouter.addRoute({ name: "search", path: "/search?q" }); // ?q declared
+      getRoutesApi(customRouter).add({ name: "search", path: "/search?q" }); // ?q declared
 
       const state = getPluginApi(customRouter).matchPath("/search?q=test");
 
@@ -536,7 +547,7 @@ describe("core/routes/routePath/matchPath", () => {
 
       await customRouter.start("").catch(() => {});
 
-      customRouter.addRoute({ name: "search", path: "/search?q" });
+      getRoutesApi(customRouter).add({ name: "search", path: "/search?q" });
 
       expect(
         getPluginApi(customRouter).matchPath("/search?q=test&extra=ignored"),
@@ -548,7 +559,10 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle mixed declared and undeclared params in default mode", () => {
       const customRouter = createTestRouter({ queryParamsMode: "default" });
 
-      customRouter.addRoute({ name: "search", path: "/search?q&page" });
+      getRoutesApi(customRouter).add({
+        name: "search",
+        path: "/search?q&page",
+      });
 
       const state = getPluginApi(customRouter).matchPath(
         "/search?q=test&page=2&sort=name",
@@ -566,7 +580,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should transform params using decodeParams", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "user",
         path: "/user/:id",
         decodeParams: (params) => ({
@@ -585,7 +599,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should propagate decoder exception (by design)", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "user",
         path: "/user/:id",
         decodeParams: () => {
@@ -621,7 +635,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should include defaultParams in matched state when URL param is missing", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "page",
         path: "/page?sort",
         defaultParams: { sort: "name", limit: "10" },
@@ -638,7 +652,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should rebuild path with defaultParams query params when rewritePathOnMatch is true", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "search",
         path: "/search?q&sort",
         defaultParams: { sort: "date" },
@@ -659,7 +673,7 @@ describe("core/routes/routePath/matchPath", () => {
       const customRouter = createTestRouter();
       let encoderCalled = false;
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
         encodeParams: (params) => {
@@ -682,7 +696,7 @@ describe("core/routes/routePath/matchPath", () => {
       });
       let encoderCalled = false;
 
-      customRouter.addRoute({
+      getRoutesApi(customRouter).add({
         name: "enc",
         path: "/enc/:id",
         encodeParams: (params) => {
@@ -727,7 +741,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should resolve forwardTo and use target route name", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         { name: "old", path: "/old", forwardTo: "new" },
         { name: "new", path: "/new" },
       ]);
@@ -740,7 +754,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should rebuild path for target route when forwardTo changes name", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         { name: "old-page", path: "/old-page", forwardTo: "new-page" },
         { name: "new-page", path: "/new-page" },
       ]);
@@ -755,7 +769,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle forwardTo with nested routes", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         { name: "inbox", path: "/inbox", forwardTo: "mail.inbox" },
         {
           name: "mail",
@@ -773,7 +787,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle forwardTo with params", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         { name: "old-user", path: "/old-user/:id", forwardTo: "user" },
         { name: "user", path: "/user/:id" },
       ]);
@@ -791,7 +805,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle decoder + forwardTo combination", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         {
           name: "old-item",
           path: "/old-item/:id",
@@ -812,7 +826,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle defaultParams + forwardTo", () => {
       const customRouter = createTestRouter();
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         {
           name: "old-list",
           path: "/old-list",
@@ -831,7 +845,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle rewritePathOnMatch=false with forwardTo", () => {
       const customRouter = createTestRouter({ rewritePathOnMatch: false });
 
-      customRouter.addRoute([
+      getRoutesApi(customRouter).add([
         { name: "alias", path: "/alias", forwardTo: "target" },
         { name: "target", path: "/target" },
       ]);
@@ -846,7 +860,7 @@ describe("core/routes/routePath/matchPath", () => {
     it("should handle trailing slash normalization with params", () => {
       const customRouter = createTestRouter({ trailingSlash: "never" });
 
-      customRouter.addRoute({ name: "item", path: "/item/:id" });
+      getRoutesApi(customRouter).add({ name: "item", path: "/item/:id" });
 
       const state = getPluginApi(customRouter).matchPath("/item/42/");
 
@@ -859,8 +873,8 @@ describe("core/routes/routePath/matchPath", () => {
 
   describe("forwardTo function", () => {
     it("should resolve dynamic forwardTo during matchPath", () => {
-      router.addRoute({ name: "match-target", path: "/match-target" });
-      router.addRoute({
+      routesApi.add({ name: "match-target", path: "/match-target" });
+      routesApi.add({
         name: "match-forward",
         path: "/match-forward",
         forwardTo: () => "match-target",

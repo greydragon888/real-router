@@ -5,6 +5,7 @@ import {
   errorCodes,
   getDependenciesApi,
   getPluginApi,
+  getRoutesApi,
 } from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
@@ -138,9 +139,10 @@ describe("cloneRouter()", () => {
 
   it("should clone config by value", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
     // Add some config to verify
-    router.addRoute({
+    api.add({
       name: "cloneTest",
       path: "/clone-test/:id",
       defaultParams: { id: "default" },
@@ -213,9 +215,10 @@ describe("cloneRouter()", () => {
 
   it("should clone config independently (deep copy)", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
-    router.addRoute({ name: "original", path: "/original" });
-    router.addRoute({ name: "redirectTarget", path: "/redirect-target" });
+    api.add({ name: "original", path: "/original" });
+    api.add({ name: "redirectTarget", path: "/redirect-target" });
     router.updateRoute("original", { forwardTo: "redirectTarget" });
 
     const clonedRouter = cloneRouter(router);
@@ -241,9 +244,10 @@ describe("cloneRouter()", () => {
 
   it("should deep clone defaultParams (nested objects are independent)", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
     // Add route with defaultParams
-    router.addRoute({
+    api.add({
       name: "paginated",
       path: "/paginated",
       defaultParams: { page: 1, sort: "name" },
@@ -437,16 +441,17 @@ describe("cloneRouter()", () => {
 
     it("should clone router with complex config", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
 
       // Add routes with encoders, decoders, defaultParams, and forwards via API
-      router.addRoute({
+      api.add({
         name: "complexRoute",
         path: "/complex/:id",
         decodeParams: (params) => ({ ...params, decoded: true }),
         encodeParams: (params) => ({ ...params, encoded: true }),
         defaultParams: { id: "default", page: 1 },
       });
-      router.addRoute({ name: "targetRoute", path: "/target" });
+      api.add({ name: "targetRoute", path: "/target" });
       router.updateRoute("complexRoute", { forwardTo: "targetRoute" });
 
       const clonedRouter = cloneRouter(router);
@@ -627,9 +632,10 @@ describe("cloneRouter()", () => {
 
     it("should preserve canDeactivate from route config", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      api.add({
         name: "workspace",
         path: "/workspace",
         canDeactivate: () => guard,
@@ -662,10 +668,11 @@ describe("cloneRouter()", () => {
   describe("forwardFnMap cloning", () => {
     it("should preserve forwardFnMap in cloned router", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
       const forwardFn = () => "clone-target";
 
-      router.addRoute({ name: "clone-target", path: "/clone-target" });
-      router.addRoute({
+      api.add({ name: "clone-target", path: "/clone-target" });
+      api.add({
         name: "clone-forward",
         path: "/clone-forward",
         forwardTo: forwardFn,
