@@ -21,13 +21,9 @@ import {
 } from "./helpers";
 import { createRouteState } from "./stateBuilder";
 import {
-  validateRemoveRouteArgs,
   validateAddRouteArgs,
-  validateParentOption,
   validateIsActiveRouteArgs,
   validateStateBuilderArgs,
-  validateUpdateRouteBasicArgs,
-  validateUpdateRoutePropertyTypes,
   validateBuildPathArgs,
   validateShouldUpdateNodeArgs,
   validateRoutes,
@@ -40,7 +36,6 @@ import type {
   BuildStateResultWithSegments,
   GuardFnFactory,
   Route,
-  RouteConfigUpdate,
 } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
@@ -173,17 +168,9 @@ export class RoutesNamespace<
   // TypeScript requires explicit method declarations for assertion functions
   // =========================================================================
 
-  static validateRemoveRouteArgs(name: unknown): asserts name is string {
-    validateRemoveRouteArgs(name);
-  }
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
   static validateAddRouteArgs(routes: readonly Route<any>[]): void {
     validateAddRouteArgs(routes);
-  }
-
-  static validateParentOption(parent: unknown): asserts parent is string {
-    validateParentOption(parent);
   }
 
   static validateIsActiveRouteArgs(
@@ -201,27 +188,6 @@ export class RoutesNamespace<
     methodName: string,
   ): void {
     validateStateBuilderArgs(routeName, routeParams, methodName);
-  }
-
-  static validateUpdateRouteBasicArgs<Deps extends DefaultDependencies>(
-    name: unknown,
-    updates: unknown,
-  ): asserts updates is RouteConfigUpdate<Deps> {
-    validateUpdateRouteBasicArgs<Deps>(name, updates);
-  }
-
-  static validateUpdateRoutePropertyTypes(
-    forwardTo: unknown,
-    defaultParams: unknown,
-    decodeParams: unknown,
-    encodeParams: unknown,
-  ): void {
-    validateUpdateRoutePropertyTypes(
-      forwardTo,
-      defaultParams,
-      decodeParams,
-      encodeParams,
-    );
   }
 
   static validateBuildPathArgs(route: unknown): asserts route is string {

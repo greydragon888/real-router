@@ -1,9 +1,9 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.4-auto-cleanup.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createNestedRouter, IS_ROUTER5 } from "../helpers";
-import { getRoutesApi } from "@real-router/core";
 
 import type { Route } from "../helpers";
 

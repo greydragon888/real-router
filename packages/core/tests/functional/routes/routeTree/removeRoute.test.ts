@@ -452,7 +452,7 @@ describe("core/routes/removeRoute", () => {
         "fn-target",
       );
 
-      const fnForwardRoute = router.getRoute("fn-forward");
+      const fnForwardRoute = routesApi.get("fn-forward");
 
       expect(typeof fnForwardRoute?.forwardTo).toBe("function");
 

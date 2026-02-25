@@ -68,7 +68,7 @@ describe("getRoutesApi()", () => {
   it("add should add a route", () => {
     routesApi.add({ name: "newRoute", path: "/new" });
 
-    expect(router.hasRoute("newRoute")).toBe(true);
+    expect(routesApi.has("newRoute")).toBe(true);
   });
 
   it("add should add multiple routes when passed an array", () => {
@@ -77,21 +77,21 @@ describe("getRoutesApi()", () => {
       { name: "r2", path: "/r2" },
     ]);
 
-    expect(router.hasRoute("r1")).toBe(true);
-    expect(router.hasRoute("r2")).toBe(true);
+    expect(routesApi.has("r1")).toBe(true);
+    expect(routesApi.has("r2")).toBe(true);
   });
 
   it("add should add a route under a parent", () => {
     routesApi.add({ name: "child", path: "/child" }, { parent: "home" });
 
-    expect(router.hasRoute("home.child")).toBe(true);
+    expect(routesApi.has("home.child")).toBe(true);
   });
 
   it("remove should remove a route", () => {
     routesApi.add({ name: "temp", path: "/temp" });
     routesApi.remove("temp");
 
-    expect(router.hasRoute("temp")).toBe(false);
+    expect(routesApi.has("temp")).toBe(false);
   });
 
   it("remove should return early when the route is currently active", async () => {
@@ -99,52 +99,52 @@ describe("getRoutesApi()", () => {
 
     routesApi.remove("home");
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
   });
 
   it("remove should log a warning when the route is not found", () => {
     routesApi.remove("nonexistent");
 
-    expect(router.hasRoute("nonexistent")).toBe(false);
+    expect(routesApi.has("nonexistent")).toBe(false);
   });
 
   it("update should update a route", () => {
     routesApi.update("home", { defaultParams: { page: "1" } });
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
     expect(router.buildPath("home")).toBe("/home?page=1");
   });
 
   it("update should set canActivate guard", () => {
     routesApi.update("home", { canActivate: () => () => true });
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
   });
 
   it("update should clear canActivate guard when null", () => {
     routesApi.update("home", { canActivate: () => () => true });
     routesApi.update("home", { canActivate: null });
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
   });
 
   it("update should set canDeactivate guard", () => {
     routesApi.update("home", { canDeactivate: () => () => true });
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
   });
 
   it("update should clear canDeactivate guard when null", () => {
     routesApi.update("home", { canDeactivate: () => () => true });
     routesApi.update("home", { canDeactivate: null });
 
-    expect(router.hasRoute("home")).toBe(true);
+    expect(routesApi.has("home")).toBe(true);
   });
 
   it("clear should clear all routes", () => {
     routesApi.clear();
 
-    expect(router.hasRoute("home")).toBe(false);
+    expect(routesApi.has("home")).toBe(false);
   });
 
   describe("when noValidate is true", () => {
@@ -163,26 +163,26 @@ describe("getRoutesApi()", () => {
     it("add should add a route without validation", () => {
       noValidateApi.add({ name: "noValidateRoute", path: "/nv" });
 
-      expect(noValidateRouter.hasRoute("noValidateRoute")).toBe(true);
+      expect(noValidateApi.has("noValidateRoute")).toBe(true);
     });
 
     it("add should add a route under a parent without validation", () => {
       noValidateApi.add({ name: "child", path: "/child" }, { parent: "home" });
 
-      expect(noValidateRouter.hasRoute("home.child")).toBe(true);
+      expect(noValidateApi.has("home.child")).toBe(true);
     });
 
     it("remove should remove a route without validation", () => {
       noValidateApi.add({ name: "temp", path: "/temp" });
       noValidateApi.remove("temp");
 
-      expect(noValidateRouter.hasRoute("temp")).toBe(false);
+      expect(noValidateApi.has("temp")).toBe(false);
     });
 
     it("update should update a route without validation", () => {
       noValidateApi.update("home", { defaultParams: { page: "1" } });
 
-      expect(noValidateRouter.hasRoute("home")).toBe(true);
+      expect(noValidateApi.has("home")).toBe(true);
     });
 
     it("has should check route existence without validation", () => {

@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouter, cloneRouter } from "@real-router/core";
+import { createRouter, cloneRouter, getRoutesApi } from "@real-router/core";
 
 import type { Route, Router } from "@real-router/core";
 import type { LogCallback } from "@real-router/logger";
@@ -51,10 +51,10 @@ describe("SSR race conditions", () => {
       const clone2 = cloneRouter(baseRouter);
 
       // getRoute on clones returns correct data
-      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone1).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
-      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone2).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
     });
@@ -66,15 +66,17 @@ describe("SSR race conditions", () => {
       const clone2 = cloneRouter(baseRouter);
 
       // Modify one clone's route configuration
-      clone1.updateRoute("about", { defaultParams: { tab: "changed" } });
+      getRoutesApi(clone1).update("about", {
+        defaultParams: { tab: "changed" },
+      });
 
       // Clone 1 sees the change
-      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone1).get("about")?.defaultParams).toStrictEqual({
         tab: "changed",
       });
 
       // Clone 2 still has original value - isolated!
-      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone2).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
     });
@@ -260,16 +262,16 @@ describe("SSR race conditions", () => {
       const clone2 = cloneRouter(baseRouter);
 
       // Add route to clone1 only
-      clone1.addRoute({ name: "clone1only", path: "/clone1only" });
+      getRoutesApi(clone1).add({ name: "clone1only", path: "/clone1only" });
 
       // Clone1 has the route
-      expect(clone1.hasRoute("clone1only")).toBe(true);
+      expect(getRoutesApi(clone1).has("clone1only")).toBe(true);
 
       // Clone2 doesn't have it
-      expect(clone2.hasRoute("clone1only")).toBe(false);
+      expect(getRoutesApi(clone2).has("clone1only")).toBe(false);
 
       // Base router doesn't have it
-      expect(baseRouter.hasRoute("clone1only")).toBe(false);
+      expect(getRoutesApi(baseRouter).has("clone1only")).toBe(false);
     });
   });
 });

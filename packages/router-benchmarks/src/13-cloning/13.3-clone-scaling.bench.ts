@@ -1,9 +1,9 @@
 // packages/router-benchmarks/modules/13-cloning/13.3-clone-scaling.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
-import { getRoutesApi } from "@real-router/core";
 
 // 13.3.1 Cloning router with 10 routes
 if (IS_ROUTER5) {

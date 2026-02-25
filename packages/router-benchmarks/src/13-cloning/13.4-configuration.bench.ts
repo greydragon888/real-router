@@ -1,9 +1,9 @@
 // packages/router-benchmarks/modules/13-cloning/13.4-configuration.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
-import { getRoutesApi } from "@real-router/core";
 
 import type { Params } from "router5/dist/types/base";
 

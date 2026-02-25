@@ -1,3 +1,4 @@
+import { getRoutesApi } from "@real-router/core";
 import { render, screen } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -14,7 +15,7 @@ describe("Link component", () => {
   beforeEach(() => {
     router = createTestRouter();
 
-    router.addRoute({
+    getRoutesApi(router).add({
       name: "home",
       path: "/home",
     });
@@ -53,7 +54,7 @@ describe("Link component", () => {
 
   it("should have active class if default route is active", async () => {
     router = createTestRouter();
-    router.addRoute({ name: "home", path: "/home" });
+    getRoutesApi(router).add({ name: "home", path: "/home" });
     await router.start("/home");
 
     render(

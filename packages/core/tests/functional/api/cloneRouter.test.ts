@@ -4,6 +4,7 @@ import {
   cloneRouter,
   createRouter,
   getDependenciesApi,
+  getRoutesApi,
 } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
@@ -43,6 +44,6 @@ describe("cloneRouter()", () => {
     const router = createTestRouter();
     const clone = cloneRouter(router);
 
-    expect(clone.hasRoute("home")).toBe(true);
+    expect(getRoutesApi(clone).has("home")).toBe(true);
   });
 });

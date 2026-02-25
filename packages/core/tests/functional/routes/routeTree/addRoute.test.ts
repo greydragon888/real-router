@@ -281,7 +281,7 @@ describe("core/routes/addRoute", () => {
     }).toThrowError('[router.addRoute] Route "first-dup" already exists');
 
     // new-before-dup should NOT be registered (atomicity preserved)
-    expect(router.hasRoute("new-before-dup")).toBe(false);
+    expect(routesApi.has("new-before-dup")).toBe(false);
   });
 
   it("should throw on duplicate nested child route", async () => {
@@ -322,7 +322,7 @@ describe("core/routes/addRoute", () => {
     );
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
-    expect(router.hasRoute("pre-validation-test")).toBe(false);
+    expect(routesApi.has("pre-validation-test")).toBe(false);
   });
 
   it("should throw on duplicate path within same batch", async () => {
@@ -533,7 +533,7 @@ describe("core/routes/addRoute", () => {
 
       routesApi.add({ name: "detail", path: "/:id" }, { parent: "products" });
 
-      expect(router.hasRoute("products.detail")).toBe(true);
+      expect(routesApi.has("products.detail")).toBe(true);
       expect(router.buildPath("products.detail", { id: "123" })).toBe(
         "/products/123",
       );
@@ -561,8 +561,8 @@ describe("core/routes/addRoute", () => {
         { parent: "dashboard" },
       );
 
-      expect(router.hasRoute("dashboard.widgets")).toBe(true);
-      expect(router.hasRoute("dashboard.charts")).toBe(true);
+      expect(routesApi.has("dashboard.widgets")).toBe(true);
+      expect(routesApi.has("dashboard.charts")).toBe(true);
     });
 
     it("should support nested parent names (fullName) in { parent } option", () => {
@@ -577,7 +577,7 @@ describe("core/routes/addRoute", () => {
         { parent: "shop.category" },
       );
 
-      expect(router.hasRoute("shop.category.items")).toBe(true);
+      expect(routesApi.has("shop.category.items")).toBe(true);
       expect(
         router.buildPath("shop.category.items", { category: "books" }),
       ).toBe("/shop/books/items");
@@ -906,7 +906,7 @@ describe("core/routes/addRoute", () => {
       expect(getPluginApi(router).forwardState("A", {}).name).toBe("B");
 
       // Remove B - now A has dangling forwardTo
-      router.removeRoute("B");
+      routesApi.remove("B");
 
       // forwardState should return A itself since B no longer exists
       expect(getPluginApi(router).forwardState("A", {}).name).toBe("A");
@@ -1052,7 +1052,7 @@ describe("core/routes/addRoute", () => {
       ]);
 
       // Use updateRoute() API to dynamically add a redirect
-      router.updateRoute("oldRoute", { forwardTo: "newRoute" });
+      routesApi.update("oldRoute", { forwardTo: "newRoute" });
 
       // Verify behavior: forwardState should follow the new rule
       const state = getPluginApi(router).forwardState("oldRoute", {});
@@ -1480,8 +1480,8 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
-        expect(router.hasRoute("cycle-a")).toBe(false);
-        expect(router.hasRoute("cycle-b")).toBe(false);
+        expect(routesApi.has("cycle-a")).toBe(false);
+        expect(routesApi.has("cycle-b")).toBe(false);
       });
 
       it("should not register handlers if forwardTo cycle is detected", async () => {
@@ -1502,8 +1502,8 @@ describe("core/routes/addRoute", () => {
         }).toThrowError(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
-        expect(router.hasRoute("cycle-with-guard-a")).toBe(false);
-        expect(router.hasRoute("cycle-with-guard-b")).toBe(false);
+        expect(routesApi.has("cycle-with-guard-a")).toBe(false);
+        expect(routesApi.has("cycle-with-guard-b")).toBe(false);
       });
     });
   });
@@ -1860,7 +1860,7 @@ describe("core/routes/addRoute", () => {
         canDeactivate: guardFactory,
       });
 
-      const route = router.getRoute("account-settings");
+      const route = routesApi.get("account-settings");
 
       expect(route).toBeDefined();
       expect(route?.canDeactivate).toBe(guardFactory);

@@ -129,7 +129,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Update Me",
       } as never);
 
-      router.updateRoute("gc-update", { defaultParams: { lang: "en" } });
+      routesApi.update("gc-update", { defaultParams: { lang: "en" } });
 
       expect(routesApi.getConfig("gc-update")).toStrictEqual({
         title: "Update Me",

@@ -1,3 +1,4 @@
+import { getRoutesApi } from "@real-router/core";
 import { renderHook, act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -384,7 +385,7 @@ describe("useRouteNode", () => {
 
     it("should handle deeply nested node correctly", async () => {
       // Add deeply nested route for testing
-      router.addRoute([
+      getRoutesApi(router).add([
         {
           name: "admin",
           path: "/admin",

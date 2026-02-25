@@ -1,3 +1,4 @@
+import { getRoutesApi } from "@real-router/core";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
@@ -15,7 +16,7 @@ const user = userEvent.setup();
 describe("ConnectedLink component", () => {
   beforeEach(async () => {
     router = createTestRouter();
-    router.addRoute({
+    getRoutesApi(router).add({
       name: "home",
       path: "/home",
     });

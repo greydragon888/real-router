@@ -1,9 +1,9 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.2-route-scaling.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench, do_not_optimize } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
-import { getRoutesApi } from "@real-router/core";
 
 import type { Route } from "../helpers";
 

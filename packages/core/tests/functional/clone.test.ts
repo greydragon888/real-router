@@ -151,7 +151,7 @@ describe("cloneRouter()", () => {
     const clonedRouter = cloneRouter(router);
 
     // Clone has same routes and behavior as original
-    expect(clonedRouter.hasRoute("cloneTest")).toBe(true);
+    expect(getRoutesApi(clonedRouter).has("cloneTest")).toBe(true);
     expect(
       getPluginApi(clonedRouter).makeState("cloneTest").params,
     ).toStrictEqual({
@@ -219,7 +219,7 @@ describe("cloneRouter()", () => {
 
     api.add({ name: "original", path: "/original" });
     api.add({ name: "redirectTarget", path: "/redirect-target" });
-    router.updateRoute("original", { forwardTo: "redirectTarget" });
+    getRoutesApi(router).update("original", { forwardTo: "redirectTarget" });
 
     const clonedRouter = cloneRouter(router);
 
@@ -229,8 +229,8 @@ describe("cloneRouter()", () => {
     );
 
     // Modify cloned router's forward rules
-    clonedRouter.addRoute({ name: "newTarget", path: "/new-target" });
-    clonedRouter.updateRoute("original", { forwardTo: "newTarget" });
+    getRoutesApi(clonedRouter).add({ name: "newTarget", path: "/new-target" });
+    getRoutesApi(clonedRouter).update("original", { forwardTo: "newTarget" });
 
     // Original should NOT be affected
     expect(getPluginApi(router).forwardState("original", {}).name).toBe(
@@ -268,7 +268,7 @@ describe("cloneRouter()", () => {
     });
 
     // Update clone's route with different defaults
-    clonedRouter.updateRoute("paginated", {
+    getRoutesApi(clonedRouter).update("paginated", {
       defaultParams: { page: 2, sort: "name" },
     });
 
@@ -423,8 +423,8 @@ describe("cloneRouter()", () => {
       const clonedRouter = cloneRouter(router);
 
       // Both routers should have same routes
-      expect(router.hasRoute("withEncoder")).toBe(true);
-      expect(clonedRouter.hasRoute("withEncoder")).toBe(true);
+      expect(getRoutesApi(router).has("withEncoder")).toBe(true);
+      expect(getRoutesApi(clonedRouter).has("withEncoder")).toBe(true);
 
       // Both should apply same encoding/decoding behavior
       const encodedPath = router.buildPath("withEncoder", {
@@ -452,12 +452,12 @@ describe("cloneRouter()", () => {
         defaultParams: { id: "default", page: 1 },
       });
       api.add({ name: "targetRoute", path: "/target" });
-      router.updateRoute("complexRoute", { forwardTo: "targetRoute" });
+      getRoutesApi(router).update("complexRoute", { forwardTo: "targetRoute" });
 
       const clonedRouter = cloneRouter(router);
 
       // Clone should have same behavior
-      expect(clonedRouter.hasRoute("complexRoute")).toBe(true);
+      expect(getRoutesApi(clonedRouter).has("complexRoute")).toBe(true);
       expect(
         getPluginApi(clonedRouter).makeState("complexRoute").params,
       ).toStrictEqual({
@@ -472,7 +472,7 @@ describe("cloneRouter()", () => {
       ).toBe("targetRoute");
 
       // Modify clone
-      clonedRouter.updateRoute("complexRoute", {
+      getRoutesApi(clonedRouter).update("complexRoute", {
         defaultParams: { id: "default", page: 2 },
       });
 
@@ -680,8 +680,8 @@ describe("cloneRouter()", () => {
 
       const clonedRouter = cloneRouter(router);
 
-      const originalRoute = router.getRoute("clone-forward");
-      const clonedRoute = clonedRouter.getRoute("clone-forward");
+      const originalRoute = getRoutesApi(router).get("clone-forward");
+      const clonedRoute = getRoutesApi(clonedRouter).get("clone-forward");
 
       expect(originalRoute?.forwardTo).toBe(forwardFn);
       expect(clonedRoute?.forwardTo).toBe(forwardFn);

@@ -437,7 +437,9 @@ describe("core/noValidate option", () => {
 
       // navigate doesn't throw directly, but validation happens internally
       // Test getRoute instead which does throw for validation errors
-      expect(() => testRouter.getRoute(123 as any)).toThrowError(TypeError);
+      expect(() => getRoutesApi(testRouter).get(123 as any)).toThrowError(
+        TypeError,
+      );
 
       testRouter.stop();
     });

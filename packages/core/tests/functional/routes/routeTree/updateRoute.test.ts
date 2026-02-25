@@ -934,9 +934,8 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should chain multiple updateRoute calls", () => {
       routesApi.add({ name: "ur-chain", path: "/ur-chain" });
 
-      router
-        .updateRoute("ur-chain", { defaultParams: { page: 1 } })
-        .updateRoute("ur-chain", { defaultParams: { page: 2, limit: 10 } });
+      routesApi.update("ur-chain", { defaultParams: { page: 1 } });
+      routesApi.update("ur-chain", { defaultParams: { page: 2, limit: 10 } });
 
       // Verify via behavior
       expect(getPluginApi(router).makeState("ur-chain").params).toStrictEqual({
@@ -1048,7 +1047,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       routesApi.add({ name: "ur-reflect", path: "/ur-reflect" });
       routesApi.update("ur-reflect", { defaultParams: { page: 1 } });
 
-      const route = router.getRoute("ur-reflect");
+      const route = routesApi.get("ur-reflect");
 
       expect(route?.defaultParams).toStrictEqual({ page: 1 });
     });
@@ -1061,7 +1060,7 @@ describe("core/routes/routeTree/updateRoute", () => {
       });
       routesApi.update("ur-remove", { defaultParams: null });
 
-      const route = router.getRoute("ur-remove");
+      const route = routesApi.get("ur-remove");
 
       expect(route?.defaultParams).toBeUndefined();
     });

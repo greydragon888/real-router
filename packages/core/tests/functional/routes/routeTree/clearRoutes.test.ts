@@ -326,7 +326,7 @@ describe("core/routes/clearRoutes", () => {
 
       deps.set("api", { fetch: () => {} });
 
-      typedRouter.clearRoutes();
+      getRoutesApi(typedRouter).clear();
 
       expect(deps.has("api")).toBe(true);
     });
@@ -620,7 +620,7 @@ describe("core/routes/clearRoutes", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
 
       // clearRoutes on router2 should work (it's not navigating)
-      router2.clearRoutes();
+      getRoutesApi(router2).clear();
 
       // router2 should be cleared
       expect(getPluginApi(router2).matchPath("/home")).toBeUndefined();
@@ -649,14 +649,14 @@ describe("core/routes/clearRoutes", () => {
       const unstartedRouter = createTestRouter();
 
       // clearRoutes should work before start()
-      unstartedRouter.clearRoutes();
+      getRoutesApi(unstartedRouter).clear();
 
       // All routes should be cleared
       expect(getPluginApi(unstartedRouter).matchPath("/")).toBeUndefined();
       expect(getPluginApi(unstartedRouter).matchPath("/home")).toBeUndefined();
 
       // Should still be able to add new routes
-      unstartedRouter.addRoute({ name: "fresh", path: "/fresh" });
+      getRoutesApi(unstartedRouter).add({ name: "fresh", path: "/fresh" });
 
       expect(getPluginApi(unstartedRouter).matchPath("/fresh")?.name).toBe(
         "fresh",
