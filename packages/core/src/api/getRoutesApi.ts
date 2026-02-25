@@ -4,22 +4,34 @@ import { validateRouteName } from "type-guards";
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
 import {
+  addRoutesCrud,
+  getRouteConfigCrud,
+  getRouteCrud,
+  removeRouteCrud,
+  updateRouteConfigCrud,
+  validateClearRoutes,
+  validateRemoveRoute,
+  validateUpdateRoute,
+  type RoutesDataContext,
+} from "../namespaces/RoutesNamespace/routesCrud";
+import {
   validateAddRouteArgs,
-  validateRoutes,
   validateParentOption,
   validateRemoveRouteArgs,
+  validateRoutes,
   validateUpdateRouteBasicArgs,
   validateUpdateRoutePropertyTypes,
 } from "../namespaces/RoutesNamespace/validators";
 import { RouterError } from "../RouterError";
 
+import type { RouteLifecycleNamespace } from "../namespaces/RouteLifecycleNamespace";
+import type { RoutesDependencies } from "../namespaces/RoutesNamespace/types";
 import type { Router } from "../Router";
 import type { GuardFnFactory, Route } from "../types";
 import type { RoutesApi } from "./types";
 import type {
   DefaultDependencies,
   ForwardToCallback,
-  Params,
 } from "@real-router/types";
 
 function throwIfDisposed(isDisposed: () => boolean): void {
@@ -32,6 +44,35 @@ export function getRoutesApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(router: Router<Dependencies>): RoutesApi<Dependencies> {
   const ctx = getInternals(router as unknown as Router);
+
+  const dataCtx: RoutesDataContext<Dependencies> = {
+    definitions: ctx.routeDefinitions,
+    config: ctx.routeConfig,
+    noValidate: ctx.noValidate,
+    matcherOptions: ctx.routeMatcherOptions,
+    getCustomFields: ctx.getRouteCustomFields,
+    setCustomFields: ctx.routeSetCustomFields,
+    getMatcher: ctx.routeGetMatcher,
+    getRootPath: ctx.getRootPath,
+    setTreeAndMatcher: (tree, matcher) => {
+      ctx.routeSetTreeAndMatcher(tree, matcher);
+    },
+    setResolvedForwardMap: ctx.routeReplaceResolvedForwardMap,
+    getResolvedForwardMap: ctx.getResolvedForwardMap,
+    getDepsStore: ctx.routeGetDepsStore as () =>
+      | RoutesDependencies<Dependencies>
+      | undefined,
+    getPendingCanActivate: ctx.routeGetPendingCanActivate as () => Map<
+      string,
+      GuardFnFactory<Dependencies>
+    >,
+    getPendingCanDeactivate: ctx.routeGetPendingCanDeactivate as () => Map<
+      string,
+      GuardFnFactory<Dependencies>
+    >,
+    getLifecycleNamespace:
+      ctx.routeGetLifecycleNamespace as () => RouteLifecycleNamespace<Dependencies>,
+  };
 
   return {
     add: (routes, options) => {
@@ -55,7 +96,11 @@ export function getRoutesApi<
         );
       }
 
-      ctx.routeAddRoutes(routeArray as unknown as Route[], parentName);
+      addRoutesCrud(
+        dataCtx,
+        routeArray as unknown as Route<Dependencies>[],
+        parentName,
+      );
     },
 
     remove: (name) => {
@@ -65,7 +110,7 @@ export function getRoutesApi<
         validateRemoveRouteArgs(name);
       }
 
-      const canRemove = ctx.routeValidateRemoveRoute(
+      const canRemove = validateRemoveRoute(
         name,
         ctx.getStateName(),
         ctx.isTransitioning(),
@@ -75,7 +120,7 @@ export function getRoutesApi<
         return;
       }
 
-      const wasRemoved = ctx.routeRemoveRoute(name);
+      const wasRemoved = removeRouteCrud(dataCtx, name);
 
       if (!wasRemoved) {
         logger.warn(
@@ -119,26 +164,28 @@ export function getRoutesApi<
       }
 
       if (!ctx.noValidate) {
-        ctx.routeValidateUpdateRoute(
+        validateUpdateRoute(
           name,
-          forwardTo as unknown as string | ForwardToCallback | null | undefined,
+          forwardTo as unknown as
+            | string
+            | ForwardToCallback<Dependencies>
+            | null
+            | undefined,
+          ctx.routeHasRoute,
+          ctx.routeGetMatcher(),
+          ctx.routeConfig,
         );
       }
 
-      ctx.routeUpdateRouteConfig(name, {
+      updateRouteConfigCrud(dataCtx, name, {
         forwardTo: forwardTo as unknown as
           | string
-          | ForwardToCallback
+          | ForwardToCallback<Dependencies>
           | null
           | undefined,
         defaultParams: defaultParams,
         decodeParams,
         encodeParams,
-      } as unknown as {
-        forwardTo?: string | ForwardToCallback | null;
-        defaultParams?: Params | null;
-        decodeParams?: ((params: Params) => Params) | null;
-        encodeParams?: ((params: Params) => Params) | null;
       });
 
       if (canActivate !== undefined) {
@@ -169,7 +216,7 @@ export function getRoutesApi<
     clear: () => {
       throwIfDisposed(ctx.isDisposed);
 
-      const canClear = ctx.routeValidateClearRoutes(ctx.isTransitioning());
+      const canClear = validateClearRoutes(ctx.isTransitioning());
 
       /* v8 ignore next 3 -- @preserve: race condition guard, mirrors Router.clearRoutes() same-path guard tested via validateClearRoutes unit tests */
       if (!canClear) {
@@ -194,11 +241,11 @@ export function getRoutesApi<
         validateRouteName(name, "getRoute");
       }
 
-      return ctx.routeGetRoute(name) as Route<Dependencies> | undefined;
+      return getRouteCrud(dataCtx, name);
     },
 
     getConfig: (name) => {
-      return ctx.routeGetRouteConfig(name);
+      return getRouteConfigCrud(dataCtx as unknown as RoutesDataContext, name);
     },
   };
 }

@@ -8,7 +8,6 @@ import type {
 } from "./types";
 import type {
   EventName,
-  ForwardToCallback,
   NavigationOptions,
   Options,
   Params,
@@ -19,7 +18,12 @@ import type {
   StateMetaInput,
   Unsubscribe,
 } from "@real-router/types";
-import type { RouteTree } from "route-tree";
+import type {
+  CreateMatcherOptions,
+  Matcher,
+  RouteDefinition,
+  RouteTree,
+} from "route-tree";
 
 export interface RouterInternals {
   readonly makeState: <P extends Params = Params, MP extends Params = Params>(
@@ -102,37 +106,28 @@ export interface RouterInternals {
   readonly routeGetForwardRecord: () => Record<string, string>;
 
   // Route mutation (issue #174)
-  readonly routeAddRoutes: (routes: Route[], parentName?: string) => void;
-  readonly routeRemoveRoute: (name: string) => boolean;
   readonly routeClearRoutes: () => void;
-  readonly routeUpdateRouteConfig: (
-    name: string,
-    updates: {
-      forwardTo?: string | ForwardToCallback | null;
-      defaultParams?: Params | null;
-      decodeParams?: ((params: Params) => Params) | null;
-      encodeParams?: ((params: Params) => Params) | null;
-    },
-  ) => void;
 
   // Route read (issue #174)
   readonly routeHasRoute: (name: string) => boolean;
-  readonly routeGetRoute: (name: string) => Route | undefined;
-  readonly routeGetRouteConfig: (
-    name: string,
-  ) => Record<string, unknown> | undefined;
 
-  // Route validation (issue #174)
-  readonly routeValidateRemoveRoute: (
-    name: string,
-    currentStateName: string | undefined,
-    isNavigating: boolean,
-  ) => boolean;
-  readonly routeValidateClearRoutes: (isNavigating: boolean) => boolean;
-  readonly routeValidateUpdateRoute: (
-    name: string,
-    forwardTo: string | ForwardToCallback | null | undefined,
+  // Raw route data (issue #174 Phase 2 — tree-shaking)
+  readonly routeDefinitions: RouteDefinition[];
+  readonly routeConfig: RouteConfig;
+  readonly routeMatcherOptions: CreateMatcherOptions | undefined;
+  readonly routeNoValidate: boolean;
+  readonly routeSetCustomFields: (
+    fields: Record<string, Record<string, unknown>>,
   ) => void;
+  readonly routeGetMatcher: () => Matcher;
+  readonly routeSetTreeAndMatcher: (tree: RouteTree, matcher: Matcher) => void;
+  readonly routeReplaceResolvedForwardMap: (
+    map: Record<string, string>,
+  ) => void;
+  readonly routeGetDepsStore: () => unknown;
+  readonly routeGetPendingCanActivate: () => Map<string, unknown>;
+  readonly routeGetPendingCanDeactivate: () => Map<string, unknown>;
+  readonly routeGetLifecycleNamespace: () => unknown;
 
   // Cross-namespace state (issue #174)
   readonly getStateName: () => string | undefined;
