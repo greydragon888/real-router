@@ -183,7 +183,7 @@ export function getRoutesApi<
           | ForwardToCallback<Dependencies>
           | null
           | undefined,
-        defaultParams: defaultParams,
+        defaultParams,
         decodeParams,
         encodeParams,
       });
