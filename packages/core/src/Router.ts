@@ -45,6 +45,7 @@ import type {
 import type {
   DefaultDependencies,
   EventName,
+  ForwardToCallback,
   NavigationOptions,
   Options,
   Params,
@@ -269,6 +270,99 @@ export class Router<
           resolvedForwardMap,
           routeCustomFields,
         );
+      },
+      // Route tree access (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetTree: () => this.#routes.getTree(),
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetForwardRecord: () => this.#routes.getForwardRecord(),
+      // Route mutation (issue #174)
+      /* v8 ignore next 6 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeAddRoutes: (routeList, parentName) => {
+        this.#routes.addRoutes(
+          routeList as unknown as Route<Dependencies>[],
+          parentName,
+        );
+      },
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeRemoveRoute: (name) => this.#routes.removeRoute(name),
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeClearRoutes: () => {
+        this.#routes.clearRoutes();
+      },
+      /* v8 ignore next 9 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeUpdateRouteConfig: (name, updates) => {
+        this.#routes.updateRouteConfig(
+          name,
+          updates as unknown as Omit<
+            RouteConfigUpdate<Dependencies>,
+            "canActivate" | "canDeactivate"
+          >,
+        );
+      },
+      // Route read (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeHasRoute: (name) => this.#routes.hasRoute(name),
+      /* v8 ignore next 2 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetRoute: (name) =>
+        this.#routes.getRoute(name) as unknown as Route | undefined,
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeGetRouteConfig: (name) => this.#routes.getRouteConfig(name),
+      // Route validation (issue #174)
+      /* v8 ignore next 2 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeValidateRemoveRoute: (name, currentStateName, isNavigating) =>
+        this.#routes.validateRemoveRoute(name, currentStateName, isNavigating),
+      /* v8 ignore next 2 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeValidateClearRoutes: (isNavigating) =>
+        this.#routes.validateClearRoutes(isNavigating),
+      /* v8 ignore next 9 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      routeValidateUpdateRoute: (name, forwardTo) => {
+        this.#routes.validateUpdateRoute(
+          name,
+          forwardTo as unknown as
+            | string
+            | ForwardToCallback<Dependencies>
+            | null
+            | undefined,
+        );
+      },
+      // Cross-namespace state (issue #174)
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      getStateName: () => this.#state.get()?.name,
+      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      isTransitioning: () => this.#eventBus.isTransitioning(),
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      clearState: () => {
+        this.#state.set(undefined);
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearAll: () => {
+        this.#routeLifecycle.clearAll();
+      },
+      // Lifecycle guard management (issue #174)
+      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleAddCanActivate: (name, handler, skipValidation) => {
+        this.#routeLifecycle.addCanActivate(
+          name,
+          handler as GuardFnFactory<Dependencies> | boolean,
+          skipValidation,
+        );
+      },
+      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleAddCanDeactivate: (name, handler, skipValidation) => {
+        this.#routeLifecycle.addCanDeactivate(
+          name,
+          handler as GuardFnFactory<Dependencies> | boolean,
+          skipValidation,
+        );
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearCanActivate: (name) => {
+        this.#routeLifecycle.clearCanActivate(name);
+      },
+      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
+      lifecycleClearCanDeactivate: (name) => {
+        this.#routeLifecycle.clearCanDeactivate(name);
       },
     });
 
@@ -759,7 +853,7 @@ export class Router<
       validateRouteName(name, "canNavigateTo");
     }
 
-    if (!this.hasRoute(name)) {
+    if (!this.#routes.hasRoute(name)) {
       return false;
     }
 

@@ -8,6 +8,7 @@ import type {
 } from "./types";
 import type {
   EventName,
+  ForwardToCallback,
   NavigationOptions,
   Options,
   Params,
@@ -95,6 +96,63 @@ export interface RouterInternals {
     resolvedForwardMap: Record<string, string>,
     routeCustomFields: Record<string, Record<string, unknown>>,
   ) => void;
+
+  // Route tree access (issue #174)
+  readonly routeGetTree: () => RouteTree;
+  readonly routeGetForwardRecord: () => Record<string, string>;
+
+  // Route mutation (issue #174)
+  readonly routeAddRoutes: (routes: Route[], parentName?: string) => void;
+  readonly routeRemoveRoute: (name: string) => boolean;
+  readonly routeClearRoutes: () => void;
+  readonly routeUpdateRouteConfig: (
+    name: string,
+    updates: {
+      forwardTo?: string | ForwardToCallback | null;
+      defaultParams?: Params | null;
+      decodeParams?: ((params: Params) => Params) | null;
+      encodeParams?: ((params: Params) => Params) | null;
+    },
+  ) => void;
+
+  // Route read (issue #174)
+  readonly routeHasRoute: (name: string) => boolean;
+  readonly routeGetRoute: (name: string) => Route | undefined;
+  readonly routeGetRouteConfig: (
+    name: string,
+  ) => Record<string, unknown> | undefined;
+
+  // Route validation (issue #174)
+  readonly routeValidateRemoveRoute: (
+    name: string,
+    currentStateName: string | undefined,
+    isNavigating: boolean,
+  ) => boolean;
+  readonly routeValidateClearRoutes: (isNavigating: boolean) => boolean;
+  readonly routeValidateUpdateRoute: (
+    name: string,
+    forwardTo: string | ForwardToCallback | null | undefined,
+  ) => void;
+
+  // Cross-namespace state (issue #174)
+  readonly getStateName: () => string | undefined;
+  readonly isTransitioning: () => boolean;
+  readonly clearState: () => void;
+  readonly lifecycleClearAll: () => void;
+
+  // Lifecycle guard management (issue #174)
+  readonly lifecycleAddCanActivate: (
+    name: string,
+    handler: GuardFnFactory | boolean,
+    skipValidation: boolean,
+  ) => void;
+  readonly lifecycleAddCanDeactivate: (
+    name: string,
+    handler: GuardFnFactory | boolean,
+    skipValidation: boolean,
+  ) => void;
+  readonly lifecycleClearCanActivate: (name: string) => void;
+  readonly lifecycleClearCanDeactivate: (name: string) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Router<any> needed to accept all generic instantiations
