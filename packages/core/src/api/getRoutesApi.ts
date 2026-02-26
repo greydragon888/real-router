@@ -5,6 +5,7 @@ import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
 import {
   addRoutesCrud,
+  clearRoutesCrud,
   getRouteConfigCrud,
   getRouteCrud,
   removeRouteCrud,
@@ -12,7 +13,6 @@ import {
   validateClearRoutes,
   validateRemoveRoute,
   validateUpdateRoute,
-  type RoutesDataContext,
 } from "../namespaces/RoutesNamespace/routesCrud";
 import {
   validateAddRouteArgs,
@@ -24,15 +24,9 @@ import {
 } from "../namespaces/RoutesNamespace/validators";
 import { RouterError } from "../RouterError";
 
-import type { RouteLifecycleNamespace } from "../namespaces/RouteLifecycleNamespace";
-import type { RoutesDependencies } from "../namespaces/RoutesNamespace/types";
 import type { Router } from "../Router";
-import type { GuardFnFactory, Route } from "../types";
 import type { RoutesApi } from "./types";
-import type {
-  DefaultDependencies,
-  ForwardToCallback,
-} from "@real-router/types";
+import type { DefaultDependencies } from "@real-router/types";
 
 function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {
@@ -43,36 +37,10 @@ function throwIfDisposed(isDisposed: () => boolean): void {
 export function getRoutesApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(router: Router<Dependencies>): RoutesApi<Dependencies> {
-  const ctx = getInternals(router as unknown as Router);
+  const ctx = getInternals(router);
 
-  const dataCtx: RoutesDataContext<Dependencies> = {
-    definitions: ctx.routeDefinitions,
-    config: ctx.routeConfig,
-    noValidate: ctx.noValidate,
-    matcherOptions: ctx.routeMatcherOptions,
-    getCustomFields: ctx.getRouteCustomFields,
-    setCustomFields: ctx.routeSetCustomFields,
-    getMatcher: ctx.routeGetMatcher,
-    getRootPath: ctx.getRootPath,
-    setTreeAndMatcher: (tree, matcher) => {
-      ctx.routeSetTreeAndMatcher(tree, matcher);
-    },
-    setResolvedForwardMap: ctx.routeReplaceResolvedForwardMap,
-    getResolvedForwardMap: ctx.getResolvedForwardMap,
-    getDepsStore: ctx.routeGetDepsStore as () =>
-      | RoutesDependencies<Dependencies>
-      | undefined,
-    getPendingCanActivate: ctx.routeGetPendingCanActivate as () => Map<
-      string,
-      GuardFnFactory<Dependencies>
-    >,
-    getPendingCanDeactivate: ctx.routeGetPendingCanDeactivate as () => Map<
-      string,
-      GuardFnFactory<Dependencies>
-    >,
-    getLifecycleNamespace:
-      ctx.routeGetLifecycleNamespace as () => RouteLifecycleNamespace<Dependencies>,
-  };
+  const store = ctx.routeGetStore();
+  const noValidate = ctx.noValidate;
 
   return {
     add: (routes, options) => {
@@ -86,21 +54,17 @@ export function getRoutesApi<
           validateParentOption(parentName);
         }
 
-        validateAddRouteArgs(routeArray as unknown as Route[]);
+        validateAddRouteArgs(routeArray);
 
         validateRoutes(
           routeArray,
-          ctx.routeGetTree(),
-          ctx.routeGetForwardRecord(),
+          store.tree,
+          store.config.forwardMap,
           parentName,
         );
       }
 
-      addRoutesCrud(
-        dataCtx,
-        routeArray as unknown as Route<Dependencies>[],
-        parentName,
-      );
+      addRoutesCrud(store, noValidate, routeArray, parentName);
     },
 
     remove: (name) => {
@@ -120,7 +84,7 @@ export function getRoutesApi<
         return;
       }
 
-      const wasRemoved = removeRouteCrud(dataCtx, name);
+      const wasRemoved = removeRouteCrud(store, noValidate, name);
 
       if (!wasRemoved) {
         logger.warn(
@@ -166,23 +130,15 @@ export function getRoutesApi<
       if (!ctx.noValidate) {
         validateUpdateRoute(
           name,
-          forwardTo as unknown as
-            | string
-            | ForwardToCallback<Dependencies>
-            | null
-            | undefined,
-          ctx.routeHasRoute,
-          ctx.routeGetMatcher(),
-          ctx.routeConfig,
+          forwardTo,
+          (n) => store.matcher.hasRoute(n),
+          store.matcher,
+          store.config,
         );
       }
 
-      updateRouteConfigCrud(dataCtx, name, {
-        forwardTo: forwardTo as unknown as
-          | string
-          | ForwardToCallback<Dependencies>
-          | null
-          | undefined,
+      updateRouteConfigCrud(store, noValidate, name, {
+        forwardTo,
         defaultParams,
         decodeParams,
         encodeParams,
@@ -190,24 +146,28 @@ export function getRoutesApi<
 
       if (canActivate !== undefined) {
         if (canActivate === null) {
-          ctx.lifecycleClearCanActivate(name);
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+          store.lifecycleNamespace!.clearCanActivate(name);
         } else {
-          ctx.lifecycleAddCanActivate(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+          store.lifecycleNamespace!.addCanActivate(
             name,
-            canActivate as unknown as boolean | GuardFnFactory,
-            ctx.noValidate,
+            canActivate,
+            noValidate,
           );
         }
       }
 
       if (canDeactivate !== undefined) {
         if (canDeactivate === null) {
-          ctx.lifecycleClearCanDeactivate(name);
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+          store.lifecycleNamespace!.clearCanDeactivate(name);
         } else {
-          ctx.lifecycleAddCanDeactivate(
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+          store.lifecycleNamespace!.addCanDeactivate(
             name,
-            canDeactivate as unknown as boolean | GuardFnFactory,
-            ctx.noValidate,
+            canDeactivate,
+            noValidate,
           );
         }
       }
@@ -223,8 +183,9 @@ export function getRoutesApi<
         return;
       }
 
-      ctx.routeClearRoutes();
-      ctx.lifecycleClearAll();
+      clearRoutesCrud(store);
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+      store.lifecycleNamespace!.clearAll();
       ctx.clearState();
     },
 
@@ -233,7 +194,7 @@ export function getRoutesApi<
         validateRouteName(name, "hasRoute");
       }
 
-      return ctx.routeHasRoute(name);
+      return store.matcher.hasRoute(name);
     },
 
     get: (name) => {
@@ -241,11 +202,11 @@ export function getRoutesApi<
         validateRouteName(name, "getRoute");
       }
 
-      return getRouteCrud(dataCtx, name);
+      return getRouteCrud(store, name);
     },
 
     getConfig: (name) => {
-      return getRouteConfigCrud(dataCtx as unknown as RoutesDataContext, name);
+      return getRouteConfigCrud(store, name);
     },
   };
 }

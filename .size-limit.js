@@ -35,12 +35,14 @@ export default [
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",
     limit: "4 kB",
+    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
     name: "@real-router/rx (ESM)",
     path: "packages/rx/dist/esm/index.mjs",
     limit: "1.5 kB",
+    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -71,6 +73,7 @@ export default [
     name: "@real-router/persistent-params-plugin (ESM)",
     path: "packages/persistent-params-plugin/dist/esm/index.mjs",
     limit: "1.5 kB",
+    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {

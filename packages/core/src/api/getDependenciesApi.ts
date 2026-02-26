@@ -22,7 +22,7 @@ function throwIfDisposed(isDisposed: () => boolean): void {
 export function getDependenciesApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(router: Router<Dependencies>): DependenciesApi<Dependencies> {
-  const ctx = getInternals(router as unknown as Router);
+  const ctx = getInternals(router);
 
   return {
     get: (name) => {

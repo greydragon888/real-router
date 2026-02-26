@@ -195,7 +195,7 @@ export class RouterWiringBuilder<
 
   wireStateDeps(): void {
     this.state.setDependencies({
-      getDefaultParams: () => this.routes.getConfig().defaultParams,
+      getDefaultParams: () => this.routes.getStore().config.defaultParams,
       buildPath: (name, params) =>
         this.routes.buildPath(name, params, this.options.get()),
       getUrlParams: (name) => this.routes.getUrlParams(name),

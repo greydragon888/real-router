@@ -229,8 +229,8 @@ export class Router<
       setRootPath: (rootPath) => {
         this.#routes.setRootPath(rootPath);
       },
-      getRootPath: () => this.#routes.getRootPath(),
-      getTree: () => this.#routes.getTree(),
+      getRootPath: () => this.#routes.getStore().rootPath,
+      getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
       noValidate,
       // Dependencies (issue #172)
@@ -256,104 +256,17 @@ export class Router<
       },
       maxDependencies: this.#limits.maxDependencies,
       // Clone support (issue #173)
-      cloneRoutes: () => this.#routes.cloneRoutes() as unknown as Route[],
       cloneOptions: () => ({ ...this.#options.get() }),
       cloneDependencies: () =>
         this.#dependencies.getAll() as Record<string, unknown>,
-      getLifecycleFactories: () =>
-        this.#routeLifecycle.getFactories() as unknown as [
-          Record<string, GuardFnFactory>,
-          Record<string, GuardFnFactory>,
-        ],
-      getPluginFactories: () =>
-        this.#plugins.getAll() as unknown as PluginFactory[],
-      getRouteConfig: () => this.#routes.getConfig(),
-      getResolvedForwardMap: () => this.#routes.getResolvedForwardMap(),
-      getRouteCustomFields: () => this.#routes.getRouteCustomFields(),
-      applyClonedConfig: (config, resolvedForwardMap, routeCustomFields) => {
-        this.#routes.applyClonedConfig(
-          config,
-          resolvedForwardMap,
-          routeCustomFields,
-        );
-      },
-      // Route tree access (issue #174)
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetTree: () => this.#routes.getTree(),
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetForwardRecord: () => this.#routes.getForwardRecord(),
-      // Route mutation (issue #174)
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeClearRoutes: () => {
-        this.#routes.clearRoutes();
-      },
-      // Route read (issue #174)
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeHasRoute: (name) => this.#routes.hasRoute(name),
-      // Raw route data (issue #174 Phase 2 — tree-shaking)
-      routeDefinitions: this.#routes.getDefinitions(),
-      routeConfig: this.#routes.getConfigInternal(),
-      routeMatcherOptions: this.#routes.getMatcherOptions(),
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeSetCustomFields: (fields) => {
-        this.#routes.setRouteCustomFields(fields);
-      },
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetMatcher: () => this.#routes.getMatcher(),
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeSetTreeAndMatcher: (tree, matcher) => {
-        this.#routes.setTreeAndMatcher(tree, matcher);
-      },
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeReplaceResolvedForwardMap: (map) => {
-        this.#routes.replaceResolvedForwardMap(map);
-      },
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetDepsStore: () => this.#routes.getDepsStore(),
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetPendingCanActivate: () => this.#routes.getPendingCanActivate(),
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetPendingCanDeactivate: () =>
-        this.#routes.getPendingCanDeactivate(),
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      routeGetLifecycleNamespace: () => this.#routes.getLifecycleNamespace(),
+      getLifecycleFactories: () => this.#routeLifecycle.getFactories(),
+      getPluginFactories: () => this.#plugins.getAll(),
+      routeGetStore: () => this.#routes.getStore(),
       // Cross-namespace state (issue #174)
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
       getStateName: () => this.#state.get()?.name,
-      /* v8 ignore next -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
       isTransitioning: () => this.#eventBus.isTransitioning(),
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
       clearState: () => {
         this.#state.set(undefined);
-      },
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      lifecycleClearAll: () => {
-        this.#routeLifecycle.clearAll();
-      },
-      // Lifecycle guard management (issue #174)
-      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      lifecycleAddCanActivate: (name, handler, skipValidation) => {
-        this.#routeLifecycle.addCanActivate(
-          name,
-          handler as GuardFnFactory<Dependencies> | boolean,
-          skipValidation,
-        );
-      },
-      /* v8 ignore next 7 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      lifecycleAddCanDeactivate: (name, handler, skipValidation) => {
-        this.#routeLifecycle.addCanDeactivate(
-          name,
-          handler as GuardFnFactory<Dependencies> | boolean,
-          skipValidation,
-        );
-      },
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      lifecycleClearCanActivate: (name) => {
-        this.#routeLifecycle.clearCanActivate(name);
-      },
-      /* v8 ignore next 3 -- @preserve: exposed via getInternals() for routes-standalone plugin, tested via plugin integration tests */
-      lifecycleClearCanDeactivate: (name) => {
-        this.#routeLifecycle.clearCanDeactivate(name);
       },
     });
 
@@ -362,7 +275,7 @@ export class Router<
     // =========================================================================
     // All public methods that access private fields must be bound to preserve
     // `this` context when methods are extracted as references.
-    // See: https://github.com/nicolo-ribaudo/tc39-proposal-bind-operator
+    // See: https://github.com/tc39/proposal-bind-operator
     // =========================================================================
 
     // Path & State Building
@@ -513,7 +426,7 @@ export class Router<
       validateShouldUpdateNodeArgs(nodeName);
     }
 
-    return this.#routes.shouldUpdateNode(nodeName);
+    return RoutesNamespace.shouldUpdateNode(nodeName);
   }
 
   // ============================================================================

@@ -1,3 +1,4 @@
+import { routeTreeToDefinitions } from "route-tree";
 import { getTypeDescription } from "type-guards";
 
 import { errorCodes } from "../constants";
@@ -5,6 +6,7 @@ import { getInternals } from "../internals";
 import { Router } from "../Router";
 import { RouterError } from "../RouterError";
 
+import type { Route } from "../types";
 import type { DefaultDependencies } from "@real-router/types";
 
 function validateCloneArgs(dependencies: unknown): void {
@@ -39,7 +41,7 @@ export function cloneRouter<
   router: Router<Dependencies>,
   dependencies?: Dependencies,
 ): Router<Dependencies> {
-  const ctx = getInternals(router as unknown as Router);
+  const ctx = getInternals(router);
 
   if (ctx.isDisposed()) {
     throw new RouterError(errorCodes.ROUTER_DISPOSED);
@@ -49,15 +51,18 @@ export function cloneRouter<
     validateCloneArgs(dependencies);
   }
 
-  const routes = ctx.cloneRoutes();
+  // Get source store directly
+  const sourceStore = ctx.routeGetStore();
+  const routes = routeTreeToDefinitions(sourceStore.tree);
+  const routeConfig = sourceStore.config;
+  const resolvedForwardMap = sourceStore.resolvedForwardMap;
+  const routeCustomFields = sourceStore.routeCustomFields;
+
   const options = ctx.cloneOptions();
   const sourceDeps = ctx.cloneDependencies();
   const [canDeactivateFactories, canActivateFactories] =
     ctx.getLifecycleFactories();
   const pluginFactories = ctx.getPluginFactories();
-  const routeConfig = ctx.getRouteConfig();
-  const resolvedForwardMap = ctx.getResolvedForwardMap();
-  const routeCustomFields = ctx.getRouteCustomFields();
 
   const mergedDeps = {
     ...sourceDeps,
@@ -65,34 +70,34 @@ export function cloneRouter<
   } as Dependencies;
 
   const newRouter = new Router<Dependencies>(
-    routes as unknown as ConstructorParameters<typeof Router<Dependencies>>[0],
+    routes as Route<Dependencies>[],
     options,
     mergedDeps,
   );
 
   for (const [name, handler] of Object.entries(canDeactivateFactories)) {
-    newRouter.addDeactivateGuard(
-      name,
-      handler as unknown as Parameters<typeof newRouter.addDeactivateGuard>[1],
-    );
+    newRouter.addDeactivateGuard(name, handler);
   }
 
   for (const [name, handler] of Object.entries(canActivateFactories)) {
-    newRouter.addActivateGuard(
-      name,
-      handler as unknown as Parameters<typeof newRouter.addActivateGuard>[1],
-    );
+    newRouter.addActivateGuard(name, handler);
   }
 
   if (pluginFactories.length > 0) {
-    newRouter.usePlugin(
-      ...(pluginFactories as unknown as Parameters<typeof newRouter.usePlugin>),
-    );
+    newRouter.usePlugin(...pluginFactories);
   }
 
-  const newCtx = getInternals(newRouter as unknown as Router);
+  const newCtx = getInternals(newRouter);
+  const newStore = newCtx.routeGetStore();
 
-  newCtx.applyClonedConfig(routeConfig, resolvedForwardMap, routeCustomFields);
+  // Apply cloned config directly to new store
+  Object.assign(newStore.config.decoders, routeConfig.decoders);
+  Object.assign(newStore.config.encoders, routeConfig.encoders);
+  Object.assign(newStore.config.defaultParams, routeConfig.defaultParams);
+  Object.assign(newStore.config.forwardMap, routeConfig.forwardMap);
+  Object.assign(newStore.config.forwardFnMap, routeConfig.forwardFnMap);
+  Object.assign(newStore.resolvedForwardMap, resolvedForwardMap);
+  Object.assign(newStore.routeCustomFields, routeCustomFields);
 
   return newRouter;
 }
