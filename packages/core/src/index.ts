@@ -50,7 +50,13 @@ export {
   getPluginApi,
   getRoutesApi,
   getDependenciesApi,
+  getLifecycleApi,
   cloneRouter,
 } from "./api";
 
-export type { PluginApi, RoutesApi, DependenciesApi } from "./api";
+export type {
+  PluginApi,
+  RoutesApi,
+  DependenciesApi,
+  LifecycleApi,
+} from "./api";
