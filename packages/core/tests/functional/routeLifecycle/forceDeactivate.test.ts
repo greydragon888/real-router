@@ -1,12 +1,16 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getLifecycleApi } from "@real-router/core";
+
 import { createLifecycleTestRouter, errorCodes, type Router } from "./setup";
 
 let router: Router;
+let lifecycle: ReturnType<typeof getLifecycleApi>;
 
 describe("core/route-lifecycle/forceDeactivate", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -14,7 +18,7 @@ describe("core/route-lifecycle/forceDeactivate", () => {
   });
 
   it("should force deactivation if transition option is set", async () => {
-    router.addDeactivateGuard("orders.view", false);
+    lifecycle.addDeactivateGuard("orders.view", false);
 
     await router.navigate("orders.view", { id: "1" });
 

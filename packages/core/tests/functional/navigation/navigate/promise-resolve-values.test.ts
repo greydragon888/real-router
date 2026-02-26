@@ -1,11 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { getLifecycleApi } from "@real-router/core";
+
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const noop = () => undefined;
 
 describe("router.navigate() - promise resolve values", () => {
@@ -13,6 +16,8 @@ describe("router.navigate() - promise resolve values", () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -26,7 +31,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canDeactivate returns Promise.resolve(true)", async () => {
         const promiseDeactivateGuard = vi.fn().mockResolvedValue(true);
 
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => promiseDeactivateGuard,
         );
@@ -46,8 +51,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseGuard1 = vi.fn().mockResolvedValue(true);
         const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
-        router.addDeactivateGuard("orders", () => promiseGuard1);
-        router.addDeactivateGuard("orders.pending", () => promiseGuard2);
+        lifecycle.addDeactivateGuard("orders", () => promiseGuard1);
+        lifecycle.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
         await router.navigate("orders.pending", {}, {});
 
@@ -65,7 +70,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canActivate returns Promise.resolve(true)", async () => {
         const promiseActivateGuard = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("profile", () => promiseActivateGuard);
+        lifecycle.addActivateGuard("profile", () => promiseActivateGuard);
 
         await router.navigate("profile", {}, {});
 
@@ -76,8 +81,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseGuard1 = vi.fn().mockResolvedValue(true);
         const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("settings", () => promiseGuard1);
-        router.addActivateGuard("settings.account", () => promiseGuard2);
+        lifecycle.addActivateGuard("settings", () => promiseGuard1);
+        lifecycle.addActivateGuard("settings.account", () => promiseGuard2);
 
         await router.navigate("settings.account", {}, {});
 
@@ -114,7 +119,7 @@ describe("router.navigate() - promise resolve values", () => {
         const syncGuard = vi.fn().mockReturnValue(true);
         const promiseMiddleware = vi.fn().mockResolvedValue(undefined);
 
-        router.addActivateGuard("orders", () => syncGuard);
+        lifecycle.addActivateGuard("orders", () => syncGuard);
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders", {}, {});
@@ -130,7 +135,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canDeactivate returns true", async () => {
         const deactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders.pending", () => deactivateGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         // Navigate to initial state
         await router.navigate("orders.pending");
@@ -147,8 +152,8 @@ describe("router.navigate() - promise resolve values", () => {
         const guard1 = vi.fn().mockReturnValue(true);
         const guard2 = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders", () => guard1);
-        router.addDeactivateGuard("orders.pending", () => guard2);
+        lifecycle.addDeactivateGuard("orders", () => guard1);
+        lifecycle.addDeactivateGuard("orders.pending", () => guard2);
 
         await router.navigate("orders.pending");
 
@@ -166,7 +171,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canActivate returns true", async () => {
         const activateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("profile", () => activateGuard);
+        lifecycle.addActivateGuard("profile", () => activateGuard);
 
         await router.navigate("profile", {}, {});
 
@@ -177,8 +182,8 @@ describe("router.navigate() - promise resolve values", () => {
         const guard1 = vi.fn().mockReturnValue(true);
         const guard2 = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("settings", () => guard1);
-        router.addActivateGuard("settings.account", () => guard2);
+        lifecycle.addActivateGuard("settings", () => guard1);
+        lifecycle.addActivateGuard("settings.account", () => guard2);
 
         await router.navigate("settings.account", {}, {});
 
@@ -215,7 +220,7 @@ describe("router.navigate() - promise resolve values", () => {
         const guard = vi.fn().mockReturnValue(true);
         const middleware = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("orders", () => guard);
+        lifecycle.addActivateGuard("orders", () => guard);
         router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
         await router.navigate("orders", {}, {});
@@ -296,7 +301,7 @@ describe("router.navigate() - promise resolve values", () => {
         };
         const redirectingMiddleware = vi.fn().mockReturnValue(redirectState);
 
-        router.addActivateGuard("profile", () => guard);
+        lifecycle.addActivateGuard("profile", () => guard);
         router.usePlugin(() => ({
           onTransitionSuccess: redirectingMiddleware,
         }));
@@ -314,7 +319,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canDeactivate returns Promise.resolve(true)", async () => {
         const promiseDeactivateGuard = vi.fn().mockResolvedValue(true);
 
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => promiseDeactivateGuard,
         );
@@ -334,8 +339,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseGuard1 = vi.fn().mockResolvedValue(true);
         const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
-        router.addDeactivateGuard("orders", () => promiseGuard1);
-        router.addDeactivateGuard("orders.pending", () => promiseGuard2);
+        lifecycle.addDeactivateGuard("orders", () => promiseGuard1);
+        lifecycle.addDeactivateGuard("orders.pending", () => promiseGuard2);
 
         await router.navigate("orders.pending");
 
@@ -353,7 +358,7 @@ describe("router.navigate() - promise resolve values", () => {
       it("should continue transition when canActivate returns Promise.resolve(true)", async () => {
         const promiseActivateGuard = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("profile", () => promiseActivateGuard);
+        lifecycle.addActivateGuard("profile", () => promiseActivateGuard);
 
         await router.navigate("profile", {}, {});
 
@@ -364,8 +369,8 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseGuard1 = vi.fn().mockResolvedValue(true);
         const promiseGuard2 = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("settings", () => promiseGuard1);
-        router.addActivateGuard("settings.account", () => promiseGuard2);
+        lifecycle.addActivateGuard("settings", () => promiseGuard1);
+        lifecycle.addActivateGuard("settings.account", () => promiseGuard2);
 
         await router.navigate("settings.account", {}, {});
 
@@ -402,7 +407,7 @@ describe("router.navigate() - promise resolve values", () => {
         const promiseGuard = vi.fn().mockResolvedValue(true);
         const promiseMiddleware = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("orders", () => promiseGuard);
+        lifecycle.addActivateGuard("orders", () => promiseGuard);
         router.usePlugin(() => ({ onTransitionSuccess: promiseMiddleware }));
 
         await router.navigate("orders", {}, {});
@@ -491,7 +496,7 @@ describe("router.navigate() - promise resolve values", () => {
           .fn()
           .mockResolvedValue(redirectState);
 
-        router.addActivateGuard("profile", () => promiseGuard);
+        lifecycle.addActivateGuard("profile", () => promiseGuard);
         router.usePlugin(() => ({
           onTransitionSuccess: promiseRedirectMiddleware,
         }));

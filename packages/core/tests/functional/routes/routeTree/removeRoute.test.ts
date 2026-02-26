@@ -1,18 +1,30 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, getPluginApi, getRoutesApi } from "@real-router/core";
+import {
+  errorCodes,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, RouterError, RoutesApi } from "@real-router/core";
+import type {
+  LifecycleApi,
+  Router,
+  RouterError,
+  RoutesApi,
+} from "@real-router/core";
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: LifecycleApi;
 
 describe("core/routes/removeRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
     await router.start("/home");
   });
 
@@ -193,7 +205,7 @@ describe("core/routes/removeRoute", () => {
       const guard = vi.fn().mockReturnValue(false);
 
       routesApi.add({ name: "editor", path: "/editor" });
-      router.addDeactivateGuard("editor", () => guard);
+      lifecycle.addDeactivateGuard("editor", () => guard);
 
       // Navigate to editor first
       await router.navigate("editor");
@@ -225,8 +237,8 @@ describe("core/routes/removeRoute", () => {
 
       routesApi.add({ name: "form1", path: "/form1" });
       routesApi.add({ name: "form2", path: "/form2" });
-      router.addDeactivateGuard("form1", () => guard1);
-      router.addDeactivateGuard("form2", () => guard2);
+      lifecycle.addDeactivateGuard("form1", () => guard1);
+      lifecycle.addDeactivateGuard("form2", () => guard2);
 
       routesApi.remove("form1");
 
@@ -252,7 +264,7 @@ describe("core/routes/removeRoute", () => {
         path: "/dashboard",
         canActivate: () => () => true,
       });
-      router.addDeactivateGuard("dashboard", () => () => true);
+      lifecycle.addDeactivateGuard("dashboard", () => () => true);
 
       routesApi.remove("dashboard");
 
@@ -415,7 +427,7 @@ describe("core/routes/removeRoute", () => {
         path: "/area",
         children: [{ name: "page", path: "/page" }],
       });
-      router.addDeactivateGuard("area.page", () => guard);
+      lifecycle.addDeactivateGuard("area.page", () => guard);
 
       // Verify guard works before removal
       await router.navigate("area.page");
@@ -569,7 +581,7 @@ describe("core/routes/removeRoute", () => {
         encodeParams: (p) => ({ ...p, id: `${p.id as number}` }),
         canActivate: () => activateGuard,
       });
-      router.addDeactivateGuard("existing", () => deactivateGuard);
+      lifecycle.addDeactivateGuard("existing", () => deactivateGuard);
 
       // Attempt to remove non-existent route
       routesApi.remove("nonexistent");

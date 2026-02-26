@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, getLifecycleApi } from "@real-router/core";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
@@ -534,7 +534,7 @@ describe("Persistent params plugin", () => {
         const spy = vi.fn();
 
         router.usePlugin(plugin);
-        router.addDeactivateGuard("route1", () => () => true);
+        getLifecycleApi(router).addDeactivateGuard("route1", () => () => true);
         await router.start("/route1/1?mode=dev");
         router.subscribe(spy);
 

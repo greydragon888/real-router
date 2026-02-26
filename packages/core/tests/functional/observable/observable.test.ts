@@ -1,19 +1,26 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const noop = () => undefined;
 
 describe("core/observable", () => {
   beforeEach(async () => {
     router = createTestRouter();
     await router.start("/home");
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -75,7 +82,7 @@ describe("core/observable", () => {
       it("should trigger TRANSITION_ERROR listener when navigation fails", async () => {
         const cb = vi.fn();
 
-        router.addActivateGuard("admin-protected", () => () => false);
+        lifecycle.addActivateGuard("admin-protected", () => () => false);
         getPluginApi(router).addEventListener(events.TRANSITION_ERROR, cb);
         try {
           await router.navigate("admin-protected", {}, {});
@@ -204,6 +211,7 @@ describe("core/observable", () => {
 
         router.stop();
         await router.start("/home");
+        lifecycle = getLifecycleApi(router);
 
         expect(cb1).toHaveBeenCalledTimes(1);
         expect(cb2).not.toHaveBeenCalled();

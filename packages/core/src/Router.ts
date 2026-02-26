@@ -39,13 +39,7 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
-import type {
-  GuardFnFactory,
-  Limits,
-  PluginFactory,
-  Route,
-  RouterEventMap,
-} from "./types";
+import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
   DefaultDependencies,
   NavigationOptions,
@@ -292,10 +286,6 @@ export class Router<
     this.dispose = this.dispose.bind(this);
 
     // Route Lifecycle (Guards)
-    this.addActivateGuard = this.addActivateGuard.bind(this);
-    this.addDeactivateGuard = this.addDeactivateGuard.bind(this);
-    this.removeActivateGuard = this.removeActivateGuard.bind(this);
-    this.removeDeactivateGuard = this.removeDeactivateGuard.bind(this);
     this.canNavigateTo = this.canNavigateTo.bind(this);
 
     // Plugins
@@ -466,64 +456,6 @@ export class Router<
   // ============================================================================
   // Route Lifecycle (Guards)
   // ============================================================================
-
-  addDeactivateGuard(
-    name: string,
-    canDeactivateHandler: GuardFnFactory<Dependencies> | boolean,
-  ): this {
-    if (!this.#noValidate) {
-      validateRouteName(name, "addDeactivateGuard");
-      RouteLifecycleNamespace.validateHandler(
-        canDeactivateHandler,
-        "addDeactivateGuard",
-      );
-    }
-
-    this.#routeLifecycle.addCanDeactivate(
-      name,
-      canDeactivateHandler,
-      this.#noValidate,
-    );
-
-    return this;
-  }
-
-  addActivateGuard(
-    name: string,
-    canActivateHandler: GuardFnFactory<Dependencies> | boolean,
-  ): this {
-    if (!this.#noValidate) {
-      validateRouteName(name, "addActivateGuard");
-      RouteLifecycleNamespace.validateHandler(
-        canActivateHandler,
-        "addActivateGuard",
-      );
-    }
-
-    this.#routeLifecycle.addCanActivate(
-      name,
-      canActivateHandler,
-      this.#noValidate,
-    );
-
-    return this;
-  }
-
-  removeActivateGuard(name: string): void {
-    if (!this.#noValidate) {
-      validateRouteName(name, "removeActivateGuard");
-    }
-
-    this.#routeLifecycle.clearCanActivate(name);
-  }
-
-  removeDeactivateGuard(name: string): void {
-    if (!this.#noValidate) {
-      validateRouteName(name, "removeDeactivateGuard");
-    }
-
-    this.#routeLifecycle.clearCanDeactivate(name);
-  }
 
   canNavigateTo(name: string, params?: Params): boolean {
     if (!this.#noValidate) {
@@ -698,10 +630,6 @@ export class Router<
     this.navigateToDefault = throwDisposed as never;
     this.start = throwDisposed as never;
     this.stop = throwDisposed as never;
-    this.addActivateGuard = throwDisposed as never;
-    this.addDeactivateGuard = throwDisposed as never;
-    this.removeActivateGuard = throwDisposed as never;
-    this.removeDeactivateGuard = throwDisposed as never;
     this.usePlugin = throwDisposed as never;
 
     this.subscribe = throwDisposed as never;

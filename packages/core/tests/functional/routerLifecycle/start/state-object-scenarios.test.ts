@@ -1,12 +1,19 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  constants,
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { LifecycleApi, Router, State } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const homeState: State = {
   name: "home",
   params: {},
@@ -17,6 +24,7 @@ const homeState: State = {
 describe("router.start() - state object scenarios", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -384,7 +392,7 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR with correct event structure", async () => {
         const validPath = "/orders/view/456";
 
-        router.addActivateGuard("orders.view", () => () => {
+        lifecycle.addActivateGuard("orders.view", () => () => {
           throw new Error("Blocked");
         });
 
@@ -420,7 +428,7 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when Promise rejects", async () => {
         const validPath = "/users/view/789";
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "users.view",
           () => () => Promise.reject(new Error("Async access denied")),
         );
@@ -453,7 +461,7 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when transition is blocked", async () => {
         const validPath = "/settings/general";
 
-        router.addActivateGuard("settings.general", () => () => {
+        lifecycle.addActivateGuard("settings.general", () => () => {
           throw new Error("Blocked");
         });
 
@@ -484,7 +492,7 @@ describe("router.start() - state object scenarios", () => {
       it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", async () => {
         const validPath = "/orders/completed";
 
-        router.addActivateGuard("orders.completed", () => () => {
+        lifecycle.addActivateGuard("orders.completed", () => () => {
           throw new Error("Blocked");
         });
 
@@ -518,7 +526,7 @@ describe("router.start() - state object scenarios", () => {
       it("should not silently fallback when primary transition fails", async () => {
         const validPath = "/items/123";
 
-        router.addActivateGuard("items", () => () => {
+        lifecycle.addActivateGuard("items", () => () => {
           throw new Error("Blocked");
         });
 
@@ -551,7 +559,7 @@ describe("router.start() - state object scenarios", () => {
           path: "/users/view/999",
         };
 
-        router.addActivateGuard("users.view", () => () => {
+        lifecycle.addActivateGuard("users.view", () => () => {
           throw new Error("Blocked");
         });
 
@@ -583,7 +591,7 @@ describe("router.start() - state object scenarios", () => {
 
         const validPath = "/profile/user/123";
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "profile.user",
           () => () =>
             Promise.reject({

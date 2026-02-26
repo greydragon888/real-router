@@ -1,18 +1,26 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  getLifecycleApi,
+  errorCodes,
+  events,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - router not started", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -143,7 +151,7 @@ describe("router.navigate() - router not started", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
-      router.addActivateGuard("users", () => guard);
+      lifecycle.addActivateGuard("users", () => guard);
       router.usePlugin(() => ({
         onTransitionSuccess: () => {
           middleware();

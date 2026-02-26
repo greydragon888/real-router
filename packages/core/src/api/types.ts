@@ -1,6 +1,11 @@
 // IMPORTANT: Use the EXACT types from Router.ts method signatures
 
-import type { EventMethodMap, Route, RouteConfigUpdate } from "../types";
+import type {
+  EventMethodMap,
+  GuardFnFactory,
+  Route,
+  RouteConfigUpdate,
+} from "../types";
 import type {
   DefaultDependencies,
   EventName,
@@ -116,4 +121,22 @@ export interface DependenciesApi<
   remove: (name: keyof Dependencies) => void;
   reset: () => void;
   has: (name: keyof Dependencies) => boolean;
+}
+
+/**
+ * Lifecycle API — guard registration (addActivateGuard, addDeactivateGuard, etc.)
+ */
+export interface LifecycleApi<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  addActivateGuard: (
+    name: string,
+    canActivateHandler: GuardFnFactory<Dependencies> | boolean,
+  ) => void;
+  addDeactivateGuard: (
+    name: string,
+    canDeactivateHandler: GuardFnFactory<Dependencies> | boolean,
+  ) => void;
+  removeActivateGuard: (name: string) => void;
+  removeDeactivateGuard: (name: string) => void;
 }

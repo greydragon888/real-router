@@ -1,18 +1,26 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes, getPluginApi } from "@real-router/core";
+import {
+  getLifecycleApi,
+  events,
+  errorCodes,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - events transition start", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -88,7 +96,7 @@ describe("router.navigate() - events transition start", () => {
       const canActivateGuard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn().mockReturnValue(true);
 
-      router.addActivateGuard("users.view", () => canActivateGuard);
+      lifecycle.addActivateGuard("users.view", () => canActivateGuard);
       router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
       const unsubStart = getPluginApi(router).addEventListener(
@@ -175,7 +183,7 @@ describe("router.navigate() - events transition start", () => {
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.addActivateGuard("users.view", () => blockingGuard);
+      lifecycle.addActivateGuard("users.view", () => blockingGuard);
 
       const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,

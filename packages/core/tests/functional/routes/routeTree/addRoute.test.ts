@@ -1,12 +1,18 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
+import {
+  createRouter,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
 import type {
   GuardFnFactory,
+  LifecycleApi,
   Params,
   Route,
   Router,
@@ -16,11 +22,13 @@ import type {
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: LifecycleApi;
 
 describe("core/routes/addRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
     await router.start("/home");
   });
 
@@ -1836,7 +1844,7 @@ describe("core/routes/addRoute", () => {
       });
 
       // Overwrite with addDeactivateGuard
-      router.addDeactivateGuard("workspace", () => guard2);
+      lifecycle.addDeactivateGuard("workspace", () => guard2);
 
       // Navigate to route
       await router.navigate("workspace");

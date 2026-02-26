@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getRoutesApi } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core";
 
 import {
   createLifecycleTestRouter,
@@ -13,11 +13,13 @@ import type { RoutesApi } from "@real-router/core";
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: ReturnType<typeof getLifecycleApi>;
 
 describe("core/route-lifecycle/guard-api", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -26,7 +28,7 @@ describe("core/route-lifecycle/guard-api", () => {
 
   describe("addActivateGuard", () => {
     it("should register activation guard identical to old canActivate", async () => {
-      router.addActivateGuard("admin", false);
+      lifecycle.addActivateGuard("admin", false);
 
       try {
         await router.navigate("admin");
@@ -38,24 +40,24 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should allow navigation when guard returns true", async () => {
-      router.addActivateGuard("admin", true);
+      lifecycle.addActivateGuard("admin", true);
 
       await router.navigate("admin");
 
       expect(router.getState()?.name).toBe("admin");
     });
 
-    it("should return this for chaining", () => {
-      const result = router.addActivateGuard("admin", true);
+    it("should register guard without throwing", () => {
+      lifecycle.addActivateGuard("admin", true);
 
-      expect(result).toBe(router);
+      expect(router.canNavigateTo("admin")).toBe(true);
     });
   });
 
   describe("addDeactivateGuard", () => {
     it("should register deactivation guard identical to old canDeactivate", async () => {
       await router.navigate("admin");
-      router.addDeactivateGuard("admin", false);
+      lifecycle.addDeactivateGuard("admin", false);
 
       try {
         await router.navigate("home");
@@ -68,24 +70,24 @@ describe("core/route-lifecycle/guard-api", () => {
 
     it("should allow navigation when guard returns true", async () => {
       await router.navigate("admin");
-      router.addDeactivateGuard("admin", true);
+      lifecycle.addDeactivateGuard("admin", true);
 
       await router.navigate("home");
 
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("should return this for chaining", () => {
-      const result = router.addDeactivateGuard("admin", true);
+    it("should register guard without throwing", () => {
+      lifecycle.addDeactivateGuard("admin", true);
 
-      expect(result).toBe(router);
+      expect(router.canNavigateTo("admin")).toBe(true);
     });
   });
 
   describe("removeActivateGuard", () => {
     it("removes guard and allows navigation", async () => {
-      router.addActivateGuard("admin", false);
-      router.removeActivateGuard("admin");
+      lifecycle.addActivateGuard("admin", false);
+      lifecycle.removeActivateGuard("admin");
 
       await router.navigate("admin");
 
@@ -96,10 +98,10 @@ describe("core/route-lifecycle/guard-api", () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
       await noValidateRouter.start("/home");
-      noValidateRouter.addActivateGuard("admin", false);
+      getLifecycleApi(noValidateRouter).addActivateGuard("admin", false);
 
       expect(() => {
-        noValidateRouter.removeActivateGuard("admin");
+        getLifecycleApi(noValidateRouter).removeActivateGuard("admin");
       }).not.toThrowError();
     });
   });
@@ -107,8 +109,8 @@ describe("core/route-lifecycle/guard-api", () => {
   describe("removeDeactivateGuard", () => {
     it("removes guard and allows navigation away", async () => {
       await router.navigate("admin");
-      router.addDeactivateGuard("admin", false);
-      router.removeDeactivateGuard("admin");
+      lifecycle.addDeactivateGuard("admin", false);
+      lifecycle.removeDeactivateGuard("admin");
 
       await router.navigate("home");
 
@@ -119,10 +121,10 @@ describe("core/route-lifecycle/guard-api", () => {
       const noValidateRouter = createTestRouter({ noValidate: true });
 
       await noValidateRouter.start("/home");
-      noValidateRouter.addDeactivateGuard("admin", false);
+      getLifecycleApi(noValidateRouter).addDeactivateGuard("admin", false);
 
       expect(() => {
-        noValidateRouter.removeDeactivateGuard("admin");
+        getLifecycleApi(noValidateRouter).removeDeactivateGuard("admin");
       }).not.toThrowError();
     });
   });
@@ -133,7 +135,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should return false when activation guard blocks", () => {
-      router.addActivateGuard("admin", false);
+      lifecycle.addActivateGuard("admin", false);
 
       expect(router.canNavigateTo("admin")).toBe(false);
     });
@@ -143,21 +145,21 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should check full hierarchy for nested routes", () => {
-      router.addActivateGuard("admin", false);
+      lifecycle.addActivateGuard("admin", false);
 
       expect(router.canNavigateTo("admin.dashboard")).toBe(false);
     });
 
     it("should return true when all hierarchy guards pass", () => {
-      router.addActivateGuard("admin", true);
-      router.addActivateGuard("admin.dashboard", true);
+      lifecycle.addActivateGuard("admin", true);
+      lifecycle.addActivateGuard("admin.dashboard", true);
 
       expect(router.canNavigateTo("admin.dashboard")).toBe(true);
     });
 
     it("should check deactivation guards on current route", async () => {
       await router.navigate("admin");
-      router.addDeactivateGuard("admin", false);
+      lifecycle.addDeactivateGuard("admin", false);
 
       expect(router.canNavigateTo("home")).toBe(false);
     });
@@ -174,7 +176,7 @@ describe("core/route-lifecycle/guard-api", () => {
     it("should handle forwarded routes", async () => {
       await router.navigate("admin");
       routesApi.add({ name: "old", path: "/old", forwardTo: "home" });
-      router.addActivateGuard("home", false);
+      lifecycle.addActivateGuard("home", false);
 
       expect(router.canNavigateTo("old")).toBe(false);
     });
@@ -182,7 +184,7 @@ describe("core/route-lifecycle/guard-api", () => {
     it("should return false for async guard with warning", () => {
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-      router.addActivateGuard("admin", () => () => Promise.resolve(true));
+      lifecycle.addActivateGuard("admin", () => () => Promise.resolve(true));
 
       expect(router.canNavigateTo("admin")).toBe(false);
       expect(warnSpy).toHaveBeenCalled();
@@ -191,7 +193,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("should work with params", () => {
-      router.addActivateGuard("users.view", false);
+      lifecycle.addActivateGuard("users.view", false);
 
       expect(router.canNavigateTo("users.view", { id: "123" })).toBe(false);
     });

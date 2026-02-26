@@ -2,7 +2,11 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import {
+  createSimpleRouter,
+  addActivateGuard,
+  addDeactivateGuard,
+} from "../helpers";
 
 /**
  * Batch size for stable measurements on sub-µs operations.
@@ -94,9 +98,9 @@ const BATCH_GUARDS = 200;
     `4.1.7 Adding canActivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
       for (let i = 0; i < BATCH_GUARDS; i++) {
-        router.addActivateGuard("about", () => () => true);
+        addActivateGuard(router, "about", () => () => true);
         // Overwrite with true to effectively clear the guard
-        router.addActivateGuard("about", true);
+        addActivateGuard(router, "about", true);
       }
     },
   ).gc("inner");
@@ -110,9 +114,9 @@ const BATCH_GUARDS = 200;
     `4.1.8 Adding canDeactivate guard for route with cleanup (×${BATCH_GUARDS})`,
     () => {
       for (let i = 0; i < BATCH_GUARDS; i++) {
-        router.addDeactivateGuard("about", () => () => true);
+        addDeactivateGuard(router, "about", () => () => true);
         // Overwrite with true to effectively clear the guard
-        router.addDeactivateGuard("about", true);
+        addDeactivateGuard(router, "about", true);
       }
     },
   ).gc("inner");

@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { RouterError, errorCodes } from "@real-router/core";
+import { getLifecycleApi, RouterError, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - guards cannot redirect", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -27,7 +30,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("canDeactivate returns error when attempting redirect", () => {
       it("should return error when canDeactivate throws redirect error", async () => {
-        router.addDeactivateGuard("users", () => () => {
+        lifecycle.addDeactivateGuard("users", () => () => {
           throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
             redirect: {
               name: "orders.pending",
@@ -53,7 +56,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should return error when canDeactivate returns false", async () => {
-        router.addDeactivateGuard("users", () => () => false);
+        lifecycle.addDeactivateGuard("users", () => () => false);
 
         await router.navigate("users");
 
@@ -71,7 +74,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("canActivate returns error when attempting redirect", () => {
       it("should return error when canActivate throws redirect error", async () => {
-        router.addActivateGuard("profile", () => () => {
+        lifecycle.addActivateGuard("profile", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             redirect: { name: "sign-in", params: {}, path: "/sign-in" },
           });
@@ -90,7 +93,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should return error when canActivate returns false", async () => {
-        router.addActivateGuard("users.view", () => () => false);
+        lifecycle.addActivateGuard("users.view", () => () => false);
 
         await router.navigate("index");
 
@@ -106,7 +109,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error for Promise-based canActivate redirect via rejection", async () => {
         vi.useFakeTimers();
 
-        router.addActivateGuard("profile", () => () => {
+        lifecycle.addActivateGuard("profile", () => () => {
           return new Promise((_resolve, reject) => {
             setTimeout(() => {
               const error = new RouterError(errorCodes.CANNOT_ACTIVATE, {
@@ -134,7 +137,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       it("should return error for Promise-based canActivate returning false", async () => {
         vi.useFakeTimers();
 
-        router.addActivateGuard("profile", () => () => {
+        lifecycle.addActivateGuard("profile", () => () => {
           return new Promise<boolean>((resolve) => {
             setTimeout(() => {
               resolve(false);
@@ -173,7 +176,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     describe("guards blocking (not redirecting)", () => {
       it("should block with false return", async () => {
-        router.addActivateGuard("admin", () => () => false);
+        lifecycle.addActivateGuard("admin", () => () => false);
 
         await router.navigate("users");
 
@@ -189,7 +192,7 @@ describe("router.navigate() - guards cannot redirect", () => {
       });
 
       it("should block with error throw", async () => {
-        router.addActivateGuard("admin", () => () => {
+        lifecycle.addActivateGuard("admin", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             message: "Access denied",
           });
@@ -215,7 +218,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     it("should return error when canDeactivate returns redirect (guards cannot redirect)", async () => {
       await router.navigate("users");
 
-      router.addDeactivateGuard("users", () => () => {
+      lifecycle.addDeactivateGuard("users", () => () => {
         throw new RouterError(errorCodes.CANNOT_DEACTIVATE, {
           redirect: { name: "sign-in", params: {}, path: "/sign-in" },
         });
@@ -236,7 +239,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     it("should remain on current route when canDeactivate returns false", async () => {
       await router.navigate("users");
 
-      router.addDeactivateGuard("users", () => () => false);
+      lifecycle.addDeactivateGuard("users", () => () => false);
 
       try {
         await router.navigate("profile");
@@ -256,7 +259,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 1: canDeactivate returning different state returns error
     it("should return error when canDeactivate returns false", async () => {
-      router.addDeactivateGuard("users", () => () => false);
+      lifecycle.addDeactivateGuard("users", () => () => false);
 
       await router.navigate("users");
 
@@ -273,7 +276,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 2: canActivate returning different state returns error
     it("should return error when canActivate returns false", async () => {
-      router.addActivateGuard("users", () => () => false);
+      lifecycle.addActivateGuard("users", () => () => false);
 
       try {
         await router.navigate("users");
@@ -285,7 +288,7 @@ describe("router.navigate() - guards cannot redirect", () => {
     });
 
     it("should allow navigation when guard returns true", async () => {
-      router.addActivateGuard("users.view", () => () => {
+      lifecycle.addActivateGuard("users.view", () => () => {
         return true;
       });
 
@@ -296,7 +299,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
     // Test 4: Protected route blocks access
     it("should block access to protected route", async () => {
-      router.addActivateGuard("admin", () => () => false);
+      lifecycle.addActivateGuard("admin", () => () => false);
 
       await router.navigate("users");
 
@@ -323,7 +326,7 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         await freshRouter.start("/home");
 
-        freshRouter.addActivateGuard("users", () => () => {
+        getLifecycleApi(freshRouter).addActivateGuard("users", () => () => {
           throw new RouterError(errorCodes.CANNOT_ACTIVATE, {
             redirect: { name: "orders", params: {}, path: "/orders" },
           });
@@ -346,7 +349,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         await freshRouter.start("/home");
 
-        freshRouter.addActivateGuard("users", () => () => false);
+        getLifecycleApi(freshRouter).addActivateGuard(
+          "users",
+          () => () => false,
+        );
 
         try {
           await freshRouter.navigate("users");
@@ -364,7 +370,10 @@ describe("router.navigate() - guards cannot redirect", () => {
 
         await freshRouter.start("/home");
 
-        freshRouter.addActivateGuard("admin", () => () => false);
+        getLifecycleApi(freshRouter).addActivateGuard(
+          "admin",
+          () => () => false,
+        );
 
         try {
           await freshRouter.navigate("admin");

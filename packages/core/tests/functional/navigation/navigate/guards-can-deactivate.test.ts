@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - guards can deactivate", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -28,8 +31,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
         // Set up canDeactivate handlers
-        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => pendingDeactivateGuard,
         );
@@ -53,8 +56,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
         const accountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "settings.account",
           () => accountDeactivateGuard,
         );
@@ -75,7 +78,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should respect canDeactivate blocking transition", async () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Block transition
 
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => blockingDeactivateGuard,
         );
@@ -103,8 +106,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => pendingDeactivateGuard,
         );
@@ -125,7 +128,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should bypass blocking guards when forceDeactivate is true", async () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
 
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => blockingDeactivateGuard,
         );
@@ -144,8 +147,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
         const privacyDeactivateGuard = vi.fn().mockReturnValue(false); // Would block
 
-        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "settings.privacy",
           () => privacyDeactivateGuard,
         );
@@ -168,8 +171,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const ordersDeactivateGuard = vi.fn().mockReturnValue(true);
         const pendingDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => pendingDeactivateGuard,
         );
@@ -190,7 +193,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should respect blocking guards in normal navigation", async () => {
         const blockingDeactivateGuard = vi.fn().mockReturnValue(false); // Blocks transition
 
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "orders.pending",
           () => blockingDeactivateGuard,
         );
@@ -217,8 +220,8 @@ describe("router.navigate() - guards can deactivate", () => {
         const settingsDeactivateGuard = vi.fn().mockReturnValue(true);
         const accountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "settings.account",
           () => accountDeactivateGuard,
         );
@@ -238,7 +241,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should verify that forceDeactivate: false calls guards normally", async () => {
         const deactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders.pending", () => deactivateGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         await router.navigate("orders.pending");
 
@@ -253,7 +256,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should only skip guards on very first navigation (no current state)", async () => {
         const profileDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("profile", () => profileDeactivateGuard);
+        lifecycle.addDeactivateGuard("profile", () => profileDeactivateGuard);
 
         // Navigate to a different state first (not home, to avoid SAME_STATES)
         await router.navigate("profile");
@@ -273,7 +276,7 @@ describe("router.navigate() - guards can deactivate", () => {
       it("should handle combination of fromState and forceDeactivate correctly", async () => {
         const deactivateGuard = vi.fn().mockReturnValue(false); // Would block normally
 
-        router.addDeactivateGuard("orders.pending", () => deactivateGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => deactivateGuard);
 
         await router.navigate("orders.pending");
 

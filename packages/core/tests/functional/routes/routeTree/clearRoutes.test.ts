@@ -4,21 +4,24 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   events,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, RoutesApi } from "@real-router/core";
+import type { LifecycleApi, Router, RoutesApi } from "@real-router/core";
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: LifecycleApi;
 
 describe("core/routes/clearRoutes", () => {
   beforeEach(async () => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
     await router.start("/home");
   });
 
@@ -221,7 +224,7 @@ describe("core/routes/clearRoutes", () => {
 
     it("should clear canDeactivate handlers", async () => {
       routesApi.add({ name: "editor", path: "/editor" });
-      router.addDeactivateGuard("editor", () => () => false); // blocking guard
+      lifecycle.addDeactivateGuard("editor", () => () => false); // blocking guard
 
       await router.navigate("editor");
 
@@ -258,7 +261,7 @@ describe("core/routes/clearRoutes", () => {
         path: "/route2",
         canActivate: () => () => false,
       });
-      router.addDeactivateGuard("home", () => () => false);
+      lifecycle.addDeactivateGuard("home", () => () => false);
 
       routesApi.clear();
 

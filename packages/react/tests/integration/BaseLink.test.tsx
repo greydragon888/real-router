@@ -1,3 +1,4 @@
+import { getLifecycleApi } from "@real-router/core";
 import {
   screen,
   render,
@@ -90,7 +91,7 @@ describe("BaseLink - Integration Tests", () => {
     it("should recover from navigation error", async () => {
       let shouldFail = true;
 
-      router.addActivateGuard("one-more-test", () => () => {
+      getLifecycleApi(router).addActivateGuard("one-more-test", () => () => {
         if (shouldFail) {
           return Promise.reject(new Error("Navigation blocked"));
         }

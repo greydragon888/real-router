@@ -4,6 +4,7 @@ import {
   cloneRouter,
   errorCodes,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core";
@@ -78,7 +79,7 @@ describe("cloneRouter()", () => {
     const router = createTestRouter();
     const canActivateGuard = vi.fn().mockReturnValue(false);
 
-    router.addActivateGuard("admin", () => canActivateGuard);
+    getLifecycleApi(router).addActivateGuard("admin", () => canActivateGuard);
 
     const clonedRouter = cloneRouter(router);
 
@@ -101,7 +102,10 @@ describe("cloneRouter()", () => {
     const router = createTestRouter();
     const canDeactivateGuard = vi.fn().mockReturnValue(false);
 
-    router.addDeactivateGuard("users", () => canDeactivateGuard);
+    getLifecycleApi(router).addDeactivateGuard(
+      "users",
+      () => canDeactivateGuard,
+    );
 
     const clonedRouter = cloneRouter(router);
 
@@ -520,9 +524,12 @@ describe("cloneRouter()", () => {
       const canActivateUsers = vi.fn().mockReturnValue(true);
       const canDeactivateAdmin = vi.fn().mockReturnValue(true);
 
-      router.addActivateGuard("home", () => canActivateHome);
-      router.addActivateGuard("users", () => canActivateUsers);
-      router.addDeactivateGuard("admin", () => canDeactivateAdmin);
+      getLifecycleApi(router).addActivateGuard("home", () => canActivateHome);
+      getLifecycleApi(router).addActivateGuard("users", () => canActivateUsers);
+      getLifecycleApi(router).addDeactivateGuard(
+        "admin",
+        () => canDeactivateAdmin,
+      );
 
       const clonedRouter = cloneRouter(router);
 
@@ -586,8 +593,11 @@ describe("cloneRouter()", () => {
       const canDeactivateHome = vi.fn().mockReturnValue(true);
 
       // Same route has both lifecycle handlers
-      router.addActivateGuard("home", () => canActivateHome);
-      router.addDeactivateGuard("home", () => canDeactivateHome);
+      getLifecycleApi(router).addActivateGuard("home", () => canActivateHome);
+      getLifecycleApi(router).addDeactivateGuard(
+        "home",
+        () => canDeactivateHome,
+      );
 
       const clonedRouter = cloneRouter(router);
 
@@ -608,7 +618,10 @@ describe("cloneRouter()", () => {
       // Verify handlers are independent - adding to clone doesn't affect original
       const newHandler = vi.fn().mockReturnValue(true);
 
-      clonedRouter.addActivateGuard("orders", () => newHandler);
+      getLifecycleApi(clonedRouter).addActivateGuard(
+        "orders",
+        () => newHandler,
+      );
 
       // Navigate on cloned router
       const state3 = await clonedRouter.navigate("orders");

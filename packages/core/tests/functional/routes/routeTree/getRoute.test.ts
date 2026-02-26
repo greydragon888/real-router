@@ -1,24 +1,27 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getRoutesApi } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
 import type {
-  Router,
-  Route,
   GuardFnFactory,
+  LifecycleApi,
   Params,
+  Route,
+  Router,
   RoutesApi,
 } from "@real-router/core";
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: LifecycleApi;
 
 describe("core/routes/routeTree/getRoute", () => {
   beforeEach(async () => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
     await router.start("/home");
   });
 
@@ -411,7 +414,7 @@ describe("core/routes/routeTree/getRoute", () => {
         let routeDuringNavigation: ReturnType<typeof routesApi.get>;
 
         // Add async guard to make navigation async
-        router.addActivateGuard("ec-slow", () => async () => {
+        lifecycle.addActivateGuard("ec-slow", () => async () => {
           // Read route during active navigation
           routeDuringNavigation = routesApi.get("ec-target");
           await new Promise((resolve) => setTimeout(resolve, 10));

@@ -1,17 +1,24 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - error handling", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -259,7 +266,7 @@ describe("router.start() - error handling", () => {
         });
 
         // Add async guard that delays the transition
-        router.addActivateGuard("home", () => async () => {
+        lifecycle.addActivateGuard("home", () => async () => {
           await middlewarePromise;
 
           return true;
@@ -293,7 +300,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should allow start() after failed async transition resets isActive", async () => {
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "home",
           () => () => Promise.reject(new Error("Guard error")),
         );
@@ -318,12 +325,13 @@ describe("router.start() - error handling", () => {
     describe("transition error handling when defaultRoute is set", () => {
       beforeEach(async () => {
         router = createTestRouter({ defaultRoute: "home" });
+        lifecycle = getLifecycleApi(router);
         await router.start("/home");
       });
 
       it("should return transition error to callback instead of falling back silently", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -338,7 +346,7 @@ describe("router.start() - error handling", () => {
 
       it("should emit TRANSITION_ERROR event when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -360,7 +368,7 @@ describe("router.start() - error handling", () => {
 
       it("should NOT silently navigate to defaultRoute when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -386,7 +394,7 @@ describe("router.start() - error handling", () => {
 
       it("should NOT emit TRANSITION_SUCCESS when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -410,7 +418,7 @@ describe("router.start() - error handling", () => {
       it("should NOT start router when transition fails (two-phase start)", async () => {
         router.stop();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 

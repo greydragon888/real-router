@@ -1,6 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter, errorCodes, constants } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  constants,
+  getLifecycleApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -49,8 +54,11 @@ describe("router.navigate() - unknown route", () => {
         { allowNotFound: true },
       );
 
-      freshRouter.addActivateGuard("profile", () => canActivateGuard);
-      freshRouter.addDeactivateGuard(
+      getLifecycleApi(freshRouter).addActivateGuard(
+        "profile",
+        () => canActivateGuard,
+      );
+      getLifecycleApi(freshRouter).addDeactivateGuard(
         constants.UNKNOWN_ROUTE,
         () => canDeactivateGuard,
       );

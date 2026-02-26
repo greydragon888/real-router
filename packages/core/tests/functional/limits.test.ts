@@ -5,6 +5,7 @@ import {
   cloneRouter,
   events,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
 } from "@real-router/core";
 
@@ -234,8 +235,8 @@ describe("core/limits (integration via public API)", () => {
       // Register many lifecycle handlers - should not throw
       expect(() => {
         for (let i = 0; i < 10; i++) {
-          router.addActivateGuard(`route${i}`, true);
-          router.addDeactivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addActivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addDeactivateGuard(`route${i}`, true);
         }
       }).not.toThrowError();
     });
@@ -393,13 +394,13 @@ describe("core/limits (integration via public API)", () => {
       // Register 199 canActivate handlers - should succeed
       expect(() => {
         for (let i = 0; i < 199; i++) {
-          router.addActivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addActivateGuard(`route${i}`, true);
         }
       }).not.toThrowError();
 
       // 200th handler should throw
       expect(() => {
-        router.addActivateGuard("route199", true);
+        getLifecycleApi(router).addActivateGuard("route199", true);
       }).toThrowError(/limit exceeded.*200/i);
     });
 
@@ -415,13 +416,13 @@ describe("core/limits (integration via public API)", () => {
 
       // Register 19 handlers - no warning
       for (let i = 0; i < 19; i++) {
-        router.addActivateGuard(`route${i}`, true);
+        getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
       // 20th handler should trigger warning
-      router.addActivateGuard("route19", true);
+      getLifecycleApi(router).addActivateGuard("route19", true);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.canActivate",
@@ -443,13 +444,13 @@ describe("core/limits (integration via public API)", () => {
 
       // Register 49 handlers - no error
       for (let i = 0; i < 49; i++) {
-        router.addActivateGuard(`route${i}`, true);
+        getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
 
       // 50th handler should trigger error log
-      router.addActivateGuard("route49", true);
+      getLifecycleApi(router).addActivateGuard("route49", true);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.canActivate",

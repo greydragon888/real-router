@@ -5,6 +5,7 @@ import {
   errorCodes,
   events,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core";
@@ -332,11 +333,11 @@ describe("dispose", () => {
 
     it("addActivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addActivateGuard("home", true);
+        getLifecycleApi(router).addActivateGuard("home", true);
       }).toThrowError();
 
       try {
-        router.addActivateGuard("home", true);
+        getLifecycleApi(router).addActivateGuard("home", true);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -344,11 +345,11 @@ describe("dispose", () => {
 
     it("addDeactivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addDeactivateGuard("home", true);
+        getLifecycleApi(router).addDeactivateGuard("home", true);
       }).toThrowError();
 
       try {
-        router.addDeactivateGuard("home", true);
+        getLifecycleApi(router).addDeactivateGuard("home", true);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }

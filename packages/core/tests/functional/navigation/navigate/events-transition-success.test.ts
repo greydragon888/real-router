@@ -1,18 +1,26 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes, getPluginApi } from "@real-router/core";
+import {
+  getLifecycleApi,
+  events,
+  errorCodes,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - events transition success", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -163,8 +171,8 @@ describe("router.navigate() - events transition success", () => {
       const middleware = vi.fn().mockReturnValue(true);
 
       // Setup guards and middleware for different routes (not parent-child)
-      router.addActivateGuard("profile", () => canActivateGuard);
-      router.addDeactivateGuard("users", () => canDeactivateGuard);
+      lifecycle.addActivateGuard("profile", () => canActivateGuard);
+      lifecycle.addDeactivateGuard("users", () => canDeactivateGuard);
       router.usePlugin(() => ({ onTransitionSuccess: middleware }));
 
       // Navigate to users first
@@ -209,7 +217,7 @@ describe("router.navigate() - events transition success", () => {
       const onError = vi.fn();
       const blockingGuard = vi.fn().mockReturnValue(false);
 
-      router.addActivateGuard("users.view", () => blockingGuard);
+      lifecycle.addActivateGuard("users.view", () => blockingGuard);
 
       const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
@@ -252,7 +260,7 @@ describe("router.navigate() - events transition success", () => {
         onCancel,
       );
 
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "users.view",
         () => () =>
           new Promise((resolve) =>
