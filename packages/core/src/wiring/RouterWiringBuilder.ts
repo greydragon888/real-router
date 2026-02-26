@@ -69,10 +69,10 @@ export class RouterWiringBuilder<
   wireRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
-        this.router.addActivateGuard(name, handler);
+        this.routeLifecycle.addCanActivate(name, handler, true);
       },
       addDeactivateGuard: (name, handler) => {
-        this.router.addDeactivateGuard(name, handler);
+        this.routeLifecycle.addCanDeactivate(name, handler, true);
       },
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),

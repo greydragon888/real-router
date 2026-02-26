@@ -6,6 +6,8 @@ import { getInternals } from "../internals";
 import { Router } from "../Router";
 import { RouterError } from "../RouterError";
 
+import { getLifecycleApi } from "./getLifecycleApi";
+
 import type { Route } from "../types";
 import type { DefaultDependencies } from "@real-router/types";
 
@@ -75,12 +77,14 @@ export function cloneRouter<
     mergedDeps,
   );
 
+  const lifecycle = getLifecycleApi(newRouter);
+
   for (const [name, handler] of Object.entries(canDeactivateFactories)) {
-    newRouter.addDeactivateGuard(name, handler);
+    lifecycle.addDeactivateGuard(name, handler);
   }
 
   for (const [name, handler] of Object.entries(canActivateFactories)) {
-    newRouter.addActivateGuard(name, handler);
+    lifecycle.addActivateGuard(name, handler);
   }
 
   if (pluginFactories.length > 0) {
