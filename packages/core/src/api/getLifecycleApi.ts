@@ -2,7 +2,7 @@ import { validateRouteName } from "type-guards";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
-import { RouteLifecycleNamespace } from "../namespaces/RouteLifecycleNamespace";
+import { validateHandler } from "../namespaces/RouteLifecycleNamespace/validators";
 import { RouterError } from "../RouterError";
 
 import type { Router } from "../Router";
@@ -28,7 +28,7 @@ export function getLifecycleApi<
 
       if (!ctx.noValidate) {
         validateRouteName(name, "addActivateGuard");
-        RouteLifecycleNamespace.validateHandler(handler, "addActivateGuard");
+        validateHandler(handler, "addActivateGuard");
       }
 
       lifecycleNamespace.addCanActivate(name, handler, ctx.noValidate);
@@ -39,7 +39,7 @@ export function getLifecycleApi<
 
       if (!ctx.noValidate) {
         validateRouteName(name, "addDeactivateGuard");
-        RouteLifecycleNamespace.validateHandler(handler, "addDeactivateGuard");
+        validateHandler(handler, "addDeactivateGuard");
       }
 
       lifecycleNamespace.addCanDeactivate(name, handler, ctx.noValidate);
