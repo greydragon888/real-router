@@ -1,3 +1,4 @@
+import { getLifecycleApi } from "@real-router/core";
 import {
   screen,
   render,
@@ -12,8 +13,6 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { BaseLink, RouterProvider } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
-
-import { getLifecycleApi } from "@real-router/core";
 
 import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
