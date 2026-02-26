@@ -25,6 +25,11 @@ export type {
 
 // Router types, factory types, and route config types
 export type {
+  Router,
+  Navigator,
+  Route,
+  Plugin,
+  Listener,
   Options,
   DefaultRouteCallback,
   ForwardToCallback,
@@ -33,17 +38,12 @@ export type {
   GuardFn,
   DefaultDependencies,
   Config,
-  Plugin,
   SubscribeState,
   SubscribeFn,
-  Listener,
   Subscription,
-  Navigator,
-  Router,
   PluginFactory,
   GuardFnFactory,
   ActivationFnFactory,
-  Route,
   RouteConfigUpdate,
 } from "./router";
 
