@@ -6,6 +6,7 @@ import { createMatcher, createRouteTree } from "route-tree";
 import { DEFAULT_ROUTE_NAME } from "./constants";
 import { resolveForwardChain } from "./helpers";
 
+import type { RoutesStore } from "./routesStore";
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
 import type { DefaultDependencies, Params } from "@real-router/types";
@@ -15,19 +16,6 @@ import type {
   RouteDefinition,
   RouteTree,
 } from "route-tree";
-
-/**
- * Context for commitTreeChanges — subset of RoutesDataContext.
- */
-interface TreeCommitContext {
-  readonly definitions: RouteDefinition[];
-  readonly config: RouteConfig;
-  readonly noValidate: boolean;
-  readonly matcherOptions: CreateMatcherOptions | undefined;
-  getRootPath: () => string;
-  setTreeAndMatcher: (tree: RouteTree, matcher: Matcher) => void;
-  setResolvedForwardMap: (map: Record<string, string>) => void;
-}
 
 /**
  * Rebuilds the route tree and matcher from definitions.
@@ -45,19 +33,31 @@ export function rebuildTree(
   return { tree, matcher };
 }
 
-/**
- * Rebuilds tree+matcher and refreshes forward map in one atomic step.
- * Replaces the repeated 3-line pattern in CRUD functions.
- */
-export function commitTreeChanges(ctx: TreeCommitContext): void {
+export function commitTreeChanges<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>, noValidate: boolean): void {
   const result = rebuildTree(
-    ctx.definitions,
-    ctx.getRootPath(),
-    ctx.matcherOptions,
+    store.definitions,
+    store.rootPath,
+    store.matcherOptions,
   );
 
-  ctx.setTreeAndMatcher(result.tree, result.matcher);
-  ctx.setResolvedForwardMap(refreshForwardMap(ctx.config, ctx.noValidate));
+  store.tree = result.tree;
+  store.matcher = result.matcher;
+  store.resolvedForwardMap = refreshForwardMap(store.config, noValidate);
+}
+
+export function rebuildTreeInPlace<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
+  const result = rebuildTree(
+    store.definitions,
+    store.rootPath,
+    store.matcherOptions,
+  );
+
+  store.tree = result.tree;
+  store.matcher = result.matcher;
 }
 
 /**

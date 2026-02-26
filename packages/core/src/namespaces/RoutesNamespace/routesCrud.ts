@@ -5,17 +5,20 @@ import { nodeToDefinition } from "route-tree";
 
 import {
   clearConfigEntries,
+  createEmptyConfig,
   removeFromDefinitions,
   resolveForwardChain,
   sanitizeRoute,
 } from "./helpers";
 import {
   commitTreeChanges,
+  rebuildTreeInPlace,
   refreshForwardMap,
   registerAllRouteHandlers,
 } from "./routeTreeOps";
 
-import type { RouteConfig, RoutesDependencies } from "./types";
+import type { RoutesStore } from "./routesStore";
+import type { RouteConfig } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
@@ -23,37 +26,7 @@ import type {
   ForwardToCallback,
   Params,
 } from "@real-router/types";
-import type {
-  CreateMatcherOptions,
-  Matcher,
-  RouteDefinition,
-  RouteTree,
-} from "route-tree";
-
-// ============================================================================
-// Context type
-// ============================================================================
-
-export interface RoutesDataContext<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> {
-  readonly definitions: RouteDefinition[];
-  readonly config: RouteConfig;
-  readonly noValidate: boolean;
-  readonly matcherOptions: CreateMatcherOptions | undefined;
-  getCustomFields: () => Record<string, Record<string, unknown>>;
-  setCustomFields: (fields: Record<string, Record<string, unknown>>) => void;
-  getMatcher: () => Matcher;
-  getRootPath: () => string;
-  setTreeAndMatcher: (tree: RouteTree, matcher: Matcher) => void;
-  /** REPLACE semantics — assigns a new map, does not merge */
-  setResolvedForwardMap: (map: Record<string, string>) => void;
-  getResolvedForwardMap: () => Record<string, string>;
-  getDepsStore: () => RoutesDependencies<Dependencies> | undefined;
-  getPendingCanActivate: () => Map<string, GuardFnFactory<Dependencies>>;
-  getPendingCanDeactivate: () => Map<string, GuardFnFactory<Dependencies>>;
-  getLifecycleNamespace: () => RouteLifecycleNamespace<Dependencies>;
-}
+import type { Matcher, RouteDefinition, RouteTree } from "route-tree";
 
 // ============================================================================
 // Helpers
@@ -240,24 +213,47 @@ export function enrichRoute<
 // ============================================================================
 
 /**
+ * Clears all routes and resets config (standalone CRUD function).
+ * Does NOT clear lifecycle handlers or state — caller handles that.
+ *
+ * @param store - Routes store
+ */
+export function clearRoutesCrud<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
+  store.definitions.length = 0;
+
+  Object.assign(store.config, createEmptyConfig());
+
+  store.resolvedForwardMap = Object.create(null) as Record<string, string>;
+  store.routeCustomFields = Object.create(null) as Record<
+    string,
+    Record<string, unknown>
+  >;
+
+  rebuildTreeInPlace(store);
+}
+
+/**
  * Adds one or more routes to the router (standalone CRUD function).
  * Input already validated by facade.
  *
- * @param ctx - Routes data context
+ * @param store - Routes store
+ * @param noValidate - Skip forward map validation
  * @param routes - Routes to add
  * @param parentName - Optional parent route fullName for nesting
  */
 export function addRoutesCrud<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  ctx: RoutesDataContext<Dependencies>,
+  store: RoutesStore<Dependencies>,
+  noValidate: boolean,
   routes: Route<Dependencies>[],
   parentName?: string,
 ): void {
-  // Add to definitions
   if (parentName) {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const parentDef = findDefinition(ctx.definitions, parentName)!;
+    const parentDef = findDefinition(store.definitions, parentName)!;
 
     parentDef.children ??= [];
 
@@ -266,51 +262,53 @@ export function addRoutesCrud<
     }
   } else {
     for (const route of routes) {
-      ctx.definitions.push(sanitizeRoute(route));
+      store.definitions.push(sanitizeRoute(route));
     }
   }
 
-  // Register handlers
   registerAllRouteHandlers(
     routes,
-    ctx.config,
-    ctx.getCustomFields(),
-    ctx.getPendingCanActivate(),
-    ctx.getPendingCanDeactivate(),
-    ctx.getDepsStore(),
+    store.config,
+    store.routeCustomFields,
+    store.pendingCanActivate,
+    store.pendingCanDeactivate,
+    store.depsStore,
     parentName ?? "",
   );
 
-  // Rebuild tree + refresh forward map
-  commitTreeChanges(ctx);
+  commitTreeChanges(store, noValidate);
 }
 
 /**
  * Removes a route and all its children (standalone CRUD function).
  *
- * @param ctx - Routes data context
+ * @param store - Routes store
+ * @param noValidate - Skip forward map validation
  * @param name - Route name (already validated)
  * @returns true if removed, false if not found
  */
 export function removeRouteCrud<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(ctx: RoutesDataContext<Dependencies>, name: string): boolean {
-  const wasRemoved = removeFromDefinitions(ctx.definitions, name);
+>(
+  store: RoutesStore<Dependencies>,
+  noValidate: boolean,
+  name: string,
+): boolean {
+  const wasRemoved = removeFromDefinitions(store.definitions, name);
 
   if (!wasRemoved) {
     return false;
   }
 
-  // Clear configurations for removed route
   clearRouteConfigurations(
     name,
-    ctx.config,
-    ctx.getCustomFields(),
-    ctx.getLifecycleNamespace(),
+    store.config,
+    store.routeCustomFields,
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    store.lifecycleNamespace!,
   );
 
-  // Rebuild tree + revalidate forward chains
-  commitTreeChanges(ctx);
+  commitTreeChanges(store, noValidate);
 
   return true;
 }
@@ -318,7 +316,8 @@ export function removeRouteCrud<
 /**
  * Updates a route's configuration in place (standalone CRUD function).
  *
- * @param ctx - Routes data context
+ * @param store - Routes store
+ * @param noValidate - Skip forward map validation
  * @param name - Route name
  * @param updates - Config updates to apply
  * @param updates.forwardTo - New forwardTo target (null removes it)
@@ -329,7 +328,8 @@ export function removeRouteCrud<
 export function updateRouteConfigCrud<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  ctx: RoutesDataContext<Dependencies>,
+  store: RoutesStore<Dependencies>,
+  noValidate: boolean,
   name: string,
   updates: {
     forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
@@ -338,44 +338,41 @@ export function updateRouteConfigCrud<
     encodeParams?: ((params: Params) => Params) | null | undefined;
   },
 ): void {
-  // Update forwardTo
   if (updates.forwardTo !== undefined) {
-    ctx.setResolvedForwardMap(
-      updateForwardTo(name, updates.forwardTo, ctx.config, ctx.noValidate),
+    store.resolvedForwardMap = updateForwardTo(
+      name,
+      updates.forwardTo,
+      store.config,
+      noValidate,
     );
   }
 
-  // Update defaultParams
   if (updates.defaultParams !== undefined) {
     if (updates.defaultParams === null) {
-      delete ctx.config.defaultParams[name];
+      delete store.config.defaultParams[name];
     } else {
-      ctx.config.defaultParams[name] = updates.defaultParams;
+      store.config.defaultParams[name] = updates.defaultParams;
     }
   }
 
-  // Update decoders with fallback wrapper
-  // Runtime guard: fallback to params if decoder returns undefined (bad user code)
   if (updates.decodeParams !== undefined) {
     if (updates.decodeParams === null) {
-      delete ctx.config.decoders[name];
+      delete store.config.decoders[name];
     } else {
       const decoder = updates.decodeParams;
 
-      ctx.config.decoders[name] = (params: Params): Params =>
+      store.config.decoders[name] = (params: Params): Params =>
         (decoder(params) as Params | undefined) ?? params;
     }
   }
 
-  // Update encoders with fallback wrapper
-  // Runtime guard: fallback to params if encoder returns undefined (bad user code)
   if (updates.encodeParams !== undefined) {
     if (updates.encodeParams === null) {
-      delete ctx.config.encoders[name];
+      delete store.config.encoders[name];
     } else {
       const encoder = updates.encodeParams;
 
-      ctx.config.encoders[name] = (params: Params): Params =>
+      store.config.encoders[name] = (params: Params): Params =>
         (encoder(params) as Params | undefined) ?? params;
     }
   }
@@ -384,16 +381,16 @@ export function updateRouteConfigCrud<
 /**
  * Gets a route by name with all its configuration (standalone CRUD function).
  *
- * @param ctx - Routes data context
+ * @param store - Routes store
  * @param name - Route name
  */
 export function getRouteCrud<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
-  ctx: RoutesDataContext<Dependencies>,
+  store: RoutesStore<Dependencies>,
   name: string,
 ): Route<Dependencies> | undefined {
-  const segments = ctx.getMatcher().getSegmentsByName(name);
+  const segments = store.matcher.getSegmentsByName(name);
 
   if (!segments) {
     return undefined;
@@ -402,26 +399,29 @@ export function getRouteCrud<
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const targetNode = segments.at(-1)! as RouteTree;
   const definition = nodeToDefinition(targetNode);
-  const factories = ctx.getLifecycleNamespace().getFactories();
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const factories = store.lifecycleNamespace!.getFactories();
 
-  return enrichRoute(definition, name, ctx.config, factories);
+  return enrichRoute(definition, name, store.config, factories);
 }
 
 /**
  * Gets the custom config fields for a route (standalone CRUD function).
  *
- * @param ctx - Routes data context
+ * @param store - Routes store
  * @param name - Route name
  */
-export function getRouteConfigCrud(
-  ctx: RoutesDataContext,
+export function getRouteConfigCrud<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  store: RoutesStore<Dependencies>,
   name: string,
 ): Record<string, unknown> | undefined {
-  if (!ctx.getMatcher().hasRoute(name)) {
+  if (!store.matcher.hasRoute(name)) {
     return undefined;
   }
 
-  return ctx.getCustomFields()[name];
+  return store.routeCustomFields[name];
 }
 
 // ============================================================================
