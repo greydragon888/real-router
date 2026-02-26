@@ -2,7 +2,12 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
+import {
+  createSimpleRouter,
+  IS_ROUTER5,
+  addActivateGuard,
+  addDeactivateGuard,
+} from "../helpers";
 
 // Helper: routes to alternate between to avoid same-state short-circuit
 const alternatingRoutes = ["about", "home"];
@@ -30,12 +35,12 @@ const alternatingRoutes = ["about", "home"];
   let index = 0;
 
   // Add guards to multiple routes
-  router.addActivateGuard("home", () => () => true);
-  router.addDeactivateGuard("home", () => () => true);
-  router.addActivateGuard("about", () => () => true);
-  router.addDeactivateGuard("about", () => () => true);
-  router.addActivateGuard("users", () => () => true);
-  router.addDeactivateGuard("users", () => () => true);
+  addActivateGuard(router, "home", () => () => true);
+  addDeactivateGuard(router, "home", () => () => true);
+  addActivateGuard(router, "about", () => () => true);
+  addDeactivateGuard(router, "about", () => () => true);
+  addActivateGuard(router, "users", () => () => true);
+  addDeactivateGuard(router, "users", () => () => true);
   router.start("/");
 
   bench("2.3.2 Navigation with maximum number of guards", () => {
@@ -81,8 +86,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.addActivateGuard("about", () => () => true);
-  router.addActivateGuard("home", () => () => true);
+  addActivateGuard(router, "about", () => () => true);
+  addActivateGuard(router, "home", () => () => true);
   router.start("/");
 
   bench("2.3.5 Guard always returning true", () => {
@@ -108,8 +113,8 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.addDeactivateGuard("home", () => () => false);
-  router.addDeactivateGuard("about", () => () => false);
+  addDeactivateGuard(router, "home", () => () => false);
+  addDeactivateGuard(router, "about", () => () => false);
   router.start("/");
 
   bench("2.3.8 Combining forceDeactivate with canDeactivate guards", () => {

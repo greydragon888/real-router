@@ -13,6 +13,8 @@ import { BaseLink, RouterProvider } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
+import { getLifecycleApi } from "@real-router/core";
+
 import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
@@ -90,7 +92,7 @@ describe("BaseLink - Integration Tests", () => {
     it("should recover from navigation error", async () => {
       let shouldFail = true;
 
-      router.addActivateGuard("one-more-test", () => () => {
+      getLifecycleApi(router).addActivateGuard("one-more-test", () => () => {
         if (shouldFail) {
           return Promise.reject(new Error("Navigation blocked"));
         }

@@ -1,9 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouter, cloneRouter, getRoutesApi } from "@real-router/core";
+import {
+  cloneRouter,
+  createRouter,
+  getLifecycleApi,
+  getRoutesApi,
+} from "@real-router/core";
 
-import type { Route, Router } from "@real-router/core";
+import type { LifecycleApi, Route, Router } from "@real-router/core";
 import type { LogCallback } from "@real-router/logger";
 
 const routes: Route[] = [
@@ -90,13 +95,13 @@ describe("SSR race conditions", () => {
       const clone2 = cloneRouter(baseRouter);
 
       // Add different guards to each clone
-      clone1.addActivateGuard("admin", () => () => {
+      getLifecycleApi(clone1).addActivateGuard("admin", () => () => {
         guardCallsClone1.push("clone1-admin");
 
         return true;
       });
 
-      clone2.addActivateGuard("admin", () => () => {
+      getLifecycleApi(clone2).addActivateGuard("admin", () => () => {
         guardCallsClone2.push("clone2-admin");
 
         return true;
@@ -122,6 +127,7 @@ describe("SSR race conditions", () => {
     let logCallback: ReturnType<typeof vi.fn>;
     let originalConfig: ReturnType<typeof logger.getConfig>;
     let router: Router;
+    let lifecycle: LifecycleApi;
 
     beforeEach(async () => {
       // Save original config
@@ -136,6 +142,7 @@ describe("SSR race conditions", () => {
 
       router = createRouter(routes, defaultOptions);
       await router.start("/home");
+      lifecycle = getLifecycleApi(router);
     });
 
     afterEach(() => {
@@ -146,7 +153,7 @@ describe("SSR race conditions", () => {
 
     it("should warn when navigate called during active async navigation", async () => {
       // Add async guard to make navigation async
-      router.addActivateGuard("admin", () => async () => {
+      lifecycle.addActivateGuard("admin", () => async () => {
         // Start another navigation while this one is in progress
         await router.navigate("public");
         // Allow time for warning to be logged
@@ -214,7 +221,7 @@ describe("SSR race conditions", () => {
       let secondNavCompleted = false;
 
       // Add async guard to first route
-      router.addActivateGuard("admin", () => async () => {
+      getLifecycleApi(router).addActivateGuard("admin", () => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         return true;

@@ -3,19 +3,22 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 import {
   errorCodes,
   events,
+  getLifecycleApi,
   getPluginApi,
   RouterError,
 } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - lifecycle events", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -159,7 +162,7 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR when guard blocks transition", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -184,7 +187,7 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR with toState information", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.view", () => () => {
+        lifecycle.addActivateGuard("users.view", () => () => {
           throw new Error("Blocked");
         });
 
@@ -214,7 +217,7 @@ describe("router.start() - lifecycle events", () => {
       it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -277,7 +280,7 @@ describe("router.start() - lifecycle events", () => {
       it("should have consistent event signature (toState, fromState, error) for CANNOT_ACTIVATE", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -338,7 +341,7 @@ describe("router.start() - lifecycle events", () => {
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 

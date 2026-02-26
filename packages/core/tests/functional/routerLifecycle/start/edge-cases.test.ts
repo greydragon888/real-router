@@ -1,16 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { constants, errorCodes } from "@real-router/core";
+import { constants, errorCodes, getLifecycleApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - edge cases", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -77,7 +79,7 @@ describe("router.start() - edge cases", () => {
         };
       });
 
-      router.addActivateGuard("users.list", () => async () => {
+      lifecycle.addActivateGuard("users.list", () => async () => {
         await guardPromise;
 
         return true;

@@ -1,4 +1,4 @@
-import { createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
 import { loggerPluginFactory as loggerPlugin } from "@real-router/logger-plugin";
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
 import {
@@ -374,7 +374,10 @@ describe("Browser Plugin", async () => {
     it("restores state on CANNOT_DEACTIVATE", async () => {
       await router.navigate("users.list");
 
-      router.addDeactivateGuard("users.list", () => () => false);
+      getLifecycleApi(router).addDeactivateGuard(
+        "users.list",
+        () => () => false,
+      );
 
       vi.spyOn(mockedBrowser, "replaceState");
 
@@ -403,8 +406,8 @@ describe("Browser Plugin", async () => {
             }, 100);
           });
 
-        router.addActivateGuard("users.view", slowGuard);
-        router.addActivateGuard("users.list", slowGuard);
+        getLifecycleApi(router).addActivateGuard("users.view", slowGuard);
+        getLifecycleApi(router).addActivateGuard("users.list", slowGuard);
 
         const state1 = {
           name: "users.view",
@@ -456,8 +459,14 @@ describe("Browser Plugin", async () => {
             resolveGuard = resolve;
           });
 
-        router.addActivateGuard("users.view", controllableGuard);
-        router.addActivateGuard("users.list", controllableGuard);
+        getLifecycleApi(router).addActivateGuard(
+          "users.view",
+          controllableGuard,
+        );
+        getLifecycleApi(router).addActivateGuard(
+          "users.list",
+          controllableGuard,
+        );
 
         const state1: State = {
           name: "users.view",
@@ -1505,7 +1514,7 @@ describe("Browser Plugin", async () => {
         );
         await router.start();
 
-        router.addDeactivateGuard("index", () => () => false);
+        getLifecycleApi(router).addDeactivateGuard("index", () => () => false);
 
         // Navigate should fail
         await expect(
@@ -1532,7 +1541,7 @@ describe("Browser Plugin", async () => {
 
         await router.navigate("users.list");
 
-        router.addActivateGuard("home", () => () => {
+        getLifecycleApi(router).addActivateGuard("home", () => () => {
           throw new Error("Transition failed");
         });
 

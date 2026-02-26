@@ -1,6 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, errorCodes, getPluginApi } from "@real-router/core";
+import {
+  events,
+  errorCodes,
+  getPluginApi,
+  getLifecycleApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
@@ -149,7 +154,10 @@ describe("router.navigate() - events listeners", () => {
         );
 
         // Guard that blocks admin
-        freshRouter.addActivateGuard("admin", () => () => false);
+        getLifecycleApi(freshRouter).addActivateGuard(
+          "admin",
+          () => () => false,
+        );
 
         try {
           await freshRouter.navigate("admin");

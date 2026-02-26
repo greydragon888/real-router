@@ -1,4 +1,4 @@
-import { createRouter } from "@real-router/core";
+import { createRouter, getLifecycleApi } from "@real-router/core";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
@@ -10,10 +10,11 @@ import {
   RxObservable,
 } from "../../src";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 describe("@real-router/rx - Integration Tests", () => {
   let router: Router;
+  let lifecycle: LifecycleApi;
 
   const routes = [
     { name: "home", path: "/" },
@@ -24,6 +25,7 @@ describe("@real-router/rx - Integration Tests", () => {
 
   beforeEach(() => {
     router = createRouter(routes, { defaultRoute: "home" });
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -124,7 +126,7 @@ describe("@real-router/rx - Integration Tests", () => {
     it("should filter events by TRANSITION_ERROR type", async () => {
       const errors: any[] = [];
 
-      router.addActivateGuard("admin", () => () => false);
+      lifecycle.addActivateGuard("admin", () => () => false);
 
       events$(router)
         .pipe(filter((e) => e.type === "TRANSITION_ERROR"))
@@ -182,7 +184,7 @@ describe("@real-router/rx - Integration Tests", () => {
       let resolveDelay: (() => void) | undefined;
 
       // Add a slow canActivate that can be cancelled
-      router.addActivateGuard("about", () => async () => {
+      lifecycle.addActivateGuard("about", () => async () => {
         await new Promise<void>((resolve) => {
           resolveDelay = resolve;
         });

@@ -3,7 +3,13 @@
 import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import {
+  createSimpleRouter,
+  cloneRouter,
+  IS_ROUTER5,
+  addActivateGuard,
+  addDeactivateGuard,
+} from "../helpers";
 
 import type { Params } from "router5/dist/types/base";
 
@@ -201,8 +207,8 @@ if (IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  router.addActivateGuard("about", () => () => true);
-  router.addDeactivateGuard("users", () => () => true);
+  addActivateGuard(router, "about", () => () => true);
+  addDeactivateGuard(router, "users", () => () => true);
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {

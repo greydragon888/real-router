@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getRoutesApi } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core";
 
 import { createLifecycleTestRouter, type Router } from "./setup";
 
@@ -8,11 +8,13 @@ import type { RoutesApi } from "@real-router/core";
 
 let router: Router;
 let routesApi: RoutesApi;
+let lifecycle: ReturnType<typeof getLifecycleApi>;
 
 describe("core/route-lifecycle/removeGuard", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
     routesApi = getRoutesApi(router);
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -20,32 +22,32 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should remove activate guard and allow navigation", async () => {
-    router.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
     await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
 
-    router.removeActivateGuard("admin");
+    lifecycle.removeActivateGuard("admin");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
   it("should remove deactivate guard and allow navigation", async () => {
-    router.addDeactivateGuard("users", () => () => false);
+    lifecycle.addDeactivateGuard("users", () => () => false);
     await router.navigate("users");
 
     expect(router.canNavigateTo("home")).toBe(false);
 
-    router.removeDeactivateGuard("users");
+    lifecycle.removeDeactivateGuard("users");
 
     expect(router.canNavigateTo("home")).toBe(true);
   });
 
   it("should allow navigation after removing activate guard", async () => {
-    router.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
     await router.navigate("index");
 
-    router.removeActivateGuard("admin");
+    lifecycle.removeActivateGuard("admin");
 
     const state = await router.navigate("admin");
 
@@ -53,10 +55,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should allow navigation after removing deactivate guard", async () => {
-    router.addDeactivateGuard("users", () => () => false);
+    lifecycle.addDeactivateGuard("users", () => () => false);
     await router.navigate("users");
 
-    router.removeDeactivateGuard("users");
+    lifecycle.removeDeactivateGuard("users");
 
     const state = await router.navigate("home");
 
@@ -65,20 +67,20 @@ describe("core/route-lifecycle/removeGuard", () => {
 
   it("should not throw when removing non-existent activate guard", () => {
     expect(() => {
-      router.removeActivateGuard("nonexistent");
+      lifecycle.removeActivateGuard("nonexistent");
     }).not.toThrowError();
   });
 
   it("should not throw when removing non-existent deactivate guard", () => {
     expect(() => {
-      router.removeDeactivateGuard("nonexistent");
+      lifecycle.removeDeactivateGuard("nonexistent");
     }).not.toThrowError();
   });
 
   it("should handle re-adding guard after removal", async () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.removeActivateGuard("admin");
-    router.addActivateGuard("admin", () => () => true);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.removeActivateGuard("admin");
+    lifecycle.addActivateGuard("admin", () => () => true);
 
     await router.navigate("index");
 
@@ -86,10 +88,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing then re-adding same guard", async () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.removeActivateGuard("admin");
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.removeActivateGuard("admin");
 
-    router.addActivateGuard("admin", () => () => true);
+    lifecycle.addActivateGuard("admin", () => () => true);
 
     const state = await router.navigate("admin");
 
@@ -97,23 +99,23 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should remove all guards for a route", async () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
 
     await router.navigate("index");
 
     expect(router.canNavigateTo("admin")).toBe(false);
 
-    router.removeActivateGuard("admin");
+    lifecycle.removeActivateGuard("admin");
 
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
   it("should remove only specified route guards", async () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.addActivateGuard("users", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("users", () => () => false);
 
-    router.removeActivateGuard("admin");
+    lifecycle.removeActivateGuard("admin");
 
     await router.navigate("index");
 
@@ -124,10 +126,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   it("should handle removing nested route guards independently", async () => {
     routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
-    router.addActivateGuard("admin", () => () => false);
-    router.addActivateGuard("admin.settings", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin.settings", () => () => false);
 
-    router.removeActivateGuard("admin.settings");
+    lifecycle.removeActivateGuard("admin.settings");
 
     await router.navigate("index");
 
@@ -138,10 +140,10 @@ describe("core/route-lifecycle/removeGuard", () => {
   it("should handle removing parent guard but keeping child guard", async () => {
     routesApi.add({ name: "settings", path: "/settings" }, { parent: "admin" });
 
-    router.addActivateGuard("admin", () => () => false);
-    router.addActivateGuard("admin.settings", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin.settings", () => () => false);
 
-    router.removeActivateGuard("admin");
+    lifecycle.removeActivateGuard("admin");
 
     await router.navigate("index");
 
@@ -150,11 +152,11 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle mixed guard types removal", async () => {
-    router.addActivateGuard("admin", () => () => false);
-    router.addDeactivateGuard("users", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
+    lifecycle.addDeactivateGuard("users", () => () => false);
 
-    router.removeActivateGuard("admin");
-    router.removeDeactivateGuard("users");
+    lifecycle.removeActivateGuard("admin");
+    lifecycle.removeDeactivateGuard("users");
 
     await router.navigate("users");
 
@@ -163,8 +165,8 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing guards before navigation", async () => {
-    router.addActivateGuard("users", () => () => false);
-    router.removeActivateGuard("users");
+    lifecycle.addActivateGuard("users", () => () => false);
+    lifecycle.removeActivateGuard("users");
 
     const state = await router.navigate("users");
 
@@ -172,11 +174,11 @@ describe("core/route-lifecycle/removeGuard", () => {
   });
 
   it("should handle removing guards after router stops", () => {
-    router.addActivateGuard("admin", () => () => false);
+    lifecycle.addActivateGuard("admin", () => () => false);
     router.stop();
 
     expect(() => {
-      router.removeActivateGuard("admin");
+      lifecycle.removeActivateGuard("admin");
     }).not.toThrowError();
   });
 });

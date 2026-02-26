@@ -2,7 +2,7 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import { createSimpleRouter, addActivateGuard } from "../helpers";
 
 /**
  * Batch size for stable measurements on sub-µs operations.
@@ -84,7 +84,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.addActivateGuard("about", true);
+  addActivateGuard(router, "about", true);
   router.start("/");
   const routes = ["about", "home"];
   let index = 0;

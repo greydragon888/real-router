@@ -1,6 +1,8 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getLifecycleApi } from "@real-router/core";
+
 import {
   createLifecycleTestRouter,
   errorCodes,
@@ -10,10 +12,12 @@ import {
 } from "./setup";
 
 let router: Router;
+let lifecycle: ReturnType<typeof getLifecycleApi>;
 
 describe("core/route-lifecycle/addDeactivateGuard", () => {
   beforeEach(async () => {
     router = await createLifecycleTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -21,7 +25,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   it("should block navigation if a component refuses deactivation", async () => {
-    router.addDeactivateGuard("users.list", () => () => Promise.reject());
+    lifecycle.addDeactivateGuard("users.list", () => () => Promise.reject());
 
     await router.navigate("users.list");
 
@@ -38,7 +42,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       path: "/users/list",
     });
 
-    router.addDeactivateGuard("users.list", true);
+    lifecycle.addDeactivateGuard("users.list", true);
 
     await router.navigate("users");
 
@@ -50,7 +54,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   it("should register and override canDeactivate handlers", async () => {
-    router.addDeactivateGuard("users.list", false);
+    lifecycle.addDeactivateGuard("users.list", false);
 
     await router.navigate("users.list");
 
@@ -61,13 +65,13 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(error?.segment).toStrictEqual("users.list");
     }
 
-    router.addDeactivateGuard("users.list", true);
+    lifecycle.addDeactivateGuard("users.list", true);
 
     await router.navigate("users");
   });
 
   it("should block navigation if canDeactivate returns an Error", async () => {
-    router.addDeactivateGuard("users.list", () => () => {
+    lifecycle.addDeactivateGuard("users.list", () => () => {
       throw new Error("blocked");
     });
 
@@ -82,7 +86,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   it("should return error when canDeactivate returns false", async () => {
-    router.addDeactivateGuard("sign-in", () => () => false);
+    lifecycle.addDeactivateGuard("sign-in", () => () => false);
 
     await router.navigate("sign-in");
 
@@ -96,96 +100,95 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   describe("validation and edge cases", () => {
-    it("should return router instance for method chaining (fluent interface)", () => {
-      const result1 = router.addDeactivateGuard("route1", true);
-      const result2 = router.addDeactivateGuard("route2", false);
-
-      expect(result1).toBe(router);
-      expect(result2).toBe(router);
+    it("should register guards without throwing", () => {
+      expect(() => {
+        lifecycle.addDeactivateGuard("route1", true);
+        lifecycle.addDeactivateGuard("route2", false);
+      }).not.toThrowError();
     });
 
     it("should throw TypeError for invalid handler types", () => {
-      // @ts-expect-error: testing null
-      expect(() => router.addDeactivateGuard("route1", null)).toThrowError(
-        TypeError,
-      );
-      // @ts-expect-error: testing undefined
-      expect(() => router.addDeactivateGuard("route2", undefined)).toThrowError(
-        TypeError,
-      );
-      // @ts-expect-error: testing number
-      expect(() => router.addDeactivateGuard("route3", 123)).toThrowError(
-        TypeError,
-      );
-      // @ts-expect-error: testing string
-      expect(() => router.addDeactivateGuard("route4", "true")).toThrowError(
-        TypeError,
-      );
-      // @ts-expect-error: testing object
-      expect(() => router.addDeactivateGuard("route5", {})).toThrowError(
-        TypeError,
-      );
-      expect(() =>
+      expect(() => {
+        // @ts-expect-error: testing null
+        lifecycle.addDeactivateGuard("route1", null);
+      }).toThrowError(TypeError);
+      expect(() => {
+        // @ts-expect-error: testing undefined
+        lifecycle.addDeactivateGuard("route2", undefined);
+      }).toThrowError(TypeError);
+      expect(() => {
+        // @ts-expect-error: testing number
+        lifecycle.addDeactivateGuard("route3", 123);
+      }).toThrowError(TypeError);
+      expect(() => {
+        // @ts-expect-error: testing string
+        lifecycle.addDeactivateGuard("route4", "true");
+      }).toThrowError(TypeError);
+      expect(() => {
+        // @ts-expect-error: testing object
+        lifecycle.addDeactivateGuard("route5", {});
+      }).toThrowError(TypeError);
+      expect(() => {
         // @ts-expect-error: testing NaN
-        router.addDeactivateGuard("route6", Number.NaN),
-      ).toThrowError(TypeError);
+        lifecycle.addDeactivateGuard("route6", Number.NaN);
+      }).toThrowError(TypeError);
     });
 
     it("should throw TypeError if factory returns non-function", () => {
       // Factory returning null
       expect(() => {
         // @ts-expect-error: testing factory returning null
-        router.addDeactivateGuard("route1", () => null);
+        lifecycle.addDeactivateGuard("route1", () => null);
       }).toThrowError(TypeError);
 
       // Factory returning undefined
       expect(() => {
         // @ts-expect-error: testing factory returning undefined
-        router.addDeactivateGuard("route2", () => undefined);
+        lifecycle.addDeactivateGuard("route2", () => undefined);
       }).toThrowError(TypeError);
 
       // Factory returning number
       expect(() => {
         // @ts-expect-error: testing factory returning number
-        router.addDeactivateGuard("route3", () => 42);
+        lifecycle.addDeactivateGuard("route3", () => 42);
       }).toThrowError(TypeError);
 
       // Factory returning object
       expect(() => {
         // @ts-expect-error: testing factory returning object
-        router.addDeactivateGuard("route4", () => ({}));
+        lifecycle.addDeactivateGuard("route4", () => ({}));
       }).toThrowError(TypeError);
     });
 
     it("should throw TypeError for invalid route names", () => {
       // Whitespace-only (empty string is valid root node)
       expect(() => {
-        router.addDeactivateGuard("   ", true);
+        lifecycle.addDeactivateGuard("   ", true);
       }).toThrowError(TypeError);
 
       // Route name with spaces
       expect(() => {
-        router.addDeactivateGuard("route name", true);
+        lifecycle.addDeactivateGuard("route name", true);
       }).toThrowError(TypeError);
 
       // Route name starting with number
       expect(() => {
-        router.addDeactivateGuard("1route", true);
+        lifecycle.addDeactivateGuard("1route", true);
       }).toThrowError(TypeError);
 
       // Route name with special characters
       expect(() => {
-        router.addDeactivateGuard("route#name", true);
+        lifecycle.addDeactivateGuard("route#name", true);
       }).toThrowError(TypeError);
 
       // Route name ending with dot
       expect(() => {
-        router.addDeactivateGuard("route.", true);
+        lifecycle.addDeactivateGuard("route.", true);
       }).toThrowError(TypeError);
 
       // Consecutive dots
       expect(() => {
-        router.addDeactivateGuard("route..name", true);
+        lifecycle.addDeactivateGuard("route..name", true);
       }).toThrowError(TypeError);
     });
 
@@ -193,19 +196,19 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       const longButValidName = "a".repeat(10_000);
 
       expect(() => {
-        router.addDeactivateGuard(longButValidName, true);
+        lifecycle.addDeactivateGuard(longButValidName, true);
       }).not.toThrowError();
 
       const tooLongName = "a".repeat(10_001);
 
       expect(() => {
-        router.addDeactivateGuard(tooLongName, true);
+        lifecycle.addDeactivateGuard(tooLongName, true);
       }).toThrowError(TypeError);
     });
 
     it("should allow system routes with @@ prefix", () => {
       expect(() => {
-        router.addDeactivateGuard("@@notFound", true);
+        lifecycle.addDeactivateGuard("@@notFound", true);
       }).not.toThrowError();
 
       // System routes can be registered - verified by no throw above
@@ -216,34 +219,34 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
     it("should rollback factory registration if compilation fails", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning non-function
-        router.addDeactivateGuard("problematic", () => null);
+        lifecycle.addDeactivateGuard("problematic", () => null);
       }).toThrowError(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
-        router.addDeactivateGuard("problematic", true);
+        lifecycle.addDeactivateGuard("problematic", true);
       }).not.toThrowError();
     });
 
     it("should rollback if factory returns non-function", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning object
-        router.addDeactivateGuard("test", () => ({}));
+        lifecycle.addDeactivateGuard("test", () => ({}));
       }).toThrowError(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
-        router.addDeactivateGuard("test", false);
+        lifecycle.addDeactivateGuard("test", false);
       }).not.toThrowError();
     });
 
     it("should maintain consistency after failed registration", async () => {
       // Register a valid guard first
-      router.addDeactivateGuard("admin", false);
+      lifecycle.addDeactivateGuard("admin", false);
 
       expect(() => {
         // @ts-expect-error: testing invalid handler
-        router.addDeactivateGuard("index", "not-a-function");
+        lifecycle.addDeactivateGuard("index", "not-a-function");
       }).toThrowError(TypeError);
 
       // Valid guard should still work
@@ -256,7 +259,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
       // Failed route can be re-registered (was rolled back)
       expect(() => {
-        router.addDeactivateGuard("index", true);
+        lifecycle.addDeactivateGuard("index", true);
       }).not.toThrowError();
     });
   });
@@ -265,13 +268,13 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
     it("should log warning when overwriting existing guard", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
-      router.addDeactivateGuard("route", true);
+      lifecycle.addDeactivateGuard("route", true);
 
       // First registration - no warning
       expect(warnSpy).not.toHaveBeenCalled();
 
       // Second registration - should warn
-      router.addDeactivateGuard("route", false);
+      lifecycle.addDeactivateGuard("route", false);
 
       // Logger format: logger.warn(context, message)
       expect(warnSpy).toHaveBeenCalledWith(
@@ -284,13 +287,13 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
     it("should replace old guard with new one", async () => {
       // First guard allows leaving
-      router.addDeactivateGuard("admin", true);
+      lifecycle.addDeactivateGuard("admin", true);
 
       await router.navigate("admin");
       await router.navigate("index");
 
       // Replace with blocking guard
-      router.addDeactivateGuard("index", false);
+      lifecycle.addDeactivateGuard("index", false);
 
       // Now cannot leave index
       try {

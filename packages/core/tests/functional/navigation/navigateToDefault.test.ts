@@ -1,6 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
+  getLifecycleApi,
   errorCodes,
   events,
   getPluginApi,
@@ -9,9 +10,10 @@ import {
 
 import { createTestRouter } from "../../helpers";
 
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 /**
  * Helper to recreate the router with specific defaultRoute/defaultParams
@@ -24,6 +26,7 @@ async function withDefault(
   router.stop();
   router = createTestRouter({ defaultRoute, defaultParams });
   await router.start("/home");
+  lifecycle = getLifecycleApi(router);
 
   return router;
 }
@@ -32,6 +35,8 @@ describe("navigateToDefault", () => {
   beforeEach(async () => {
     router = createTestRouter();
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -205,7 +210,7 @@ describe("navigateToDefault", () => {
 
       await withDefault("admin");
 
-      router.addActivateGuard("admin", () => blockingGuard);
+      lifecycle.addActivateGuard("admin", () => blockingGuard);
 
       try {
         await router.navigateToDefault();
@@ -226,7 +231,7 @@ describe("navigateToDefault", () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
       await withDefault("users");
-      router.addActivateGuard("users", () => blockingGuard);
+      lifecycle.addActivateGuard("users", () => blockingGuard);
 
       try {
         await router.navigateToDefault();
@@ -356,7 +361,7 @@ describe("navigateToDefault", () => {
       const pluginSpy = vi.fn();
 
       await withDefault("settings.account");
-      router.addActivateGuard("settings.account", () => canActivateGuard);
+      lifecycle.addActivateGuard("settings.account", () => canActivateGuard);
       router.usePlugin(() => ({ onTransitionSuccess: pluginSpy }));
 
       const state = await router.navigateToDefault();
@@ -521,7 +526,7 @@ describe("navigateToDefault", () => {
 
       await withDefault("admin", defaultParams);
 
-      router.addActivateGuard("admin", () => blockingGuard);
+      lifecycle.addActivateGuard("admin", () => blockingGuard);
 
       try {
         await router.navigateToDefault();
@@ -811,7 +816,7 @@ describe("navigateToDefault", () => {
       const blockingGuard = vi.fn().mockReturnValue(false);
 
       await withDefault("admin");
-      router.addActivateGuard("admin", () => blockingGuard);
+      lifecycle.addActivateGuard("admin", () => blockingGuard);
 
       try {
         await router.navigateToDefault();
@@ -835,7 +840,7 @@ describe("navigateToDefault", () => {
         message: "Custom navigation error",
       });
 
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         return new Promise((_resolve, reject) => {
           setTimeout(() => {
             reject(customError);

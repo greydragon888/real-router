@@ -16,7 +16,11 @@ import { run } from "mitata";
 // MUST be first import to suppress console before router warnings
 import "./helpers/suppress-console";
 
-import { addEventListener, createSimpleRouter } from "./helpers";
+import {
+  addEventListener,
+  createSimpleRouter,
+  addActivateGuard,
+} from "./helpers";
 
 // ============================================================================
 // JIT Warmup: Pre-warm V8 for stable benchmark measurements
@@ -52,7 +56,7 @@ function warmupJIT(): void {
       onStop: () => {},
       onTransitionSuccess: () => {},
     }));
-    router.addActivateGuard("home", warmupGuard);
+    addActivateGuard(router, "home", warmupGuard);
 
     // Warm up ALL start() variants (critical for sections 10-11)
     // Variant 1: start() without args

@@ -1,16 +1,24 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events, getPluginApi } from "@real-router/core";
+import {
+  constants,
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - path string scenarios", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -211,7 +219,7 @@ describe("router.start() - path string scenarios", () => {
 
       const invalidPath = "/non/existent/path";
 
-      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+      lifecycle.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
         return Promise.reject(new Error("Guard error"));
       });
 
@@ -357,7 +365,7 @@ describe("router.start() - path string scenarios", () => {
       const invalidPath = "/nonexistent/route";
 
       // Block transition via guard to force failure
-      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+      lifecycle.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
         throw new Error("Blocked");
       });
 

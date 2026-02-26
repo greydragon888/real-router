@@ -2,7 +2,11 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import {
+  createSimpleRouter,
+  addActivateGuard,
+  addDeactivateGuard,
+} from "../helpers";
 
 // Helper: routes to alternate between to avoid same-state short-circuit
 const alternatingRoutes = ["about", "home"];
@@ -49,12 +53,12 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.addActivateGuard("about", () => async () => {
+  addActivateGuard(router, "about", () => async () => {
     await Promise.resolve();
 
     return true;
   });
-  router.addActivateGuard("home", () => async () => {
+  addActivateGuard(router, "home", () => async () => {
     await Promise.resolve();
 
     return true;
@@ -71,12 +75,12 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.addDeactivateGuard("home", () => async () => {
+  addDeactivateGuard(router, "home", () => async () => {
     await Promise.resolve();
 
     return true;
   });
-  router.addDeactivateGuard("about", () => async () => {
+  addDeactivateGuard(router, "about", () => async () => {
     await Promise.resolve();
 
     return true;
@@ -190,13 +194,13 @@ const alternatingRoutes = ["about", "home"];
   const router = createSimpleRouter();
   let index = 0;
 
-  router.addActivateGuard("about", () => async () => {
+  addActivateGuard(router, "about", () => async () => {
     // Simulate async validation
     await Promise.resolve();
 
     return true;
   });
-  router.addActivateGuard("home", () => async () => {
+  addActivateGuard(router, "home", () => async () => {
     await Promise.resolve();
 
     return true;

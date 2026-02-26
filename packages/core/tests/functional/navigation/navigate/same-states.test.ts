@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - same states", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -92,8 +95,11 @@ describe("router.navigate() - same states", () => {
         const canDeactivateGuard = vi.fn().mockReturnValue(true);
         const canActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("orders.pending", () => canDeactivateGuard);
-        router.addActivateGuard("orders.pending", () => canActivateGuard);
+        lifecycle.addDeactivateGuard(
+          "orders.pending",
+          () => canDeactivateGuard,
+        );
+        lifecycle.addActivateGuard("orders.pending", () => canActivateGuard);
 
         // First navigation
         await router.navigate("orders.pending");
@@ -132,7 +138,7 @@ describe("router.navigate() - same states", () => {
       it("should bypass guards when force is true", async () => {
         const canDeactivateSpy = vi.fn().mockReturnValue(false); // Block deactivation
 
-        router.addDeactivateGuard("orders.pending", () => canDeactivateSpy);
+        lifecycle.addDeactivateGuard("orders.pending", () => canDeactivateSpy);
 
         // First navigation
         await router.navigate("orders.pending");

@@ -4,6 +4,7 @@ import {
   createRouter,
   cloneRouter,
   getDependenciesApi,
+  getLifecycleApi,
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core";
@@ -50,10 +51,12 @@ describe("core/noValidate option", () => {
   describe("noValidate: true", () => {
     let router: Router;
     let routesApi: RoutesApi;
+    let lifecycle: ReturnType<typeof getLifecycleApi>;
 
     beforeEach(() => {
       router = createTestRouter({ noValidate: true });
       routesApi = getRoutesApi(router);
+      lifecycle = getLifecycleApi(router);
     });
 
     afterEach(() => {
@@ -156,16 +159,16 @@ describe("core/noValidate option", () => {
 
       it("should skip validation in canDeactivate", () => {
         // Valid handler
-        expect(() =>
-          router.addDeactivateGuard("home", () => () => true),
-        ).not.toThrowError();
+        expect(() => {
+          lifecycle.addDeactivateGuard("home", () => () => true);
+        }).not.toThrowError();
       });
 
       it("should skip validation in canActivate", () => {
         // Valid handler
-        expect(() =>
-          router.addActivateGuard("home", () => () => true),
-        ).not.toThrowError();
+        expect(() => {
+          lifecycle.addActivateGuard("home", () => () => true);
+        }).not.toThrowError();
       });
 
       it("should skip validation in canNavigateTo", async () => {

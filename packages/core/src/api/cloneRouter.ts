@@ -5,7 +5,6 @@ import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
 import { Router } from "../Router";
 import { RouterError } from "../RouterError";
-
 import { getLifecycleApi } from "./getLifecycleApi";
 
 import type { Route } from "../types";

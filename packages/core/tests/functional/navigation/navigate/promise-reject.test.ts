@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - promise reject", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -27,7 +30,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Deactivate guard failed");
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         // Navigate to initial state
         await router.navigate("orders.pending");
@@ -51,8 +54,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
         const nextGuard = vi.fn().mockResolvedValue(true);
 
-        router.addDeactivateGuard("orders", () => rejectingGuard);
-        router.addDeactivateGuard("orders.pending", () => nextGuard);
+        lifecycle.addDeactivateGuard("orders", () => rejectingGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => nextGuard);
 
         await router.navigate("orders.pending");
 
@@ -78,7 +81,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Activate guard failed");
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         try {
           await router.navigate("profile");
@@ -96,8 +99,8 @@ describe("router.navigate() - promise reject", () => {
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
         const nextGuard = vi.fn().mockResolvedValue(true);
 
-        router.addActivateGuard("settings", () => rejectingGuard);
-        router.addActivateGuard("settings.account", () => nextGuard);
+        lifecycle.addActivateGuard("settings", () => rejectingGuard);
+        lifecycle.addActivateGuard("settings.account", () => nextGuard);
 
         try {
           await router.navigate("settings.account");
@@ -148,7 +151,7 @@ describe("router.navigate() - promise reject", () => {
         const testError = new Error("Middleware rejection");
         const rejectingMiddleware = vi.fn().mockRejectedValue(testError);
 
-        router.addActivateGuard("orders", () => passingGuard);
+        lifecycle.addActivateGuard("orders", () => passingGuard);
         router.usePlugin(() => ({ onTransitionSuccess: rejectingMiddleware }));
 
         const state = await router.navigate("orders");
@@ -185,7 +188,7 @@ describe("router.navigate() - promise reject", () => {
         });
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         let err: any;
 
@@ -227,7 +230,7 @@ describe("router.navigate() - promise reject", () => {
 
         const rejectingGuard = vi.fn().mockRejectedValue(testError);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         let err: any;
 
@@ -251,7 +254,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectString = "Guard failed with string";
         const rejectingGuard = vi.fn().mockRejectedValue(rejectString);
 
-        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         // Navigate to initial state
         await router.navigate("orders.pending");
@@ -278,7 +281,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectNumber = 404;
         const rejectingGuard = vi.fn().mockRejectedValue(rejectNumber);
 
-        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         await router.navigate("orders.pending");
         rejectingGuard.mockClear();
@@ -300,7 +303,7 @@ describe("router.navigate() - promise reject", () => {
       it("should wrap null rejection in RouterError", async () => {
         const rejectingGuard = vi.fn().mockRejectedValue(null);
 
-        router.addDeactivateGuard("orders.pending", () => rejectingGuard);
+        lifecycle.addDeactivateGuard("orders.pending", () => rejectingGuard);
 
         await router.navigate("orders.pending");
         rejectingGuard.mockClear();
@@ -325,7 +328,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectString = "Activation failed";
         const rejectingGuard = vi.fn().mockRejectedValue(rejectString);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         let err: any;
 
@@ -345,7 +348,7 @@ describe("router.navigate() - promise reject", () => {
         const rejectNumber = 403;
         const rejectingGuard = vi.fn().mockRejectedValue(rejectNumber);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         let err: any;
 
@@ -364,7 +367,7 @@ describe("router.navigate() - promise reject", () => {
       it("should wrap undefined rejection in RouterError", async () => {
         const rejectingGuard = vi.fn().mockRejectedValue(undefined);
 
-        router.addActivateGuard("profile", () => rejectingGuard);
+        lifecycle.addActivateGuard("profile", () => rejectingGuard);
 
         let err: any;
 

@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - error sync exceptions", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -29,7 +32,10 @@ describe("router.navigate() - error sync exceptions", () => {
           throw new Error(errorMessage);
         });
 
-        router.addDeactivateGuard("orders.pending", () => errorDeactivateGuard);
+        lifecycle.addDeactivateGuard(
+          "orders.pending",
+          () => errorDeactivateGuard,
+        );
 
         // Navigate to initial state
         await router.navigate("orders.pending", {}, {});
@@ -56,8 +62,8 @@ describe("router.navigate() - error sync exceptions", () => {
         const nextGuard = vi.fn().mockReturnValue(true);
 
         // Attach guards in order they will be called: child first, then parent
-        router.addDeactivateGuard("orders.pending", () => nextGuard); // Called first
-        router.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
+        lifecycle.addDeactivateGuard("orders.pending", () => nextGuard); // Called first
+        lifecycle.addDeactivateGuard("orders", () => errorGuard); // Called second, throws error
 
         await router.navigate("orders.pending", {}, {});
 
@@ -86,7 +92,7 @@ describe("router.navigate() - error sync exceptions", () => {
           throw new Error(errorMessage);
         });
 
-        router.addActivateGuard("profile", () => errorActivateGuard);
+        lifecycle.addActivateGuard("profile", () => errorActivateGuard);
 
         try {
           await router.navigate("profile");
@@ -106,8 +112,8 @@ describe("router.navigate() - error sync exceptions", () => {
         });
         const nextGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("settings", () => errorGuard);
-        router.addActivateGuard("settings.account", () => nextGuard);
+        lifecycle.addActivateGuard("settings", () => errorGuard);
+        lifecycle.addActivateGuard("settings.account", () => nextGuard);
 
         try {
           await router.navigate("settings.account");
@@ -162,7 +168,7 @@ describe("router.navigate() - error sync exceptions", () => {
           throw new Error("Middleware failed");
         });
 
-        router.addActivateGuard("orders", () => activateGuard);
+        lifecycle.addActivateGuard("orders", () => activateGuard);
         router.usePlugin(() => ({ onTransitionSuccess: errorMiddleware }));
 
         const state = await router.navigate("orders");
@@ -183,7 +189,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw new Error("canActivate failed synchronously");
       };
 
-      router.addActivateGuard("users", throwingHookFactory);
+      lifecycle.addActivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("users");
@@ -208,7 +214,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw new Error("canDeactivate failed synchronously");
       };
 
-      router.addDeactivateGuard("users", throwingHookFactory);
+      lifecycle.addDeactivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("index");
@@ -244,7 +250,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw new Error("Hook error");
       };
 
-      router.addActivateGuard("users", throwingHookFactory);
+      lifecycle.addActivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("users");
@@ -267,7 +273,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw error;
       };
 
-      router.addActivateGuard("users", throwingHookFactory);
+      lifecycle.addActivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("users");
@@ -288,7 +294,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw new Error("Navigation blocked");
       };
 
-      router.addActivateGuard("users", throwingHookFactory);
+      lifecycle.addActivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("users");
@@ -308,7 +314,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw { custom: "error", code: 42 };
       };
 
-      router.addActivateGuard("users", throwingHookFactory);
+      lifecycle.addActivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("users");
@@ -347,7 +353,7 @@ describe("router.navigate() - error sync exceptions", () => {
         throw "String error message";
       };
 
-      router.addDeactivateGuard("users", throwingHookFactory);
+      lifecycle.addDeactivateGuard("users", throwingHookFactory);
 
       try {
         await router.navigate("index");

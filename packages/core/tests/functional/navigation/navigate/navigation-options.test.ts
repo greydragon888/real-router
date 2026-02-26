@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { events, getPluginApi } from "@real-router/core";
+import { getLifecycleApi, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { Router, State, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - navigation meta and options", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -36,7 +39,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should allow navigation when canActivate guard returns true", async () => {
-    router.addActivateGuard("profile", () => () => true);
+    lifecycle.addActivateGuard("profile", () => () => true);
 
     const state = await router.navigate("profile", {}, {});
 
@@ -46,7 +49,7 @@ describe("router.navigate() - navigation meta and options", () => {
   it("should allow navigation when guard returns true after previous navigation", async () => {
     await router.navigate("users", {}, { custom: "option" });
 
-    router.addActivateGuard("settings", () => () => true);
+    lifecycle.addActivateGuard("settings", () => () => true);
 
     const state = await router.navigate("settings", {}, {});
 
@@ -54,7 +57,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should allow navigation when canDeactivate guard returns true", async () => {
-    router.addDeactivateGuard("home", () => () => true);
+    lifecycle.addDeactivateGuard("home", () => () => true);
 
     const state = await router.navigate("settings", {}, {});
 
@@ -62,7 +65,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should preserve original navigation options in final state", async () => {
-    router.addActivateGuard("profile", () => () => true);
+    lifecycle.addActivateGuard("profile", () => () => true);
 
     const navOptions = { reload: true, replace: true };
 
@@ -76,13 +79,13 @@ describe("router.navigate() - navigation meta and options", () => {
     let deactivateCallCount = 0;
     let activateCallCount = 0;
 
-    router.addDeactivateGuard("home", () => () => {
+    lifecycle.addDeactivateGuard("home", () => () => {
       deactivateCallCount++;
 
       return true;
     });
 
-    router.addActivateGuard("profile", () => () => {
+    lifecycle.addActivateGuard("profile", () => () => {
       activateCallCount++;
 
       return true;
@@ -169,14 +172,14 @@ describe("router.navigate() - navigation meta and options", () => {
       await freshRouter.navigate("users", {}, {});
 
       // Register first guard (factory pattern: () => guardFn)
-      freshRouter.addDeactivateGuard("users", () => () => {
+      getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
         callLog.push("guard1");
 
         return true;
       });
 
       // Register second guard for the SAME route - should REPLACE, not add
-      freshRouter.addDeactivateGuard("users", () => () => {
+      getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
         callLog.push("guard2");
 
         return true;
@@ -198,14 +201,14 @@ describe("router.navigate() - navigation meta and options", () => {
       await freshRouter.start("/home");
 
       // Register first guard (factory pattern: () => guardFn)
-      freshRouter.addActivateGuard("users", () => () => {
+      getLifecycleApi(freshRouter).addActivateGuard("users", () => () => {
         callLog.push("guard1");
 
         return true;
       });
 
       // Register second guard for the SAME route - should REPLACE, not add
-      freshRouter.addActivateGuard("users", () => () => {
+      getLifecycleApi(freshRouter).addActivateGuard("users", () => () => {
         callLog.push("guard2");
 
         return true;
@@ -229,7 +232,7 @@ describe("router.navigate() - navigation meta and options", () => {
 
       // Register handler 10 times for the same route (factory pattern)
       for (let i = 0; i < 10; i++) {
-        freshRouter.addDeactivateGuard("users", () => () => {
+        getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
           callCount++;
 
           return true;
@@ -253,7 +256,7 @@ describe("router.navigate() - navigation meta and options", () => {
       await freshRouter.navigate("users", {}, {});
 
       // Register guard for users (factory pattern)
-      freshRouter.addDeactivateGuard("users", () => () => {
+      getLifecycleApi(freshRouter).addDeactivateGuard("users", () => () => {
         callLog.push("users-guard");
 
         return true;
