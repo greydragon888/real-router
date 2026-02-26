@@ -2,7 +2,7 @@
 
 export { do_not_optimize } from "mitata";
 
-export { createRouter, cloneRouter } from "./router-adapter";
+export { createRouter, cloneRouter, addEventListener } from "./router-adapter";
 
 export { ROUTER_NAME, IS_ROUTER5, UNIFIED_OPTIONS } from "./constants";
 

@@ -2,7 +2,7 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import { addEventListener, createSimpleRouter } from "../helpers";
 
 // 11.3.1 Invoking $$success listeners
 {
@@ -10,8 +10,8 @@ import { createSimpleRouter } from "../helpers";
   const routes = ["about", "home"];
   let index = 0;
 
-  router.addEventListener("$$success", () => {});
-  router.addEventListener("$$success", () => {});
+  addEventListener(router, "$$success", () => {});
+  addEventListener(router, "$$success", () => {});
   router.start("/");
 
   bench("11.3.1 Invoking $$success listeners", () => {
@@ -38,7 +38,7 @@ import { createSimpleRouter } from "../helpers";
   const routes = ["about", "home"];
   let index = 0;
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     // States should be frozen
   });
   router.start("/");
@@ -55,7 +55,7 @@ import { createSimpleRouter } from "../helpers";
   let index = 0;
 
   for (let i = 0; i < 10; i++) {
-    router.addEventListener("$$success", () => {});
+    addEventListener(router, "$$success", () => {});
   }
 
   router.start("/");

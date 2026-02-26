@@ -57,6 +57,8 @@ export interface PluginApi {
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
 
+  buildNavigationState: (name: string, params?: Params) => State | undefined;
+
   getOptions: () => Options;
 
   getTree: () => RouteTree;

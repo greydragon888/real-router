@@ -26,7 +26,6 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
-import { validateListenerArgs } from "./namespaces/EventBusNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import {
   validateAddRouteArgs,
@@ -34,7 +33,6 @@ import {
   validateIsActiveRouteArgs,
   validateRoutes,
   validateShouldUpdateNodeArgs,
-  validateStateBuilderArgs,
 } from "./namespaces/RoutesNamespace/validators";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
@@ -42,7 +40,6 @@ import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
 import type {
-  EventMethodMap,
   GuardFnFactory,
   Limits,
   PluginFactory,
@@ -51,11 +48,9 @@ import type {
 } from "./types";
 import type {
   DefaultDependencies,
-  EventName,
   NavigationOptions,
   Options,
   Params,
-  Plugin,
   State,
   SubscribeFn,
   Unsubscribe,
@@ -68,7 +63,7 @@ import type { CreateMatcherOptions } from "route-tree";
  * All functionality is provided by namespace classes:
  * - OptionsNamespace: getOptions (immutable)
  * - DependenciesNamespace: get/set/remove dependencies
- * - EventEmitter: event listeners, subscribe
+ * - EventEmitter: subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
@@ -226,6 +221,8 @@ export class Router<
         this.#navigation.navigateToState(toState, fromState, opts),
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
+      buildPath: (route, params) =>
+        this.#routes.buildPath(route, params, this.#options.get()),
       setRootPath: (rootPath) => {
         this.#routes.setRootPath(rootPath);
       },
@@ -286,7 +283,6 @@ export class Router<
     this.getState = this.getState.bind(this);
     this.getPreviousState = this.getPreviousState.bind(this);
     this.areStatesEqual = this.areStatesEqual.bind(this);
-    this.buildNavigationState = this.buildNavigationState.bind(this);
     this.shouldUpdateNode = this.shouldUpdateNode.bind(this);
 
     // Router Lifecycle
@@ -304,9 +300,6 @@ export class Router<
 
     // Plugins
     this.usePlugin = this.usePlugin.bind(this);
-
-    // Events
-    this.addEventListener = this.addEventListener.bind(this);
 
     // Navigation
     this.navigate = this.navigate.bind(this);
@@ -389,34 +382,6 @@ export class Router<
     }
 
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
-  }
-
-  buildNavigationState(name: string, params: Params = {}): State | undefined {
-    if (!this.#noValidate) {
-      validateStateBuilderArgs(name, params, "buildNavigationState");
-    }
-
-    const { name: resolvedName, params: resolvedParams } = getInternals(
-      this,
-    ).forwardState(name, params);
-    const routeInfo = this.#routes.buildStateResolved(
-      resolvedName,
-      resolvedParams,
-    );
-
-    if (!routeInfo) {
-      return undefined;
-    }
-
-    return this.#state.makeState(
-      routeInfo.name,
-      routeInfo.params,
-      this.buildPath(routeInfo.name, routeInfo.params),
-      {
-        params: routeInfo.meta,
-        options: {},
-      },
-    );
   }
 
   shouldUpdateNode(
@@ -634,21 +599,6 @@ export class Router<
   }
 
   // ============================================================================
-  // Events (backed by EventEmitter)
-  // ============================================================================
-
-  addEventListener<E extends EventName>(
-    eventName: E,
-    cb: Plugin[EventMethodMap[E]],
-  ): Unsubscribe {
-    if (!this.#noValidate) {
-      validateListenerArgs(eventName, cb);
-    }
-
-    return this.#eventBus.addEventListener(eventName, cb);
-  }
-
-  // ============================================================================
   // Subscription (backed by EventEmitter)
   // ============================================================================
 
@@ -754,7 +704,6 @@ export class Router<
     this.removeDeactivateGuard = throwDisposed as never;
     this.usePlugin = throwDisposed as never;
 
-    this.addEventListener = throwDisposed as never;
     this.subscribe = throwDisposed as never;
     this.canNavigateTo = throwDisposed as never;
   }

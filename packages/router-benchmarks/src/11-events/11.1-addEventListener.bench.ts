@@ -2,7 +2,7 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter } from "../helpers";
+import { addEventListener, createSimpleRouter } from "../helpers";
 
 // 11.1.1 Adding $start listener with cleanup
 {
@@ -13,7 +13,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.1 Adding $start listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$start", listener);
+      const unsub = addEventListener(router, "$start", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -30,7 +30,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.2 Adding $stop listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$stop", listener);
+      const unsub = addEventListener(router, "$stop", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -47,7 +47,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.3 Adding $$start listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$$start", listener);
+      const unsub = addEventListener(router, "$$start", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -64,7 +64,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.4 Adding $$success listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$$success", listener);
+      const unsub = addEventListener(router, "$$success", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -81,7 +81,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.5 Adding $$error listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$$error", listener);
+      const unsub = addEventListener(router, "$$error", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -98,7 +98,7 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.6 Adding $$cancel listener with cleanup", () => {
     for (let i = 0; i < 100; i++) {
-      const unsub = router.addEventListener("$$cancel", listener);
+      const unsub = addEventListener(router, "$$cancel", listener);
 
       do_not_optimize(unsub);
       unsub();
@@ -115,7 +115,7 @@ import { createSimpleRouter } from "../helpers";
       const unsubscribers: (() => void)[] = [];
 
       for (let i = 0; i < 10; i++) {
-        const unsub = router.addEventListener("$$success", () => {});
+        const unsub = addEventListener(router, "$$success", () => {});
 
         do_not_optimize(unsub);
         unsubscribers.push(unsub);
@@ -134,12 +134,12 @@ import { createSimpleRouter } from "../helpers";
 
   bench("11.1.8 Adding listeners for all events with cleanup", () => {
     for (let i = 0; i < 10; i++) {
-      const unsub1 = router.addEventListener("$start", () => {});
-      const unsub2 = router.addEventListener("$stop", () => {});
-      const unsub3 = router.addEventListener("$$start", () => {});
-      const unsub4 = router.addEventListener("$$success", () => {});
-      const unsub5 = router.addEventListener("$$error", () => {});
-      const unsub6 = router.addEventListener("$$cancel", () => {});
+      const unsub1 = addEventListener(router, "$start", () => {});
+      const unsub2 = addEventListener(router, "$stop", () => {});
+      const unsub3 = addEventListener(router, "$$start", () => {});
+      const unsub4 = addEventListener(router, "$$success", () => {});
+      const unsub5 = addEventListener(router, "$$error", () => {});
+      const unsub6 = addEventListener(router, "$$cancel", () => {});
 
       do_not_optimize(unsub1);
       do_not_optimize(unsub2);

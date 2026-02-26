@@ -3,7 +3,12 @@
 import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import {
+  addEventListener,
+  createSimpleRouter,
+  createNestedRouter,
+  IS_ROUTER5,
+} from "../helpers";
 
 import type { Route } from "../helpers";
 
@@ -155,7 +160,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 1000; i++) {
-    router.addEventListener("$$success", () => {});
+    addEventListener(router, "$$success", () => {});
   }
 
   router.start("/");

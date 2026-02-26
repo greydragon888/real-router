@@ -84,6 +84,31 @@ export function getPluginApi<
 
       return ctx.addEventListener(eventName, cb);
     },
+    buildNavigationState: (name, params = {}) => {
+      if (!ctx.noValidate) {
+        validateStateBuilderArgs(name, params, "buildNavigationState");
+      }
+
+      const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
+        name,
+        params,
+      );
+      const routeInfo = ctx.buildStateResolved(resolvedName, resolvedParams);
+
+      if (!routeInfo) {
+        return;
+      }
+
+      return ctx.makeState(
+        routeInfo.name,
+        routeInfo.params,
+        ctx.buildPath(routeInfo.name, routeInfo.params),
+        {
+          params: routeInfo.meta,
+          options: {},
+        },
+      );
+    },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
     getForwardState: () => ctx.forwardState,

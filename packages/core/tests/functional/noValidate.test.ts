@@ -234,16 +234,6 @@ describe("core/noValidate option", () => {
         ).not.toThrowError();
       });
 
-      it("should skip validation in addEventListener (facade)", () => {
-        // Invalid event name would throw with noValidate: false
-        expect(() =>
-          router.addEventListener(
-            "invalidEvent" as unknown as EventName,
-            () => {},
-          ),
-        ).not.toThrowError();
-      });
-
       it("should skip validation in subscribe", () => {
         expect(() => router.subscribe(() => {})).not.toThrowError();
       });

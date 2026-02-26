@@ -2,7 +2,12 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import {
+  addEventListener,
+  createSimpleRouter,
+  cloneRouter,
+  IS_ROUTER5,
+} from "../helpers";
 
 // 13.5.1 Clone state changes do not affect the original
 {
@@ -71,7 +76,7 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.addEventListener("$$success", () => {});
+  addEventListener(router, "$$success", () => {});
   router.start("/");
 
   // JIT warmup for stable memory measurements
@@ -82,7 +87,7 @@ if (IS_ROUTER5) {
       clonedCalled = true;
     };
 
-    cloned.addEventListener("$$success", listener);
+    addEventListener(cloned, "$$success", listener);
     router.navigate(routes[i % 2]);
     cloned.start("/");
     cloned.navigate("users");
@@ -101,7 +106,7 @@ if (IS_ROUTER5) {
       clonedCalled = true;
     };
 
-    cloned.addEventListener("$$success", listener);
+    addEventListener(cloned, "$$success", listener);
 
     router.navigate(routes[index++ % 2]);
 
@@ -119,14 +124,14 @@ if (IS_ROUTER5) {
   const routes = ["about", "home"];
   let index = 0;
 
-  router.addEventListener("$$success", () => {});
+  addEventListener(router, "$$success", () => {});
   router.start("/");
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
     let clonedCalled = false;
     const cloned = cloneRouter(router);
-    const unsub = cloned.addEventListener("$$success", () => {
+    const unsub = addEventListener(cloned, "$$success", () => {
       clonedCalled = true;
     });
 
@@ -143,7 +148,7 @@ if (IS_ROUTER5) {
 
     const cloned = cloneRouter(router);
 
-    const unsub = cloned.addEventListener("$$success", () => {
+    const unsub = addEventListener(cloned, "$$success", () => {
       clonedCalled = true;
     });
 

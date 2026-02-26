@@ -30,6 +30,7 @@ describe("getPluginApi()", () => {
     expect(typeof api.getRootPath).toBe("function");
     expect(typeof api.navigateToState).toBe("function");
     expect(typeof api.addEventListener).toBe("function");
+    expect(typeof api.buildNavigationState).toBe("function");
     expect(typeof api.getOptions).toBe("function");
     expect(typeof api.getTree).toBe("function");
     expect(typeof api.getForwardState).toBe("function");
@@ -101,7 +102,7 @@ describe("getPluginApi()", () => {
     expect(result.name).toBe("users");
   });
 
-  it("addEventListener should delegate to router.addEventListener", async () => {
+  it("addEventListener should register event listeners", async () => {
     await router.start("/home");
     let called = false;
     const unsub = api.addEventListener(events.TRANSITION_SUCCESS, () => {

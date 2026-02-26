@@ -16,7 +16,7 @@ import { run } from "mitata";
 // MUST be first import to suppress console before router warnings
 import "./helpers/suppress-console";
 
-import { createSimpleRouter } from "./helpers";
+import { addEventListener, createSimpleRouter } from "./helpers";
 
 // ============================================================================
 // JIT Warmup: Pre-warm V8 for stable benchmark measurements
@@ -80,8 +80,8 @@ function warmupJIT(): void {
     // Warm up event system
     const unsub = router.subscribe(() => {});
 
-    router.addEventListener("$$success", () => {});
-    router.addEventListener("$$error", () => {});
+    addEventListener(router, "$$success", () => {});
+    addEventListener(router, "$$error", () => {});
 
     unsub();
 

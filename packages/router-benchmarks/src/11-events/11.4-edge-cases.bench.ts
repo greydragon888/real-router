@@ -2,7 +2,7 @@
 
 import { bench } from "mitata";
 
-import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
+import { addEventListener, createSimpleRouter, IS_ROUTER5 } from "../helpers";
 
 /**
  * Batch size for stable measurements on sub-µs operations.
@@ -14,12 +14,12 @@ const BATCH = 50;
   const router = createSimpleRouter();
   let addedListenerUnsub: (() => void) | null = null;
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     const listener = () => {
       // Added during dispatch
     };
 
-    addedListenerUnsub = router.addEventListener("$$success", listener);
+    addedListenerUnsub = addEventListener(router, "$$success", listener);
   });
 
   router.start("/");
@@ -47,11 +47,11 @@ const BATCH = 50;
     }
 
     // Re-add for next iteration
-    handlerUnsub = router.addEventListener("$$success", () => {});
+    handlerUnsub = addEventListener(router, "$$success", () => {});
   };
 
-  router.addEventListener("$$success", removerHandler);
-  handlerUnsub = router.addEventListener("$$success", () => {});
+  addEventListener(router, "$$success", removerHandler);
+  handlerUnsub = addEventListener(router, "$$success", () => {});
 
   router.start("/");
   const routes = ["about", "home"];
@@ -67,7 +67,7 @@ const BATCH = 50;
   const router = createSimpleRouter();
   let count = 0;
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     count++;
     if (count < 3) {
       router.navigate(count % 2 === 0 ? "about" : "users");
@@ -88,7 +88,7 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     // Testing immutability
   });
 
@@ -126,10 +126,10 @@ const BATCH = 50;
 {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$start", () => {
+  addEventListener(router, "$$start", () => {
     // Event handler
   });
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     // Event handler
   });
 
@@ -147,10 +147,10 @@ const BATCH = 50;
 if (!IS_ROUTER5) {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$start", () => {
+  addEventListener(router, "$$start", () => {
     // Event handler
   });
-  router.addEventListener("$$cancel", () => {
+  addEventListener(router, "$$cancel", () => {
     // Event handler
   });
 
@@ -169,7 +169,7 @@ if (!IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     void Promise.resolve();
     // Async operation - should not block dispatch
   });
@@ -191,7 +191,7 @@ if (!IS_ROUTER5) {
     const unsubscribers: (() => void)[] = [];
 
     for (let i = 0; i < 1000; i++) {
-      unsubscribers.push(router.addEventListener("$$success", () => {}));
+      unsubscribers.push(addEventListener(router, "$$success", () => {}));
     }
     // Cleanup to prevent accumulation
     for (const unsub of unsubscribers) {
@@ -204,7 +204,7 @@ if (!IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$success", () => {
+  addEventListener(router, "$$success", () => {
     // Handler receives toState, fromState, options
   });
 
@@ -223,7 +223,7 @@ if (!IS_ROUTER5) {
 
   bench(`11.4.16 Removing listener via unsubscribe (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      const unsubscribe = router.addEventListener("$$success", () => {});
+      const unsubscribe = addEventListener(router, "$$success", () => {});
 
       unsubscribe();
     }
@@ -238,7 +238,7 @@ if (!IS_ROUTER5) {
     `11.4.17 Multiple removal of same listener (idempotent) (×${BATCH})`,
     () => {
       for (let i = 0; i < BATCH; i++) {
-        const unsubscribe = router.addEventListener("$$success", () => {});
+        const unsubscribe = addEventListener(router, "$$success", () => {});
 
         unsubscribe();
         unsubscribe();
@@ -252,20 +252,20 @@ if (!IS_ROUTER5) {
 {
   const router = createSimpleRouter();
 
-  router.addEventListener("$$success", () => {});
-  router.addEventListener("$$success", () => {});
-  router.addEventListener("$$success", () => {});
+  addEventListener(router, "$$success", () => {});
+  addEventListener(router, "$$success", () => {});
+  addEventListener(router, "$$success", () => {});
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
-    const unsubscribe = router.addEventListener("$$success", () => {});
+    const unsubscribe = addEventListener(router, "$$success", () => {});
 
     unsubscribe();
   }
 
   bench(`11.4.18 Removing one of multiple listeners (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      const unsubscribe = router.addEventListener("$$success", () => {});
+      const unsubscribe = addEventListener(router, "$$success", () => {});
 
       unsubscribe();
     }

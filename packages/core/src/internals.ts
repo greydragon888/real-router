@@ -56,6 +56,8 @@ export interface RouterInternals<
     cb: Plugin[EventMethodMap[E]],
   ) => Unsubscribe;
 
+  readonly buildPath: (route: string, params?: Params) => string;
+
   readonly setRootPath: (rootPath: string) => void;
   readonly getRootPath: () => string;
 
