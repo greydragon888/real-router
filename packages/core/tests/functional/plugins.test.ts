@@ -96,8 +96,9 @@ describe("core/plugins", () => {
       onTransitionError: () => undefined,
     };
 
-    myPlugin = (router?: Router & { myCustomMethod?: Function }) => {
-      router!.myCustomMethod = () => undefined;
+    myPlugin = (router) => {
+      (router as unknown as Record<string, unknown>).myCustomMethod = () =>
+        undefined;
 
       return myPluginMethods;
     };

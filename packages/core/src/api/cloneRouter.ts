@@ -3,12 +3,12 @@ import { getTypeDescription } from "type-guards";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
-import { Router } from "../Router";
+import { Router as RouterClass } from "../Router";
 import { RouterError } from "../RouterError";
 import { getLifecycleApi } from "./getLifecycleApi";
 
 import type { Route } from "../types";
-import type { DefaultDependencies } from "@real-router/types";
+import type { DefaultDependencies, Router } from "@real-router/types";
 
 function validateCloneArgs(dependencies: unknown): void {
   if (dependencies === undefined) {
@@ -41,7 +41,7 @@ export function cloneRouter<
 >(
   router: Router<Dependencies>,
   dependencies?: Dependencies,
-): Router<Dependencies> {
+): RouterClass<Dependencies> {
   const ctx = getInternals(router);
 
   if (ctx.isDisposed()) {
@@ -70,7 +70,7 @@ export function cloneRouter<
     ...dependencies,
   } as Dependencies;
 
-  const newRouter = new Router<Dependencies>(
+  const newRouter = new RouterClass<Dependencies>(
     routes as Route<Dependencies>[],
     options,
     mergedDeps,

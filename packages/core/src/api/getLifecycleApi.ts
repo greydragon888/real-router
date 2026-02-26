@@ -5,9 +5,8 @@ import { getInternals } from "../internals";
 import { validateHandler } from "../namespaces/RouteLifecycleNamespace/validators";
 import { RouterError } from "../RouterError";
 
-import type { Router } from "../Router";
 import type { LifecycleApi } from "./types";
-import type { DefaultDependencies } from "@real-router/types";
+import type { DefaultDependencies, Router } from "@real-router/types";
 
 function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {

@@ -1,5 +1,4 @@
 // packages/core/src/Router.ts
-/* eslint-disable unicorn/prefer-event-target -- custom EventEmitter package, not Node.js EventEmitter */
 
 /**
  * Router class - facade with integrated namespaces.
@@ -45,6 +44,7 @@ import type {
   NavigationOptions,
   Options,
   Params,
+  Router as RouterInterface,
   State,
   SubscribeFn,
   Unsubscribe,
@@ -69,8 +69,7 @@ import type { CreateMatcherOptions } from "route-tree";
  */
 export class Router<
   Dependencies extends DefaultDependencies = DefaultDependencies,
-> {
-  // Index signatures to satisfy interface
+> implements RouterInterface<Dependencies> {
   [key: string]: unknown;
 
   // ============================================================================
@@ -164,6 +163,7 @@ export class Router<
     // =========================================================================
 
     const routerFSM = createRouterFSM();
+    // eslint-disable-next-line unicorn/prefer-event-target
     const emitter = new EventEmitter<RouterEventMap>({
       onListenerError: (eventName, error) => {
         logger.error("Router", `Error in listener for ${eventName}:`, error);
@@ -575,8 +575,6 @@ export class Router<
     return promiseState;
   }
 
-  navigateToDefault(): Promise<State>;
-  navigateToDefault(options: NavigationOptions): Promise<State>;
   navigateToDefault(options?: NavigationOptions): Promise<State> {
     // 1. Validate arguments
     if (!this.#noValidate) {

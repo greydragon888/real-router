@@ -1,5 +1,8 @@
-import type { Router } from "./Router";
-import type { Navigator, DefaultDependencies } from "@real-router/types";
+import type {
+  Navigator,
+  DefaultDependencies,
+  Router,
+} from "@real-router/types";
 
 export const getNavigator = <
   Dependencies extends DefaultDependencies = DefaultDependencies,

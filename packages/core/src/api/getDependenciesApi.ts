@@ -9,9 +9,8 @@ import {
 } from "../namespaces/DependenciesNamespace/validators";
 import { RouterError } from "../RouterError";
 
-import type { Router } from "../Router";
 import type { DependenciesApi } from "./types";
-import type { DefaultDependencies } from "@real-router/types";
+import type { DefaultDependencies, Router } from "@real-router/types";
 
 function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {

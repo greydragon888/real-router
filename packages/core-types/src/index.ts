@@ -23,9 +23,7 @@ export type {
   TransitionMeta,
 } from "./base";
 
-// Router types (base types without Router dependency)
-// Note: Route, RouteConfigUpdate, ActivationFnFactory,
-// PluginFactory, BuildStateResultWithSegments are in @real-router/core
+// Router types, factory types, and route config types
 export type {
   Options,
   DefaultRouteCallback,
@@ -42,6 +40,11 @@ export type {
   Subscription,
   Navigator,
   Router,
+  PluginFactory,
+  GuardFnFactory,
+  ActivationFnFactory,
+  Route,
+  RouteConfigUpdate,
 } from "./router";
 
 // Limits configuration
@@ -56,7 +59,16 @@ export type {
   EventToPluginMap,
   EventToNameMap,
   ErrorCodeToValueMap,
+  EventMethodMap,
 } from "./constants";
+
+// API interfaces (modular router access)
+export type {
+  PluginApi,
+  RoutesApi,
+  DependenciesApi,
+  LifecycleApi,
+} from "./api";
 
 // Note: RouterError type is a forward declaration matching the class in real-router package
 // Use import { RouterError } from "real-router" for the actual class implementation

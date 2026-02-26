@@ -116,8 +116,10 @@ export function browserPluginFactory(
 
   let removePopStateListener: (() => void) | undefined;
 
-  return function browserPlugin(router: Router) {
-    const api = getPluginApi(router);
+  return function browserPlugin(routerBase) {
+    // Cast to augmented Router (class + module augmentation: buildUrl, matchUrl, etc.)
+    const router = routerBase as Router;
+    const api = getPluginApi(routerBase);
 
     // Store original methods for restoration on teardown
 

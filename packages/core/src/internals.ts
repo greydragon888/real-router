@@ -1,5 +1,5 @@
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
-import type { Router } from "./Router";
+import type { Router as RouterClass } from "./Router";
 import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
 import type {
   DefaultDependencies,
@@ -8,6 +8,7 @@ import type {
   Options,
   Params,
   Plugin,
+  Router as RouterInterface,
   RouteTreeState,
   SimpleState,
   State,
@@ -100,7 +101,7 @@ export interface RouterInternals<
 const internals = new WeakMap<object, RouterInternals<any>>();
 
 export function getInternals<D extends DefaultDependencies>(
-  router: Router<D>,
+  router: RouterInterface<D>,
 ): RouterInternals<D> {
   const ctx = internals.get(router);
 
@@ -114,7 +115,7 @@ export function getInternals<D extends DefaultDependencies>(
 }
 
 export function registerInternals<D extends DefaultDependencies>(
-  router: Router<D>,
+  router: RouterClass<D>,
   ctx: RouterInternals<D>,
 ): void {
   internals.set(router, ctx);

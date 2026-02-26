@@ -1,6 +1,6 @@
 // packages/core/src/index.ts
 
-// Router-dependent types (defined in core)
+// Router-dependent types (re-exported from @real-router/types)
 export type {
   ActivationFnFactory,
   BuildStateResultWithSegments,
