@@ -1,12 +1,18 @@
 // packages/core/src/namespaces/RoutesNamespace/routesStore.ts
 
+import { nodeToDefinition } from "route-tree";
+
 import { createEmptyConfig, sanitizeRoute } from "./helpers";
 import {
   cacheForwardMap,
+  commitTreeChanges,
   rebuildTree,
+  rebuildTreeInPlace,
+  refreshForwardMap,
   registerAllRouteHandlers,
   validateAndCacheForwardMap,
 } from "./routeTreeOps";
+import { validateRoutes } from "./validators";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
@@ -18,6 +24,36 @@ import type {
   RouteDefinition,
   RouteTree,
 } from "route-tree";
+
+export interface RoutesStoreOps<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  readonly commitTreeChanges: (
+    store: RoutesStore<Dependencies>,
+    noValidate: boolean,
+  ) => void;
+  readonly rebuildTreeInPlace: (store: RoutesStore<Dependencies>) => void;
+  readonly refreshForwardMap: (
+    config: RouteConfig,
+    noValidate: boolean,
+  ) => Record<string, string>;
+  readonly registerAllRouteHandlers: (
+    routes: readonly Route<Dependencies>[],
+    config: RouteConfig,
+    routeCustomFields: Record<string, Record<string, unknown>>,
+    pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
+    pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
+    depsStore: RoutesDependencies<Dependencies> | undefined,
+    parentName: string,
+  ) => void;
+  readonly nodeToDefinition: (node: RouteTree) => RouteDefinition;
+  readonly validateRoutes: (
+    routes: Route<Dependencies>[],
+    tree?: RouteTree,
+    forwardMap?: Record<string, string>,
+    parentName?: string,
+  ) => void;
+}
 
 export interface RoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -34,6 +70,7 @@ export interface RoutesStore<
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
+  readonly ops: RoutesStoreOps<Dependencies>;
 }
 
 export function createRoutesStore<
@@ -85,5 +122,13 @@ export function createRoutesStore<
     lifecycleNamespace: undefined,
     pendingCanActivate,
     pendingCanDeactivate,
+    ops: {
+      commitTreeChanges,
+      rebuildTreeInPlace,
+      refreshForwardMap,
+      registerAllRouteHandlers,
+      nodeToDefinition,
+      validateRoutes,
+    },
   };
 }

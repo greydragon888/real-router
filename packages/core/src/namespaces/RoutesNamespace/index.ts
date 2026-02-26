@@ -8,4 +8,4 @@ export { createEmptyConfig } from "./helpers";
 
 export type { RouteConfig, RoutesDependencies } from "./types";
 
-export type { RoutesStore } from "./routesStore";
+export type { RoutesStore, RoutesStoreOps } from "./routesStore";

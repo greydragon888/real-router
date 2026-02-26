@@ -1,7 +1,6 @@
 // packages/core/src/namespaces/RoutesNamespace/routesCrud.ts
 
 import { logger } from "@real-router/logger";
-import { nodeToDefinition } from "route-tree";
 
 import {
   clearConfigEntries,
@@ -10,12 +9,6 @@ import {
   resolveForwardChain,
   sanitizeRoute,
 } from "./helpers";
-import {
-  commitTreeChanges,
-  rebuildTreeInPlace,
-  refreshForwardMap,
-  registerAllRouteHandlers,
-} from "./routeTreeOps";
 
 import type { RoutesStore } from "./routesStore";
 import type { RouteConfig } from "./types";
@@ -128,6 +121,10 @@ export function updateForwardTo<
   forwardTo: string | ForwardToCallback<Dependencies> | null,
   config: RouteConfig,
   noValidate: boolean,
+  refreshForwardMapFn: (
+    config: RouteConfig,
+    noValidate: boolean,
+  ) => Record<string, string>,
 ): Record<string, string> {
   if (forwardTo === null) {
     delete config.forwardMap[name];
@@ -140,7 +137,7 @@ export function updateForwardTo<
     config.forwardFnMap[name] = forwardTo;
   }
 
-  return refreshForwardMap(config, noValidate);
+  return refreshForwardMapFn(config, noValidate);
 }
 
 /**
@@ -231,7 +228,7 @@ export function clearRoutesCrud<
     Record<string, unknown>
   >;
 
-  rebuildTreeInPlace(store);
+  store.ops.rebuildTreeInPlace(store);
 }
 
 /**
@@ -266,7 +263,7 @@ export function addRoutesCrud<
     }
   }
 
-  registerAllRouteHandlers(
+  store.ops.registerAllRouteHandlers(
     routes,
     store.config,
     store.routeCustomFields,
@@ -276,7 +273,7 @@ export function addRoutesCrud<
     parentName ?? "",
   );
 
-  commitTreeChanges(store, noValidate);
+  store.ops.commitTreeChanges(store, noValidate);
 }
 
 /**
@@ -308,7 +305,7 @@ export function removeRouteCrud<
     store.lifecycleNamespace!,
   );
 
-  commitTreeChanges(store, noValidate);
+  store.ops.commitTreeChanges(store, noValidate);
 
   return true;
 }
@@ -344,6 +341,7 @@ export function updateRouteConfigCrud<
       updates.forwardTo,
       store.config,
       noValidate,
+      store.ops.refreshForwardMap,
     );
   }
 
@@ -398,7 +396,7 @@ export function getRouteCrud<
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const targetNode = segments.at(-1)! as RouteTree;
-  const definition = nodeToDefinition(targetNode);
+  const definition = store.ops.nodeToDefinition(targetNode);
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const factories = store.lifecycleNamespace!.getFactories();
 

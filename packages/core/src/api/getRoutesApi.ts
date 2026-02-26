@@ -18,7 +18,6 @@ import {
   validateAddRouteArgs,
   validateParentOption,
   validateRemoveRouteArgs,
-  validateRoutes,
   validateUpdateRouteBasicArgs,
   validateUpdateRoutePropertyTypes,
 } from "../namespaces/RoutesNamespace/validators";
@@ -56,7 +55,7 @@ export function getRoutesApi<
 
         validateAddRouteArgs(routeArray);
 
-        validateRoutes(
+        store.ops.validateRoutes(
           routeArray,
           store.tree,
           store.config.forwardMap,
