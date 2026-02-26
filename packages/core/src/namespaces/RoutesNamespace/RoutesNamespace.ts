@@ -30,6 +30,18 @@ import type {
 
 const EMPTY_OPTIONS = Object.freeze({});
 
+function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
+  const params: string[] = [];
+
+  for (const segment of segments) {
+    for (const param of segment.paramMeta.urlParams) {
+      params.push(param);
+    }
+  }
+
+  return params;
+}
+
 /**
  * Independent namespace for managing routes.
  *
@@ -58,6 +70,46 @@ export class RoutesNamespace<
     matcherOptions?: CreateMatcherOptions,
   ) {
     this.#store = createRoutesStore(routes, noValidate, matcherOptions);
+  }
+
+  /**
+   * Creates a predicate function to check if a route node should be updated.
+   * Note: Argument validation is done by facade (Router.ts) via validateShouldUpdateNodeArgs.
+   */
+  static shouldUpdateNode(
+    nodeName: string,
+  ): (toState: State, fromState?: State) => boolean {
+    return (toState: State, fromState?: State): boolean => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!(toState && typeof toState === "object" && "name" in toState)) {
+        throw new TypeError(
+          "[router.shouldUpdateNode] toState must be valid State object",
+        );
+      }
+
+      if (toState.meta?.options.reload) {
+        return true;
+      }
+
+      if (nodeName === DEFAULT_ROUTE_NAME && !fromState) {
+        return true;
+      }
+
+      const { intersection, toActivate, toDeactivate } = getTransitionPath(
+        toState,
+        fromState,
+      );
+
+      if (nodeName === intersection) {
+        return true;
+      }
+
+      if (toActivate.includes(nodeName)) {
+        return true;
+      }
+
+      return toDeactivate.includes(nodeName);
+    };
   }
 
   // =========================================================================
@@ -388,46 +440,6 @@ export class RoutesNamespace<
     );
   }
 
-  /**
-   * Creates a predicate function to check if a route node should be updated.
-   * Note: Argument validation is done by facade (Router.ts) via validateShouldUpdateNodeArgs.
-   */
-  shouldUpdateNode(
-    nodeName: string,
-  ): (toState: State, fromState?: State) => boolean {
-    return (toState: State, fromState?: State): boolean => {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!(toState && typeof toState === "object" && "name" in toState)) {
-        throw new TypeError(
-          "[router.shouldUpdateNode] toState must be valid State object",
-        );
-      }
-
-      if (toState.meta?.options.reload) {
-        return true;
-      }
-
-      if (nodeName === DEFAULT_ROUTE_NAME && !fromState) {
-        return true;
-      }
-
-      const { intersection, toActivate, toDeactivate } = getTransitionPath(
-        toState,
-        fromState,
-      );
-
-      if (nodeName === intersection) {
-        return true;
-      }
-
-      if (toActivate.includes(nodeName)) {
-        return true;
-      }
-
-      return toDeactivate.includes(nodeName);
-    };
-  }
-
   getUrlParams(name: string): string[] {
     const segments = this.#store.matcher.getSegmentsByName(name);
 
@@ -435,7 +447,7 @@ export class RoutesNamespace<
       return [];
     }
 
-    return this.#collectUrlParamsArray(segments as readonly RouteTree[]);
+    return collectUrlParamsArray(segments as readonly RouteTree[]);
   }
 
   getStore(): RoutesStore<Dependencies> {
@@ -510,17 +522,5 @@ export class RoutesNamespace<
     }
 
     throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
-  }
-
-  #collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
-    const params: string[] = [];
-
-    for (const segment of segments) {
-      for (const param of segment.paramMeta.urlParams) {
-        params.push(param);
-      }
-    }
-
-    return params;
   }
 }

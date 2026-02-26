@@ -426,7 +426,7 @@ export class Router<
       validateShouldUpdateNodeArgs(nodeName);
     }
 
-    return this.#routes.shouldUpdateNode(nodeName);
+    return RoutesNamespace.shouldUpdateNode(nodeName);
   }
 
   // ============================================================================
