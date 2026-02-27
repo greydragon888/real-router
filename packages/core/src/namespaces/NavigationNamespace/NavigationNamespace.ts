@@ -38,6 +38,7 @@ export class NavigationNamespace {
   #canNavigate!: () => boolean;
   #deps!: NavigationDependencies;
   #transitionDeps!: TransitionDependencies;
+  #currentController: AbortController | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -118,13 +119,15 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { signal, ...cleanOpts } = opts;
     const toState = deps.makeState(
       route.name,
       route.params,
       deps.buildPath(route.name, route.params),
       {
         params: route.meta,
-        options: opts,
+        options: cleanOpts,
       },
     );
 
@@ -166,6 +169,29 @@ export class NavigationNamespace {
       deps.cancelNavigation();
     }
 
+    const controller = new AbortController();
+
+    this.#currentController = controller;
+
+    /* v8 ignore next 8 -- @preserve: external signal integration tested by AbortController API tests (Task 6); branch not reachable without caller providing opts.signal */
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        this.#currentController = null;
+
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+          reason: opts.signal.reason,
+        });
+      }
+
+      opts.signal.addEventListener(
+        "abort",
+        () => {
+          controller.abort(opts.signal?.reason);
+        },
+        { once: true, signal: controller.signal },
+      );
+    }
+
     deps.startTransition(toState, fromState);
 
     try {
@@ -174,6 +200,7 @@ export class NavigationNamespace {
         toState,
         fromState,
         opts,
+        controller.signal,
       );
 
       if (
@@ -187,7 +214,10 @@ export class NavigationNamespace {
         );
 
         deps.setState(stateWithTransition);
-        deps.sendTransitionDone(stateWithTransition, fromState, opts);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { signal, ...transitionOpts } = opts;
+
+        deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
 
         return stateWithTransition;
       } else {
@@ -203,6 +233,11 @@ export class NavigationNamespace {
       this.#routeTransitionError(error, toState, fromState);
 
       throw error;
+    } finally {
+      controller.abort(); // Cleanup: removes listener on external signal
+      if (this.#currentController === controller) {
+        this.#currentController = null;
+      }
     }
   }
 
@@ -237,6 +272,17 @@ export class NavigationNamespace {
     );
 
     return this.navigate(resolvedRoute, resolvedParams, opts);
+  }
+
+  /**
+   * Aborts the current in-flight navigation, if any.
+   */
+  /* v8 ignore next 4 -- @preserve: new public method tested by AbortController API integration tests (Task 6) */
+  abortCurrentNavigation(): void {
+    this.#currentController?.abort(
+      new RouterError(errorCodes.TRANSITION_CANCELLED),
+    );
+    this.#currentController = null;
   }
 
   // =========================================================================

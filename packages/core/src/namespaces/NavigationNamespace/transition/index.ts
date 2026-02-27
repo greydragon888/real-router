@@ -13,6 +13,7 @@ export async function transition(
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,
+  signal: AbortSignal,
 ): Promise<TransitionOutput> {
   // We're caching the necessary data
   const [canDeactivateFunctions, canActivateFunctions] =
@@ -21,7 +22,7 @@ export async function transition(
 
   // State management functions
   // Issue #36: Check both explicit cancellation AND router shutdown
-  const isCancelled = () => !deps.isActive();
+  const isCancelled = () => signal.aborted || !deps.isActive();
 
   const { toDeactivate, toActivate, intersection } = getTransitionPath(
     toState,
@@ -41,6 +42,7 @@ export async function transition(
       toDeactivate,
       errorCodes.CANNOT_DEACTIVATE,
       isCancelled,
+      signal,
     );
   }
 
@@ -56,6 +58,7 @@ export async function transition(
       toActivate,
       errorCodes.CANNOT_ACTIVATE,
       isCancelled,
+      signal,
     );
   }
 

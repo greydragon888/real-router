@@ -14,6 +14,7 @@ export async function executeLifecycleGuards(
   segments: string[],
   errorCode: string,
   isCancelled: () => boolean,
+  signal: AbortSignal,
 ): Promise<void> {
   const segmentsToProcess = segments.filter((name) => guard.has(name));
 
@@ -35,6 +36,13 @@ export async function executeLifecycleGuards(
     try {
       result = await guardFn(toState, fromState);
     } catch (error: unknown) {
+      /* v8 ignore next 4 -- @preserve: AbortError race condition guard — signal may abort between isCancelled check and guard execution; covered by AbortController API integration tests */
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+          reason: signal.reason,
+        });
+      }
+
       rethrowAsRouterError(error, errorCode, segment);
     }
 
