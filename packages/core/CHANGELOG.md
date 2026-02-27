@@ -1,5 +1,201 @@
 # @real-router/core
 
+## 0.26.0
+
+### Minor Changes
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Switch `cloneRouter` to standalone via WeakMap and remove `CloneNamespace` from Router (#173)
+
+  **Breaking Change:** `Router.clone()` instance method removed. Use `cloneRouter(router, deps?)` instead.
+
+  **Removed:** `CloneNamespace` class (3 files), `Router.clone()` method, clone wiring in `RouterWiringBuilder`.
+
+  **Migration:**
+
+  ```diff
+  - const cloned = router.clone({ api: newApi });
+  + import { cloneRouter } from "@real-router/core";
+  + const cloned = cloneRouter(router, { api: newApi });
+  ```
+
+  `cloneRouter` collects all router data (routes, options, dependencies, guards, plugins, forwardTo, rootPath, middleware) via WeakMap internals and creates a fresh router instance.
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Switch `getDependenciesApi` to standalone via WeakMap and remove DI methods from Router (#172)
+
+  **Breaking Change:** DI methods removed from the `Router` class. Use `getDependenciesApi(router)` instead.
+
+  **Removed methods:** `setDependency`, `setDependencies`, `removeDependency`, `resetDependencies`, `hasDependency`, `getDependency`, `getDependencies`.
+
+  **Migration:**
+
+  ```diff
+  - router.setDependency("api", apiService);
+  - const dep = router.getDependency("api");
+  + import { getDependenciesApi } from "@real-router/core";
+  + const deps = getDependenciesApi(router);
+  + deps.set("api", apiService);
+  + const dep = deps.get("api");
+  ```
+
+  `getDependency` remains available internally via factory injection (`PluginFactory`, `GuardFnFactory`, `ForwardToCallback`).
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `DependenciesNamespace` class with plain `DependenciesStore` and inline CRUD logic into `getDependenciesApi` (#187)
+
+  **Breaking Change:** `RouterInternals` dependency entries replaced with single `dependenciesGetStore()` accessor. Plugins using `getInternals()` must migrate.
+
+  **What changed:**
+  - New `DependenciesStore<D>` interface — plain data object (`dependencies` + `limits`)
+  - `DependenciesNamespace` class eliminated — `createDependenciesStore()` factory replaces `new DependenciesNamespace()`
+  - CRUD logic (`set`, `setMultiple`, `checkDependencyCount`) moved into `getDependenciesApi.ts` as module-private functions
+  - `RouterInternals` reduced from 9 `dependency*` entries + `maxDependencies` to one `dependenciesGetStore()`
+  - Wiring accesses store directly (`dependenciesStore.dependencies[key]`) instead of class methods
+
+  **Migration (plugins using `getInternals()`):**
+
+  ```diff
+    const ctx = getInternals(router);
+  - const value = ctx.dependencyGet("myDep");
+  - const all = ctx.dependencyGetAll();
+  - ctx.dependencySet("myDep", value);
+  - const count = ctx.dependencyCount();
+  + const store = ctx.dependenciesGetStore();
+  + const value = store.dependencies["myDep"];
+  + const all = { ...store.dependencies };
+  + store.dependencies["myDep"] = value;
+  + const count = Object.keys(store.dependencies).length;
+  ```
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Add factory functions and WeakMap internals for modular plugin access (#170, #171)
+
+  **Breaking Change:** PluginApi methods removed from the `Router` class. Use `getPluginApi(router)` instead.
+
+  **Removed methods:** `makeState`, `buildState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `navigateToState`, `addEventListener`, `getOptions`.
+
+  **Migration:**
+
+  ```diff
+  - const state = router.matchPath("/home");
+  + import { getPluginApi } from "@real-router/core";
+  + const api = getPluginApi(router);
+  + const state = api.matchPath("/home");
+  ```
+
+  **New exports:**
+  - `getPluginApi(router)` — returns `PluginApi` with `makeState`, `buildState`, `matchPath`, `navigateToState`, `addEventListener`, etc.
+  - `getRoutesApi(router)` — returns `RoutesApi` with `add`, `remove`, `update`, `clear`, `has`
+  - `getDependenciesApi(router)` — returns `DependenciesApi` with `get`, `set`, `remove`, `reset`, `has`, etc.
+  - `cloneRouter(router, deps?)` — clones router for SSR
+
+  Internally, `getPluginApi` uses a WeakMap-based internals mechanism for decoupled access to router state.
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Extract guard management methods into `getLifecycleApi` (#183)
+
+  **Breaking Change:** Guard registration methods removed from the `Router` class. Use `getLifecycleApi(router)` instead.
+
+  **Removed methods:** `addActivateGuard`, `addDeactivateGuard`, `removeActivateGuard`, `removeDeactivateGuard`.
+
+  **Migration:**
+
+  ```diff
+  - router.addActivateGuard("admin", guardFactory);
+  - router.removeActivateGuard("admin");
+  + import { getLifecycleApi } from "@real-router/core";
+  + const lifecycle = getLifecycleApi(router);
+  + lifecycle.addActivateGuard("admin", guardFactory);
+  + lifecycle.removeActivateGuard("admin");
+  ```
+
+  `canNavigateTo` remains on the Router class — it is a sync UI query method used in hot-path rendering.
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Move `addEventListener` and `buildNavigationState` from Router to `getPluginApi()` (#182)
+
+  **Breaking Change:** `router.addEventListener()` and `router.buildNavigationState()` are removed from the Router class. Use `getPluginApi(router)` instead.
+
+  **Migration:**
+
+  ```diff
+  - router.addEventListener("transitionSuccess", handler);
+  + import { getPluginApi } from "@real-router/core";
+  + getPluginApi(router).addEventListener("transitionSuccess", handler);
+  ```
+
+  ```diff
+  - const state = router.buildNavigationState("users", { id: "123" });
+  + import { getPluginApi } from "@real-router/core";
+  + const state = getPluginApi(router).buildNavigationState("users", { id: "123" });
+  ```
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `ActivationFn` and `ActivationFnFactory` re-exports (#187)
+
+  **Breaking Change:** `ActivationFn` and `ActivationFnFactory` are no longer exported. Use `GuardFn` and `GuardFnFactory` instead.
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Switch `getRoutesApi` to standalone via WeakMap and remove Route CRUD methods from Router (#174)
+
+  **Breaking Change:** Route CRUD methods removed from the `Router` class. Use `getRoutesApi(router)` instead.
+
+  **Removed methods:** `addRoute`, `removeRoute`, `updateRoute`, `clearRoutes`, `getRoute`, `getRouteConfig`, `hasRoute`.
+
+  **Migration:**
+
+  ```diff
+  - router.addRoute({ name: "users", path: "/users" });
+  - router.removeRoute("users");
+  + import { getRoutesApi } from "@real-router/core";
+  + const routes = getRoutesApi(router);
+  + routes.add({ name: "users", path: "/users" });
+  + routes.remove("users");
+  ```
+
+  Internally, CRUD logic extracted from `RoutesNamespace` into standalone `routesCrud.ts` for tree-shaking — only included in the bundle when `getRoutesApi()` is imported. Static validator delegates removed from `RoutesNamespace` in favor of direct imports from `validators.ts`.
+
+  Heavy operations (`commitTreeChanges`, `rebuildTreeInPlace`, `refreshForwardMap`, `registerAllRouteHandlers`, `nodeToDefinition`, `validateRoutes`) injected via `RoutesStore.ops` — breaks the static import chain `routesCrud.ts → routeTreeOps.ts → route-tree`, reducing `getRoutesApi` standalone bundle from 10.17 kB to 4.04 kB brotli (-60%).
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Introduce `RoutesStore`, consolidate clone internals and reduce `RouterInternals` surface (#180)
+
+  **Breaking Change:** `RouterInternals` route-related entries replaced with single `routeGetStore()` accessor. Plugins using `getInternals()` must migrate.
+
+  **What changed:**
+  - New `RoutesStore<D>` interface — plain data object holding all route state (~13 fields previously spread across `RoutesNamespace` private properties)
+  - `RoutesNamespace` now owns a single `#store: RoutesStore` instead of ~13 private fields and ~11 accessor methods
+  - `RouterInternals` reduced from ~20 individual `route*` entries to one `routeGetStore()` — eliminates `RoutesDataContext` assembly boilerplate
+  - `RouterInternals<D>` is now generic — removes `as unknown as` type casts in `cloneRouter`, `getRoutesApi`, `getDependenciesApi`
+  - `cloneRouter()` operates directly on `RoutesStore` — removes `applyClonedConfig()`, `cloneRoutes()`, and related accessor methods
+  - `getRoutesApi()` passes store directly instead of assembling `RoutesDataContext` per call
+
+  **Migration (plugins using `getInternals()`):**
+
+  ```diff
+    const ctx = getInternals(router);
+  - const tree = ctx.routeGetTree();
+  - const definitions = ctx.routeDefinitions;
+  - const config = ctx.routeConfig;
+  - const matcher = ctx.routeGetMatcher();
+  + const store = ctx.routeGetStore();
+  + const tree = store.tree;
+  + const definitions = store.definitions;
+  + const config = store.config;
+  + const matcher = store.matcher;
+  ```
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Re-export consolidated types from `@real-router/types` (#184)
+  - Replace factory type and route config definitions in `types.ts` with re-exports from `@real-router/types`
+  - Replace API interface definitions in `api/types.ts` with re-exports
+  - Standalone API functions (`getPluginApi`, `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getNavigator`) now accept `Router` interface instead of class — enables passing interface-typed router values
+  - `PluginApi.getTree()` returns `unknown` (was `RouteTree`)
+
+  All existing imports from `@real-router/core` continue working via re-exports.
+
+### Patch Changes
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Update documentation for modular architecture (#187)
+  - **core/README.md**: Rewrite API reference — Promise-based navigation, standalone API functions (`getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`), remove callback-based examples, add `dispose()`, update error codes
+  - **ARCHITECTURE.md**: Update package dependency diagram, split internal packages (bundled vs separate), add standalone API section, update SSR example to `cloneRouter()`
+  - **IMPLEMENTATION_NOTES.md**: Update namespace structure (Router.ts ~640 lines, `api/` folder, store pattern), add "Standalone API Extraction" section
+  - **README.md**: Update React example (`useRouteNode` instead of `useRoute`)
+
+- Updated dependencies [[`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb), [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb)]:
+  - @real-router/types@0.16.0
+
 ## 0.25.4
 
 ### Patch Changes
