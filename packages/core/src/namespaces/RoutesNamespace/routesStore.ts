@@ -4,11 +4,8 @@ import { logger } from "@real-router/logger";
 import { createMatcher, createRouteTree, nodeToDefinition } from "route-tree";
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import {
-  createEmptyConfig,
-  resolveForwardChain,
-  sanitizeRoute,
-} from "./helpers";
+import { resolveForwardChain } from "./forwardToValidation";
+import { createEmptyConfig, sanitizeRoute } from "./helpers";
 import { validateRoutes } from "./validators";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
@@ -26,36 +23,6 @@ import type {
 // Interfaces
 // =============================================================================
 
-export interface RoutesStoreOperations<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> {
-  readonly commitTreeChanges: (
-    store: RoutesStore<Dependencies>,
-    noValidate: boolean,
-  ) => void;
-  readonly rebuildTreeInPlace: (store: RoutesStore<Dependencies>) => void;
-  readonly refreshForwardMap: (
-    config: RouteConfig,
-    noValidate: boolean,
-  ) => Record<string, string>;
-  readonly registerAllRouteHandlers: (
-    routes: readonly Route<Dependencies>[],
-    config: RouteConfig,
-    routeCustomFields: Record<string, Record<string, unknown>>,
-    pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>,
-    pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>,
-    depsStore: RoutesDependencies<Dependencies> | undefined,
-    parentName: string,
-  ) => void;
-  readonly nodeToDefinition: (node: RouteTree) => RouteDefinition;
-  readonly validateRoutes: (
-    routes: Route<Dependencies>[],
-    tree?: RouteTree,
-    forwardMap?: Record<string, string>,
-    parentName?: string,
-  ) => void;
-}
-
 export interface RoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
@@ -71,7 +38,20 @@ export interface RoutesStore<
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies> | undefined;
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
-  readonly operations: RoutesStoreOperations<Dependencies>;
+  readonly treeOperations: {
+    readonly commitTreeChanges: (
+      store: RoutesStore<Dependencies>,
+      noValidate: boolean,
+    ) => void;
+    readonly resetStore: (store: RoutesStore<Dependencies>) => void;
+    readonly nodeToDefinition: (node: RouteTree) => RouteDefinition;
+    readonly validateRoutes: (
+      routes: Route<Dependencies>[],
+      tree?: RouteTree,
+      forwardMap?: Record<string, string>,
+      parentName?: string,
+    ) => void;
+  };
 }
 
 // =============================================================================
@@ -91,7 +71,7 @@ function rebuildTree(
   return { tree, matcher };
 }
 
-function commitTreeChanges<
+export function commitTreeChanges<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>, noValidate: boolean): void {
   const result = rebuildTree(
@@ -119,10 +99,34 @@ export function rebuildTreeInPlace<
 }
 
 // =============================================================================
+// Store reset
+// =============================================================================
+
+/**
+ * Clears all routes and resets config.
+ * Does NOT clear lifecycle handlers or state — caller handles that.
+ */
+export function resetStore<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
+  store.definitions.length = 0;
+
+  Object.assign(store.config, createEmptyConfig());
+
+  store.resolvedForwardMap = Object.create(null) as Record<string, string>;
+  store.routeCustomFields = Object.create(null) as Record<
+    string,
+    Record<string, unknown>
+  >;
+
+  rebuildTreeInPlace(store);
+}
+
+// =============================================================================
 // Forward map
 // =============================================================================
 
-function refreshForwardMap(
+export function refreshForwardMap(
   config: RouteConfig,
   noValidate: boolean,
 ): Record<string, string> {
@@ -283,7 +287,9 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
   }
 }
 
-function registerAllRouteHandlers<Dependencies extends DefaultDependencies>(
+export function registerAllRouteHandlers<
+  Dependencies extends DefaultDependencies,
+>(
   routes: readonly Route<Dependencies>[],
   config: RouteConfig,
   routeCustomFields: Record<string, Record<string, unknown>>,
@@ -372,11 +378,9 @@ export function createRoutesStore<
     lifecycleNamespace: undefined,
     pendingCanActivate,
     pendingCanDeactivate,
-    operations: {
+    treeOperations: {
       commitTreeChanges,
-      rebuildTreeInPlace,
-      refreshForwardMap,
-      registerAllRouteHandlers,
+      resetStore,
       nodeToDefinition,
       validateRoutes,
     },

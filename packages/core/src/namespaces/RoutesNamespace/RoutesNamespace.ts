@@ -4,8 +4,11 @@ import { isString, validateRouteName } from "type-guards";
 
 import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
 import { paramsMatch, paramsMatchExcluding } from "./helpers";
-import { clearRoutesCrud } from "./routesCrud";
-import { createRoutesStore, rebuildTreeInPlace } from "./routesStore";
+import {
+  createRoutesStore,
+  rebuildTreeInPlace,
+  resetStore,
+} from "./routesStore";
 import { constants } from "../../constants";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -76,14 +79,8 @@ export class RoutesNamespace<
   readonly #store: RoutesStore<Dependencies>;
 
   get #deps(): RoutesDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: defensive guard, unreachable via public API (RouterWiringBuilder always calls setDependencies) */
-    if (!this.#store.depsStore) {
-      throw new Error(
-        "[real-router] RoutesNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#store.depsStore;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.#store.depsStore!;
   }
 
   constructor(
@@ -182,7 +179,7 @@ export class RoutesNamespace<
   }
 
   clearRoutes(): void {
-    clearRoutesCrud(this.#store);
+    resetStore(this.#store);
   }
 
   // =========================================================================
