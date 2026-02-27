@@ -34,7 +34,12 @@ export async function executeLifecycleGuards(
     const guardFn = guard.get(segment)!;
 
     try {
-      result = await guardFn(toState, fromState);
+      // Pass signal only to guards that explicitly declare a 3rd parameter (opt-in).
+      // Checking guardFn.length avoids breaking existing 2-param guards and vitest
+      // toHaveBeenCalledWith(arg1, arg2) assertions that are strict about arg count.
+      result = await (guardFn.length >= 3
+        ? guardFn(toState, fromState, signal)
+        : guardFn(toState, fromState));
     } catch (error: unknown) {
       /* v8 ignore next 4 -- @preserve: AbortError race condition guard — signal may abort between isCancelled check and guard execution; covered by AbortController API integration tests */
       if (error instanceof DOMException && error.name === "AbortError") {

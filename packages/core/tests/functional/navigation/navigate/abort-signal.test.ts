@@ -195,19 +195,33 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
   // =========================================================================
 
   describe("signal in guards", () => {
-    it("7. GuardFn type accepts signal as optional 3rd parameter", () => {
-      // Type-level test: verify GuardFn signature accepts signal
+    it("7. Guard with 3 explicit params receives signal at runtime", async () => {
+      // Type-level: verify GuardFn signature accepts signal as optional 3rd parameter
       expectTypeOf<GuardFn>()
         .parameter(2)
         .toEqualTypeOf<AbortSignal | undefined>();
 
-      // Runtime: guard that accepts signal parameter (type-compatible)
-      const guardWithSignal: GuardFn = (_toState, _fromState, signal) => {
-        // signal is typed as AbortSignal | undefined
-        return signal?.aborted === true ? false : true;
-      };
+      // Runtime: verify signal is actually delivered to guards that declare 3 params.
+      // Only guards with guardFn.length >= 3 receive the signal (opt-in mechanism).
+      let receivedSignal: AbortSignal | undefined;
+      // Capture aborted state at call time (finally block aborts controller after nav)
+      let signalAbortedAtCallTime = true;
 
-      expect(typeof guardWithSignal).toBe("function");
+      lifecycle.addActivateGuard(
+        "users",
+        () => (_toState, _fromState, signal) => {
+          receivedSignal = signal;
+          signalAbortedAtCallTime = signal?.aborted ?? true;
+
+          return true;
+        },
+      );
+
+      await router.navigate("users");
+
+      expect(receivedSignal).toBeInstanceOf(AbortSignal);
+      // Signal was NOT aborted when the guard ran (only aborted in finally for cleanup)
+      expect(signalAbortedAtCallTime).toBe(false);
     });
 
     it("8. Guard uses signal in fetch() simulation — fetch cancelled on abort", async () => {

@@ -166,6 +166,10 @@ export class NavigationNamespace {
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use cloneRouter() to create isolated instance per request.",
       );
+      // Note: previous controller is NOT aborted here. cancelNavigation() sends CANCEL
+      // to the FSM which is sufficient to notify the previous navigation. Aborting the
+      // previous controller would cause isCancelled() to return true inside the still-
+      // running previous transition, causing it to reject instead of completing normally.
       deps.cancelNavigation();
     }
 
