@@ -6,7 +6,7 @@ import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
 import {
   buildNameFromSegments,
   createRouteState,
-} from "../../src/namespaces/RoutesNamespace/stateBuilder";
+} from "../../src/namespaces/RoutesNamespace/RoutesNamespace";
 import { createTestRouter } from "../helpers";
 
 import type { Router, Route, RoutesApi } from "@real-router/core";

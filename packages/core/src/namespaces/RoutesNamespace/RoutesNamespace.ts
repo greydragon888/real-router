@@ -5,9 +5,7 @@ import { isString, validateRouteName } from "type-guards";
 import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
 import { paramsMatch, paramsMatchExcluding } from "./helpers";
 import { clearRoutesCrud } from "./routesCrud";
-import { createRoutesStore } from "./routesStore";
-import { rebuildTreeInPlace } from "./routeTreeOps";
-import { createRouteState } from "./stateBuilder";
+import { createRoutesStore, rebuildTreeInPlace } from "./routesStore";
 import { constants } from "../../constants";
 import { getTransitionPath } from "../../transitionPath";
 
@@ -24,6 +22,7 @@ import type {
 } from "@real-router/types";
 import type {
   CreateMatcherOptions,
+  RouteParams,
   RouteTree,
   RouteTreeState,
 } from "route-tree";
@@ -40,6 +39,29 @@ function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
   }
 
   return params;
+}
+
+export function buildNameFromSegments(
+  segments: readonly { fullName: string }[],
+): string {
+  return segments.at(-1)?.fullName ?? "";
+}
+
+export function createRouteState<P extends RouteParams = RouteParams>(
+  matchResult: {
+    readonly segments: readonly { fullName: string }[];
+    readonly params: Readonly<Record<string, unknown>>;
+    readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
+  },
+  name?: string,
+): RouteTreeState<P> {
+  const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
+
+  return {
+    name: resolvedName,
+    params: matchResult.params as P,
+    meta: matchResult.meta as Record<string, Record<string, "url" | "query">>,
+  };
 }
 
 /**

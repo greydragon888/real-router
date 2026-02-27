@@ -228,7 +228,7 @@ export function clearRoutesCrud<
     Record<string, unknown>
   >;
 
-  store.ops.rebuildTreeInPlace(store);
+  store.operations.rebuildTreeInPlace(store);
 }
 
 /**
@@ -263,7 +263,7 @@ export function addRoutesCrud<
     }
   }
 
-  store.ops.registerAllRouteHandlers(
+  store.operations.registerAllRouteHandlers(
     routes,
     store.config,
     store.routeCustomFields,
@@ -273,7 +273,7 @@ export function addRoutesCrud<
     parentName ?? "",
   );
 
-  store.ops.commitTreeChanges(store, noValidate);
+  store.operations.commitTreeChanges(store, noValidate);
 }
 
 /**
@@ -305,7 +305,7 @@ export function removeRouteCrud<
     store.lifecycleNamespace!,
   );
 
-  store.ops.commitTreeChanges(store, noValidate);
+  store.operations.commitTreeChanges(store, noValidate);
 
   return true;
 }
@@ -341,7 +341,7 @@ export function updateRouteConfigCrud<
       updates.forwardTo,
       store.config,
       noValidate,
-      store.ops.refreshForwardMap,
+      store.operations.refreshForwardMap,
     );
   }
 
@@ -396,7 +396,7 @@ export function getRouteCrud<
 
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const targetNode = segments.at(-1)! as RouteTree;
-  const definition = store.ops.nodeToDefinition(targetNode);
+  const definition = store.operations.nodeToDefinition(targetNode);
   // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const factories = store.lifecycleNamespace!.getFactories();
 

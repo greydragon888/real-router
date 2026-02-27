@@ -54,7 +54,7 @@ export function getRoutesApi<
 
         validateAddRouteArgs(routeArray);
 
-        store.ops.validateRoutes(
+        store.operations.validateRoutes(
           routeArray,
           store.tree,
           store.config.forwardMap,
