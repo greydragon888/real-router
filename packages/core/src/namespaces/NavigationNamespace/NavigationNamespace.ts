@@ -119,8 +119,7 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { signal, ...cleanOpts } = opts;
+    const { signal: _signal, ...cleanOpts } = opts;
     const toState = deps.makeState(
       route.name,
       route.params,
@@ -214,8 +213,8 @@ export class NavigationNamespace {
         );
 
         deps.setState(stateWithTransition);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { signal, ...transitionOpts } = opts;
+
+        const { signal: _signal2, ...transitionOpts } = opts;
 
         deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
 
