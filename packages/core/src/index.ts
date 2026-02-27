@@ -2,7 +2,6 @@
 
 // Router-dependent types (re-exported from @real-router/types)
 export type {
-  ActivationFnFactory,
   BuildStateResultWithSegments,
   GuardFnFactory,
   PluginFactory,
@@ -15,7 +14,6 @@ export { Router } from "./Router";
 
 // Types (re-exported from core-types - no Router dependency)
 export type {
-  ActivationFn,
   Config,
   DefaultDependencies,
   GuardFn,

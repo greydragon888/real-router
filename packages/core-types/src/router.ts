@@ -3,7 +3,7 @@
 /**
  * Router types and interfaces.
  *
- * Factory types (PluginFactory, GuardFnFactory, ActivationFnFactory) and
+ * Factory types (PluginFactory, GuardFnFactory) and
  * route config types (Route, RouteConfigUpdate) use self-referencing Router<D>
  * within this single file to resolve circular dependencies.
  */
@@ -154,12 +154,6 @@ export interface Options {
    */
   noValidate?: boolean;
 }
-
-export type ActivationFn = (
-  toState: State,
-  fromState: State | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-) => boolean | Promise<boolean | State | void> | State | void;
 
 export type GuardFn = (
   toState: State,
@@ -322,17 +316,6 @@ export type GuardFnFactory<
   router: Router<Dependencies>,
   getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
 ) => GuardFn;
-
-/**
- * Factory function for creating activation guards.
- * Receives the router instance and a dependency getter.
- */
-export type ActivationFnFactory<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
-> = (
-  router: Router<Dependencies>,
-  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
-) => ActivationFn;
 
 // =============================================================================
 // Route Configuration Types (use GuardFnFactory<D> + ForwardToCallback<D>)

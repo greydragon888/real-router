@@ -34,7 +34,6 @@ export type {
   DefaultRouteCallback,
   ForwardToCallback,
   DefaultParamsCallback,
-  ActivationFn,
   GuardFn,
   DefaultDependencies,
   Config,
@@ -43,7 +42,6 @@ export type {
   Subscription,
   PluginFactory,
   GuardFnFactory,
-  ActivationFnFactory,
   RouteConfigUpdate,
 } from "./router";
 

@@ -3,7 +3,7 @@
 /**
  * Core-internal types + re-exports from @real-router/types.
  *
- * Factory types (PluginFactory, GuardFnFactory, ActivationFnFactory) and
+ * Factory types (PluginFactory, GuardFnFactory) and
  * route config types (Route, RouteConfigUpdate) are canonical in @real-router/types
  * and re-exported here for backward compatibility.
  */
@@ -19,7 +19,6 @@ import type {
 
 // Re-export from @real-router/types (canonical source)
 export type {
-  ActivationFnFactory,
   GuardFnFactory,
   PluginFactory,
   Route,
