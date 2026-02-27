@@ -5,13 +5,13 @@ import { createRouter, getDependenciesApi } from "@real-router/core";
 import type { Router } from "@real-router/core";
 
 // Import all individual test modules
-import "./dependencies/setDependency.test";
-import "./dependencies/setDependencies.test";
+import "./api/getDependenciesApi/setDependency.test";
+import "./api/getDependenciesApi/setDependencies.test";
 import "./dependencies/getDependency.test";
-import "./dependencies/getDependencies.test";
-import "./dependencies/removeDependency.test";
-import "./dependencies/hasDependency.test";
-import "./dependencies/resetDependencies.test";
+import "./api/getDependenciesApi/getDependencies.test";
+import "./api/getDependenciesApi/removeDependency.test";
+import "./api/getDependenciesApi/hasDependency.test";
+import "./api/getDependenciesApi/resetDependencies.test";
 
 let router: Router<{ foo?: number; bar?: string }>;
 

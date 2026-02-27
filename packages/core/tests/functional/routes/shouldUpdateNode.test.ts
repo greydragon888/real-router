@@ -1,7 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getTransitionPath } from "../../../../src/transitionPath";
-import { makeState, createTestRouter } from "../../../helpers";
+import { getTransitionPath } from "../../../src/transitionPath";
+import { makeState, createTestRouter } from "../../helpers";
 
 import type { Router } from "@real-router/core";
 

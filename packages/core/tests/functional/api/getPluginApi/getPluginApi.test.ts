@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { events, getPluginApi, RouterError } from "@real-router/core";
 
-import { createTestRouter } from "../../helpers";
+import { createTestRouter } from "../../../helpers";
 
 import type { Router, PluginApi } from "@real-router/core";
 

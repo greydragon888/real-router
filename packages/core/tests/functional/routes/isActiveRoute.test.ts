@@ -3,7 +3,7 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter, getRoutesApi } from "@real-router/core";
 
-import { createTestRouter } from "../../../helpers";
+import { createTestRouter } from "../../helpers";
 
 import type { Params, Router, RoutesApi } from "@real-router/core";
 
