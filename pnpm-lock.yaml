@@ -300,9 +300,6 @@ importers:
 
   packages/route-tree:
     dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
       path-matcher:
         specifier: workspace:^
         version: link:../path-matcher

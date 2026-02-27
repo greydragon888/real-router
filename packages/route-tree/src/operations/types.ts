@@ -8,8 +8,7 @@
  * @module operations/types
  */
 
-import type { RouteTree } from "../builder/types";
-import type { RouteParams } from "@real-router/types";
+import type { RouteTree } from "../builder";
 import type { Options as QueryParamsOptions } from "search-params";
 
 // =============================================================================
@@ -118,4 +117,6 @@ export interface RouteTreeState<P extends RouteParams = RouteParams> {
   meta: RouteTreeStateMeta;
 }
 
-export { type RouteParams } from "@real-router/types";
+/** Route parameters map. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- cross-package boundary type
+export type RouteParams = Record<string, any>;

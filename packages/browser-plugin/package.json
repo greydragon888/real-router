@@ -57,8 +57,6 @@
     "@real-router/logger": "workspace:^"
   },
   "devDependencies": {
-    "@real-router/logger-plugin": "workspace:^",
-    "@real-router/persistent-params-plugin": "workspace:^",
     "@testing-library/jest-dom": "6.9.1",
     "jsdom": "27.4.0",
     "type-guards": "workspace:^"

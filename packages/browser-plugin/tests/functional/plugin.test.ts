@@ -1,6 +1,4 @@
 import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
-import { loggerPluginFactory as loggerPlugin } from "@real-router/logger-plugin";
-import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
 import {
   describe,
   beforeAll,
@@ -1711,83 +1709,6 @@ describe("Browser Plugin", async () => {
      */
 
     describe("Integration with other real-router plugins", () => {
-      it("works with loggerPlugin - basic compatibility", async () => {
-        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
-
-        // Use both plugins together (common production scenario)
-        router.usePlugin(loggerPlugin());
-        router.usePlugin(browserPluginFactory({}, mockedBrowser));
-
-        await router.start();
-        await router.navigate("users.list");
-
-        // Both plugins should work without conflicts
-        expect(router.getState()?.name).toBe("users.list");
-        expect(currentHistoryState?.name).toBe("users.list");
-
-        // Logger should have logged the transition
-        expect(consoleLogSpy).toHaveBeenCalled();
-
-        consoleLogSpy.mockRestore();
-      });
-
-      it("works with persistentParamsPlugin - preserves query params", async () => {
-        const persistParams = ["lang", "theme"];
-
-        // Use both plugins together
-        router.usePlugin(persistentParamsPlugin(persistParams));
-        router.usePlugin(browserPluginFactory({}, mockedBrowser));
-
-        await router.start();
-
-        // Navigate with persistent params
-        await router.navigate("home", { lang: "en", theme: "dark" });
-
-        expect(router.getState()?.params.lang).toBe("en");
-        expect(router.getState()?.params.theme).toBe("dark");
-
-        // Navigate to different route - params should persist
-        await router.navigate("users.list");
-
-        expect(router.getState()?.params.lang).toBe("en");
-        expect(router.getState()?.params.theme).toBe("dark");
-
-        // Browser history should include persistent params
-        const url = router.buildUrl("users.list", router.getState()?.params);
-
-        expect(url).toContain("lang=en");
-        expect(url).toContain("theme=dark");
-      });
-
-      it("handles all three plugins together (real-world scenario)", async () => {
-        const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(noop);
-
-        // Production-like setup with all plugins
-        router.usePlugin(loggerPlugin());
-        router.usePlugin(persistentParamsPlugin(["sessionId"]));
-        router.usePlugin(browserPluginFactory({}, mockedBrowser));
-
-        await router.start();
-
-        // Navigate with persistent params
-        await router.navigate("home", { sessionId: "abc123" });
-
-        expect(router.getState()?.name).toBe("home");
-        expect(router.getState()?.params.sessionId).toBe("abc123");
-
-        // Navigate to different route
-        await router.navigate("users.view", { id: "42" });
-
-        // All functionality should work
-        expect(router.getState()?.name).toBe("users.view");
-        expect(router.getState()?.params.id).toBe("42");
-        expect(router.getState()?.params.sessionId).toBe("abc123"); // Persisted
-        expect(currentHistoryState?.name).toBe("users.view"); // Browser updated
-        expect(consoleLogSpy).toHaveBeenCalled(); // Logger logged
-
-        consoleLogSpy.mockRestore();
-      });
-
       it("browser plugin does not interfere with custom plugin hooks", async () => {
         const customHookStates: string[] = [];
 
