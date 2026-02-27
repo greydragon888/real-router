@@ -28,6 +28,6 @@ export const DEFAULT_DEPENDENCIES: Partial<TestDependencies> = {
 export function createDependenciesTestRouter(
   initialDeps: Partial<TestDependencies> = DEFAULT_DEPENDENCIES,
 ): Router<TestDependencies> {
-  // Router now has built-in dependency management via DependenciesNamespace
+  // Router now has built-in dependency management via DependenciesStore
   return createRouter<TestDependencies>([], {}, initialDeps);
 }

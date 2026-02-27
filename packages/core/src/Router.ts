@@ -15,7 +15,6 @@ import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import { getInternals, registerInternals } from "./internals";
 import {
-  DependenciesNamespace,
   EventBusNamespace,
   NavigationNamespace,
   OptionsNamespace,
@@ -25,6 +24,8 @@ import {
   RoutesNamespace,
   StateNamespace,
 } from "./namespaces";
+import { createDependenciesStore } from "./namespaces/DependenciesNamespace/dependenciesStore";
+import { validateDependenciesObject } from "./namespaces/DependenciesNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import {
   validateAddRouteArgs,
@@ -38,6 +39,7 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
+import type { DependenciesStore } from "./namespaces/DependenciesNamespace/dependenciesStore";
 import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
   DefaultDependencies,
@@ -56,7 +58,7 @@ import type { CreateMatcherOptions } from "route-tree";
  *
  * All functionality is provided by namespace classes:
  * - OptionsNamespace: getOptions (immutable)
- * - DependenciesNamespace: get/set/remove dependencies
+ * - DependenciesStore: get/set/remove dependencies
  * - EventEmitter: subscribe
  * - StateNamespace: state storage (getState, setState, getPreviousState)
  * - RoutesNamespace: route tree operations
@@ -78,7 +80,7 @@ export class Router<
 
   readonly #options: OptionsNamespace;
   readonly #limits: Limits;
-  readonly #dependencies: DependenciesNamespace<Dependencies>;
+  readonly #dependenciesStore: DependenciesStore<Dependencies>;
   readonly #state: StateNamespace;
   readonly #routes: RoutesNamespace<Dependencies>;
   readonly #routeLifecycle: RouteLifecycleNamespace<Dependencies>;
@@ -126,10 +128,7 @@ export class Router<
 
     // Conditional validation for dependencies
     if (!noValidate) {
-      DependenciesNamespace.validateDependenciesObject(
-        dependencies,
-        "constructor",
-      );
+      validateDependenciesObject(dependencies, "constructor");
     }
 
     // Conditional validation for initial routes - structure and batch duplicates
@@ -145,7 +144,8 @@ export class Router<
 
     this.#options = new OptionsNamespace(options);
     this.#limits = createLimits(options.limits);
-    this.#dependencies = new DependenciesNamespace<Dependencies>(dependencies);
+    this.#dependenciesStore =
+      createDependenciesStore<Dependencies>(dependencies);
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
@@ -187,7 +187,7 @@ export class Router<
         router: this,
         options: this.#options,
         limits: this.#limits,
-        dependencies: this.#dependencies,
+        dependenciesStore: this.#dependenciesStore,
         state: this.#state,
         routes: this.#routes,
         routeLifecycle: this.#routeLifecycle,
@@ -225,31 +225,14 @@ export class Router<
       isDisposed: () => this.#eventBus.isDisposed(),
       noValidate,
       // Dependencies (issue #172)
-      dependencyGet: (key) => this.#dependencies.get(key as keyof Dependencies),
-      dependencyGetAll: () =>
-        this.#dependencies.getAll() as Record<string, unknown>,
-      dependencySet: (name, value) =>
-        this.#dependencies.set(
-          name as keyof Dependencies & string,
-          value as Dependencies[keyof Dependencies & string],
-        ),
-      dependencySetMultiple: (deps) => {
-        this.#dependencies.setMultiple(deps as Partial<Dependencies>);
-      },
-      dependencyCount: () => this.#dependencies.count(),
-      dependencyRemove: (name) => {
-        this.#dependencies.remove(name as keyof Dependencies);
-      },
-      dependencyHas: (name) =>
-        this.#dependencies.has(name as keyof Dependencies),
-      dependencyReset: () => {
-        this.#dependencies.reset();
-      },
-      maxDependencies: this.#limits.maxDependencies,
+      dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)
       cloneOptions: () => ({ ...this.#options.get() }),
       cloneDependencies: () =>
-        this.#dependencies.getAll() as Record<string, unknown>,
+        ({ ...this.#dependenciesStore.dependencies }) as Record<
+          string,
+          unknown
+        >,
       getLifecycleFactories: () => this.#routeLifecycle.getFactories(),
       getPluginFactories: () => this.#plugins.getAll(),
       routeGetStore: () => this.#routes.getStore(),
@@ -448,7 +431,9 @@ export class Router<
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();
-    this.#dependencies.reset();
+    this.#dependenciesStore.dependencies = Object.create(
+      null,
+    ) as Partial<Dependencies>;
 
     this.#markDisposed();
   }

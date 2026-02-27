@@ -17,12 +17,26 @@ let router: Router<{ foo?: number; bar?: string }>;
 
 describe("core/dependencies (integration)", () => {
   beforeEach(() => {
-    // Router now has built-in dependency management via DependenciesNamespace
+    // Router now has built-in dependency management via DependenciesStore
     router = createRouter<{ foo?: number; bar?: string }>([], {}, { foo: 1 });
   });
 
   afterEach(() => {
     router.stop();
+  });
+
+  it("should skip undefined values in initial dependencies", () => {
+    const initDeps = { foo: 1 } as Record<string, unknown>;
+
+    initDeps.bar = undefined; // simulate undefined value at runtime
+    const r = createRouter([], {}, initDeps);
+    const deps = getDependenciesApi(r);
+
+    expect(deps.has("foo")).toBe(true);
+    expect(deps.has("bar")).toBe(false);
+    expect(deps.getAll()).toStrictEqual({ foo: 1 });
+
+    r.stop();
   });
 
   describe("full dependency lifecycle", () => {

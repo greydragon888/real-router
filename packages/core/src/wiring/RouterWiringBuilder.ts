@@ -21,7 +21,7 @@ export class RouterWiringBuilder<
   private readonly router: WiringOptions<Dependencies>["router"];
   private readonly options: WiringOptions<Dependencies>["options"];
   private readonly limits: WiringOptions<Dependencies>["limits"];
-  private readonly dependencies: WiringOptions<Dependencies>["dependencies"];
+  private readonly dependenciesStore: WiringOptions<Dependencies>["dependenciesStore"];
   private readonly state: WiringOptions<Dependencies>["state"];
   private readonly routes: WiringOptions<Dependencies>["routes"];
   private readonly routeLifecycle: WiringOptions<Dependencies>["routeLifecycle"];
@@ -34,7 +34,7 @@ export class RouterWiringBuilder<
     this.router = wiringOptions.router;
     this.options = wiringOptions.options;
     this.limits = wiringOptions.limits;
-    this.dependencies = wiringOptions.dependencies;
+    this.dependenciesStore = wiringOptions.dependenciesStore;
     this.state = wiringOptions.state;
     this.routes = wiringOptions.routes;
     this.routeLifecycle = wiringOptions.routeLifecycle;
@@ -45,7 +45,7 @@ export class RouterWiringBuilder<
   }
 
   wireLimits(): void {
-    this.dependencies.setLimits(this.limits);
+    this.dependenciesStore.limits = this.limits;
     this.plugins.setLimits(this.limits);
     this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
@@ -60,7 +60,7 @@ export class RouterWiringBuilder<
 
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependencies.get(dependencyName),
+        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
@@ -79,7 +79,8 @@ export class RouterWiringBuilder<
       getState: () => this.state.get(),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
-      getDependency: (name) => this.dependencies.get(name),
+      getDependency: (name) =>
+        this.dependenciesStore.dependencies[name] as Dependencies[typeof name],
       forwardState: (name, params) => {
         const ctx = getInternals(this.router);
 
@@ -103,7 +104,7 @@ export class RouterWiringBuilder<
         this.eventBus.addEventListener(eventName, cb),
       canNavigate: () => this.eventBus.canBeginTransition(),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependencies.get(dependencyName),
+        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
     };
 
     this.plugins.setDependencies(pluginsDeps);
@@ -135,7 +136,7 @@ export class RouterWiringBuilder<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name: string) =>
-        this.dependencies.get(name as keyof Dependencies),
+        this.dependenciesStore.dependencies[name as keyof Dependencies],
       startTransition: (toState, fromState) => {
         this.eventBus.beginTransition(toState, fromState);
       },

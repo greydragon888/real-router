@@ -89,7 +89,7 @@ Router.ts (facade) ────────────────────�
     ├── StateNamespace         — current/previous state storage
     ├── NavigationNamespace    — navigate(), transition pipeline
     ├── OptionsNamespace       — router configuration
-    ├── DependenciesNamespace  — dependency injection container
+    ├── DependenciesStore      — dependency injection container
     ├── EventBusNamespace     — FSM + EventEmitter encapsulation, events, subscribe
     ├── PluginsNamespace       — plugin lifecycle management
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards

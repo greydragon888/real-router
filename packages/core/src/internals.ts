@@ -1,3 +1,4 @@
+import type { DependenciesStore } from "./namespaces/DependenciesNamespace";
 import type { RoutesStore } from "./namespaces/RoutesNamespace";
 import type { Router as RouterClass } from "./Router";
 import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
@@ -69,15 +70,7 @@ export interface RouterInternals<
   readonly noValidate: boolean;
 
   // Dependencies (issue #172)
-  readonly dependencyGet: (key: string) => unknown;
-  readonly dependencyGetAll: () => Record<string, unknown>;
-  readonly dependencySet: (name: string, value: unknown) => boolean;
-  readonly dependencySetMultiple: (deps: Record<string, unknown>) => void;
-  readonly dependencyCount: () => number;
-  readonly dependencyRemove: (name: string) => void;
-  readonly dependencyHas: (name: string) => boolean;
-  readonly dependencyReset: () => void;
-  readonly maxDependencies: number;
+  readonly dependenciesGetStore: () => DependenciesStore<D>;
 
   // Clone support (issue #173)
   readonly cloneOptions: () => Options;

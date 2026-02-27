@@ -1,7 +1,6 @@
 // packages/core/src/wiring/types.ts
 
 import type {
-  DependenciesNamespace,
   EventBusNamespace,
   NavigationNamespace,
   OptionsNamespace,
@@ -11,6 +10,7 @@ import type {
   RoutesNamespace,
   StateNamespace,
 } from "../namespaces";
+import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
 import type { Router } from "../Router";
 import type { Limits } from "../types";
 import type { DefaultDependencies } from "@real-router/types";
@@ -28,8 +28,8 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   options: OptionsNamespace;
   /** Immutable limits configuration */
   limits: Limits;
-  /** Dependencies namespace */
-  dependencies: DependenciesNamespace<Dependencies>;
+  /** Dependencies store */
+  dependenciesStore: DependenciesStore<Dependencies>;
   /** State namespace */
   state: StateNamespace;
   /** Routes namespace */
