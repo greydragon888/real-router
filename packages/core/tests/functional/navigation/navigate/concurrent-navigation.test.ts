@@ -8,19 +8,27 @@ import {
   vi,
 } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  getLifecycleApi,
+  errorCodes,
+  events,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { Router, State, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - concurrent navigation", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -51,7 +59,7 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should cancel navigation via router.stop() and reject with TRANSITION_CANCELLED error", async () => {
       vi.useFakeTimers();
 
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -80,7 +88,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      router.addActivateGuard("profile", () => () => {
+      lifecycle.addActivateGuard("profile", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -88,7 +96,7 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -130,7 +138,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      router.addActivateGuard("orders", asyncGuard);
+      lifecycle.addActivateGuard("orders", asyncGuard);
 
       const promise = router.navigate("orders");
 
@@ -161,7 +169,7 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      router.addActivateGuard("settings", guard);
+      lifecycle.addActivateGuard("settings", guard);
 
       const promise = router.navigate("settings");
 
@@ -193,7 +201,7 @@ describe("router.navigate() - concurrent navigation", () => {
           }),
       );
 
-      router.addActivateGuard("admin", failingGuard);
+      lifecycle.addActivateGuard("admin", failingGuard);
 
       const promise = router.navigate("admin");
 
@@ -231,7 +239,7 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should handle router.stop() called multiple times", async () => {
       vi.useFakeTimers();
 
-      router.addActivateGuard("profile", () => () => {
+      lifecycle.addActivateGuard("profile", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -263,7 +271,7 @@ describe("router.navigate() - concurrent navigation", () => {
       const onSuccess = vi.fn();
       const onCancel = vi.fn();
 
-      router.addActivateGuard("orders", () => () => {
+      lifecycle.addActivateGuard("orders", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -271,11 +279,11 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -307,7 +315,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       const onCancel = vi.fn();
 
-      router.addActivateGuard("profile", () => () => {
+      lifecycle.addActivateGuard("profile", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -315,7 +323,7 @@ describe("router.navigate() - concurrent navigation", () => {
         });
       });
 
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onCancel,
       );
@@ -351,7 +359,7 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should handle cancellation when router is stopped during navigation", async () => {
       vi.useFakeTimers();
 
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -380,14 +388,14 @@ describe("router.navigate() - concurrent navigation", () => {
 
       vi.useFakeTimers();
 
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
           }, 100);
         });
       });
-      router.addActivateGuard("profile", () => () => {
+      lifecycle.addActivateGuard("profile", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(true);
@@ -422,7 +430,7 @@ describe("router.navigate() - concurrent navigation", () => {
     it("should handle cancellation during slow guard scenarios", async () => {
       vi.useFakeTimers();
 
-      router.addActivateGuard("orders", () => () => {
+      lifecycle.addActivateGuard("orders", () => () => {
         return new Promise<boolean>((resolve) => {
           setTimeout(() => {
             resolve(false);
@@ -451,7 +459,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       router.stop();
 
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "admin",
         () => () =>
           new Promise((_resolve, reject) => {
@@ -485,7 +493,7 @@ describe("router.navigate() - concurrent navigation", () => {
       const onError = vi.fn();
       const onSuccess = vi.fn();
 
-      router.addActivateGuard("orders.pending", () => () => {
+      lifecycle.addActivateGuard("orders.pending", () => () => {
         return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
@@ -493,11 +501,11 @@ describe("router.navigate() - concurrent navigation", () => {
         );
       });
 
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );

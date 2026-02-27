@@ -1,8 +1,7 @@
 // packages/core/src/index.ts
 
-// Router-dependent types (defined in core)
+// Router-dependent types (re-exported from @real-router/types)
 export type {
-  ActivationFnFactory,
   BuildStateResultWithSegments,
   GuardFnFactory,
   PluginFactory,
@@ -15,7 +14,6 @@ export { Router } from "./Router";
 
 // Types (re-exported from core-types - no Router dependency)
 export type {
-  ActivationFn,
   Config,
   DefaultDependencies,
   GuardFn,
@@ -44,3 +42,19 @@ export { RouterError } from "./RouterError";
 export { createRouter } from "./createRouter";
 
 export { getNavigator } from "./getNavigator";
+
+// Factory API (Phase 0: parallel API for modular architecture)
+export {
+  getPluginApi,
+  getRoutesApi,
+  getDependenciesApi,
+  getLifecycleApi,
+  cloneRouter,
+} from "./api";
+
+export type {
+  PluginApi,
+  RoutesApi,
+  DependenciesApi,
+  LifecycleApi,
+} from "./api";

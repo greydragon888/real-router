@@ -1,11 +1,11 @@
 // packages/core-types/modules/router.ts
 
 /**
- * Base router types without Router class dependency.
+ * Router types and interfaces.
  *
- * Router-dependent types (Route, RouteConfigUpdate, ActivationFnFactory,
- * PluginFactory) are defined in @real-router/core
- * to avoid circular dependencies.
+ * Factory types (PluginFactory, GuardFnFactory) and
+ * route config types (Route, RouteConfigUpdate) use self-referencing Router<D>
+ * within this single file to resolve circular dependencies.
  */
 
 import type {
@@ -155,12 +155,6 @@ export interface Options {
   noValidate?: boolean;
 }
 
-export type ActivationFn = (
-  toState: State,
-  fromState: State | undefined,
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
-) => boolean | Promise<boolean | State | void> | State | void;
-
 export type GuardFn = (
   toState: State,
   fromState: State | undefined,
@@ -238,67 +232,152 @@ export interface Navigator {
 }
 
 /**
- * Router interface - public API for route navigation and lifecycle management.
+ * Router interface — full public API for route navigation and lifecycle management.
  *
- * Defines the contract for router implementations. The actual Router class in
- * @real-router/core implements this interface with full functionality.
- *
- * This interface uses `GuardFn | boolean` for guard types to avoid circular
- * dependencies. The concrete Router class in @real-router/core narrows this to
- * `GuardFnFactory | boolean` for more precise type checking.
+ * Generic parameter D constrains dependency injection types.
+ * Factory types (PluginFactory, GuardFnFactory) self-reference this interface
+ * within the same file to avoid circular dependencies.
  */
-export interface Router {
-  /**
-   * Register an activation guard for a route.
-   *
-   * @param name - Route name
-   * @param guard - Guard function or boolean
-   * @returns this for method chaining
-   */
-  addActivateGuard: (name: string, guard: GuardFn | boolean) => this;
+export interface Router<D extends DefaultDependencies = DefaultDependencies> {
+  // Plugins add properties at runtime (e.g. browser-plugin adds buildUrl, matchUrl).
+  // Index signature allows property access when module augmentation isn't in scope.
+  [key: string]: unknown;
 
-  /**
-   * Register a deactivation guard for a route.
-   *
-   * @param name - Route name
-   * @param guard - Guard function or boolean
-   * @returns this for method chaining
-   */
-  addDeactivateGuard: (name: string, guard: GuardFn | boolean) => this;
+  isActiveRoute: (
+    name: string,
+    params?: Params,
+    strictEquality?: boolean,
+    ignoreQueryParams?: boolean,
+  ) => boolean;
 
-  /**
-   * Remove an activation guard from a route.
-   *
-   * @param name - Route name
-   */
-  removeActivateGuard: (name: string) => void;
+  buildPath: (route: string, params?: Params) => string;
 
-  /**
-   * Remove a deactivation guard from a route.
-   *
-   * @param name - Route name
-   */
-  removeDeactivateGuard: (name: string) => void;
+  getState: <P extends Params = Params, MP extends Params = Params>() =>
+    | State<P, MP>
+    | undefined;
 
-  /**
-   * Check if navigation to a route is allowed without performing actual navigation.
-   *
-   * Synchronously checks all activation and deactivation guards in the transition path.
-   * Async guards return false with a console warning.
-   *
-   * @param name - Route name to check
-   * @param params - Route parameters (optional)
-   * @returns true if navigation is allowed, false otherwise
-   */
+  getPreviousState: () => State | undefined;
+
+  areStatesEqual: (
+    state1: State | undefined,
+    state2: State | undefined,
+    ignoreQueryParams?: boolean,
+  ) => boolean;
+
+  shouldUpdateNode: (
+    nodeName: string,
+  ) => (toState: State, fromState?: State) => boolean;
+
+  isActive: () => boolean;
+
+  start: (startPath: string) => Promise<State>;
+
+  stop: () => this;
+
+  dispose: () => void;
+
   canNavigateTo: (name: string, params?: Params) => boolean;
 
+  usePlugin: (...plugins: PluginFactory<D>[]) => Unsubscribe;
+
+  subscribe: (listener: SubscribeFn) => Unsubscribe;
+
+  navigate: (
+    routeName: string,
+    routeParams?: Params,
+    options?: NavigationOptions,
+  ) => Promise<State>;
+
+  navigateToDefault: (options?: NavigationOptions) => Promise<State>;
+}
+
+// =============================================================================
+// Factory Types (self-reference Router<D>)
+// =============================================================================
+
+/**
+ * Factory function for creating plugins.
+ * Receives the router instance and a dependency getter.
+ */
+export type PluginFactory<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = (
+  router: Router<Dependencies>,
+  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
+) => Plugin;
+
+/**
+ * Factory function for creating guards.
+ * Receives the router instance and a dependency getter.
+ */
+export type GuardFnFactory<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = (
+  router: Router<Dependencies>,
+  getDependency: <K extends keyof Dependencies>(key: K) => Dependencies[K],
+) => GuardFn;
+
+// =============================================================================
+// Route Configuration Types (use GuardFnFactory<D> + ForwardToCallback<D>)
+// =============================================================================
+
+/**
+ * Route configuration.
+ */
+export interface Route<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  [key: string]: unknown;
+  /** Route name (dot-separated for nested routes). */
+  name: string;
+  /** URL path pattern for this route. */
+  path: string;
+  /** Factory function that returns a guard for route activation. */
+  canActivate?: GuardFnFactory<Dependencies>;
+  /** Factory function that returns a guard for route deactivation. */
+  canDeactivate?: GuardFnFactory<Dependencies>;
   /**
-   * Dispose the router and release all resources.
+   * Redirects navigation to another route.
    *
-   * Stops the router if active, calls plugin teardown, clears all event
-   * listeners, routes, and dependencies. After disposal, all
-   * mutating methods throw a ROUTER_DISPOSED error. Idempotent — safe to
-   * call multiple times.
+   * IMPORTANT: forwardTo creates a URL alias, not a transition chain.
+   * Guards (canActivate) on the source route are NOT executed.
+   * Only guards on the final destination are executed.
+   *
+   * This matches Vue Router and Angular Router behavior.
    */
-  dispose: () => void;
+  forwardTo?: string | ForwardToCallback<Dependencies>;
+  /** Nested child routes. */
+  children?: Route<Dependencies>[];
+  /** Encodes state params to URL params. */
+  encodeParams?: (stateParams: Params) => Params;
+  /** Decodes URL params to state params. */
+  decodeParams?: (pathParams: Params) => Params;
+  /**
+   * Default parameters for this route.
+   *
+   * These values are merged into state.params when creating route states.
+   * Missing URL params are filled from defaultParams.
+   */
+  defaultParams?: Params;
+}
+
+/**
+ * Configuration update options for updateRoute().
+ * All properties are optional. Set to null to remove the configuration.
+ */
+export interface RouteConfigUpdate<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> {
+  /** Set to null to remove forwardTo */
+  forwardTo?: string | ForwardToCallback<Dependencies> | null;
+  /** Set to null to remove defaultParams */
+  defaultParams?: Params | null;
+  /** Set to null to remove decoder */
+  decodeParams?: ((params: Params) => Params) | null;
+  /** Set to null to remove encoder */
+  encodeParams?: ((params: Params) => Params) | null;
+  /** Set to null to remove canActivate */
+  canActivate?: GuardFnFactory<Dependencies> | null;
+  /** Set to null to remove canDeactivate */
+  canDeactivate?: GuardFnFactory<Dependencies> | null;
 }

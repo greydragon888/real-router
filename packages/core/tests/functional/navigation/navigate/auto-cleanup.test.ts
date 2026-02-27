@@ -1,15 +1,16 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import { getLifecycleApi, createRouter, errorCodes } from "@real-router/core";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 const noop = () => undefined;
 
 describe("router.navigate() - auto cleanup", () => {
   describe("navigation with options.autoCleanUp === true", () => {
     let router: Router;
+    let lifecycle: LifecycleApi;
 
     beforeEach(async () => {
       vi.spyOn(logger, "error").mockImplementation(noop);
@@ -49,6 +50,8 @@ describe("router.navigate() - auto cleanup", () => {
       );
 
       await router.start("/home");
+
+      lifecycle = getLifecycleApi(router);
     });
 
     afterEach(() => {
@@ -63,7 +66,7 @@ describe("router.navigate() - auto cleanup", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       // Try to register a guard - if one exists, it will trigger overwrite warning
-      router.addDeactivateGuard(routeName, true);
+      lifecycle.addDeactivateGuard(routeName, true);
 
       const hadGuard = warnSpy.mock.calls.some(
         (call) =>
@@ -86,8 +89,8 @@ describe("router.navigate() - auto cleanup", () => {
         await router.navigate("users");
 
         // Set up guards for routes
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
-        router.addDeactivateGuard("orders", () => ordersDeactivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard("orders", () => ordersDeactivateGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
         expect(hasCanDeactivate("orders")).toBe(true);
@@ -116,9 +119,15 @@ describe("router.navigate() - auto cleanup", () => {
         const usersListDeactivateGuard = vi.fn().mockReturnValue(true);
         const usersViewDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
-        router.addDeactivateGuard("users.list", () => usersListDeactivateGuard);
-        router.addDeactivateGuard("users.view", () => usersViewDeactivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard(
+          "users.list",
+          () => usersListDeactivateGuard,
+        );
+        lifecycle.addDeactivateGuard(
+          "users.view",
+          () => usersViewDeactivateGuard,
+        );
 
         expect(hasCanDeactivate("users")).toBe(true);
         expect(hasCanDeactivate("users.list")).toBe(true);
@@ -149,12 +158,12 @@ describe("router.navigate() - auto cleanup", () => {
         const settingsGeneralDeactivateGuard = vi.fn().mockReturnValue(true);
         const settingsAccountDeactivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addDeactivateGuard("settings", () => settingsDeactivateGuard);
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard("settings", () => settingsDeactivateGuard);
+        lifecycle.addDeactivateGuard(
           "settings.general",
           () => settingsGeneralDeactivateGuard,
         );
-        router.addDeactivateGuard(
+        lifecycle.addDeactivateGuard(
           "settings.account",
           () => settingsAccountDeactivateGuard,
         );
@@ -189,13 +198,13 @@ describe("router.navigate() - auto cleanup", () => {
 
         await router.navigate("users", {}, {});
 
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
 
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.addActivateGuard("orders", () => blockingActivateGuard);
+        lifecycle.addActivateGuard("orders", () => blockingActivateGuard);
 
         try {
           await router.navigate("orders", {}, {});
@@ -212,8 +221,8 @@ describe("router.navigate() - auto cleanup", () => {
         const usersDeactivateGuard = vi.fn().mockReturnValue(true);
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
-        router.addActivateGuard("profile", () => blockingActivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addActivateGuard("profile", () => blockingActivateGuard);
 
         await router.navigate("users", {}, {});
 
@@ -237,14 +246,14 @@ describe("router.navigate() - auto cleanup", () => {
           const normalDeactivateGuard = vi.fn().mockReturnValue(true);
 
           // Navigate to users first with normal guard
-          router.addDeactivateGuard("users", () => normalDeactivateGuard);
+          lifecycle.addDeactivateGuard("users", () => normalDeactivateGuard);
 
           await router.navigate("users");
 
           // Replace with blocking guard that returns false
           const blockingDeactivateGuard = vi.fn().mockReturnValue(false);
 
-          router.addDeactivateGuard("users", () => blockingDeactivateGuard);
+          lifecycle.addDeactivateGuard("users", () => blockingDeactivateGuard);
 
           expect(hasCanDeactivate("users")).toBe(true);
 
@@ -275,7 +284,7 @@ describe("router.navigate() - auto cleanup", () => {
 
         await router.navigate("users", {}, {});
 
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
 
@@ -292,8 +301,8 @@ describe("router.navigate() - auto cleanup", () => {
 
         await router.navigate("users", {}, {});
 
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
-        router.addDeactivateGuard("profile", () => profileDeactivateGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard("profile", () => profileDeactivateGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
         expect(hasCanDeactivate("profile")).toBe(true);
@@ -314,8 +323,8 @@ describe("router.navigate() - auto cleanup", () => {
         await router.navigate("users", {}, {});
 
         // Set up guards: one for active route, one for route we'll never visit
-        router.addDeactivateGuard("users", () => usersDeactivateGuard);
-        router.addDeactivateGuard("profile", () => neverActiveGuard);
+        lifecycle.addDeactivateGuard("users", () => usersDeactivateGuard);
+        lifecycle.addDeactivateGuard("profile", () => neverActiveGuard);
 
         expect(hasCanDeactivate("users")).toBe(true);
         expect(hasCanDeactivate("profile")).toBe(true);

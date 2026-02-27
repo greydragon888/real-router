@@ -1,6 +1,6 @@
 import { describe, afterEach, beforeEach, it, expect, beforeAll } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getPluginApi } from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../helpers";
 
@@ -65,7 +65,9 @@ describe("core/utils", () => {
     it("should decode path params on match", () => {
       expect(
         omitMeta(
-          router.matchPath<{ one: string; two: string }>("/encoded/hello/123"),
+          getPluginApi(router).matchPath<{ one: string; two: string }>(
+            "/encoded/hello/123",
+          ),
         ),
       ).toStrictEqual({
         name: "withEncoder",
@@ -82,7 +84,9 @@ describe("core/utils", () => {
 
       const neverRouter = createTestRouter({ trailingSlash: "never" });
 
-      expect(omitMeta(neverRouter.matchPath("/profile"))).toStrictEqual({
+      expect(
+        omitMeta(getPluginApi(neverRouter).matchPath("/profile")),
+      ).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile",
@@ -92,7 +96,9 @@ describe("core/utils", () => {
 
       const alwaysRouter = createTestRouter({ trailingSlash: "always" });
 
-      expect(omitMeta(alwaysRouter.matchPath("/profile"))).toStrictEqual({
+      expect(
+        omitMeta(getPluginApi(alwaysRouter).matchPath("/profile")),
+      ).toStrictEqual({
         name: "profile.me",
         params: {},
         path: "/profile/",
@@ -158,9 +164,10 @@ describe("core/utils", () => {
         router.buildPath("query", { param1: true, param2: false }),
       ).toStrictEqual("/query?param1=true&param2=false");
 
-      const match = router.matchPath<{ param1: boolean; param: boolean }>(
-        "/query?param1=true&param2=false",
-      );
+      const match = getPluginApi(router).matchPath<{
+        param1: boolean;
+        param: boolean;
+      }>("/query?param1=true&param2=false");
 
       expect(match?.params).toStrictEqual({
         param1: true,
@@ -190,6 +197,8 @@ describe("core/utils", () => {
     ]);
 
     expect(router.buildPath("withDefaults")).toStrictEqual("/with-defaults/1");
-    expect(router.makeState("withDefaults").params).toStrictEqual({ id: "1" });
+    expect(getPluginApi(router).makeState("withDefaults").params).toStrictEqual(
+      { id: "1" },
+    );
   });
 });

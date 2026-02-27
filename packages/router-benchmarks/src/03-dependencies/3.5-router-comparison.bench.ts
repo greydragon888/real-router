@@ -11,9 +11,10 @@
  * These tests use the common API available in both routers.
  */
 
+import { getDependenciesApi } from "@real-router/core";
 import { bench, do_not_optimize } from "mitata";
 
-import { createRouter, IS_ROUTER5 } from "../helpers";
+import { createRouter, IS_ROUTER5, addActivateGuard } from "../helpers";
 
 import type { Route } from "../helpers";
 
@@ -145,14 +146,15 @@ const alternatingRoutes = ["about", "home"];
   const router = createRouter(routes, {}, testDependencies);
   let index = 0;
 
-  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
+  addActivateGuard(router, "about", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
+
+  addActivateGuard(router, "home", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -270,14 +272,15 @@ const alternatingRoutes = ["about", "home"];
     },
   }));
 
-  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
+  addActivateGuard(router, "about", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
+
+  addActivateGuard(router, "home", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -310,14 +313,15 @@ const alternatingRoutes = ["about", "home"];
     },
   }));
 
-  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
+  addActivateGuard(router, "about", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
 
     return true;
   });
-  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
+
+  addActivateGuard(router, "home", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
 
     do_not_optimize(getDep("authService"));
@@ -385,13 +389,15 @@ const alternatingRoutes = ["about", "home"];
   }));
 
   // Auth guard
-  router.addActivateGuard("about", (_router, depsOrGetDep) => () => {
+
+  addActivateGuard(router, "about", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
     const auth = getDep("authService");
 
     return auth.isAuthenticated();
   });
-  router.addActivateGuard("home", (_router, depsOrGetDep) => () => {
+
+  addActivateGuard(router, "home", (_router: any, depsOrGetDep: any) => () => {
     const getDep = normalizeDependencyAccessor<TestDependencies>(depsOrGetDep);
     const auth = getDep("authService");
 
@@ -503,7 +509,7 @@ if (!IS_ROUTER5) {
     "3.5.15 Batch: getDependency direct access (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
-        do_not_optimize(router.getDependency("authService"));
+        do_not_optimize(getDependenciesApi(router).get("authService"));
       }
     },
   ).gc("inner");
@@ -540,8 +546,8 @@ if (!IS_ROUTER5) {
     "3.5.17 Batch: setDependencies/resetDependencies cycle (1000 iterations, real-router only)",
     () => {
       for (let i = 0; i < 1000; i++) {
-        router.setDependencies(depsSets[i % 2]);
-        router.resetDependencies();
+        getDependenciesApi(router).setAll(depsSets[i % 2]);
+        getDependenciesApi(router).reset();
       }
     },
   ).gc("inner");

@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - guards can activate", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -27,8 +30,11 @@ describe("router.navigate() - guards can activate", () => {
         const ordersActivateGuard = vi.fn().mockReturnValue(true);
         const pendingActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("orders", () => ordersActivateGuard);
-        router.addActivateGuard("orders.pending", () => pendingActivateGuard);
+        lifecycle.addActivateGuard("orders", () => ordersActivateGuard);
+        lifecycle.addActivateGuard(
+          "orders.pending",
+          () => pendingActivateGuard,
+        );
 
         const state = await router.navigate("orders.pending");
 
@@ -42,8 +48,11 @@ describe("router.navigate() - guards can activate", () => {
         const settingsActivateGuard = vi.fn().mockReturnValue(true);
         const profileActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("settings", () => settingsActivateGuard);
-        router.addActivateGuard("settings.profile", () => profileActivateGuard);
+        lifecycle.addActivateGuard("settings", () => settingsActivateGuard);
+        lifecycle.addActivateGuard(
+          "settings.profile",
+          () => profileActivateGuard,
+        );
 
         const state = await router.navigate("settings.profile");
 
@@ -56,7 +65,10 @@ describe("router.navigate() - guards can activate", () => {
       it("should respect blocking canActivate guards", async () => {
         const blockingActivateGuard = vi.fn().mockReturnValue(false);
 
-        router.addActivateGuard("orders.pending", () => blockingActivateGuard);
+        lifecycle.addActivateGuard(
+          "orders.pending",
+          () => blockingActivateGuard,
+        );
 
         try {
           await router.navigate("orders.pending");
@@ -73,7 +85,7 @@ describe("router.navigate() - guards can activate", () => {
       it("should not call canActivate handlers for non-existing route", async () => {
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "non.existent.route",
           () => nonExistentActivateGuard,
         );
@@ -92,8 +104,8 @@ describe("router.navigate() - guards can activate", () => {
         const existingActivateGuard = vi.fn().mockReturnValue(true);
         const nonExistentActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard("orders", () => existingActivateGuard);
-        router.addActivateGuard(
+        lifecycle.addActivateGuard("orders", () => existingActivateGuard);
+        lifecycle.addActivateGuard(
           "orders.nonexistent",
           () => nonExistentActivateGuard,
         );
@@ -112,7 +124,7 @@ describe("router.navigate() - guards can activate", () => {
       it("should handle completely invalid route names", async () => {
         const invalidActivateGuard = vi.fn().mockReturnValue(true);
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "totally.invalid.route.name",
           () => invalidActivateGuard,
         );

@@ -1,16 +1,26 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  cloneRouter,
+  errorCodes,
+  events,
+  getDependenciesApi,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router, PluginFactory } from "@real-router/core";
+import type { Router, PluginFactory, RoutesApi } from "@real-router/core";
 
 let router: Router;
+let routesApi: RoutesApi;
 
 describe("dispose", () => {
   beforeEach(() => {
     router = createTestRouter();
+    routesApi = getRoutesApi(router);
   });
 
   describe("basic dispose functionality", () => {
@@ -76,7 +86,7 @@ describe("dispose", () => {
     it("dispose() emits ROUTER_STOP when router was started (READY → DISPOSED)", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.dispose();
@@ -87,7 +97,7 @@ describe("dispose", () => {
     it("dispose() does NOT emit ROUTER_STOP on never-started router (IDLE → DISPOSED)", () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       router.dispose();
 
@@ -127,7 +137,10 @@ describe("dispose", () => {
     it("dispose() clears event listeners", async () => {
       const listener = vi.fn();
 
-      router.addEventListener(events.TRANSITION_SUCCESS, listener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_SUCCESS,
+        listener,
+      );
       await router.start("/home");
 
       listener.mockClear();
@@ -156,7 +169,7 @@ describe("dispose", () => {
     it("dispose() clears routes", async () => {
       await router.start("/home");
 
-      expect(router.hasRoute("home")).toBe(true);
+      expect(routesApi.has("home")).toBe(true);
 
       router.dispose();
 
@@ -165,15 +178,16 @@ describe("dispose", () => {
 
     it("dispose() clears dependencies", async () => {
       const r = router as Router<{ myDep: string }>;
+      const deps = getDependenciesApi(r);
 
-      r.setDependency("myDep", "value");
+      deps.set("myDep", "value");
 
-      expect(r.hasDependency("myDep")).toBe(true);
+      expect(deps.has("myDep")).toBe(true);
 
       await router.start("/home");
       router.dispose();
 
-      expect(r.hasDependency("myDep")).toBe(false);
+      expect(deps.has("myDep")).toBe(false);
     });
   });
 
@@ -267,11 +281,17 @@ describe("dispose", () => {
 
     it("addEventListener() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addEventListener(events.TRANSITION_SUCCESS, vi.fn());
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_SUCCESS,
+          vi.fn(),
+        );
       }).toThrowError();
 
       try {
-        router.addEventListener(events.TRANSITION_SUCCESS, vi.fn());
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_SUCCESS,
+          vi.fn(),
+        );
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -279,11 +299,11 @@ describe("dispose", () => {
 
     it("addRoute() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addRoute({ name: "newRoute", path: "/new" });
+        routesApi.add({ name: "newRoute", path: "/new" });
       }).toThrowError();
 
       try {
-        router.addRoute({ name: "newRoute", path: "/new" });
+        routesApi.add({ name: "newRoute", path: "/new" });
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -313,11 +333,11 @@ describe("dispose", () => {
 
     it("addActivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addActivateGuard("home", true);
+        getLifecycleApi(router).addActivateGuard("home", true);
       }).toThrowError();
 
       try {
-        router.addActivateGuard("home", true);
+        getLifecycleApi(router).addActivateGuard("home", true);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -325,37 +345,38 @@ describe("dispose", () => {
 
     it("addDeactivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.addDeactivateGuard("home", true);
+        getLifecycleApi(router).addDeactivateGuard("home", true);
       }).toThrowError();
 
       try {
-        router.addDeactivateGuard("home", true);
+        getLifecycleApi(router).addDeactivateGuard("home", true);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
     });
 
-    it("setDependency() throws ROUTER_DISPOSED after dispose()", () => {
+    it("getDependenciesApi set() throws ROUTER_DISPOSED after dispose()", () => {
       const r = router as Router<{ key: string }>;
+      const deps = getDependenciesApi(r);
 
       expect(() => {
-        r.setDependency("key", "value");
+        deps.set("key", "value");
       }).toThrowError();
 
       try {
-        r.setDependency("key", "value");
+        deps.set("key", "value");
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
     });
 
-    it("clone() throws ROUTER_DISPOSED after dispose()", () => {
+    it("cloneRouter() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
-        router.clone();
+        cloneRouter(router);
       }).toThrowError();
 
       try {
-        router.clone();
+        cloneRouter(router);
       } catch (error: any) {
         expect(error.code).toBe(errorCodes.ROUTER_DISPOSED);
       }
@@ -377,7 +398,7 @@ describe("dispose", () => {
 
     it("getOptions() still works after dispose()", () => {
       router.dispose();
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       expect(opts).toBeDefined();
     });

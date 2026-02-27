@@ -1,5 +1,10 @@
-import { createRouter, errorCodes, RouterError } from "@real-router/core";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import {
+  createRouter,
+  errorCodes,
+  getPluginApi,
+  RouterError,
+} from "@real-router/core";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createSafeBrowser } from "../../src/browser";
 import { browserPluginFactory } from "../../src/plugin";
@@ -54,7 +59,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       // Note: id is overwritten by makeState with ++stateId (value 2 after router.start)
@@ -79,7 +89,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.params).toStrictEqual({});
@@ -102,7 +117,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.options).toStrictEqual({});
@@ -120,7 +140,12 @@ describe("Utils", () => {
         },
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.meta?.id).toBeGreaterThanOrEqual(1);
@@ -136,7 +161,12 @@ describe("Utils", () => {
         state: null,
       } as PopStateEvent;
 
-      const state = createStateFromEvent(evt, router, browser, {});
+      const state = createStateFromEvent(
+        evt,
+        getPluginApi(router),
+        browser,
+        {},
+      );
 
       expect(state).toBeDefined();
       expect(state?.name).toBe("home");
@@ -188,7 +218,11 @@ describe("Utils", () => {
     it("returns false when no default route is configured (line 159)", () => {
       const routerWithoutDefault = createRouter(routerConfig);
 
-      const result = handleMissingState(routerWithoutDefault, {});
+      const result = handleMissingState(
+        routerWithoutDefault,
+        getPluginApi(routerWithoutDefault),
+        {},
+      );
 
       expect(result).toBe(false);
     });
@@ -197,7 +231,9 @@ describe("Utils", () => {
       await router.start("/home");
       const navigateSpy = vi.spyOn(router, "navigateToDefault");
 
-      const result = handleMissingState(router, { replace: true });
+      const result = handleMissingState(router, getPluginApi(router), {
+        replace: true,
+      });
 
       expect(result).toBe(true);
       expect(navigateSpy).toHaveBeenCalledWith({

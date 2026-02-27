@@ -1,8 +1,14 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.5-comparative.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import {
+  addEventListener,
+  createSimpleRouter,
+  createNestedRouter,
+  IS_ROUTER5,
+} from "../helpers";
 
 import type { Route } from "../helpers";
 
@@ -112,6 +118,7 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createNestedRouter();
+  const routesApi = getRoutesApi(router);
   // Alternate between two nested levels to avoid SAME_STATES
   const routes = ["l1.l2.l3.l4.l5", "l1.l2.l3"];
   let index = 0;
@@ -140,7 +147,7 @@ if (IS_ROUTER5) {
     ],
   };
 
-  router.addRoute(nestedRoute);
+  routesApi.add(nestedRoute);
   router.start("/");
 
   bench("12.5.5 Comparison: 5 levels of nesting", () => {
@@ -153,7 +160,7 @@ if (IS_ROUTER5) {
   const router = createSimpleRouter();
 
   for (let i = 0; i < 1000; i++) {
-    router.addEventListener("$$success", () => {});
+    addEventListener(router, "$$success", () => {});
   }
 
   router.start("/");
@@ -197,11 +204,12 @@ if (IS_ROUTER5) {
   ).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = ["route500", "route501"];
   let index = 0;
 
   for (let i = 0; i < 1000; i++) {
-    router.addRoute({ name: `route${i}`, path: `/route${i}` });
+    routesApi.add({ name: `route${i}`, path: `/route${i}` });
   }
 
   for (let i = 0; i < 20; i++) {

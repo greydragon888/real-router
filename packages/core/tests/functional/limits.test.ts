@@ -1,6 +1,13 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, events } from "@real-router/core";
+import {
+  createRouter,
+  cloneRouter,
+  events,
+  getDependenciesApi,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import type { Router } from "@real-router/core";
 
@@ -125,14 +132,16 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 1 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 1 dependency - should succeed
       expect(() => {
-        router.setDependency("dep1", 1);
+        deps.set("dep1", 1);
       }).not.toThrowError();
 
       // 2nd dependency should throw
       expect(() => {
-        router.setDependency("dep2", 2);
+        deps.set("dep2", 2);
       }).toThrowError("Dependency limit exceeded");
     });
 
@@ -141,12 +150,12 @@ describe("core/limits (integration via public API)", () => {
 
       // Add 1 listener - should succeed
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).not.toThrowError();
 
       // 2nd listener should throw
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrowError("Listener limit");
     });
   });
@@ -169,6 +178,8 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 0 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set many dependencies at once via setDependencies - should not throw
       // This covers validateDependencyLimit with maxDependencies === 0
       const manyDeps: Record<string, number> = {};
@@ -178,12 +189,12 @@ describe("core/limits (integration via public API)", () => {
       }
 
       expect(() => {
-        router.setDependencies(manyDeps);
+        deps.setAll(manyDeps);
       }).not.toThrowError();
 
-      // Also test setDependency to cover #checkDependencyCount early return
+      // Also test set to cover #checkDependencyCount early return
       expect(() => {
-        router.setDependency("extraDep", 999);
+        deps.set("extraDep", 999);
       }).not.toThrowError();
     });
 
@@ -193,7 +204,7 @@ describe("core/limits (integration via public API)", () => {
       // Add many listeners - should not throw
       expect(() => {
         for (let i = 0; i < 10; i++) {
-          router.addEventListener(events.ROUTER_START, () => {});
+          getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrowError();
     });
@@ -207,7 +218,7 @@ describe("core/limits (integration via public API)", () => {
       // Add listener BEFORE start to ensure event is emitted
       let startEventReceived = false;
 
-      router.addEventListener(events.ROUTER_START, () => {
+      getPluginApi(router).addEventListener(events.ROUTER_START, () => {
         startEventReceived = true;
       });
 
@@ -224,8 +235,8 @@ describe("core/limits (integration via public API)", () => {
       // Register many lifecycle handlers - should not throw
       expect(() => {
         for (let i = 0; i < 10; i++) {
-          router.addActivateGuard(`route${i}`, true);
-          router.addDeactivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addActivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addDeactivateGuard(`route${i}`, true);
         }
       }).not.toThrowError();
     });
@@ -252,6 +263,8 @@ describe("core/limits (integration via public API)", () => {
     it("should enforce default maxDependencies limit (100)", () => {
       const router = createRouter<Record<string, number>>([]);
 
+      const deps = getDependenciesApi(router);
+
       // Set 99 dependencies first
       const deps99: Record<string, number> = {};
 
@@ -260,13 +273,13 @@ describe("core/limits (integration via public API)", () => {
       }
 
       expect(() => {
-        router.setDependencies(deps99);
+        deps.setAll(deps99);
       }).not.toThrowError();
 
-      // Adding 2 more via setDependencies should throw (would be 101 total)
+      // Adding 2 more via setAll should throw (would be 101 total)
       // This tests validateDependencyLimit throw path
       expect(() => {
-        router.setDependencies({ dep99: 99, dep100: 100 });
+        deps.setAll({ dep99: 99, dep100: 100 });
       }).toThrowError("Dependency limit exceeded");
     });
 
@@ -276,13 +289,13 @@ describe("core/limits (integration via public API)", () => {
       // Add 10000 listeners - should succeed
       expect(() => {
         for (let i = 0; i < 10_000; i++) {
-          router.addEventListener(events.ROUTER_START, () => {});
+          getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
       }).not.toThrowError();
 
       // 10001st listener should throw
       expect(() => {
-        router.addEventListener(events.ROUTER_START, () => {});
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrowError("Listener limit");
     });
 
@@ -321,15 +334,17 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 100 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 20 dependencies - no warning yet (count is checked before add)
       for (let i = 0; i < 20; i++) {
-        router.setDependency(`dep${i}`, i);
+        deps.set(`dep${i}`, i);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
       // 21st dependency should trigger warning (count === 20 at check time)
-      router.setDependency("dep20", 20);
+      deps.set("dep20", 20);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -350,15 +365,17 @@ describe("core/limits (integration via public API)", () => {
         limits: { maxDependencies: 100 },
       });
 
+      const deps = getDependenciesApi(router);
+
       // Set 50 dependencies - no error yet (count is checked before add)
       for (let i = 0; i < 50; i++) {
-        router.setDependency(`dep${i}`, i);
+        deps.set(`dep${i}`, i);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
 
       // 51st dependency should trigger error log (count === 50 at check time)
-      router.setDependency("dep50", 50);
+      deps.set("dep50", 50);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.setDependency",
@@ -377,13 +394,13 @@ describe("core/limits (integration via public API)", () => {
       // Register 199 canActivate handlers - should succeed
       expect(() => {
         for (let i = 0; i < 199; i++) {
-          router.addActivateGuard(`route${i}`, true);
+          getLifecycleApi(router).addActivateGuard(`route${i}`, true);
         }
       }).not.toThrowError();
 
       // 200th handler should throw
       expect(() => {
-        router.addActivateGuard("route199", true);
+        getLifecycleApi(router).addActivateGuard("route199", true);
       }).toThrowError(/limit exceeded.*200/i);
     });
 
@@ -399,13 +416,13 @@ describe("core/limits (integration via public API)", () => {
 
       // Register 19 handlers - no warning
       for (let i = 0; i < 19; i++) {
-        router.addActivateGuard(`route${i}`, true);
+        getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
       // 20th handler should trigger warning
-      router.addActivateGuard("route19", true);
+      getLifecycleApi(router).addActivateGuard("route19", true);
 
       expect(warnSpy).toHaveBeenCalledWith(
         "router.canActivate",
@@ -427,13 +444,13 @@ describe("core/limits (integration via public API)", () => {
 
       // Register 49 handlers - no error
       for (let i = 0; i < 49; i++) {
-        router.addActivateGuard(`route${i}`, true);
+        getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
 
       // 50th handler should trigger error log
-      router.addActivateGuard("route49", true);
+      getLifecycleApi(router).addActivateGuard("route49", true);
 
       expect(errorSpy).toHaveBeenCalledWith(
         "router.canActivate",
@@ -492,7 +509,7 @@ describe("core/limits (integration via public API)", () => {
     it("should preserve limits in cloned router", () => {
       const router = createRouter([], { limits: { maxPlugins: 3 } });
 
-      const cloned = router.clone();
+      const cloned = cloneRouter(router);
 
       // Cloned router should have same limits
       expect(() => {

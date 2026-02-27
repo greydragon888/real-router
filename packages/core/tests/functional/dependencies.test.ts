@@ -1,23 +1,23 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getDependenciesApi } from "@real-router/core";
 
 import type { Router } from "@real-router/core";
 
 // Import all individual test modules
-import "./dependencies/setDependency.test";
-import "./dependencies/setDependencies.test";
+import "./api/getDependenciesApi/setDependency.test";
+import "./api/getDependenciesApi/setDependencies.test";
 import "./dependencies/getDependency.test";
-import "./dependencies/getDependencies.test";
-import "./dependencies/removeDependency.test";
-import "./dependencies/hasDependency.test";
-import "./dependencies/resetDependencies.test";
+import "./api/getDependenciesApi/getDependencies.test";
+import "./api/getDependenciesApi/removeDependency.test";
+import "./api/getDependenciesApi/hasDependency.test";
+import "./api/getDependenciesApi/resetDependencies.test";
 
 let router: Router<{ foo?: number; bar?: string }>;
 
 describe("core/dependencies (integration)", () => {
   beforeEach(() => {
-    // Router now has built-in dependency management via DependenciesNamespace
+    // Router now has built-in dependency management via DependenciesStore
     router = createRouter<{ foo?: number; bar?: string }>([], {}, { foo: 1 });
   });
 
@@ -25,83 +25,103 @@ describe("core/dependencies (integration)", () => {
     router.stop();
   });
 
+  it("should skip undefined values in initial dependencies", () => {
+    const initDeps = { foo: 1 } as Record<string, unknown>;
+
+    initDeps.bar = undefined; // simulate undefined value at runtime
+    const r = createRouter([], {}, initDeps);
+    const deps = getDependenciesApi(r);
+
+    expect(deps.has("foo")).toBe(true);
+    expect(deps.has("bar")).toBe(false);
+    expect(deps.getAll()).toStrictEqual({ foo: 1 });
+
+    r.stop();
+  });
+
   describe("full dependency lifecycle", () => {
     it("should handle complete dependency lifecycle", () => {
+      const deps = getDependenciesApi(router);
+
       // Initial state
-      expect(router.hasDependency("foo")).toBe(true);
-      expect(router.getDependency("foo")).toBe(1);
+      expect(deps.has("foo")).toBe(true);
+      expect(deps.get("foo")).toBe(1);
 
       // Set new dependency
-      router.setDependency("bar", "hello");
+      deps.set("bar", "hello");
 
-      expect(router.hasDependency("bar")).toBe(true);
-      expect(router.getDependency("bar")).toBe("hello");
+      expect(deps.has("bar")).toBe(true);
+      expect(deps.get("bar")).toBe("hello");
 
       // Update existing dependency
-      router.setDependency("foo", 42);
+      deps.set("foo", 42);
 
-      expect(router.getDependency("foo")).toBe(42);
+      expect(deps.get("foo")).toBe(42);
 
       // Get all dependencies
-      const deps = router.getDependencies();
+      const allDeps = deps.getAll();
 
-      expect(deps).toStrictEqual({ foo: 42, bar: "hello" });
+      expect(allDeps).toStrictEqual({ foo: 42, bar: "hello" });
 
       // Remove one dependency
-      router.removeDependency("bar");
+      deps.remove("bar");
 
-      expect(router.hasDependency("bar")).toBe(false);
+      expect(deps.has("bar")).toBe(false);
 
       // Reset all dependencies
-      router.resetDependencies();
+      deps.reset();
 
-      expect(router.hasDependency("foo")).toBe(false);
+      expect(deps.has("foo")).toBe(false);
 
-      expect(router.getDependencies()).toStrictEqual({});
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should support fluent chaining across all methods", () => {
-      const result = router
-        .setDependency("bar", "value1")
-        // @ts-expect-error: testing new key
-        .setDependency("baz", "value2")
-        .setDependencies({ foo: 100 })
-        // @ts-expect-error: testing removal
-        .removeDependency("baz")
-        .setDependency("bar", "updated");
+      const deps = getDependenciesApi(router);
 
-      expect(result).toBe(router);
-      expect(router.getDependency("foo")).toBe(100);
-      expect(router.getDependency("bar")).toBe("updated");
-      expect(router.hasDependency("baz" as "foo")).toBe(false);
+      deps.set("bar", "value1");
+      // @ts-expect-error: testing new key
+      deps.set("baz", "value2");
+      deps.setAll({ foo: 100 });
+      // @ts-expect-error: testing removal
+      deps.remove("baz");
+      deps.set("bar", "updated");
+
+      expect(deps.get("foo")).toBe(100);
+      expect(deps.get("bar")).toBe("updated");
+      // @ts-expect-error: testing removal
+      expect(deps.has("baz")).toBe(false);
     });
 
     it("should handle batch operations correctly", () => {
-      router.setDependencies({
+      const deps = getDependenciesApi(router);
+
+      deps.setAll({
         foo: 10,
         bar: "test",
       });
 
-      expect(router.getDependency("foo")).toBe(10);
-      expect(router.getDependency("bar")).toBe("test");
+      expect(deps.get("foo")).toBe(10);
+      expect(deps.get("bar")).toBe("test");
 
-      const allDeps = router.getDependencies();
+      const allDeps = deps.getAll();
 
       expect(allDeps).toStrictEqual({ foo: 10, bar: "test" });
 
-      router.resetDependencies();
+      deps.reset();
 
-      expect(router.getDependencies()).toStrictEqual({});
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should maintain data integrity across operations", () => {
+      const deps = getDependenciesApi(router);
       const service = { count: 0 };
 
       // @ts-expect-error: testing object value
-      router.setDependency("foo", service);
+      deps.set("foo", service);
 
-      const ref1 = router.getDependency("foo");
-      const ref2 = router.getDependency("foo");
+      const ref1 = deps.get("foo");
+      const ref2 = deps.get("foo");
 
       // Same reference
       expect(ref1).toBe(ref2);
@@ -116,18 +136,18 @@ describe("core/dependencies (integration)", () => {
     });
 
     it("should handle error cases gracefully", () => {
+      const deps = getDependenciesApi(router);
+
       expect(() => {
-        router.getDependency("nonexistent" as "foo");
+        deps.get("nonexistent" as "foo");
       }).toThrowError(ReferenceError);
 
       expect(() => {
-        // @ts-expect-error: testing invalid key type
-        router.setDependency(123, "value");
+        deps.set(123 as any, "value");
       }).toThrowError(TypeError);
 
       expect(() => {
-        // @ts-expect-error: testing invalid input
-        router.setDependencies([]);
+        deps.setAll([] as any);
       }).toThrowError(TypeError);
     });
   });

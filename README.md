@@ -90,16 +90,19 @@ await router.navigate("users.profile", { id: "123" });
 ### With React
 
 ```tsx
-import { RouterProvider, useRoute, Link } from "@real-router/react";
+import { RouterProvider, useRouteNode, Link } from "@real-router/react";
 
 function App() {
-  const { route } = useRoute();
+  const { route } = useRouteNode(""); // root — re-renders on any route change
 
   return (
-    <nav>
-      <Link routeName="home">Home</Link>
-      <Link routeName="users">Users</Link>
-    </nav>
+    <div>
+      <nav>
+        <Link routeName="home">Home</Link>
+        <Link routeName="users">Users</Link>
+      </nav>
+      <p>Current route: {route?.name}</p>
+    </div>
   );
 }
 

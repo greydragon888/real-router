@@ -1,8 +1,15 @@
 // packages/router-benchmarks/modules/13-cloning/13.4-configuration.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createSimpleRouter, cloneRouter, IS_ROUTER5 } from "../helpers";
+import {
+  createSimpleRouter,
+  cloneRouter,
+  IS_ROUTER5,
+  addActivateGuard,
+  addDeactivateGuard,
+} from "../helpers";
 
 import type { Params } from "router5/dist/types/base";
 
@@ -39,9 +46,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
   for (let i = 0; i < 50; i++) {
-    router.addRoute({
+    routesApi.add({
       name: `route${i}`,
       path: `/route${i}`,
       defaultParams: { id: String(i), tab: "default" },
@@ -50,7 +58,7 @@ if (IS_ROUTER5) {
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("route25");
@@ -58,7 +66,7 @@ if (IS_ROUTER5) {
   }
 
   bench("13.4.1 Clone preserves defaultParams", () => {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("route25");
@@ -106,8 +114,9 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
-  router.addRoute({
+  routesApi.add({
     name: "custom",
     path: "/custom/:id",
     encodeParams: (params) => ({
@@ -122,7 +131,7 @@ if (IS_ROUTER5) {
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("custom", { id: "123" });
@@ -130,7 +139,7 @@ if (IS_ROUTER5) {
   }
 
   bench("13.4.2 Clone preserves decoders/encoders", () => {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("custom", { id: "123" });
@@ -169,13 +178,14 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
 
-  router.addRoute({ name: "old", path: "/old", forwardTo: "about" });
-  router.addRoute({ name: "old2", path: "/old2", forwardTo: "old" });
+  routesApi.add({ name: "old", path: "/old", forwardTo: "about" });
+  routesApi.add({ name: "old2", path: "/old2", forwardTo: "old" });
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("old2");
@@ -183,7 +193,7 @@ if (IS_ROUTER5) {
   }
 
   bench("13.4.3 Clone preserves forwardTo chains", () => {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
 
     cloned.start("/");
     cloned.navigate("old2");
@@ -194,11 +204,11 @@ if (IS_ROUTER5) {
 }
 
 // 13.4.4 Clone preserves lifecycle handlers
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
 
-  router.addActivateGuard("about", () => () => true);
-  router.addDeactivateGuard("users", () => () => true);
+  addActivateGuard(router, "about", () => () => true);
+  addDeactivateGuard(router, "users", () => () => true);
 
   // JIT warmup for stable memory measurements
   for (let i = 0; i < 100; i++) {
@@ -212,32 +222,6 @@ if (IS_ROUTER5) {
 
   bench("13.4.4 Clone preserves lifecycle handlers", () => {
     const cloned = cloneRouter(router);
-
-    cloned.start("/");
-    cloned.navigate("about");
-    cloned.navigate("users");
-
-    // Fallback: stop started clone
-    cloned.stop();
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-
-  router.addActivateGuard("about", () => () => true);
-  router.addDeactivateGuard("users", () => () => true);
-
-  // JIT warmup for stable memory measurements
-  for (let i = 0; i < 100; i++) {
-    const cloned = router.clone();
-
-    cloned.start("/");
-    cloned.navigate("about");
-    cloned.navigate("users");
-    cloned.stop();
-  }
-
-  bench("13.4.4 Clone preserves lifecycle handlers", () => {
-    const cloned = router.clone();
 
     cloned.start("/");
     cloned.navigate("about");

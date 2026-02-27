@@ -180,12 +180,6 @@ importers:
         specifier: workspace:^
         version: link:../logger
     devDependencies:
-      '@real-router/logger-plugin':
-        specifier: workspace:^
-        version: link:../logger-plugin
-      '@real-router/persistent-params-plugin':
-        specifier: workspace:^
-        version: link:../persistent-params-plugin
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1
@@ -251,9 +245,6 @@ importers:
         specifier: workspace:^
         version: link:../core
     devDependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
       type-guards:
         specifier: workspace:^
         version: link:../type-guards
@@ -300,9 +291,6 @@ importers:
 
   packages/route-tree:
     dependencies:
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
       path-matcher:
         specifier: workspace:^
         version: link:../path-matcher
@@ -315,12 +303,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
-      '@real-router/rx':
-        specifier: workspace:^
-        version: link:../rx
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types

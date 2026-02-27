@@ -1,8 +1,6 @@
 // packages/core/src/wiring/types.ts
 
 import type {
-  CloneNamespace,
-  DependenciesNamespace,
   EventBusNamespace,
   NavigationNamespace,
   OptionsNamespace,
@@ -12,6 +10,7 @@ import type {
   RoutesNamespace,
   StateNamespace,
 } from "../namespaces";
+import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
 import type { Router } from "../Router";
 import type { Limits } from "../types";
 import type { DefaultDependencies } from "@real-router/types";
@@ -29,8 +28,8 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   options: OptionsNamespace;
   /** Immutable limits configuration */
   limits: Limits;
-  /** Dependencies namespace */
-  dependencies: DependenciesNamespace<Dependencies>;
+  /** Dependencies store */
+  dependenciesStore: DependenciesStore<Dependencies>;
   /** State namespace */
   state: StateNamespace;
   /** Routes namespace */
@@ -43,8 +42,6 @@ export interface WiringOptions<Dependencies extends DefaultDependencies> {
   navigation: NavigationNamespace;
   /** Router lifecycle namespace (start/stop) */
   lifecycle: RouterLifecycleNamespace;
-  /** Clone namespace (SSR cloning) */
-  clone: CloneNamespace<Dependencies>;
   /** EventBus namespace — unified FSM + EventEmitter abstraction */
   eventBus: EventBusNamespace;
 }

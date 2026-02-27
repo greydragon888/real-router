@@ -88,6 +88,14 @@ export interface EventToNameMap {
 }
 
 /**
+ * Mapping of event names to plugin method names.
+ * Type-level computation from EventToNameMap + EventToPluginMap.
+ */
+export type EventMethodMap = {
+  [K in EventsKeys as EventToNameMap[K]]: EventToPluginMap[K];
+};
+
+/**
  * Mapping of error code keys to their values
  */
 export interface ErrorCodeToValueMap {

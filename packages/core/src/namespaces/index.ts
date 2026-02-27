@@ -1,6 +1,8 @@
 // packages/core/src/namespaces/index.ts
 
-export { DependenciesNamespace } from "./DependenciesNamespace";
+export { createDependenciesStore } from "./DependenciesNamespace";
+
+export type { DependenciesStore } from "./DependenciesNamespace";
 
 export {
   deepFreeze,
@@ -32,9 +34,5 @@ export type { RouteConfig } from "./RoutesNamespace";
 export { NavigationNamespace } from "./NavigationNamespace";
 
 export { RouterLifecycleNamespace } from "./RouterLifecycleNamespace";
-
-export { CloneNamespace } from "./CloneNamespace";
-
-export type { ApplyConfigFn, CloneData, RouterFactory } from "./CloneNamespace";
 
 export { EventBusNamespace } from "./EventBusNamespace";

@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, RouterError } from "@real-router/core";
+import { getLifecycleApi, errorCodes, RouterError } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - error context", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -25,7 +28,7 @@ describe("router.navigate() - error context", () => {
     it("should preserve error message when guard throws Error", async () => {
       const errorMessage = "Custom guard error message";
 
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         throw new Error(errorMessage);
       });
 
@@ -40,7 +43,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should preserve error stack when guard throws Error", async () => {
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         throw new Error("Error with stack");
       });
 
@@ -56,7 +59,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should include segment info in canActivate error", async () => {
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         throw new Error("Guard error");
       });
 
@@ -73,7 +76,7 @@ describe("router.navigate() - error context", () => {
     it("should include segment info in canDeactivate error", async () => {
       await router.navigate("users");
 
-      router.addDeactivateGuard("users", () => () => {
+      lifecycle.addDeactivateGuard("users", () => () => {
         throw new Error("Guard error");
       });
 
@@ -90,7 +93,7 @@ describe("router.navigate() - error context", () => {
     it("should preserve error message when Promise rejects with Error", async () => {
       const errorMessage = "Async rejection message";
 
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "users",
         () => () => Promise.reject(new Error(errorMessage)),
       );
@@ -106,7 +109,7 @@ describe("router.navigate() - error context", () => {
     });
 
     it("should handle Promise rejection with plain object", async () => {
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "users",
         () => () => Promise.reject({ reason: "auth_failed", userId: 123 }),
       );

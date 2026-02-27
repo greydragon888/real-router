@@ -7,6 +7,7 @@
  * Extracted from RoutesNamespace class for better separation of concerns.
  */
 
+import { logger } from "@real-router/logger";
 import { validateRoute } from "route-tree";
 import {
   isString,
@@ -15,11 +16,19 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import { validateRouteProperties, validateForwardToTargets } from "./helpers";
+import {
+  resolveForwardChain,
+  validateForwardToTargets,
+  validateRouteProperties,
+} from "./forwardToValidation";
 
+import type { RouteConfig } from "./types";
 import type { Route, RouteConfigUpdate } from "../../types";
-import type { DefaultDependencies } from "@real-router/types";
-import type { RouteTree } from "route-tree";
+import type {
+  DefaultDependencies,
+  ForwardToCallback,
+} from "@real-router/types";
+import type { Matcher, RouteTree } from "route-tree";
 
 /**
  * Validates removeRoute arguments.
@@ -327,5 +336,202 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
 
   if (tree && forwardMap) {
     validateForwardToTargets(routes, forwardMap, tree);
+  }
+}
+
+// ============================================================================
+// Instance-level validators (moved from routesCrud.ts)
+// ============================================================================
+
+/**
+ * Collects URL params from segments into a Set.
+ */
+function collectUrlParams(segments: readonly RouteTree[]): Set<string> {
+  const params = new Set<string>();
+
+  for (const segment of segments) {
+    for (const param of segment.paramMeta.urlParams) {
+      params.add(param);
+    }
+  }
+
+  return params;
+}
+
+/**
+ * Validates removeRoute constraints.
+ * Returns false if removal should be blocked (route is active).
+ * Logs warnings for edge cases.
+ *
+ * @param name - Route name to remove
+ * @param currentStateName - Current active route name (or undefined)
+ * @param isNavigating - Whether navigation is in progress
+ * @returns true if removal can proceed, false if blocked
+ */
+export function validateRemoveRoute(
+  name: string,
+  currentStateName: string | undefined,
+  isNavigating: boolean,
+): boolean {
+  // Check if trying to remove currently active route (or its parent)
+  if (currentStateName) {
+    const isExactMatch = currentStateName === name;
+    const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
+
+    if (isExactMatch || isParentOfCurrent) {
+      const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
+
+      logger.warn(
+        "router.removeRoute",
+        `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
+      );
+
+      return false;
+    }
+  }
+
+  // Warn if navigation is in progress (but allow removal)
+  if (isNavigating) {
+    logger.warn(
+      "router.removeRoute",
+      `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
+    );
+  }
+
+  return true;
+}
+
+/**
+ * Validates clearRoutes operation.
+ * Returns false if operation should be blocked (navigation in progress).
+ *
+ * @param isNavigating - Whether navigation is in progress
+ * @returns true if clearRoutes can proceed, false if blocked
+ */
+export function validateClearRoutes(isNavigating: boolean): boolean {
+  if (isNavigating) {
+    logger.error(
+      "router.clearRoutes",
+      "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
+    );
+
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Validates that forwardTo target doesn't require params that source doesn't have.
+ *
+ * @param sourceName - Source route name
+ * @param targetName - Target route name
+ * @param matcher - Current route matcher
+ */
+export function validateForwardToParamCompatibility(
+  sourceName: string,
+  targetName: string,
+  matcher: Matcher,
+): void {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const sourceSegments = matcher.getSegmentsByName(
+    sourceName,
+  )! as readonly RouteTree[];
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const targetSegments = matcher.getSegmentsByName(
+    targetName,
+  )! as readonly RouteTree[];
+
+  // Get source URL params as a Set for O(1) lookup
+  const sourceParams = collectUrlParams(sourceSegments);
+
+  // Build target URL params array (inline — no separate helper needed)
+  const targetParams: string[] = [];
+
+  for (const segment of targetSegments) {
+    for (const param of segment.paramMeta.urlParams) {
+      targetParams.push(param);
+    }
+  }
+
+  // Check if target requires params that source doesn't have
+  const missingParams = targetParams.filter(
+    (param) => !sourceParams.has(param),
+  );
+
+  if (missingParams.length > 0) {
+    throw new Error(
+      `[real-router] forwardTo target "${targetName}" requires params ` +
+        `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
+    );
+  }
+}
+
+/**
+ * Validates that adding forwardTo doesn't create a cycle.
+ * Creates a test map with the new entry and uses resolveForwardChain
+ * to detect cycles before any mutation happens.
+ *
+ * @param sourceName - Source route name
+ * @param targetName - Target route name
+ * @param config - Current route config (forwardMap read-only in this call)
+ */
+export function validateForwardToCycle(
+  sourceName: string,
+  targetName: string,
+  config: RouteConfig,
+): void {
+  // Create a test map with the new entry to validate BEFORE mutation
+  const testMap = {
+    ...config.forwardMap,
+    [sourceName]: targetName,
+  };
+
+  // resolveForwardChain will throw if cycle is detected or max depth exceeded
+  resolveForwardChain(sourceName, testMap);
+}
+
+/**
+ * Validates updateRoute instance-level constraints (route existence, forwardTo).
+ *
+ * @param name - Route name (already validated by static method)
+ * @param forwardTo - Cached forwardTo value
+ * @param hasRoute - Function to check route existence
+ * @param matcher - Current route matcher
+ * @param config - Current route config
+ */
+export function validateUpdateRoute<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  name: string,
+  forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
+  hasRoute: (n: string) => boolean,
+  matcher: Matcher,
+  config: RouteConfig,
+): void {
+  // Validate route exists
+  if (!hasRoute(name)) {
+    throw new ReferenceError(
+      `[real-router] updateRoute: route "${name}" does not exist`,
+    );
+  }
+
+  // Validate forwardTo target exists and is valid (only for string forwardTo)
+  if (
+    forwardTo !== undefined &&
+    forwardTo !== null &&
+    typeof forwardTo === "string"
+  ) {
+    if (!hasRoute(forwardTo)) {
+      throw new Error(
+        `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
+      );
+    }
+
+    // Check forwardTo param compatibility
+    validateForwardToParamCompatibility(name, forwardTo, matcher);
+
+    // Check for cycle detection
+    validateForwardToCycle(name, forwardTo, config);
   }
 }

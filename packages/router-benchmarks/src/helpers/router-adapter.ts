@@ -66,6 +66,128 @@ export const createRouter: CreateRouterFn = <
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 export const cloneRouter = routerModule.cloneRouter;
 
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+const _getPluginApi:
+  | typeof import("@real-router/core").getPluginApi
+  | undefined =
+  ROUTER_NAME === "real-router" ? routerModule.getPluginApi : undefined;
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
+/**
+ * Cross-router addEventListener helper.
+ * real-router moved addEventListener to getPluginApi() (#182).
+ * router5/router6 still have it on the instance.
+ */
+export function addEventListener(
+  router: Router,
+  eventName: string,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  cb: Function,
+): () => void {
+  if (_getPluginApi) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return _getPluginApi(router).addEventListener(eventName as any, cb as any);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  return (router as any).addEventListener(eventName, cb);
+}
+
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+const _getLifecycleApi:
+  | typeof import("@real-router/core").getLifecycleApi
+  | undefined =
+  ROUTER_NAME === "real-router" ? routerModule.getLifecycleApi : undefined;
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
+/**
+ * Cross-router addActivateGuard helper.
+ * real-router moved addActivateGuard to getLifecycleApi() (#183).
+ * router5/router6 still have it on the instance.
+ */
+export function addActivateGuard<D extends object = object>(
+  router: Router<D>,
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  guard: boolean | Function,
+): void {
+  if (_getLifecycleApi) {
+    _getLifecycleApi(router as unknown as Router).addActivateGuard(
+      name,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      guard as any,
+    );
+
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  (router as any).addActivateGuard(name, guard);
+}
+
+/**
+ * Cross-router addDeactivateGuard helper.
+ * real-router moved addDeactivateGuard to getLifecycleApi() (#183).
+ * router5/router6 still have it on the instance.
+ */
+export function addDeactivateGuard<D extends object = object>(
+  router: Router<D>,
+  name: string,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  guard: boolean | Function,
+): void {
+  if (_getLifecycleApi) {
+    _getLifecycleApi(router as unknown as Router).addDeactivateGuard(
+      name,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+      guard as any,
+    );
+
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  (router as any).addDeactivateGuard(name, guard);
+}
+
+/**
+ * Cross-router removeActivateGuard helper.
+ * real-router moved removeActivateGuard to getLifecycleApi() (#183).
+ * router5/router6 still have it on the instance.
+ */
+export function removeActivateGuard<D extends object = object>(
+  router: Router<D>,
+  name: string,
+): void {
+  if (_getLifecycleApi) {
+    _getLifecycleApi(router as unknown as Router).removeActivateGuard(name);
+
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  (router as any).removeActivateGuard(name);
+}
+
+/**
+ * Cross-router removeDeactivateGuard helper.
+ * real-router moved removeDeactivateGuard to getLifecycleApi() (#183).
+ * router5/router6 still have it on the instance.
+ */
+export function removeDeactivateGuard<D extends object = object>(
+  router: Router<D>,
+  name: string,
+): void {
+  if (_getLifecycleApi) {
+    _getLifecycleApi(router as unknown as Router).removeDeactivateGuard(name);
+
+    return;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
+  (router as any).removeDeactivateGuard(name);
+}
+
 export type { Route, Router } from "@real-router/core";
 
 console.error(

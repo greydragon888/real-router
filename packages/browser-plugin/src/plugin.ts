@@ -1,5 +1,6 @@
 // packages/browser-plugin/modules/plugin.ts
 
+import { getPluginApi } from "@real-router/core";
 import { isStateStrict as isState } from "type-guards";
 
 import { createSafeBrowser } from "./browser";
@@ -115,7 +116,11 @@ export function browserPluginFactory(
 
   let removePopStateListener: (() => void) | undefined;
 
-  return function browserPlugin(router: Router) {
+  return function browserPlugin(routerBase) {
+    // Cast to augmented Router (class + module augmentation: buildUrl, matchUrl, etc.)
+    const router = routerBase as Router;
+    const api = getPluginApi(routerBase);
+
     // Store original methods for restoration on teardown
 
     const routerStart = router.start;
@@ -193,7 +198,7 @@ export function browserPluginFactory(
      * Overrides router.start to integrate with browser location.
      * When no path is provided, resolves current browser URL automatically.
      */
-    router.start = async (path?: string) => {
+    router.start = (path?: string) => {
       return routerStart(path ?? browser.getLocation(options));
     };
 
@@ -229,7 +234,7 @@ export function browserPluginFactory(
     router.matchUrl = (url) => {
       const path = urlToPath(url);
 
-      return path ? router.matchPath(path) : undefined;
+      return path ? api.matchPath(path) : undefined;
     };
 
     /**
@@ -237,7 +242,7 @@ export function browserPluginFactory(
      * Useful for updating URL without causing a full transition.
      */
     router.replaceHistoryState = (name, params = {}) => {
-      const state = router.buildState(name, params);
+      const state = api.buildState(name, params);
 
       if (!state) {
         throw new Error(
@@ -245,7 +250,7 @@ export function browserPluginFactory(
         );
       }
 
-      const builtState = router.makeState(
+      const builtState = api.makeState(
         state.name,
         state.params,
         router.buildPath(state.name, state.params),
@@ -313,11 +318,11 @@ export function browserPluginFactory(
       // Top-level error recovery
       try {
         const routerState = router.getState();
-        const state = createStateFromEvent(evt, router, browser, options);
+        const state = createStateFromEvent(evt, api, browser, options);
         const isNewState = !isState(evt.state);
 
         // Handle missing state
-        if (!state && handleMissingState(router, transitionOptions)) {
+        if (!state && handleMissingState(router, api, transitionOptions)) {
           return;
         }
 
@@ -340,7 +345,7 @@ export function browserPluginFactory(
 
         try {
           // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
-          const toState = await router.navigateToState(
+          const toState = await api.navigateToState(
             state,
             routerState,
             transitionOptions,

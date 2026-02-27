@@ -1,16 +1,24 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events, RouterError } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+  RouterError,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - lifecycle events", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -22,7 +30,10 @@ describe("router.start() - lifecycle events", () => {
       it("should emit ROUTER_START event when starting router", async () => {
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         await router.start("/home");
 
@@ -36,12 +47,15 @@ describe("router.start() - lifecycle events", () => {
         const transitionStartListener = vi.fn();
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
+        getPluginApi(router).addEventListener(
           events.TRANSITION_START,
           transitionStartListener,
         );
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -76,7 +90,7 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR for invalid path", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -100,7 +114,7 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR for invalid state object", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -121,7 +135,7 @@ describe("router.start() - lifecycle events", () => {
       it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -148,11 +162,11 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR when guard blocks transition", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -173,11 +187,11 @@ describe("router.start() - lifecycle events", () => {
       it("should emit TRANSITION_ERROR with toState information", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.view", () => () => {
+        lifecycle.addActivateGuard("users.view", () => () => {
           throw new Error("Blocked");
         });
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -203,11 +217,11 @@ describe("router.start() - lifecycle events", () => {
       it("should return error to callback AND emit TRANSITION_ERROR", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -237,7 +251,7 @@ describe("router.start() - lifecycle events", () => {
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -266,11 +280,11 @@ describe("router.start() - lifecycle events", () => {
       it("should have consistent event signature (toState, fromState, error) for CANNOT_ACTIVATE", async () => {
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -302,11 +316,11 @@ describe("router.start() - lifecycle events", () => {
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -327,15 +341,15 @@ describe("router.start() - lifecycle events", () => {
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );

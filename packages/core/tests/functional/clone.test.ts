@@ -1,6 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import {
+  cloneRouter,
+  errorCodes,
+  getDependenciesApi,
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -40,10 +47,10 @@ function createTrackingPlugin(id: string, orderTracker?: string[]) {
   };
 }
 
-describe("router.clone()", () => {
+describe("cloneRouter()", () => {
   it("should share the route tree with original router", async () => {
     const router = createTestRouter();
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Both routers should recognize the same routes
     expect(router.buildPath("home")).toBe(clonedRouter.buildPath("home"));
@@ -58,7 +65,7 @@ describe("router.clone()", () => {
 
     router.usePlugin(tracker.factory);
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Verify plugin is cloned by checking it responds to events on cloned router
     await clonedRouter.start("/home");
@@ -72,9 +79,9 @@ describe("router.clone()", () => {
     const router = createTestRouter();
     const canActivateGuard = vi.fn().mockReturnValue(false);
 
-    router.addActivateGuard("admin", () => canActivateGuard);
+    getLifecycleApi(router).addActivateGuard("admin", () => canActivateGuard);
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     await clonedRouter.start("/");
 
@@ -95,9 +102,12 @@ describe("router.clone()", () => {
     const router = createTestRouter();
     const canDeactivateGuard = vi.fn().mockReturnValue(false);
 
-    router.addDeactivateGuard("users", () => canDeactivateGuard);
+    getLifecycleApi(router).addDeactivateGuard(
+      "users",
+      () => canDeactivateGuard,
+    );
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     await clonedRouter.start("/");
 
@@ -121,27 +131,34 @@ describe("router.clone()", () => {
 
   it("should clone router options", async () => {
     const router = createTestRouter();
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
-    expect(clonedRouter.getOptions()).toStrictEqual(router.getOptions());
-    expect(clonedRouter.getOptions()).not.toBe(router.getOptions());
+    expect(getPluginApi(clonedRouter).getOptions()).toStrictEqual(
+      getPluginApi(router).getOptions(),
+    );
+    expect(getPluginApi(clonedRouter).getOptions()).not.toBe(
+      getPluginApi(router).getOptions(),
+    );
   });
 
   it("should clone config by value", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
     // Add some config to verify
-    router.addRoute({
+    api.add({
       name: "cloneTest",
       path: "/clone-test/:id",
       defaultParams: { id: "default" },
     });
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Clone has same routes and behavior as original
-    expect(clonedRouter.hasRoute("cloneTest")).toBe(true);
-    expect(clonedRouter.makeState("cloneTest").params).toStrictEqual({
+    expect(getRoutesApi(clonedRouter).has("cloneTest")).toBe(true);
+    expect(
+      getPluginApi(clonedRouter).makeState("cloneTest").params,
+    ).toStrictEqual({
       id: "default",
     });
   });
@@ -149,7 +166,7 @@ describe("router.clone()", () => {
   it("should make independent router clone: plugins", async () => {
     const router = createTestRouter();
     const tracker = createTrackingPlugin("plugin");
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Add plugin only to cloned router
     clonedRouter.usePlugin(tracker.factory);
@@ -168,16 +185,18 @@ describe("router.clone()", () => {
 
   it("should accept new dependencies", async () => {
     const router = createTestRouter() as unknown as Router<{ foo: string }>;
-    const clonedRouter = router.clone({ foo: "bar" });
+    const clonedRouter = cloneRouter(router, { foo: "bar" });
 
-    expect(clonedRouter.getDependency("foo")).toBe("bar");
+    const deps = getDependenciesApi(clonedRouter);
+
+    expect(deps.get("foo")).toBe("bar");
   });
 
   it("should not share state with original router", async () => {
     const router = createTestRouter();
 
     await router.start("/");
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     expect(router.isActive()).toBe(true);
     expect(clonedRouter.isActive()).toBe(false);
@@ -190,7 +209,7 @@ describe("router.clone()", () => {
 
     router.subscribe(listener);
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     await clonedRouter.start("/");
 
@@ -200,62 +219,72 @@ describe("router.clone()", () => {
 
   it("should clone config independently (deep copy)", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
-    router.addRoute({ name: "original", path: "/original" });
-    router.addRoute({ name: "redirectTarget", path: "/redirect-target" });
-    router.updateRoute("original", { forwardTo: "redirectTarget" });
+    api.add({ name: "original", path: "/original" });
+    api.add({ name: "redirectTarget", path: "/redirect-target" });
+    getRoutesApi(router).update("original", { forwardTo: "redirectTarget" });
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Clone inherits forward rules from original
-    expect(clonedRouter.forwardState("original", {}).name).toBe(
+    expect(getPluginApi(clonedRouter).forwardState("original", {}).name).toBe(
       "redirectTarget",
     );
 
     // Modify cloned router's forward rules
-    clonedRouter.addRoute({ name: "newTarget", path: "/new-target" });
-    clonedRouter.updateRoute("original", { forwardTo: "newTarget" });
+    getRoutesApi(clonedRouter).add({ name: "newTarget", path: "/new-target" });
+    getRoutesApi(clonedRouter).update("original", { forwardTo: "newTarget" });
 
     // Original should NOT be affected
-    expect(router.forwardState("original", {}).name).toBe("redirectTarget");
+    expect(getPluginApi(router).forwardState("original", {}).name).toBe(
+      "redirectTarget",
+    );
     // Clone uses new forward rule
-    expect(clonedRouter.forwardState("original", {}).name).toBe("newTarget");
+    expect(getPluginApi(clonedRouter).forwardState("original", {}).name).toBe(
+      "newTarget",
+    );
   });
 
   it("should deep clone defaultParams (nested objects are independent)", async () => {
     const router = createTestRouter();
+    const api = getRoutesApi(router);
 
     // Add route with defaultParams
-    router.addRoute({
+    api.add({
       name: "paginated",
       path: "/paginated",
       defaultParams: { page: 1, sort: "name" },
     });
 
-    const clonedRouter = router.clone();
+    const clonedRouter = cloneRouter(router);
 
     // Both have same defaults initially
-    expect(router.makeState("paginated").params).toStrictEqual({
+    expect(getPluginApi(router).makeState("paginated").params).toStrictEqual({
       page: 1,
       sort: "name",
     });
-    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+    expect(
+      getPluginApi(clonedRouter).makeState("paginated").params,
+    ).toStrictEqual({
       page: 1,
       sort: "name",
     });
 
     // Update clone's route with different defaults
-    clonedRouter.updateRoute("paginated", {
+    getRoutesApi(clonedRouter).update("paginated", {
       defaultParams: { page: 2, sort: "name" },
     });
 
     // Original should NOT be affected
-    expect(router.makeState("paginated").params).toStrictEqual({
+    expect(getPluginApi(router).makeState("paginated").params).toStrictEqual({
       page: 1,
       sort: "name",
     });
     // Clone has updated defaults
-    expect(clonedRouter.makeState("paginated").params).toStrictEqual({
+    expect(
+      getPluginApi(clonedRouter).makeState("paginated").params,
+    ).toStrictEqual({
       page: 2,
       sort: "name",
     });
@@ -269,8 +298,8 @@ describe("router.clone()", () => {
     it("should throw TypeError for invalid dependencies (array)", async () => {
       const router = createTestRouter();
 
-      expect(() => router.clone([] as never)).toThrowError(TypeError);
-      expect(() => router.clone([] as never)).toThrowError(
+      expect(() => cloneRouter(router, [] as never)).toThrowError(TypeError);
+      expect(() => cloneRouter(router, [] as never)).toThrowError(
         /Invalid dependencies/,
       );
     });
@@ -278,8 +307,8 @@ describe("router.clone()", () => {
     it("should throw TypeError for invalid dependencies (null)", async () => {
       const router = createTestRouter();
 
-      expect(() => router.clone(null as never)).toThrowError(TypeError);
-      expect(() => router.clone(null as never)).toThrowError(
+      expect(() => cloneRouter(router, null as never)).toThrowError(TypeError);
+      expect(() => cloneRouter(router, null as never)).toThrowError(
         /Invalid dependencies/,
       );
     });
@@ -287,8 +316,10 @@ describe("router.clone()", () => {
     it("should throw TypeError for invalid dependencies (primitive)", async () => {
       const router = createTestRouter();
 
-      expect(() => router.clone("string" as never)).toThrowError(TypeError);
-      expect(() => router.clone(123 as never)).toThrowError(
+      expect(() => cloneRouter(router, "string" as never)).toThrowError(
+        TypeError,
+      );
+      expect(() => cloneRouter(router, 123 as never)).toThrowError(
         /Invalid dependencies/,
       );
     });
@@ -304,10 +335,10 @@ describe("router.clone()", () => {
         enumerable: true,
       });
 
-      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+      expect(() => cloneRouter(router, depsWithGetter as never)).toThrowError(
         TypeError,
       );
-      expect(() => router.clone(depsWithGetter as never)).toThrowError(
+      expect(() => cloneRouter(router, depsWithGetter as never)).toThrowError(
         /Getters not allowed/,
       );
     });
@@ -320,24 +351,30 @@ describe("router.clone()", () => {
   describe("error handling", () => {
     it("should work with empty dependencies (default)", async () => {
       const router = createTestRouter();
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       expect(clonedRouter).toBeDefined();
-      expect(clonedRouter.getDependencies()).toStrictEqual({});
+
+      const deps = getDependenciesApi(clonedRouter);
+
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should work with explicit empty object dependencies", async () => {
       const router = createTestRouter();
-      const clonedRouter = router.clone({});
+      const clonedRouter = cloneRouter(router, {});
 
       expect(clonedRouter).toBeDefined();
-      expect(clonedRouter.getDependencies()).toStrictEqual({});
+
+      const deps = getDependenciesApi(clonedRouter);
+
+      expect(deps.getAll()).toStrictEqual({});
     });
 
     it("should work when router has no middleware", async () => {
       const router = createTestRouter();
       // Don't add any middleware
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       // Clone should work without errors
       expect(clonedRouter).toBeDefined();
@@ -354,7 +391,7 @@ describe("router.clone()", () => {
     it("should work when router has no plugins", async () => {
       const router = createTestRouter();
       // Don't add any plugins
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       // Clone should work without errors
       expect(clonedRouter).toBeDefined();
@@ -366,7 +403,7 @@ describe("router.clone()", () => {
     it("should clone lifecycle handlers from route definitions", async () => {
       const router = createTestRouter();
       // createTestRouter has routes with canActivate defined
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       await clonedRouter.start("/");
 
@@ -387,11 +424,11 @@ describe("router.clone()", () => {
     it("should clone config including route-defined encoders/decoders", async () => {
       const router = createTestRouter();
       // createTestRouter has withEncoder route with encodeParams/decodeParams
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       // Both routers should have same routes
-      expect(router.hasRoute("withEncoder")).toBe(true);
-      expect(clonedRouter.hasRoute("withEncoder")).toBe(true);
+      expect(getRoutesApi(router).has("withEncoder")).toBe(true);
+      expect(getRoutesApi(clonedRouter).has("withEncoder")).toBe(true);
 
       // Both should apply same encoding/decoding behavior
       const encodedPath = router.buildPath("withEncoder", {
@@ -408,42 +445,52 @@ describe("router.clone()", () => {
 
     it("should clone router with complex config", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
 
       // Add routes with encoders, decoders, defaultParams, and forwards via API
-      router.addRoute({
+      api.add({
         name: "complexRoute",
         path: "/complex/:id",
         decodeParams: (params) => ({ ...params, decoded: true }),
         encodeParams: (params) => ({ ...params, encoded: true }),
         defaultParams: { id: "default", page: 1 },
       });
-      router.addRoute({ name: "targetRoute", path: "/target" });
-      router.updateRoute("complexRoute", { forwardTo: "targetRoute" });
+      api.add({ name: "targetRoute", path: "/target" });
+      getRoutesApi(router).update("complexRoute", { forwardTo: "targetRoute" });
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       // Clone should have same behavior
-      expect(clonedRouter.hasRoute("complexRoute")).toBe(true);
-      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+      expect(getRoutesApi(clonedRouter).has("complexRoute")).toBe(true);
+      expect(
+        getPluginApi(clonedRouter).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 1,
       });
       expect(
-        clonedRouter.forwardState("complexRoute", { id: "1", page: 1 }).name,
+        getPluginApi(clonedRouter).forwardState("complexRoute", {
+          id: "1",
+          page: 1,
+        }).name,
       ).toBe("targetRoute");
 
       // Modify clone
-      clonedRouter.updateRoute("complexRoute", {
+      getRoutesApi(clonedRouter).update("complexRoute", {
         defaultParams: { id: "default", page: 2 },
       });
 
       // Original should NOT be affected
-      expect(router.makeState("complexRoute").params).toStrictEqual({
+      expect(
+        getPluginApi(router).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 1,
       });
       // Clone has updated defaults
-      expect(clonedRouter.makeState("complexRoute").params).toStrictEqual({
+      expect(
+        getPluginApi(clonedRouter).makeState("complexRoute").params,
+      ).toStrictEqual({
         id: "default",
         page: 2,
       });
@@ -457,7 +504,7 @@ describe("router.clone()", () => {
 
       router.usePlugin(plugin1.factory, plugin2.factory);
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       await clonedRouter.start("/");
 
@@ -477,11 +524,14 @@ describe("router.clone()", () => {
       const canActivateUsers = vi.fn().mockReturnValue(true);
       const canDeactivateAdmin = vi.fn().mockReturnValue(true);
 
-      router.addActivateGuard("home", () => canActivateHome);
-      router.addActivateGuard("users", () => canActivateUsers);
-      router.addDeactivateGuard("admin", () => canDeactivateAdmin);
+      getLifecycleApi(router).addActivateGuard("home", () => canActivateHome);
+      getLifecycleApi(router).addActivateGuard("users", () => canActivateUsers);
+      getLifecycleApi(router).addDeactivateGuard(
+        "admin",
+        () => canDeactivateAdmin,
+      );
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       await clonedRouter.start("/");
 
@@ -514,11 +564,11 @@ describe("router.clone()", () => {
       const plugin1Tracker = createTrackingPlugin("p1");
       const plugin2Tracker = createTrackingPlugin("p2");
 
-      const clone1 = router.clone();
+      const clone1 = cloneRouter(router);
 
       clone1.usePlugin(plugin1Tracker.factory);
 
-      const clone2 = clone1.clone();
+      const clone2 = cloneRouter(clone1);
 
       clone2.usePlugin(plugin2Tracker.factory);
 
@@ -543,10 +593,13 @@ describe("router.clone()", () => {
       const canDeactivateHome = vi.fn().mockReturnValue(true);
 
       // Same route has both lifecycle handlers
-      router.addActivateGuard("home", () => canActivateHome);
-      router.addDeactivateGuard("home", () => canDeactivateHome);
+      getLifecycleApi(router).addActivateGuard("home", () => canActivateHome);
+      getLifecycleApi(router).addDeactivateGuard(
+        "home",
+        () => canDeactivateHome,
+      );
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       await clonedRouter.start("/");
 
@@ -565,7 +618,10 @@ describe("router.clone()", () => {
       // Verify handlers are independent - adding to clone doesn't affect original
       const newHandler = vi.fn().mockReturnValue(true);
 
-      clonedRouter.addActivateGuard("orders", () => newHandler);
+      getLifecycleApi(clonedRouter).addActivateGuard(
+        "orders",
+        () => newHandler,
+      );
 
       // Navigate on cloned router
       const state3 = await clonedRouter.navigate("orders");
@@ -589,15 +645,16 @@ describe("router.clone()", () => {
 
     it("should preserve canDeactivate from route config", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
       const guard = vi.fn().mockReturnValue(false);
 
-      router.addRoute({
+      api.add({
         name: "workspace",
         path: "/workspace",
         canDeactivate: () => guard,
       });
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
       await clonedRouter.start("/");
 
@@ -624,24 +681,28 @@ describe("router.clone()", () => {
   describe("forwardFnMap cloning", () => {
     it("should preserve forwardFnMap in cloned router", async () => {
       const router = createTestRouter();
+      const api = getRoutesApi(router);
       const forwardFn = () => "clone-target";
 
-      router.addRoute({ name: "clone-target", path: "/clone-target" });
-      router.addRoute({
+      api.add({ name: "clone-target", path: "/clone-target" });
+      api.add({
         name: "clone-forward",
         path: "/clone-forward",
         forwardTo: forwardFn,
       });
 
-      const clonedRouter = router.clone();
+      const clonedRouter = cloneRouter(router);
 
-      const originalRoute = router.getRoute("clone-forward");
-      const clonedRoute = clonedRouter.getRoute("clone-forward");
+      const originalRoute = getRoutesApi(router).get("clone-forward");
+      const clonedRoute = getRoutesApi(clonedRouter).get("clone-forward");
 
       expect(originalRoute?.forwardTo).toBe(forwardFn);
       expect(clonedRoute?.forwardTo).toBe(forwardFn);
 
-      const clonedResult = clonedRouter.forwardState("clone-forward", {});
+      const clonedResult = getPluginApi(clonedRouter).forwardState(
+        "clone-forward",
+        {},
+      );
 
       expect(clonedResult.name).toBe("clone-target");
     });

@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/03-dependencies/3.1-initialization.bench.ts
 
+import { getDependenciesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createRouter, IS_ROUTER5 } from "../helpers";
@@ -22,8 +23,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.1 Setting empty dependencies (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies({});
-      router.resetDependencies();
+      getDependenciesApi(router).setAll({});
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -34,9 +35,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.2 Setting single dependency (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      // @ts-expect-error - test dependency
-      router.setDependency("service", { name: "test" });
-      router.resetDependencies();
+      (getDependenciesApi(router) as any).set("service", { name: "test" });
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -52,8 +52,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.3 Setting multiple dependencies (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies(deps);
-      router.resetDependencies();
+      getDependenciesApi(router).setAll(deps);
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -69,8 +69,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.4 Setting simple dependencies (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies(simpleDeps);
-      router.resetDependencies();
+      getDependenciesApi(router).setAll(simpleDeps);
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -85,8 +85,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.5 Setting object dependencies (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies(objectDeps);
-      router.resetDependencies();
+      getDependenciesApi(router).setAll(objectDeps);
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }
@@ -101,8 +101,8 @@ if (!IS_ROUTER5) {
 
   bench(`3.1.6 Setting function dependencies (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      router.setDependencies(funcDeps);
-      router.resetDependencies();
+      getDependenciesApi(router).setAll(funcDeps);
+      getDependenciesApi(router).reset();
     }
   }).gc("inner");
 }

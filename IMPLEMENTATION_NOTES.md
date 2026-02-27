@@ -954,13 +954,22 @@ Issues:
 - Unclear boundaries of responsibility
 - Router.ts was a god class (2500+ lines)
 
-**Solution:** Migrated to **facade + namespaces** pattern:
+**Solution:** Migrated to **facade + namespaces + standalone API** pattern:
 
 ```
 src/
-├── Router.ts (facade, ~1176 lines)
+├── Router.ts (facade, ~640 lines)
+├── internals.ts              — WeakMap<Router, RouterInternals> registry
 ├── fsm/
 │   ├── routerFSM.ts          — FSM config, states, events, factory
+│   └── index.ts
+├── api/                      — standalone functions (tree-shakeable)
+│   ├── getRoutesApi.ts       — route CRUD
+│   ├── getDependenciesApi.ts — dependency CRUD
+│   ├── getLifecycleApi.ts    — guard management
+│   ├── getPluginApi.ts       — plugin management
+│   ├── cloneRouter.ts        — SSR cloning
+│   ├── types.ts              — API return types
 │   └── index.ts
 ├── wiring/
 │   ├── RouterWiringBuilder.ts — Builder: namespace dependency wiring (10 methods)
@@ -970,14 +979,19 @@ src/
 └── namespaces/
     ├── RoutesNamespace/
     │   ├── RoutesNamespace.ts
+    │   ├── routesStore.ts     — plain data store (RoutesStore)
+    │   ├── forwardToValidation.ts
     │   ├── constants.ts
     │   ├── helpers.ts
-    │   ├── types.ts
-    │   └── stateBuilder.ts
+    │   ├── validators.ts
+    │   └── types.ts
+    ├── DependenciesNamespace/
+    │   ├── dependenciesStore.ts — plain data store (DependenciesStore)
+    │   └── validators.ts
     ├── EventBusNamespace/     — FSM + EventEmitter encapsulation (replaces ObservableNamespace)
     ├── StateNamespace/
     ├── NavigationNamespace/
-    └── ... (11 namespaces total)
+    └── ... (9 namespaces total)
 ```
 
 **Benefits:**
@@ -987,52 +1001,32 @@ src/
 - No circular dependencies
 - Router.ts is thin facade (validation + delegation)
 - Namespace internals are encapsulated
+- Standalone API functions are tree-shakeable (only bundled when imported)
 
 **Migration:** Completed January 2026. Legacy `src/core/` folder deleted after full test coverage verification.
 
 ### Validation Pattern
 
-**Decision:** All input validation happens in Router.ts facade via **static methods** on namespace classes.
+**Two entry points, same validators:**
+
+1. **Facade methods** (Router.ts) — validate via static methods on namespace classes
+2. **Standalone API** (`api/get*Api.ts`) — validate via standalone functions from `validators.ts`
 
 ```typescript
-// Router.ts (facade)
+// Router.ts (facade path)
 buildPath(route: string, params?: Params): string {
-  // 1. Validate via static method (throws on invalid input)
   RoutesNamespace.validateBuildPathArgs(route);
-
-  // 2. Delegate to namespace instance (input guaranteed valid)
   return this.#routes.buildPath(route, params, this.#options.get());
 }
 
-// RoutesNamespace.ts
-class RoutesNamespace {
-  // Static: validation only, no instance access
-  static validateBuildPathArgs(route: unknown): asserts route is string {
-    if (!isString(route) || route === "") {
-      throw new TypeError(`buildPath: route must be non-empty string`);
-    }
-  }
-
-  // Instance: business logic, assumes valid input
-  buildPath(route: string, params?: Params, options?: Options): string {
-    // No validation here - route is guaranteed valid
-    return this.#tree.buildPath(route, params, options);
-  }
+// api/getDependenciesApi.ts (standalone API path)
+set(name, value) {
+  validateSetDependencyArgs(name, value, "set");
+  setDependency(store, name, value);
 }
 ```
 
-**Why static methods?**
-
-1. **No instance needed** — validation doesn't require state
-2. **Clear contract** — `static` signals "pure validation, no side effects"
-3. **Testable independently** — can test validation without Router instance
-4. **Type narrowing** — `asserts` keyword narrows types for TypeScript
-
-**Why validate in facade, not namespace?**
-
-1. **Single entry point** — all public API goes through facade
-2. **Consistent error messages** — facade knows method names for errors
-3. **Namespace trusts facade** — cleaner internal code without defensive checks
+Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) regardless of caller. Some validators are shared between facade and API (e.g., `validateDependenciesObject` used in both Router.ts constructor and getDependenciesApi).
 
 ### Plugin Interception Pattern
 
@@ -1097,6 +1091,39 @@ buildStateResolved(resolvedName, resolvedParams) {
 - `forwardState` — intercepted by persistent-params-plugin
 - `navigate` — could be intercepted for analytics
 - `buildPath` — could be intercepted for URL rewriting
+
+### Standalone API Extraction (Modular Architecture)
+
+**Problem:** All API surface was on the Router class, making it impossible to tree-shake unused features (e.g., dependency management, guard management, cloning).
+
+**Solution:** Extract domain-specific operations into standalone functions that access router internals via a `WeakMap`:
+
+```typescript
+// internals.ts — module-level registry
+const internals = new WeakMap<object, RouterInternals>();
+
+export function getInternals(router: Router): RouterInternals {
+  const ctx = internals.get(router);
+  if (!ctx) throw new TypeError("Invalid router instance");
+  return ctx;
+}
+
+// Router.ts — registers on construction
+registerInternals(this, { makeState, forwardState, dependenciesGetStore, ... });
+
+// api/getDependenciesApi.ts — consumer
+export function getDependenciesApi(router: Router): DependenciesApi {
+  const ctx = getInternals(router);
+  const store = ctx.dependenciesGetStore();
+  return { set(name, value) { /* operates on store directly */ } };
+}
+```
+
+**Store pattern:** Heavy namespaces (DependenciesNamespace, RoutesNamespace parts) replaced with plain data stores (`DependenciesStore`, `RoutesStore`) — interfaces + factory functions, no classes. CRUD logic moved into the corresponding API function as module-private functions. This enables tree-shaking: if `getDependenciesApi` is not imported, its CRUD logic is dead-code-eliminated.
+
+**Extracted APIs:** `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter`.
+
+**Tree operations injection:** Heavy route-tree functions (`addRouteNode`, `removeRouteNode`) are injected via `store.treeOperations` at runtime (set during wiring), avoiding static import chains that would pull in route-tree code into every API consumer.
 
 ### FSM Migration: dispose(), TransitionMeta, Event Flow
 

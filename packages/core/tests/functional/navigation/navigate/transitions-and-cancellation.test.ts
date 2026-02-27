@@ -1,13 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const noop = () => undefined;
 
 describe("router.navigate() - transitions and cancellation", () => {
@@ -15,6 +16,8 @@ describe("router.navigate() - transitions and cancellation", () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -59,6 +62,8 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     // Restart for afterEach cleanup
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   it("should call middleware, activate, and deactivate hooks during navigation", async () => {
@@ -71,8 +76,8 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     router.usePlugin(() => ({ onTransitionSuccess: middlewareMock1 as any }));
     router.usePlugin(() => ({ onTransitionSuccess: middlewareMock2 as any }));
-    router.addActivateGuard("users", () => activateMock as any);
-    router.addDeactivateGuard("users", () => deactivateMock as any);
+    lifecycle.addActivateGuard("users", () => activateMock as any);
+    lifecycle.addDeactivateGuard("users", () => deactivateMock as any);
 
     await router.navigate("users");
 
@@ -90,7 +95,7 @@ describe("router.navigate() - transitions and cancellation", () => {
   describe("Issue #36: Safe behavior when router.stop() is called during navigation", () => {
     // router.stop() called inside guard should cancel transition
     it("should cancel transition when router.stop() is called inside canActivate", async () => {
-      router.addActivateGuard("users", () => () => {
+      lifecycle.addActivateGuard("users", () => () => {
         router.stop(); // Stop router during guard
 
         return true; // Guard returns true, but router is stopped
@@ -116,8 +121,8 @@ describe("router.navigate() - transitions and cancellation", () => {
 
     const childGuard = vi.fn().mockReturnValue(true);
 
-    router.addActivateGuard("settings", () => parentGuard);
-    router.addActivateGuard("settings.account", () => childGuard);
+    lifecycle.addActivateGuard("settings", () => parentGuard);
+    lifecycle.addActivateGuard("settings.account", () => childGuard);
 
     await expect(router.navigate("settings.account")).rejects.toMatchObject({
       code: errorCodes.TRANSITION_CANCELLED,
@@ -135,7 +140,7 @@ describe("router.navigate() - transitions and cancellation", () => {
       it("should handle multiple stop() calls safely", async () => {
         const freshRouter = createTestRouter();
 
-        freshRouter.addActivateGuard(
+        getLifecycleApi(freshRouter).addActivateGuard(
           "users",
           () => () =>
             new Promise((resolve) =>

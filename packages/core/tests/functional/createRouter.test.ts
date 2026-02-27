@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import { createRouter, getPluginApi } from "@real-router/core";
 
 describe("createRouter", () => {
   it("should not throw", () => {
@@ -71,7 +71,7 @@ describe("createRouter", () => {
     it("should override default options with user options", () => {
       const router = createRouter([], { defaultRoute: "home" });
 
-      expect(router.getOptions().defaultRoute).toBe("home");
+      expect(getPluginApi(router).getOptions().defaultRoute).toBe("home");
     });
   });
 
@@ -116,8 +116,8 @@ describe("createRouter", () => {
       });
 
       // logger should be deleted from options after configure
-      expect(router.getOptions()).not.toHaveProperty("logger");
-      expect(router.getOptions().defaultRoute).toBe("home");
+      expect(getPluginApi(router).getOptions()).not.toHaveProperty("logger");
+      expect(getPluginApi(router).getOptions().defaultRoute).toBe("home");
     });
   });
 });

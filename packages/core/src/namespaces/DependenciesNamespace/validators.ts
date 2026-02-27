@@ -1,10 +1,8 @@
 // packages/core/src/namespaces/DependenciesNamespace/validators.ts
 
 /**
- * Static validation functions for DependenciesNamespace.
- * Called by Router facade before instance methods.
- *
- * Extracted from DependenciesNamespace class for better separation of concerns.
+ * Static validation functions for dependencies.
+ * Called by Router facade and getDependenciesApi before store operations.
  */
 
 import { getTypeDescription } from "type-guards";

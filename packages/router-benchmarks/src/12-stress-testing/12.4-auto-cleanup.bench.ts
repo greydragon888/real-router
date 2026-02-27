@@ -1,8 +1,9 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.4-auto-cleanup.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createNestedRouter, IS_ROUTER5 } from "../helpers";
+import { createNestedRouter, IS_ROUTER5, addDeactivateGuard } from "../helpers";
 
 import type { Route } from "../helpers";
 
@@ -11,7 +12,7 @@ import type { Route } from "../helpers";
   const router = createNestedRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.addDeactivateGuard("admin.users.list", () => () => true);
+    addDeactivateGuard(router, "admin.users.list", () => () => true);
   }
 
   router.start("/");
@@ -30,8 +31,8 @@ import type { Route } from "../helpers";
   const router = createNestedRouter();
 
   for (let i = 0; i < 50; i++) {
-    router.addDeactivateGuard("admin.users.list", () => () => true);
-    router.addDeactivateGuard("admin.users", () => () => true);
+    addDeactivateGuard(router, "admin.users.list", () => () => true);
+    addDeactivateGuard(router, "admin.users", () => () => true);
   }
 
   router.start("/");
@@ -47,8 +48,8 @@ import type { Route } from "../helpers";
   const router = createNestedRouter();
 
   for (let i = 0; i < 5; i++) {
-    router.addDeactivateGuard("admin.users.list", () => () => true);
-    router.addDeactivateGuard("admin.users.profile", () => () => true);
+    addDeactivateGuard(router, "admin.users.list", () => () => true);
+    addDeactivateGuard(router, "admin.users.profile", () => () => true);
   }
 
   router.start("/");
@@ -79,7 +80,7 @@ import type { Route } from "../helpers";
   const router = createNestedRouter();
 
   for (let i = 0; i < 10; i++) {
-    router.addDeactivateGuard("admin.users.list", () => () => true);
+    addDeactivateGuard(router, "admin.users.list", () => () => true);
   }
 
   router.start("/");
@@ -98,7 +99,7 @@ if (IS_ROUTER5) {
   const router = createNestedRouter();
 
   // Add deep guards for nested router
-  router.addDeactivateGuard("root.level1.level2", () => () => true);
+  addDeactivateGuard(router, "root.level1.level2", () => () => true);
 
   // Build deep route structure to avoid TypeScript recursion limits
   const deepRoute: Route = {
@@ -139,7 +140,7 @@ if (IS_ROUTER5) {
 
   // @ts-expect-error - use method from router5
   router.add(deepRoute);
-  router.addDeactivateGuard("deep.l1.l2.l3.l4.l5.l6", () => () => true);
+  addDeactivateGuard(router, "deep.l1.l2.l3.l4.l5.l6", () => () => true);
   router.start("/");
 
   bench("12.4.5 Auto-cleanup with deep 7-level hierarchy", () => {
@@ -148,9 +149,10 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createNestedRouter();
+  const routesApi = getRoutesApi(router);
 
   // Add deep guards for nested router
-  router.addDeactivateGuard("root.level1.level2", () => () => true);
+  addDeactivateGuard(router, "root.level1.level2", () => () => true);
 
   // Build deep route structure to avoid TypeScript recursion limits
   const deepRoute: Route = {
@@ -189,8 +191,8 @@ if (IS_ROUTER5) {
     ],
   };
 
-  router.addRoute(deepRoute);
-  router.addDeactivateGuard("deep.l1.l2.l3.l4.l5.l6", () => () => true);
+  routesApi.add(deepRoute);
+  addDeactivateGuard(router, "deep.l1.l2.l3.l4.l5.l6", () => () => true);
   router.start("/");
 
   bench("12.4.5 Auto-cleanup with deep 7-level hierarchy", () => {

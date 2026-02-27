@@ -1,9 +1,14 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouter } from "@real-router/core";
+import {
+  cloneRouter,
+  createRouter,
+  getLifecycleApi,
+  getRoutesApi,
+} from "@real-router/core";
 
-import type { Route, Router } from "@real-router/core";
+import type { LifecycleApi, Route, Router } from "@real-router/core";
 import type { LogCallback } from "@real-router/logger";
 
 const routes: Route[] = [
@@ -23,8 +28,8 @@ describe("SSR race conditions", () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
       // Two isolated clones (simulating two SSR requests)
-      const routerA = baseRouter.clone();
-      const routerB = baseRouter.clone();
+      const routerA = cloneRouter(baseRouter);
+      const routerB = cloneRouter(baseRouter);
 
       await routerA.start("/home");
       await routerB.start("/home");
@@ -47,14 +52,14 @@ describe("SSR race conditions", () => {
     it("should return correct route from cloned instance", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // getRoute on clones returns correct data
-      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone1).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
-      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone2).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
     });
@@ -62,19 +67,21 @@ describe("SSR race conditions", () => {
     it("should isolate route configuration updates between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Modify one clone's route configuration
-      clone1.updateRoute("about", { defaultParams: { tab: "changed" } });
+      getRoutesApi(clone1).update("about", {
+        defaultParams: { tab: "changed" },
+      });
 
       // Clone 1 sees the change
-      expect(clone1.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone1).get("about")?.defaultParams).toStrictEqual({
         tab: "changed",
       });
 
       // Clone 2 still has original value - isolated!
-      expect(clone2.getRoute("about")?.defaultParams).toStrictEqual({
+      expect(getRoutesApi(clone2).get("about")?.defaultParams).toStrictEqual({
         tab: "info",
       });
     });
@@ -84,17 +91,17 @@ describe("SSR race conditions", () => {
       const guardCallsClone1: string[] = [];
       const guardCallsClone2: string[] = [];
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Add different guards to each clone
-      clone1.addActivateGuard("admin", () => () => {
+      getLifecycleApi(clone1).addActivateGuard("admin", () => () => {
         guardCallsClone1.push("clone1-admin");
 
         return true;
       });
 
-      clone2.addActivateGuard("admin", () => () => {
+      getLifecycleApi(clone2).addActivateGuard("admin", () => () => {
         guardCallsClone2.push("clone2-admin");
 
         return true;
@@ -120,6 +127,7 @@ describe("SSR race conditions", () => {
     let logCallback: ReturnType<typeof vi.fn>;
     let originalConfig: ReturnType<typeof logger.getConfig>;
     let router: Router;
+    let lifecycle: LifecycleApi;
 
     beforeEach(async () => {
       // Save original config
@@ -134,6 +142,7 @@ describe("SSR race conditions", () => {
 
       router = createRouter(routes, defaultOptions);
       await router.start("/home");
+      lifecycle = getLifecycleApi(router);
     });
 
     afterEach(() => {
@@ -144,7 +153,7 @@ describe("SSR race conditions", () => {
 
     it("should warn when navigate called during active async navigation", async () => {
       // Add async guard to make navigation async
-      router.addActivateGuard("admin", () => async () => {
+      lifecycle.addActivateGuard("admin", () => async () => {
         // Start another navigation while this one is in progress
         await router.navigate("public");
         // Allow time for warning to be logged
@@ -212,7 +221,7 @@ describe("SSR race conditions", () => {
       let secondNavCompleted = false;
 
       // Add async guard to first route
-      router.addActivateGuard("admin", () => async () => {
+      getLifecycleApi(router).addActivateGuard("admin", () => async () => {
         await new Promise((resolve) => setTimeout(resolve, 50));
 
         return true;
@@ -240,7 +249,7 @@ describe("SSR race conditions", () => {
 
     it("should not leak state from clone to base router", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
-      const clone = baseRouter.clone();
+      const clone = cloneRouter(baseRouter);
 
       await clone.start("/home");
       await clone.navigate("admin");
@@ -256,20 +265,20 @@ describe("SSR race conditions", () => {
     it("should maintain route tree independence between clones", async () => {
       const baseRouter = createRouter(routes, defaultOptions);
 
-      const clone1 = baseRouter.clone();
-      const clone2 = baseRouter.clone();
+      const clone1 = cloneRouter(baseRouter);
+      const clone2 = cloneRouter(baseRouter);
 
       // Add route to clone1 only
-      clone1.addRoute({ name: "clone1only", path: "/clone1only" });
+      getRoutesApi(clone1).add({ name: "clone1only", path: "/clone1only" });
 
       // Clone1 has the route
-      expect(clone1.hasRoute("clone1only")).toBe(true);
+      expect(getRoutesApi(clone1).has("clone1only")).toBe(true);
 
       // Clone2 doesn't have it
-      expect(clone2.hasRoute("clone1only")).toBe(false);
+      expect(getRoutesApi(clone2).has("clone1only")).toBe(false);
 
       // Base router doesn't have it
-      expect(baseRouter.hasRoute("clone1only")).toBe(false);
+      expect(getRoutesApi(baseRouter).has("clone1only")).toBe(false);
     });
   });
 });

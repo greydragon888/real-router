@@ -1,17 +1,24 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - error handling", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -35,7 +42,7 @@ describe("router.start() - error handling", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws
-        router.addEventListener(events.ROUTER_START, () => {
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {
           throw new Error("Listener crashed");
         });
 
@@ -60,7 +67,7 @@ describe("router.start() - error handling", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
         // Add listener that throws on TRANSITION_SUCCESS
-        router.addEventListener(events.TRANSITION_SUCCESS, () => {
+        getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, () => {
           throw new Error("Success listener crashed");
         });
 
@@ -86,7 +93,7 @@ describe("router.start() - error handling", () => {
         router = createTestRouter({ allowNotFound: false });
 
         // Add listener that throws on TRANSITION_ERROR
-        router.addEventListener(events.TRANSITION_ERROR, () => {
+        getPluginApi(router).addEventListener(events.TRANSITION_ERROR, () => {
           throw new Error("Error listener crashed");
         });
 
@@ -185,7 +192,7 @@ describe("router.start() - error handling", () => {
       it("should maintain consistent state during concurrent start attempts", async () => {
         const startListeners: number[] = [];
 
-        router.addEventListener(events.ROUTER_START, () => {
+        getPluginApi(router).addEventListener(events.ROUTER_START, () => {
           startListeners.push(Date.now());
         });
 
@@ -259,7 +266,7 @@ describe("router.start() - error handling", () => {
         });
 
         // Add async guard that delays the transition
-        router.addActivateGuard("home", () => async () => {
+        lifecycle.addActivateGuard("home", () => async () => {
           await middlewarePromise;
 
           return true;
@@ -293,7 +300,7 @@ describe("router.start() - error handling", () => {
       });
 
       it("should allow start() after failed async transition resets isActive", async () => {
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "home",
           () => () => Promise.reject(new Error("Guard error")),
         );
@@ -318,12 +325,13 @@ describe("router.start() - error handling", () => {
     describe("transition error handling when defaultRoute is set", () => {
       beforeEach(async () => {
         router = createTestRouter({ defaultRoute: "home" });
+        lifecycle = getLifecycleApi(router);
         await router.start("/home");
       });
 
       it("should return transition error to callback instead of falling back silently", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
@@ -338,13 +346,13 @@ describe("router.start() - error handling", () => {
 
       it("should emit TRANSITION_ERROR event when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -360,13 +368,13 @@ describe("router.start() - error handling", () => {
 
       it("should NOT silently navigate to defaultRoute when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -386,13 +394,13 @@ describe("router.start() - error handling", () => {
 
       it("should NOT emit TRANSITION_SUCCESS when transition fails", async () => {
         // Add middleware that blocks the transition
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -410,13 +418,16 @@ describe("router.start() - error handling", () => {
       it("should NOT start router when transition fails (two-phase start)", async () => {
         router.stop();
 
-        router.addActivateGuard("users.list", () => () => {
+        lifecycle.addActivateGuard("users.list", () => () => {
           throw new Error("Blocked");
         });
 
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         try {
           await router.start("/users/list");

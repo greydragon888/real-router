@@ -1,19 +1,26 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const noop = () => undefined;
 
 describe("core/observable", () => {
   beforeEach(async () => {
     router = createTestRouter();
     await router.start("/home");
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -26,7 +33,7 @@ describe("core/observable", () => {
         const freshRouter = createTestRouter();
         const cb = vi.fn();
 
-        freshRouter.addEventListener(events.ROUTER_START, cb);
+        getPluginApi(freshRouter).addEventListener(events.ROUTER_START, cb);
         await freshRouter.start("/home");
 
         expect(cb).toHaveBeenCalledTimes(1);
@@ -38,7 +45,7 @@ describe("core/observable", () => {
       it("should trigger ROUTER_STOP listener when router stops", () => {
         const cb = vi.fn();
 
-        router.addEventListener(events.ROUTER_STOP, cb);
+        getPluginApi(router).addEventListener(events.ROUTER_STOP, cb);
         router.stop();
 
         expect(cb).toHaveBeenCalledTimes(1);
@@ -48,7 +55,7 @@ describe("core/observable", () => {
       it("should trigger TRANSITION_START listener during navigation", async () => {
         const cb = vi.fn();
 
-        router.addEventListener(events.TRANSITION_START, cb);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, cb);
         await router.navigate("users");
 
         expect(cb).toHaveBeenCalledTimes(1);
@@ -61,7 +68,7 @@ describe("core/observable", () => {
       it("should trigger TRANSITION_SUCCESS listener after successful navigation", async () => {
         const cb = vi.fn();
 
-        router.addEventListener(events.TRANSITION_SUCCESS, cb);
+        getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, cb);
         await router.navigate("users", {}, {});
 
         expect(cb).toHaveBeenCalledTimes(1);
@@ -75,8 +82,8 @@ describe("core/observable", () => {
       it("should trigger TRANSITION_ERROR listener when navigation fails", async () => {
         const cb = vi.fn();
 
-        router.addActivateGuard("admin-protected", () => () => false);
-        router.addEventListener(events.TRANSITION_ERROR, cb);
+        lifecycle.addActivateGuard("admin-protected", () => () => false);
+        getPluginApi(router).addEventListener(events.TRANSITION_ERROR, cb);
         try {
           await router.navigate("admin-protected", {}, {});
         } catch (error: any) {
@@ -104,7 +111,7 @@ describe("core/observable", () => {
           },
         }));
 
-        router.addEventListener(events.TRANSITION_CANCEL, cb);
+        getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, cb);
 
         // First navigation - will be delayed by middleware
         const first = router.navigate("users");
@@ -140,8 +147,8 @@ describe("core/observable", () => {
           throw new Error("listener failed");
         });
 
-        freshRouter.addEventListener(events.ROUTER_START, badCb);
-        freshRouter.addEventListener(events.ROUTER_START, goodCb);
+        getPluginApi(freshRouter).addEventListener(events.ROUTER_START, badCb);
+        getPluginApi(freshRouter).addEventListener(events.ROUTER_START, goodCb);
 
         await freshRouter.start("/home");
 
@@ -154,14 +161,20 @@ describe("core/observable", () => {
     describe("unsubscribe functionality", () => {
       it("should return an unsubscribe function", () => {
         const cb = vi.fn();
-        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+        const unsubscribe = getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          cb,
+        );
 
         expect(typeof unsubscribe).toBe("function");
       });
 
       it("should not call listener after unsubscribe", () => {
         const cb = vi.fn();
-        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+        const unsubscribe = getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          cb,
+        );
 
         unsubscribe();
         router.stop();
@@ -171,7 +184,10 @@ describe("core/observable", () => {
 
       it("should allow unsubscribing multiple times without error", () => {
         const cb = vi.fn();
-        const unsubscribe = router.addEventListener(events.ROUTER_STOP, cb);
+        const unsubscribe = getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          cb,
+        );
 
         unsubscribe();
 
@@ -184,14 +200,18 @@ describe("core/observable", () => {
         const cb1 = vi.fn();
         const cb2 = vi.fn();
 
-        router.addEventListener(events.ROUTER_STOP, cb1);
-        const unsubscribe2 = router.addEventListener(events.ROUTER_STOP, cb2);
+        getPluginApi(router).addEventListener(events.ROUTER_STOP, cb1);
+        const unsubscribe2 = getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          cb2,
+        );
 
         unsubscribe2();
         unsubscribe2(); // second call is a no-op
 
         router.stop();
         await router.start("/home");
+        lifecycle = getLifecycleApi(router);
 
         expect(cb1).toHaveBeenCalledTimes(1);
         expect(cb2).not.toHaveBeenCalled();
@@ -201,9 +221,12 @@ describe("core/observable", () => {
         const cb1 = vi.fn();
         const cb2 = vi.fn();
 
-        const unsubscribe1 = router.addEventListener(events.ROUTER_STOP, cb1);
+        const unsubscribe1 = getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          cb1,
+        );
 
-        router.addEventListener(events.ROUTER_STOP, cb2);
+        getPluginApi(router).addEventListener(events.ROUTER_STOP, cb2);
 
         unsubscribe1();
         router.stop();
@@ -216,26 +239,35 @@ describe("core/observable", () => {
     describe("validation", () => {
       it("should throw TypeError for invalid event name", () => {
         expect(() => {
-          router.addEventListener("invalid-event" as any, () => {});
+          getPluginApi(router).addEventListener(
+            "invalid-event" as any,
+            () => {},
+          );
         }).toThrowError("Invalid event name");
       });
 
       it("should throw TypeError for non-function callback", () => {
         expect(() => {
-          router.addEventListener(events.ROUTER_START, "not-a-function" as any);
+          getPluginApi(router).addEventListener(
+            events.ROUTER_START,
+            "not-a-function" as any,
+          );
         }).toThrowError(TypeError);
         expect(() => {
-          router.addEventListener(events.ROUTER_START, "not-a-function" as any);
+          getPluginApi(router).addEventListener(
+            events.ROUTER_START,
+            "not-a-function" as any,
+          );
         }).toThrowError("Expected callback to be a function");
       });
 
       it("should throw when adding duplicate listener", () => {
         const cb = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, cb);
+        getPluginApi(router).addEventListener(events.ROUTER_START, cb);
 
         expect(() => {
-          router.addEventListener(events.ROUTER_START, cb);
+          getPluginApi(router).addEventListener(events.ROUTER_START, cb);
         }).toThrowError("Duplicate listener");
       });
     });

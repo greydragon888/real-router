@@ -1,3 +1,5 @@
+// packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
+
 import { RouterError } from "../../../RouterError";
 
 /**

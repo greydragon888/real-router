@@ -1,3 +1,4 @@
+import { getRoutesApi } from "@real-router/core";
 import { act, renderHook } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -117,7 +118,7 @@ describe("useIsActiveRoute", () => {
     });
 
     it("should handle complex route parameters correctly", async () => {
-      router.addRoute([
+      getRoutesApi(router).add([
         {
           name: "complex",
           path: "/complex",
@@ -219,7 +220,7 @@ describe("useIsActiveRoute", () => {
     });
 
     it("should handle special characters in parameters", async () => {
-      router.addRoute([{ name: "search", path: "/search" }]);
+      getRoutesApi(router).add([{ name: "search", path: "/search" }]);
 
       const specialParams = {
         q: "hello#world&test?param=value/path",
@@ -327,7 +328,7 @@ describe("useIsActiveRoute", () => {
   describe("Route hierarchy edge cases", () => {
     it("should correctly check parent route with nested active route", async () => {
       // Add a new route hierarchy with deep nesting
-      router.addRoute([
+      getRoutesApi(router).add([
         {
           name: "settings",
           path: "/settings",
@@ -369,7 +370,7 @@ describe("useIsActiveRoute", () => {
     });
 
     it("should distinguish routes with similar names", async () => {
-      router.addRoute([
+      getRoutesApi(router).add([
         { name: "user", path: "/user" },
         { name: "user-settings", path: "/user-settings" },
       ]);
@@ -401,7 +402,7 @@ describe("useIsActiveRoute", () => {
     });
 
     it("should handle root-level route correctly", async () => {
-      router.addRoute([{ name: "dashboard", path: "/dashboard" }]);
+      getRoutesApi(router).add([{ name: "dashboard", path: "/dashboard" }]);
 
       await act(() => router.navigate("dashboard"));
 

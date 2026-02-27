@@ -7,7 +7,7 @@
 
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
-import { createRouter } from "../../../src";
+import { createRouter, getLifecycleApi } from "../../../src";
 
 import type { Route } from "../../../src";
 
@@ -108,7 +108,10 @@ boxplot(() => {
       const router = createRouter(routes);
 
       for (let g = 1; g <= 3; g++) {
-        router.addActivateGuard("page", passthroughGuardFactory);
+        getLifecycleApi(router).addActivateGuard(
+          "page",
+          passthroughGuardFactory,
+        );
       }
 
       void router.start("/");

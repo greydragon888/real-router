@@ -2,7 +2,7 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createSimpleRouter, IS_ROUTER5 } from "../helpers";
+import { createSimpleRouter, IS_ROUTER5, addActivateGuard } from "../helpers";
 
 /**
  * Batch size for stable measurements on sub-µs operations.
@@ -100,12 +100,16 @@ if (!IS_ROUTER5) {
 
   // @ts-expect-error - test dependency
   router.setDependency("auth", { isAllowed: () => true });
-  router.addActivateGuard("about", (_router, getDependency) => () => {
-    // @ts-expect-error - test dependency
-    do_not_optimize(getDependency("auth"));
 
-    return true;
-  });
+  addActivateGuard(
+    router,
+    "about",
+    (_router: any, getDependency: any) => () => {
+      do_not_optimize(getDependency("auth"));
+
+      return true;
+    },
+  );
   router.start("/");
   const routes = ["about", "home"];
   let index = 0;

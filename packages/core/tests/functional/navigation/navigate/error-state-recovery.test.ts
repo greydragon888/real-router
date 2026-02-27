@@ -1,18 +1,21 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { errorCodes } from "@real-router/core";
+import { getLifecycleApi, errorCodes } from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - error state recovery", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -27,7 +30,7 @@ describe("router.navigate() - error state recovery", () => {
 
       expect(router.getState()?.name).toBe("users");
 
-      router.addActivateGuard("home", () => () => false);
+      lifecycle.addActivateGuard("home", () => () => false);
       try {
         await router.navigate("home");
       } catch (error: any) {
@@ -43,7 +46,7 @@ describe("router.navigate() - error state recovery", () => {
 
       expect(router.getState()?.name).toBe("users");
 
-      router.addDeactivateGuard("users", () => () => false);
+      lifecycle.addDeactivateGuard("users", () => () => false);
       try {
         await router.navigate("home");
       } catch (error: any) {
@@ -76,7 +79,7 @@ describe("router.navigate() - error state recovery", () => {
     it("should allow new navigation after guard error", async () => {
       await router.navigate("users");
 
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "home",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -113,7 +116,7 @@ describe("router.navigate() - error state recovery", () => {
 
   describe("async error handling (analysis 10.5)", () => {
     it("should handle Promise rejection in canActivate guard", async () => {
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "users",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -135,7 +138,7 @@ describe("router.navigate() - error state recovery", () => {
     it("should handle Promise rejection in canDeactivate guard", async () => {
       await router.navigate("users");
 
-      router.addDeactivateGuard(
+      lifecycle.addDeactivateGuard(
         "users",
         () => () =>
           new Promise((_resolve, reject) =>
@@ -174,7 +177,7 @@ describe("router.navigate() - error state recovery", () => {
     it("should cancel transition when router.stop() called during async guard", async () => {
       let guardCalled = false;
 
-      router.addActivateGuard(
+      lifecycle.addActivateGuard(
         "users",
         () => () =>
           new Promise((resolve) => {

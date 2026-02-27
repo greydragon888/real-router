@@ -1,18 +1,26 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  getLifecycleApi,
+  errorCodes,
+  events,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - route not found", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -36,7 +44,7 @@ describe("router.navigate() - route not found", () => {
     it("should emit TRANSITION_ERROR event with ROUTE_NOT_FOUND error", async () => {
       const onError = vi.fn();
 
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -110,7 +118,7 @@ describe("router.navigate() - route not found", () => {
     it("should emit TRANSITION_ERROR with current state as fromState", async () => {
       const onError = vi.fn();
 
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -145,11 +153,11 @@ describe("router.navigate() - route not found", () => {
       const onStart = vi.fn();
       const onError = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -171,11 +179,11 @@ describe("router.navigate() - route not found", () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
 
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -197,7 +205,7 @@ describe("router.navigate() - route not found", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
-      router.addActivateGuard("users", () => guard);
+      lifecycle.addActivateGuard("users", () => guard);
       router.usePlugin(() => ({
         onTransitionSuccess: () => {
           middleware();
@@ -217,7 +225,7 @@ describe("router.navigate() - route not found", () => {
     it("should handle multiple invalid route navigations", async () => {
       const onError = vi.fn();
 
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -324,7 +332,7 @@ describe("router.navigate() - route not found", () => {
 
     it("should handle navigation without callback for invalid route", async () => {
       const onError = vi.fn();
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );

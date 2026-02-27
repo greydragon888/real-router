@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { cloneRouter } from "@real-router/core";
+
 import { getNavigator } from "../../src/getNavigator";
 import { createTestRouter } from "../helpers";
 
@@ -41,7 +43,7 @@ describe("core/getNavigator", () => {
   });
 
   it("works with cloned router", () => {
-    const cloned = router.clone();
+    const cloned = cloneRouter(router);
     const nav = getNavigator(cloned);
 
     expect(nav.getState).toBeTypeOf("function");

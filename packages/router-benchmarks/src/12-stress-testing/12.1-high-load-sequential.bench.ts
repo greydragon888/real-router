@@ -1,5 +1,6 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.1-high-load-sequential.bench.ts
 
+import { getRoutesApi } from "@real-router/core";
 import { bench } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
@@ -132,11 +133,12 @@ if (IS_ROUTER5) {
   }).gc("inner");
 } else {
   const router = createSimpleRouter();
+  const routesApi = getRoutesApi(router);
   const routes = Array.from({ length: 20 }, (_, i) => `route${i}`);
 
   // Add 20 routes
   for (const route of routes) {
-    router.addRoute({ name: route, path: `/${route}` });
+    routesApi.add({ name: route, path: `/${route}` });
   }
 
   router.start("/");

@@ -1,6 +1,6 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events } from "@real-router/core";
+import { constants, errorCodes, events, getPluginApi } from "@real-router/core";
 
 import { createTestRouter } from "../../helpers";
 
@@ -68,7 +68,7 @@ describe("stop", () => {
     it("should not emit ROUTER_STOP event when router is not started", () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       router.stop();
 
@@ -108,7 +108,7 @@ describe("stop", () => {
     it("should emit ROUTER_STOP event only once per start/stop cycle", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.stop();
@@ -137,7 +137,7 @@ describe("stop", () => {
     it("should emit ROUTER_STOP event when stopping started router", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.stop();
@@ -148,7 +148,7 @@ describe("stop", () => {
     it("should emit ROUTER_STOP event with no arguments", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.stop();
@@ -159,7 +159,7 @@ describe("stop", () => {
     it("should emit ROUTER_STOP event after state is cleared", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/users/list");
 
@@ -176,7 +176,7 @@ describe("stop", () => {
     it("should emit ROUTER_STOP event for different router states", async () => {
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       await router.start("/home");
       router.stop();
@@ -218,9 +218,9 @@ describe("stop", () => {
       const stopListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.ROUTER_STOP, stopListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -248,8 +248,8 @@ describe("stop", () => {
       const startListener = vi.fn();
       const stopListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.ROUTER_STOP, stopListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, stopListener);
 
       for (let i = 0; i < 5; i++) {
         await router.start("/home");
@@ -271,7 +271,7 @@ describe("stop", () => {
       await router.start("/home");
       router.stop();
 
-      const options = router.getOptions();
+      const options = getPluginApi(router).getOptions();
 
       expect(options.allowNotFound).toBe(true);
       expect(options.trailingSlash).toBe("always");

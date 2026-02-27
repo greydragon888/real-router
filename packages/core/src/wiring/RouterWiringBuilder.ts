@@ -1,5 +1,8 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
+import { getInternals } from "../internals";
+import { validateStateBuilderArgs } from "../namespaces/RoutesNamespace/validators";
+
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
 import type {
@@ -18,33 +21,31 @@ export class RouterWiringBuilder<
   private readonly router: WiringOptions<Dependencies>["router"];
   private readonly options: WiringOptions<Dependencies>["options"];
   private readonly limits: WiringOptions<Dependencies>["limits"];
-  private readonly dependencies: WiringOptions<Dependencies>["dependencies"];
+  private readonly dependenciesStore: WiringOptions<Dependencies>["dependenciesStore"];
   private readonly state: WiringOptions<Dependencies>["state"];
   private readonly routes: WiringOptions<Dependencies>["routes"];
   private readonly routeLifecycle: WiringOptions<Dependencies>["routeLifecycle"];
   private readonly plugins: WiringOptions<Dependencies>["plugins"];
   private readonly navigation: WiringOptions<Dependencies>["navigation"];
   private readonly lifecycle: WiringOptions<Dependencies>["lifecycle"];
-  private readonly clone: WiringOptions<Dependencies>["clone"];
   private readonly eventBus: EventBusNamespace;
 
   constructor(wiringOptions: WiringOptions<Dependencies>) {
     this.router = wiringOptions.router;
     this.options = wiringOptions.options;
     this.limits = wiringOptions.limits;
-    this.dependencies = wiringOptions.dependencies;
+    this.dependenciesStore = wiringOptions.dependenciesStore;
     this.state = wiringOptions.state;
     this.routes = wiringOptions.routes;
     this.routeLifecycle = wiringOptions.routeLifecycle;
     this.plugins = wiringOptions.plugins;
     this.navigation = wiringOptions.navigation;
     this.lifecycle = wiringOptions.lifecycle;
-    this.clone = wiringOptions.clone;
     this.eventBus = wiringOptions.eventBus;
   }
 
   wireLimits(): void {
-    this.dependencies.setLimits(this.limits);
+    this.dependenciesStore.limits = this.limits;
     this.plugins.setLimits(this.limits);
     this.eventBus.setLimits({
       maxListeners: this.limits.maxListeners,
@@ -59,7 +60,7 @@ export class RouterWiringBuilder<
 
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependencies.get(dependencyName),
+        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
@@ -68,18 +69,27 @@ export class RouterWiringBuilder<
   wireRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
-        this.router.addActivateGuard(name, handler);
+        this.routeLifecycle.addCanActivate(name, handler, true);
       },
       addDeactivateGuard: (name, handler) => {
-        this.router.addDeactivateGuard(name, handler);
+        this.routeLifecycle.addCanDeactivate(name, handler, true);
       },
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),
       getState: () => this.state.get(),
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
-      getDependency: (name) => this.dependencies.get(name),
-      forwardState: (name, params) => this.router.forwardState(name, params),
+      getDependency: (name) =>
+        this.dependenciesStore.dependencies[name] as Dependencies[typeof name],
+      forwardState: (name, params) => {
+        const ctx = getInternals(this.router);
+
+        if (!ctx.noValidate) {
+          validateStateBuilderArgs(name, params, "forwardState");
+        }
+
+        return ctx.forwardState(name, params);
+      },
     };
 
     this.routes.setDependencies(routesDeps);
@@ -94,7 +104,7 @@ export class RouterWiringBuilder<
         this.eventBus.addEventListener(eventName, cb),
       canNavigate: () => this.eventBus.canBeginTransition(),
       getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependencies.get(dependencyName),
+        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
     };
 
     this.plugins.setDependencies(pluginsDeps);
@@ -109,10 +119,13 @@ export class RouterWiringBuilder<
         this.state.set(state);
       },
       buildStateWithSegments: (routeName, routeParams) => {
-        const { name, params } = this.router.forwardState(
-          routeName,
-          routeParams,
-        );
+        const ctx = getInternals(this.router);
+
+        if (!ctx.noValidate) {
+          validateStateBuilderArgs(routeName, routeParams, "navigate");
+        }
+
+        const { name, params } = ctx.forwardState(routeName, routeParams);
 
         return this.routes.buildStateWithSegmentsResolved(name, params);
       },
@@ -123,7 +136,7 @@ export class RouterWiringBuilder<
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name: string) =>
-        this.dependencies.get(name as keyof Dependencies),
+        this.dependenciesStore.dependencies[name as keyof Dependencies],
       startTransition: (toState, fromState) => {
         this.eventBus.beginTransition(toState, fromState);
       },
@@ -183,29 +196,10 @@ export class RouterWiringBuilder<
 
   wireStateDeps(): void {
     this.state.setDependencies({
-      getDefaultParams: () => this.routes.getConfig().defaultParams,
+      getDefaultParams: () => this.routes.getStore().config.defaultParams,
       buildPath: (name, params) =>
         this.routes.buildPath(name, params, this.options.get()),
       getUrlParams: (name) => this.routes.getUrlParams(name),
-    });
-  }
-
-  wireCloneCallbacks(): void {
-    this.clone.setGetCloneData(() => {
-      const [canDeactivateFactories, canActivateFactories] =
-        this.routeLifecycle.getFactories();
-
-      return {
-        routes: this.routes.cloneRoutes(),
-        options: { ...this.options.get() },
-        dependencies: this.dependencies.getAll(),
-        canDeactivateFactories,
-        canActivateFactories,
-        pluginFactories: this.plugins.getAll(),
-        routeConfig: this.routes.getConfig(),
-        resolvedForwardMap: this.routes.getResolvedForwardMap(),
-        routeCustomFields: this.routes.getRouteCustomFields(),
-      };
     });
   }
 

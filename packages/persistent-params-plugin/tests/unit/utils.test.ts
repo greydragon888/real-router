@@ -12,7 +12,7 @@ import {
   mergeParams,
 } from "../../src/utils";
 
-import type { Params } from "@real-router/types";
+import type { Params } from "@real-router/core";
 
 describe("validateParamKey", () => {
   describe("Valid parameter names", () => {

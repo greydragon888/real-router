@@ -1,12 +1,19 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events } from "@real-router/core";
+import {
+  constants,
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
-import type { Router, State } from "@real-router/core";
+import type { LifecycleApi, Router, State } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 const homeState: State = {
   name: "home",
   params: {},
@@ -17,6 +24,7 @@ const homeState: State = {
 describe("router.start() - state object scenarios", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -28,8 +36,8 @@ describe("router.start() - state object scenarios", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -53,7 +61,7 @@ describe("router.start() - state object scenarios", () => {
     it("should emit TRANSITION_SUCCESS with replace: true option", async () => {
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -89,7 +97,7 @@ describe("router.start() - state object scenarios", () => {
     it("should handle transition with path parameters", async () => {
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -267,7 +275,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -283,7 +291,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -304,7 +312,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -322,7 +330,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -340,7 +348,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -363,7 +371,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -384,13 +392,13 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR with correct event structure", async () => {
         const validPath = "/orders/view/456";
 
-        router.addActivateGuard("orders.view", () => () => {
+        lifecycle.addActivateGuard("orders.view", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -420,14 +428,14 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when Promise rejects", async () => {
         const validPath = "/users/view/789";
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "users.view",
           () => () => Promise.reject(new Error("Async access denied")),
         );
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -453,13 +461,13 @@ describe("router.start() - state object scenarios", () => {
       it("should emit TRANSITION_ERROR when transition is blocked", async () => {
         const validPath = "/settings/general";
 
-        router.addActivateGuard("settings.general", () => () => {
+        lifecycle.addActivateGuard("settings.general", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -484,18 +492,18 @@ describe("router.start() - state object scenarios", () => {
       it("should emit only TRANSITION_ERROR when transition is blocked (no fallback)", async () => {
         const validPath = "/orders/completed";
 
-        router.addActivateGuard("orders.completed", () => () => {
+        lifecycle.addActivateGuard("orders.completed", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionSuccessListener = vi.fn();
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -518,13 +526,13 @@ describe("router.start() - state object scenarios", () => {
       it("should not silently fallback when primary transition fails", async () => {
         const validPath = "/items/123";
 
-        router.addActivateGuard("items", () => () => {
+        lifecycle.addActivateGuard("items", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -551,13 +559,13 @@ describe("router.start() - state object scenarios", () => {
           path: "/users/view/999",
         };
 
-        router.addActivateGuard("users.view", () => () => {
+        lifecycle.addActivateGuard("users.view", () => () => {
           throw new Error("Blocked");
         });
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -583,7 +591,7 @@ describe("router.start() - state object scenarios", () => {
 
         const validPath = "/profile/user/123";
 
-        router.addActivateGuard(
+        lifecycle.addActivateGuard(
           "profile.user",
           () => () =>
             Promise.reject({
@@ -595,7 +603,7 @@ describe("router.start() - state object scenarios", () => {
 
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -661,7 +669,10 @@ describe("router.start() - state object scenarios", () => {
         };
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         try {
           await router.start(invalidState.path);
@@ -681,7 +692,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const transitionErrorListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           transitionErrorListener,
         );
@@ -727,7 +738,7 @@ describe("router.start() - state object scenarios", () => {
         };
         const transitionSuccessListener = vi.fn();
 
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           transitionSuccessListener,
         );
@@ -783,7 +794,10 @@ describe("router.start() - state object scenarios", () => {
         };
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         await router.start(invalidState.path);
 
@@ -814,7 +828,10 @@ describe("router.start() - state object scenarios", () => {
         };
         const startListener = vi.fn();
 
-        router.addEventListener(events.ROUTER_START, startListener);
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          startListener,
+        );
 
         await router.start(validState.path);
 
@@ -877,7 +894,7 @@ describe("router.start() - state object scenarios", () => {
     it("should use replace: true in TRANSITION_SUCCESS event for path string", async () => {
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -899,7 +916,7 @@ describe("router.start() - state object scenarios", () => {
         path: "/users/view/456",
       };
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -922,7 +939,7 @@ describe("router.start() - state object scenarios", () => {
 
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );

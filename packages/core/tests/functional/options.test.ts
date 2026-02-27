@@ -7,7 +7,12 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
+import {
+  createRouter,
+  errorCodes,
+  getDependenciesApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../helpers";
 
@@ -29,15 +34,17 @@ describe("core/options", () => {
     it("should return constructor-provided value", () => {
       const customRouter = createTestRouter({ trailingSlash: "always" });
 
-      expect(customRouter.getOptions().trailingSlash).toBe("always");
+      expect(getPluginApi(customRouter).getOptions().trailingSlash).toBe(
+        "always",
+      );
 
       customRouter.stop();
     });
 
     // 🔴 CRITICAL: Performance - same frozen object every call
     it("should return the same frozen object on each call", () => {
-      const opts1 = router.getOptions();
-      const opts2 = router.getOptions();
+      const opts1 = getPluginApi(router).getOptions();
+      const opts2 = getPluginApi(router).getOptions();
 
       // Same frozen object (performance optimization)
       expect(opts1).toBe(opts2);
@@ -47,7 +54,7 @@ describe("core/options", () => {
 
     // 🔴 CRITICAL: Isolation - mutations throw TypeError
     it("should throw when attempting to mutate returned object", () => {
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       // Mutations should throw in strict mode (Vitest runs in strict mode)
       expect(() => {
@@ -70,7 +77,7 @@ describe("core/options", () => {
         queryParams: { arrayFormat: "brackets" },
       });
 
-      const opts = customRouter.getOptions();
+      const opts = getPluginApi(customRouter).getOptions();
 
       // Nested objects should also be frozen
       expect(Object.isFrozen(opts.queryParams)).toBe(true);
@@ -90,7 +97,7 @@ describe("core/options", () => {
 
     // 🔴 CRITICAL: Default values
     it("should return all options with default values when no custom options provided", () => {
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       // Check all required fields exist
       expect(opts).toHaveProperty("trailingSlash");
@@ -109,7 +116,7 @@ describe("core/options", () => {
 
     // 🟡 IMPORTANT: Works before start()
     it("should work before router.start()", () => {
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       expect(opts).toBeDefined();
       expect(opts.trailingSlash).toBe("preserve");
@@ -119,7 +126,7 @@ describe("core/options", () => {
     it("should work after router.start()", async () => {
       await router.start("/home");
 
-      const opts = router.getOptions();
+      const opts = getPluginApi(router).getOptions();
 
       expect(opts).toBeDefined();
       expect(opts.trailingSlash).toBe("preserve");
@@ -134,7 +141,7 @@ describe("core/options", () => {
         defaultParams: { id: "123" },
       });
 
-      const opts = customRouter.getOptions();
+      const opts = getPluginApi(customRouter).getOptions();
 
       expect(opts.trailingSlash).toBe("always");
       expect(opts.allowNotFound).toBe(false);
@@ -152,7 +159,7 @@ describe("core/options", () => {
         },
       });
 
-      const opts = customRouter.getOptions();
+      const opts = getPluginApi(customRouter).getOptions();
 
       expect(opts.limits).toStrictEqual({ maxPlugins: 50 });
 
@@ -163,7 +170,7 @@ describe("core/options", () => {
     it("should return default values for optional fields when not set", () => {
       // Create router without custom options
       const plainRouter = createRouter([{ name: "test", path: "/test" }]);
-      const opts = plainRouter.getOptions();
+      const opts = getPluginApi(plainRouter).getOptions();
 
       // Optional fields have defaults, not undefined
       expect(opts.defaultRoute).toBe("");
@@ -179,7 +186,9 @@ describe("core/options", () => {
 
     // 🟢 DESIRABLE: Multiple sequential calls return same frozen object
     it("should handle multiple sequential calls correctly", () => {
-      const calls = Array.from({ length: 5 }, () => router.getOptions());
+      const calls = Array.from({ length: 5 }, () =>
+        getPluginApi(router).getOptions(),
+      );
 
       // All same frozen object (performance optimization)
       for (let i = 0; i < calls.length; i++) {
@@ -201,7 +210,7 @@ describe("core/options", () => {
         allowNotFound: false,
       });
 
-      const opts = customRouter.getOptions();
+      const opts = getPluginApi(customRouter).getOptions();
 
       expect(opts.trailingSlash).toBe("never");
       expect(opts.allowNotFound).toBe(false);
@@ -217,7 +226,7 @@ describe("core/options", () => {
         defaultParams: { id: "123" },
       });
 
-      const opts = customRouter.getOptions();
+      const opts = getPluginApi(customRouter).getOptions();
 
       expectTypeOf(opts.trailingSlash).toBeString();
 
@@ -547,19 +556,19 @@ describe("core/options", () => {
       it("should accept empty string for defaultRoute", () => {
         const r = createRouter([], { defaultRoute: "" });
 
-        expect(r.getOptions().defaultRoute).toBe("");
+        expect(getPluginApi(r).getOptions().defaultRoute).toBe("");
       });
 
       it("should accept empty object for queryParams", () => {
         const r = createRouter([], { queryParams: {} });
 
-        expect(r.getOptions().queryParams).toStrictEqual({});
+        expect(getPluginApi(r).getOptions().queryParams).toStrictEqual({});
       });
 
       it("should accept empty object for defaultParams", () => {
         const r = createRouter([], { defaultParams: {} });
 
-        expect(r.getOptions().defaultParams).toStrictEqual({});
+        expect(getPluginApi(r).getOptions().defaultParams).toStrictEqual({});
       });
 
       it("should safely reject object with throwing toString for string option", () => {
@@ -591,14 +600,18 @@ describe("core/options", () => {
         const frozenParams = Object.freeze({ id: "123" });
         const r = createRouter([], { defaultParams: frozenParams });
 
-        expect(r.getOptions().defaultParams).toStrictEqual({ id: "123" });
+        expect(getPluginApi(r).getOptions().defaultParams).toStrictEqual({
+          id: "123",
+        });
       });
 
       it("should accept sealed object for defaultParams", () => {
         const sealedParams = Object.seal({ id: "456" });
         const r = createRouter([], { defaultParams: sealedParams });
 
-        expect(r.getOptions().defaultParams).toStrictEqual({ id: "456" });
+        expect(getPluginApi(r).getOptions().defaultParams).toStrictEqual({
+          id: "456",
+        });
       });
     });
   });
@@ -694,8 +707,8 @@ describe("core/options", () => {
       await r.start("/home");
 
       // Route 'users.list' is defined as '/users/list' without trailing slash
-      const withoutSlash = r.matchPath("/users/list");
-      const withSlash = r.matchPath("/users/list/");
+      const withoutSlash = getPluginApi(r).matchPath("/users/list");
+      const withSlash = getPluginApi(r).matchPath("/users/list/");
 
       // In strict mode, trailing slash matters
       expect(withoutSlash).toBeDefined();
@@ -754,8 +767,10 @@ describe("core/options", () => {
           getDep("routeName")) as Options["defaultRoute"],
       });
 
+      const deps = getDependenciesApi(customRouter);
+
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
-      customRouter.setDependency("routeName", "home");
+      deps.set("routeName", "home");
       await customRouter.start("/users");
 
       const state = await customRouter.navigateToDefault();
@@ -771,8 +786,10 @@ describe("core/options", () => {
           getDep("routeName")) as Options["defaultRoute"],
       });
 
+      const deps = getDependenciesApi(customRouter);
+
       // @ts-expect-error: DefaultDependencies = object, ad-hoc key for test
-      customRouter.setDependency("routeName", "home");
+      deps.set("routeName", "home");
 
       const state = await customRouter.start("/home");
 

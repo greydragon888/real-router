@@ -1,14 +1,15 @@
-import { createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { loggerPlugin, loggerPluginFactory } from "../../src";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 const noop = () => {};
 
 describe("@real-router/logger-plugin", () => {
   let router: Router;
+  let lifecycle: LifecycleApi;
   let loggerSpy: ReturnType<typeof vi.spyOn>;
   let warnSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -29,6 +30,7 @@ describe("@real-router/logger-plugin", () => {
       ],
       { defaultRoute: "home" },
     );
+    lifecycle = getLifecycleApi(router);
 
     // Spy on console methods (plugin uses console directly)
     loggerSpy = vi.spyOn(console, "log").mockImplementation(noop);
@@ -110,7 +112,7 @@ describe("@real-router/logger-plugin", () => {
       await router.start("/");
       warnSpy.mockClear();
 
-      router.addActivateGuard("users", () => (_toState, _fromState) => {
+      lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
         return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
@@ -188,7 +190,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should close group on transition cancel", async () => {
-      router.addDeactivateGuard("home", () => () => false);
+      lifecycle.addDeactivateGuard("home", () => () => false);
       router.usePlugin(loggerPlugin);
       await router.start("/");
       try {
@@ -207,7 +209,7 @@ describe("@real-router/logger-plugin", () => {
 
       await router.start("/");
 
-      router.addActivateGuard("users", () => (_toState, _fromState) => {
+      lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
         return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
@@ -328,7 +330,7 @@ describe("@real-router/logger-plugin", () => {
 
       await router.start("/");
 
-      router.addActivateGuard("users", () => (_toState, _fromState) => {
+      lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
         return new Promise<boolean>((resolve) =>
           setTimeout(() => {
             resolve(true);
@@ -550,7 +552,7 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        router.addActivateGuard("users", () => (_toState, _fromState) => {
+        lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
           return new Promise<boolean>((resolve) =>
             setTimeout(() => {
               resolve(true);
@@ -585,7 +587,7 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
         warnSpy.mockClear();
 
-        router.addActivateGuard("users", () => (_toState, _fromState) => {
+        lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
           return new Promise<boolean>((resolve) =>
             setTimeout(() => {
               resolve(true);

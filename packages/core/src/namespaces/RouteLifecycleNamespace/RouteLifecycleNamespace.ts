@@ -3,11 +3,7 @@
 import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
 
-import {
-  validateHandler,
-  validateHandlerLimit,
-  validateNotRegistering,
-} from "./validators";
+import { validateHandlerLimit, validateNotRegistering } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
@@ -53,17 +49,6 @@ export class RouteLifecycleNamespace<
   #router!: Router<Dependencies>;
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
-
-  // =========================================================================
-  // Static validation methods (called by facade for input validation)
-  // =========================================================================
-
-  static validateHandler<D extends DefaultDependencies>(
-    handler: unknown,
-    methodName: string,
-  ): asserts handler is GuardFnFactory<D> | boolean {
-    validateHandler<D>(handler, methodName);
-  }
 
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;

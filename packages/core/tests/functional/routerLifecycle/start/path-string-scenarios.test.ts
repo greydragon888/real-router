@@ -1,16 +1,24 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { constants, errorCodes, events } from "@real-router/core";
+import {
+  constants,
+  errorCodes,
+  events,
+  getLifecycleApi,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter, omitMeta } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { LifecycleApi, Router } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.start() - path string scenarios", () => {
   beforeEach(() => {
     router = createTestRouter();
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -22,8 +30,8 @@ describe("router.start() - path string scenarios", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -45,7 +53,7 @@ describe("router.start() - path string scenarios", () => {
     it("should handle path with query parameters", async () => {
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -79,8 +87,11 @@ describe("router.start() - path string scenarios", () => {
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start("/invalid/path");
@@ -100,8 +111,11 @@ describe("router.start() - path string scenarios", () => {
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start("/nonexistent/route");
@@ -126,8 +140,11 @@ describe("router.start() - path string scenarios", () => {
       const startListener = vi.fn();
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start("/invalid/path");
@@ -148,7 +165,7 @@ describe("router.start() - path string scenarios", () => {
       router = createTestRouter({ allowNotFound: true });
       const startListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
 
       await router.start("/invalid/path");
 
@@ -167,8 +184,8 @@ describe("router.start() - path string scenarios", () => {
       const startListener = vi.fn();
       const transitionSuccessListener = vi.fn();
 
-      router.addEventListener(events.ROUTER_START, startListener);
-      router.addEventListener(
+      getPluginApi(router).addEventListener(events.ROUTER_START, startListener);
+      getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         transitionSuccessListener,
       );
@@ -202,13 +219,16 @@ describe("router.start() - path string scenarios", () => {
 
       const invalidPath = "/non/existent/path";
 
-      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+      lifecycle.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
         return Promise.reject(new Error("Guard error"));
       });
 
       const transitionErrorListener = vi.fn();
 
-      router.addEventListener(events.TRANSITION_ERROR, transitionErrorListener);
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_ERROR,
+        transitionErrorListener,
+      );
 
       try {
         await router.start(invalidPath);
@@ -345,7 +365,7 @@ describe("router.start() - path string scenarios", () => {
       const invalidPath = "/nonexistent/route";
 
       // Block transition via guard to force failure
-      router.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
+      lifecycle.addActivateGuard(constants.UNKNOWN_ROUTE, () => () => {
         throw new Error("Blocked");
       });
 

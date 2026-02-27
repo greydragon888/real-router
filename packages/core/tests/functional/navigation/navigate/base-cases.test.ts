@@ -1,5 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
+import { getPluginApi } from "@real-router/core";
+
 import { createTestRouter, omitMeta } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
@@ -73,7 +75,7 @@ describe("router.navigate() - base cases", () => {
 
     expect(router.getState()?.path).toBe("/encoded/one/two");
 
-    const matched = router.matchPath("/encoded/one/two");
+    const matched = getPluginApi(router).matchPath("/encoded/one/two");
 
     expect(matched?.params).toStrictEqual({ one: "one", two: "two" });
   });

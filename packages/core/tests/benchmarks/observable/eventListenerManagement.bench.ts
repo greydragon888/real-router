@@ -15,7 +15,7 @@
 
 import { bench, boxplot, summary } from "mitata";
 
-import { createRouter, events } from "@real-router/core";
+import { createRouter, events, getPluginApi } from "@real-router/core";
 
 import type { NavigationOptions, State } from "@real-router/types";
 
@@ -99,33 +99,33 @@ boxplot(() => {
     bench("addEventListener: first listener (empty Set)", () => {
       const router = createBenchRouter();
 
-      router.addEventListener(events.TRANSITION_START, noop);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, noop);
     });
 
     bench("addEventListener: second listener", () => {
       const router = createBenchRouter();
 
-      router.addEventListener(events.TRANSITION_START, listener1);
-      router.addEventListener(events.TRANSITION_START, listener2);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, listener1);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, listener2);
     });
 
     bench("addEventListener: third listener", () => {
       const router = createBenchRouter();
 
-      router.addEventListener(events.TRANSITION_START, listener1);
-      router.addEventListener(events.TRANSITION_START, listener2);
-      router.addEventListener(events.TRANSITION_START, listener3);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, listener1);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, listener2);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, listener3);
     });
 
     bench("addEventListener: different event types", () => {
       const router = createBenchRouter();
 
-      router.addEventListener(events.ROUTER_START, noop);
-      router.addEventListener(events.ROUTER_STOP, noop);
-      router.addEventListener(events.TRANSITION_START, noop);
-      router.addEventListener(events.TRANSITION_SUCCESS, noop);
-      router.addEventListener(events.TRANSITION_ERROR, noop);
-      router.addEventListener(events.TRANSITION_CANCEL, noop);
+      getPluginApi(router).addEventListener(events.ROUTER_START, noop);
+      getPluginApi(router).addEventListener(events.ROUTER_STOP, noop);
+      getPluginApi(router).addEventListener(events.TRANSITION_START, noop);
+      getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, noop);
+      getPluginApi(router).addEventListener(events.TRANSITION_ERROR, noop);
+      getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, noop);
     });
   });
 });
@@ -139,7 +139,7 @@ boxplot(() => {
     bench("unsubscribe: returned function call", () => {
       const router = createBenchRouter();
 
-      const unsubscribe = router.addEventListener(
+      const unsubscribe = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         noop,
       );
@@ -150,12 +150,15 @@ boxplot(() => {
     bench("unsubscribe: multiple listeners", () => {
       const router = createBenchRouter();
 
-      const unsub1 = router.addEventListener(events.TRANSITION_START, noop);
-      const unsub2 = router.addEventListener(
+      const unsub1 = getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        noop,
+      );
+      const unsub2 = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         listener1,
       );
-      const unsub3 = router.addEventListener(
+      const unsub3 = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         listener2,
       );
@@ -168,12 +171,15 @@ boxplot(() => {
     bench("unsubscribe: in reverse order", () => {
       const router = createBenchRouter();
 
-      const unsub1 = router.addEventListener(events.TRANSITION_START, noop);
-      const unsub2 = router.addEventListener(
+      const unsub1 = getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        noop,
+      );
+      const unsub2 = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         listener1,
       );
-      const unsub3 = router.addEventListener(
+      const unsub3 = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         listener2,
       );
@@ -196,7 +202,7 @@ boxplot(() => {
       const listeners = generateListeners(10);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
     });
 
@@ -205,7 +211,7 @@ boxplot(() => {
       const listeners = generateListeners(50);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
     });
 
@@ -214,7 +220,7 @@ boxplot(() => {
       const listeners = generateListeners(100);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
     });
 
@@ -223,7 +229,7 @@ boxplot(() => {
       const listeners = generateListeners(500);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
     });
   });
@@ -241,7 +247,9 @@ boxplot(() => {
       const unsubscribes: (() => void)[] = [];
 
       for (const l of listeners) {
-        unsubscribes.push(router.addEventListener(events.TRANSITION_START, l));
+        unsubscribes.push(
+          getPluginApi(router).addEventListener(events.TRANSITION_START, l),
+        );
       }
 
       for (const unsub of unsubscribes) {
@@ -255,7 +263,9 @@ boxplot(() => {
       const unsubscribes: (() => void)[] = [];
 
       for (const l of listeners) {
-        unsubscribes.push(router.addEventListener(events.TRANSITION_START, l));
+        unsubscribes.push(
+          getPluginApi(router).addEventListener(events.TRANSITION_START, l),
+        );
       }
 
       for (const unsub of unsubscribes) {
@@ -269,7 +279,9 @@ boxplot(() => {
       const unsubscribes: (() => void)[] = [];
 
       for (const l of listeners) {
-        unsubscribes.push(router.addEventListener(events.TRANSITION_START, l));
+        unsubscribes.push(
+          getPluginApi(router).addEventListener(events.TRANSITION_START, l),
+        );
       }
 
       for (const unsub of unsubscribes) {
@@ -291,21 +303,27 @@ boxplot(() => {
       const plugin = createPluginHandlers();
 
       const unsubscribes = [
-        router.addEventListener(events.ROUTER_START, plugin.onStart),
-        router.addEventListener(events.ROUTER_STOP, plugin.onStop),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
+          events.ROUTER_START,
+          plugin.onStart,
+        ),
+        getPluginApi(router).addEventListener(
+          events.ROUTER_STOP,
+          plugin.onStop,
+        ),
+        getPluginApi(router).addEventListener(
           events.TRANSITION_START,
           plugin.onTransitionStart,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           plugin.onTransitionSuccess,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           plugin.onTransitionError,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_CANCEL,
           plugin.onTransitionCancel,
         ),
@@ -329,21 +347,27 @@ boxplot(() => {
 
       for (const plugin of plugins) {
         unsubscribes.push(
-          router.addEventListener(events.ROUTER_START, plugin.onStart),
-          router.addEventListener(events.ROUTER_STOP, plugin.onStop),
-          router.addEventListener(
+          getPluginApi(router).addEventListener(
+            events.ROUTER_START,
+            plugin.onStart,
+          ),
+          getPluginApi(router).addEventListener(
+            events.ROUTER_STOP,
+            plugin.onStop,
+          ),
+          getPluginApi(router).addEventListener(
             events.TRANSITION_START,
             plugin.onTransitionStart,
           ),
-          router.addEventListener(
+          getPluginApi(router).addEventListener(
             events.TRANSITION_SUCCESS,
             plugin.onTransitionSuccess,
           ),
-          router.addEventListener(
+          getPluginApi(router).addEventListener(
             events.TRANSITION_ERROR,
             plugin.onTransitionError,
           ),
-          router.addEventListener(
+          getPluginApi(router).addEventListener(
             events.TRANSITION_CANCEL,
             plugin.onTransitionCancel,
           ),
@@ -369,7 +393,7 @@ boxplot(() => {
       const router = createBenchRouter();
 
       // Mount (useEffect callback)
-      const unsubscribe = router.addEventListener(
+      const unsubscribe = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         noop,
       );
@@ -387,7 +411,10 @@ boxplot(() => {
       // 10 components mount
       for (const listener of listeners) {
         unsubscribes.push(
-          router.addEventListener(events.TRANSITION_SUCCESS, listener),
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_SUCCESS,
+            listener,
+          ),
         );
       }
 
@@ -404,7 +431,7 @@ boxplot(() => {
       for (let i = 0; i < 10; i++) {
         const listener = createListener();
 
-        const unsub = router.addEventListener(
+        const unsub = getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           listener,
         );
@@ -427,19 +454,19 @@ boxplot(() => {
       const analyticsHandlers = createAnalyticsHandlers();
 
       const unsubscribes = [
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_START,
           analyticsHandlers.trackStart,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_SUCCESS,
           analyticsHandlers.trackSuccess,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_ERROR,
           analyticsHandlers.trackError,
         ),
-        router.addEventListener(
+        getPluginApi(router).addEventListener(
           events.TRANSITION_CANCEL,
           analyticsHandlers.trackCancel,
         ),
@@ -463,10 +490,22 @@ boxplot(() => {
 
       for (const svc of services) {
         unsubscribes.push(
-          router.addEventListener(events.TRANSITION_START, svc.trackStart),
-          router.addEventListener(events.TRANSITION_SUCCESS, svc.trackSuccess),
-          router.addEventListener(events.TRANSITION_ERROR, svc.trackError),
-          router.addEventListener(events.TRANSITION_CANCEL, svc.trackCancel),
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_START,
+            svc.trackStart,
+          ),
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_SUCCESS,
+            svc.trackSuccess,
+          ),
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_ERROR,
+            svc.trackError,
+          ),
+          getPluginApi(router).addEventListener(
+            events.TRANSITION_CANCEL,
+            svc.trackCancel,
+          ),
         );
       }
 
@@ -487,7 +526,7 @@ boxplot(() => {
     bench("guard: auth check on every navigation", () => {
       const router = createBenchRouter();
 
-      const unsub = router.addEventListener(
+      const unsub = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         emptyTransitionStartHandler,
       );
@@ -504,9 +543,18 @@ boxplot(() => {
       const loggingGuard = createListener();
 
       const unsubscribes = [
-        router.addEventListener(events.TRANSITION_START, authGuard),
-        router.addEventListener(events.TRANSITION_START, permissionsGuard),
-        router.addEventListener(events.TRANSITION_START, loggingGuard),
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_START,
+          authGuard,
+        ),
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_START,
+          permissionsGuard,
+        ),
+        getPluginApi(router).addEventListener(
+          events.TRANSITION_START,
+          loggingGuard,
+        ),
       ];
 
       for (const unsub of unsubscribes) {
@@ -528,7 +576,7 @@ boxplot(() => {
       const listeners = generateListeners(100);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
       // No cleanup - just measuring creation overhead
     });
@@ -539,7 +587,7 @@ boxplot(() => {
 
       for (let i = 0; i < 50; i++) {
         const listener = createListener();
-        const unsub = router.addEventListener(
+        const unsub = getPluginApi(router).addEventListener(
           events.TRANSITION_START,
           listener,
         );
@@ -566,7 +614,9 @@ boxplot(() => {
         const eventType = eventTypes[i % eventTypes.length];
         const listener = createListener();
 
-        unsubscribes.push(router.addEventListener(eventType, listener));
+        unsubscribes.push(
+          getPluginApi(router).addEventListener(eventType, listener),
+        );
       }
 
       for (const unsub of unsubscribes) {
@@ -587,7 +637,7 @@ boxplot(() => {
       const listeners = generateListeners(100);
 
       for (const l of listeners) {
-        router.addEventListener(events.TRANSITION_START, l);
+        getPluginApi(router).addEventListener(events.TRANSITION_START, l);
       }
     });
 
@@ -598,7 +648,9 @@ boxplot(() => {
 
       // Pre-add all listeners
       for (const l of listeners) {
-        unsubscribes.push(router.addEventListener(events.TRANSITION_START, l));
+        unsubscribes.push(
+          getPluginApi(router).addEventListener(events.TRANSITION_START, l),
+        );
       }
 
       // Only measure unsubscribe

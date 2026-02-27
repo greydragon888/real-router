@@ -1,18 +1,26 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, events } from "@real-router/core";
+import {
+  getLifecycleApi,
+  errorCodes,
+  events,
+  getPluginApi,
+} from "@real-router/core";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router } from "@real-router/core";
+import type { Router, LifecycleApi } from "@real-router/core";
 
 let router: Router;
+let lifecycle: LifecycleApi;
 
 describe("router.navigate() - router not started", () => {
   beforeEach(async () => {
     router = createTestRouter();
 
     await router.start("/home");
+
+    lifecycle = getLifecycleApi(router);
   });
 
   afterEach(() => {
@@ -57,15 +65,15 @@ describe("router.navigate() - router not started", () => {
       const onSuccess = vi.fn();
       const onError = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onStart,
       );
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onSuccess,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onError,
       );
@@ -143,7 +151,7 @@ describe("router.navigate() - router not started", () => {
       const guard = vi.fn().mockReturnValue(true);
       const middleware = vi.fn();
 
-      router.addActivateGuard("users", () => guard);
+      lifecycle.addActivateGuard("users", () => guard);
       router.usePlugin(() => ({
         onTransitionSuccess: () => {
           middleware();
@@ -210,19 +218,19 @@ describe("router.navigate() - router not started", () => {
       const onTransitionError = vi.fn();
       const onTransitionSuccess = vi.fn();
 
-      const unsubStart = router.addEventListener(
+      const unsubStart = getPluginApi(router).addEventListener(
         events.TRANSITION_START,
         onTransitionStart,
       );
-      const unsubCancel = router.addEventListener(
+      const unsubCancel = getPluginApi(router).addEventListener(
         events.TRANSITION_CANCEL,
         onTransitionCancel,
       );
-      const unsubError = router.addEventListener(
+      const unsubError = getPluginApi(router).addEventListener(
         events.TRANSITION_ERROR,
         onTransitionError,
       );
-      const unsubSuccess = router.addEventListener(
+      const unsubSuccess = getPluginApi(router).addEventListener(
         events.TRANSITION_SUCCESS,
         onTransitionSuccess,
       );

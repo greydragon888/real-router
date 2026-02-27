@@ -1,49 +1,20 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
-import { logger } from "@real-router/logger";
-import {
-  createMatcher,
-  createRouteTree,
-  nodeToDefinition,
-  routeTreeToDefinitions,
-} from "route-tree";
 import { isString, validateRouteName } from "type-guards";
 
 import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
+import { paramsMatch, paramsMatchExcluding } from "./helpers";
 import {
-  clearConfigEntries,
-  createEmptyConfig,
-  paramsMatch,
-  paramsMatchExcluding,
-  removeFromDefinitions,
-  resolveForwardChain,
-  sanitizeRoute,
-} from "./helpers";
-import { createRouteState } from "./stateBuilder";
-import {
-  validateRemoveRouteArgs,
-  validateSetRootPathArgs,
-  validateAddRouteArgs,
-  validateParentOption,
-  validateIsActiveRouteArgs,
-  validateStateBuilderArgs,
-  validateUpdateRouteBasicArgs,
-  validateUpdateRoutePropertyTypes,
-  validateBuildPathArgs,
-  validateMatchPathArgs,
-  validateShouldUpdateNodeArgs,
-  validateRoutes,
-} from "./validators";
+  createRoutesStore,
+  rebuildTreeInPlace,
+  resetStore,
+} from "./routesStore";
 import { constants } from "../../constants";
 import { getTransitionPath } from "../../transitionPath";
 
-import type { RouteConfig, RoutesDependencies } from "./types";
-import type {
-  BuildStateResultWithSegments,
-  GuardFnFactory,
-  Route,
-  RouteConfigUpdate,
-} from "../../types";
+import type { RoutesStore } from "./routesStore";
+import type { RoutesDependencies } from "./types";
+import type { BuildStateResultWithSegments, Route } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
@@ -54,13 +25,47 @@ import type {
 } from "@real-router/types";
 import type {
   CreateMatcherOptions,
-  Matcher,
-  RouteDefinition,
+  RouteParams,
   RouteTree,
   RouteTreeState,
 } from "route-tree";
 
 const EMPTY_OPTIONS = Object.freeze({});
+
+function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
+  const params: string[] = [];
+
+  for (const segment of segments) {
+    for (const param of segment.paramMeta.urlParams) {
+      params.push(param);
+    }
+  }
+
+  return params;
+}
+
+export function buildNameFromSegments(
+  segments: readonly { fullName: string }[],
+): string {
+  return segments.at(-1)?.fullName ?? "";
+}
+
+export function createRouteState<P extends RouteParams = RouteParams>(
+  matchResult: {
+    readonly segments: readonly { fullName: string }[];
+    readonly params: Readonly<Record<string, unknown>>;
+    readonly meta: Readonly<Record<string, Record<string, "url" | "query">>>;
+  },
+  name?: string,
+): RouteTreeState<P> {
+  const resolvedName = name ?? buildNameFromSegments(matchResult.segments);
+
+  return {
+    name: resolvedName,
+    params: matchResult.params as P,
+    meta: matchResult.meta as Record<string, Record<string, "url" | "query">>,
+  };
+}
 
 /**
  * Independent namespace for managing routes.
@@ -71,188 +76,59 @@ const EMPTY_OPTIONS = Object.freeze({});
 export class RoutesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
-  // =========================================================================
-  // Private instance fields
-  // =========================================================================
+  readonly #store: RoutesStore<Dependencies>;
 
-  readonly #definitions: RouteDefinition[] = [];
-  readonly #config: RouteConfig = createEmptyConfig();
-  #resolvedForwardMap: Record<string, string> = Object.create(null) as Record<
-    string,
-    string
-  >;
-
-  #routeCustomFields: Record<string, Record<string, unknown>> = Object.create(
-    null,
-  ) as Record<string, Record<string, unknown>>;
-
-  // Pending canActivate handlers that need to be registered after router is set
-  // Key: route name, Value: canActivate factory
-  readonly #pendingCanActivate = new Map<
-    string,
-    GuardFnFactory<Dependencies>
-  >();
-
-  // Pending canDeactivate handlers that need to be registered after router is set
-  // Key: route name, Value: canDeactivate factory
-  readonly #pendingCanDeactivate = new Map<
-    string,
-    GuardFnFactory<Dependencies>
-  >();
-
-  #rootPath = "";
-  #tree: RouteTree;
-  #matcher: Matcher;
-  readonly #matcherOptions: CreateMatcherOptions | undefined;
-
-  // Dependencies injected via setDependencies (for facade method calls)
-  #depsStore: RoutesDependencies<Dependencies> | undefined;
-
-  // Lifecycle handlers reference (set after construction)
-  #lifecycleNamespace!: RouteLifecycleNamespace<Dependencies>;
-
-  // When true, skips validation for production performance
-  readonly #noValidate: boolean;
-
-  /**
-   * Gets dependencies or throws if not initialized.
-   */
   get #deps(): RoutesDependencies<Dependencies> {
-    /* v8 ignore next 3 -- @preserve: defensive guard, unreachable via public API (RouterWiringBuilder always calls setDependencies) */
-    if (!this.#depsStore) {
-      throw new Error(
-        "[real-router] RoutesNamespace: dependencies not initialized",
-      );
-    }
-
-    return this.#depsStore;
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    return this.#store.depsStore!;
   }
-
-  // =========================================================================
-  // Constructor
-  // =========================================================================
 
   constructor(
     routes: Route<Dependencies>[] = [],
     noValidate = false,
     matcherOptions?: CreateMatcherOptions,
   ) {
-    this.#noValidate = noValidate;
-    this.#matcherOptions = matcherOptions;
-
-    // Sanitize routes to store only essential properties
-    for (const route of routes) {
-      this.#definitions.push(sanitizeRoute(route));
-    }
-
-    // Create initial tree
-    this.#tree = createRouteTree(
-      DEFAULT_ROUTE_NAME,
-      this.#rootPath,
-      this.#definitions,
-    );
-
-    // Initialize matcher with options and register tree
-    this.#matcher = createMatcher(matcherOptions);
-    this.#matcher.registerTree(this.#tree);
-
-    // Register handlers for all routes (defaultParams, encoders, decoders, forwardTo)
-    // Note: canActivate handlers are registered later when #lifecycleNamespace is set
-    this.#registerAllRouteHandlers(routes);
-
-    // Validate and cache forwardTo chains (detect cycles)
-    // Skip validation in noValidate mode for production performance
-    if (noValidate) {
-      // Still need to cache resolved forwards, just skip validation
-      this.#cacheForwardMap();
-    } else {
-      this.#validateAndCacheForwardMap();
-    }
+    this.#store = createRoutesStore(routes, noValidate, matcherOptions);
   }
 
-  // =========================================================================
-  // Static validation methods (delegated to validators.ts)
-  // TypeScript requires explicit method declarations for assertion functions
-  // =========================================================================
+  /**
+   * Creates a predicate function to check if a route node should be updated.
+   * Note: Argument validation is done by facade (Router.ts) via validateShouldUpdateNodeArgs.
+   */
+  static shouldUpdateNode(
+    nodeName: string,
+  ): (toState: State, fromState?: State) => boolean {
+    return (toState: State, fromState?: State): boolean => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!(toState && typeof toState === "object" && "name" in toState)) {
+        throw new TypeError(
+          "[router.shouldUpdateNode] toState must be valid State object",
+        );
+      }
 
-  static validateRemoveRouteArgs(name: unknown): asserts name is string {
-    validateRemoveRouteArgs(name);
-  }
+      if (toState.meta?.options.reload) {
+        return true;
+      }
 
-  static validateSetRootPathArgs(
-    rootPath: unknown,
-  ): asserts rootPath is string {
-    validateSetRootPathArgs(rootPath);
-  }
+      if (nodeName === DEFAULT_ROUTE_NAME && !fromState) {
+        return true;
+      }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
-  static validateAddRouteArgs(routes: readonly Route<any>[]): void {
-    validateAddRouteArgs(routes);
-  }
+      const { intersection, toActivate, toDeactivate } = getTransitionPath(
+        toState,
+        fromState,
+      );
 
-  static validateParentOption(parent: unknown): asserts parent is string {
-    validateParentOption(parent);
-  }
+      if (nodeName === intersection) {
+        return true;
+      }
 
-  static validateIsActiveRouteArgs(
-    name: unknown,
-    params: unknown,
-    strictEquality: unknown,
-    ignoreQueryParams: unknown,
-  ): void {
-    validateIsActiveRouteArgs(name, params, strictEquality, ignoreQueryParams);
-  }
+      if (toActivate.includes(nodeName)) {
+        return true;
+      }
 
-  static validateStateBuilderArgs(
-    routeName: unknown,
-    routeParams: unknown,
-    methodName: string,
-  ): void {
-    validateStateBuilderArgs(routeName, routeParams, methodName);
-  }
-
-  static validateUpdateRouteBasicArgs<Deps extends DefaultDependencies>(
-    name: unknown,
-    updates: unknown,
-  ): asserts updates is RouteConfigUpdate<Deps> {
-    validateUpdateRouteBasicArgs<Deps>(name, updates);
-  }
-
-  static validateUpdateRoutePropertyTypes(
-    forwardTo: unknown,
-    defaultParams: unknown,
-    decodeParams: unknown,
-    encodeParams: unknown,
-  ): void {
-    validateUpdateRoutePropertyTypes(
-      forwardTo,
-      defaultParams,
-      decodeParams,
-      encodeParams,
-    );
-  }
-
-  static validateBuildPathArgs(route: unknown): asserts route is string {
-    validateBuildPathArgs(route);
-  }
-
-  static validateMatchPathArgs(path: unknown): asserts path is string {
-    validateMatchPathArgs(path);
-  }
-
-  static validateShouldUpdateNodeArgs(
-    nodeName: unknown,
-  ): asserts nodeName is string {
-    validateShouldUpdateNodeArgs(nodeName);
-  }
-
-  static validateRoutes<Deps extends DefaultDependencies>(
-    routes: Route<Deps>[],
-    tree?: RouteTree,
-    forwardMap?: Record<string, string>,
-    parentName?: string,
-  ): void {
-    validateRoutes(routes, tree, forwardMap, parentName);
+      return toDeactivate.includes(nodeName);
+    };
   }
 
   // =========================================================================
@@ -264,23 +140,19 @@ export class RoutesNamespace<
    * canActivate handlers from initial routes are deferred until deps are set.
    */
   setDependencies(deps: RoutesDependencies<Dependencies>): void {
-    this.#depsStore = deps;
+    this.#store.depsStore = deps;
 
-    // Register pending canActivate handlers that were deferred during construction
-    for (const [routeName, handler] of this.#pendingCanActivate) {
+    for (const [routeName, handler] of this.#store.pendingCanActivate) {
       deps.addActivateGuard(routeName, handler);
     }
 
-    // Clear pending handlers after registration
-    this.#pendingCanActivate.clear();
+    this.#store.pendingCanActivate.clear();
 
-    // Register pending canDeactivate handlers that were deferred during construction
-    for (const [routeName, handler] of this.#pendingCanDeactivate) {
+    for (const [routeName, handler] of this.#store.pendingCanDeactivate) {
       deps.addDeactivateGuard(routeName, handler);
     }
 
-    // Clear pending handlers after registration
-    this.#pendingCanDeactivate.clear();
+    this.#store.pendingCanDeactivate.clear();
   }
 
   /**
@@ -290,218 +162,24 @@ export class RoutesNamespace<
     namespace: RouteLifecycleNamespace<Dependencies> | undefined,
   ): void {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.#lifecycleNamespace = namespace!;
+    this.#store.lifecycleNamespace = namespace!;
   }
 
   // =========================================================================
   // Route tree operations
   // =========================================================================
 
-  /**
-   * Returns the root path.
-   */
-  getRootPath(): string {
-    return this.#rootPath;
-  }
-
-  /**
-   * Returns the route tree.
-   * Used by facade for state-dependent validation.
-   */
-  getTree(): RouteTree {
-    return this.#tree;
-  }
-
-  /**
-   * Returns the forward record (route name -> forward target).
-   * Used by facade for state-dependent validation.
-   */
-  getForwardRecord(): Record<string, string> {
-    return this.#config.forwardMap;
-  }
-
-  /**
-   * Sets the root path and rebuilds the tree.
-   */
   setRootPath(newRootPath: string): void {
-    this.#rootPath = newRootPath;
-    this.#rebuildTree();
+    this.#store.rootPath = newRootPath;
+    rebuildTreeInPlace(this.#store);
   }
 
-  /**
-   * Checks if a route exists.
-   */
   hasRoute(name: string): boolean {
-    return this.#matcher.hasRoute(name);
+    return this.#store.matcher.hasRoute(name);
   }
 
-  /**
-   * Gets a route by name with all its configuration.
-   */
-  getRoute(name: string): Route<Dependencies> | undefined {
-    const segments = this.#matcher.getSegmentsByName(name);
-
-    if (!segments) {
-      return undefined;
-    }
-
-    const targetNode = this.#getLastSegment(segments as readonly RouteTree[]);
-    const definition = nodeToDefinition(targetNode);
-
-    return this.#enrichRoute(definition, name);
-  }
-
-  getRouteConfig(name: string): Record<string, unknown> | undefined {
-    if (!this.#matcher.hasRoute(name)) {
-      return undefined;
-    }
-
-    return this.#routeCustomFields[name];
-  }
-
-  getRouteCustomFields(): Record<string, Record<string, unknown>> {
-    return this.#routeCustomFields;
-  }
-
-  /**
-   * Adds one or more routes to the router.
-   * Input already validated by facade (properties and state-dependent checks).
-   *
-   * @param routes - Routes to add
-   * @param parentName - Optional parent route fullName for nesting
-   */
-  addRoutes(routes: Route<Dependencies>[], parentName?: string): void {
-    // Add to definitions
-    if (parentName) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const parentDef = this.#findDefinition(this.#definitions, parentName)!;
-
-      parentDef.children ??= [];
-      for (const route of routes) {
-        parentDef.children.push(sanitizeRoute(route));
-      }
-    } else {
-      for (const route of routes) {
-        this.#definitions.push(sanitizeRoute(route));
-      }
-    }
-
-    // Register handlers
-    this.#registerAllRouteHandlers(routes, parentName ?? "");
-
-    // Rebuild tree
-    this.#rebuildTree();
-
-    // Validate and cache forwardTo chains
-    this.#refreshForwardMap();
-  }
-
-  /**
-   * Removes a route and all its children.
-   *
-   * @param name - Route name (already validated)
-   * @returns true if removed, false if not found
-   */
-  removeRoute(name: string): boolean {
-    const wasRemoved = removeFromDefinitions(this.#definitions, name);
-
-    if (!wasRemoved) {
-      return false;
-    }
-
-    // Clear configurations for removed route
-    this.#clearRouteConfigurations(name);
-
-    // Rebuild tree
-    this.#rebuildTree();
-
-    // Revalidate forward chains
-    this.#refreshForwardMap();
-
-    return true;
-  }
-
-  /**
-   * Updates a route's configuration in place without rebuilding the tree.
-   * This is used by Router.updateRoute to directly modify config entries
-   * without destroying other routes' forwardMap references.
-   *
-   * @param name - Route name
-   * @param updates - Config updates to apply
-   * @param updates.forwardTo - Forward target route name (null to clear)
-   * @param updates.defaultParams - Default parameters (null to clear)
-   * @param updates.decodeParams - Params decoder function (null to clear)
-   * @param updates.encodeParams - Params encoder function (null to clear)
-   */
-
-  updateRouteConfig(
-    name: string,
-    updates: {
-      forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
-      defaultParams?: Params | null | undefined;
-      decodeParams?: ((params: Params) => Params) | null | undefined;
-      encodeParams?: ((params: Params) => Params) | null | undefined;
-    },
-  ): void {
-    // Update forwardTo
-    if (updates.forwardTo !== undefined) {
-      this.#updateForwardTo(name, updates.forwardTo);
-    }
-
-    // Update defaultParams
-    if (updates.defaultParams !== undefined) {
-      if (updates.defaultParams === null) {
-        delete this.#config.defaultParams[name];
-      } else {
-        this.#config.defaultParams[name] = updates.defaultParams;
-      }
-    }
-
-    // Update decoders with fallback wrapper
-    // Runtime guard: fallback to params if decoder returns undefined (bad user code)
-    if (updates.decodeParams !== undefined) {
-      if (updates.decodeParams === null) {
-        delete this.#config.decoders[name];
-      } else {
-        const decoder = updates.decodeParams;
-
-        this.#config.decoders[name] = (params: Params): Params =>
-          (decoder(params) as Params | undefined) ?? params;
-      }
-    }
-
-    // Update encoders with fallback wrapper
-    // Runtime guard: fallback to params if encoder returns undefined (bad user code)
-    if (updates.encodeParams !== undefined) {
-      if (updates.encodeParams === null) {
-        delete this.#config.encoders[name];
-      } else {
-        const encoder = updates.encodeParams;
-
-        this.#config.encoders[name] = (params: Params): Params =>
-          (encoder(params) as Params | undefined) ?? params;
-      }
-    }
-  }
-
-  /**
-   * Clears all routes from the router.
-   */
   clearRoutes(): void {
-    this.#definitions.length = 0;
-
-    // Reset config to empty null-prototype objects
-    Object.assign(this.#config, createEmptyConfig());
-
-    // Clear forward cache
-    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
-    this.#routeCustomFields = Object.create(null) as Record<
-      string,
-      Record<string, unknown>
-    >;
-
-    // Rebuild empty tree
-    this.#rebuildTree();
+    resetStore(this.#store);
   }
 
   // =========================================================================
@@ -521,22 +199,22 @@ export class RoutesNamespace<
       return isString(params?.path) ? params.path : "";
     }
 
-    // R2 optimization: avoid spread when no defaultParams
-    const paramsWithDefault = Object.hasOwn(this.#config.defaultParams, route)
-      ? { ...this.#config.defaultParams[route], ...params }
+    const paramsWithDefault = Object.hasOwn(
+      this.#store.config.defaultParams,
+      route,
+    )
+      ? { ...this.#store.config.defaultParams[route], ...params }
       : (params ?? {});
 
-    // Apply custom encoder if defined
     const encodedParams =
-      typeof this.#config.encoders[route] === "function"
-        ? this.#config.encoders[route]({ ...paramsWithDefault })
+      typeof this.#store.config.encoders[route] === "function"
+        ? this.#store.config.encoders[route]({ ...paramsWithDefault })
         : paramsWithDefault;
 
-    // Map core trailingSlash to matcher: "preserve"/"strict" → default (no change)
     const ts = options?.trailingSlash;
     const trailingSlash = ts === "never" || ts === "always" ? ts : undefined;
 
-    return this.#matcher.buildPath(route, encodedParams, {
+    return this.#store.matcher.buildPath(route, encodedParams, {
       trailingSlash,
       queryParamsMode: options?.queryParamsMode,
     });
@@ -553,7 +231,7 @@ export class RoutesNamespace<
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Router.ts always passes options
     const opts = options!;
 
-    const matchResult = this.#matcher.match(path);
+    const matchResult = this.#store.matcher.match(path);
 
     if (!matchResult) {
       return undefined;
@@ -563,8 +241,8 @@ export class RoutesNamespace<
     const { name, params, meta } = routeState;
 
     const decodedParams =
-      typeof this.#config.decoders[name] === "function"
-        ? this.#config.decoders[name](params as Params)
+      typeof this.#store.config.decoders[name] === "function"
+        ? this.#store.config.decoders[name](params as Params)
         : params;
 
     const { name: routeName, params: routeParams } = this.#deps.forwardState<P>(
@@ -576,15 +254,15 @@ export class RoutesNamespace<
 
     if (opts.rewritePathOnMatch) {
       const buildParams =
-        typeof this.#config.encoders[routeName] === "function"
-          ? this.#config.encoders[routeName]({
+        typeof this.#store.config.encoders[routeName] === "function"
+          ? this.#store.config.encoders[routeName]({
               ...(routeParams as Params),
             })
           : (routeParams as Record<string, unknown>);
 
       const ts = opts.trailingSlash;
 
-      builtPath = this.#matcher.buildPath(routeName, buildParams, {
+      builtPath = this.#store.matcher.buildPath(routeName, buildParams, {
         trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
         queryParamsMode: opts.queryParamsMode,
       });
@@ -608,10 +286,9 @@ export class RoutesNamespace<
     name: string,
     params: P,
   ): { name: string; params: P } {
-    // Path 1: Dynamic forward
-    if (Object.hasOwn(this.#config.forwardFnMap, name)) {
+    if (Object.hasOwn(this.#store.config.forwardFnMap, name)) {
       const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
-      const dynamicForward = this.#config.forwardFnMap[name];
+      const dynamicForward = this.#store.config.forwardFnMap[name];
       const resolved = this.#resolveDynamicForward(
         name,
         dynamicForward,
@@ -624,16 +301,15 @@ export class RoutesNamespace<
       };
     }
 
-    // Path 2: Static forward (O(1) cached)
-    const staticForward = this.#resolvedForwardMap[name] ?? name;
+    const staticForward = this.#store.resolvedForwardMap[name] ?? name;
 
-    // Path 3: Mixed chain (static target has dynamic forward)
     if (
       staticForward !== name &&
-      Object.hasOwn(this.#config.forwardFnMap, staticForward)
+      Object.hasOwn(this.#store.config.forwardFnMap, staticForward)
     ) {
       const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
-      const targetDynamicForward = this.#config.forwardFnMap[staticForward];
+      const targetDynamicForward =
+        this.#store.config.forwardFnMap[staticForward];
       const resolved = this.#resolveDynamicForward(
         staticForward,
         targetDynamicForward,
@@ -646,7 +322,6 @@ export class RoutesNamespace<
       };
     }
 
-    // Path 4: Static forward only
     if (staticForward !== name) {
       const paramsWithSourceDefaults = this.#mergeDefaultParams(name, params);
 
@@ -659,7 +334,6 @@ export class RoutesNamespace<
       };
     }
 
-    // No forward - merge own defaults
     return { name, params: this.#mergeDefaultParams(name, params) };
   }
 
@@ -672,14 +346,14 @@ export class RoutesNamespace<
     resolvedName: string,
     resolvedParams: Params,
   ): RouteTreeState | undefined {
-    const segments = this.#matcher.getSegmentsByName(resolvedName);
+    const segments = this.#store.matcher.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const meta = this.#matcher.getMetaByName(resolvedName)!;
+    const meta = this.#store.matcher.getMetaByName(resolvedName)!;
 
     return createRouteState(
       { segments, params: resolvedParams, meta },
@@ -687,23 +361,18 @@ export class RoutesNamespace<
     );
   }
 
-  /**
-   * Builds a RouteTreeState with segments from already-resolved route name and params.
-   * Called by Router.buildStateWithSegments after forwardState is applied at facade level.
-   * This allows plugins to intercept forwardState.
-   */
   buildStateWithSegmentsResolved<P extends Params = Params>(
     resolvedName: string,
     resolvedParams: P,
   ): BuildStateResultWithSegments<P> | undefined {
-    const segments = this.#matcher.getSegmentsByName(resolvedName);
+    const segments = this.#store.matcher.getSegmentsByName(resolvedName);
 
     if (!segments) {
       return undefined;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const meta = this.#matcher.getMetaByName(resolvedName)!;
+    const meta = this.#store.matcher.getMetaByName(resolvedName)!;
     const state = createRouteState<P>(
       {
         segments: segments as readonly RouteTree[],
@@ -753,7 +422,7 @@ export class RoutesNamespace<
       return false;
     }
 
-    const defaultParams = this.#config.defaultParams[name] as
+    const defaultParams = this.#store.config.defaultParams[name] as
       | Params
       | undefined;
 
@@ -790,311 +459,45 @@ export class RoutesNamespace<
     );
   }
 
-  /**
-   * Creates a predicate function to check if a route node should be updated.
-   * Note: Argument validation is done by facade (Router.ts) via validateShouldUpdateNodeArgs.
-   */
-  shouldUpdateNode(
-    nodeName: string,
-  ): (toState: State, fromState?: State) => boolean {
-    return (toState: State, fromState?: State): boolean => {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (!(toState && typeof toState === "object" && "name" in toState)) {
-        throw new TypeError(
-          "[router.shouldUpdateNode] toState must be valid State object",
-        );
-      }
-
-      if (toState.meta?.options.reload) {
-        return true;
-      }
-
-      if (nodeName === DEFAULT_ROUTE_NAME && !fromState) {
-        return true;
-      }
-
-      const { intersection, toActivate, toDeactivate } = getTransitionPath(
-        toState,
-        fromState,
-      );
-
-      if (nodeName === intersection) {
-        return true;
-      }
-
-      if (toActivate.includes(nodeName)) {
-        return true;
-      }
-
-      return toDeactivate.includes(nodeName);
-    };
-  }
-
-  /**
-   * Returns the config object.
-   */
-  getConfig(): RouteConfig {
-    return this.#config;
-  }
-
-  /**
-   * Returns URL params for a route.
-   * Used by StateNamespace.
-   */
   getUrlParams(name: string): string[] {
-    const segments = this.#matcher.getSegmentsByName(name);
+    const segments = this.#store.matcher.getSegmentsByName(name);
 
     if (!segments) {
       return [];
     }
 
-    return this.#collectUrlParamsArray(segments as readonly RouteTree[]);
+    return collectUrlParamsArray(segments as readonly RouteTree[]);
   }
 
-  /**
-   * Returns the resolved forward map.
-   */
-  getResolvedForwardMap(): Record<string, string> {
-    return this.#resolvedForwardMap;
+  getStore(): RoutesStore<Dependencies> {
+    return this.#store;
   }
 
-  /**
-   * Sets resolved forward map (used by clone).
-   */
-  setResolvedForwardMap(map: Record<string, string>): void {
-    Object.assign(this.#resolvedForwardMap, map);
-  }
-
-  /**
-   * Applies cloned route config from source router.
-   * Used by clone to copy decoders, encoders, defaultParams, forwardMap,
-   * forwardFnMap and resolvedForwardMap into this namespace's config.
-   */
-  applyClonedConfig(
-    config: RouteConfig,
-    resolvedForwardMap: Record<string, string>,
-    routeCustomFields: Record<string, Record<string, unknown>>,
-  ): void {
-    Object.assign(this.#config.decoders, config.decoders);
-    Object.assign(this.#config.encoders, config.encoders);
-    Object.assign(this.#config.defaultParams, config.defaultParams);
-    Object.assign(this.#config.forwardMap, config.forwardMap);
-    Object.assign(this.#config.forwardFnMap, config.forwardFnMap);
-    this.setResolvedForwardMap({ ...resolvedForwardMap });
-    Object.assign(this.#routeCustomFields, routeCustomFields);
-  }
-
-  /**
-   * Creates a clone of the routes for a new router (from tree).
-   */
-  cloneRoutes(): Route<Dependencies>[] {
-    return routeTreeToDefinitions(this.#tree) as Route<Dependencies>[];
-  }
-
-  // =========================================================================
-  // Public validation methods (used by Router facade)
-  // =========================================================================
-
-  /**
-   * Validates that forwardTo target doesn't require params that source doesn't have.
-   * Used by updateRoute for forwardTo validation.
-   */
-  validateForwardToParamCompatibility(
-    sourceName: string,
-    targetName: string,
-  ): void {
-    const sourceSegments = this.#getSegmentsOrThrow(sourceName);
-    const targetSegments = this.#getSegmentsOrThrow(targetName);
-
-    // Get source and target URL params using helper
-    const sourceParams = this.#collectUrlParams(sourceSegments);
-    const targetParams = this.#collectUrlParamsArray(targetSegments);
-
-    // Check if target requires params that source doesn't have
-    const missingParams = targetParams.filter(
-      (param) => !sourceParams.has(param),
-    );
-
-    if (missingParams.length > 0) {
-      throw new Error(
-        `[real-router] forwardTo target "${targetName}" requires params ` +
-          `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
-      );
-    }
-  }
-
-  /**
-   * Validates that adding forwardTo doesn't create a cycle.
-   * Creates a test map with the new entry and uses resolveForwardChain
-   * to detect cycles before any mutation happens.
-   * Used by updateRoute for forwardTo validation.
-   */
-  validateForwardToCycle(sourceName: string, targetName: string): void {
-    // Create a test map with the new entry to validate BEFORE mutation
-    const testMap = {
-      ...this.#config.forwardMap,
-      [sourceName]: targetName,
-    };
-
-    // resolveForwardChain will throw if cycle is detected or max depth exceeded
-    resolveForwardChain(sourceName, testMap);
-  }
-
-  /**
-   * Validates removeRoute constraints.
-   * Returns false if removal should be blocked (route is active).
-   * Logs warnings for edge cases.
-   *
-   * @param name - Route name to remove
-   * @param currentStateName - Current active route name (or undefined)
-   * @param isNavigating - Whether navigation is in progress
-   * @returns true if removal can proceed, false if blocked
-   */
-  validateRemoveRoute(
-    name: string,
-    currentStateName: string | undefined,
-    isNavigating: boolean,
-  ): boolean {
-    // Check if trying to remove currently active route (or its parent)
-    if (currentStateName) {
-      const isExactMatch = currentStateName === name;
-      const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
-
-      if (isExactMatch || isParentOfCurrent) {
-        const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
-
-        logger.warn(
-          "router.removeRoute",
-          `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
-        );
-
-        return false;
-      }
-    }
-
-    // Warn if navigation is in progress (but allow removal)
-    if (isNavigating) {
-      logger.warn(
-        "router.removeRoute",
-        `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
-      );
-    }
-
-    return true;
-  }
-
-  /**
-   * Validates clearRoutes operation.
-   * Returns false if operation should be blocked (navigation in progress).
-   *
-   * @param isNavigating - Whether navigation is in progress
-   * @returns true if clearRoutes can proceed, false if blocked
-   */
-  validateClearRoutes(isNavigating: boolean): boolean {
-    if (isNavigating) {
-      logger.error(
-        "router.clearRoutes",
-        "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
-      );
-
-      return false;
-    }
-
-    return true;
-  }
-
-  /**
-   * Validates updateRoute instance-level constraints (route existence, forwardTo).
-   * Called after static validation passes.
-   *
-   * @param name - Route name (already validated by static method)
-   * @param forwardTo - Cached forwardTo value (to avoid calling getter twice)
-   */
-  validateUpdateRoute(
-    name: string,
-    forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
-  ): void {
-    // Validate route exists
-    if (!this.hasRoute(name)) {
-      throw new ReferenceError(
-        `[real-router] updateRoute: route "${name}" does not exist`,
-      );
-    }
-
-    // Validate forwardTo target exists and is valid (only for string forwardTo)
-    if (
-      forwardTo !== undefined &&
-      forwardTo !== null &&
-      typeof forwardTo === "string"
-    ) {
-      if (!this.hasRoute(forwardTo)) {
-        throw new Error(
-          `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
-        );
-      }
-
-      // Check forwardTo param compatibility
-      this.validateForwardToParamCompatibility(name, forwardTo);
-
-      // Check for cycle detection
-      this.validateForwardToCycle(name, forwardTo);
-    }
-  }
-
-  // =========================================================================
-  // Private methods
-  // =========================================================================
-
-  #updateForwardTo(
-    name: string,
-    forwardTo: string | ForwardToCallback<Dependencies> | null,
-  ): void {
-    if (forwardTo === null) {
-      delete this.#config.forwardMap[name];
-      delete this.#config.forwardFnMap[name];
-    } else if (typeof forwardTo === "string") {
-      delete this.#config.forwardFnMap[name];
-      this.#config.forwardMap[name] = forwardTo;
-    } else {
-      delete this.#config.forwardMap[name];
-      this.#config.forwardFnMap[name] = forwardTo;
-    }
-
-    this.#refreshForwardMap();
-  }
-
-  /**
-   * Merges route's defaultParams with provided params.
-   */
   #mergeDefaultParams<P extends Params = Params>(
     routeName: string,
     params: P,
   ): P {
-    if (Object.hasOwn(this.#config.defaultParams, routeName)) {
-      return { ...this.#config.defaultParams[routeName], ...params } as P;
+    if (Object.hasOwn(this.#store.config.defaultParams, routeName)) {
+      return {
+        ...this.#store.config.defaultParams[routeName],
+        ...params,
+      } as P;
     }
 
     return params;
   }
 
-  /**
-   * Resolves dynamic forwardTo chain with cycle detection and max depth.
-   * Throws if cycle detected, max depth exceeded, or invalid return type.
-   */
   #resolveDynamicForward(
     startName: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    startFn: ForwardToCallback<any>,
+    startFn: ForwardToCallback<Dependencies>,
     params: Params,
   ): string {
     const visited = new Set<string>([startName]);
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-    let current = startFn(this.#deps.getDependency as any, params);
+    let current = startFn(this.#deps.getDependency, params);
     let depth = 0;
     const MAX_DEPTH = 100;
 
-    // Validate initial return type
     if (typeof current !== "string") {
       throw new TypeError(
         `forwardTo callback must return a string, got ${typeof current}`,
@@ -1102,13 +505,10 @@ export class RoutesNamespace<
     }
 
     while (depth < MAX_DEPTH) {
-      // Check if target route exists
-
-      if (this.#matcher.getSegmentsByName(current) === undefined) {
+      if (this.#store.matcher.getSegmentsByName(current) === undefined) {
         throw new Error(`Route "${current}" does not exist`);
       }
 
-      // Check for cycle
       if (visited.has(current)) {
         const chain = [...visited, current].join(" → ");
 
@@ -1117,19 +517,18 @@ export class RoutesNamespace<
 
       visited.add(current);
 
-      // Check if current has dynamic forward
-      if (Object.hasOwn(this.#config.forwardFnMap, current)) {
-        const fn = this.#config.forwardFnMap[current];
+      if (Object.hasOwn(this.#store.config.forwardFnMap, current)) {
+        const fn = this.#store.config.forwardFnMap[
+          current
+        ] as ForwardToCallback<Dependencies>;
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-        current = fn(this.#deps.getDependency as any, params);
+        current = fn(this.#deps.getDependency, params);
 
         depth++;
         continue;
       }
 
-      // Check if current has static forward
-      const staticForward = this.#config.forwardMap[current];
+      const staticForward = this.#store.config.forwardMap[current];
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (staticForward !== undefined) {
@@ -1138,364 +537,9 @@ export class RoutesNamespace<
         continue;
       }
 
-      // No more forwards - return current
       return current;
     }
 
     throw new Error(`forwardTo exceeds maximum depth of ${MAX_DEPTH}`);
-  }
-
-  #rebuildTree(): void {
-    this.#tree = createRouteTree(
-      DEFAULT_ROUTE_NAME,
-      this.#rootPath,
-      this.#definitions,
-    );
-
-    // Re-register tree in matcher (creates new instance, preserving options if set)
-    this.#matcher = createMatcher(this.#matcherOptions);
-    this.#matcher.registerTree(this.#tree);
-  }
-
-  /**
-   * Gets segments by name or throws if not found.
-   * Use when route existence has been validated by hasRoute() beforehand.
-   */
-  #getSegmentsOrThrow(name: string): readonly RouteTree[] {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return this.#matcher.getSegmentsByName(name)! as readonly RouteTree[];
-  }
-
-  /**
-   * Gets last segment from segments array.
-   * Use when segments array is guaranteed to be non-empty.
-   */
-  #getLastSegment(segments: readonly RouteTree[]): RouteTree {
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return segments.at(-1)!;
-  }
-
-  /**
-   * Collects URL params from segments into a Set.
-   */
-  #collectUrlParams(segments: readonly RouteTree[]): Set<string> {
-    const params = new Set<string>();
-
-    for (const segment of segments) {
-      // Named routes always have parsers (null only for root without path)
-      for (const param of segment.paramMeta.urlParams) {
-        params.add(param);
-      }
-    }
-
-    return params;
-  }
-
-  /**
-   * Collects URL params from segments into an array.
-   *
-   * @param segments - Non-null segments (caller must validate existence first)
-   */
-  #collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
-    const params: string[] = [];
-
-    for (const segment of segments) {
-      // Named routes always have parsers (null only for root without path)
-      for (const param of segment.paramMeta.urlParams) {
-        params.push(param);
-      }
-    }
-
-    return params;
-  }
-
-  /**
-   * Refreshes forward map cache, conditionally validating based on noValidate flag.
-   */
-  #refreshForwardMap(): void {
-    if (this.#noValidate) {
-      this.#cacheForwardMap();
-    } else {
-      this.#validateAndCacheForwardMap();
-    }
-  }
-
-  #validateAndCacheForwardMap(): void {
-    // Clear existing cache
-    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
-
-    // Resolve all chains
-    for (const fromRoute of Object.keys(this.#config.forwardMap)) {
-      this.#resolvedForwardMap[fromRoute] = resolveForwardChain(
-        fromRoute,
-        this.#config.forwardMap,
-      );
-    }
-  }
-
-  /**
-   * Caches forward chains without validation (noValidate mode).
-   * Simply resolves chains without cycle detection or max depth checks.
-   */
-  #cacheForwardMap(): void {
-    // Clear existing cache
-    this.#resolvedForwardMap = Object.create(null) as Record<string, string>;
-
-    // Resolve chains without validation
-    for (const fromRoute of Object.keys(this.#config.forwardMap)) {
-      let current = fromRoute;
-
-      while (this.#config.forwardMap[current]) {
-        current = this.#config.forwardMap[current];
-      }
-
-      this.#resolvedForwardMap[fromRoute] = current;
-    }
-  }
-
-  #clearRouteConfigurations(routeName: string): void {
-    const shouldClear = (n: string): boolean =>
-      n === routeName || n.startsWith(`${routeName}.`);
-
-    clearConfigEntries(this.#config.decoders, shouldClear);
-    clearConfigEntries(this.#config.encoders, shouldClear);
-    clearConfigEntries(this.#config.defaultParams, shouldClear);
-    clearConfigEntries(this.#config.forwardMap, shouldClear);
-    clearConfigEntries(this.#config.forwardFnMap, shouldClear);
-    clearConfigEntries(this.#routeCustomFields, shouldClear);
-
-    // Clear forwardMap entries pointing TO deleted route
-    clearConfigEntries(this.#config.forwardMap, (key) =>
-      shouldClear(this.#config.forwardMap[key]),
-    );
-
-    // Clear lifecycle handlers
-    const [canDeactivateFactories, canActivateFactories] =
-      this.#lifecycleNamespace.getFactories();
-
-    for (const n of Object.keys(canActivateFactories)) {
-      if (shouldClear(n)) {
-        this.#lifecycleNamespace.clearCanActivate(n);
-      }
-    }
-
-    for (const n of Object.keys(canDeactivateFactories)) {
-      if (shouldClear(n)) {
-        this.#lifecycleNamespace.clearCanDeactivate(n);
-      }
-    }
-  }
-
-  #registerAllRouteHandlers(
-    routes: readonly Route<Dependencies>[],
-    parentName = "",
-  ): void {
-    for (const route of routes) {
-      const fullName = parentName ? `${parentName}.${route.name}` : route.name;
-
-      this.#registerSingleRouteHandlers(route, fullName);
-
-      if (route.children) {
-        this.#registerAllRouteHandlers(route.children, fullName);
-      }
-    }
-  }
-
-  #registerSingleRouteHandlers(
-    route: Route<Dependencies>,
-    fullName: string,
-  ): void {
-    const standardKeys = new Set([
-      "name",
-      "path",
-      "children",
-      "canActivate",
-      "canDeactivate",
-      "forwardTo",
-      "encodeParams",
-      "decodeParams",
-      "defaultParams",
-    ]);
-    const customFields = Object.fromEntries(
-      Object.entries(route).filter(([k]) => !standardKeys.has(k)),
-    );
-
-    if (Object.keys(customFields).length > 0) {
-      this.#routeCustomFields[fullName] = customFields;
-    }
-
-    // Register canActivate via deps.canActivate (allows tests to spy on router.canActivate)
-    if (route.canActivate) {
-      // Note: Uses #depsStore directly because this method is called from constructor
-      // before setDependencies(). The getter #deps would throw if deps not set.
-      if (this.#depsStore) {
-        // Deps available, register immediately
-        this.#depsStore.addActivateGuard(fullName, route.canActivate);
-      } else {
-        // Deps not set yet, store for later registration
-        this.#pendingCanActivate.set(fullName, route.canActivate);
-      }
-    }
-
-    // Register canDeactivate via deps.canDeactivate (allows tests to spy on router.canDeactivate)
-    if (route.canDeactivate) {
-      // Note: Uses #depsStore directly because this method is called from constructor
-      // before setDependencies(). The getter #deps would throw if deps not set.
-      if (this.#depsStore) {
-        // Deps available, register immediately
-        this.#depsStore.addDeactivateGuard(fullName, route.canDeactivate);
-      } else {
-        // Deps not set yet, store for later registration
-        this.#pendingCanDeactivate.set(fullName, route.canDeactivate);
-      }
-    }
-
-    // Register forwardTo
-    if (route.forwardTo) {
-      this.#registerForwardTo(route, fullName);
-    }
-
-    // Register transformers with fallback wrapper
-    if (route.decodeParams) {
-      this.#config.decoders[fullName] = (params: Params): Params =>
-        route.decodeParams?.(params) ?? params;
-    }
-
-    if (route.encodeParams) {
-      this.#config.encoders[fullName] = (params: Params): Params =>
-        route.encodeParams?.(params) ?? params;
-    }
-
-    // Register defaults
-    if (route.defaultParams) {
-      this.#config.defaultParams[fullName] = route.defaultParams;
-    }
-  }
-
-  #findDefinition(
-    definitions: RouteDefinition[],
-    fullName: string,
-    parentPrefix = "",
-  ): RouteDefinition | undefined {
-    for (const def of definitions) {
-      const currentFullName = parentPrefix
-        ? `${parentPrefix}.${def.name}`
-        : def.name;
-
-      if (currentFullName === fullName) {
-        return def;
-      }
-      if (def.children && fullName.startsWith(`${currentFullName}.`)) {
-        return this.#findDefinition(def.children, fullName, currentFullName);
-      }
-    }
-
-    /* v8 ignore next -- @preserve: defensive return, callers validate route exists before calling */
-    return undefined;
-  }
-
-  #registerForwardTo(route: Route<Dependencies>, fullName: string): void {
-    if (route.canActivate) {
-      /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
-      const forwardTarget =
-        typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
-
-      logger.warn(
-        "real-router",
-        `Route "${fullName}" has both forwardTo and canActivate. ` +
-          `canActivate will be ignored because forwardTo creates a redirect (industry standard). ` +
-          `Move canActivate to the target route "${forwardTarget}".`,
-      );
-    }
-
-    if (route.canDeactivate) {
-      /* v8 ignore next -- @preserve: edge case, both string and function tested separately */
-      const forwardTarget =
-        typeof route.forwardTo === "string" ? route.forwardTo : "[dynamic]";
-
-      logger.warn(
-        "real-router",
-        `Route "${fullName}" has both forwardTo and canDeactivate. ` +
-          `canDeactivate will be ignored because forwardTo creates a redirect (industry standard). ` +
-          `Move canDeactivate to the target route "${forwardTarget}".`,
-      );
-    }
-
-    // Async validation ALWAYS runs (even with noValidate=true)
-    if (typeof route.forwardTo === "function") {
-      const isNativeAsync =
-        (route.forwardTo as { constructor: { name: string } }).constructor
-          .name === "AsyncFunction";
-      const isTranspiledAsync = route.forwardTo
-        .toString()
-        .includes("__awaiter");
-
-      if (isNativeAsync || isTranspiledAsync) {
-        throw new TypeError(
-          `forwardTo callback cannot be async for route "${fullName}". ` +
-            `Async functions break matchPath/buildPath.`,
-        );
-      }
-    }
-
-    // forwardTo is guaranteed to exist at this point
-    if (typeof route.forwardTo === "string") {
-      this.#config.forwardMap[fullName] = route.forwardTo;
-    } else {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      this.#config.forwardFnMap[fullName] = route.forwardTo!;
-    }
-  }
-
-  #enrichRoute(
-    routeDef: RouteDefinition,
-    routeName: string,
-  ): Route<Dependencies> {
-    const route: Route<Dependencies> = {
-      name: routeDef.name,
-      path: routeDef.path,
-    };
-
-    const forwardToFn = this.#config.forwardFnMap[routeName];
-    const forwardToStr = this.#config.forwardMap[routeName];
-
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (forwardToFn !== undefined) {
-      route.forwardTo = forwardToFn;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    } else if (forwardToStr !== undefined) {
-      route.forwardTo = forwardToStr;
-    }
-
-    if (routeName in this.#config.defaultParams) {
-      route.defaultParams = this.#config.defaultParams[routeName];
-    }
-
-    if (routeName in this.#config.decoders) {
-      route.decodeParams = this.#config.decoders[routeName];
-    }
-
-    if (routeName in this.#config.encoders) {
-      route.encodeParams = this.#config.encoders[routeName];
-    }
-
-    const [canDeactivateFactories, canActivateFactories] =
-      this.#lifecycleNamespace.getFactories();
-
-    if (routeName in canActivateFactories) {
-      route.canActivate = canActivateFactories[routeName];
-    }
-
-    if (routeName in canDeactivateFactories) {
-      route.canDeactivate = canDeactivateFactories[routeName];
-    }
-
-    if (routeDef.children) {
-      route.children = routeDef.children.map((child) =>
-        this.#enrichRoute(child, `${routeName}.${child.name}`),
-      );
-    }
-
-    return route;
   }
 }
