@@ -91,6 +91,7 @@ export interface NavigationOptions {
     | number
     | boolean
     | Record<string, unknown>
+    | AbortSignal
     | undefined;
 
   /**
@@ -232,6 +233,18 @@ export interface NavigationOptions {
    * @see {@link NavigationOptions.redirected} for the input mechanism
    */
   redirected?: boolean | undefined;
+
+  /**
+   * Optional abort signal for cancelling the navigation.
+   *
+   * @description
+   * When provided, this signal can be used to cancel the navigation operation.
+   * If the signal is aborted, the navigation will be cancelled and any pending
+   * guards or transitions will be interrupted.
+   *
+   * @default undefined
+   */
+  signal?: AbortSignal | undefined;
 }
 
 export interface Params {
