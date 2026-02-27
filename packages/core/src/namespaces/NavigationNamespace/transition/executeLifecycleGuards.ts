@@ -1,19 +1,21 @@
+// packages/core/src/namespaces/NavigationNamespace/transition/executeLifecycleGuards.ts
+
 import { rethrowAsRouterError } from "./errorHandling";
 import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 
 import type { GuardFn, State } from "@real-router/types";
 
-// Helper: execution of the Lifecycle Hooks group
-export async function executeLifecycleHooks(
-  hooks: Map<string, GuardFn>,
+// Helper: execution of the Lifecycle Guards group
+export async function executeLifecycleGuards(
+  guard: Map<string, GuardFn>,
   toState: State,
   fromState: State | undefined,
   segments: string[],
   errorCode: string,
   isCancelled: () => boolean,
 ): Promise<void> {
-  const segmentsToProcess = segments.filter((name) => hooks.has(name));
+  const segmentsToProcess = segments.filter((name) => guard.has(name));
 
   if (segmentsToProcess.length === 0) {
     return;
@@ -26,12 +28,12 @@ export async function executeLifecycleHooks(
       throw new RouterError(errorCodes.TRANSITION_CANCELLED);
     }
 
-    // Safe cast: segmentsToProcess only contains names that exist in hooks (filtered above)
+    // Safe cast: segmentsToProcess only contains names that exist in guard (filtered above)
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed by filter
-    const hookFn = hooks.get(segment)!;
+    const guardFn = guard.get(segment)!;
 
     try {
-      result = await hookFn(toState, fromState);
+      result = await guardFn(toState, fromState);
     } catch (error: unknown) {
       rethrowAsRouterError(error, errorCode, segment);
     }

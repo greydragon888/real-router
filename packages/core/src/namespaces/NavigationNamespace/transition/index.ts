@@ -1,6 +1,6 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/index.ts
 
-import { executeLifecycleHooks } from "./executeLifecycleHooks";
+import { executeLifecycleGuards } from "./executeLifecycleGuards";
 import { constants, errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
@@ -34,7 +34,7 @@ export async function transition(
   const shouldActivate = !isUnknownRoute && toActivate.length > 0;
 
   if (shouldDeactivate) {
-    await executeLifecycleHooks(
+    await executeLifecycleGuards(
       canDeactivateFunctions,
       toState,
       fromState,
@@ -49,7 +49,7 @@ export async function transition(
   }
 
   if (shouldActivate) {
-    await executeLifecycleHooks(
+    await executeLifecycleGuards(
       canActivateFunctions,
       toState,
       fromState,
