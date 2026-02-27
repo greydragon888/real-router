@@ -1,5 +1,22 @@
 # @real-router/types
 
+## 0.16.0
+
+### Minor Changes
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `ActivationFn` and `ActivationFnFactory` types (#187)
+
+  **Breaking Change:** `ActivationFn` and `ActivationFnFactory` types have been removed. Use `GuardFn` and `GuardFnFactory` instead — guards return `boolean | Promise<boolean>` only.
+
+- [#187](https://github.com/greydragon888/real-router/pull/187) [`d31e86b`](https://github.com/greydragon888/real-router/commit/d31e86ba5400d369fcaa48fd4d6e4433e4e063eb) Thanks [@greydragon888](https://github.com/greydragon888)! - Consolidate Router-dependent types into `@real-router/types` (#184)
+  - Expand `Router` interface from 6 to 15 methods, make generic `Router<D>`
+  - Move factory types (`PluginFactory`, `GuardFnFactory`, `ActivationFnFactory`) from `@real-router/core` using interface self-reference
+  - Move route config types (`Route`, `RouteConfigUpdate`) from `@real-router/core`
+  - Add `EventMethodMap` type-level computation to constants
+  - Add API interfaces (`PluginApi`, `RoutesApi`, `DependenciesApi`, `LifecycleApi`) in new `api.ts`
+
+  All types are now importable from `@real-router/types` without depending on `@real-router/core`.
+
 ## 0.15.0
 
 ### Minor Changes
