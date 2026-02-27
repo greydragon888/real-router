@@ -29,13 +29,16 @@ const routes = [
 
 const router = createRouter(routes);
 
-router.start();
-router.navigate("users.profile", { id: "123" });
+await router.start("/");
+await router.navigate("users.profile", { id: "123" });
 ```
 
 ---
 
-## Essential API
+## Router API
+
+The Router class provides core lifecycle, navigation, state, and subscription methods. 
+Domain-specific operations (routes, dependencies, guards, plugin infrastructure, cloning) are available through standalone API functions for tree-shaking.
 
 ### `createRouter(routes?, options?, dependencies?)`
 
@@ -53,23 +56,23 @@ const router = createRouter(
 
 ### Lifecycle
 
-#### `router.start(startPath?, done?)`
+#### `router.start(path): Promise<State>`
 
-Starts the router. [Wiki](https://github.com/greydragon888/real-router/wiki/start)
+Starts the router with an initial path. Returns a Promise that resolves with the matched state. [Wiki](https://github.com/greydragon888/real-router/wiki/start)
 
 ```typescript
-router.start();
-router.start("/users/123");
-router.start("/users/123", (err, state) => {
-  if (err) console.error(err);
-});
+const state = await router.start("/users/123");
 ```
 
-#### `router.stop()`
+#### `router.stop(): this`
 
-Stops the router. [Wiki](https://github.com/greydragon888/real-router/wiki/stop)
+Stops the router. Cancels any in-progress transition. [Wiki](https://github.com/greydragon888/real-router/wiki/stop)
 
-#### `router.isActive()`
+#### `router.dispose(): void`
+
+Permanently terminates the router. Unlike `stop()`, it cannot be restarted. All mutating methods throw `RouterError(DISPOSED)` after disposal. Idempotent. [Wiki](https://github.com/greydragon888/real-router/wiki/dispose)
+
+#### `router.isActive(): boolean`
 
 Returns whether the router is active (started and has current state). [Wiki](https://github.com/greydragon888/real-router/wiki/isActive)
 
@@ -77,26 +80,48 @@ Returns whether the router is active (started and has current state). [Wiki](htt
 
 ### Navigation
 
-#### `router.navigate(name, params?, options?, done?)`
+All navigation methods return `Promise<State>`.
 
-Navigates to a route by name. Returns a cancel function. [Wiki](https://github.com/greydragon888/real-router/wiki/navigate)
+#### `router.navigate(name, params?, options?): Promise<State>`
+
+Navigates to a route by name. [Wiki](https://github.com/greydragon888/real-router/wiki/navigate)
 
 ```typescript
-router.navigate("users");
-router.navigate("users.profile", { id: "123" });
-router.navigate("users.profile", { id: "123" }, { replace: true });
+const state = await router.navigate("users.profile", { id: "123" });
 
-// With callback
-router.navigate("users", {}, {}, (err, state) => {
-  if (err) console.error(err);
-});
+// With navigation options
+await router.navigate("users", {}, { replace: true });
 
-// Cancellation
-const cancel = router.navigate("users.profile", { id: "123" });
-cancel(); // abort navigation
+// Concurrent navigation cancels previous
+router.navigate("slow-route");
+router.navigate("fast-route"); // Previous rejects with TRANSITION_CANCELLED
+
+// Error handling
+try {
+  await router.navigate("admin");
+} catch (err) {
+  if (err instanceof RouterError) {
+    // ROUTE_NOT_FOUND, CANNOT_ACTIVATE, CANNOT_DEACTIVATE,
+    // TRANSITION_CANCELLED, SAME_STATES, ROUTER_DISPOSED
+  }
+}
 ```
 
-#### `router.getState()`
+**Fire-and-forget safe:** calling `router.navigate(...)` without `await` suppresses expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`).
+
+#### `router.navigateToDefault(options?): Promise<State>`
+
+Navigates to the default route. [Wiki](https://github.com/greydragon888/real-router/wiki/navigateToDefault)
+
+#### `router.canNavigateTo(name, params?): boolean`
+
+Synchronously checks if navigation to a route would be allowed by guards. [Wiki](https://github.com/greydragon888/real-router/wiki/canNavigateTo)
+
+---
+
+### State
+
+#### `router.getState(): State | undefined`
 
 Returns the current router state. [Wiki](https://github.com/greydragon888/real-router/wiki/getState)
 
@@ -105,85 +130,56 @@ const state = router.getState();
 // { name: "users.profile", params: { id: "123" }, path: "/users/123" }
 ```
 
-#### `router.navigateToDefault(options?, done?)`
+#### `router.getPreviousState(): State | undefined`
 
-Navigates to the default route. [Wiki](https://github.com/greydragon888/real-router/wiki/navigateToDefault)
+Returns the previous router state. [Wiki](https://github.com/greydragon888/real-router/wiki/getPreviousState)
+
+#### `router.areStatesEqual(state1, state2, ignoreQueryParams?): boolean`
+
+Compare two states for equality. Query params ignored by default. [Wiki](https://github.com/greydragon888/real-router/wiki/areStatesEqual)
+
+#### `router.shouldUpdateNode(nodeName): (toState, fromState?) => boolean`
+
+Create a predicate to check if a route node should update during transition. [Wiki](https://github.com/greydragon888/real-router/wiki/shouldUpdateNode)
 
 ---
 
-### Guards
+### Path Operations
 
-#### `router.addActivateGuard(name, guardFactory)`
+#### `router.buildPath(name, params?): string`
 
-Registers a guard for route activation. [Wiki](https://github.com/greydragon888/real-router/wiki/canActivate)
-
-```typescript
-router.addActivateGuard("admin", () => (toState, fromState, done) => {
-  if (!isAuthenticated()) {
-    done({ redirect: { name: "login" } });
-  } else {
-    done();
-  }
-});
-```
-
-#### `router.addDeactivateGuard(name, guardFactory)`
-
-Registers a guard for route deactivation. [Wiki](https://github.com/greydragon888/real-router/wiki/canDeactivate)
+Build URL path from route name. [Wiki](https://github.com/greydragon888/real-router/wiki/buildPath)
 
 ```typescript
-router.addDeactivateGuard("editor", () => (toState, fromState, done) => {
-  if (hasUnsavedChanges()) {
-    done({ error: new Error("Unsaved changes") });
-  } else {
-    done();
-  }
-});
+const path = router.buildPath("users.profile", { id: "123" });
+// "/users/123"
 ```
+
+#### `router.isActiveRoute(name, params?, strictEquality?, ignoreQueryParams?): boolean`
+
+Check if route is currently active. [Wiki](https://github.com/greydragon888/real-router/wiki/isActiveRoute)
 
 ---
 
 ### Events
 
-#### `router.subscribe(listener)`
+#### `router.subscribe(listener): Unsubscribe`
 
 Subscribes to successful transitions. [Wiki](https://github.com/greydragon888/real-router/wiki/subscribe)
 
 ```typescript
 const unsubscribe = router.subscribe(({ route, previousRoute }) => {
-  console.log("Navigation:", previousRoute?.name, "→", route.name);
+  console.log("Navigation:", previousRoute?.name, "->", route.name);
 });
-```
-
-#### `router.addEventListener(event, listener)`
-
-Adds an event listener. Returns an unsubscribe function. [Wiki](https://github.com/greydragon888/real-router/wiki/addEventListener)
-
-```typescript
-import { events } from "@real-router/core";
-
-const unsubscribe = router.addEventListener(
-  events.TRANSITION_START,
-  (toState, fromState) => {
-    console.log("Starting:", toState.name);
-  },
-);
-
-// To remove listener, call the returned unsubscribe function
-unsubscribe();
-
-// Available events:
-// ROUTER_START, ROUTER_STOP
-// TRANSITION_START, TRANSITION_SUCCESS, TRANSITION_ERROR, TRANSITION_CANCEL
 ```
 
 ---
 
 ### Plugins
 
-#### `router.usePlugin(pluginFactory)`
+#### `router.usePlugin(...plugins): Unsubscribe`
 
-Registers a plugin. Returns an unsubscribe function. [Wiki](https://github.com/greydragon888/real-router/wiki/usePlugin)
+Registers one or more plugins. Returns an unsubscribe function. [Wiki](https://github.com/greydragon888/real-router/wiki/usePlugin)
 
 ```typescript
 import { browserPluginFactory } from "@real-router/browser-plugin";
@@ -193,284 +189,123 @@ const unsubscribe = router.usePlugin(browserPluginFactory());
 
 ---
 
-## Advanced API
+## Standalone API
 
-### Routes
+Standalone functions provide domain-specific operations. They are tree-shakeable — only imported functions are bundled.
 
-#### `router.addRoute(route, options?): void`
+### Routes — `getRoutesApi(router)`
 
-Add a route definition at runtime.
-
-**Parameters:**
-
-- `route: Route | Route[]` — route configuration object(s)
-- `options?: { parent?: string }` — optional parent route fullName
-
-**Examples:**
+Runtime route management. [Wiki](https://github.com/greydragon888/real-router/wiki/getRoutesApi)
 
 ```typescript
-// Add route with children syntax
-router.addRoute({
-  name: "users",
-  path: "/users",
-  children: [{ name: "profile", path: "/:id" }],
+import { getRoutesApi } from "@real-router/core";
+
+const routes = getRoutesApi(router);
+
+// Add routes
+routes.add({ name: "settings", path: "/settings" });
+routes.add({ name: "profile", path: "/:id" }, { parent: "users" });
+
+// Query
+routes.has("users"); // true
+routes.get("users"); // Route | undefined
+
+// Modify
+routes.update("users", { forwardTo: "users.list" });
+routes.remove("settings");
+routes.clear();
+```
+
+**Methods:** `add`, `remove`, `update`, `clear`, `has`, `get`, `getConfig`
+
+### Dependencies — `getDependenciesApi(router)`
+
+Dependency injection container. [Wiki](https://github.com/greydragon888/real-router/wiki/getDependenciesApi)
+
+```typescript
+import { getDependenciesApi } from "@real-router/core";
+
+const deps = getDependenciesApi(router);
+
+deps.set("authService", authService);
+deps.get("authService"); // authService
+deps.has("authService"); // true
+deps.getAll(); // { authService: ... }
+deps.remove("authService");
+deps.reset();
+```
+
+**Methods:** `get`, `getAll`, `set`, `setAll`, `remove`, `reset`, `has`
+
+### Guards — `getLifecycleApi(router)`
+
+Route activation/deactivation guards. [Wiki](https://github.com/greydragon888/real-router/wiki/getLifecycleApi)
+
+```typescript
+import { getLifecycleApi } from "@real-router/core";
+
+const lifecycle = getLifecycleApi(router);
+
+// Guard returns boolean or Promise<boolean> (true = allow, false = block)
+lifecycle.addActivateGuard("admin", () => (toState, fromState) => {
+  return isAuthenticated(); // sync
 });
 
-// Add route under existing parent using { parent } option
-router.addRoute({ name: "profile", path: "/:id" }, { parent: "users" });
-// Creates "users.profile" fullName
+lifecycle.addDeactivateGuard("editor", () => async (toState, fromState) => {
+  return !(await checkUnsavedChanges()); // async
+});
 
-// Batch add under same parent
-router.addRoute(
-  [
-    { name: "profile", path: "/:id" },
-    { name: "settings", path: "/settings" },
-  ],
-  { parent: "users" },
-);
+// Remove guards
+lifecycle.removeActivateGuard("admin");
+lifecycle.removeDeactivateGuard("editor");
 ```
 
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/addRoute)
+**Methods:** `addActivateGuard`, `addDeactivateGuard`, `removeActivateGuard`, `removeDeactivateGuard`
 
-#### `router.removeRoute(name: string): void`
+### Plugin Infrastructure — `getPluginApi(router)`
 
-Remove a route by name.\
-`name: string` — route name to remove\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/removeRoute)
-
-#### `router.getRoute(name: string): Route | undefined`
-
-Get route definition by name.\
-`name: string` — route name\
-Returns: `Route | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getRoute)
-
-#### `router.hasRoute(name: string): boolean`
-
-Check if a route exists.\
-`name: string` — route name\
-Returns: `boolean`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/hasRoute)
-
-#### `router.clearRoutes(): void`
-
-Remove all routes.
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/clearRoutes)
-
-#### `router.updateRoute(name: string, updates: Partial<Route>): void`
-
-Update route configuration.\
-`name: string` — route name\
-`updates: Partial<Route>` — properties to update\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/updateRoute)
-
-**Note:** To set up route forwarding (redirect), use the `forwardTo` option in route configuration:
+Low-level API for plugin authors. Provides access to state building, path matching, event system, and navigation. [Wiki](https://github.com/greydragon888/real-router/wiki/getPluginApi)
 
 ```typescript
-router.addRoute({ name: "old-url", path: "/old", forwardTo: "new-url" });
-// Or update existing route
-router.updateRoute("old-url", { forwardTo: "new-url" });
+import { getPluginApi } from "@real-router/core";
+
+const api = getPluginApi(router);
+
+// State building
+const state = api.matchPath("/users/123");
+const builtState = api.makeState("users.profile", { id: "123" });
+
+// Event system
+const unsub = api.addEventListener(events.TRANSITION_START, (toState, fromState) => {
+  console.log("Starting:", toState.name);
+});
+
+// Navigation with pre-built state
+await api.navigateToState(toState, fromState, opts);
+
+// Root path management
+api.setRootPath("/app");
+api.getRootPath(); // "/app"
+
+// Forward state interception (used by persistent-params-plugin)
+api.setForwardState((name, params) => ({ name, params: withPersistent(params) }));
 ```
 
----
+**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `navigateToState`, `addEventListener`, `getOptions`, `getTree`, `getForwardState`, `setForwardState`
 
-### State Utilities
+### SSR Cloning — `cloneRouter(router, deps?)`
 
-#### `router.getPreviousState(): State | undefined`
+Clone router for server-side rendering. [Wiki](https://github.com/greydragon888/real-router/wiki/cloneRouter)
 
-Get previous router state.\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getPreviousState)
+```typescript
+import { cloneRouter } from "@real-router/core";
 
-#### `router.shouldUpdateNode(nodeName: string): (toState, fromState?) => boolean`
+// Server: clone router per request
+const serverRouter = cloneRouter(router, { request: req });
+await serverRouter.start(req.url);
+```
 
-Create a predicate to check if a route node should update during transition.\
-`nodeName: string` — route node name\
-Returns: predicate function\
-[Wiki](https://github.com/greydragon888/real-router/wiki/shouldUpdateNode)
-
-#### `router.areStatesEqual(state1: State, state2: State, ignoreQueryParams?: boolean): boolean`
-
-Compare two states for equality.\
-`state1: State` — first state\
-`state2: State` — second state\
-`ignoreQueryParams?: boolean` — ignore query params (default: true)\
-Returns: `boolean`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/areStatesEqual)
-
----
-
-### Path Operations
-
-#### `router.buildPath(name: string, params?: Params): string`
-
-Build URL path from route name.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-Returns: `string`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/buildPath)
-
-#### `router.buildUrl(name: string, params?: Params, options?: object): string`
-
-Build full URL from route name (includes base path and query string).\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`options?: object` — URL building options\
-Returns: `string`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/buildUrl)
-
-#### `router.isActiveRoute(name: string, params?: Params, strictEquality?: boolean, ignoreQueryParams?: boolean): boolean`
-
-Check if route is currently active.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`strictEquality?: boolean` — exact match (default: false)\
-`ignoreQueryParams?: boolean` — ignore query params (default: true)\
-Returns: `boolean`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/isActiveRoute)
-
----
-
-### Dependencies
-
-#### `router.getDependency(name: string): unknown`
-
-Get a dependency by name.\
-`name: string` — dependency name\
-Returns: `unknown`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getDependency)
-
-#### `router.getDependencies(): Dependencies`
-
-Get all dependencies.\
-Returns: `Dependencies`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getDependencies)
-
-#### `router.setDependency(name: string, value: unknown): void`
-
-Set a dependency.\
-`name: string` — dependency name\
-`value: unknown` — dependency value\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/setDependency)
-
-#### `router.setDependencies(deps: Dependencies): void`
-
-Set multiple dependencies.\
-`deps: Dependencies` — dependencies object\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/setDependencies)
-
-#### `router.hasDependency(name: string): boolean`
-
-Check if dependency exists.\
-`name: string` — dependency name\
-Returns: `boolean`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/hasDependency)
-
-#### `router.removeDependency(name: string): void`
-
-Remove a dependency.\
-`name: string` — dependency name\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/removeDependency)
-
-#### `router.resetDependencies(): void`
-
-Remove all dependencies.\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/resetDependencies)
-
----
-
-### Options
-
-#### `router.getOptions(): Options`
-
-Get all router options.\
-Returns: `Options`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getOptions)
-
----
-
-### Other
-
-#### `router.clone(dependencies?: Dependencies): Router`
-
-Clone router for SSR.\
-`dependencies?: Dependencies` — override dependencies\
-Returns: `Router`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/clone)
-
----
-
-## Plugin Development API
-
-The following methods are designed for **plugin authors**. They provide low-level access for advanced use cases like browser history integration, persistent parameters, and custom navigation sources.
-
-These methods are stable but intended for plugin development, not application code.
-
-#### `router.matchPath(path: string): State | undefined`
-
-Match URL path to route state.\
-`path: string` — URL path to match\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/matchPath)
-
-#### `router.makeState(name, params?, path?, meta?, forceId?): State`
-
-Create State with custom `meta.id` for history restoration.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`path?: string` — URL path\
-`meta?: object` — metadata\
-`forceId?: number` — force specific `meta.id` value\
-Returns: `State`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/makeState)
-
-#### `router.buildState(name: string, params?: Params): State | undefined`
-
-Validate route and build state with segment metadata.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/buildState)
-
-#### `router.forwardState(name: string, params: Params): { name: string; params: Params }`
-
-Resolve route forwarding and merge default params.\
-`name: string` — route name\
-`params: Params` — route parameters\
-Returns: `{ name, params }` — resolved route name and merged params\
-[Wiki](https://github.com/greydragon888/real-router/wiki/forwardState)
-
-#### `router.navigateToState(toState, fromState, opts, done, emitSuccess): CancelFn`
-
-Navigate with pre-built State object.\
-`toState: State` — target state\
-`fromState: State | undefined` — current state\
-`opts: NavigationOptions` — navigation options\
-`done: DoneFn` — callback\
-`emitSuccess: boolean` — whether to emit TRANSITION_SUCCESS\
-Returns: `CancelFn`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/navigateToState)
-
-#### `router.setRootPath(rootPath: string): void`
-
-Dynamically modify router base path.\
-`rootPath: string` — new root path prefix\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/setRootPath)
-
-#### `router.getRootPath(): string`
-
-Read current base path.\
-Returns: `string`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/getRootPath)
+Shares immutable route tree (O(1)), copies mutable state (dependencies, options, plugins, guards).
 
 ---
 
@@ -508,22 +343,25 @@ Navigation errors are instances of `RouterError`:
 ```typescript
 import { RouterError, errorCodes } from "@real-router/core";
 
-router.navigate("users", {}, {}, (err, state) => {
+try {
+  await router.navigate("users");
+} catch (err) {
   if (err instanceof RouterError) {
     console.log(err.code, err.message);
   }
-});
+}
 ```
 
-| Code                | Description                    |
-| ------------------- | ------------------------------ |
-| `ROUTE_NOT_FOUND`   | Route doesn't exist            |
-| `CANNOT_ACTIVATE`   | Blocked by canActivate guard   |
-| `CANNOT_DEACTIVATE` | Blocked by canDeactivate guard |
-| `CANCELLED`         | Navigation was cancelled       |
-| `SAME_STATES`       | Already at target route        |
-| `NOT_STARTED`       | Router not started             |
-| `ALREADY_STARTED`   | Router already started         |
+| Code                  | Description                    |
+| --------------------- | ------------------------------ |
+| `ROUTE_NOT_FOUND`     | Route doesn't exist            |
+| `CANNOT_ACTIVATE`     | Blocked by canActivate guard   |
+| `CANNOT_DEACTIVATE`   | Blocked by canDeactivate guard |
+| `CANCELLED`           | Navigation was cancelled       |
+| `SAME_STATES`         | Already at target route        |
+| `NOT_STARTED`         | Router not started             |
+| `ALREADY_STARTED`     | Router already started         |
+| `DISPOSED`            | Router has been disposed       |
 
 See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for details.
 

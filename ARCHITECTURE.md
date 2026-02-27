@@ -7,74 +7,75 @@
 ```
 real-router/
 ├── packages/
-│   ├── core/                 # Router implementation (facade + namespaces)
-│   ├── core-types/           # @real-router/types — shared TypeScript types
-│   ├── react/                # React integration (Provider, hooks, components)
-│   ├── rx/                   # Reactive Observable API (state$, events$, operators)
-│   ├── browser-plugin/       # Browser history synchronization
-│   ├── logger-plugin/        # Development logging with timing
+│   ├── core/                      # Router implementation (facade + namespaces)
+│   ├── core-types/                # @real-router/types — shared TypeScript types
+│   ├── react/                     # React integration (Provider, hooks, components)
+│   ├── rx/                        # Reactive Observable API (state$, events$, operators)
+│   ├── browser-plugin/            # Browser history synchronization
+│   ├── logger-plugin/             # Development logging with timing
 │   ├── persistent-params-plugin/  # Parameter persistence
-│   ├── helpers/              # Route comparison utilities
-│   ├── logger/               # @real-router/logger — isomorphic logging
-│   ├── cache-manager/        # @real-router/cache-manager — centralized LRU cache registry
-│   ├── fsm/                  # @real-router/fsm — finite state machine engine (internal)
-│   ├── event-emitter/        # Generic typed event emitter (internal)
-│   ├── route-tree/           # Route tree building, validation, matcher factory (internal)
-│   ├── path-matcher/         # Segment Trie URL matching and path building (internal)
-│   ├── search-params/        # Query string handling (internal)
-│   └── type-guards/          # Runtime type validation (internal)
+│   ├── helpers/                   # Route comparison utilities
+│   ├── logger/                    # @real-router/logger — isomorphic logging
+│   ├── cache-manager/             # @real-router/cache-manager — centralized LRU cache registry
+│   ├── fsm/                       # @real-router/fsm — finite state machine engine (internal)
+│   ├── event-emitter/             # Generic typed event emitter (internal)
+│   ├── route-tree/                # Route tree building, validation, matcher factory (internal)
+│   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
+│   ├── search-params/             # Query string handling (internal)
+│   └── type-guards/               # Runtime type validation (internal)
 ```
 
 ## Package Dependencies
 
 ```
-                              ┌─────────────────┐
-                              │  @real-router/  │
-                              │     types       │
-                              └────────┬────────┘
-                                       │
-                ┌──────────────────────┼──────────────────────┐
-                │                      │                      │
-                ▼                      ▼                      ▼
-      ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-      │  @real-router/  │    │   route-tree    │    │  type-guards    │
-      │     logger      │    │   (internal)    │    │   (internal)    │
-      └────────┬────────┘    └────────┬────────┘    └────────┬────────┘
-               │           ┌──────────┼─────────┐            │
-               │           ▼          │         ▼            │
-               │   ┌──────────────┐   │  ┌──────────────┐    │
-               │   │ path-matcher │   │  │search-params │    │
-               │   │  (internal)  │   │  │  (internal)  │    │
-               │   └──────────────┘   │  └──────────────┘    │
-               │                      │                      │
-               ▼                      ▼                      ▼
-             ┌─────────────────────────────────────────────────┐
-             │              @real-router/core                  │
-             │  ┌─────────────────────────────────────────┐    │
-             │  │  Bundles: route-tree, path-matcher,     │    │
-             │  │  search-params, type-guards, fsm,       │    │
-             │  │  event-emitter                          │    │
-             │  └─────────────────────────────────────────┘    │
-             └──────────────────────┬──────────────────────────┘
-                                    │
-          ┌─────────────┬───────────┼───────────┬─────────────┬─────────────┐
-          │             │           │           │             │             │
-          ▼             ▼           ▼           ▼             ▼             ▼
-  ┌──────────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐
-  │browser-plugin│ │  react   │ │    rx    │ │ helpers  │ │logger-   │ │persistent-│
-  │              │ │          │ │          │ │          │ │plugin    │ │params     │
-  └──────────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘ └───────────┘
-
-
-  ┌─────────────────┐
-  │  @real-router/  │  Standalone (no @real-router deps).
-  │  cache-manager  │  Will be consumed by core in future phases.
-  └─────────────────┘
+  Standalone (zero deps)          @real-router/types
+  ┌──────────────┐                ┌──────────────┐
+  │ path-matcher │                │    types     │
+  └──────────────┘                └──────┬───────┘
+  ┌──────────────┐                       │
+  │search-params │              ┌────────┼────────┐
+  └──────────────┘              │        │        │
+  ┌──────────────┐              ▼        │        ▼
+  │event-emitter │      ┌────────────┐   │  ┌──────────┐
+  └──────────────┘      │ type-guards│   │  │route-tree│──→ path-matcher
+  ┌──────────────┐      │ (internal) │   │  │(internal)│──→ search-params
+  │@real-router/ │      └────────────┘   │  └──────────┘
+  │     fsm      │                       │
+  └──────────────┘                       │
+  ┌──────────────┐                       │
+  │@real-router/ │                       │
+  │    logger    │                       │
+  └──────┬───────┘                       │
+         │                               │
+         ▼                               ▼
+       ┌───────────────────────────────────────────────────────┐
+       │                  @real-router/core                    │
+       │                                                       │
+       │  deps: types, logger, fsm                             │
+       │  bundles (noExternal): route-tree, type-guards,       │
+       │                        event-emitter                  │
+       └───────────────────────────┬───────────────────────────┘
+                                   │
+        ┌──────────┬───────────┬───┼──────┬───────────┬────────────┐
+        │          │           │   │      │           │            │
+        ▼          ▼           ▼   │      ▼           ▼            ▼
+  ┌───────────┐ ┌────────┐ ┌────┐  │ ┌─────────┐ ┌──────────┐ ┌───────────┐
+  │ browser-  │ │ react  │ │ rx │  │ │ logger- │ │persistent│ │  helpers  │
+  │  plugin   │ │        │ │    │  │ │  plugin │ │ -params  │ │           │
+  │ +logger   │ │+helpers│ │    │  │ │ +logger │ │          │ │           │
+  └───────────┘ └────────┘ └────┘  │ └─────────┘ └──────────┘ └───────────┘
+                                   │
+                          ┌─────────────────┐
+                          │  @real-router/  │  Standalone (no @real-router deps).
+                          │  cache-manager  │  Will be consumed by core in future phases.
+                          └─────────────────┘
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`, `@real-router/cache-manager`
 
-**Internal packages (bundled):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `@real-router/logger`, `@real-router/fsm`
+**Internal packages (bundled into core):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
+
+**Internal packages (separate, not bundled):** `@real-router/logger`, `@real-router/fsm`
 
 ## Core Architecture
 
@@ -89,19 +90,27 @@ Router.ts (facade) ────────────────────�
     ├── StateNamespace         — current/previous state storage
     ├── NavigationNamespace    — navigate(), transition pipeline
     ├── OptionsNamespace       — router configuration
-    ├── DependenciesStore      — dependency injection container
+    ├── DependenciesStore      — dependency injection container (plain store)
     ├── EventBusNamespace     — FSM + EventEmitter encapsulation, events, subscribe
     ├── PluginsNamespace       — plugin lifecycle management
     ├── RouteLifecycleNamespace — canActivate/canDeactivate guards
-    ├── RouterLifecycleNamespace — start/stop operations
-    └── CloneNamespace         — SSR cloning support
+    └── RouterLifecycleNamespace — start/stop operations
+
+api/ (standalone functions — tree-shakeable, access router via WeakMap)
+    ├── getRoutesApi(router)      — route CRUD, addRoute/removeRoute
+    ├── getDependenciesApi(router) — dependency CRUD, set/get/remove
+    ├── getLifecycleApi(router)   — guard management, addActivateGuard/addDeactivateGuard
+    ├── getPluginApi(router)      — usePlugin/hasPlugin
+    └── cloneRouter(router, deps) — SSR cloning support
 
 wiring/ (construction-time, Builder+Director pattern)
     ├── RouterWiringBuilder    — Builder: namespace dependency wiring (10 methods)
     └── wireRouter             — Director: calls wire methods in correct order
 ```
 
-**Key principle:** Router.ts is a thin facade. All business logic lives in namespaces. All lifecycle state is driven by a single FSM — no boolean flags. Namespace dependency wiring is delegated to `RouterWiringBuilder` (Builder+Director pattern).
+**Key principle:** Router.ts is a thin facade (~640 lines). All business logic lives in namespaces. All lifecycle state is driven by a single FSM — no boolean flags. Namespace dependency wiring is delegated to `RouterWiringBuilder` (Builder+Director pattern).
+
+**Standalone API:** Functions in `api/` access router internals via a `WeakMap<Router, RouterInternals>` registry. This decouples the API surface from the Router class and enables tree-shaking — only imported API functions are bundled.
 
 **Detailed documentation:** [packages/core/CLAUDE.md](packages/core/CLAUDE.md)
 
@@ -212,10 +221,13 @@ router.navigate("fast-route"); // Previous promise rejects with TRANSITION_CANCE
 router.dispose();
 ```
 
-**Guards** return `boolean | Promise<boolean> | State | void` (no callbacks):
+**Guards** (`GuardFn`) return `boolean | Promise<boolean>`:
 
 ```typescript
-router.addActivateGuard("admin", () => (toState, fromState) => {
+import { getLifecycleApi } from "@real-router/core";
+
+const lifecycle = getLifecycleApi(router);
+lifecycle.addActivateGuard("admin", () => (toState, fromState) => {
   return isAuthenticated; // true = allow, false = block
 });
 ```
@@ -344,15 +356,17 @@ Full paths:
 ## SSR Support
 
 ```typescript
+import { cloneRouter } from "@real-router/core";
+
 // Server: clone router per request
-const serverRouter = router.clone({ request: req });
+const serverRouter = cloneRouter(router, { request: req });
 await serverRouter.start(req.url);
 
 // Client: hydrate with same state
 await router.start(window.location.pathname);
 ```
 
-`clone()` shares immutable route tree (O(1)), copies mutable state.
+`cloneRouter()` shares immutable route tree (O(1)), copies mutable state (dependencies, options, plugins, guards).
 
 ## See Also
 
