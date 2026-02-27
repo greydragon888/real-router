@@ -119,6 +119,7 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
+    // eslint-disable-next-line sonarjs/no-unused-vars
     const { signal: _signal, ...cleanOpts } = opts;
     const toState = deps.makeState(
       route.name,
@@ -214,6 +215,7 @@ export class NavigationNamespace {
 
         deps.setState(stateWithTransition);
 
+        // eslint-disable-next-line sonarjs/no-unused-vars
         const { signal: _signal2, ...transitionOpts } = opts;
 
         deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
