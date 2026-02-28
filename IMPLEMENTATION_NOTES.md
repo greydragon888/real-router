@@ -459,22 +459,37 @@ React package ignores `react` and `react-dom` from size calculation.
 
 ### knip Configuration
 
+Uses knip v5.85+ with **configuration hints** enabled (built-in since v5.84.0) — warns about unused `ignore`/`ignoreDependencies` entries.
+
 `knip.json` ignores:
 
-- `terser`, `fast-check` (used but not detected)
-- `@real-router/persistent-params-plugin` (internal workspace deps)
+- `terser`, `fast-check` (used but not detected by knip)
+- `@real-router/browser-plugin`, `@real-router/logger` (internal workspace deps)
 - `@stryker-mutator/api`, `jsdom` (test infrastructure)
+
+`ignore` array is intentionally empty — knip excludes `dist/`, `coverage/`, and `*.d.ts` by default.
 
 ### syncpack Configuration
 
-`syncpack.config.mjs` enforces:
+Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
-- Workspace packages use `workspace:^` protocol
+- Workspace packages use `workspace:^` protocol (pinned via `policy: "pinned"` version group)
 - Peer dependencies use `>=` ranges
 - All other dependencies are pinned (exact versions)
-- Consistent versions across all packages
+- Consistent versions across all packages (`policy: "sameRange"`)
+
+**v13 → v14 migration notes:**
+
+- `lintFormatting`, `lintSemverRanges`, `lintVersions` config options removed (always enabled in v14)
+- `fix-mismatches` command → `fix`
+- Local package versions (`.version` field) must be ignored in both `semverGroups` and `versionGroups` — v14 includes them in `sameRange` checks, causing false positives when comparing `0.x.y` with `workspace:^`
+- Workspace dependencies moved to a separate `pinned` version group (`pinVersion: "workspace:^"`) — v14's `sameRange` cannot compare `workspace:^` specifiers
 
 ## Turbo Configuration
+
+Uses turbo v2.8.12+.
+
+**v2.8.11 migration:** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
 
 ### Environment Variables
 
@@ -602,6 +617,8 @@ minimum-release-age=1440
 ```
 
 Blocks installation of npm packages published less than 24 hours ago. Protects against compromised packages being installed before the community detects them.
+
+**Temporary exclusions:** When updating to a package released within the last 24 hours, add version-pinned entries to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` with a `TODO: remove after` comment. Include transitive dependencies (e.g., platform binaries for `turbo`). Glob patterns with version unions are not supported — list each package explicitly.
 
 ### Dependency License Review
 

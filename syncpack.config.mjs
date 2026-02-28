@@ -2,15 +2,12 @@
 
 /** @type {import("syncpack").RcFile} */
 export default {
-  lintFormatting: false,
-  lintSemverRanges: true,
-  lintVersions: true,
   sortFirst: ["name", "version", "type", "description", "main", "module", "types", "exports"],
   source: ["package.json", "packages/*/package.json"],
   semverGroups: [
     {
-      label: "Ignore root package version (private, no version field)",
-      packages: ["real-router"],
+      label: "Ignore local package versions",
+      packages: ["**"],
       dependencyTypes: ["local"],
       isIgnored: true,
     },
@@ -43,10 +40,25 @@ export default {
       isIgnored: true,
     },
     {
-      label: "Ignore root package version (private, no version field)",
-      packages: ["real-router"],
+      label: "Ignore local package versions",
+      packages: ["**"],
       dependencyTypes: ["local"],
       isIgnored: true,
+    },
+    {
+      label: "Workspace packages use workspace:^ protocol",
+      dependencies: [
+        "@real-router/*",
+        "core-types",
+        "route-tree",
+        "type-guards",
+        "logger",
+        "search-params",
+        "event-emitter",
+        "path-matcher",
+      ],
+      pinVersion: "workspace:^",
+      policy: "pinned",
     },
     {
       label: "Ensure consistent versions across packages",

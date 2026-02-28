@@ -1,6 +1,5 @@
 {
   "$schema": "./node_modules/turbo/schema.json",
-  "daemon": false,
   "globalPassThroughEnv": ["CI", "GITHUB_ACTIONS"],
   "globalDependencies": [
     "tsconfig.json",

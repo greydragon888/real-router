@@ -29,7 +29,7 @@
     }
   },
   "ignoreWorkspaces": [],
-  "ignore": ["dist/**", "coverage/**", "**/*.d.ts"],
+  "ignore": [],
   "ignoreDependencies": [
     "@real-router/browser-plugin",
     "@real-router/logger",
