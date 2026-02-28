@@ -23,8 +23,8 @@ import {
   RouterLifecycleNamespace,
   RoutesNamespace,
   StateNamespace,
+  createDependenciesStore,
 } from "./namespaces";
-import { createDependenciesStore } from "./namespaces/DependenciesNamespace/dependenciesStore";
 import { validateDependenciesObject } from "./namespaces/DependenciesNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
 import {
@@ -39,7 +39,7 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
-import type { DependenciesStore } from "./namespaces/DependenciesNamespace/dependenciesStore";
+import type { DependenciesStore } from "./namespaces";
 import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
   DefaultDependencies,
@@ -400,6 +400,7 @@ export class Router<
   }
 
   stop(): this {
+    this.#navigation.abortCurrentNavigation();
     this.#eventBus.cancelTransitionIfRunning(this.#state.get());
 
     if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
@@ -417,6 +418,7 @@ export class Router<
       return;
     }
 
+    this.#navigation.abortCurrentNavigation();
     this.#eventBus.cancelTransitionIfRunning(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {

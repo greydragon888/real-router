@@ -86,13 +86,6 @@ export interface RouterError extends Error {
  * @see {@link State.meta} for where options are stored after navigation
  */
 export interface NavigationOptions {
-  [key: string]:
-    | string
-    | number
-    | boolean
-    | Record<string, unknown>
-    | undefined;
-
   /**
    * Replace the current history entry instead of pushing a new one.
    *
@@ -232,6 +225,18 @@ export interface NavigationOptions {
    * @see {@link NavigationOptions.redirected} for the input mechanism
    */
   redirected?: boolean | undefined;
+
+  /**
+   * Optional abort signal for cancelling the navigation.
+   *
+   * @description
+   * When provided, this signal can be used to cancel the navigation operation.
+   * If the signal is aborted, the navigation will be cancelled and any pending
+   * guards or transitions will be interrupted.
+   *
+   * @default undefined
+   */
+  signal?: AbortSignal | undefined;
 }
 
 export interface Params {

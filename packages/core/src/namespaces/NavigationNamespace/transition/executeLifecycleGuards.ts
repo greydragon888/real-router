@@ -14,6 +14,7 @@ export async function executeLifecycleGuards(
   segments: string[],
   errorCode: string,
   isCancelled: () => boolean,
+  signal: AbortSignal,
 ): Promise<void> {
   const segmentsToProcess = segments.filter((name) => guard.has(name));
 
@@ -33,8 +34,14 @@ export async function executeLifecycleGuards(
     const guardFn = guard.get(segment)!;
 
     try {
-      result = await guardFn(toState, fromState);
+      result = await guardFn(toState, fromState, signal);
     } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+          reason: signal.reason,
+        });
+      }
+
       rethrowAsRouterError(error, errorCode, segment);
     }
 

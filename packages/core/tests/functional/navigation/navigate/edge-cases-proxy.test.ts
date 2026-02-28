@@ -50,65 +50,6 @@ describe("router.navigate() - edge cases proxy", () => {
     });
 
     // -------------------------------------------------------------------------
-    // 12.4.3: NavigationOptions with arbitrary fields
-    // -------------------------------------------------------------------------
-
-    describe("NavigationOptions with custom fields", () => {
-      it("should preserve custom fields in state.meta.options", async () => {
-        const customOpts = {
-          replace: true,
-          customData: { foo: "bar", nested: { value: 123 } },
-          myFlag: true,
-        };
-
-        const state = await router.navigate("users", {}, customOpts);
-
-        expect(state).toStrictEqual(
-          expect.objectContaining({
-            meta: expect.objectContaining({
-              options: expect.objectContaining({
-                replace: true,
-                customData: { foo: "bar", nested: { value: 123 } },
-                myFlag: true,
-              }),
-            }),
-          }),
-        );
-      });
-
-      it("should accept Symbol values in custom fields (no structuredClone)", async () => {
-        // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
-        // Symbol values are now accepted in NavigationOptions
-        const testSymbol = Symbol("test");
-        const optsWithSymbol = {
-          reload: true,
-          symbolField: testSymbol,
-        };
-
-        // Symbol values now work - no structuredClone is called on options
-        // @ts-expect-error - testing runtime behavior with Symbol in options
-        const state = await router.navigate("users", {}, optsWithSymbol);
-
-        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
-      });
-
-      it("should accept function values in custom fields (no structuredClone)", async () => {
-        // Since state freezing moved to makeState (using Object.freeze, not structuredClone),
-        // function values are now accepted in NavigationOptions
-        const optsWithFunction = {
-          reload: true,
-          customCallback: () => "test",
-        };
-
-        // Function values now work - no structuredClone is called on options
-        // @ts-expect-error - testing runtime behavior with function in options
-        const state = await router.navigate("users", {}, optsWithFunction);
-
-        expect(state).toStrictEqual(expect.objectContaining({ name: "users" }));
-      });
-    });
-
-    // -------------------------------------------------------------------------
     // 12.2.4: Recursive navigate from callback
     // -------------------------------------------------------------------------
 

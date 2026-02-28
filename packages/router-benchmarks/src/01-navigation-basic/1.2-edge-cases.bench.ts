@@ -277,10 +277,9 @@ if (!IS_ROUTER5) {
       alternatingRoutes[index++ % 2],
       {},
       {
-        customFlag: true,
-        source: "benchmark",
-        timestamp: Date.now(),
-        metadata: { key: "value" },
+        replace: true,
+        reload: true,
+        force: true,
       },
     );
   }).gc("inner");

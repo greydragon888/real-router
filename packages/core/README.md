@@ -96,6 +96,14 @@ await router.navigate("users", {}, { replace: true });
 router.navigate("slow-route");
 router.navigate("fast-route"); // Previous rejects with TRANSITION_CANCELLED
 
+// Cancel via AbortController
+const controller = new AbortController();
+router.navigate("route", {}, { signal: controller.signal });
+controller.abort(); // rejects with TRANSITION_CANCELLED
+
+// Timeout
+router.navigate("route", {}, { signal: AbortSignal.timeout(5000) });
+
 // Error handling
 try {
   await router.navigate("admin");
@@ -253,6 +261,12 @@ lifecycle.addActivateGuard("admin", () => (toState, fromState) => {
 
 lifecycle.addDeactivateGuard("editor", () => async (toState, fromState) => {
   return !(await checkUnsavedChanges()); // async
+});
+
+// Guards receive AbortSignal for cooperative cancellation
+lifecycle.addActivateGuard("dashboard", () => async (toState, fromState, signal) => {
+  const res = await fetch("/api/auth", { signal }); // auto-cancelled on abort
+  return res.ok;
 });
 
 // Remove guards

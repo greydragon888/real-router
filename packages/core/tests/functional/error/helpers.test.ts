@@ -515,16 +515,16 @@ describe("deepFreezeState", () => {
         meta: {
           id: 1,
           params: {},
-          options: { state: { custom: "value" } },
+          options: { replace: true, reload: true },
         },
       };
 
       const frozen = deepFreezeState(state);
 
-      expect(Object.isFrozen(frozen.meta?.options.state)).toBe(true);
+      expect(Object.isFrozen(frozen.meta?.options)).toBe(true);
 
       expect(() => {
-        (frozen.meta!.options.state as { custom: string }).custom = "modified";
+        (frozen.meta!.options as { replace: boolean }).replace = false;
       }).toThrowError();
     });
 

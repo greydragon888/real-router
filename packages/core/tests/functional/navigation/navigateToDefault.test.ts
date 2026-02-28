@@ -67,7 +67,7 @@ describe("navigateToDefault", () => {
     it("should pass navigation options through to state meta", async () => {
       await withDefault("orders", {});
 
-      const options = { replace: true, source: "default" };
+      const options = { replace: true, force: true };
 
       const state = await router.navigateToDefault(options);
 
@@ -258,7 +258,7 @@ describe("navigateToDefault", () => {
         onSuccess,
       );
 
-      const options = { replace: true, source: "default" };
+      const options = { replace: true, reload: true };
 
       const state = await router.navigateToDefault(options);
 
@@ -387,7 +387,7 @@ describe("navigateToDefault", () => {
 
     it("should use defaultParams with navigation options", async () => {
       const defaultParams = { id: 123 };
-      const options = { replace: true, source: "auto" };
+      const options = { replace: true, reload: true };
 
       await withDefault("orders.view", defaultParams);
 
@@ -547,6 +547,7 @@ describe("navigateToDefault", () => {
             params: defaultParams,
           }),
           expect.any(Object), // fromState
+          expect.any(AbortSignal), // signal
         );
       }
     });
@@ -743,11 +744,11 @@ describe("navigateToDefault", () => {
       );
     });
 
-    it("should pass custom options through to state meta", async () => {
+    it("should pass valid options through to state meta", async () => {
       const options = {
-        source: "default-navigation",
-        metadata: { trigger: "auto" },
-        customFlag: true,
+        replace: true,
+        reload: true,
+        force: true,
       };
 
       const state = await router.navigateToDefault(options);
@@ -761,7 +762,6 @@ describe("navigateToDefault", () => {
       const options = {
         replace: true,
         force: false,
-        source: "default",
         reload: false,
       };
 

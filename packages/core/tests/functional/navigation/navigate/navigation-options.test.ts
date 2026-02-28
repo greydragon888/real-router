@@ -31,7 +31,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should add navigation options to meta", async () => {
-    const options = { reload: true, replace: true, source: "external" };
+    const options = { reload: true, replace: true, force: true };
 
     await router.navigate("profile", {}, options);
 
@@ -47,7 +47,7 @@ describe("router.navigate() - navigation meta and options", () => {
   });
 
   it("should allow navigation when guard returns true after previous navigation", async () => {
-    await router.navigate("users", {}, { custom: "option" });
+    await router.navigate("users", {}, { replace: true });
 
     lifecycle.addActivateGuard("settings", () => () => true);
 

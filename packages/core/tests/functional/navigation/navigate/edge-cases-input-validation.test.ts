@@ -76,16 +76,6 @@ describe("router.navigate() - edge cases input validation", () => {
       }).not.toThrowError();
     });
 
-    it("should accept options with custom fields", () => {
-      expect(() => {
-        void router.navigate(
-          "users",
-          {},
-          { replace: true, customField: "value" },
-        );
-      }).not.toThrowError();
-    });
-
     it("should include method name in error message", () => {
       const action = () => {
         // @ts-expect-error -- testing runtime validation

@@ -160,13 +160,19 @@ const state = await router.navigate(name, params, options)
                      │
                      ▼
              ┌───────────────┐
-             │  Deactivation │  canDeactivate guards
+             │AbortController│  Internal controller created per navigation
+             │    setup      │  External opts.signal linked if provided
+             └───────┬───────┘
+                     │
+                     ▼
+             ┌───────────────┐
+             │  Deactivation │  canDeactivate guards (signal as 3rd param)
              │    guards     │  (innermost → outermost)
              └───────┬───────┘
                      │
                      ▼
              ┌───────────────┐
-             │  Activation   │  canActivate guards
+             │  Activation   │  canActivate guards (signal as 3rd param)
              │    guards     │  (outermost → innermost)
              └───────┬───────┘
                      │
@@ -188,6 +194,8 @@ const state = await router.navigate(name, params, options)
 ```
 
 On error at any step: FSM sends `FAIL` → `emitTransitionError()`, Promise rejects with `RouterError`.
+
+**Cancellation sources:** `signal.aborted` (external AbortController), concurrent navigation (aborts previous controller), `stop()`, `dispose()`. All checked via `isCancelled = () => signal.aborted || !deps.isActive()`.
 
 ### Navigation API
 
@@ -217,17 +225,22 @@ try {
 router.navigate("slow-route");
 router.navigate("fast-route"); // Previous promise rejects with TRANSITION_CANCELLED
 
+// Cancel via AbortController
+const controller = new AbortController();
+router.navigate("route", {}, { signal: controller.signal });
+controller.abort(); // rejects with TRANSITION_CANCELLED
+
 // Permanent disposal (cannot restart)
 router.dispose();
 ```
 
-**Guards** (`GuardFn`) return `boolean | Promise<boolean>`:
+**Guards** (`GuardFn`) return `boolean | Promise<boolean>` and receive an optional `AbortSignal`:
 
 ```typescript
 import { getLifecycleApi } from "@real-router/core";
 
 const lifecycle = getLifecycleApi(router);
-lifecycle.addActivateGuard("admin", () => (toState, fromState) => {
+lifecycle.addActivateGuard("admin", () => (toState, fromState, signal) => {
   return isAuthenticated; // true = allow, false = block
 });
 ```

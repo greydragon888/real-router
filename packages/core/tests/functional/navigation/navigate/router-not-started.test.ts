@@ -105,7 +105,7 @@ describe("router.navigate() - router not started", () => {
     });
 
     it("should handle navigation with options when router not started", async () => {
-      const options = { replace: true, source: "test" };
+      const options = { replace: true, force: true };
 
       try {
         await router.navigate("profile", {}, options);

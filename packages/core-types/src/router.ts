@@ -158,6 +158,7 @@ export interface Options {
 export type GuardFn = (
   toState: State,
   fromState: State | undefined,
+  signal?: AbortSignal,
 ) => boolean | Promise<boolean>;
 
 export type DefaultDependencies = object;

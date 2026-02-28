@@ -38,6 +38,7 @@ export class NavigationNamespace {
   #canNavigate!: () => boolean;
   #deps!: NavigationDependencies;
   #transitionDeps!: TransitionDependencies;
+  #currentController: AbortController | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -118,13 +119,15 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
+    const cleanOpts =
+      opts.signal === undefined ? opts : NavigationNamespace.#stripSignal(opts);
     const toState = deps.makeState(
       route.name,
       route.params,
       deps.buildPath(route.name, route.params),
       {
         params: route.meta,
-        options: opts,
+        options: cleanOpts,
       },
     );
 
@@ -163,7 +166,32 @@ export class NavigationNamespace {
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use cloneRouter() to create isolated instance per request.",
       );
+      this.#currentController?.abort(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
       deps.cancelNavigation();
+    }
+
+    const controller = new AbortController();
+
+    this.#currentController = controller;
+
+    if (opts.signal) {
+      if (opts.signal.aborted) {
+        this.#currentController = null;
+
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+          reason: opts.signal.reason,
+        });
+      }
+
+      opts.signal.addEventListener(
+        "abort",
+        () => {
+          controller.abort(opts.signal?.reason);
+        },
+        { once: true, signal: controller.signal },
+      );
     }
 
     deps.startTransition(toState, fromState);
@@ -174,6 +202,7 @@ export class NavigationNamespace {
         toState,
         fromState,
         opts,
+        controller.signal,
       );
 
       if (
@@ -187,7 +216,13 @@ export class NavigationNamespace {
         );
 
         deps.setState(stateWithTransition);
-        deps.sendTransitionDone(stateWithTransition, fromState, opts);
+
+        const transitionOpts =
+          opts.signal === undefined
+            ? opts
+            : NavigationNamespace.#stripSignal(opts);
+
+        deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
 
         return stateWithTransition;
       } else {
@@ -203,6 +238,11 @@ export class NavigationNamespace {
       this.#routeTransitionError(error, toState, fromState);
 
       throw error;
+    } finally {
+      controller.abort(); // Cleanup: removes listener on external signal
+      if (this.#currentController === controller) {
+        this.#currentController = null;
+      }
     }
   }
 
@@ -239,9 +279,29 @@ export class NavigationNamespace {
     return this.navigate(resolvedRoute, resolvedParams, opts);
   }
 
+  /**
+   * Aborts the current in-flight navigation, if any.
+   */
+  abortCurrentNavigation(): void {
+    this.#currentController?.abort(
+      new RouterError(errorCodes.TRANSITION_CANCELLED),
+    );
+    this.#currentController = null;
+  }
+
   // =========================================================================
   // Private methods
   // =========================================================================
+
+  /**
+   * Strips the non-serializable `signal` field from NavigationOptions.
+   */
+  static #stripSignal(opts: NavigationOptions): NavigationOptions {
+    // eslint-disable-next-line sonarjs/no-unused-vars
+    const { signal: _, ...rest } = opts;
+
+    return rest;
+  }
 
   /**
    * Builds the final state with frozen TransitionMeta attached.
