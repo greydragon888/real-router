@@ -5,6 +5,107 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-02-28]
+
+### @real-router/types@0.17.0
+
+### Minor Changes
+
+- [#192](https://github.com/greydragon888/real-router/pull/192) [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `signal` field to `NavigationOptions` and `GuardFn` (#188)
+
+  New optional `signal?: AbortSignal` field on `NavigationOptions` allows cancelling in-flight navigations via the standard `AbortController` API. Guards receive the signal as an optional third parameter.
+
+  ```typescript
+  const controller = new AbortController();
+  router.navigate("users", {}, { signal: controller.signal });
+
+  // Cancel the navigation
+  controller.abort();
+  ```
+
+- [#192](https://github.com/greydragon888/real-router/pull/192) [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove index signature from `NavigationOptions`, enforce strict fields only (#188)
+
+  **BREAKING CHANGE:** `NavigationOptions` no longer accepts arbitrary keys. Only known fields (`replace`, `reload`, `force`, `forceDeactivate`, `redirected`, `signal`) are allowed.
+
+  **Migration:**
+
+  ```diff
+  - router.navigate('route', {}, { replace: true, customKey: 'value' });
+  + router.navigate('route', {}, { replace: true });
+  ```
+
+### @real-router/core@0.27.0
+
+### Minor Changes
+
+- [#192](https://github.com/greydragon888/real-router/pull/192) [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097) Thanks [@greydragon888](https://github.com/greydragon888)! - Integrate AbortController API into `router.navigate()` (#188)
+
+  Each navigation creates an internal `AbortController`. Pass an external `signal` via `NavigationOptions` to cancel navigations from userland:
+
+  ```typescript
+  const controller = new AbortController();
+
+  const promise = router.navigate("users", {}, { signal: controller.signal });
+
+  controller.abort(); // rejects with TRANSITION_CANCELLED
+  ```
+
+  Key behaviors:
+  - Pre-aborted signal rejects immediately without starting a transition
+  - Concurrent navigation aborts the previous navigation's signal
+  - `router.stop()` and `router.dispose()` abort in-flight navigations
+  - Guards receive `signal` as optional third parameter for cooperative cancellation
+  - `AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`
+  - Signal is stripped from `state.meta.options` (non-serializable)
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097), [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/types@0.17.0
+
+### @real-router/browser-plugin@0.5.4
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
+### @real-router/helpers@0.1.31
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
+### @real-router/logger-plugin@0.2.30
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
+### @real-router/persistent-params-plugin@0.1.30
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
+### @real-router/react@0.4.9
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+  - @real-router/helpers@0.1.31
+
+### @real-router/rx@0.1.19
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
 ## [2026-02-27]
 
 ### @real-router/core@0.26.0
