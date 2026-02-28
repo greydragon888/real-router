@@ -630,7 +630,7 @@ export function getRoutesApi<
 
       if (!ctx.noValidate) {
         validateAddRouteArgs(routeArray);
-        store.treeOperations.validateRoutes(routeArray, undefined, undefined);
+        store.treeOperations.validateRoutes(routeArray);
       }
 
       const currentPath = router.getState()?.path;
