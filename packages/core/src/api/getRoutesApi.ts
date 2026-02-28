@@ -252,7 +252,6 @@ function addRoutes<
   store.treeOperations.commitTreeChanges(store, noValidate);
 }
 
-/* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
 /**
  * Atomically replaces all routes with a new set.
  * Follows RFC 6-step semantics for HMR support.

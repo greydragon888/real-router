@@ -205,10 +205,6 @@ export class RouteLifecycleNamespace<
    * Clears only lifecycle handlers that were registered from route definitions.
    * Used by HMR to remove definition-sourced guards without touching externally-added guards.
    */
-  /**
-   * Clears only lifecycle handlers that were registered from route definitions.
-   * Used by HMR to remove definition-sourced guards without touching externally-added guards.
-   */
   /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
   clearDefinitionGuards(): void {
     for (const name of this.#definitionActivateGuardNames) {
