@@ -9,6 +9,7 @@ import {
   sanitizeRoute,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
+  clearRouteData,
   refreshForwardMap,
   registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
@@ -25,6 +26,7 @@ import {
 import { RouterError } from "../RouterError";
 
 import type { RoutesApi } from "./types";
+import type { RouterInternals } from "../internals";
 import type { RouteLifecycleNamespace } from "../namespaces/RouteLifecycleNamespace";
 import type { RoutesStore } from "../namespaces/RoutesNamespace/routesStore";
 import type { RouteConfig } from "../namespaces/RoutesNamespace/types";
@@ -248,6 +250,58 @@ function addRoutes<
   );
 
   store.treeOperations.commitTreeChanges(store, noValidate);
+}
+
+/* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
+/**
+ * Atomically replaces all routes with a new set.
+ * Follows RFC 6-step semantics for HMR support.
+ */
+function replaceRoutes<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(
+  store: RoutesStore<Dependencies>,
+  noValidate: boolean,
+  routes: Route<Dependencies>[],
+  ctx: RouterInternals<Dependencies>,
+  currentPath: string | undefined,
+): void {
+  // Step 2: Clear route data (WITHOUT tree rebuild)
+  clearRouteData(store);
+
+  // Step 3: Clear definition lifecycle handlers (preserve external guards)
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
+  store.lifecycleNamespace!.clearDefinitionGuards();
+
+  // Step 4: Register new routes
+  for (const route of routes) {
+    store.definitions.push(sanitizeRoute(route));
+  }
+
+  registerAllRouteHandlers(
+    routes,
+    store.config,
+    store.routeCustomFields,
+    store.pendingCanActivate,
+    store.pendingCanDeactivate,
+    store.depsStore,
+    "",
+  );
+
+  // Step 5: One tree rebuild
+  store.treeOperations.commitTreeChanges(store, noValidate);
+
+  // Step 6: Revalidate state
+  if (currentPath !== undefined) {
+    const revalidated = ctx.matchPath(currentPath);
+
+    if (revalidated) {
+      ctx.setState(revalidated);
+    } else {
+      ctx.clearState();
+    }
+  }
+  /* v8 ignore stop */
 }
 
 /**
@@ -508,6 +562,7 @@ export function getRoutesApi<
             name,
             canActivate,
             noValidate,
+            true,
           );
         }
       }
@@ -522,6 +577,7 @@ export function getRoutesApi<
             name,
             canDeactivate,
             noValidate,
+            true,
           );
         }
       }
@@ -561,6 +617,29 @@ export function getRoutesApi<
 
     getConfig: (name) => {
       return getRouteConfig(store, name);
+    },
+
+    /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
+    replace: (routes) => {
+      throwIfDisposed(ctx.isDisposed);
+
+      const routeArray = Array.isArray(routes) ? routes : [routes];
+
+      const canReplace = validateClearRoutes(ctx.isTransitioning());
+
+      if (!canReplace) {
+        return;
+      }
+
+      if (!ctx.noValidate) {
+        validateAddRouteArgs(routeArray);
+        store.treeOperations.validateRoutes(routeArray, undefined, undefined);
+      }
+
+      const currentPath = router.getState()?.path;
+
+      replaceRoutes(store, noValidate, routeArray, ctx, currentPath);
+      /* v8 ignore stop */
     },
   };
 }

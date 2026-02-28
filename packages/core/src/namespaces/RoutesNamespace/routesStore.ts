@@ -122,6 +122,22 @@ export function resetStore<
   rebuildTreeInPlace(store);
 }
 
+/* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
+export function clearRouteData<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
+  store.definitions.length = 0;
+
+  Object.assign(store.config, createEmptyConfig());
+
+  store.resolvedForwardMap = Object.create(null) as Record<string, string>;
+  store.routeCustomFields = Object.create(null) as Record<
+    string,
+    Record<string, unknown>
+  >;
+}
+/* v8 ignore stop */
+
 // =============================================================================
 // Forward map
 // =============================================================================

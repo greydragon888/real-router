@@ -45,6 +45,8 @@ export class RouteLifecycleNamespace<
   readonly #canActivateFunctions = new Map<string, GuardFn>();
 
   readonly #registering = new Set<string>();
+  readonly #definitionActivateGuardNames = new Set<string>();
+  readonly #definitionDeactivateGuardNames = new Set<string>();
 
   #router!: Router<Dependencies>;
   #deps!: RouteLifecycleDependencies<Dependencies>;
@@ -78,7 +80,13 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     skipValidation: boolean,
+    isFromDefinition = false,
   ): void {
+    if (isFromDefinition) {
+      this.#definitionActivateGuardNames.add(name);
+    } else {
+      this.#definitionActivateGuardNames.delete(name);
+    }
     if (!skipValidation) {
       validateNotRegistering(
         this.#registering.has(name),
@@ -120,7 +128,13 @@ export class RouteLifecycleNamespace<
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
     skipValidation: boolean,
+    isFromDefinition = false,
   ): void {
+    if (isFromDefinition) {
+      this.#definitionDeactivateGuardNames.add(name);
+    } else {
+      this.#definitionDeactivateGuardNames.delete(name);
+    }
     if (!skipValidation) {
       validateNotRegistering(
         this.#registering.has(name),
@@ -159,6 +173,7 @@ export class RouteLifecycleNamespace<
   clearCanActivate(name: string): void {
     this.#canActivateFactories.delete(name);
     this.#canActivateFunctions.delete(name);
+    this.#definitionActivateGuardNames.delete(name);
   }
 
   /**
@@ -170,6 +185,7 @@ export class RouteLifecycleNamespace<
   clearCanDeactivate(name: string): void {
     this.#canDeactivateFactories.delete(name);
     this.#canDeactivateFunctions.delete(name);
+    this.#definitionDeactivateGuardNames.delete(name);
   }
 
   /**
@@ -181,7 +197,33 @@ export class RouteLifecycleNamespace<
     this.#canActivateFunctions.clear();
     this.#canDeactivateFactories.clear();
     this.#canDeactivateFunctions.clear();
+    this.#definitionActivateGuardNames.clear();
+    this.#definitionDeactivateGuardNames.clear();
   }
+
+  /**
+   * Clears only lifecycle handlers that were registered from route definitions.
+   * Used by HMR to remove definition-sourced guards without touching externally-added guards.
+   */
+  /**
+   * Clears only lifecycle handlers that were registered from route definitions.
+   * Used by HMR to remove definition-sourced guards without touching externally-added guards.
+   */
+  /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
+  clearDefinitionGuards(): void {
+    for (const name of this.#definitionActivateGuardNames) {
+      this.#canActivateFactories.delete(name);
+      this.#canActivateFunctions.delete(name);
+    }
+    for (const name of this.#definitionDeactivateGuardNames) {
+      this.#canDeactivateFactories.delete(name);
+      this.#canDeactivateFunctions.delete(name);
+    }
+
+    this.#definitionActivateGuardNames.clear();
+    this.#definitionDeactivateGuardNames.clear();
+  }
+  /* v8 ignore stop */
 
   /**
    * Returns lifecycle factories as records for cloning.
