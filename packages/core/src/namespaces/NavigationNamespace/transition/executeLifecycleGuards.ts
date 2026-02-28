@@ -41,7 +41,6 @@ export async function executeLifecycleGuards(
         ? guardFn(toState, fromState, signal)
         : guardFn(toState, fromState));
     } catch (error: unknown) {
-      /* v8 ignore next 4 -- @preserve: AbortError race condition guard — signal may abort between isCancelled check and guard execution; covered by AbortController API integration tests */
       if (error instanceof DOMException && error.name === "AbortError") {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
           reason: signal.reason,

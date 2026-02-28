@@ -177,7 +177,6 @@ export class NavigationNamespace {
 
     this.#currentController = controller;
 
-    /* v8 ignore next 8 -- @preserve: external signal integration tested by AbortController API tests (Task 6); branch not reachable without caller providing opts.signal */
     if (opts.signal) {
       if (opts.signal.aborted) {
         this.#currentController = null;
@@ -282,7 +281,6 @@ export class NavigationNamespace {
   /**
    * Aborts the current in-flight navigation, if any.
    */
-  /* v8 ignore next 4 -- @preserve: new public method tested by AbortController API integration tests (Task 6) */
   abortCurrentNavigation(): void {
     this.#currentController?.abort(
       new RouterError(errorCodes.TRANSITION_CANCELLED),
