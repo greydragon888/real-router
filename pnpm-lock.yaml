@@ -312,6 +312,9 @@ importers:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
       router5:
         specifier: 8.0.1
         version: 8.0.1
@@ -4703,6 +4706,11 @@ packages:
     resolution: {integrity: sha512-1h/Lnq9yajKY2PEbBadPXj3VxsDDu844OnaAo52UVmIzIvwwtBPIuNvkjuzBlTWpfJyUbG3ez0KSBibQkj4ojg==}
     engines: {node: '>=0.6.11 <=0.7.0 || >=0.7.3'}
 
+  turbo-darwin-64@2.8.12:
+    resolution: {integrity: sha512-EiHJmW2MeQQx+21x8hjMHw/uPhXt9PIxvDrxzOtyVwrXzL0tQmsxtO4qHf2l7uA+K6PUJ4+TjY1MHZDuCvWXrw==}
+    cpu: [x64]
+    os: [darwin]
+
   turbo-darwin-arm64@2.8.12:
     resolution: {integrity: sha512-cbqqGN0vd7ly2TeuaM8k9AK9u1CABO4kBA5KPSqovTiLL3sORccn/mZzJSbvQf0EsYRfU34MgW5FotfwW3kx8Q==}
     cpu: [arm64]
@@ -4717,6 +4725,16 @@ packages:
     resolution: {integrity: sha512-BRJCMdyXjyBoL0GYpvj9d2WNfMHwc3tKmJG5ATn2Efvil9LsiOsd/93/NxDqW0jACtHFNVOPnd/CBwXRPiRbwA==}
     cpu: [arm64]
     os: [linux]
+
+  turbo-windows-64@2.8.12:
+    resolution: {integrity: sha512-vyFOlpFFzQFkikvSVhVkESEfzIopgs2J7J1rYvtSwSHQ4zmHxkC95Q8Kjkus8gg+8X2mZyP1GS5jirmaypGiPw==}
+    cpu: [x64]
+    os: [win32]
+
+  turbo-windows-arm64@2.8.12:
+    resolution: {integrity: sha512-9nRnlw5DF0LkJClkIws1evaIF36dmmMEO84J5Uj4oQ8C0QTHwlH7DNe5Kq2Jdmu8GXESCNDNuUYG8Cx6W/vm3g==}
+    cpu: [arm64]
+    os: [win32]
 
   turbo@2.8.12:
     resolution: {integrity: sha512-auUAMLmi0eJhxDhQrxzvuhfEbICnVt0CTiYQYY8WyRJ5nwCDZxD0JG8bCSxT4nusI2CwJzmZAay5BfF6LmK7Hw==}
@@ -9887,6 +9905,9 @@ snapshots:
 
   tunnel@0.0.6: {}
 
+  turbo-darwin-64@2.8.12:
+    optional: true
+
   turbo-darwin-arm64@2.8.12:
     optional: true
 
@@ -9896,11 +9917,20 @@ snapshots:
   turbo-linux-arm64@2.8.12:
     optional: true
 
+  turbo-windows-64@2.8.12:
+    optional: true
+
+  turbo-windows-arm64@2.8.12:
+    optional: true
+
   turbo@2.8.12:
     optionalDependencies:
+      turbo-darwin-64: 2.8.12
       turbo-darwin-arm64: 2.8.12
       turbo-linux-64: 2.8.12
       turbo-linux-arm64: 2.8.12
+      turbo-windows-64: 2.8.12
+      turbo-windows-arm64: 2.8.12
 
   type-check@0.4.0:
     dependencies:
