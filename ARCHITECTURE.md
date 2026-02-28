@@ -27,48 +27,60 @@ real-router/
 
 ## Package Dependencies
 
-```
-  Standalone (zero deps)          @real-router/types
-  ┌──────────────┐                ┌──────────────┐
-  │ path-matcher │                │    types     │
-  └──────────────┘                └──────┬───────┘
-  ┌──────────────┐                       │
-  │search-params │              ┌────────┼────────┐
-  └──────────────┘              │        │        │
-  ┌──────────────┐              ▼        │        ▼
-  │event-emitter │      ┌────────────┐   │  ┌──────────┐
-  └──────────────┘      │ type-guards│   │  │route-tree│──→ path-matcher
-  ┌──────────────┐      │ (internal) │   │  │(internal)│──→ search-params
-  │@real-router/ │      └────────────┘   │  └──────────┘
-  │     fsm      │                       │
-  └──────────────┘                       │
-  ┌──────────────┐                       │
-  │@real-router/ │                       │
-  │    logger    │                       │
-  └──────┬───────┘                       │
-         │                               │
-         ▼                               ▼
-       ┌───────────────────────────────────────────────────────┐
-       │                  @real-router/core                    │
-       │                                                       │
-       │  deps: types, logger, fsm                             │
-       │  bundles (noExternal): route-tree, type-guards,       │
-       │                        event-emitter                  │
-       └───────────────────────────┬───────────────────────────┘
-                                   │
-        ┌──────────┬───────────┬───┼──────┬───────────┬────────────┐
-        │          │           │   │      │           │            │
-        ▼          ▼           ▼   │      ▼           ▼            ▼
-  ┌───────────┐ ┌────────┐ ┌────┐  │ ┌─────────┐ ┌──────────┐ ┌───────────┐
-  │ browser-  │ │ react  │ │ rx │  │ │ logger- │ │persistent│ │  helpers  │
-  │  plugin   │ │        │ │    │  │ │  plugin │ │ -params  │ │           │
-  │ +logger   │ │+helpers│ │    │  │ │ +logger │ │          │ │           │
-  └───────────┘ └────────┘ └────┘  │ └─────────┘ └──────────┘ └───────────┘
-                                   │
-                          ┌─────────────────┐
-                          │  @real-router/  │  Standalone (no @real-router deps).
-                          │  cache-manager  │  Will be consumed by core in future phases.
-                          └─────────────────┘
+```mermaid
+graph TD
+    subgraph standalone [Standalone — zero deps]
+        PM[path-matcher]
+        SP[search-params]
+        EE[event-emitter]
+        FSM["@real-router/fsm"]
+        LOG["@real-router/logger"]
+        TYPES["@real-router/types"]
+        CM["@real-router/cache-manager"]
+    end
+
+    subgraph internal [Internal packages]
+        TG[type-guards] -->|dep| TYPES
+        RT[route-tree] -->|dep| PM
+        RT -->|dep| SP
+    end
+
+    subgraph core [Core]
+        CORE["@real-router/core"]
+    end
+
+    CORE -->|dep| TYPES
+    CORE -->|dep| LOG
+    CORE -->|dep| FSM
+    CORE -.->|bundles| RT
+    CORE -.->|bundles| TG
+    CORE -.->|bundles| EE
+
+    subgraph consumers [Consumer packages]
+        BP["@real-router/browser-plugin"]
+        REACT["@real-router/react"]
+        RX["@real-router/rx"]
+        LP["@real-router/logger-plugin"]
+        PPP["@real-router/persistent-params-plugin"]
+        HELPERS["@real-router/helpers"]
+    end
+
+    BP -->|dep| CORE
+    BP -->|dep| LOG
+    BP -.->|bundles| TG
+
+    LP -->|dep| CORE
+    LP -->|dep| LOG
+
+    REACT -->|dep| CORE
+    REACT -->|dep| HELPERS
+
+    RX -->|dep| CORE
+
+    PPP -->|dep| CORE
+    PPP -.->|bundles| TG
+
+    HELPERS -->|dep| CORE
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`, `@real-router/cache-manager`
@@ -118,8 +130,25 @@ wiring/ (construction-time, Builder+Director pattern)
 
 All router lifecycle and navigation state is managed by a single finite state machine:
 
-```
-IDLE → STARTING → READY ⇄ TRANSITIONING (+ NAVIGATE self-loop) → IDLE | DISPOSED
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> STARTING : START
+    IDLE --> DISPOSED : DISPOSE
+
+    STARTING --> READY : STARTED
+    STARTING --> IDLE : FAIL
+
+    READY --> TRANSITIONING : NAVIGATE
+    READY --> READY : FAIL
+    READY --> IDLE : STOP
+
+    TRANSITIONING --> TRANSITIONING : NAVIGATE
+    TRANSITIONING --> READY : COMPLETE
+    TRANSITIONING --> READY : CANCEL
+    TRANSITIONING --> READY : FAIL
+
+    DISPOSED --> [*]
 ```
 
 | State           | Description                                          |
