@@ -34,12 +34,7 @@ export async function executeLifecycleGuards(
     const guardFn = guard.get(segment)!;
 
     try {
-      // Pass signal only to guards that explicitly declare a 3rd parameter (opt-in).
-      // Checking guardFn.length avoids breaking existing 2-param guards and vitest
-      // toHaveBeenCalledWith(arg1, arg2) assertions that are strict about arg count.
-      result = await (guardFn.length >= 3
-        ? guardFn(toState, fromState, signal)
-        : guardFn(toState, fromState));
+      result = await guardFn(toState, fromState, signal);
     } catch (error: unknown) {
       if (error instanceof DOMException && error.name === "AbortError") {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED, {

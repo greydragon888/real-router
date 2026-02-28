@@ -547,6 +547,7 @@ describe("navigateToDefault", () => {
             params: defaultParams,
           }),
           expect.any(Object), // fromState
+          expect.any(AbortSignal), // signal
         );
       }
     });
