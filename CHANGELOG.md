@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-02-28]
 
+### @real-router/core@0.28.0
+
+### Minor Changes
+
+- [#196](https://github.com/greydragon888/real-router/pull/196) [`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `routesApi.replace()` for atomic route replacement (#195)
+
+  Combines `clear + add` into a single operation with one tree rebuild, state preservation via `matchPath` revalidation, and selective guard cleanup (`isFromDefinition` tracking). Designed for HMR use cases.
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/types@0.18.0
+
+### @real-router/types@0.18.0
+
+### Minor Changes
+
+- [#196](https://github.com/greydragon888/real-router/pull/196) [`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `replace()` method to `RoutesApi` interface (#195)
+
+  New method for atomic route replacement (HMR support).
+
+### @real-router/browser-plugin@0.5.5
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+
+### @real-router/helpers@0.1.32
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+
+### @real-router/logger-plugin@0.2.31
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+
+### @real-router/persistent-params-plugin@0.1.31
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+
+### @real-router/react@0.4.10
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+  - @real-router/helpers@0.1.32
+
+### @real-router/rx@0.1.20
+
+### Patch Changes
+
+- Updated dependencies [[`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b)]:
+  - @real-router/core@0.28.0
+
+
 ### @real-router/types@0.17.0
 
 ### Minor Changes
