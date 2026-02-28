@@ -242,6 +242,9 @@ export class Router<
       clearState: () => {
         this.#state.set(undefined);
       },
+      setState: (state) => {
+        this.#state.set(state);
+      },
     });
 
     // =========================================================================

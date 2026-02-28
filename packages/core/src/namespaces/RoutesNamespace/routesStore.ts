@@ -109,6 +109,17 @@ export function rebuildTreeInPlace<
 export function resetStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
+  clearRouteData(store);
+  rebuildTreeInPlace(store);
+}
+
+/**
+ * Clears route data without rebuilding the tree.
+ * Used by replace() to avoid double rebuild (clearRouteData + commitTreeChanges).
+ */
+export function clearRouteData<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+>(store: RoutesStore<Dependencies>): void {
   store.definitions.length = 0;
 
   Object.assign(store.config, createEmptyConfig());
@@ -118,8 +129,6 @@ export function resetStore<
     string,
     Record<string, unknown>
   >;
-
-  rebuildTreeInPlace(store);
 }
 
 // =============================================================================

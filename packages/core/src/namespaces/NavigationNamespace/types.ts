@@ -28,7 +28,7 @@ export interface NavigationDependencies {
   getState: () => State | undefined;
 
   /** Set router state */
-  setState: (state?: State) => void;
+  setState: (state: State) => void;
 
   /** Build state with segments from route name and params */
   buildStateWithSegments: <P extends Params = Params>(

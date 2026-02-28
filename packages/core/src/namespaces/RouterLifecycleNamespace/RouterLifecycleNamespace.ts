@@ -135,6 +135,6 @@ export class RouterLifecycleNamespace {
    * Called only for READY/TRANSITIONING states (facade handles STARTING/IDLE/DISPOSED).
    */
   stop(): void {
-    this.#deps.setState();
+    this.#deps.clearState();
   }
 }

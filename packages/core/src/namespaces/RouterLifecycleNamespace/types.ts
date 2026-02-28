@@ -10,7 +10,7 @@ import type {
 export interface RouterLifecycleDependencies {
   getOptions: () => Options;
   makeNotFoundState: (path: string, options: NavigationOptions) => State;
-  setState: (state?: State) => void;
+  clearState: () => void;
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,
   ) => State<P, MP> | undefined;

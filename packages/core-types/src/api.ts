@@ -101,6 +101,8 @@ export interface RoutesApi<
 
   clear: () => void;
 
+  replace: (routes: Route<Dependencies>[] | Route<Dependencies>) => void;
+
   has: (name: string) => boolean;
 
   get: (name: string) => Route<Dependencies> | undefined;

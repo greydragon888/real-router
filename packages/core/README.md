@@ -222,9 +222,16 @@ routes.get("users"); // Route | undefined
 routes.update("users", { forwardTo: "users.list" });
 routes.remove("settings");
 routes.clear();
+
+// Atomic replacement (HMR, feature flags)
+routes.replace([
+  { name: "home", path: "/" },
+  { name: "dashboard", path: "/dashboard" },
+]);
+// Preserves state (if route exists), external guards, one tree rebuild
 ```
 
-**Methods:** `add`, `remove`, `update`, `clear`, `has`, `get`, `getConfig`
+**Methods:** `add`, `remove`, `replace`, `update`, `clear`, `has`, `get`, `getConfig`
 
 ### Dependencies — `getDependenciesApi(router)`
 

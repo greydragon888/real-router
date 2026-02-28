@@ -69,10 +69,10 @@ export class RouterWiringBuilder<
   wireRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanActivate(name, handler, true);
+        this.routeLifecycle.addCanActivate(name, handler, true, true);
       },
       addDeactivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanDeactivate(name, handler, true);
+        this.routeLifecycle.addCanDeactivate(name, handler, true, true);
       },
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),
@@ -179,8 +179,8 @@ export class RouterWiringBuilder<
       getOptions: () => this.options.get(),
       makeNotFoundState: (path, options) =>
         this.state.makeNotFoundState(path, options),
-      setState: (state) => {
-        this.state.set(state);
+      clearState: () => {
+        this.state.set(undefined);
       },
       matchPath: (path) => this.routes.matchPath(path, this.options.get()),
       completeStart: () => {
