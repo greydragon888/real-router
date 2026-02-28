@@ -1,5 +1,12 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.30
+
+### Patch Changes
+
+- Updated dependencies [[`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097)]:
+  - @real-router/core@0.27.0
+
 ## 0.1.29
 
 ### Patch Changes

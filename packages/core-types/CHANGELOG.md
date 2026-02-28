@@ -1,5 +1,32 @@
 # @real-router/types
 
+## 0.17.0
+
+### Minor Changes
+
+- [#192](https://github.com/greydragon888/real-router/pull/192) [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `signal` field to `NavigationOptions` and `GuardFn` (#188)
+
+  New optional `signal?: AbortSignal` field on `NavigationOptions` allows cancelling in-flight navigations via the standard `AbortController` API. Guards receive the signal as an optional third parameter.
+
+  ```typescript
+  const controller = new AbortController();
+  router.navigate("users", {}, { signal: controller.signal });
+
+  // Cancel the navigation
+  controller.abort();
+  ```
+
+- [#192](https://github.com/greydragon888/real-router/pull/192) [`63647eb`](https://github.com/greydragon888/real-router/commit/63647eb81d13b5a9d54b7294685ce93c81bfc097) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove index signature from `NavigationOptions`, enforce strict fields only (#188)
+
+  **BREAKING CHANGE:** `NavigationOptions` no longer accepts arbitrary keys. Only known fields (`replace`, `reload`, `force`, `forceDeactivate`, `redirected`, `signal`) are allowed.
+
+  **Migration:**
+
+  ```diff
+  - router.navigate('route', {}, { replace: true, customKey: 'value' });
+  + router.navigate('route', {}, { replace: true });
+  ```
+
 ## 0.16.0
 
 ### Minor Changes
