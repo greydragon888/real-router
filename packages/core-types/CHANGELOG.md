@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.18.0
+
+### Minor Changes
+
+- [#196](https://github.com/greydragon888/real-router/pull/196) [`1141890`](https://github.com/greydragon888/real-router/commit/114189008eb3d42c3841b5d4b56aa10b26d19c1b) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `replace()` method to `RoutesApi` interface (#195)
+
+  New method for atomic route replacement (HMR support).
+
 ## 0.17.0
 
 ### Minor Changes
