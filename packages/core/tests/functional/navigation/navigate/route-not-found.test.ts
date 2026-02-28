@@ -103,7 +103,7 @@ describe("router.navigate() - route not found", () => {
     });
 
     it("should handle route with options when route not found", async () => {
-      const options = { replace: true, source: "manual" };
+      const options = { replace: true, force: true };
 
       try {
         await router.navigate("invalid.route", {}, options);

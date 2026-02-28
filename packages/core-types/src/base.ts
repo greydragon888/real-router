@@ -86,14 +86,6 @@ export interface RouterError extends Error {
  * @see {@link State.meta} for where options are stored after navigation
  */
 export interface NavigationOptions {
-  [key: string]:
-    | string
-    | number
-    | boolean
-    | Record<string, unknown>
-    | AbortSignal
-    | undefined;
-
   /**
    * Replace the current history entry instead of pushing a new one.
    *

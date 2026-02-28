@@ -263,7 +263,7 @@ describe("router.navigate() - events transition start", () => {
         onStart,
       );
 
-      const navigationOptions = { replace: true, source: "test" };
+      const navigationOptions = { replace: true, reload: true };
 
       await router.navigate("profile", {}, navigationOptions);
 

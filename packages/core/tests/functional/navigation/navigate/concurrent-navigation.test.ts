@@ -328,7 +328,7 @@ describe("router.navigate() - concurrent navigation", () => {
         onCancel,
       );
 
-      const navigationOptions = { replace: true, source: "test" };
+      const navigationOptions = { replace: true, reload: true };
 
       const promise = router.navigate("profile", {}, navigationOptions);
 

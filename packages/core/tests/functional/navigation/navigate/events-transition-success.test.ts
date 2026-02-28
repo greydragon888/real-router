@@ -101,7 +101,7 @@ describe("router.navigate() - events transition success", () => {
         onSuccess,
       );
 
-      const navigationOptions = { replace: true, source: "test" };
+      const navigationOptions = { replace: true, reload: true };
 
       const newState = await router.navigate("profile", {}, navigationOptions);
 
