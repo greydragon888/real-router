@@ -113,19 +113,18 @@ describe("core/observable", () => {
 
         getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, cb);
 
-        // First navigation - will be delayed by middleware
+        // First navigation - will be cancelled by concurrent second navigation
         const first = router.navigate("users");
 
-        // Second navigation - in the new Promise-based API, both navigations complete
+        // Second navigation - aborts first navigation's controller
         const second = router.navigate("orders");
 
         await vi.runAllTimersAsync();
 
-        // In the new Promise-based API, both navigations complete successfully
-        // The first navigation completes after the middleware delay
-        const firstResult = await first;
-
-        expect(firstResult.name).toBe("users");
+        // First navigation is properly cancelled (signal aborted by concurrent nav)
+        await expect(first).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
         const secondResult = await second;
 

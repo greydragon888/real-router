@@ -53,11 +53,12 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        // Navigate to admin (will be redirected to users)
-        await freshRouter.navigate("admin");
+        // Navigate to admin (redirect in TRANSITION_START listener cancels it)
+        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
-        // Current behavior: analytics fires for BOTH admin AND users
-        // This is the bug - analytics should only fire for final destination
+        // TRANSITION_START fires synchronously for both admin and users
         expect(analyticsLog).toStrictEqual([
           "analytics:admin",
           "analytics:users",
@@ -92,10 +93,12 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        await freshRouter.navigate("admin");
+        // Redirect chain in TRANSITION_START listener cancels admin
+        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
-        // Current: effect fires for admin, profile, AND users
-        // Expected (ideal): effect fires only for users (final destination)
+        // TRANSITION_START fires synchronously for each redirect in the chain
         expect(callLog).toStrictEqual([
           "effect:admin",
           "effect:profile",
@@ -210,7 +213,10 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        await freshRouter.navigate("admin");
+        // Redirect in TRANSITION_START listener cancels admin navigation
+        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
         // All 3 listeners fire for both admin and users
         expect(listener1Calls).toStrictEqual(["admin", "users"]);
@@ -253,7 +259,10 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        await freshRouter.navigate("admin");
+        // Redirect in TRANSITION_START listener cancels admin navigation
+        await expect(freshRouter.navigate("admin")).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
         // Order shows: all listeners for admin, then all for users
         expect(executionOrder).toStrictEqual([
@@ -292,10 +301,12 @@ describe("router.navigate() - events listeners", () => {
           },
         );
 
-        await freshRouter.navigate("users");
+        // Redirect chain in TRANSITION_START listener cancels users navigation
+        await expect(freshRouter.navigate("users")).rejects.toMatchObject({
+          code: errorCodes.TRANSITION_CANCELLED,
+        });
 
-        // All redirects in the chain are tracked
-        // Current behavior: each redirect triggers all listeners
+        // All redirects in the chain are tracked via synchronous TRANSITION_START events
         expect(redirects).toStrictEqual(["users", "orders", "profile"]);
 
         freshRouter.stop();

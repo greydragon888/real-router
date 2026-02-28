@@ -159,10 +159,10 @@ describe("router.navigate() - events transition start", () => {
 
       await vi.runAllTimersAsync();
 
-      // In the new Promise-based API, both navigations complete successfully
-      const firstResult = await firstNav;
-
-      expect(firstResult.name).toBe("users.view");
+      // First navigation is properly cancelled (signal aborted by concurrent nav)
+      await expect(firstNav).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
 
       const secondResult = await secondNav;
 

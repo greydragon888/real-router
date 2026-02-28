@@ -133,6 +133,58 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       vi.useRealTimers();
     });
 
+    it("4a. concurrent navigate() aborts previous navigation's signal immediately", async () => {
+      vi.useFakeTimers();
+      let capturedSignal: AbortSignal | undefined;
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => (_toState, _fromState, signal) => {
+          capturedSignal = signal;
+
+          return new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          });
+        },
+      );
+
+      lifecycle.addActivateGuard("profile", () => () => {
+        return new Promise<boolean>((resolve) => {
+          setTimeout(() => {
+            resolve(true);
+          }, 100);
+        });
+      });
+
+      const promise1 = router.navigate("users");
+
+      // Flush deactivation-phase microtask so activation guard runs and sets capturedSignal
+      await Promise.resolve();
+
+      // Concurrent navigation: triggers abort in navigateToState()
+      const promise2 = router.navigate("profile");
+
+      // Key assertion: previous navigation's signal must be aborted immediately
+      expect(capturedSignal).toBeInstanceOf(AbortSignal);
+      expect(capturedSignal!.aborted).toBe(true);
+
+      // Cleanup
+      setTimeout(() => router.stop(), 50);
+      await vi.runAllTimersAsync();
+
+      await expect(promise1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+      await expect(promise2).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await router.start("/home");
+      vi.useRealTimers();
+    });
+
     it("5. stop() during navigation aborts internal controller", async () => {
       vi.useFakeTimers();
 
@@ -201,8 +253,7 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
         .parameter(2)
         .toEqualTypeOf<AbortSignal | undefined>();
 
-      // Runtime: verify signal is actually delivered to guards that declare 3 params.
-      // Only guards with guardFn.length >= 3 receive the signal (opt-in mechanism).
+      // Runtime: verify signal is actually delivered to guards.
       let receivedSignal: AbortSignal | undefined;
       // Capture aborted state at call time (finally block aborts controller after nav)
       let signalAbortedAtCallTime = true;

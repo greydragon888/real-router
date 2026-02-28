@@ -42,5 +42,8 @@ export function isNavigationOptions(
     }
   }
 
-  return true;
+  // Validate signal field
+  const signalValue = obj.signal;
+
+  return !(signalValue !== undefined && !(signalValue instanceof AbortSignal));
 }

@@ -62,6 +62,22 @@ describe("Router Type Guards", () => {
       ).toBe(false);
     });
 
+    it("validates signal field (AbortSignal)", () => {
+      expect(
+        isNavigationOptions({ signal: new AbortController().signal }),
+      ).toBe(true);
+      expect(isNavigationOptions({ signal: undefined })).toBe(true);
+    });
+
+    it("rejects non-AbortSignal signal values", () => {
+      expect(isNavigationOptions({ signal: 42 } as any)).toBe(false);
+      expect(isNavigationOptions({ signal: "not-a-signal" } as any)).toBe(
+        false,
+      );
+      expect(isNavigationOptions({ signal: {} } as any)).toBe(false);
+      expect(isNavigationOptions({ signal: true } as any)).toBe(false);
+    });
+
     it("validates all fields are optional", () => {
       // All fields undefined (absent)
       expect(isNavigationOptions({})).toBe(true);

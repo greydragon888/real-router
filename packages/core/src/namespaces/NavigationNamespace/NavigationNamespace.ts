@@ -119,8 +119,8 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
-    // eslint-disable-next-line sonarjs/no-unused-vars
-    const { signal: _signal, ...cleanOpts } = opts;
+    const cleanOpts =
+      opts.signal === undefined ? opts : NavigationNamespace.#stripSignal(opts);
     const toState = deps.makeState(
       route.name,
       route.params,
@@ -166,10 +166,9 @@ export class NavigationNamespace {
         "Concurrent navigation detected on shared router instance. " +
           "For SSR, use cloneRouter() to create isolated instance per request.",
       );
-      // Note: previous controller is NOT aborted here. cancelNavigation() sends CANCEL
-      // to the FSM which is sufficient to notify the previous navigation. Aborting the
-      // previous controller would cause isCancelled() to return true inside the still-
-      // running previous transition, causing it to reject instead of completing normally.
+      this.#currentController?.abort(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
       deps.cancelNavigation();
     }
 
@@ -218,8 +217,10 @@ export class NavigationNamespace {
 
         deps.setState(stateWithTransition);
 
-        // eslint-disable-next-line sonarjs/no-unused-vars
-        const { signal: _signal2, ...transitionOpts } = opts;
+        const transitionOpts =
+          opts.signal === undefined
+            ? opts
+            : NavigationNamespace.#stripSignal(opts);
 
         deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
 
@@ -291,6 +292,16 @@ export class NavigationNamespace {
   // =========================================================================
   // Private methods
   // =========================================================================
+
+  /**
+   * Strips the non-serializable `signal` field from NavigationOptions.
+   */
+  static #stripSignal(opts: NavigationOptions): NavigationOptions {
+    // eslint-disable-next-line sonarjs/no-unused-vars
+    const { signal: _, ...rest } = opts;
+
+    return rest;
+  }
 
   /**
    * Builds the final state with frozen TransitionMeta attached.
