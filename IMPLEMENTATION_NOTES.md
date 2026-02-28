@@ -1163,7 +1163,7 @@ stop()    → routerFSM.send("CANCEL")  → emitTransitionCancel()  (if transiti
 
 #### Removed API
 
-- **`router.cancel()`** — functionality integrated into `stop()`, `dispose()`, and concurrent navigation logic
+- **`router.cancel()`** — replaced by `AbortController` API: pass `{ signal }` to `navigate()` for external cancellation. Internally, `stop()`, `dispose()`, and concurrent navigation abort the current controller
 - **`emitSuccess` parameter** — removed from `navigateToState()` (core + browser-plugin)
 
 #### Bundle Size

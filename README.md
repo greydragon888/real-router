@@ -47,6 +47,7 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 - **Universal**: Client-side and server-side rendering
 - **Nested routes**: Full support for hierarchical route structures
 - **Lifecycle guards**: `addActivateGuard` / `addDeactivateGuard` for navigation control
+- **AbortController support**: Cancel navigations via standard `AbortSignal` API
 - **Observable state**: Compatible with RxJS and other observable libraries
 - **Plugin architecture**: Modular functionality
 
