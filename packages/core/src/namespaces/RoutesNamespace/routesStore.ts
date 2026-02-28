@@ -109,19 +109,14 @@ export function rebuildTreeInPlace<
 export function resetStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
-  store.definitions.length = 0;
-
-  Object.assign(store.config, createEmptyConfig());
-
-  store.resolvedForwardMap = Object.create(null) as Record<string, string>;
-  store.routeCustomFields = Object.create(null) as Record<
-    string,
-    Record<string, unknown>
-  >;
-
+  clearRouteData(store);
   rebuildTreeInPlace(store);
 }
 
+/**
+ * Clears route data without rebuilding the tree.
+ * Used by replace() to avoid double rebuild (clearRouteData + commitTreeChanges).
+ */
 export function clearRouteData<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {

@@ -624,7 +624,6 @@ export function getRoutesApi<
 
       const canReplace = validateClearRoutes(ctx.isTransitioning());
 
-      /* v8 ignore next 3 -- @preserve: race condition guard, mirrors clear() behavior */
       if (!canReplace) {
         return;
       }

@@ -75,6 +75,7 @@ export class RouteLifecycleNamespace<
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
    * @param skipValidation - True when called during route config building (#noValidate)
+   * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanActivate(
     name: string,
@@ -123,6 +124,7 @@ export class RouteLifecycleNamespace<
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
    * @param skipValidation - True when called during route config building (#noValidate)
+   * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanDeactivate(
     name: string,
@@ -205,7 +207,6 @@ export class RouteLifecycleNamespace<
    * Clears only lifecycle handlers that were registered from route definitions.
    * Used by HMR to remove definition-sourced guards without touching externally-added guards.
    */
-  /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
   clearDefinitionGuards(): void {
     for (const name of this.#definitionActivateGuardNames) {
       this.#canActivateFactories.delete(name);
@@ -219,7 +220,6 @@ export class RouteLifecycleNamespace<
     this.#definitionActivateGuardNames.clear();
     this.#definitionDeactivateGuardNames.clear();
   }
-  /* v8 ignore stop */
 
   /**
    * Returns lifecycle factories as records for cloning.

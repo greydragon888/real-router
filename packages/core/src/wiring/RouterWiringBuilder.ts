@@ -179,8 +179,8 @@ export class RouterWiringBuilder<
       getOptions: () => this.options.get(),
       makeNotFoundState: (path, options) =>
         this.state.makeNotFoundState(path, options),
-      setState: (state) => {
-        this.state.set(state);
+      clearState: () => {
+        this.state.set(undefined);
       },
       matchPath: (path) => this.routes.matchPath(path, this.options.get()),
       completeStart: () => {

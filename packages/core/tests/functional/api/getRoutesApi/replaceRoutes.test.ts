@@ -329,6 +329,30 @@ describe("core/routes/replaceRoutes", () => {
       expect(router.getState()?.name).toBe("updated");
     });
 
+    it("should clear definition canDeactivate guards on replace", async () => {
+      routesApi.add({
+        name: "sticky-def",
+        path: "/sticky-def",
+        canDeactivate: () => () => false, // definition deactivate guard
+      });
+
+      await router.navigate("sticky-def");
+
+      // Definition deactivate guard blocks leaving
+      await expect(router.navigate("home")).rejects.toThrowError();
+
+      // Replace without deactivate guard (state revalidation keeps us on sticky-def)
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "sticky-def", path: "/sticky-def" }, // no canDeactivate
+      ]);
+
+      // Definition guard is cleared — can leave now
+      await router.navigate("home");
+
+      expect(router.getState()?.name).toBe("home");
+    });
+
     it("should handle definition canActivate + external canDeactivate on replace correctly", async () => {
       routesApi.add({
         name: "cross-type",
@@ -369,6 +393,61 @@ describe("core/routes/replaceRoutes", () => {
 
       // External deactivate guard preserved — cannot leave sticky
       await expect(router.navigate("home")).rejects.toThrowError();
+    });
+
+    it("should overwrite external guard with definition guard on replace (definition wins)", async () => {
+      routesApi.add({ name: "contested", path: "/contested" });
+      // External guard that allows navigation
+      lifecycle.addActivateGuard("contested", () => () => true);
+
+      // Navigation works with permissive external guard
+      await router.navigate("contested");
+
+      expect(router.getState()?.name).toBe("contested");
+
+      // Replace with blocking definition guard — overwrites external
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        {
+          name: "contested",
+          path: "/contested",
+          canActivate: () => () => false, // definition guard blocks
+        },
+      ]);
+
+      await router.navigate("home");
+
+      // Definition guard now blocks navigation
+      await expect(router.navigate("contested")).rejects.toThrowError();
+    });
+
+    it("should have no stale entries after removeActivateGuard + replace", async () => {
+      // Add route with definition guard
+      routesApi.add({
+        name: "removable",
+        path: "/removable",
+        canActivate: () => () => false,
+      });
+
+      // Remove the guard externally — should clear from definitionActivateGuardNames
+      lifecycle.removeActivateGuard("removable");
+
+      // Navigation works now (guard removed)
+      await router.navigate("removable");
+
+      expect(router.getState()?.name).toBe("removable");
+
+      // Replace without guard — should not throw or leave stale tracking
+      routesApi.replace([
+        { name: "home", path: "/home" },
+        { name: "removable", path: "/removable" }, // no guard
+      ]);
+
+      // Navigation still works — no stale definition guard entry
+      await router.navigate("home");
+      await router.navigate("removable");
+
+      expect(router.getState()?.name).toBe("removable");
     });
   });
 

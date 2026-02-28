@@ -242,11 +242,9 @@ export class Router<
       clearState: () => {
         this.#state.set(undefined);
       },
-      /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
       setState: (state) => {
         this.#state.set(state);
       },
-      /* v8 ignore stop */
     });
 
     // =========================================================================
