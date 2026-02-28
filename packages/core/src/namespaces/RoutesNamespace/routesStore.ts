@@ -122,7 +122,6 @@ export function resetStore<
   rebuildTreeInPlace(store);
 }
 
-/* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
 export function clearRouteData<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(store: RoutesStore<Dependencies>): void {
@@ -136,7 +135,6 @@ export function clearRouteData<
     Record<string, unknown>
   >;
 }
-/* v8 ignore stop */
 
 // =============================================================================
 // Forward map

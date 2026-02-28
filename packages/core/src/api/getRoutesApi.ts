@@ -293,7 +293,7 @@ function replaceRoutes<
 
   // Step 6: Revalidate state
   if (currentPath !== undefined) {
-    const revalidated = ctx.matchPath(currentPath);
+    const revalidated = ctx.matchPath(currentPath, ctx.getOptions());
 
     if (revalidated) {
       ctx.setState(revalidated);
@@ -301,7 +301,6 @@ function replaceRoutes<
       ctx.clearState();
     }
   }
-  /* v8 ignore stop */
 }
 
 /**
@@ -619,7 +618,6 @@ export function getRoutesApi<
       return getRouteConfig(store, name);
     },
 
-    /* v8 ignore start -- @preserve: HMR infrastructure, tested when HMR is implemented */
     replace: (routes) => {
       throwIfDisposed(ctx.isDisposed);
 
@@ -627,6 +625,7 @@ export function getRoutesApi<
 
       const canReplace = validateClearRoutes(ctx.isTransitioning());
 
+      /* v8 ignore next 3 -- @preserve: race condition guard, mirrors clear() behavior */
       if (!canReplace) {
         return;
       }
@@ -639,7 +638,6 @@ export function getRoutesApi<
       const currentPath = router.getState()?.path;
 
       replaceRoutes(store, noValidate, routeArray, ctx, currentPath);
-      /* v8 ignore stop */
     },
   };
 }
