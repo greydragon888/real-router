@@ -115,7 +115,7 @@ try {
 }
 ```
 
-**Fire-and-forget safe:** calling `router.navigate(...)` without `await` suppresses expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`).
+**Fire-and-forget safe:** calling `router.navigate(...)` without `await` suppresses expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`).
 
 #### `router.navigateToDefault(options?): Promise<State>`
 
@@ -179,6 +179,21 @@ Subscribes to successful transitions. [Wiki](https://github.com/greydragon888/re
 const unsubscribe = router.subscribe(({ route, previousRoute }) => {
   console.log("Navigation:", previousRoute?.name, "->", route.name);
 });
+```
+
+---
+
+### Navigator
+
+#### `getNavigator(router): Navigator`
+
+Returns a frozen subset of router methods for passing to view layers (React, Vue, etc.). All methods are pre-bound — safe to destructure. [Wiki](https://github.com/greydragon888/real-router/wiki/getNavigator)
+
+```typescript
+import { getNavigator } from "@real-router/core";
+
+const navigator = getNavigator(router);
+// { navigate, getState, isActiveRoute, canNavigateTo, subscribe }
 ```
 
 ---
@@ -326,7 +341,7 @@ const serverRouter = cloneRouter(router, { request: req });
 await serverRouter.start(req.url);
 ```
 
-Shares immutable route tree (O(1)), copies mutable state (dependencies, options, plugins, guards).
+Rebuilds route tree from definitions, copies mutable state (dependencies, options, plugins, guards). Each clone gets an independent tree.
 
 ---
 
@@ -334,8 +349,8 @@ Shares immutable route tree (O(1)), copies mutable state (dependencies, options,
 
 ```typescript
 interface Options {
-  defaultRoute: string; // Default route name (default: "")
-  defaultParams: Params; // Default route params (default: {})
+  defaultRoute: string | DefaultRouteCallback; // Default route name (default: "")
+  defaultParams: Params | DefaultParamsCallback; // Default route params (default: {})
   trailingSlash: "strict" | "never" | "always" | "preserve"; // (default: "preserve")
   urlParamsEncoding: "default" | "uri" | "uriComponent" | "none"; // (default: "default")
   queryParamsMode: "default" | "strict" | "loose"; // (default: "loose")
@@ -343,6 +358,8 @@ interface Options {
   allowNotFound: boolean; // Allow navigation to unknown routes (default: true)
   rewritePathOnMatch: boolean; // Rewrite path on successful match (default: false)
   logger?: Partial<LoggerConfig>; // Logger configuration
+  limits?: Partial<LimitsConfig>; // Resource limits (max plugins, listeners, etc.)
+  noValidate?: boolean; // Skip argument validation in production (default: false)
 }
 ```
 
@@ -373,16 +390,18 @@ try {
 }
 ```
 
-| Code                  | Description                    |
-| --------------------- | ------------------------------ |
-| `ROUTE_NOT_FOUND`     | Route doesn't exist            |
-| `CANNOT_ACTIVATE`     | Blocked by canActivate guard   |
-| `CANNOT_DEACTIVATE`   | Blocked by canDeactivate guard |
-| `CANCELLED`           | Navigation was cancelled       |
-| `SAME_STATES`         | Already at target route        |
-| `NOT_STARTED`         | Router not started             |
-| `ALREADY_STARTED`     | Router already started         |
-| `DISPOSED`            | Router has been disposed       |
+| Code                     | Description                       |
+| ------------------------ | --------------------------------- |
+| `ROUTE_NOT_FOUND`        | Route doesn't exist               |
+| `CANNOT_ACTIVATE`        | Blocked by canActivate guard      |
+| `CANNOT_DEACTIVATE`      | Blocked by canDeactivate guard    |
+| `CANCELLED`              | Navigation was cancelled          |
+| `SAME_STATES`            | Already at target route           |
+| `NOT_STARTED`            | Router not started                |
+| `NO_START_PATH_OR_STATE` | `start()` called without a path   |
+| `ALREADY_STARTED`        | Router already started            |
+| `TRANSITION_ERR`         | Generic transition error          |
+| `DISPOSED`               | Router has been disposed          |
 
 See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for details.
 
