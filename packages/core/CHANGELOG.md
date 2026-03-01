@@ -1,5 +1,22 @@
 # @real-router/core
 
+## 0.29.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `State.meta.options` storage, move `reload`/`redirected` to `TransitionMeta` (#202)
+
+  **Breaking Change:** Navigation options are no longer stored in `state.meta.options`.
+  - `reload` and `redirected` flags are now available on `state.transition` after successful navigation
+  - `transitionPath` accepts optional `opts` parameter for reload detection
+  - `shouldUpdateNode` reads `reload` from `state.transition` instead of `state.meta.options`
+  - Removed `EMPTY_OPTIONS` constant and `cleanOpts` helper
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/types@0.19.0
+
 ## 0.28.0
 
 ### Minor Changes

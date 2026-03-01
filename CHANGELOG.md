@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-01]
 
+### @real-router/browser-plugin@0.6.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `meta.options` from history state and popstate restoration (#202)
+
+  **Breaking Change:** `state.meta.options` is no longer written to `history.state` or restored on popstate.
+
+  Existing history entries with `meta.options` are not affected — extra fields are ignored on spread.
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
+### @real-router/core@0.29.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `State.meta.options` storage, move `reload`/`redirected` to `TransitionMeta` (#202)
+
+  **Breaking Change:** Navigation options are no longer stored in `state.meta.options`.
+  - `reload` and `redirected` flags are now available on `state.transition` after successful navigation
+  - `transitionPath` accepts optional `opts` parameter for reload detection
+  - `shouldUpdateNode` reads `reload` from `state.transition` instead of `state.meta.options`
+  - Removed `EMPTY_OPTIONS` constant and `cleanOpts` helper
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/types@0.19.0
+
+### @real-router/types@0.19.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `options` field from `StateMeta` type (#202)
+
+  **Breaking Change:** `StateMeta` no longer includes `options: NavigationOptions` field.
+
+  `TransitionMeta` extended with optional `reload` and `redirected` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta?.options?.redirected) { ... }
+  + if (state.transition?.redirected) { ... }
+
+  - if (state.meta?.options?.reload) { ... }
+  + if (state.transition?.reload) { ... }
+  ```
+
+### @real-router/helpers@0.1.33
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
+### @real-router/logger-plugin@0.2.33
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
+### @real-router/persistent-params-plugin@0.1.32
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
+### @real-router/react@0.4.11
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+  - @real-router/helpers@0.1.33
+
+### @real-router/rx@0.1.21
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
+
 ### @real-router/logger-plugin@0.2.32
 
 ### Patch Changes
