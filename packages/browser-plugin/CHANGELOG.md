@@ -1,5 +1,20 @@
 # @real-router/browser-plugin
 
+## 0.6.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `meta.options` from history state and popstate restoration (#202)
+
+  **Breaking Change:** `state.meta.options` is no longer written to `history.state` or restored on popstate.
+
+  Existing history entries with `meta.options` are not affected — extra fields are ignored on spread.
+
+### Patch Changes
+
+- Updated dependencies [[`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae)]:
+  - @real-router/core@0.29.0
+
 ## 0.5.5
 
 ### Patch Changes

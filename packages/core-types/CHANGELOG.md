@@ -1,5 +1,25 @@
 # @real-router/types
 
+## 0.19.0
+
+### Minor Changes
+
+- [#203](https://github.com/greydragon888/real-router/pull/203) [`eb29a60`](https://github.com/greydragon888/real-router/commit/eb29a60637f6835152be85550e0fad368900a4ae) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `options` field from `StateMeta` type (#202)
+
+  **Breaking Change:** `StateMeta` no longer includes `options: NavigationOptions` field.
+
+  `TransitionMeta` extended with optional `reload` and `redirected` fields.
+
+  **Migration:**
+
+  ```diff
+  - if (state.meta?.options?.redirected) { ... }
+  + if (state.transition?.redirected) { ... }
+
+  - if (state.meta?.options?.reload) { ... }
+  + if (state.transition?.reload) { ... }
+  ```
+
 ## 0.18.0
 
 ### Minor Changes
