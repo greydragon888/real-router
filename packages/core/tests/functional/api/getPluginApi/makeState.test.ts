@@ -68,7 +68,7 @@ describe("makeState", () => {
       "home",
       {},
       "/home",
-      { params: {}, options: {} },
+      { params: {} },
       999,
     );
 
@@ -109,7 +109,7 @@ describe("makeState", () => {
           "home",
           {},
           "/home",
-          { params: {}, options: {} },
+          { params: {} },
           "999" as unknown as number,
         ),
       ).toThrowError(TypeError);
@@ -118,7 +118,7 @@ describe("makeState", () => {
           "home",
           {},
           "/home",
-          { params: {}, options: {} },
+          { params: {} },
           {} as unknown as number,
         ),
       ).toThrowError(/Invalid forceId/);

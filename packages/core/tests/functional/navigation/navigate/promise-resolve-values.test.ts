@@ -244,7 +244,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/settings",
           meta: {
             id: 555,
-            options: {},
             params: {},
           },
         };
@@ -270,7 +269,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/profile",
           meta: {
             id: 444,
-            options: {},
             params: {},
           },
         };
@@ -295,7 +293,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/orders",
           meta: {
             id: 333,
-            options: {},
             params: {},
           },
         };
@@ -431,7 +428,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/settings",
           meta: {
             id: 555,
-            options: {},
             params: {},
           },
         };
@@ -459,7 +455,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/profile",
           meta: {
             id: 444,
-            options: {},
             params: {},
           },
         };
@@ -488,7 +483,6 @@ describe("router.navigate() - promise resolve values", () => {
           path: "/orders",
           meta: {
             id: 333,
-            options: {},
             params: {},
           },
         };

@@ -256,7 +256,6 @@ export function browserPluginFactory(
         router.buildPath(state.name, state.params),
         {
           params: state.meta,
-          options: {},
         },
         1, // forceId
       );

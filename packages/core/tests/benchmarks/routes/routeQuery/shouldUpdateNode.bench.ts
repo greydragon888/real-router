@@ -15,12 +15,7 @@ import { bench, boxplot, summary } from "mitata";
 
 import { createRouter } from "@real-router/core";
 
-import type {
-  NavigationOptions,
-  Route,
-  Router,
-  State,
-} from "@real-router/core";
+import type { Route, Router, State } from "@real-router/core";
 
 // ============================================================================
 // Helpers
@@ -65,13 +60,13 @@ function createTestRouter(routes: Route[]): Router {
 function makeState(
   name: string,
   params: Record<string, string> = {},
-  options?: NavigationOptions,
+  hasMeta?: boolean,
 ): State {
   return {
     name,
     params,
     path: `/${name.replaceAll(".", "/")}`,
-    meta: options ? { id: 1, params: {}, options } : undefined,
+    meta: hasMeta ? { id: 1, params: {} } : undefined,
   };
 }
 
@@ -109,7 +104,7 @@ const STATES = {
   usersList: makeState("users.list"),
   usersView: makeState(ROUTE_USERS_VIEW, { id: "123" }),
   adminDashboard: makeState("admin.dashboard"),
-  withReload: makeState(ROUTE_USERS_VIEW, { id: "123" }, { reload: true }),
+  withReload: makeState(ROUTE_USERS_VIEW, { id: "123" }, true),
   deep5: makeState(generateDeepRoute(5).name),
   deep10: makeState(generateDeepRoute(10).name),
 };

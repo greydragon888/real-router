@@ -79,7 +79,6 @@ boxplot(() => {
           meta: {
             id: 42,
             params: {},
-            options: { reload: true },
           },
         },
         methodName,
@@ -129,11 +128,6 @@ boxplot(() => {
           meta: {
             id: 99,
             params: { cartId: "abc123" },
-            options: {
-              replace: false,
-              reload: false,
-              force: false,
-            },
           },
         },
         methodName,

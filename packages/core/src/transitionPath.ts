@@ -333,18 +333,6 @@ function computeTransitionPath(
     };
   }
 
-  const toStateOptions = toState.meta?.options ?? {};
-
-  // ===== FAST PATH 2: Force reload =====
-  // Skip all optimization when reload is requested
-  if (toStateOptions.reload) {
-    return {
-      intersection: EMPTY_INTERSECTION,
-      toActivate: nameToIDs(toState.name),
-      toDeactivate: reverseArray(nameToIDs(fromState.name)),
-    };
-  }
-
   // ===== FAST PATH 3: Missing meta or meta.params requires full reload =====
   // Check if meta or meta.params is actually missing (not just empty)
   const toHasMeta = toState.meta?.params !== undefined;
@@ -399,7 +387,11 @@ function computeTransitionPath(
 export function getTransitionPath(
   toState: State,
   fromState?: State,
+  opts?: { reload?: boolean },
 ): TransitionPath {
+  if (opts?.reload) {
+    return computeTransitionPath(toState, fromState);
+  }
   if (
     cachedResult !== null &&
     toState === cachedToState &&

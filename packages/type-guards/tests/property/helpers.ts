@@ -138,17 +138,6 @@ export const stateFullArbitrary = fc.record({
     fc.record({
       id: fc.option(fc.integer({ min: 0 }), { nil: undefined }),
       params: fc.option(paramsSimpleArbitrary, { nil: undefined }),
-      options: fc.option(
-        fc.record({
-          replace: fc.option(fc.boolean(), { nil: undefined }),
-          reload: fc.option(fc.boolean(), { nil: undefined }),
-          force: fc.option(fc.boolean(), { nil: undefined }),
-          state: fc.option(fc.dictionary(fc.string(), fc.anything()), {
-            nil: undefined,
-          }),
-        }),
-        { nil: undefined },
-      ),
     }),
     { nil: undefined },
   ),
@@ -167,15 +156,6 @@ export const historyStateArbitrary = fc
     id: fc.integer({ min: 0 }),
     hasParams: fc.boolean(),
     metaParams: paramsSimpleArbitrary,
-    hasOptions: fc.boolean(),
-    hasReplace: fc.boolean(),
-    replace: fc.boolean(),
-    hasReload: fc.boolean(),
-    reload: fc.boolean(),
-    hasForce: fc.boolean(),
-    force: fc.boolean(),
-    hasState: fc.boolean(),
-    state: fc.dictionary(fc.string(), fc.anything()),
   })
   .map((data) => {
     const meta: Record<string, unknown> = {};
@@ -186,28 +166,6 @@ export const historyStateArbitrary = fc
 
     if (data.hasParams) {
       meta.params = data.metaParams;
-    }
-
-    if (data.hasOptions) {
-      const options: Record<string, unknown> = {};
-
-      if (data.hasReplace) {
-        options.replace = data.replace;
-      }
-
-      if (data.hasReload) {
-        options.reload = data.reload;
-      }
-
-      if (data.hasForce) {
-        options.force = data.force;
-      }
-
-      if (data.hasState) {
-        options.state = data.state;
-      }
-
-      meta.options = options;
     }
 
     return {

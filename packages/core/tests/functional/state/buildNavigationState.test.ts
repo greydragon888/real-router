@@ -63,13 +63,6 @@ describe("getPluginApi().buildNavigationState()", () => {
       expect(Object.isFrozen(state?.params)).toBe(true);
       expect(Object.isFrozen(state?.meta)).toBe(true);
     });
-
-    it("should return State with meta.options as empty object", () => {
-      const state = api.buildNavigationState("home");
-
-      expect(state).toBeDefined();
-      expect(state?.meta?.options).toStrictEqual({});
-    });
   });
 
   describe("route not found", () => {

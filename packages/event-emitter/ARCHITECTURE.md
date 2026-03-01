@@ -35,11 +35,11 @@ graph LR
     end
 ```
 
-| Consumer                 | What it uses             | Purpose                                    |
-| ------------------------ | ------------------------ | ------------------------------------------ |
-| **EventBusNamespace**    | `EventEmitter` class     | Router event dispatch (start, stop, transitions) |
-| **EventBusNamespace**    | `Unsubscribe` type       | Return type for `addEventListener()`       |
-| **Router options**       | `EventEmitterLimits`     | `maxListeners`, `warnListeners`, `maxEventDepth` |
+| Consumer              | What it uses         | Purpose                                          |
+| --------------------- | -------------------- | ------------------------------------------------ |
+| **EventBusNamespace** | `EventEmitter` class | Router event dispatch (start, stop, transitions) |
+| **EventBusNamespace** | `Unsubscribe` type   | Return type for `addEventListener()`             |
+| **Router options**    | `EventEmitterLimits` | `maxListeners`, `warnListeners`, `maxEventDepth` |
 
 ## Public API
 
@@ -49,14 +49,26 @@ graph LR
 class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   constructor(options?: EventEmitterOptions);
 
-  on<E extends keyof TEventMap & string>(eventName: E, cb: (...args: TEventMap[E]) => void): Unsubscribe;
-  off<E extends keyof TEventMap & string>(eventName: E, cb: (...args: TEventMap[E]) => void): void;
-  emit<E extends keyof TEventMap & string>(eventName: E, ...args: TEventMap[E]): void;
+  on<E extends keyof TEventMap & string>(
+    eventName: E,
+    cb: (...args: TEventMap[E]) => void,
+  ): Unsubscribe;
+  off<E extends keyof TEventMap & string>(
+    eventName: E,
+    cb: (...args: TEventMap[E]) => void,
+  ): void;
+  emit<E extends keyof TEventMap & string>(
+    eventName: E,
+    ...args: TEventMap[E]
+  ): void;
   clearAll(): void;
   listenerCount(eventName: keyof TEventMap & string): number;
   setLimits(limits: EventEmitterLimits): void;
 
-  static validateCallback(cb: unknown, eventName: string): asserts cb is Function;
+  static validateCallback(
+    cb: unknown,
+    eventName: string,
+  ): asserts cb is Function;
 }
 ```
 
@@ -64,9 +76,9 @@ class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
 ```typescript
 interface EventEmitterLimits {
-  maxListeners: number;   // 0 = unlimited
-  warnListeners: number;  // 0 = no warning
-  maxEventDepth: number;  // 0 = no depth tracking
+  maxListeners: number; // 0 = unlimited
+  warnListeners: number; // 0 = no warning
+  maxEventDepth: number; // 0 = no depth tracking
 }
 
 interface EventEmitterOptions {
@@ -93,16 +105,20 @@ class EventEmitter<TEventMap> {
   #limits: EventEmitterLimits;
   // Current limits (mutable via setLimits).
 
-  readonly #onListenerError: ((eventName: string, error: unknown) => void) | null;
+  readonly #onListenerError:
+    | ((eventName: string, error: unknown) => void)
+    | null;
   readonly #onListenerWarn: ((eventName: string, count: number) => void) | null;
 }
 ```
 
 **Why `Map<string, Set>`?**
+
 - `Map`: O(1) lookup by event name
 - `Set`: O(1) add/remove/has, automatic deduplication by identity
 
 **Why `#depthMap` is null?**
+
 - Lazy initialization — zero allocation if depth tracking never enabled (`maxEventDepth === 0`)
 - Created on first `emit()` via `??=`
 
@@ -137,16 +153,16 @@ emit(eventName, ...args)
     │
     ▼
 ┌───────────────┐
-│  Get Set       │  callbacks.get(eventName)
-│  Empty check   │  → !set || size === 0 → return (fast exit)
+│  Get Set      │  callbacks.get(eventName)
+│  Empty check  │  → !set || size === 0 → return (fast exit)
 └──────┬────────┘
        │
        ▼
-┌───────────────────────────────────────────┐
-│  maxEventDepth === 0?                      │
-│  ├── YES → #emitFast()                    │
-│  └── NO  → #emitWithDepthTracking()       │
-└───────────────────────────────────────────┘
+┌───────────────────────────────────────┐
+│  maxEventDepth === 0?                 │
+│  ├── YES → #emitFast()                │
+│  └── NO  → #emitWithDepthTracking()   │
+└───────────────────────────────────────┘
 ```
 
 #### Fast Path (#emitFast)
@@ -198,11 +214,16 @@ No depth tracking, no try/finally overhead:
 
 ```typescript
 switch (args.length) {
-  case 0: cb();
-  case 1: cb(args[0]);
-  case 2: cb(args[0], args[1]);
-  case 3: cb(args[0], args[1], args[2]);
-  default: Function.prototype.apply.call(cb, undefined, args);
+  case 0:
+    cb();
+  case 1:
+    cb(args[0]);
+  case 2:
+    cb(args[0], args[1]);
+  case 3:
+    cb(args[0], args[1], args[2]);
+  default:
+    Function.prototype.apply.call(cb, undefined, args);
 }
 ```
 
@@ -221,19 +242,19 @@ Standard pattern in event systems (DOM, Node.js EventEmitter).
 
 Three-level error handling:
 
-| Level | Behavior |
-|-------|----------|
-| Per-listener `try/catch` | Each listener isolated — one failing doesn't stop others |
-| `RecursionDepthError` | Re-thrown (propagates to caller) |
+| Level                      | Behavior                                                             |
+| -------------------------- | -------------------------------------------------------------------- |
+| Per-listener `try/catch`   | Each listener isolated — one failing doesn't stop others             |
+| `RecursionDepthError`      | Re-thrown (propagates to caller)                                     |
 | `onListenerError` callback | Called for non-recursion errors; if absent, error silently swallowed |
 
 ## Limits System
 
-| Limit            | Default | Per-event? | Behavior when exceeded |
-| ---------------- | ------- | ---------- | ---------------------- |
-| `maxListeners`   | 0 (off) | Yes        | `on()` throws Error    |
-| `warnListeners`  | 0 (off) | Yes        | `onListenerWarn()` called, no throw |
-| `maxEventDepth`  | 0 (off) | Yes        | `emit()` throws RecursionDepthError |
+| Limit           | Default | Per-event? | Behavior when exceeded              |
+| --------------- | ------- | ---------- | ----------------------------------- |
+| `maxListeners`  | 0 (off) | Yes        | `on()` throws Error                 |
+| `warnListeners` | 0 (off) | Yes        | `onListenerWarn()` called, no throw |
+| `maxEventDepth` | 0 (off) | Yes        | `emit()` throws RecursionDepthError |
 
 - **0 = disabled** for all limits
 - `warnListeners` fires when `set.size === threshold` (exact match, fires once)
@@ -276,33 +297,33 @@ emitter.on("$$success", callback);  // → Unsubscribe
 ```typescript
 createRouter(routes, {
   limits: {
-    maxListeners: 10_000,  // per event
-    warnListeners: 1_000,  // warning threshold
-    maxEventDepth: 5,      // recursion protection
+    maxListeners: 10_000, // per event
+    warnListeners: 1_000, // warning threshold
+    maxEventDepth: 5, // recursion protection
   },
 });
 ```
 
 ## Performance Characteristics
 
-| Operation                 | Time     | Notes                                |
-| ------------------------- | -------- | ------------------------------------ |
-| `emit()` — no listeners  | ~5.8 ns  | Early return, zero work              |
-| `emit()` — 1 listener    | ~30 ns   | Direct call, snapshot of 1           |
-| `emit()` — 10 listeners  | ~90 ns   | Linear: ~18 ns + 5.5 ns per listener |
-| `emit()` — 100 listeners | ~565 ns  | Same linear scaling                  |
-| Depth tracking overhead   | +3.8 ns  | +12.5% per emit                     |
-| `on()` + `off()` cycle   | ~56 ns   | Single listener add/remove           |
+| Operation                | Time    | Notes                                |
+| ------------------------ | ------- | ------------------------------------ |
+| `emit()` — no listeners  | ~5.8 ns | Early return, zero work              |
+| `emit()` — 1 listener    | ~30 ns  | Direct call, snapshot of 1           |
+| `emit()` — 10 listeners  | ~90 ns  | Linear: ~18 ns + 5.5 ns per listener |
+| `emit()` — 100 listeners | ~565 ns | Same linear scaling                  |
+| Depth tracking overhead  | +3.8 ns | +12.5% per emit                      |
+| `on()` + `off()` cycle   | ~56 ns  | Single listener add/remove           |
 
 **Scaling model:** `emit(3 args, N listeners) ~ 18 ns + 5.5 ns * N`
 
 ### Memory
 
-| Allocation          | Size     | When                              |
-| ------------------- | -------- | --------------------------------- |
-| Snapshot `[...set]`  | ~8 B/listener | Every emit with listeners    |
-| `#depthMap`          | ~400 B   | First emit with depth tracking    |
-| Closure per `on()`   | ~200 B   | Once per subscription             |
+| Allocation          | Size          | When                           |
+| ------------------- | ------------- | ------------------------------ |
+| Snapshot `[...set]` | ~8 B/listener | Every emit with listeners      |
+| `#depthMap`         | ~400 B        | First emit with depth tracking |
+| Closure per `on()`  | ~200 B        | Once per subscription          |
 
 ## See Also
 

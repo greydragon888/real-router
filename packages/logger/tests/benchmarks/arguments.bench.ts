@@ -194,7 +194,6 @@ boxplot(() => {
         path: "/users/123",
         meta: {
           params: {},
-          options: {},
         },
       };
 

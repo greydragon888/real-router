@@ -21,8 +21,6 @@ function createState(
   params: Record<string, any> = {},
 
   metaParams: Record<string, any> = {},
-
-  options: Record<string, any> = {},
 ): State {
   return {
     name,
@@ -31,7 +29,6 @@ function createState(
     meta: {
       id: 1,
       params: metaParams,
-      options,
     },
   };
 }
@@ -191,7 +188,6 @@ const TEST_DATA = {
           ...state,
           meta: {
             ...state.meta,
-            options: { reload: true },
           },
         },
       };

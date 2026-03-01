@@ -274,9 +274,6 @@ describe("router.navigate() - events transition start", () => {
       expect(toState).toStrictEqual(
         expect.objectContaining({
           name: "profile",
-          meta: expect.objectContaining({
-            options: expect.objectContaining(navigationOptions),
-          }),
         }),
       );
 
@@ -301,9 +298,6 @@ describe("router.navigate() - events transition start", () => {
       expect(onStart).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "profile",
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ force: true }),
-          }),
         }), // toState
         expect.objectContaining({
           name: "profile",

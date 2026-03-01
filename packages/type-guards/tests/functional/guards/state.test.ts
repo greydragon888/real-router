@@ -24,7 +24,6 @@ describe("State Type Guards", () => {
         meta: {
           id: 1,
           params: {},
-          options: {},
         },
       };
 
@@ -203,7 +202,6 @@ describe("State Type Guards", () => {
         meta: {
           id: 1,
           params: {},
-          options: {},
         },
       };
 
@@ -305,7 +303,6 @@ describe("State Type Guards", () => {
         meta: {
           id: 1,
           params: {},
-          options: {},
         },
         custom: "data", // Additional properties allowed
       };
@@ -343,41 +340,6 @@ describe("State Type Guards", () => {
             params: {},
             path: "/home",
             meta: { params: "invalid" },
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("meta.options field validation (line 158)", () => {
-      it("accepts valid options object in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { options: { reload: true } },
-          }),
-        ).toBe(true);
-      });
-
-      it("rejects non-object options in meta (string)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { options: "invalid" },
-          }),
-        ).toBe(false);
-      });
-
-      it("rejects non-object options in meta (number)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { options: 123 },
           }),
         ).toBe(false);
       });

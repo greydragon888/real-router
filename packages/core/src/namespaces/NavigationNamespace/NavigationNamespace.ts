@@ -119,15 +119,12 @@ export class NavigationNamespace {
 
     const { state: route } = result;
 
-    const cleanOpts =
-      opts.signal === undefined ? opts : NavigationNamespace.#stripSignal(opts);
     const toState = deps.makeState(
       route.name,
       route.params,
       deps.buildPath(route.name, route.params),
       {
         params: route.meta,
-        options: cleanOpts,
       },
     );
 
@@ -213,6 +210,7 @@ export class NavigationNamespace {
           finalState,
           transitionOutput,
           fromState,
+          opts,
         );
 
         deps.setState(stateWithTransition);
@@ -310,12 +308,15 @@ export class NavigationNamespace {
     finalState: State,
     transitionOutput: TransitionOutput["meta"],
     fromState: State | undefined,
+    opts: NavigationOptions,
   ): State {
     const transitionMeta: TransitionMeta = {
       phase: transitionOutput.phase,
       ...(fromState?.name !== undefined && { from: fromState.name }),
       reason: "success",
       segments: transitionOutput.segments,
+      ...(opts.reload !== undefined && { reload: opts.reload }),
+      ...(opts.redirected !== undefined && { redirected: opts.redirected }),
     };
 
     Object.freeze(transitionMeta.segments.deactivated);

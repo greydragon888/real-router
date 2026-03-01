@@ -56,7 +56,6 @@ boxplot(() => {
       const state = createState("users", { id: "123" }, "/users/123", {
         id: 1,
         params: { source: "browser" },
-        options: {},
       });
 
       do_not_optimize(freezeStateInPlace(state));
@@ -77,7 +76,6 @@ boxplot(() => {
         {
           id: 1,
           params: { tab: "overview", filter: "active" },
-          options: { reload: true },
         },
       );
 
@@ -136,7 +134,6 @@ boxplot(() => {
         createState("users", { id: "123" }, "/users/123", {
           id: 1,
           params: { source: "browser" },
-          options: {},
         }),
       );
 

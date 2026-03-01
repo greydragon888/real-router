@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import { RouterError } from "@real-router/core";
 
-import type { NavigationOptions, Params, State } from "@real-router/types";
+import type { Params, State } from "@real-router/types";
 
 describe("RouterError Circular References Properties", () => {
   describe("Handling circular references in params", () => {
@@ -97,7 +97,6 @@ describe("RouterError Circular References Properties", () => {
         meta: {
           id: 1,
           params: metaParams,
-          options: {},
         },
       };
 
@@ -108,38 +107,6 @@ describe("RouterError Circular References Properties", () => {
         (err.redirect?.meta as { params: { foo: string } } | undefined)?.params
           .foo,
       ).toBe("bar");
-
-      return true;
-    });
-
-    it("deepFreezeState handles circular reference in meta.options.state", () => {
-      const optionsState: Record<string, unknown> = { value: "test" };
-
-      optionsState.circular = optionsState;
-
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: {},
-          options: {
-            state: optionsState,
-          } as unknown as NavigationOptions,
-        },
-      };
-
-      const err = new RouterError("ERR", { redirect: state });
-
-      expect(Object.isFrozen(err.redirect)).toBe(true);
-      expect(
-        (
-          err.redirect?.meta as
-            | { options: { state: Record<string, unknown> } }
-            | undefined
-        )?.options.state.value,
-      ).toBe("test");
 
       return true;
     });
@@ -259,7 +226,6 @@ describe("RouterError Circular References Properties", () => {
           meta: fc.option(
             fc.record({
               params: fc.dictionary(fc.string(), fc.anything(), { maxKeys: 3 }),
-              options: fc.record({}),
             }),
           ),
         }),

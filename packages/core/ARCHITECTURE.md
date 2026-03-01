@@ -545,7 +545,11 @@ createRouter([
 ]);
 ```
 
-Child names are automatically prefixed with parent name via dot notation.
+Child names are automatically prefixed with parent name via dot notation. 
+The resulting full name (e.g. `"users.profile"`) is used for navigation and guards.
+
+**Dots are forbidden in route `name`** — hierarchy is defined only via `children` array or `{ parent }` option in `addRoute()`. 
+A name containing a dot throws `TypeError` at registration time.
 
 ### ForwardTo (Route Aliasing)
 
@@ -671,7 +675,7 @@ All states returned by `makeState()` are recursively frozen via `Object.freeze()
 
 - State object itself
 - `state.params`
-- `state.meta`, `state.meta.params`, `state.meta.options`
+- `state.meta`, `state.meta.params`
 - `state.transition` and its nested `segments`
 
 ### State ID Counter

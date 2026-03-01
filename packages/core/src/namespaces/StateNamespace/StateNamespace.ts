@@ -7,12 +7,7 @@ import { constants } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
-import type {
-  NavigationOptions,
-  Params,
-  State,
-  StateMetaInput,
-} from "@real-router/types";
+import type { Params, State, StateMetaInput } from "@real-router/types";
 import type { RouteTreeStateMeta } from "route-tree";
 
 /**
@@ -158,7 +153,6 @@ export class StateNamespace {
           ...meta,
           id: forceId ?? ++this.#stateId,
           params: meta.params,
-          options: meta.options,
         }
       : undefined;
 
@@ -190,13 +184,12 @@ export class StateNamespace {
   /**
    * Creates a frozen state object for the "not found" route.
    */
-  makeNotFoundState(path: string, options: NavigationOptions): State {
+  makeNotFoundState(path: string): State {
     return this.makeState<{ path: string }>(
       constants.UNKNOWN_ROUTE,
       { path },
       path,
       {
-        options,
         params: {},
       },
     );

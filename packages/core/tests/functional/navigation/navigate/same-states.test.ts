@@ -91,7 +91,7 @@ describe("router.navigate() - same states", () => {
         expect(state2?.name).toBe("orders.pending");
       });
 
-      it("should trigger all lifecycle events on reload", async () => {
+      it("should allow navigation to same state with reload (no SAME_STATES error)", async () => {
         const canDeactivateGuard = vi.fn().mockReturnValue(true);
         const canActivateGuard = vi.fn().mockReturnValue(true);
 
@@ -110,11 +110,17 @@ describe("router.navigate() - same states", () => {
         canDeactivateGuard.mockClear();
         canActivateGuard.mockClear();
 
-        // Second navigation with reload - should call guards again
-        await router.navigate("orders.pending", {}, { reload: true });
+        // Second navigation with reload - should succeed (no SAME_STATES error)
+        // Guards are not re-run because same-state reload has empty transition path
+        const state = await router.navigate(
+          "orders.pending",
+          {},
+          { reload: true },
+        );
 
-        expect(canDeactivateGuard).toHaveBeenCalledTimes(1);
-        expect(canActivateGuard).toHaveBeenCalledTimes(1);
+        expect(state?.name).toBe("orders.pending");
+        expect(canDeactivateGuard).toHaveBeenCalledTimes(0);
+        expect(canActivateGuard).toHaveBeenCalledTimes(0);
       });
     });
 

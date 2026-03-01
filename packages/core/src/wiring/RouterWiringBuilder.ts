@@ -177,8 +177,7 @@ export class RouterWiringBuilder<
   wireLifecycleDeps(): void {
     const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.options.get(),
-      makeNotFoundState: (path, options) =>
-        this.state.makeNotFoundState(path, options),
+      makeNotFoundState: (path) => this.state.makeNotFoundState(path),
       clearState: () => {
         this.state.set(undefined);
       },

@@ -54,7 +54,6 @@ describe("Utils", () => {
             // id is NOT in the object - fallback to 1 is used
             // Note: makeState then overrides with ++stateId, but the fallback branch is executed
             params: {},
-            options: {},
           },
         },
       } as PopStateEvent;
@@ -84,7 +83,6 @@ describe("Utils", () => {
           meta: {
             id: 5,
             // params is NOT in the object - should fallback to {}
-            options: {},
           },
         },
       } as PopStateEvent;
@@ -98,34 +96,6 @@ describe("Utils", () => {
 
       expect(state).toBeDefined();
       expect(state?.meta?.params).toStrictEqual({});
-    });
-
-    it("uses fallback for missing meta.options (line 114)", async () => {
-      await router.start("/home");
-
-      // Create event with state that has meta WITHOUT options property
-      const evt = {
-        state: {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: {
-            id: 5,
-            params: {},
-            // options is NOT in the object - should fallback to {}
-          },
-        },
-      } as PopStateEvent;
-
-      const state = createStateFromEvent(
-        evt,
-        getPluginApi(router),
-        browser,
-        {},
-      );
-
-      expect(state).toBeDefined();
-      expect(state?.meta?.options).toStrictEqual({});
     });
 
     it("uses all fallbacks when meta is empty (lines 112-114)", async () => {
@@ -150,7 +120,6 @@ describe("Utils", () => {
       expect(state).toBeDefined();
       expect(state?.meta?.id).toBeGreaterThanOrEqual(1);
       expect(state?.meta?.params).toStrictEqual({});
-      expect(state?.meta?.options).toStrictEqual({});
     });
 
     it("matches path when event has no state (new navigation)", async () => {
@@ -192,7 +161,7 @@ describe("Utils", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 1, params: {}, options: {} },
+        meta: { id: 1, params: {} },
       };
 
       const result = shouldSkipTransition(newState, undefined, router);
@@ -205,7 +174,7 @@ describe("Utils", () => {
         name: "home",
         params: {},
         path: "/home",
-        meta: { id: 1, params: {}, options: {} },
+        meta: { id: 1, params: {} },
       };
 
       const result = shouldSkipTransition(state, state, router);
@@ -251,13 +220,13 @@ describe("Utils", () => {
       name: "home",
       params: {},
       path: "/home",
-      meta: { id: 1, params: {}, options: {} },
+      meta: { id: 1, params: {} },
     };
     const toState: State = {
       name: "users",
       params: {},
       path: "/users",
-      meta: { id: 2, params: {}, options: {} },
+      meta: { id: 2, params: {} },
     };
 
     beforeEach(async () => {

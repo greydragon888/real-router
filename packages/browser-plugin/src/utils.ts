@@ -73,7 +73,6 @@ export function createStateFromEvent(
     {
       ...evt.state.meta,
       params: evt.state.meta?.params ?? {},
-      options: evt.state.meta?.options ?? {},
     },
     evt.state.meta?.id,
   );

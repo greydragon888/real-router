@@ -41,12 +41,12 @@ boxplot(() => {
       });
     });
 
-    bench("isHistoryState: with options", () => {
+    bench("isHistoryState: with id in meta", () => {
       isHistoryState({
         name: "profile",
         params: {},
         path: "/profile",
-        meta: { options: { reload: true } },
+        meta: { id: 1, params: {} },
       });
     });
 
@@ -58,7 +58,6 @@ boxplot(() => {
         meta: {
           id: 42,
           params: { from: "home" },
-          options: { replace: true },
         },
       });
     });
@@ -147,12 +146,12 @@ boxplot(() => {
       } as any);
     });
 
-    bench("isHistoryState: reject invalid meta.options type", () => {
+    bench("isHistoryState: with extra fields in meta (backward compat)", () => {
       isHistoryState({
         name: "home",
         params: {},
         path: "/",
-        meta: { options: "invalid" },
+        meta: { extra: "field" },
       } as any);
     });
   });

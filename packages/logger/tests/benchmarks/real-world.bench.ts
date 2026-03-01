@@ -35,7 +35,7 @@ boxplot(() => {
         name: "users.profile",
         params: { id: "123" },
         path: "/users/123",
-        meta: { params: {}, options: {} },
+        meta: { params: {} },
       };
 
       logger.configure({ level: "all" });

@@ -74,7 +74,7 @@ Permanently terminates the router. Unlike `stop()`, it cannot be restarted. All 
 
 #### `router.isActive(): boolean`
 
-Returns whether the router is active (started and has current state). [Wiki](https://github.com/greydragon888/real-router/wiki/isActive)
+Returns whether the router is active (not idle and not disposed). [Wiki](https://github.com/greydragon888/real-router/wiki/isActive)
 
 ---
 

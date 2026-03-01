@@ -49,7 +49,6 @@ describe("deepFreezeState", () => {
         meta: {
           id: 1,
           params: { source: "browser" },
-          options: {},
         },
       };
 
@@ -58,7 +57,6 @@ describe("deepFreezeState", () => {
       expect(Object.isFrozen(frozen)).toBe(true);
       expect(Object.isFrozen(frozen.meta)).toBe(true);
       expect(Object.isFrozen(frozen.meta?.params)).toBe(true);
-      expect(Object.isFrozen(frozen.meta?.options)).toBe(true);
     });
   });
 
@@ -473,7 +471,6 @@ describe("deepFreezeState", () => {
         meta: {
           id: 1,
           params: { source: "navigation" },
-          options: {},
         },
       };
 
@@ -486,48 +483,6 @@ describe("deepFreezeState", () => {
       }).toThrowError();
     });
 
-    it("should freeze meta.options", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: {},
-          options: { replace: true },
-        },
-      };
-
-      const frozen = deepFreezeState(state);
-
-      expect(Object.isFrozen(frozen.meta?.options)).toBe(true);
-
-      expect(() => {
-        frozen.meta!.options.replace = false;
-      }).toThrowError();
-    });
-
-    it("should freeze meta.options.state if present", () => {
-      const state: State = {
-        name: "test",
-        path: "/test",
-        params: {},
-        meta: {
-          id: 1,
-          params: {},
-          options: { replace: true, reload: true },
-        },
-      };
-
-      const frozen = deepFreezeState(state);
-
-      expect(Object.isFrozen(frozen.meta?.options)).toBe(true);
-
-      expect(() => {
-        (frozen.meta!.options as { replace: boolean }).replace = false;
-      }).toThrowError();
-    });
-
     it("should handle circular reference in meta", () => {
       const state: State = {
         name: "test",
@@ -536,7 +491,6 @@ describe("deepFreezeState", () => {
         meta: {
           id: 1,
           params: {},
-          options: {},
         },
       };
 
@@ -599,7 +553,6 @@ describe("freezeStateInPlace", () => {
         meta: {
           id: 1,
           params: { source: "browser" },
-          options: {},
         },
       };
 
@@ -609,7 +562,6 @@ describe("freezeStateInPlace", () => {
       expect(Object.isFrozen(frozen)).toBe(true);
       expect(Object.isFrozen(frozen.meta)).toBe(true);
       expect(Object.isFrozen(frozen.meta?.params)).toBe(true);
-      expect(Object.isFrozen(frozen.meta?.options)).toBe(true);
     });
   });
 

@@ -536,22 +536,6 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
       vi.useRealTimers();
     });
 
-    it("17. Signal NOT stored in state.meta.options after successful navigation", async () => {
-      const controller = new AbortController();
-
-      const state = await router.navigate(
-        "users",
-        {},
-        { signal: controller.signal },
-      );
-
-      expect(state.name).toBe("users");
-      // Signal must NOT be in state.meta.options (non-serializable)
-      expect(
-        (state.meta?.options as Record<string, unknown>)?.signal,
-      ).toBeUndefined();
-    });
-
     it("18. Already-aborted signal passed to navigate() → immediate TRANSITION_CANCELLED", async () => {
       // Create already-aborted signal
       const controller = new AbortController();

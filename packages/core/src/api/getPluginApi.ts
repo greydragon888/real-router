@@ -104,7 +104,6 @@ export function getPluginApi<
         ctx.buildPath(routeInfo.name, routeInfo.params),
         {
           params: routeInfo.meta,
-          options: {},
         },
       );
     },

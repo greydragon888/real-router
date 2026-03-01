@@ -113,9 +113,7 @@ describe("router.navigate() - edge cases proxy", () => {
 
         expect(state).toStrictEqual(
           expect.objectContaining({
-            meta: expect.objectContaining({
-              options: expect.objectContaining({ replace: true }),
-            }),
+            name: "users",
           }),
         );
       });

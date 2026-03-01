@@ -111,7 +111,7 @@ import type { Route } from "../helpers";
   }).gc("inner");
 }
 
-// 9.5.6 Redirect with meta.options preservation
+// 9.5.6 Redirect with transition options
 {
   const router = createSimpleRouter();
 
@@ -127,7 +127,7 @@ import type { Route } from "../helpers";
   }));
   router.start("/");
 
-  bench("9.5.6 Redirect with meta.options preservation", () => {
+  bench("9.5.6 Redirect with transition options", () => {
     router.navigate("about", {}, { reload: true });
   }).gc("inner");
 }

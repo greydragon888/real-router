@@ -332,7 +332,7 @@ describe("Browser Plugin", async () => {
         name: "users.view",
         params: { id: "1" },
         path: "/users/view/1",
-        meta: { id: 2, params: {}, options: {}, source: "popstate" },
+        meta: { id: 2, params: {}, source: "popstate" },
       };
 
       globalThis.dispatchEvent(
@@ -411,14 +411,14 @@ describe("Browser Plugin", async () => {
           name: "users.view",
           params: { id: "1" },
           path: "/users/view/1",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         const state2 = {
           name: "users.view",
           params: { id: "2" },
           path: "/users/view/2",
-          meta: { id: 2, params: {}, options: {} },
+          meta: { id: 2, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -470,21 +470,21 @@ describe("Browser Plugin", async () => {
           name: "users.view",
           params: { id: "1" },
           path: "/users/view/1",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         const state2: State = {
           name: "users.view",
           params: { id: "2" },
           path: "/users/view/2",
-          meta: { id: 2, params: {}, options: {} },
+          meta: { id: 2, params: {} },
         };
 
         const state3: State = {
           name: "users.list",
           params: {},
           path: "/users/list",
-          meta: { id: 3, params: {}, options: {} },
+          meta: { id: 3, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -574,7 +574,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 2, params: {}, options: {} },
+          meta: { id: 2, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -610,7 +610,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 2, params: {}, options: {} },
+          meta: { id: 2, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -842,7 +842,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: {},
           path: "/home",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         router.lastKnownState = externalState;
@@ -1141,7 +1141,6 @@ describe("Browser Plugin", async () => {
             meta: {
               id: i,
               params: {},
-              options: {},
             },
           };
         });
@@ -1551,7 +1550,7 @@ describe("Browser Plugin", async () => {
               name: "home",
               params: {},
               path: "/home",
-              meta: { id: 99, params: {}, options: {} },
+              meta: { id: 99, params: {} },
             },
           }),
         );
@@ -1861,7 +1860,7 @@ describe("Browser Plugin", async () => {
           name: '<script>alert("xss")</script>',
           params: {},
           path: "/malicious",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -1900,7 +1899,7 @@ describe("Browser Plugin", async () => {
           name: "users.view",
           params: { id: "123", __proto__: { polluted: true } },
           path: "/users/view/123",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -1921,7 +1920,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: { constructor: { prototype: { polluted: true } } },
           path: "/home",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         globalThis.dispatchEvent(
@@ -1949,7 +1948,7 @@ describe("Browser Plugin", async () => {
           name: "home",
           params: { deep: deeplyNested },
           path: "/home",
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         // The key test: router should not crash with deeply nested objects

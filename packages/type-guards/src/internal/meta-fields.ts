@@ -28,11 +28,6 @@ export function isMetaFields<MP extends Params = Params>(
     return false;
   }
 
-  // Check options field if present
-  if ("options" in obj && typeof obj.options !== "object") {
-    return false;
-  }
-
   // Check id field if present
   if ("id" in obj && typeof obj.id !== "number") {
     return false;

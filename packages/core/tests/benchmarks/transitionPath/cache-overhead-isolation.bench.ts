@@ -173,7 +173,7 @@ function getTransitionPath_keyIndexCache(
 ): TransitionPath {
   if (
     !fromState ||
-    toState.meta?.options.reload ||
+    toState.transition?.reload ||
     hasMetaParams(toState) ||
     hasMetaParams(fromState)
   ) {
@@ -201,8 +201,6 @@ function makeState(
     meta: {
       id: 1,
       params: metaParams,
-      options: {},
-      redirected: false,
     },
   } as State;
 }

@@ -37,7 +37,6 @@ import { createSimpleRouter } from "../helpers";
       do_not_optimize(
         router.makeState("about", {}, "/about", {
           params: {},
-          options: { reload: true },
         }),
       );
     }

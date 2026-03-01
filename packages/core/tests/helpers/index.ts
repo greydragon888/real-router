@@ -1,4 +1,4 @@
-import type { NavigationOptions, Params, State } from "@real-router/core";
+import type { Params, State } from "@real-router/core";
 
 export { createTestRouter } from "./testRouters";
 
@@ -18,7 +18,6 @@ export const makeState = (
   name: string,
   params: Params = {},
   metaParams: Params = {},
-  options: NavigationOptions = {},
 ): State => ({
   name,
   path: `/${name.replaceAll(".", "/")}`,
@@ -26,6 +25,5 @@ export const makeState = (
   meta: {
     id: 0,
     params: metaParams,
-    options,
   },
 });

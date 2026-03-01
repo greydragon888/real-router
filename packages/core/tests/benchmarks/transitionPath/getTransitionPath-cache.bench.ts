@@ -28,7 +28,6 @@ function makeState(
   name: string,
   params: Record<string, any> = {},
   metaParams: Record<string, any> = {},
-  options: Record<string, any> = {},
 ): State {
   return {
     name,
@@ -37,7 +36,6 @@ function makeState(
     meta: {
       id: 1,
       params: metaParams,
-      options,
     },
   };
 }

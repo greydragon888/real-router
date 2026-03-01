@@ -4,16 +4,18 @@
 
 ## Overview
 
-`@real-router/fsm` is a **standalone, zero-dependency** synchronous finite state machine engine (107 LOC). It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITIONING, DISPOSED) and transitions are managed by a single FSM instance.
+`@real-router/fsm` is a **standalone, zero-dependency** synchronous finite state machine engine.
+It drives the entire router lifecycle — all states (IDLE, STARTING, READY, TRANSITIONING, DISPOSED) and transitions are managed by a single FSM instance.
 
-**Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition. Events flow through FSM actions into the event emitter.
+**Key role:** No boolean flags, no ad-hoc state management. Every router state change is an FSM transition.
+Events flow through FSM actions into the event emitter.
 
 ## Package Structure
 
 ```
 fsm/
 ├── src/
-│   ├── fsm.ts      — FSM class (137 lines, all logic)
+│   ├── fsm.ts       — FSM class (all logic)
 │   ├── types.ts     — FSMConfig, TransitionInfo, TransitionListener
 │   └── index.ts     — Public API exports
 ```
@@ -35,12 +37,11 @@ graph LR
     end
 ```
 
-| Consumer              | What it uses         | Purpose                                     |
-| --------------------- | -------------------- | ------------------------------------------- |
-| **EventBusNamespace** | `FSM` class          | Router lifecycle state machine              |
-| **EventBusNamespace** | `fsm.on()`           | Trigger event emission on state transitions |
-| **EventBusNamespace** | `fsm.canSend()`      | Check if router can begin a transition      |
-| **EventBusNamespace** | `TransitionInfo` type | Listener callback signature                 |
+| Consumer              | What it uses    | Purpose                                     |
+| --------------------- | --------------- | ------------------------------------------- |
+| **EventBusNamespace** | `FSM` class     | Router lifecycle state machine              |
+| **EventBusNamespace** | `fsm.on()`      | Trigger event emission on state transitions |
+| **EventBusNamespace** | `fsm.canSend()` | Check if router can begin a transition      |
 
 ## Public API
 
@@ -59,7 +60,11 @@ class FSM<
   canSend(event: TEvents): boolean;
   getState(): TStates;
   getContext(): TContext;
-  on<E extends TEvents>(from: TStates, event: E, action: ActionFn<E>): () => void;
+  on<E extends TEvents>(
+    from: TStates,
+    event: E,
+    action: ActionFn<E>,
+  ): () => void;
   onTransition(listener: (info: TransitionInfo) => void): () => void;
 }
 ```
@@ -116,41 +121,44 @@ The transition table is a nested record: `state → event → nextState`.
 
 ### send() — Transition Flow
 
-```
-send(event, payload?)
-    │
-    ▼
-┌─────────────────────┐
-│  Lookup next state    │  nextState = #currentTransitions[event]
-│  undefined → no-op    │  → return #state (no actions, no listeners)
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Update state        │  #state = nextState
-│  (BEFORE listeners)  │  #currentTransitions = transitions[nextState]
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Execute action      │  if #actions !== null:
-│  (specific to pair)  │    action = #actions.get(`${from}\0${event}`)
-│                      │    action?.(payload)
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│  Fire listeners      │  if #listenerCount > 0:
-│  (generic observers) │    info = { from, to, event, payload }
-│                      │    for listener of #listeners:
-│                      │      listener !== null → listener(info)
-└──────────┬──────────┘
-           │
-           ▼
-  return #state (may differ from nextState if reentrant send occurred)
+```typescript
+send(event, ...args) {
+  // 1. Lookup next state — no-op if transition undefined
+  const nextState = this.#currentTransitions[event];
+  if (nextState === undefined) {
+    return this.#state;
+  }
+
+  // 2. Update state BEFORE actions and listeners
+  const from = this.#state;
+  this.#state = nextState;
+  this.#currentTransitions = this.#transitions[nextState];
+
+  // 3. Execute action for specific (from, event) pair
+  if (this.#actions !== null) {
+    const action = this.#actions.get(`${from}\0${event}`);
+    if (action !== undefined) {
+      action(args[0]);
+    }
+  }
+
+  // 4. Fire generic transition listeners
+  if (this.#listenerCount > 0) {
+    const info = { from, to: nextState, event, payload: args[0] };
+    for (const listener of this.#listeners) {
+      if (listener !== null) {
+        listener(info);
+      }
+    }
+  }
+
+  // May differ from nextState if reentrant send() occurred
+  return this.#state;
+}
 ```
 
 **Critical ordering:**
+
 1. State updated **before** actions and listeners
 2. Actions fire **before** listeners
 3. Return value is `#state`, not `nextState` (reflects reentrant mutations)
@@ -198,6 +206,7 @@ onTransition(listener) {
 ```
 
 **Why null-slot?**
+
 - No array shifting/splicing on unsubscribe
 - Prevents unbounded growth (reuses vacated slots)
 - Null checks during iteration are O(1)
@@ -206,13 +215,13 @@ onTransition(listener) {
 
 ## Hot-Path Optimizations
 
-| Optimization                 | Purpose                                                  |
-| ---------------------------- | -------------------------------------------------------- |
-| `#currentTransitions` cache  | O(1) event lookup — avoids `transitions[state][event]` double lookup |
-| `#listenerCount` fast-path   | Skips listener iteration + `TransitionInfo` allocation when 0 |
-| Lazy `#actions` (`null`)     | No Map allocation when `on()` not used                   |
-| Null-slot listener array     | Reuses slots from unsubscribed listeners                 |
-| Early exit on no-op          | Returns immediately if transition undefined              |
+| Optimization                | Purpose                                                              |
+| --------------------------- | -------------------------------------------------------------------- |
+| `#currentTransitions` cache | O(1) event lookup — avoids `transitions[state][event]` double lookup |
+| `#listenerCount` fast-path  | Skips listener iteration + `TransitionInfo` allocation when 0        |
+| Lazy `#actions` (`null`)    | No Map allocation when `on()` not used                               |
+| Null-slot listener array    | Reuses slots from unsubscribed listeners                             |
+| Early exit on no-op         | Returns immediately if transition undefined                          |
 
 ## Reentrancy
 
@@ -221,10 +230,10 @@ onTransition(listener) {
 ```typescript
 fsm.onTransition(({ to }) => {
   if (to === "STARTING") {
-    fsm.send("STARTED");  // reentrant — executes synchronously inline
+    fsm.send("STARTED"); // reentrant — executes synchronously inline
   }
 });
-fsm.send("START");  // triggers IDLE → STARTING → READY
+fsm.send("START"); // triggers IDLE → STARTING → READY
 ```
 
 - State already updated before listeners — reentrant `send()` sees new state
@@ -248,16 +257,20 @@ This is intentional: FSM prioritizes state consistency over listener execution g
 ```typescript
 interface RouterPayloads {
   NAVIGATE: { toState: State; fromState: State | undefined };
-  COMPLETE: { state: State; fromState: State | undefined; opts: NavigationOptions };
+  COMPLETE: {
+    state: State;
+    fromState: State | undefined;
+    opts: NavigationOptions;
+  };
   FAIL: { toState?: State; fromState?: State; error?: unknown };
   CANCEL: { toState: State; fromState: State | undefined };
   // START, STARTED, STOP not listed → no payload allowed
 }
 
-fsm.send("NAVIGATE", { toState, fromState });  // required
-fsm.send("START");                              // no payload
-fsm.send("NAVIGATE");                          // TS error
-fsm.send("START", {});                         // TS error
+fsm.send("NAVIGATE", { toState, fromState }); // required
+fsm.send("START"); // no payload
+fsm.send("NAVIGATE"); // TS error
+fsm.send("START", {}); // TS error
 ```
 
 Default `TPayloadMap = Record<never, never>` — all events are payload-free.
@@ -310,28 +323,32 @@ fsm.on("TRANSITIONING", "COMPLETE", (payload) => emitter.emit("$$success", ...))
 
 ### Flow: Navigation → FSM → Events
 
-```
-router.navigate(name, params)
-    → fsm.send("NAVIGATE", { toState, fromState })
-        → #state = TRANSITIONING
-        → action: emitter.emit("$$start", toState, fromState)
-    → [guards, state update]
-    → fsm.send("COMPLETE", { state, fromState, opts })
-        → #state = READY
-        → action: emitter.emit("$$success", state, fromState, opts)
+```typescript
+// 1. Start transition
+fsm.send("NAVIGATE", { toState, fromState });
+//    → #state = TRANSITIONING
+//    → action: emitter.emit("$$start", toState, fromState)
+
+// 2. Run guards, update state
+// ...
+
+// 3. Complete transition
+fsm.send("COMPLETE", { state, fromState, opts });
+//    → #state = READY
+//    → action: emitter.emit("$$success", state, fromState, opts)
 ```
 
 ## Performance Characteristics
 
-| Operation                   | Complexity | Notes                                   |
-| --------------------------- | ---------- | --------------------------------------- |
-| `send()` — no-op           | O(1)       | Single property lookup, early return    |
-| `send()` — transition      | O(1) + O(L)| 1 lookup + L listeners                 |
-| `canSend()`                | O(1)       | Cached `#currentTransitions` lookup     |
-| `getState()` / `getContext()` | O(1)    | Direct field access                     |
-| `on()` registration        | O(1)       | Map.set()                               |
-| `onTransition()` registration | O(n)    | indexOf(null) scan for slot reuse       |
-| Unsubscribe                | O(1)       | Direct index null assignment            |
+| Operation                     | Complexity  | Notes                                |
+| ----------------------------- | ----------- | ------------------------------------ |
+| `send()` — no-op              | O(1)        | Single property lookup, early return |
+| `send()` — transition         | O(1) + O(L) | 1 lookup + L listeners               |
+| `canSend()`                   | O(1)        | Cached `#currentTransitions` lookup  |
+| `getState()` / `getContext()` | O(1)        | Direct field access                  |
+| `on()` registration           | O(1)        | Map.set()                            |
+| `onTransition()` registration | O(n)        | indexOf(null) scan for slot reuse    |
+| Unsubscribe                   | O(1)        | Direct index null assignment         |
 
 ### Memory
 
