@@ -1,5 +1,13 @@
 # @real-router/logger-plugin
 
+## 0.2.32
+
+### Patch Changes
+
+- [#200](https://github.com/greydragon888/real-router/pull/200) [`d17021a`](https://github.com/greydragon888/real-router/commit/d17021a12047d27313b9c0dfc17ab48b6e3882b9) Thanks [@greydragon888](https://github.com/greydragon888)! - Eliminate redundant computations in logger-plugin (#199)
+
+  Pre-compute immutable flags and prefix at initialization, cache transition label and perf mark name across handlers, extract shared `resetTransitionState()` cleanup, inline `getTiming()`, and replace `Object.entries()` with `Object.keys()` for emptiness checks in params-diff.
+
 ## 0.2.31
 
 ### Patch Changes
