@@ -52,14 +52,29 @@ export class RouteLifecycleNamespace<
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
 
+  /**
+   * Injects the router instance during wiring phase.
+   *
+   * @param router - Router instance to use for factory compilation
+   */
   setRouter(router: Router<Dependencies>): void {
     this.#router = router;
   }
 
+  /**
+   * Injects namespace dependencies (getDependency accessor) during wiring phase.
+   *
+   * @param deps - Dependencies object containing getDependency accessor
+   */
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
   }
 
+  /**
+   * Updates handler registration limits (max lifecycle handlers threshold).
+   *
+   * @param limits - Limits configuration with maxLifecycleHandlers
+   */
   setLimits(limits: Limits): void {
     this.#limits = limits;
   }
@@ -253,6 +268,15 @@ export class RouteLifecycleNamespace<
     return [this.#canDeactivateFunctions, this.#canActivateFunctions];
   }
 
+  /**
+   * Synchronously checks the canActivate guard for a route.
+   * Returns `true` if no guard is registered or the guard allows activation.
+   * Returns `false` if the guard blocks, returns a Promise, or throws.
+   *
+   * @param name - Route name to check the guard for
+   * @param toState - Target navigation state
+   * @param fromState - Current state (`undefined` on initial navigation)
+   */
   checkActivateGuardSync(
     name: string,
     toState: State,
@@ -267,6 +291,15 @@ export class RouteLifecycleNamespace<
     );
   }
 
+  /**
+   * Synchronously checks the canDeactivate guard for a route.
+   * Returns `true` if no guard is registered or the guard allows deactivation.
+   * Returns `false` if the guard blocks, returns a Promise, or throws.
+   *
+   * @param name - Route name to check the guard for
+   * @param toState - Target navigation state
+   * @param fromState - Current state (`undefined` on initial navigation)
+   */
   checkDeactivateGuardSync(
     name: string,
     toState: State,
@@ -288,6 +321,14 @@ export class RouteLifecycleNamespace<
   /**
    * Registers a handler.
    * Handles overwrite warning, count threshold warnings, and factory compilation.
+   *
+   * @param type - Guard type for log messages ("activate" or "deactivate")
+   * @param name - Route name to register the guard for
+   * @param handler - Guard factory function or boolean shorthand
+   * @param factories - Target factory map (canActivate or canDeactivate)
+   * @param functions - Target compiled functions map (canActivate or canDeactivate)
+   * @param methodName - Public API method name for error/warning messages
+   * @param isOverwrite - Whether this replaces an existing guard for the same route
    */
   #registerHandler(
     type: "activate" | "deactivate",
@@ -340,6 +381,17 @@ export class RouteLifecycleNamespace<
     }
   }
 
+  /**
+   * Shared implementation for synchronous guard checks.
+   * Warns if a guard returns a Promise (async guards are not supported in sync mode).
+   * Catches exceptions and treats them as navigation-blocking (`false`).
+   *
+   * @param functions - Map of compiled guard functions to look up
+   * @param name - Route name to check the guard for
+   * @param toState - Target navigation state
+   * @param fromState - Current state (`undefined` on initial navigation)
+   * @param methodName - Public API method name for warning messages
+   */
   #checkGuardSync(
     functions: Map<string, GuardFn>,
     name: string,
@@ -371,6 +423,12 @@ export class RouteLifecycleNamespace<
     }
   }
 
+  /**
+   * Emits warn/error log messages when handler count approaches the configured limit.
+   *
+   * @param currentSize - Current handler count (after adding the new one)
+   * @param methodName - Public API method name for warning messages
+   */
   #checkCountThresholds(currentSize: number, methodName: string): void {
     const maxLifecycleHandlers = this.#limits.maxLifecycleHandlers;
 
