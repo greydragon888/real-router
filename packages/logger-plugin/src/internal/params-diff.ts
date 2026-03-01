@@ -79,15 +79,11 @@ export const logParamsDiff = (diff: ParamsDiff, context: string): void => {
     parts.push(`Changed: { ${items.join(", ")} }`);
   }
 
-  const addedEntries = Object.entries(diff.added);
-
-  if (addedEntries.length > 0) {
+  if (Object.keys(diff.added).length > 0) {
     parts.push(`Added: ${JSON.stringify(diff.added)}`);
   }
 
-  const removedEntries = Object.entries(diff.removed);
-
-  if (removedEntries.length > 0) {
+  if (Object.keys(diff.removed).length > 0) {
     parts.push(`Removed: ${JSON.stringify(diff.removed)}`);
   }
 

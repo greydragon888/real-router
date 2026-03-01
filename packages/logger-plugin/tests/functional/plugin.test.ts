@@ -663,6 +663,60 @@ describe("@real-router/logger-plugin", () => {
         expect(successCall?.[0]).not.toMatch(/\(\d+/);
       });
 
+      it("should not show timing on cancel when showTiming is false", async () => {
+        vi.useFakeTimers();
+
+        router.usePlugin(loggerPluginFactory({ showTiming: false }));
+        await router.start("/");
+        warnSpy.mockClear();
+
+        lifecycle.addActivateGuard("users", () => (_toState, _fromState) => {
+          return new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 200),
+          );
+        });
+
+        const navPromise = router.navigate("users");
+
+        setTimeout(() => {
+          router.stop();
+        }, 10);
+
+        await vi.runAllTimersAsync();
+
+        try {
+          await navPromise;
+        } catch {
+          // Expected TRANSITION_CANCELLED error
+        }
+
+        const cancelCall = warnSpy.mock.calls.find((call: unknown[]) =>
+          (call[0] as string).includes("Transition cancelled"),
+        );
+
+        expect(cancelCall?.[0]).not.toMatch(/\(\d+/);
+
+        vi.useRealTimers();
+      });
+
+      it("should not show timing on error when showTiming is false", async () => {
+        router.usePlugin(loggerPluginFactory({ showTiming: false }));
+        await router.start("/");
+        errorSpy.mockClear();
+
+        await expect(
+          router.navigate("nonexistent", {}, {}),
+        ).rejects.toMatchObject({ code: errorCodes.ROUTE_NOT_FOUND });
+
+        const errorCall = errorSpy.mock.calls.find((call: unknown[]) =>
+          (call[0] as string).includes("Transition error"),
+        );
+
+        expect(errorCall?.[0]).not.toMatch(/\(\d+/);
+      });
+
       it("should show timing when showTiming is true (default)", async () => {
         router.usePlugin(loggerPluginFactory({ showTiming: true }));
         await router.start("/");

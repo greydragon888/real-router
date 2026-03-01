@@ -14,37 +14,8 @@ import { getParamsDiff, logParamsDiff } from "./internal/params-diff";
 import { createPerformanceTracker } from "./internal/performance-marks";
 import { now } from "./internal/timing";
 
-import type { LoggerPluginConfig, LogLevel } from "./types";
+import type { LoggerPluginConfig } from "./types";
 import type { PluginFactory, RouterError, State } from "@real-router/core";
-
-/**
- * Checks if the given log type should be output based on the configured level.
- *
- * Level hierarchy:
- * - 'all': log everything (start, stop, transitions, warnings, errors)
- * - 'transitions': only transition events (start, success, cancel, error)
- * - 'errors': only errors
- * - 'none': nothing
- */
-const shouldLog = (
-  level: LogLevel,
-  type: "lifecycle" | "transition" | "warning" | "error",
-): boolean => {
-  if (level === "none") {
-    return false;
-  }
-
-  if (level === "errors") {
-    return type === "error";
-  }
-
-  if (level === "transitions") {
-    return type === "transition" || type === "warning" || type === "error";
-  }
-
-  // level === 'all'
-  return true;
-};
 
 /**
  * Creates a logger-plugin for real-router.
@@ -78,6 +49,19 @@ export function loggerPluginFactory(
     ...options,
   };
 
+  // Pre-compute log level flags
+  const logLifecycle = config.level === "all";
+  const logTransition = config.level !== "none" && config.level !== "errors";
+  const logWarning = logTransition;
+  const logError = config.level !== "none";
+
+  // Pre-compute feature flags
+  const shouldLogParams = logTransition && config.showParamsDiff;
+  const shouldShowTiming = config.showTiming;
+
+  // Cached prefix
+  const prefix = `[${config.context}]`;
+
   return () => {
     // Create helper managers
     const groups = createGroupManager(supportsConsoleGroups());
@@ -88,12 +72,14 @@ export function loggerPluginFactory(
 
     // Transition state
     let transitionStartTime: number | null = null;
+    let transitionLabel = "";
+    let startMarkName = "";
 
     /**
      * Logs parameter differences when navigating within the same route.
      */
     const logParamsIfNeeded = (toState: State, fromState?: State): void => {
-      if (!config.showParamsDiff || !fromState) {
+      if (!shouldLogParams || !fromState) {
         return;
       }
 
@@ -110,22 +96,21 @@ export function loggerPluginFactory(
     };
 
     /**
-     * Formats timing string based on config.
+     * Resets transition state. Must be called AFTER timing is read.
      */
-    const getTiming = (): string => {
-      if (!config.showTiming) {
-        return "";
-      }
-
-      return formatTiming(transitionStartTime, now);
+    const resetTransitionState = (): void => {
+      groups.close();
+      transitionLabel = "";
+      startMarkName = "";
+      transitionStartTime = null;
     };
 
     return {
       onStart() {
         perf.mark("router:start");
 
-        if (shouldLog(config.level, "lifecycle")) {
-          console.log(`[${config.context}] Router started`);
+        if (logLifecycle) {
+          console.log(`${prefix} Router started`);
         }
       },
 
@@ -135,8 +120,8 @@ export function loggerPluginFactory(
         perf.mark("router:stop");
         perf.measure("router:lifetime", "router:start", "router:stop");
 
-        if (shouldLog(config.level, "lifecycle")) {
-          console.log(`[${config.context}] Router stopped`);
+        if (logLifecycle) {
+          console.log(`${prefix} Router stopped`);
         }
       },
 
@@ -146,71 +131,66 @@ export function loggerPluginFactory(
 
         const fromRoute = formatRouteName(fromState);
         const toRoute = formatRouteName(toState);
-        const label = createTransitionLabel(fromRoute, toRoute);
 
-        perf.mark(`router:transition-start:${label}`);
+        transitionLabel = createTransitionLabel(fromRoute, toRoute);
+        startMarkName = `router:transition-start:${transitionLabel}`;
 
-        if (shouldLog(config.level, "transition")) {
-          console.log(
-            `[${config.context}] Transition: ${fromRoute} → ${toRoute}`,
-            {
-              from: fromState,
-              to: toState,
-            },
-          );
+        perf.mark(startMarkName);
+
+        if (logTransition) {
+          console.log(`${prefix} Transition: ${fromRoute} → ${toRoute}`, {
+            from: fromState,
+            to: toState,
+          });
 
           logParamsIfNeeded(toState, fromState);
         }
       },
 
       onTransitionSuccess(toState: State, fromState?: State) {
-        const fromRoute = formatRouteName(fromState);
-        const toRoute = formatRouteName(toState);
-        const label = createTransitionLabel(fromRoute, toRoute);
+        const label = transitionLabel;
+        const endMark = `router:transition-end:${label}`;
 
-        perf.mark(`router:transition-end:${label}`);
-        perf.measure(
-          `router:transition:${label}`,
-          `router:transition-start:${label}`,
-          `router:transition-end:${label}`,
-        );
+        perf.mark(endMark);
+        perf.measure(`router:transition:${label}`, startMarkName, endMark);
 
-        if (shouldLog(config.level, "transition")) {
-          const timing = getTiming();
+        if (logTransition) {
+          const timing = shouldShowTiming
+            ? formatTiming(transitionStartTime, now)
+            : "";
 
-          console.log(`[${config.context}] Transition success${timing}`, {
+          console.log(`${prefix} Transition success${timing}`, {
             to: toState,
             from: fromState,
           });
         }
 
-        groups.close();
-        transitionStartTime = null;
+        resetTransitionState();
       },
 
       onTransitionCancel(toState: State, fromState?: State) {
-        const fromRoute = formatRouteName(fromState);
-        const toRoute = formatRouteName(toState);
-        const label = createTransitionLabel(fromRoute, toRoute);
+        const label = transitionLabel;
+        const cancelMark = `router:transition-cancel:${label}`;
 
-        perf.mark(`router:transition-cancel:${label}`);
+        perf.mark(cancelMark);
         perf.measure(
           `router:transition-cancelled:${label}`,
-          `router:transition-start:${label}`,
-          `router:transition-cancel:${label}`,
+          startMarkName,
+          cancelMark,
         );
 
-        if (shouldLog(config.level, "warning")) {
-          const timing = getTiming();
+        if (logWarning) {
+          const timing = shouldShowTiming
+            ? formatTiming(transitionStartTime, now)
+            : "";
 
-          console.warn(`[${config.context}] Transition cancelled${timing}`, {
+          console.warn(`${prefix} Transition cancelled${timing}`, {
             to: toState,
             from: fromState,
           });
         }
 
-        groups.close();
-        transitionStartTime = null;
+        resetTransitionState();
       },
 
       onTransitionError(
@@ -218,38 +198,34 @@ export function loggerPluginFactory(
         fromState: State | undefined,
         err: RouterError,
       ) {
-        const fromRoute = formatRouteName(fromState);
-        const toRoute = formatRouteName(toState);
-        const label = createTransitionLabel(fromRoute, toRoute);
+        const label = transitionLabel;
+        const errorMark = `router:transition-error:${label}`;
 
-        perf.mark(`router:transition-error:${label}`);
+        perf.mark(errorMark);
         perf.measure(
           `router:transition-failed:${label}`,
-          `router:transition-start:${label}`,
-          `router:transition-error:${label}`,
+          startMarkName,
+          errorMark,
         );
 
-        if (shouldLog(config.level, "error")) {
-          const timing = getTiming();
+        if (logError) {
+          const timing = shouldShowTiming
+            ? formatTiming(transitionStartTime, now)
+            : "";
 
-          console.error(
-            `[${config.context}] Transition error: ${err.code}${timing}`,
-            {
-              error: err,
-              stack: err.stack,
-              to: toState,
-              from: fromState,
-            },
-          );
+          console.error(`${prefix} Transition error: ${err.code}${timing}`, {
+            error: err,
+            stack: err.stack,
+            to: toState,
+            from: fromState,
+          });
         }
 
-        groups.close();
-        transitionStartTime = null;
+        resetTransitionState();
       },
 
       teardown() {
-        groups.close();
-        transitionStartTime = null;
+        resetTransitionState();
       },
     };
   };
