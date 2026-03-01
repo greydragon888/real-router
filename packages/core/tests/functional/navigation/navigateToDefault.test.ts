@@ -72,9 +72,6 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault(options);
 
       expect(state.name).toBe("orders");
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
 
     it("should pass callback through and invoke it on completion", async () => {
@@ -92,9 +89,6 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault(options);
 
       expect(state.name).toBe("home");
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining({ force: true }),
-      );
     });
 
     it("should use defaultParams when they are set", async () => {
@@ -124,9 +118,6 @@ describe("navigateToDefault", () => {
 
       // Should complete successfully with navigation to admin.dashboard
       expect(state.name).toBe("admin.dashboard");
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining({ reload: true }),
-      );
     });
   });
 
@@ -260,18 +251,10 @@ describe("navigateToDefault", () => {
 
       const options = { replace: true, reload: true };
 
-      const state = await router.navigateToDefault(options);
-
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
+      await router.navigateToDefault(options);
 
       expect(onSuccess).toHaveBeenCalledWith(
-        expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
-        }),
+        expect.any(Object),
         expect.any(Object), // fromState
         options,
       );
@@ -290,7 +273,6 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault({ force: true });
 
       expect(state.name).toBe("profile");
-      expect(state.meta?.options.force).toBe(true);
     });
 
     it("should trigger all navigation lifecycle events for defaultRoute", async () => {
@@ -395,9 +377,6 @@ describe("navigateToDefault", () => {
 
       expect(state.name).toBe("orders.view");
       expect(state.params).toStrictEqual(defaultParams);
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
 
     it("should use defaultParams with callback", async () => {
@@ -421,9 +400,6 @@ describe("navigateToDefault", () => {
 
       expect(state.name).toBe("profile.user");
       expect(state.params).toStrictEqual(defaultParams);
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining({ force: true }),
-      );
     });
 
     it("should handle complex defaultParams object", async () => {
@@ -650,9 +626,7 @@ describe("navigateToDefault", () => {
 
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
-          meta: expect.objectContaining({
-            options: expect.objectContaining(options),
-          }),
+          name: expect.any(String),
         }),
         expect.any(Object),
         options,
@@ -668,9 +642,6 @@ describe("navigateToDefault", () => {
 
       expect(state.name).toBe("users");
       expect(state.params).toStrictEqual({ tab: "main" });
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
 
     it("should parse callback and options arguments (reversed order)", async () => {
@@ -681,9 +652,6 @@ describe("navigateToDefault", () => {
 
       expect(state.name).toBe("users");
       expect(state.params).toStrictEqual({ tab: "main" });
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
 
     it("should throw TypeError for invalid argument types", () => {
@@ -699,16 +667,6 @@ describe("navigateToDefault", () => {
   describe("navigation options", () => {
     beforeEach(async () => {
       await withDefault("users", { id: 123 });
-    });
-
-    it("should pass replace option through to state meta", async () => {
-      const options = { replace: true };
-
-      const state = await router.navigateToDefault(options);
-
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
 
     it("should pass force option and allow same-state navigation", async () => {
@@ -729,47 +687,6 @@ describe("navigateToDefault", () => {
       const state = await router.navigateToDefault({ force: true });
 
       expect(state.name).toBe("users");
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining({ force: true }),
-      );
-    });
-
-    it("should pass reload option through to state meta", async () => {
-      const options = { reload: true };
-
-      const state = await router.navigateToDefault(options);
-
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
-    });
-
-    it("should pass valid options through to state meta", async () => {
-      const options = {
-        replace: true,
-        reload: true,
-        force: true,
-      };
-
-      const state = await router.navigateToDefault(options);
-
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
-    });
-
-    it("should combine provided options with internal navigation", async () => {
-      const options = {
-        replace: true,
-        force: false,
-        reload: false,
-      };
-
-      const state = await router.navigateToDefault(options);
-
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining(options),
-      );
     });
   });
 
@@ -924,9 +841,6 @@ describe("navigateToDefault", () => {
 
       expect(state.name).toBe("admin.dashboard");
       expect(state.params).toStrictEqual({ tab: "users", filter: "active" });
-      expect(state.meta?.options).toStrictEqual(
-        expect.objectContaining({ replace: true }),
-      );
     });
   });
 

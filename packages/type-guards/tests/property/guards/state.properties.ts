@@ -113,8 +113,7 @@ describe("State Type Guards Properties", () => {
           const meta = state.meta as unknown as Record<string, unknown>;
           const hasUndefinedFields =
             ("id" in meta && meta.id === undefined) ||
-            ("params" in meta && meta.params === undefined) ||
-            ("options" in meta && meta.options === undefined);
+            ("params" in meta && meta.params === undefined);
 
           if (hasUndefinedFields) {
             expect(result).toBe(false);
@@ -268,7 +267,7 @@ describe("State Type Guards Properties", () => {
           name: "home",
           path: "",
           params: {},
-          meta: { id: 0, params: {}, options: {} },
+          meta: { id: 0, params: {} },
         }),
       ).toBe(true);
 

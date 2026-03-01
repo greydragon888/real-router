@@ -16,6 +16,8 @@ export type TransitionPhase = "deactivating" | "activating";
 export type TransitionReason = "success" | "blocked" | "cancelled" | "error";
 
 export interface TransitionMeta {
+  readonly reload?: boolean;
+  readonly redirected?: boolean;
   phase: TransitionPhase;
   from?: string;
   reason: TransitionReason;
@@ -38,7 +40,6 @@ export interface State<P extends Params = Params, MP extends Params = Params> {
 export interface StateMeta<P extends Params = Params> {
   id: number;
   params: P;
-  options: NavigationOptions;
 }
 
 /**
@@ -79,11 +80,9 @@ export interface RouterError extends Error {
  * guard enforcement, and state comparison logic.
  *
  * All options are optional and have sensible defaults. Options can be combined to achieve
- * complex navigation behaviors. The options object is stored in state.meta.options and is
- * available to guards and event listeners.
+ * complex navigation behaviors. These options are available to guards and event listeners.
  *
  * @see {@link Router.navigate} for navigation method that accepts these options
- * @see {@link State.meta} for where options are stored after navigation
  */
 export interface NavigationOptions {
   /**
@@ -206,19 +205,17 @@ export interface NavigationOptions {
    * @internal
    *
    * @description
-   * Automatically set by the router when a navigation is triggered by a redirect from
-   * guards or lifecycle hooks. This flag is used internally to track redirect chains
-   * and is stored in state.meta.options.redirected.
+   * Automatically set by the router when a navigation is triggered by a redirect.
+   * Available on `state.transition` after successful navigation (not during guard execution).
    *
    * @default false (auto-set by router during redirects)
    *
    * @example
-   * // Accessing redirect flag in lifecycle
-   * router.addActivateGuard('dashboard', (toState, fromState) => {
-   *   if (toState.meta?.options?.redirected) {
+   * // Accessing redirect flag in TRANSITION_SUCCESS listener
+   * router.addEventListener('TRANSITION_SUCCESS', (state) => {
+   *   if (state.transition?.redirected) {
    *     console.log('This navigation is from a redirect');
    *   }
-   *   return true;
    * });
    *
    * @see {@link Router.navigate} for redirect handling implementation

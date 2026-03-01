@@ -30,8 +30,6 @@ import type {
   RouteTreeState,
 } from "route-tree";
 
-const EMPTY_OPTIONS = Object.freeze({});
-
 function collectUrlParamsArray(segments: readonly RouteTree[]): string[] {
   const params: string[] = [];
 
@@ -106,7 +104,7 @@ export class RoutesNamespace<
         );
       }
 
-      if (toState.meta?.options.reload) {
+      if (toState.transition?.reload) {
         return true;
       }
 
@@ -270,7 +268,6 @@ export class RoutesNamespace<
 
     return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
       params: meta as MP,
-      options: EMPTY_OPTIONS,
     });
   }
 

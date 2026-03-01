@@ -112,18 +112,18 @@ describe("router.navigate() - events transition success", () => {
       expect(successNewState).toStrictEqual(
         expect.objectContaining({
           name: "profile",
-          meta: expect.objectContaining({
-            options: expect.objectContaining(navigationOptions),
+          transition: expect.objectContaining({
+            reload: true,
           }),
         }),
       );
 
-      // Verify state also has options
+      // Verify state also has transition.reload
       expect(newState).toStrictEqual(
         expect.objectContaining({
           name: "profile",
-          meta: expect.objectContaining({
-            options: expect.objectContaining(navigationOptions),
+          transition: expect.objectContaining({
+            reload: true,
           }),
         }),
       );
@@ -148,16 +148,12 @@ describe("router.navigate() - events transition success", () => {
       expect(onSuccess).toHaveBeenCalledWith(
         expect.objectContaining({
           name: "profile",
-          meta: expect.objectContaining({
-            options: expect.objectContaining({ force: true }),
-          }),
         }), // newState
         expect.objectContaining({
           name: "profile",
         }), // fromState (same route),
         { force: true },
       );
-
       // Verify state is correct
       expect(newState?.name).toBe("profile");
 

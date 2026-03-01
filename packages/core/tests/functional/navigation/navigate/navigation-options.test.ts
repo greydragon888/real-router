@@ -30,12 +30,12 @@ describe("router.navigate() - navigation meta and options", () => {
     expect(router.getState()?.name).toBe("orders.pending");
   });
 
-  it("should add navigation options to meta", async () => {
+  it("should set transition.reload when navigating with reload option", async () => {
     const options = { reload: true, replace: true, force: true };
 
     await router.navigate("profile", {}, options);
 
-    expect(router.getState()?.meta?.options).toStrictEqual(options);
+    expect(router.getState()?.transition?.reload).toBe(true);
   });
 
   it("should allow navigation when canActivate guard returns true", async () => {
@@ -64,15 +64,14 @@ describe("router.navigate() - navigation meta and options", () => {
     expect(state.name).toBe("settings");
   });
 
-  it("should preserve original navigation options in final state", async () => {
+  it("should preserve reload flag in transition for final state", async () => {
     lifecycle.addActivateGuard("profile", () => () => true);
 
     const navOptions = { reload: true, replace: true };
 
     const state = await router.navigate("profile", {}, navOptions);
 
-    expect(state.meta?.options.reload).toBe(true);
-    expect(state.meta?.options.replace).toBe(true);
+    expect(state.transition?.reload).toBe(true);
   });
 
   it("should execute both deactivate and activate guards during transition", async () => {
@@ -98,8 +97,8 @@ describe("router.navigate() - navigation meta and options", () => {
     expect(activateCallCount).toBe(1);
   });
 
-  describe("Issue #59: opts.redirected flows through to meta.options (verifies 12.3 fix)", () => {
-    it("should not have meta.options.redirected for normal navigation", async () => {
+  describe("Issue #59: opts.redirected flows through to transition (verifies 12.3 fix)", () => {
+    it("should not have transition.redirected for normal navigation", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
@@ -107,12 +106,12 @@ describe("router.navigate() - navigation meta and options", () => {
       const resultState = await freshRouter.navigate("users", {}, {});
 
       expect(resultState).toBeDefined();
-      expect(resultState.meta?.options.redirected).toBeUndefined();
+      expect(resultState.transition?.redirected).toBeUndefined();
 
       freshRouter.stop();
     });
 
-    it("should have meta.options.redirected = true when opts.redirected is true", async () => {
+    it("should have transition.redirected = true when opts.redirected is true", async () => {
       const freshRouter = createTestRouter();
 
       await freshRouter.start("/home");
@@ -124,7 +123,7 @@ describe("router.navigate() - navigation meta and options", () => {
       );
 
       expect(resultState).toBeDefined();
-      expect(resultState.meta?.options.redirected).toBe(true);
+      expect(resultState.transition?.redirected).toBe(true);
 
       freshRouter.stop();
     });
@@ -139,7 +138,7 @@ describe("router.navigate() - navigation meta and options", () => {
         events.TRANSITION_SUCCESS,
         (toState: State) => {
           stateLog.push({
-            redirected: toState.meta?.options.redirected,
+            redirected: toState.transition?.redirected,
           });
         },
       );
@@ -156,6 +155,58 @@ describe("router.navigate() - navigation meta and options", () => {
         { redirected: undefined },
         { redirected: true },
       ]);
+
+      freshRouter.stop();
+    });
+  });
+
+  describe("transition meta flags (transition.reload and transition.redirected)", () => {
+    it("sets transition.reload to true when navigating with reload option", async () => {
+      const state = await router.navigate("profile", {}, { reload: true });
+
+      expect(state.transition?.reload).toBe(true);
+    });
+
+    it("does not set transition.reload for normal navigation", async () => {
+      const state = await router.navigate("profile", {}, {});
+
+      expect(state.transition?.reload).toBeUndefined();
+    });
+
+    it("sets transition.redirected to true when navigating with redirected option", async () => {
+      const state = await router.navigate("users", {}, { redirected: true });
+
+      expect(state.transition?.redirected).toBe(true);
+    });
+
+    it("does not set transition.redirected for normal navigation", async () => {
+      const state = await router.navigate("users", {}, {});
+
+      expect(state.transition?.redirected).toBeUndefined();
+    });
+
+    it("transition.reload is not available during guard execution (only after success)", async () => {
+      const freshRouter = createTestRouter();
+      let reloadInGuard: boolean | undefined;
+
+      await freshRouter.start("/home");
+
+      getLifecycleApi(freshRouter).addActivateGuard(
+        "profile",
+        () => (toState) => {
+          // TransitionMeta is built AFTER guards, so transition is not set yet
+          reloadInGuard = toState.transition?.reload;
+
+          return true;
+        },
+      );
+
+      await freshRouter.navigate("profile", {}, { reload: true });
+
+      // During guard, transition is not yet built
+      expect(reloadInGuard).toBeUndefined();
+      // After success, transition.reload is available
+      expect(freshRouter.getState()?.transition?.reload).toBe(true);
 
       freshRouter.stop();
     });

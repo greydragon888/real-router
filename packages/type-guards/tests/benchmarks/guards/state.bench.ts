@@ -63,7 +63,6 @@ boxplot(() => {
         meta: {
           id: 42,
           params: {},
-          options: { reload: true },
         },
       });
     });

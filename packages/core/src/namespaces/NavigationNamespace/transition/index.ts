@@ -27,6 +27,7 @@ export async function transition(
   const { toDeactivate, toActivate, intersection } = getTransitionPath(
     toState,
     fromState,
+    opts.reload === undefined ? undefined : { reload: opts.reload },
   );
 
   // determine the necessary steps

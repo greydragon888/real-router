@@ -54,7 +54,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
           name,
           path,
           params,
-          meta: { id: 1, params: {}, options: {} },
+          meta: { id: 1, params: {} },
         };
 
         // Lines 140-143: All type checks should pass
@@ -71,7 +71,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         name,
         path,
         params,
-        meta: { id: 1, params: {}, options: {} },
+        meta: { id: 1, params: {} },
       };
 
       // Line 141: typeof obj.name !== "string"
@@ -87,7 +87,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         name,
         path,
         params,
-        meta: { id: 1, params: {}, options: {} },
+        meta: { id: 1, params: {} },
       };
 
       // Line 142: typeof obj.path !== "string"
@@ -112,7 +112,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         name,
         path,
         params: invalidParams,
-        meta: { id: 1, params: {}, options: {} },
+        meta: { id: 1, params: {} },
       };
 
       // Line 143: !isParamsStrict(obj.params)
@@ -189,37 +189,10 @@ describe("State Edge Cases (Uncovered Branches)", () => {
           name,
           path,
           params,
-          meta: { params: metaParams, id: 1, options: {} },
+          meta: { params: metaParams, id: 1 },
         };
 
         // Line 157: "params" in meta && !isParamsStrict(meta.params)
-        expect(isHistoryState(state)).toBe(false);
-
-        return true;
-      },
-    );
-
-    test.prop(
-      [
-        validRouteNameArbitrary,
-        validRoutePathArbitrary,
-        paramsSimpleArbitrary,
-        fc.string(),
-      ],
-      {
-        numRuns: 10_000,
-      },
-    )(
-      "rejects meta with non-object options field",
-      (name, path, params, optionsValue) => {
-        const state = {
-          name,
-          path,
-          params,
-          meta: { options: optionsValue, id: 1 },
-        };
-
-        // Line 158: "options" in meta && typeof meta.options !== "object"
         expect(isHistoryState(state)).toBe(false);
 
         return true;
@@ -243,7 +216,7 @@ describe("State Edge Cases (Uncovered Branches)", () => {
           name,
           path,
           params,
-          meta: { id: idValue, options: {} },
+          meta: { id: idValue },
         };
 
         // Line 159: "id" in meta && typeof meta.id !== "number"
@@ -289,25 +262,6 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         path,
         params,
         meta: { params: metaParams },
-      };
-
-      expect(isHistoryState(state)).toBe(true);
-
-      return true;
-    });
-
-    test.prop(
-      [validRouteNameArbitrary, validRoutePathArbitrary, paramsSimpleArbitrary],
-      {
-        numRuns: 10_000,
-      },
-    )("accepts state with meta.options", (name, path, params) => {
-      // Line 158: "options" in meta && typeof meta.options === "object"
-      const state = {
-        name,
-        path,
-        params,
-        meta: { options: { replace: true, reload: false } },
       };
 
       expect(isHistoryState(state)).toBe(true);
@@ -379,32 +333,6 @@ describe("State Edge Cases (Uncovered Branches)", () => {
           path,
           params,
           meta: { id: `${idValue}` }, // String instead of number
-        };
-
-        expect(isStateStrict(state)).toBe(false);
-
-        return true;
-      },
-    );
-
-    test.prop(
-      [
-        validRouteNameArbitrary,
-        validRoutePathArbitrary,
-        paramsSimpleArbitrary,
-        fc.string(),
-      ],
-      {
-        numRuns: 5000,
-      },
-    )(
-      "rejects state with meta.options as non-object",
-      (name, path, params, optionsValue) => {
-        const state = {
-          name,
-          path,
-          params,
-          meta: { options: optionsValue },
         };
 
         expect(isStateStrict(state)).toBe(false);

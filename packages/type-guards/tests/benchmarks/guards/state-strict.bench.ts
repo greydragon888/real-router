@@ -51,7 +51,6 @@ boxplot(() => {
         meta: {
           id: 42,
           params: { previous: "home" },
-          options: { reload: true },
         },
       });
     });

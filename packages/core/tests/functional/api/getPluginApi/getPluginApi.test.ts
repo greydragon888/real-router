@@ -170,7 +170,7 @@ describe("getPluginApi()", () => {
       name: "home",
       params: {},
       path: "/home",
-      meta: { id: 1, params: {}, options: {} },
+      meta: { id: 1, params: {} },
     };
 
     // throwIfDisposed is synchronous — throws before the async body runs

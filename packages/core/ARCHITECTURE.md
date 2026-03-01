@@ -671,7 +671,7 @@ All states returned by `makeState()` are recursively frozen via `Object.freeze()
 
 - State object itself
 - `state.params`
-- `state.meta`, `state.meta.params`, `state.meta.options`
+- `state.meta`, `state.meta.params`
 - `state.transition` and its nested `segments`
 
 ### State ID Counter

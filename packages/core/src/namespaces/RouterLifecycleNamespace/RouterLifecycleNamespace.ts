@@ -117,7 +117,7 @@ export class RouterLifecycleNamespace {
         startOptions,
       );
     } else {
-      const notFoundState = deps.makeNotFoundState(startPath, startOptions);
+      const notFoundState = deps.makeNotFoundState(startPath);
 
       finalState = await this.#navigateToState(
         notFoundState,

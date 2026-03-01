@@ -27,7 +27,6 @@ describe("core/routes", () => {
         "a.b.c.d": { p3: "url" },
         "a.b.c.e": { p4: "url" },
       },
-      options: {},
     };
 
     describe("input validation", () => {
@@ -348,9 +347,15 @@ describe("core/routes", () => {
     });
 
     it("should always update node if reload option is set", () => {
-      const toState = makeState("a.b.c", { p1: 1, p2: 2 }, meta.params, {
-        reload: true,
-      });
+      const toState = {
+        ...makeState("a.b.c", { p1: 1, p2: 2 }, meta.params),
+        transition: {
+          reload: true as const,
+          phase: "activating" as const,
+          reason: "success" as const,
+          segments: { deactivated: [], activated: [], intersection: "" },
+        },
+      };
 
       expect(router.shouldUpdateNode("a.b.c")(toState)).toBe(true);
       expect(router.shouldUpdateNode("a")(toState)).toBe(true);
@@ -545,11 +550,12 @@ describe("core/routes", () => {
       const state = makeState("a.b.c", {}, meta.params);
       const reloadState = {
         ...state,
-        meta: {
-          ...state.meta,
-          id: 1,
-          params: {},
-          options: { reload: true },
+        meta: { ...state.meta, id: 1, params: {} },
+        transition: {
+          reload: true,
+          phase: "activating" as const,
+          reason: "success" as const,
+          segments: { deactivated: [], activated: [], intersection: "" },
         },
       };
 
