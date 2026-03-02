@@ -170,15 +170,9 @@ Performance Summary:
 | #   | Category           | Description                                 |
 | --- | ------------------ | ------------------------------------------- |
 | 01  | Navigation Basic   | Simple navigation, parameters, edge cases   |
-| 02  | Navigation Plugins | Sync/async middleware and guards            |
-| 03  | Dependencies       | Dependency injection operations             |
-| 04  | Plugins Management | Plugin registration and lifecycle           |
 | 07  | Path Operations    | buildPath, matchPath, setRootPath           |
 | 08  | Current State      | State creation, comparison, building        |
-| 09  | Redirects          | Middleware redirects, guards, forwardTo     |
-| 11  | Events             | addEventListener, subscribe, event dispatch |
-| 12  | Stress Testing     | High load, scaling, auto-cleanup            |
-| 13  | Cloning            | SSR scenarios, testing, isolation           |
+| 12  | Stress Testing     | High load, scaling                          |
 
 ## Directory Structure
 
@@ -191,15 +185,9 @@ packages/router-benchmarks/
 │   │   ├── create-router.ts     # Router factory
 │   │   └── suppress-console.ts  # Console suppression
 │   ├── 01-navigation-basic/     # Category benchmarks
-│   ├── 02-navigation-plugins/
-│   ├── 03-dependencies/
-│   ├── 04-plugins-management/
 │   ├── 07-path-operations/
 │   ├── 08-current-state/
-│   ├── 09-redirects/
-│   ├── 11-events/
-│   ├── 12-stress-testing/
-│   └── 13-cloning/
+│   └── 12-stress-testing/
 ├── .bench/                      # JSON results per router
 │   ├── real-router/             # real-router results by category
 │   ├── router5/                 # router5 results by category

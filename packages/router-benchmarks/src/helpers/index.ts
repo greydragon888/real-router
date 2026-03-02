@@ -4,12 +4,6 @@ export { do_not_optimize } from "mitata";
 
 export {
   createRouter,
-  cloneRouter,
-  addEventListener,
-  addActivateGuard,
-  addDeactivateGuard,
-  removeActivateGuard,
-  removeDeactivateGuard,
 } from "./router-adapter";
 
 export { ROUTER_NAME, IS_ROUTER5, UNIFIED_OPTIONS } from "./constants";
