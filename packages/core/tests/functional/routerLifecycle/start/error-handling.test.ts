@@ -444,4 +444,77 @@ describe("router.start() - error handling", () => {
       // scenario since start() is synchronous.
     });
   });
+
+  describe("fire-and-forget start() suppression (Issue #211)", () => {
+    it("should not produce unhandled rejection when void start() is followed by stop()", async () => {
+      const unhandledErrors: unknown[] = [];
+      const handler = (reason: unknown) => {
+        unhandledErrors.push(reason);
+      };
+
+      process.on("unhandledRejection", handler);
+
+      void router.start("/home");
+      router.stop();
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      process.off("unhandledRejection", handler);
+
+      expect(unhandledErrors).toHaveLength(0);
+    });
+
+    it("should not produce unhandled rejection when void start() results in ROUTE_NOT_FOUND", async () => {
+      const unhandledErrors: unknown[] = [];
+      const handler = (reason: unknown) => {
+        unhandledErrors.push(reason);
+      };
+
+      process.on("unhandledRejection", handler);
+
+      const localRouter = createTestRouter({ allowNotFound: false });
+
+      void localRouter.start("/nonexistent-path-xyz");
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      process.off("unhandledRejection", handler);
+
+      expect(unhandledErrors).toHaveLength(0);
+    });
+
+    it("should not produce unhandled rejection for happy-path fire-and-forget start()", async () => {
+      const unhandledErrors: unknown[] = [];
+      const handler = (reason: unknown) => {
+        unhandledErrors.push(reason);
+      };
+
+      process.on("unhandledRejection", handler);
+
+      void router.start("/home");
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      process.off("unhandledRejection", handler);
+
+      expect(unhandledErrors).toHaveLength(0);
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("should still allow await start() to resolve normally (no regression)", async () => {
+      const state = await router.start("/home");
+
+      expect(state).toBeDefined();
+      expect(state.name).toBe("home");
+      expect(router.isActive()).toBe(true);
+    });
+
+    it("should still allow await start() to reject with ROUTE_NOT_FOUND when caller catches", async () => {
+      const localRouter = createTestRouter({ allowNotFound: false });
+
+      await expect(localRouter.start("/nonexistent")).rejects.toMatchObject({
+        code: errorCodes.ROUTE_NOT_FOUND,
+      });
+    });
+  });
 });
