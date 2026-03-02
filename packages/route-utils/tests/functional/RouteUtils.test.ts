@@ -11,6 +11,7 @@ import { RouteUtils, getRouteUtils } from "@real-router/route-utils";
 //           detail
 //             extra   <- 5 segments deep (4 dots)
 //     admin
+//     modal  <- absolute: true
 const makeRoot = () =>
   createRouteTree("", "", [
     {
@@ -37,6 +38,7 @@ const makeRoot = () =>
       ],
     },
     { name: "admin", path: "/admin" },
+    { name: "modal", path: "~/modal" },
   ]);
 
 describe("RouteUtils", () => {
@@ -59,6 +61,11 @@ describe("RouteUtils", () => {
 
     it("returns undefined for unknown route", () => {
       expect(utils.getRoute("nonexistent")).toBeUndefined();
+    });
+
+    it("returns the node for an absolute route (indexed by #buildIndex)", () => {
+      expect(utils.getRoute("modal")?.fullName).toBe("modal");
+      expect(utils.getRoute("modal")?.absolute).toBe(true);
     });
   });
 
@@ -93,6 +100,13 @@ describe("RouteUtils", () => {
       const chain = utils.getChain("users");
 
       expect(Object.isFrozen(chain)).toBe(true);
+    });
+
+    it("returns chain for an absolute route", () => {
+      const chain = utils.getChain("modal");
+      expect(chain?.length).toBe(2);
+      expect(chain?.[0].fullName).toBe("");
+      expect(chain?.[1].fullName).toBe("modal");
     });
   });
 
@@ -145,6 +159,14 @@ describe("RouteUtils", () => {
       const siblings = utils.getSiblings("users");
 
       expect(Object.isFrozen(siblings)).toBe(true);
+    });
+
+    it("excludes absolute routes from siblings", () => {
+      // "modal" is absolute, so it should NOT appear in siblings of "users" or "admin"
+      const siblings = utils.getSiblings("users");
+      expect(siblings?.map((s) => s.fullName)).not.toContain("modal");
+      // "admin" is non-absolute, so it SHOULD appear
+      expect(siblings?.map((s) => s.fullName)).toContain("admin");
     });
   });
 
