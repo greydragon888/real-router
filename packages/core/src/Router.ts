@@ -378,28 +378,32 @@ export class Router<
     return this.#eventBus.isActive();
   }
 
-  async start(startPath: string): Promise<State> {
+  start(startPath: string): Promise<State> {
     // Static validation
     if (!this.#noValidate) {
       RouterLifecycleNamespace.validateStartArgs([startPath]);
     }
 
     if (!this.#eventBus.canStart()) {
-      throw CACHED_ALREADY_STARTED_ERROR;
+      return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
 
     this.#eventBus.sendStart();
 
-    try {
-      return await this.#lifecycle.start(startPath);
-    } catch (error) {
-      if (this.#eventBus.isReady()) {
-        this.#lifecycle.stop();
-        this.#eventBus.sendStop();
-      }
+    const promiseState = this.#lifecycle
+      .start(startPath)
+      .catch((error: unknown) => {
+        if (this.#eventBus.isReady()) {
+          this.#lifecycle.stop();
+          this.#eventBus.sendStop();
+        }
 
-      throw error;
-    }
+        throw error;
+      });
+
+    Router.#suppressUnhandledRejection(promiseState);
+
+    return promiseState;
   }
 
   stop(): this {
