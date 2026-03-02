@@ -701,7 +701,7 @@ For navigation from `users.profile` to `admin.dashboard`:
 | --------- | -------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------- |
 | `GuardFn` | `(toState, fromState, signal?) => boolean \| Promise<boolean>` | No            | Route config `canActivate`/`canDeactivate`, `addActivateGuard()`, `addDeactivateGuard()` |
 
-**Note:** `ActivationFn` (which allowed redirect via `State` return) was removed in PR #187. All guards now use `GuardFn` (boolean only). Guards cannot redirect — they can only block navigation.
+**Note:** Guards cannot redirect — they can only block navigation.
 
 ### Guard Factory Pattern (DI)
 

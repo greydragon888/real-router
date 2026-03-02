@@ -45,11 +45,11 @@ graph LR
     end
 ```
 
-| Consumer      | What it uses                     | Purpose                                    |
-| ------------- | -------------------------------- | ------------------------------------------ |
-| **state$()**  | `getPluginApi`, `events.TRANSITION_SUCCESS` | Subscribe to state changes        |
-| **events$()** | `getPluginApi`, all 6 event constants       | Subscribe to all lifecycle events |
-| **observable()** | `state$()`                    | TC39 Observable interop wrapper            |
+| Consumer         | What it uses                                | Purpose                           |
+| ---------------- | ------------------------------------------- | --------------------------------- |
+| **state$()**     | `getPluginApi`, `events.TRANSITION_SUCCESS` | Subscribe to state changes        |
+| **events$()**    | `getPluginApi`, all 6 event constants       | Subscribe to all lifecycle events |
+| **observable()** | `state$()`                                  | TC39 Observable interop wrapper   |
 
 ## Public API
 
@@ -177,28 +177,28 @@ subscribe(observerOrNext, options?)
     │
     ▼
 ┌──────────────────────┐
-│  Normalize observer    │  function → { next: fn }
-│  Check AbortSignal     │  signal.aborted → return pre-closed Subscription
+│  Normalize observer  │  function → { next: fn }
+│  Check AbortSignal   │  signal.aborted → return pre-closed Subscription
+└──────────┬───────────┘
+           │
+           ▼
+┌───────────────────────┐
+│  Create safe wrappers │  safeNext, safeError, safeComplete
+│  (closed-guard +      │  - safeNext: try { next(value) } catch → safeError
+│   try/catch each)     │  - safeError: try { error(err) } catch → silent
+│                       │  - safeComplete: set closed, try { complete() } catch → silent
+└──────────┬────────────┘
+           │
+           ▼
+┌──────────────────────┐
+│  Wire AbortSignal    │  signal.addEventListener("abort", unsubscribe)
+│  (if provided)       │  Cleaned up on unsubscribe
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────┐
-│  Create safe wrappers  │  safeNext, safeError, safeComplete
-│  (closed-guard +       │  - safeNext: try { next(value) } catch → safeError
-│   try/catch each)      │  - safeError: try { error(err) } catch → silent
-│                        │  - safeComplete: set closed, try { complete() } catch → silent
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Wire AbortSignal      │  signal.addEventListener("abort", unsubscribe)
-│  (if provided)         │  Cleaned up on unsubscribe
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│  Call #subscribeFn     │  teardown = subscribeFn({ next, error, complete })
-│  (may throw → error)  │  Errors caught → safeError
+│  Call #subscribeFn   │  teardown = subscribeFn({ next, error, complete })
+│  (may throw → error) │  Errors caught → safeError
 └──────────┬───────────┘
            │
            ▼
@@ -206,6 +206,7 @@ subscribe(observerOrNext, options?)
 ```
 
 **Error boundaries:**
+
 - Error in `next` callback → forwarded to `error` callback
 - Error in `error` callback → caught silently
 - Error in `complete` callback → caught silently
@@ -233,12 +234,12 @@ for await (const value of observable) {
     │
     ▼
 ┌──────────────────────┐
-│  Subscribe to source   │  Track: latestValue, hasValue, completed, error
+│  Subscribe to source │  Track: latestValue, hasValue, completed, error
 └──────────┬───────────┘
            │
            ▼
 ┌──────────────────────────────┐
-│  Loop while !completed        │
+│  Loop while !completed       │
 │  ├── hasValue?               │
 │  │   ├── YES → yield value   │  (clears hasValue)
 │  │   └── NO  → await Promise │  (resolved by next/error/complete)
@@ -246,9 +247,9 @@ for await (const value of observable) {
 └──────────────────────────────┘
            │
            ▼
-┌──────────────────────┐
+┌────────────────────────┐
 │  finally: unsubscribe  │  Always runs (break, throw, or natural completion)
-└──────────────────────┘
+└────────────────────────┘
 ```
 
 **Latest-value:** If multiple values arrive while the iterator is suspended in `yield`, only the most recent value is yielded next. Intermediate values are skipped.
@@ -337,14 +338,14 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 
 **takeUntil** — Complete when `notifier` emits. Manages two subscriptions with race condition guards:
 
-| Event              | Action                              |
-| ------------------ | ----------------------------------- |
-| Notifier emits     | Complete + unsubscribe both         |
-| Notifier errors    | Error + unsubscribe source          |
-| Source emits       | Forward to observer                 |
-| Source errors      | Error + unsubscribe notifier        |
-| Source completes   | Complete + unsubscribe both         |
-| Unsubscribe        | Unsubscribe both                    |
+| Event            | Action                       |
+| ---------------- | ---------------------------- |
+| Notifier emits   | Complete + unsubscribe both  |
+| Notifier errors  | Error + unsubscribe source   |
+| Source emits     | Forward to observer          |
+| Source errors    | Error + unsubscribe notifier |
+| Source completes | Complete + unsubscribe both  |
+| Unsubscribe      | Unsubscribe both             |
 
 **Subscription order:** Notifier subscribes first (handles synchronous emission), then source. Early return if notifier completes/errors synchronously before source subscription.
 
@@ -352,11 +353,11 @@ createStatefulOperator(subscribeFn) — Stateful operators (distinctUntilChanged
 
 Three-level error handling in `subscribe()`:
 
-| Level                            | Behavior                                           |
-| -------------------------------- | -------------------------------------------------- |
-| Error in `next` callback         | Forwarded to `error` callback via `safeError`      |
-| Error in `error`/`complete`/teardown | Caught silently (prevents cascade)             |
-| No `error` callback provided     | `console.error("Unhandled error in RxObservable:", err)` |
+| Level                                | Behavior                                                 |
+| ------------------------------------ | -------------------------------------------------------- |
+| Error in `next` callback             | Forwarded to `error` callback via `safeError`            |
+| Error in `error`/`complete`/teardown | Caught silently (prevents cascade)                       |
+| No `error` callback provided         | `console.error("Unhandled error in RxObservable:", err)` |
 
 Operators add their own try/catch around user-provided functions (project, predicate, comparator) and forward errors to `observer.error`.
 
@@ -376,26 +377,26 @@ Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxOb
 
 ## Performance Characteristics
 
-| Operation                    | Complexity | Notes                                     |
-| ---------------------------- | ---------- | ----------------------------------------- |
-| `subscribe()`                | O(1)       | Closure creation + optional signal wiring  |
-| `pipe()` — no operators     | O(1)       | Returns `this`                             |
-| `pipe()` — N operators      | O(N)       | One new `RxObservable` per operator        |
-| `state$()` subscribe        | O(1)       | Single `addEventListener` + optional microtask |
-| `events$()` subscribe       | O(1)       | 6 `addEventListener` calls                 |
-| `map` / `filter` per value  | O(1)       | Single function call + forward             |
-| `distinctUntilChanged`       | O(1)       | Compare + optional forward                 |
-| `debounceTime` per value    | O(1)       | `clearTimeout` + `setTimeout`              |
-| `takeUntil` per value       | O(1)       | Guard check + forward                      |
+| Operation                  | Complexity | Notes                                          |
+| -------------------------- | ---------- | ---------------------------------------------- |
+| `subscribe()`              | O(1)       | Closure creation + optional signal wiring      |
+| `pipe()` — no operators    | O(1)       | Returns `this`                                 |
+| `pipe()` — N operators     | O(N)       | One new `RxObservable` per operator            |
+| `state$()` subscribe       | O(1)       | Single `addEventListener` + optional microtask |
+| `events$()` subscribe      | O(1)       | 6 `addEventListener` calls                     |
+| `map` / `filter` per value | O(1)       | Single function call + forward                 |
+| `distinctUntilChanged`     | O(1)       | Compare + optional forward                     |
+| `debounceTime` per value   | O(1)       | `clearTimeout` + `setTimeout`                  |
+| `takeUntil` per value      | O(1)       | Guard check + forward                          |
 
 ### Memory
 
-| Allocation              | Size          | When                            |
-| ----------------------- | ------------- | ------------------------------- |
-| Per `subscribe()` call  | ~300 B        | Closures for safe wrappers      |
-| Per operator in `pipe()`| ~200 B        | New `RxObservable` + closure    |
-| `events$()` teardown    | ~100 B        | Array of 6 unsubscribe functions |
-| `debounceTime` state    | ~50 B         | Timer ID + pending value        |
+| Allocation               | Size   | When                             |
+| ------------------------ | ------ | -------------------------------- |
+| Per `subscribe()` call   | ~300 B | Closures for safe wrappers       |
+| Per operator in `pipe()` | ~200 B | New `RxObservable` + closure     |
+| `events$()` teardown     | ~100 B | Array of 6 unsubscribe functions |
+| `debounceTime` state     | ~50 B  | Timer ID + pending value         |
 
 ## See Also
 

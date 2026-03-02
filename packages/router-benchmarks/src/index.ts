@@ -28,7 +28,6 @@ import { createSimpleRouter } from "./helpers";
  */
 const JIT_WARMUP_ITERATIONS = 300;
 
-
 /**
  * Global JIT warmup that exercises all major router code paths.
  * This ensures V8 has optimized the code before benchmarks run,
@@ -73,7 +72,6 @@ function warmupJIT(): void {
 
     // Warm up event system
     const unsub = router.subscribe(() => {});
-
 
     unsub();
 

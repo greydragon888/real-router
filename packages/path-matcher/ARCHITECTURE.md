@@ -385,12 +385,12 @@ buildPath(name, params, options)
 type URLParamsEncodingType = "default" | "uri" | "uriComponent" | "none";
 ```
 
-| Strategy         | Encoder                                | Decoder              | Notes                         |
-| ---------------- | -------------------------------------- | -------------------- | ----------------------------- |
+| Strategy         | Encoder                                | Decoder              | Notes                                          |
+| ---------------- | -------------------------------------- | -------------------- | ---------------------------------------------- |
 | `"default"`      | `encodeURIComponentExcludingSubDelims` | `decodeURIComponent` | Preserves sub-delimiters `!$'()*+,:;` and `\|` |
-| `"uri"`          | `encodeURI`                            | `decodeURI`          | Preserves more characters |
-| `"uriComponent"` | `encodeURIComponent`                   | `decodeURIComponent` | Strictest encoding        |
-| `"none"`         | identity                               | identity             | No encoding/decoding      |
+| `"uri"`          | `encodeURI`                            | `decodeURI`          | Preserves more characters                      |
+| `"uriComponent"` | `encodeURIComponent`                   | `decodeURIComponent` | Strictest encoding                             |
+| `"none"`         | identity                               | identity             | No encoding/decoding                           |
 
 ### Default Encoding
 
@@ -471,11 +471,11 @@ No circular dependencies.
 
 ### Path Building
 
-| Scenario         | Complexity | Notes                                       |
-| ---------------- | ---------- | ------------------------------------------- |
+| Scenario         | Complexity | Notes                                              |
+| ---------------- | ---------- | -------------------------------------------------- |
 | Static route     | O(1)       | Single `buildStaticParts[0]` (no params to inject) |
-| Dynamic route    | O(p)       | p = number of parameters                    |
-| With constraints | O(p + c)   | Constraint validation before encoding       |
+| Dynamic route    | O(p)       | p = number of parameters                           |
+| With constraints | O(p + c)   | Constraint validation before encoding              |
 
 ### Registration
 
