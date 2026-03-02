@@ -14,12 +14,30 @@ export class RouteUtils {
     this.#buildIndex(root);
   }
 
-  /** Returns the route node for the given full name, or undefined if not found. */
+  /**
+   * O(1) lookup of a route node by full name.
+   *
+   * @param name - Full route name (e.g. `"users.profile"`)
+   * @returns The route tree node, or `undefined` if not found
+   */
   getRoute(name: string): RouteTree | undefined {
     return this.#nodeIndex.get(name);
   }
 
-  /** Returns the ancestor chain from root to the named node (inclusive), or undefined if not found. */
+  /**
+   * Returns the ancestor chain from root to the named node (inclusive).
+   *
+   * Result is cached and frozen — repeated calls return the same array reference.
+   *
+   * @param name - Full route name (e.g. `"users.profile"`)
+   * @returns Frozen array `[root, ..., node]`, or `undefined` if not found
+   *
+   * @example
+   * ```ts
+   * utils.getChain("users.profile");
+   * // → [root, users, users.profile]
+   * ```
+   */
   getChain(name: string): readonly RouteTree[] | undefined {
     const cached = this.#chainCache.get(name);
 
@@ -49,7 +67,12 @@ export class RouteUtils {
     return frozen;
   }
 
-  /** Returns the parent of the named node, null for root, or undefined if not found. */
+  /**
+   * Returns the parent node of the named route.
+   *
+   * @param name - Full route name
+   * @returns Parent node, `null` for root, or `undefined` if not found
+   */
   getParent(name: string): RouteTree | null | undefined {
     const node = this.#nodeIndex.get(name);
 
@@ -60,7 +83,15 @@ export class RouteUtils {
     return node.parent;
   }
 
-  /** Returns the non-absolute siblings of the named node (excluding itself), or undefined if not found or root. */
+  /**
+   * Returns non-absolute siblings of the named node (excluding itself).
+   *
+   * Siblings are children of the same parent, filtered by `nonAbsoluteChildren`.
+   * Result is cached and frozen — repeated calls return the same array reference.
+   *
+   * @param name - Full route name
+   * @returns Frozen array of sibling nodes, or `undefined` if not found or root
+   */
   getSiblings(name: string): readonly RouteTree[] | undefined {
     const cached = this.#siblingsCache.get(name);
 
@@ -86,7 +117,20 @@ export class RouteUtils {
     return siblings;
   }
 
-  /** Returns all prefix segments for the given full name, or undefined if not in tree. */
+  /**
+   * Returns cumulative name segments for the given route.
+   *
+   * Result is cached and frozen — repeated calls return the same array reference.
+   *
+   * @param name - Full route name
+   * @returns Frozen array of cumulative segments, or `undefined` if not in tree
+   *
+   * @example
+   * ```ts
+   * utils.getNameSegments("users.profile.edit");
+   * // → ["users", "users.profile", "users.profile.edit"]
+   * ```
+   */
   getNameSegments(name: string): readonly string[] | undefined {
     const cached = this.#nameSegmentsCache.get(name);
 
@@ -105,7 +149,20 @@ export class RouteUtils {
     return frozen;
   }
 
-  /** Returns true if child is a descendant of parent (string prefix check, not tree lookup). */
+  /**
+   * Checks if `child` is a descendant of `parent` via string prefix comparison.
+   *
+   * Does not perform tree lookup — O(k) where k is the name length.
+   *
+   * @param child - Full name of the potential descendant
+   * @param parent - Full name of the potential ancestor
+   * @returns `true` if `child` starts with `parent.` (dot-separated)
+   *
+   * @remarks
+   * Does not work with root (`""`) as parent — returns `false` because
+   * `"users".startsWith(".")` is `false`. This is acceptable since
+   * every route in the tree is trivially a descendant of root.
+   */
   isDescendantOf(child: string, parent: string): boolean {
     return child !== parent && child.startsWith(`${parent}.`);
   }
@@ -118,42 +175,19 @@ export class RouteUtils {
   }
 }
 
-// Helper — implements nameToIDs algorithm with fast paths
+/**
+ * Builds cumulative name segments from a dot-separated route name.
+ *
+ * Not on a hot path — result is cached by {@link RouteUtils.getNameSegments}.
+ *
+ * @param name - Full route name (e.g. `"a.b.c"`)
+ * @returns Array of cumulative prefixes (e.g. `["a", "a.b", "a.b.c"]`)
+ */
 function buildNameSegments(name: string): string[] {
   if (name === "") {
     return [""];
   }
 
-  const dot1 = name.indexOf(".");
-
-  if (dot1 === -1) {
-    return [name];
-  }
-
-  const dot2 = name.indexOf(".", dot1 + 1);
-
-  if (dot2 === -1) {
-    return [name.slice(0, dot1), name];
-  }
-
-  const dot3 = name.indexOf(".", dot2 + 1);
-
-  if (dot3 === -1) {
-    return [name.slice(0, dot1), name.slice(0, dot2), name];
-  }
-
-  const dot4 = name.indexOf(".", dot3 + 1);
-
-  if (dot4 === -1) {
-    return [
-      name.slice(0, dot1),
-      name.slice(0, dot2),
-      name.slice(0, dot3),
-      name,
-    ];
-  }
-
-  // 5+ segments: general case
   const parts = name.split(".");
   const result: string[] = [];
   let acc = parts[0];

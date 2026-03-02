@@ -305,7 +305,7 @@ importers:
         version: link:../search-params
 
   packages/route-utils:
-    devDependencies:
+    dependencies:
       route-tree:
         specifier: workspace:^
         version: link:../route-tree

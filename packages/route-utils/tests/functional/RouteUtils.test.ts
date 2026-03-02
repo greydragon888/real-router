@@ -104,6 +104,7 @@ describe("RouteUtils", () => {
 
     it("returns chain for an absolute route", () => {
       const chain = utils.getChain("modal");
+
       expect(chain?.length).toBe(2);
       expect(chain?.[0].fullName).toBe("");
       expect(chain?.[1].fullName).toBe("modal");
@@ -164,9 +165,18 @@ describe("RouteUtils", () => {
     it("excludes absolute routes from siblings", () => {
       // "modal" is absolute, so it should NOT appear in siblings of "users" or "admin"
       const siblings = utils.getSiblings("users");
+
       expect(siblings?.map((s) => s.fullName)).not.toContain("modal");
       // "admin" is non-absolute, so it SHOULD appear
       expect(siblings?.map((s) => s.fullName)).toContain("admin");
+    });
+
+    it("returns non-absolute root children for absolute route siblings", () => {
+      const siblings = utils.getSiblings("modal");
+
+      expect(siblings?.map((s) => s.fullName)).toContain("users");
+      expect(siblings?.map((s) => s.fullName)).toContain("admin");
+      expect(siblings?.map((s) => s.fullName)).not.toContain("modal");
     });
   });
 
