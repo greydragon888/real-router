@@ -304,6 +304,12 @@ importers:
         specifier: workspace:^
         version: link:../search-params
 
+  packages/route-utils:
+    dependencies:
+      route-tree:
+        specifier: workspace:^
+        version: link:../route-tree
+
   packages/router-benchmarks:
     dependencies:
       '@real-router/core':

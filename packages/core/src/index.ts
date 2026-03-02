@@ -58,3 +58,5 @@ export type {
   DependenciesApi,
   LifecycleApi,
 } from "./api";
+
+export type { RouteTree } from "route-tree";
