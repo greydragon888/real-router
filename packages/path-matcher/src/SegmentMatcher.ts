@@ -394,11 +394,11 @@ export class SegmentMatcher {
     params: Record<string, string>,
   ): CompiledRoute | undefined {
     let node = startNode;
-    const len = path.length;
+    const length = path.length;
 
-    while (start <= len) {
+    while (start <= length) {
       const end = path.indexOf("/", start);
-      const segmentEnd = end === -1 ? len : end;
+      const segmentEnd = end === -1 ? length : end;
       const segment = path.slice(start, segmentEnd);
 
       const lookupKey = this.#options.caseSensitive

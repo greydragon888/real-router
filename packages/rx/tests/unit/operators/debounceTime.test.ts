@@ -16,7 +16,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -37,7 +37,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 400));
@@ -58,7 +58,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(0)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -68,16 +68,16 @@ describe("debounceTime()", () => {
 
   it("should clear timeout on unsubscribe", async () => {
     const values: number[] = [];
-    let emitFn: ((v: number) => void) | undefined;
+    let emitFn: ((value: number) => void) | undefined;
 
     const source = new RxObservable<number>((observer) => {
-      emitFn = (v) => observer.next?.(v);
+      emitFn = (value) => observer.next?.(value);
 
       return;
     });
 
     const subscription = source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     emitFn?.(1);
@@ -103,8 +103,8 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
-      error: (e) => errors.push(e),
+      next: (value) => values.push(value),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -127,7 +127,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -148,7 +148,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -173,11 +173,11 @@ describe("debounceTime()", () => {
     const debounced = source.pipe(debounceTime(50));
 
     debounced.subscribe({
-      next: (v) => values1.push(v),
+      next: (value) => values1.push(value),
     });
 
     debounced.subscribe({
-      next: (v) => values2.push(v),
+      next: (value) => values2.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 200));
@@ -200,7 +200,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -223,7 +223,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -245,7 +245,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -267,7 +267,7 @@ describe("debounceTime()", () => {
     });
 
     source.pipe(debounceTime(50)).subscribe({
-      next: (v) => events.push(`next:${v}`),
+      next: (value) => events.push(`next:${value}`),
       complete: () => events.push("complete"),
     });
 
@@ -278,16 +278,16 @@ describe("debounceTime()", () => {
 
   it("should not emit if hasValue is false when timeout fires", async () => {
     const values: number[] = [];
-    let emitFn: ((v: number) => void) | undefined;
+    let emitFn: ((value: number) => void) | undefined;
 
     const source = new RxObservable<number>((observer) => {
-      emitFn = (v) => observer.next?.(v);
+      emitFn = (value) => observer.next?.(value);
 
       return;
     });
 
     source.pipe(debounceTime(30)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     emitFn?.(1);
@@ -313,7 +313,7 @@ describe("debounceTime()", () => {
       });
 
       source.pipe(debounceTime(50)).subscribe({
-        error: (e) => errors.push(e),
+        error: (error) => errors.push(error),
       });
 
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -331,7 +331,7 @@ describe("debounceTime()", () => {
       });
 
       const subscription = source.pipe(debounceTime(50)).subscribe({
-        next: (v) => values.push(v),
+        next: (value) => values.push(value),
       });
 
       // Unsubscribe immediately without any emissions

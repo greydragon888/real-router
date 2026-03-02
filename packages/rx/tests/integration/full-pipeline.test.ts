@@ -44,7 +44,7 @@ describe("@real-router/rx - Integration Tests", () => {
           filter((name) => name !== "home"),
           distinctUntilChanged(),
         )
-        .subscribe({ next: (v) => values.push(v) });
+        .subscribe({ next: (value) => values.push(value) });
 
       await router.start("/");
       await router.navigate("about");
@@ -64,7 +64,7 @@ describe("@real-router/rx - Integration Tests", () => {
           map(({ route }) => route.path),
           filter((path) => path !== "/"),
         )
-        .subscribe({ next: (v) => values.push(v) });
+        .subscribe({ next: (value) => values.push(value) });
 
       await router.start("/");
       await router.navigate("about");
@@ -81,7 +81,7 @@ describe("@real-router/rx - Integration Tests", () => {
           map(({ route }) => route.name),
           filter((name) => name !== "home"),
         )
-        .subscribe({ next: (v) => values.push(v) });
+        .subscribe({ next: (value) => values.push(value) });
 
       await router.start("/");
       await router.navigate("about");
@@ -108,7 +108,7 @@ describe("@real-router/rx - Integration Tests", () => {
           }),
         )
         .subscribe({
-          next: (v) => values.push(v),
+          next: (value) => values.push(value),
           error: (err) => errors.push(err),
         });
 
@@ -129,8 +129,8 @@ describe("@real-router/rx - Integration Tests", () => {
       lifecycle.addActivateGuard("admin", () => () => false);
 
       events$(router)
-        .pipe(filter((e) => e.type === "TRANSITION_ERROR"))
-        .subscribe({ next: (e) => errors.push(e) });
+        .pipe(filter((event) => event.type === "TRANSITION_ERROR"))
+        .subscribe({ next: (event) => errors.push(event) });
 
       await router.start("/");
       await router.navigate("about");
@@ -150,8 +150,8 @@ describe("@real-router/rx - Integration Tests", () => {
       const successes: any[] = [];
 
       events$(router)
-        .pipe(filter((e) => e.type === "TRANSITION_SUCCESS"))
-        .subscribe({ next: (e) => successes.push(e) });
+        .pipe(filter((event) => event.type === "TRANSITION_SUCCESS"))
+        .subscribe({ next: (event) => successes.push(event) });
 
       await router.start("/");
       await router.navigate("about");
@@ -168,8 +168,11 @@ describe("@real-router/rx - Integration Tests", () => {
 
       events$(router)
         .pipe(
-          filter((e) => e.type === "ROUTER_START" || e.type === "ROUTER_STOP"),
-          map((e) => e.type),
+          filter(
+            (event) =>
+              event.type === "ROUTER_START" || event.type === "ROUTER_STOP",
+          ),
+          map((event) => event.type),
         )
         .subscribe({ next: (type) => events.push(type) });
 
@@ -193,8 +196,8 @@ describe("@real-router/rx - Integration Tests", () => {
       });
 
       events$(router)
-        .pipe(filter((e) => e.type === "TRANSITION_CANCEL"))
-        .subscribe({ next: (e) => cancelEvents.push(e) });
+        .pipe(filter((event) => event.type === "TRANSITION_CANCEL"))
+        .subscribe({ next: (event) => cancelEvents.push(event) });
 
       await router.start("/");
 
@@ -305,7 +308,7 @@ describe("@real-router/rx - Integration Tests", () => {
 
       state$(router, { replay: false })
         .pipe(map(({ route }) => route.name))
-        .subscribe({ next: (v) => values.push(v) });
+        .subscribe({ next: (value) => values.push(value) });
 
       // Wait to ensure no replay happens
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -324,7 +327,7 @@ describe("@real-router/rx - Integration Tests", () => {
 
       state$(router)
         .pipe(map(({ route }) => route.name))
-        .subscribe({ next: (v) => values.push(v) });
+        .subscribe({ next: (value) => values.push(value) });
 
       await new Promise((resolve) => setTimeout(resolve, 20));
 
@@ -340,7 +343,7 @@ describe("@real-router/rx - Integration Tests", () => {
       state$(router)
         .pipe(map(({ route }) => route.name))
         .subscribe(
-          { next: (v) => values.push(v) },
+          { next: (value) => values.push(value) },
           { signal: controller.signal },
         );
 
@@ -365,7 +368,7 @@ describe("@real-router/rx - Integration Tests", () => {
           distinctUntilChanged(),
         )
         .subscribe(
-          { next: (v) => values.push(v) },
+          { next: (value) => values.push(value) },
           { signal: controller.signal },
         );
 
@@ -400,7 +403,7 @@ describe("@real-router/rx - Integration Tests", () => {
       const events: string[] = [];
 
       events$(router)
-        .pipe(map((e) => e.type))
+        .pipe(map((event) => event.type))
         .subscribe(
           { next: (type) => events.push(type) },
           { signal: controller.signal },
@@ -416,7 +419,7 @@ describe("@real-router/rx - Integration Tests", () => {
       expect(events).toContain("ROUTER_START");
       expect(events).toContain("TRANSITION_SUCCESS");
       expect(
-        events.filter((e) => e === "TRANSITION_SUCCESS").length,
+        events.filter((type) => type === "TRANSITION_SUCCESS").length,
       ).toBeLessThan(3);
     });
   });

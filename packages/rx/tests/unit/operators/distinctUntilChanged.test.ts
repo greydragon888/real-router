@@ -20,7 +20,7 @@ describe("distinctUntilChanged", () => {
     });
 
     source.pipe(distinctUntilChanged()).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     expect(values).toStrictEqual([1, 2, 3, 1]);
@@ -48,7 +48,7 @@ describe("distinctUntilChanged", () => {
         }),
       )
       .subscribe({
-        next: (v) => values.push(v),
+        next: (value) => values.push(value),
       });
 
     expect(values).toStrictEqual([1, 2, 3]);
@@ -79,7 +79,7 @@ describe("distinctUntilChanged", () => {
     source
       .pipe(distinctUntilChanged((prev, curr) => prev.major === curr.major))
       .subscribe({
-        next: (v) => values.push(v),
+        next: (value) => values.push(value),
       });
 
     expect(values).toStrictEqual([
@@ -101,7 +101,7 @@ describe("distinctUntilChanged", () => {
     });
 
     source.pipe(distinctUntilChanged()).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     expect(values).toStrictEqual([5]);
@@ -109,18 +109,18 @@ describe("distinctUntilChanged", () => {
 
   it("should handle unsubscribe correctly", async () => {
     const values: number[] = [];
-    let emitFn: ((v: number) => void) | undefined;
+    let emitFn: ((value: number) => void) | undefined;
 
     const source = new RxObservable<number>((observer) => {
-      emitFn = (v) => observer.next?.(v);
+      emitFn = (value) => observer.next?.(value);
 
       return;
     });
 
     const subscription = source.pipe(distinctUntilChanged()).subscribe({
-      next: (v) => {
-        values.push(v);
-        if (v === 2) {
+      next: (value) => {
+        values.push(value);
+        if (value === 2) {
           subscription.unsubscribe();
         }
       },
@@ -145,8 +145,8 @@ describe("distinctUntilChanged", () => {
     });
 
     source.pipe(distinctUntilChanged()).subscribe({
-      next: (v) => values.push(v),
-      error: (e) => errors.push(e),
+      next: (value) => values.push(value),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -169,7 +169,7 @@ describe("distinctUntilChanged", () => {
     });
 
     source.pipe(distinctUntilChanged()).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -192,8 +192,8 @@ describe("distinctUntilChanged", () => {
 
     const piped = source.pipe(distinctUntilChanged());
 
-    piped.subscribe({ next: (v) => values1.push(v) });
-    piped.subscribe({ next: (v) => values2.push(v) });
+    piped.subscribe({ next: (value) => values1.push(value) });
+    piped.subscribe({ next: (value) => values2.push(value) });
 
     expect(values1).toStrictEqual([1, 2]);
     expect(values2).toStrictEqual([1, 2]);

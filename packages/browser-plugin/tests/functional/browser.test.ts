@@ -47,7 +47,7 @@ describe("Browser API", () => {
   });
 
   describe("addPopstateListener", () => {
-    let handler: (e: PopStateEvent) => void;
+    let handler: (event: PopStateEvent) => void;
 
     beforeEach(() => {
       handler = vi.fn();

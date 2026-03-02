@@ -25,7 +25,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -55,7 +55,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -106,7 +106,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -132,7 +132,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -160,7 +160,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -189,7 +189,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 100));
@@ -219,7 +219,7 @@ describe("takeUntil()", () => {
     });
 
     const subscription = source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -242,16 +242,16 @@ describe("takeUntil()", () => {
       return;
     });
 
-    let emitFn: ((v: number) => void) | undefined;
+    let emitFn: ((value: number) => void) | undefined;
 
     const source = new RxObservable<number>((observer) => {
-      emitFn = (v) => observer.next?.(v);
+      emitFn = (value) => observer.next?.(value);
 
       return;
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
     });
 
     emitFn?.(1);
@@ -287,11 +287,11 @@ describe("takeUntil()", () => {
     const piped = source.pipe(takeUntil(notifier));
 
     piped.subscribe({
-      next: (v) => values1.push(v),
+      next: (value) => values1.push(value),
     });
 
     piped.subscribe({
-      next: (v) => values2.push(v),
+      next: (value) => values2.push(value),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -317,7 +317,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      next: (v) => values.push(v),
+      next: (value) => values.push(value),
       complete: () => completeCalls.push(1),
     });
 
@@ -329,7 +329,7 @@ describe("takeUntil()", () => {
 
   it("should ignore source error after notifier completes", async () => {
     const errors: unknown[] = [];
-    let sourceErrorFn: ((e: Error) => void) | undefined;
+    let sourceErrorFn: ((error: Error) => void) | undefined;
     let notifierEmitFn: (() => void) | undefined;
 
     const notifier = new RxObservable<void>((observer) => {
@@ -342,13 +342,13 @@ describe("takeUntil()", () => {
 
     const source = new RxObservable<number>((observer) => {
       observer.next?.(1);
-      sourceErrorFn = (e) => observer.error?.(e);
+      sourceErrorFn = (error) => observer.error?.(error);
 
       return;
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     notifierEmitFn?.();
@@ -379,7 +379,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -392,10 +392,10 @@ describe("takeUntil()", () => {
 
   it("should ignore notifier error after notifier already emitted", async () => {
     const errors: unknown[] = [];
-    let notifierErrorFn: ((e: Error) => void) | undefined;
+    let notifierErrorFn: ((error: Error) => void) | undefined;
 
     const notifier = new RxObservable<void>((observer) => {
-      notifierErrorFn = (e) => observer.error?.(e);
+      notifierErrorFn = (error) => observer.error?.(error);
       observer.next?.();
 
       return;
@@ -408,7 +408,7 @@ describe("takeUntil()", () => {
     });
 
     source.pipe(takeUntil(notifier)).subscribe({
-      error: (e) => errors.push(e),
+      error: (error) => errors.push(error),
     });
 
     await new Promise((resolve) => setTimeout(resolve, 10));

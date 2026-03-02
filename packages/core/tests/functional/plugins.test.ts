@@ -479,7 +479,7 @@ describe("core/plugins", () => {
 
         // None should respond (only onStart events, no teardowns)
         expect(
-          orderTracker.filter((e) => !e.includes("teardown")),
+          orderTracker.filter((entry) => !entry.includes("teardown")),
         ).toHaveLength(0);
       });
     });

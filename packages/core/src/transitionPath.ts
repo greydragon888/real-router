@@ -35,10 +35,10 @@ const DEFAULT_ROUTE_NAME = "";
  * @internal
  */
 function reverseArray(arr: string[]): string[] {
-  const len = arr.length;
+  const length = arr.length;
   const result: string[] = [];
 
-  for (let i = len - 1; i >= 0; i--) {
+  for (let i = length - 1; i >= 0; i--) {
     result.push(arr[i]);
   }
 
@@ -68,11 +68,11 @@ function nameToIDsGeneral(name: string): string[] {
 
   // Calculate cumulative lengths and slice from original string
   // This avoids repeated string concatenation (O(k²) → O(k))
-  let cumulativeLen = segments[0].length;
+  let cumulativeLength = segments[0].length;
 
   for (let i = 1; i < segmentCount - 1; i++) {
-    cumulativeLen += 1 + segments[i].length; // +1 for dot separator
-    ids.push(name.slice(0, cumulativeLen));
+    cumulativeLength += 1 + segments[i].length; // +1 for dot separator
+    ids.push(name.slice(0, cumulativeLength));
   }
 
   // Last segment is always the full route name

@@ -610,7 +610,51 @@ export default tsEslint.config(
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
       // ============================================
-      "unicorn/prevent-abbreviations": "off", // Allow fn, err, props, params, etc.
+      "unicorn/prevent-abbreviations": [
+        "error",
+        {
+          replacements: {
+            i: false,
+            idx: false,
+            j: false,
+            fn: false,
+            args: false,
+            arg: false,
+            obj: false,
+            arr: false,
+            opts: false,
+            cb: false,
+            params: false,
+            param: false,
+            err: false,
+            std: false,
+            dev: false,
+            stdDev: false,
+            prod: false,
+            val: false,
+            util: false,
+            utils: false,
+            def: false,
+            defs: false,
+            str: false,
+            evt: false,
+            num: false,
+            nums: false,
+            acc: false,
+            ctx: false,
+            ref: false,
+            refs: false,
+            prop: false,
+            props: false,
+            msg: false,
+            msgs: false,
+            env: false,
+            dist: false,
+            prev: false,
+            curr: false,
+          },
+        },
+      ], // Allow fn, err, props, params, etc.
       "unicorn/no-null": "off", // null is used in DOM API and some libraries
       "unicorn/prefer-top-level-await": "off", // Not supported everywhere
       "unicorn/no-array-reduce": "warn", // Only warning, reduce is sometimes convenient

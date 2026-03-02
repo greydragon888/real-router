@@ -246,11 +246,11 @@ function insertIntoTrieFrom(
   start: number,
   compiled: CompiledRoute,
 ): void {
-  const len = path.length;
+  const length = path.length;
 
-  while (start <= len) {
+  while (start <= length) {
     const end = path.indexOf("/", start);
-    const segmentEnd = end === -1 ? len : end;
+    const segmentEnd = end === -1 ? length : end;
     const segment = path.slice(start, segmentEnd);
 
     if (segment.endsWith("?")) {
@@ -271,7 +271,7 @@ function insertIntoTrieFrom(
       );
 
       // Path without param: skip this segment and continue from node
-      if (segmentEnd >= len) {
+      if (segmentEnd >= length) {
         node.route ??= compiled;
       } else {
         insertIntoTrieFrom(state, node, path, segmentEnd + 1, compiled);
@@ -320,11 +320,11 @@ function walkTrieFrom(
 
   let node = startNode;
   let start = 1;
-  const len = normalized.length;
+  const length = normalized.length;
 
-  while (start <= len) {
+  while (start <= length) {
     const end = normalized.indexOf("/", start);
-    const segmentEnd = end === -1 ? len : end;
+    const segmentEnd = end === -1 ? length : end;
 
     /* v8 ignore start -- defensive: indexOf always returns valid index for non-empty segments */
     if (segmentEnd <= start) {

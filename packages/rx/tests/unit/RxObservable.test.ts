@@ -29,7 +29,7 @@ describe("RxObservable", () => {
         observer.next?.(3);
       });
 
-      observable.subscribe({ next: (v) => values.push(v) });
+      observable.subscribe({ next: (value) => values.push(value) });
 
       expect(values).toStrictEqual([1, 2, 3]);
     });
@@ -41,7 +41,7 @@ describe("RxObservable", () => {
         observer.next?.(2);
       });
 
-      observable.subscribe((v) => values.push(v));
+      observable.subscribe((value) => values.push(value));
 
       expect(values).toStrictEqual([1, 2]);
     });
@@ -59,13 +59,13 @@ describe("RxObservable", () => {
 
     it("stops emissions after unsubscribe", () => {
       const values: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
       });
 
-      const subscription = observable.subscribe((v) => values.push(v));
+      const subscription = observable.subscribe((value) => values.push(value));
 
       emit!(1);
       emit!(2);
@@ -328,13 +328,15 @@ describe("RxObservable", () => {
   describe("re-subscription", () => {
     it("allows re-subscription after unsubscribe", () => {
       const values: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
       });
 
-      const observer: Observer<number> = { next: (v) => values.push(v) };
+      const observer: Observer<number> = {
+        next: (value) => values.push(value),
+      };
 
       const sub1 = observable.subscribe(observer);
 
@@ -352,15 +354,15 @@ describe("RxObservable", () => {
   describe("AbortSignal", () => {
     it("auto-unsubscribes when signal aborts", () => {
       const values: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
       });
 
       const controller = new AbortController();
 
-      observable.subscribe((v) => values.push(v), {
+      observable.subscribe((value) => values.push(value), {
         signal: controller.signal,
       });
 
@@ -419,10 +421,10 @@ describe("RxObservable", () => {
     it("creates independent chains", () => {
       const values1: number[] = [];
       const values2: number[] = [];
-      const emitters: ((v: number) => void)[] = [];
+      const emitters: ((value: number) => void)[] = [];
 
       const source = new RxObservable<number>((observer) => {
-        const emit = (v: number) => observer.next?.(v);
+        const emit = (value: number) => observer.next?.(value);
 
         emitters.push(emit);
 
@@ -437,7 +439,7 @@ describe("RxObservable", () => {
 
       const double = (obs: RxObservable<number>) =>
         new RxObservable<number>((observer) => {
-          const sub = obs.subscribe((v) => observer.next?.(v * 2));
+          const sub = obs.subscribe((value) => observer.next?.(value * 2));
 
           return () => {
             sub.unsubscribe();
@@ -446,8 +448,8 @@ describe("RxObservable", () => {
 
       const piped = source.pipe(double);
 
-      source.subscribe((v) => values1.push(v));
-      piped.subscribe((v) => values2.push(v));
+      source.subscribe((value) => values1.push(value));
+      piped.subscribe((value) => values2.push(value));
 
       emitters.forEach((emit) => {
         emit(1);
@@ -472,7 +474,7 @@ describe("RxObservable", () => {
       // eslint-disable-next-line sonarjs/no-identical-functions
       const double = (obs: RxObservable<number>) =>
         new RxObservable<number>((observer) => {
-          const sub = obs.subscribe((v) => observer.next?.(v * 2));
+          const sub = obs.subscribe((value) => observer.next?.(value * 2));
 
           return () => {
             sub.unsubscribe();
@@ -481,14 +483,14 @@ describe("RxObservable", () => {
 
       const addTen = (obs: RxObservable<number>) =>
         new RxObservable<number>((observer) => {
-          const sub = obs.subscribe((v) => observer.next?.(v + 10));
+          const sub = obs.subscribe((value) => observer.next?.(value + 10));
 
           return () => {
             sub.unsubscribe();
           };
         });
 
-      source.pipe(double, addTen).subscribe((v) => values.push(v));
+      source.pipe(double, addTen).subscribe((value) => values.push(value));
 
       expect(values).toStrictEqual([12, 14, 16]);
     });
@@ -515,10 +517,10 @@ describe("RxObservable", () => {
   describe("Symbol.asyncIterator", () => {
     it("yields values via for await", async () => {
       const values: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
 
         return () => {};
       });
@@ -547,10 +549,10 @@ describe("RxObservable", () => {
     it("exits cleanly on break", async () => {
       const values: number[] = [];
       const teardownCalls: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
 
         return () => teardownCalls.push(1);
       });
@@ -577,10 +579,10 @@ describe("RxObservable", () => {
 
     it("uses latest-value semantics", async () => {
       const values: number[] = [];
-      let emit: ((v: number) => void) | null = null;
+      let emit: ((value: number) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emit = (v) => observer.next?.(v);
+        emit = (value) => observer.next?.(value);
       });
 
       const iteratorPromise = (async () => {
@@ -645,11 +647,11 @@ describe("RxObservable", () => {
     });
 
     it("throws on observable error with value", async () => {
-      let emitValue: ((v: number) => void) | null = null;
+      let emitValue: ((value: number) => void) | null = null;
       let emitError: ((err: Error) => void) | null = null;
 
       const observable = new RxObservable<number>((observer) => {
-        emitValue = (v) => observer.next?.(v);
+        emitValue = (value) => observer.next?.(value);
         emitError = (err) => observer.error?.(err);
       });
 

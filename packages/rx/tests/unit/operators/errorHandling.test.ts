@@ -16,16 +16,16 @@ describe("Operator error handling", () => {
 
       source
         .pipe(
-          map((v) => {
-            if (v === 2) {
+          map((value) => {
+            if (value === 2) {
               throw new Error("map error");
             }
 
-            return v * 2;
+            return value * 2;
           }),
         )
         .subscribe({
-          error: (e) => errors.push(e),
+          error: (error) => errors.push(error),
         });
 
       expect(errors).toHaveLength(1);
@@ -42,8 +42,8 @@ describe("Operator error handling", () => {
         return;
       });
 
-      source.pipe(map((v) => v * 2)).subscribe({
-        error: (e) => errors.push(e),
+      source.pipe(map((value) => value * 2)).subscribe({
+        error: (error) => errors.push(error),
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -64,8 +64,8 @@ describe("Operator error handling", () => {
         return;
       });
 
-      source.pipe(map((v) => v * 2)).subscribe({
-        next: (v) => values.push(v),
+      source.pipe(map((value) => value * 2)).subscribe({
+        next: (value) => values.push(value),
         complete: () => completeCalls.push(1),
       });
 
@@ -87,8 +87,8 @@ describe("Operator error handling", () => {
 
       source
         .pipe(
-          filter((v) => {
-            if (v === 2) {
+          filter((value) => {
+            if (value === 2) {
               throw new Error("filter error");
             }
 
@@ -96,7 +96,7 @@ describe("Operator error handling", () => {
           }),
         )
         .subscribe({
-          error: (e) => errors.push(e),
+          error: (error) => errors.push(error),
         });
 
       expect(errors).toHaveLength(1);
@@ -113,8 +113,8 @@ describe("Operator error handling", () => {
         return;
       });
 
-      source.pipe(filter((v) => v > 0)).subscribe({
-        error: (e) => errors.push(e),
+      source.pipe(filter((value) => value > 0)).subscribe({
+        error: (error) => errors.push(error),
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));
@@ -136,8 +136,8 @@ describe("Operator error handling", () => {
         return;
       });
 
-      source.pipe(filter((v) => v % 2 === 1)).subscribe({
-        next: (v) => values.push(v),
+      source.pipe(filter((value) => value % 2 === 1)).subscribe({
+        next: (value) => values.push(value),
         complete: () => completeCalls.push(1),
       });
 
@@ -170,8 +170,8 @@ describe("Operator error handling", () => {
           }),
         )
         .subscribe({
-          next: (v) => values.push(v),
-          error: (e) => errors.push(e),
+          next: (value) => values.push(value),
+          error: (error) => errors.push(error),
         });
 
       expect(values).toStrictEqual([1]);
@@ -190,7 +190,7 @@ describe("Operator error handling", () => {
       });
 
       source.pipe(distinctUntilChanged()).subscribe({
-        error: (e) => errors.push(e),
+        error: (error) => errors.push(error),
       });
 
       await new Promise((resolve) => setTimeout(resolve, 50));

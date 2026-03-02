@@ -133,13 +133,13 @@ function forEachParam(
   handler: (chunk: string) => void,
 ): void {
   let start = 0;
-  const len = searchPart.length;
+  const length = searchPart.length;
 
-  while (start < len) {
+  while (start < length) {
     let end = searchPart.indexOf("&", start);
 
     if (end === -1) {
-      end = len;
+      end = length;
     }
 
     handler(searchPart.slice(start, end));
@@ -184,13 +184,13 @@ export const parse = (
 
   // Process each parameter
   let start = 0;
-  const len = searchPart.length;
+  const length = searchPart.length;
 
-  while (start < len) {
+  while (start < length) {
     let end = searchPart.indexOf("&", start);
 
     if (end === -1) {
-      end = len;
+      end = length;
     }
 
     processParamChunk(searchPart, start, end, params, options.strategies);
@@ -245,13 +245,13 @@ function parseIntoInternal(
   params: Record<string, unknown>,
 ): void {
   let start = 0;
-  const len = searchPart.length;
+  const length = searchPart.length;
 
-  while (start < len) {
+  while (start < length) {
     let end = searchPart.indexOf("&", start);
 
     if (end === -1) {
-      end = len;
+      end = length;
     }
 
     // No strategies = simple decoding
