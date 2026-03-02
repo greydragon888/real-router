@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-02]
+
+### @real-router/core@0.30.0
+
+### Minor Changes
+
+- [#212](https://github.com/greydragon888/real-router/pull/212) [`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `Router.start()` to suppress unhandled rejections for fire-and-forget usage, matching `navigate()` and `navigateToDefault()` behavior.
+  Calling `void router.start(path)` is now safe and will not produce `UnhandledPromiseRejectionWarning` for expected errors (`TRANSITION_CANCELLED`, `ROUTE_NOT_FOUND`).
+  Fixes #211.
+
+### @real-router/browser-plugin@0.6.1
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+
+### @real-router/helpers@0.1.34
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+
+### @real-router/logger-plugin@0.2.34
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+
+### @real-router/persistent-params-plugin@0.1.33
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+
+### @real-router/react@0.4.12
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+  - @real-router/helpers@0.1.34
+
+### @real-router/rx@0.1.22
+
+### Patch Changes
+
+- Updated dependencies [[`94938c4`](https://github.com/greydragon888/real-router/commit/94938c4db1d617659e6f434859651ab8aaaf0cf3)]:
+  - @real-router/core@0.30.0
+
 ## [2026-03-01]
 
 ### @real-router/browser-plugin@0.6.0
