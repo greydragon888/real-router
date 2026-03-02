@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload coverage artifacts
         if: needs.check.outputs.should_run == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           path: packages/*/coverage/
@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload build artifacts
         if: needs.check.outputs.should_run == 'true'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: packages/*/dist/
