@@ -66,15 +66,9 @@ function saveResults(timestamp) {
  */
 const SECTION_TO_FILE = {
   1: "01-navigation-basic.json",
-  2: "02-navigation-plugins.json",
-  3: "03-dependencies.json",
-  4: "04-plugins-management.json",
   7: "07-path-operations.json",
   8: "08-current-state.json",
-  9: "09-redirects.json",
-  11: "11-events.json",
   12: "12-stress-testing.json",
-  13: "13-cloning.json",
 };
 
 /**
@@ -388,15 +382,9 @@ function formatDiffCompact(diff, width = 0) {
  */
 const CATEGORY_NAMES = {
   1: "Navigation Basic",
-  2: "Navigation Plugins",
-  3: "Dependencies",
-  4: "Plugins Management",
   7: "Path Operations",
   8: "Current State",
-  9: "Redirects",
-  11: "Events",
   12: "Stress Testing",
-  13: "Cloning",
 };
 
 /**
