@@ -81,6 +81,7 @@ import type { Route } from "../helpers";
 // 1.1.5 Navigation with multiple parameters
 {
   const routes: Route[] = [
+    { name: "home", path: "/" },
     {
       name: "complex",
       path: "/complex/:id/:slug/:category?page&sort&limit&offset",

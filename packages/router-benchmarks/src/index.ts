@@ -17,6 +17,7 @@ import { run } from "mitata";
 import "./helpers/suppress-console";
 
 import { createSimpleRouter } from "./helpers";
+import { IS_REAL_ROUTER } from "./helpers/constants";
 
 // ============================================================================
 // JIT Warmup: Pre-warm V8 for stable benchmark measurements
@@ -36,6 +37,16 @@ const JIT_WARMUP_ITERATIONS = 300;
 function warmupJIT(): void {
   console.error(`JIT warmup: ${JIT_WARMUP_ITERATIONS} iterations...`);
 
+  // Suppress unhandled rejection for real-router's async start().
+  // router5/router6 start() returns the router object (not a Promise) — .catch() would crash.
+  const safeStart = IS_REAL_ROUTER
+    ? (r: ReturnType<typeof createSimpleRouter>, path: string) => {
+        r.start(path).catch(() => {});
+      }
+    : (r: ReturnType<typeof createSimpleRouter>, path: string) => {
+        void r.start(path);
+      };
+
   for (let i = 0; i < JIT_WARMUP_ITERATIONS; i++) {
     // Create fresh router instances to warm up object creation paths
     const router = createSimpleRouter();
@@ -49,19 +60,19 @@ function warmupJIT(): void {
 
     // Warm up ALL start() variants (critical for sections 10-11)
     // Variant 1: start() without args
-    void router.start("/");
+    safeStart(router, "/");
     router.stop();
 
     // Variant 2: start(path)
-    void router.start("/about");
+    safeStart(router, "/about");
     router.stop();
 
     // Variant 3: start(another path)
-    void router.start("/");
+    safeStart(router, "/");
     router.stop();
 
     // Now do navigation warmup
-    void router.start("/");
+    safeStart(router, "/");
 
     // Warm up navigation paths
     void router.navigate("about");
