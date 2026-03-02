@@ -46,7 +46,7 @@
     "test": "vitest run"
   },
   "sideEffects": false,
-  "dependencies": {
+  "devDependencies": {
     "route-tree": "workspace:^"
   }
 }
