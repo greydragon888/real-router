@@ -16,11 +16,7 @@ import { run } from "mitata";
 // MUST be first import to suppress console before router warnings
 import "./helpers/suppress-console";
 
-import {
-  addEventListener,
-  createSimpleRouter,
-  addActivateGuard,
-} from "./helpers";
+import { createSimpleRouter } from "./helpers";
 
 // ============================================================================
 // JIT Warmup: Pre-warm V8 for stable benchmark measurements
@@ -31,12 +27,6 @@ import {
  * V8 needs 200-300 iterations to fully optimize hot code paths.
  */
 const JIT_WARMUP_ITERATIONS = 300;
-
-// Warmup helper functions (defined outside to satisfy eslint consistent-function-scoping)
-function warmupGuardHandler(): boolean {
-  return true;
-}
-const warmupGuard = () => warmupGuardHandler;
 
 /**
  * Global JIT warmup that exercises all major router code paths.
@@ -56,7 +46,6 @@ function warmupJIT(): void {
       onStop: () => {},
       onTransitionSuccess: () => {},
     }));
-    addActivateGuard(router, "home", warmupGuard);
 
     // Warm up ALL start() variants (critical for sections 10-11)
     // Variant 1: start() without args
@@ -84,9 +73,6 @@ function warmupJIT(): void {
     // Warm up event system
     const unsub = router.subscribe(() => {});
 
-    addEventListener(router, "$$success", () => {});
-    addEventListener(router, "$$error", () => {});
-
     unsub();
 
     router.stop();
@@ -101,22 +87,6 @@ const SECTION_IMPORTS: Record<number, string[]> = {
     "./01-navigation-basic/1.1-success.bench",
     "./01-navigation-basic/1.2-edge-cases.bench",
   ],
-  2: [
-    "./02-navigation-plugins/2.1-sync-extensions.bench",
-    "./02-navigation-plugins/2.2-async-extensions.bench",
-    "./02-navigation-plugins/2.3-edge-cases.bench",
-  ],
-  3: [
-    "./03-dependencies/3.1-initialization.bench",
-    "./03-dependencies/3.2-adding.bench",
-    "./03-dependencies/3.3-getting.bench",
-    "./03-dependencies/3.4-edge-cases.bench",
-    "./03-dependencies/3.5-router-comparison.bench.ts",
-  ],
-  4: [
-    "./04-plugins-management/4.1-adding.bench",
-    "./04-plugins-management/4.2-edge-cases.bench",
-  ],
   7: [
     "./07-path-operations/7.1-buildPath.bench",
     "./07-path-operations/7.2-matchPath.bench",
@@ -130,34 +100,10 @@ const SECTION_IMPORTS: Record<number, string[]> = {
     "./08-current-state/8.6-forward.bench",
     "./08-current-state/8.7-edge-cases.bench",
   ],
-  9: [
-    "./09-redirects/9.1-middleware.bench",
-    "./09-redirects/9.2-guards.bench",
-    "./09-redirects/9.3-forwardTo.bench",
-    "./09-redirects/9.5-edge-cases.bench",
-  ],
-  11: [
-    "./11-events/11.1-addEventListener.bench",
-    "./11-events/11.2-subscribe.bench",
-    "./11-events/11.3-invokeEventListeners.bench",
-    "./11-events/11.4-edge-cases.bench",
-  ],
   12: [
     "./12-stress-testing/12.1-high-load-sequential.bench",
     "./12-stress-testing/12.2-route-scaling.bench",
-    "./12-stress-testing/12.3-extension-scaling.bench",
-    "./12-stress-testing/12.4-auto-cleanup.bench",
-    "./12-stress-testing/12.5-comparative.bench",
   ],
-  13: [
-    "./13-cloning/13.1-ssr-scenarios.bench",
-    "./13-cloning/13.2-testing-scenarios.bench",
-    "./13-cloning/13.3-clone-scaling.bench",
-    "./13-cloning/13.4-configuration.bench",
-    "./13-cloning/13.5-isolation.bench",
-    "./13-cloning/13.6-edge-cases.bench",
-  ],
-  14: ["./14-rx/14.1-state$.bench"],
 };
 
 // Parse BENCH_SECTIONS environment variable
@@ -221,17 +167,9 @@ const OUTPUT_DIR = fileURLToPath(
 // Section number to folder name mapping
 const SECTION_NAMES: Record<number, string> = {
   1: "01-navigation-basic",
-  2: "02-navigation-plugins",
-  3: "03-dependencies",
-  4: "04-plugins-management",
-  6: "06-route-nodes",
   7: "07-path-operations",
   8: "08-current-state",
-  9: "09-redirects",
-  11: "11-events",
   12: "12-stress-testing",
-  13: "13-cloning",
-  14: "14-rx",
 };
 
 // Mitata result types (not exported by the library)

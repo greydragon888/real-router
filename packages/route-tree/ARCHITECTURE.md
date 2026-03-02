@@ -49,14 +49,14 @@ graph LR
 
 `route-tree` wraps `path-matcher` and `search-params` into a single facade:
 
-| Dependency        | What route-tree uses   | Purpose                                                              |
-| ----------------- | ---------------------- | -------------------------------------------------------------------- |
-| **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                      |
-| **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                            |
+| Dependency        | What route-tree uses   | Purpose                                                                                                |
+| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------ |
+| **path-matcher**  | `SegmentMatcher` class | Segment Trie for URL matching and path building                                                        |
+| **path-matcher**  | `buildParamMeta()`     | Extract param metadata from path patterns                                                              |
 | **path-matcher**  | `ParamMeta` type       | Parameter metadata (urlParams, queryParams, spatParams, constraintPatterns, paramTypeMap, pathPattern) |
-| **search-params** | `parse()`              | Query string parsing (DI into SegmentMatcher)                        |
-| **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                       |
-| **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                   |
+| **search-params** | `parse()`              | Query string parsing (DI into SegmentMatcher)                                                          |
+| **search-params** | `build()`              | Query string building (DI into SegmentMatcher)                                                         |
+| **search-params** | Type re-exports        | `ArrayFormat`, `BooleanFormat`, `NullFormat`, etc.                                                     |
 
 **Key design:** `path-matcher` has no query string handling — `route-tree` injects `search-params` functions via dependency injection at matcher creation time.
 
@@ -274,18 +274,18 @@ validateRoutePath(path, routeName, methodName, parentNode?)
 
 **Rejected:**
 
-| Rule                             | Example                    | Reason             |
-| -------------------------------- | -------------------------- | ------------------ |
-| Non-string                       | `null`, `123`              | Type safety             |
-| Whitespace (`\s`)                | `"/users /list"`           | Any whitespace rejected |
+| Rule                             | Example                    | Reason                          |
+| -------------------------------- | -------------------------- | ------------------------------- |
+| Non-string                       | `null`, `123`              | Type safety                     |
+| Whitespace (`\s`)                | `"/users /list"`           | Any whitespace rejected         |
 | Invalid path format              | `"#fragment"`              | Must match `/^([/?~]\|[^/]+$)/` |
-| Double slashes                   | `"//users"`                | Malformed URLs          |
-| Tilde under parameterized parent | `"~/admin"` under `"/:id"` | Ambiguous matching     |
+| Double slashes                   | `"//users"`                | Malformed URLs                  |
+| Tilde under parameterized parent | `"~/admin"` under `"/:id"` | Ambiguous matching              |
 
 ### Error Hierarchy
 
 ```
-RouteNodeError (base)                — not exported from package
+RouteNodeError (base)       — not exported from package
 ├── DuplicateRouteError     — { duplicateValue, duplicateType: "name" | "path" }  ← exported
 ├── InvalidRouteError       — malformed route definition                          ← exported
 ├── RouteNotFoundError      — { routeName }                                       ← internal only
@@ -388,21 +388,21 @@ const routes = routeTreeToDefinitions(sourceStore.tree);
 const newRouter = new Router(routes, options, mergedDeps);
 ```
 
-Tree is immutable (`Object.freeze`) — safe to read from source router while building clone.
+Tree is read synchronously — no concurrency concerns in single-threaded JS.
 
 ### Core Imports Summary
 
-| Core module              | Imports from route-tree                                            |
-| ------------------------ | ------------------------------------------------------------------ |
-| `routesStore.ts`         | `createMatcher`, `createRouteTree`, `nodeToDefinition`, types      |
+| Core module              | Imports from route-tree                                                           |
+| ------------------------ | --------------------------------------------------------------------------------- |
+| `routesStore.ts`         | `createMatcher`, `createRouteTree`, `nodeToDefinition`, types                     |
 | `RoutesNamespace.ts`     | Types only (`CreateMatcherOptions`, `RouteParams`, `RouteTree`, `RouteTreeState`) |
-| `validators.ts`          | `validateRoute`, `Matcher`, `RouteTree` types                      |
-| `forwardToValidation.ts` | `getSegmentsByName`, `RouteTree` type                              |
-| `cloneRouter.ts`         | `routeTreeToDefinitions`                                           |
-| `Router.ts`              | `CreateMatcherOptions` type                                        |
-| `internals.ts`           | `RouteTree` type                                                   |
-| `StateNamespace`         | `RouteTreeStateMeta` type                                          |
-| `getRoutesApi.ts`        | `RouteDefinition`, `RouteTree` types                               |
+| `validators.ts`          | `validateRoute`, `Matcher`, `RouteTree` types                                     |
+| `forwardToValidation.ts` | `getSegmentsByName`, `RouteTree` type                                             |
+| `cloneRouter.ts`         | `routeTreeToDefinitions`                                                          |
+| `Router.ts`              | `CreateMatcherOptions` type                                                       |
+| `internals.ts`           | `RouteTree` type                                                                  |
+| `StateNamespace`         | `RouteTreeStateMeta` type                                                         |
+| `getRoutesApi.ts`        | `RouteDefinition`, `RouteTree` types                                              |
 
 ## Performance Characteristics
 

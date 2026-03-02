@@ -28,15 +28,9 @@ for arg in "$@"; do
         echo ""
         echo "Available sections:"
         echo "   1  Navigation Basic"
-        echo "   2  Navigation Plugins"
-        echo "   3  Dependencies"
-        echo "   4  Plugins Management"
         echo "   7  Path Operations"
         echo "   8  Current State"
-        echo "   9  Redirects"
-        echo "  11  Events"
         echo "  12  Stress Testing"
-        echo "  13  Cloning"
         echo ""
         echo "Examples:"
         echo "  sudo ./bench-compare.sh           # Run all sections"
@@ -328,7 +322,7 @@ if warn_if_throttling; then
 fi
 
 # Define available sections (no section 6)
-AVAILABLE_SECTIONS=(1 2 3 4 5 7 8 9 11 12 13)
+AVAILABLE_SECTIONS=(1 7 8 12)
 
 # Parse requested sections or use all
 if [[ -n "$BENCH_SECTIONS" ]]; then
