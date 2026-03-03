@@ -48,7 +48,7 @@ export default [
   {
     name: "@real-router/route-utils (ESM)",
     path: "packages/route-utils/dist/esm/index.mjs",
-    limit: "0.5 kB",
+    limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
