@@ -11,7 +11,7 @@ src/
 ├── segmentTesters.ts   — makeSegmentTester factory + startsWithSegment/endsWithSegment/includesSegment
 ├── routeRelation.ts    — areRoutesRelated (pure string comparison)
 ├── constants.ts        — MAX_SEGMENT_LENGTH, SAFE_SEGMENT_PATTERN, ROUTE_SEGMENT_SEPARATOR
-├── types.ts            — SegmentTestFunction interface
+├── types.ts            — RouteTreeNode interface, SegmentTestFunction interface
 └── index.ts            — Public exports
 
 tests/
@@ -29,7 +29,7 @@ The package serves two independent purposes unified under a single import:
 
 ### 1. Route Tree Queries (`RouteUtils` class)
 
-Instance methods that query pre-computed route tree data. Depends on `route-tree`.
+Instance methods that query pre-computed route tree data. Accepts any object matching the `RouteTreeNode` interface (structurally compatible with `RouteTree` from `route-tree`).
 
 - `getChain(name)` — ancestor chain lookup (Map read)
 - `getSiblings(name)` — sibling lookup (Map read)
@@ -125,10 +125,10 @@ Validation is split: type/empty/null checks happen in the returned function, len
 ### WeakMap Factory (`getRouteUtils`)
 
 ```typescript
-const cache = new WeakMap<RouteTree, RouteUtils>();
+const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 ```
 
-- **Key:** `RouteTree` object reference (not value equality)
+- **Key:** `RouteTreeNode` object reference (not value equality)
 - **Lifecycle:** RouteUtils is GC'd when the RouteTree is GC'd
 - **Use case:** Avoids redundant O(n) construction when the same tree is queried multiple times
 
@@ -151,9 +151,10 @@ const cache = new WeakMap<RouteTree, RouteUtils>();
 
 | Dependency           | Type    | Purpose                                                 |
 | -------------------- | ------- | ------------------------------------------------------- |
-| `route-tree`         | runtime | `RouteTree` type + tree traversal via `.children` / `.nonAbsoluteChildren` |
 | `@real-router/types` | runtime | `State` type for segment tester overloads               |
 | `mitata`             | dev     | Benchmark engine                                        |
+
+`RouteTreeNode` interface is defined locally — no runtime dependency on the internal `route-tree` package. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
 ---
 

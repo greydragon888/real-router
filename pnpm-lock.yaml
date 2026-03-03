@@ -301,13 +301,13 @@ importers:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
-      route-tree:
-        specifier: workspace:^
-        version: link:../route-tree
     devDependencies:
       mitata:
         specifier: 1.0.34
         version: 1.0.34
+      route-tree:
+        specifier: workspace:^
+        version: link:../route-tree
 
   packages/router-benchmarks:
     dependencies:

@@ -5,8 +5,7 @@ import {
   includesSegment,
 } from "./segmentTesters.js";
 
-import type { SegmentTestFunction } from "./types.js";
-import type { RouteTree } from "route-tree";
+import type { RouteTreeNode, SegmentTestFunction } from "./types.js";
 
 export class RouteUtils {
   // ===== Static facade: segment testing =====
@@ -48,7 +47,7 @@ export class RouteUtils {
   readonly #chainCache: Map<string, readonly string[]>;
   readonly #siblingsCache: Map<string, readonly string[]>;
 
-  constructor(root: RouteTree) {
+  constructor(root: RouteTreeNode) {
     this.#chainCache = new Map();
     this.#siblingsCache = new Map();
     this.#buildAll(root, []);
@@ -102,7 +101,7 @@ export class RouteUtils {
   isDescendantOf(child: string, parent: string): boolean {
     return child !== parent && child.startsWith(`${parent}.`);
   }
-  #buildAll(node: RouteTree, chain: string[]): void {
+  #buildAll(node: RouteTreeNode, chain: string[]): void {
     const { fullName } = node;
 
     // Build chain: root gets [""], others get cumulative segments

@@ -60,6 +60,7 @@ graph TD
         RX["@real-router/rx"]
         LP["@real-router/logger-plugin"]
         PPP["@real-router/persistent-params-plugin"]
+        ROUTEUTILS["@real-router/route-utils"]
     end
 
     BP -->|dep| CORE
@@ -70,13 +71,14 @@ graph TD
     LP -->|dep| LOG
 
     REACT -->|dep| CORE
-    REACT -->|dep| ROUTEUTILS["@real-router/route-utils"]
+    REACT -->|dep| ROUTEUTILS
 
     RX -->|dep| CORE
 
     PPP -->|dep| CORE
     PPP -.->|bundles| TG
 
+    ROUTEUTILS -->|dep| TYPES
 ```
 
 **Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`

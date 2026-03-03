@@ -55,7 +55,7 @@ startsWithSegment("users.profile", "users"); // → true
 
 Pre-computes all route tree data eagerly in the constructor. Subsequent lookups are O(1) Map reads.
 
-#### `new RouteUtils(root: RouteTree)`
+#### `new RouteUtils(root: RouteTreeNode)`
 
 Creates a new instance. All ancestor chains and sibling lists are frozen during construction.
 
@@ -91,7 +91,7 @@ RouteUtils.areRoutesRelated("users", "users.profile"); // true
 
 ### `getRouteUtils(root): RouteUtils`
 
-WeakMap-cached factory. Same `RouteTree` reference → same instance. [Wiki](https://github.com/greydragon888/real-router/wiki/route-utils)
+WeakMap-cached factory. Same `RouteTreeNode` reference → same instance. [Wiki](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ```typescript
 const utils1 = getRouteUtils(tree);

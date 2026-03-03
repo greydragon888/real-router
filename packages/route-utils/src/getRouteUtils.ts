@@ -1,10 +1,10 @@
 import { RouteUtils } from "./RouteUtils.js";
 
-import type { RouteTree } from "route-tree";
+import type { RouteTreeNode } from "./types.js";
 
-const cache = new WeakMap<RouteTree, RouteUtils>();
+const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 
-export function getRouteUtils(root: RouteTree): RouteUtils {
+export function getRouteUtils(root: RouteTreeNode): RouteUtils {
   let utils = cache.get(root);
 
   if (utils === undefined) {

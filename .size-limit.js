@@ -46,8 +46,8 @@ export default [
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
-    name: "@real-router/helpers (ESM)",
-    path: "packages/helpers/dist/esm/index.mjs",
+    name: "@real-router/route-utils (ESM)",
+    path: "packages/route-utils/dist/esm/index.mjs",
     limit: "0.5 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },

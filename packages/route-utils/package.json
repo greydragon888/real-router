@@ -48,10 +48,10 @@
   },
   "sideEffects": false,
   "devDependencies": {
-    "mitata": "1.0.34"
+    "mitata": "1.0.34",
+    "route-tree": "workspace:^"
   },
   "dependencies": {
-    "@real-router/types": "workspace:^",
-    "route-tree": "workspace:^"
+    "@real-router/types": "workspace:^"
   }
 }
