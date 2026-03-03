@@ -309,6 +309,10 @@ importers:
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
+    devDependencies:
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
 
   packages/router-benchmarks:
     dependencies:
