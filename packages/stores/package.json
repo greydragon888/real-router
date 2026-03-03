@@ -1,0 +1,62 @@
+{
+  "name": "@real-router/stores",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "description": "Framework-agnostic subscription layer for Real-Router state",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "real-router",
+    "store",
+    "subscription",
+    "state"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "homepage": "https://github.com/greydragon888/real-router",
+  "scripts": {
+    "test": "vitest",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0 --no-error-on-unmatched-pattern",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/route-utils": "workspace:^"
+  },
+  "peerDependencies": {
+    "@real-router/core": "~0.31.0"
+  },
+  "devDependencies": {
+    "@real-router/core": "workspace:^"
+  }
+}
