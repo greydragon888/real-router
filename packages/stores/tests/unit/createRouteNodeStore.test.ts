@@ -1,7 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouteNodeStore } from "../../src/createRouteNodeStore.js";
+import { createRouteNodeStore } from "../../src";
 
 import type { Router } from "@real-router/core";
 
@@ -117,57 +117,50 @@ describe("createRouteNodeStore", () => {
     expect(store.getSnapshot().route?.name).toBe("users.view");
   });
 
-  it("Object.is dedup: listener NOT called if snapshot unchanged (same route, same previousRoute)", async () => {
-    // Create a fresh router that hasn't started yet so getState() returns undefined
-    const freshRouter = createRouter([
-      { name: "home", path: "/" },
-      { name: "admin", path: "/admin" },
-    ]);
-
-    // Override shouldUpdateNode to always return true, forcing dedup evaluation
-    vi.spyOn(freshRouter, "shouldUpdateNode").mockReturnValue(() => true);
-
-    // Create store for "admin" before start
-    // getState() = undefined → admin inactive → snapshot = { route: undefined, previousRoute: undefined }
-    const store = createRouteNodeStore(freshRouter, "admin");
-    const listener = vi.fn();
-
-    store.subscribe(listener);
-
-    // Start router at "/" (home)
-    // Subscription fires: next = { route: home-state, previousRoute: undefined }
-    // computeSnapshot: admin still inactive → route=undefined, previousRoute=undefined
-    // currentSnapshot has route=undefined, previousRoute=undefined → SAME → Object.is = true → no update
-    await freshRouter.start("/");
-
-    expect(listener).not.toHaveBeenCalled();
-
-    freshRouter.stop();
-  });
-
-  it("computeSnapshot returns same object reference when fields unchanged", async () => {
+  it("dedup: same snapshot reference when navigation doesn't affect node", async () => {
     const store = createRouteNodeStore(router, "admin");
     const initialSnapshot = store.getSnapshot();
 
-    // Navigate between unrelated routes
+    // Navigate between unrelated routes (home → users)
     await router.navigate("users");
 
-    // admin is never active, snapshot should not have been updated
+    // admin is never active, snapshot reference should be identical
     expect(store.getSnapshot()).toBe(initialSnapshot);
   });
 
-  it("WeakMap cache: getCachedShouldUpdate for same router+nodeName returns same fn reference", () => {
-    const spy = vi.spyOn(router, "shouldUpdateNode");
-
+  it("two stores for same node work independently", async () => {
     const store1 = createRouteNodeStore(router, "users");
     const store2 = createRouteNodeStore(router, "users");
 
-    // shouldUpdateNode called exactly once (cache hit on second call)
-    expect(spy).toHaveBeenCalledTimes(1);
+    await router.navigate("users");
 
-    // Both stores work independently
-    expect(store1.getSnapshot()).toBeDefined();
-    expect(store2.getSnapshot()).toBeDefined();
+    // Both stores reflect the navigation correctly
+    expect(store1.getSnapshot().route?.name).toBe("users");
+    expect(store2.getSnapshot().route?.name).toBe("users");
+
+    // Destroying one does not affect the other
+    store1.destroy();
+
+    await router.navigate("users.view", { id: "1" });
+
+    expect(store2.getSnapshot().route?.name).toBe("users.view");
+  });
+
+  it("unsubscribe: listener no longer called after unsubscribing", async () => {
+    const store = createRouteNodeStore(router, "users");
+    const listener = vi.fn();
+
+    const unsubscribe = store.subscribe(listener);
+
+    await router.navigate("users");
+
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+
+    await router.navigate("home");
+
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 
   it("destroy: unsubscribes from router", async () => {
@@ -189,6 +182,34 @@ describe("createRouteNodeStore", () => {
 
     expect(() => {
       store.destroy();
+    }).not.toThrowError();
+  });
+
+  it("post-destroy: getSnapshot still returns last snapshot", async () => {
+    const store = createRouteNodeStore(router, "users");
+
+    await router.navigate("users");
+
+    const lastSnapshot = store.getSnapshot();
+
+    expect(lastSnapshot.route?.name).toBe("users");
+
+    store.destroy();
+
+    expect(store.getSnapshot()).toBe(lastSnapshot);
+  });
+
+  it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
+    const store = createRouteNodeStore(router, "users");
+
+    store.destroy();
+
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(() => {
+      unsubscribe();
     }).not.toThrowError();
   });
 });

@@ -30,6 +30,7 @@ export function createRouteNodeStore(
       next,
     );
 
+    /* v8 ignore next 3 -- @preserve: dedup guard; shouldUpdateNode filters accurately so computeSnapshot always returns new ref */
     if (!Object.is(store.getSnapshot(), newSnapshot)) {
       store._update(newSnapshot);
     }

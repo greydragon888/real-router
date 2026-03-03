@@ -144,4 +144,34 @@ describe("createRouteStore", () => {
       store.destroy();
     }).not.toThrowError();
   });
+
+  it("post-destroy: getSnapshot still returns last snapshot", async () => {
+    const store = createRouteStore(router);
+
+    store.subscribe(() => {});
+
+    await router.navigate("admin");
+
+    const lastSnapshot = store.getSnapshot();
+
+    expect(lastSnapshot.route?.name).toBe("admin");
+
+    store.destroy();
+
+    expect(store.getSnapshot()).toBe(lastSnapshot);
+  });
+
+  it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
+    const store = createRouteStore(router);
+
+    store.destroy();
+
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(() => {
+      unsubscribe();
+    }).not.toThrowError();
+  });
 });

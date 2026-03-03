@@ -214,4 +214,29 @@ describe("createActiveRouteStore", () => {
 
     freshRouter.stop();
   });
+
+  it("post-destroy: getSnapshot still returns last value", async () => {
+    await router.navigate("admin");
+    const store = createActiveRouteStore(router, "admin");
+
+    expect(store.getSnapshot()).toBe(true);
+
+    store.destroy();
+
+    expect(store.getSnapshot()).toBe(true);
+  });
+
+  it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
+    const store = createActiveRouteStore(router, "admin");
+
+    store.destroy();
+
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe(listener);
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(() => {
+      unsubscribe();
+    }).not.toThrowError();
+  });
 });

@@ -28,6 +28,7 @@ export function createBaseStore<T>(initialSnapshot: T): BaseStore<T> {
     },
 
     _update(snapshot: T): void {
+      /* v8 ignore next 2 -- @preserve: defensive guard unreachable via public API (destroy() removes router subscription first) */
       if (destroyed) {
         return;
       }
