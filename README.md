@@ -152,10 +152,12 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 
 ### Utilities
 
-| Package                                  | Description                                          |
-| ---------------------------------------- | ---------------------------------------------------- |
-| [@real-router/rx](packages/rx)           | Reactive Observable API (state$, events$, operators) |
-| [@real-router/helpers](packages/helpers) | Route comparison and checking utilities              |
+| Package                                          | Description                                          |
+| ------------------------------------------------ | ---------------------------------------------------- |
+| [@real-router/fsm](packages/fsm)                 | Finite state machine engine                          |
+| [@real-router/logger](packages/logger)           | Structured logging utility                           |
+| [@real-router/rx](packages/rx)                   | Reactive Observable API (state$, events$, operators) |
+| [@real-router/route-utils](packages/route-utils) | Route tree queries and segment testing utilities     |
 
 ## Documentation
 

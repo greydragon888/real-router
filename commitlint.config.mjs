@@ -16,7 +16,6 @@ export const TYPES = [
 export const SCOPES = [
   "core",
   "fsm",
-  "cache-manager",
   "types",
   "path-matcher",
   "route-tree",
@@ -30,6 +29,7 @@ export const SCOPES = [
   "react",
   "rx",
   "event-emitter",
+  "route-utils",
   "router-benchmarks",
   "deps",
   "config",

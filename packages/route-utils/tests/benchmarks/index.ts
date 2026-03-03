@@ -1,14 +1,16 @@
 /**
- * Real Router Benchmarks Entry Point
+ * RouteUtils Benchmarks Entry Point
  *
  * Run: pnpm bench
  * Results: .bench/mitata-results.json
  *
  * Categories:
- * 1. navigation - Route navigation performance
- * 2. helpers - Helper function benchmarks
- * 3. (commented) transitionPath - Transition path calculation
- * 4. (commented) routes - Route operations
+ * 1. Construction - RouteUtils constructor / index building
+ * 2. getChain - Cached and cold path chain lookups
+ * 3. getSiblings - Cached and wide tree sibling lookups
+ * 4. isDescendantOf - String prefix checks
+ * 5. getRouteUtils - WeakMap factory cache
+ * 6. Stress - Large-scale and deep/wide tree scenarios
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -17,16 +19,7 @@ import { fileURLToPath } from "node:url";
 import { run } from "mitata";
 
 // Import all benchmark files (they register benchmarks via summary/bench)
-import "./navigation/basic.bench";
-import "./navigation/options.bench";
-import "./navigation/guards.bench";
-import "./helpers/freezeStateInPlace.bench";
-import "./validation/isNavigationOptions.bench";
-// import "./transitionPath/getTransitionPath.bench";
-// import "./routes/routeQuery/isActiveRoute.bench";
-// import "./routes/routeQuery/shouldUpdateNode.bench";
-// import "./routes/routePath/buildPath.bench";
-// import "./routes/routePath/matchPath.bench";
+import "./route-utils.bench";
 
 // ============================================================================
 // Run benchmarks and save results
@@ -113,6 +106,6 @@ run()
       console.error("Error processing results:", error);
     }
   })
-  .catch((error: unknown) => {
+  .catch((error) => {
     console.error("Run error:", error);
   });

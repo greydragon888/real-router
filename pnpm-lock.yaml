@@ -196,8 +196,6 @@ importers:
         specifier: workspace:^
         version: link:../type-guards
 
-  packages/cache-manager: {}
-
   packages/core:
     dependencies:
       '@real-router/fsm':
@@ -225,12 +223,6 @@ importers:
   packages/event-emitter: {}
 
   packages/fsm: {}
-
-  packages/helpers:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
 
   packages/logger: {}
 
@@ -260,9 +252,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/helpers':
+      '@real-router/route-utils':
         specifier: workspace:^
-        version: link:../helpers
+        version: link:../route-utils
       '@types/react':
         specifier: '>=18.0.0'
         version: 19.2.9
@@ -303,6 +295,19 @@ importers:
       search-params:
         specifier: workspace:^
         version: link:../search-params
+
+  packages/route-utils:
+    dependencies:
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
+      route-tree:
+        specifier: workspace:^
+        version: link:../route-tree
 
   packages/router-benchmarks:
     dependencies:

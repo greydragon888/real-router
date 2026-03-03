@@ -136,10 +136,9 @@ pnpm publish --provenance --access public --no-git-checks
 Packages are published in dependency order:
 
 1. `@real-router/logger` (no @real-router deps)
-2. `@real-router/cache-manager` (no @real-router deps)
-3. `@real-router/types` (no deps)
-4. `@real-router/core` (depends on types, logger)
-5. All other packages
+2. `@real-router/types` (no deps)
+3. `@real-router/core` (depends on types, logger)
+4. All other packages
 
 **Important:** The `publish_package` function must return `0` even when package is already published:
 
@@ -182,12 +181,13 @@ dts: {
 ```
 
 **Results:**
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Total .d.ts lines | 12,080 | 3,793 | -69% |
-| core .d.ts | 1,807 | 216 | -88% |
-| browser-plugin .d.ts | 1,831 | 500 | -73% |
-| react .d.ts | 1,813 | 80 | -96% |
+
+| Metric               | Before | After | Change |
+| -------------------- | ------ | ----- | ------ |
+| Total .d.ts lines    | 12,080 | 3,793 | -69%   |
+| core .d.ts           | 1,807  | 216   | -88%   |
+| browser-plugin .d.ts | 1,831  | 500   | -73%   |
+| react .d.ts          | 1,813  | 80    | -96%   |
 
 This approach ensures:
 
@@ -446,7 +446,7 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 | @real-router/react             | 2 kB   |
 | @real-router/rx                | 1.5 kB |
 | @real-router/browser-plugin    | 4 kB   |
-| @real-router/helpers           | 0.5 kB |
+| @real-router/route-utils       | 0.5 kB |
 | path-matcher                   | 4 kB   |
 | route-tree                     | 6.5 kB |
 | search-params                  | 1.5 kB |
@@ -867,33 +867,26 @@ import { performance } from "perf_hooks";
 globalThis.performance = performance;
 ```
 
-## Cache Manager Package
+## Route Utils Package
 
 ### Why?
 
-Centralized cache registry for hot paths in the router (transition path computation, node state lookups, path building). Follows the same singleton pattern as `@real-router/logger`.
+`@real-router/route-utils` provides a cached read-only query API for route tree structure and segment testing utilities. Consolidates `@real-router/helpers` (segment testers) and adds new pre-computed queries (chains, siblings, descendant checks).
 
 ### Design Decisions
 
-**Single `Map<string, T>` LRU:** Initial design used 3 Maps (`dict`, `cache`, `reverseDict`) for numeric index keys. After analysis, the 3-Map approach added ~3x memory overhead with no benefit for string-only keys. Simplified to native `Map<string, T>` using insertion-order for LRU semantics.
+**Pre-computed chains and siblings:** Constructor eagerly walks the entire tree once, building `Map<string, readonly string[]>` for chains and siblings. All subsequent lookups are O(1) Map reads returning frozen arrays (referential equality on repeated calls).
 
-**LRU via Map insertion order:** `delete(key)` then `set(key, value)` moves entry to end. `keys().next().value` gives oldest (first) entry for eviction. No external LRU library needed.
+**WeakMap factory caching:** `getRouteUtils(root)` caches instances via `WeakMap<RouteTreeNode, RouteUtils>`. Since `RouteTree` is immutable (`Object.freeze`), every mutation creates a new root — automatic cache invalidation without manual `rebuild()`.
 
-**Cache hit via `Map.has()`:** Using `has()` instead of checking `get() !== undefined` correctly handles `T = undefined` as a cached value.
+**Structural typing for RouteTree:** `route-utils` defines a minimal `RouteTreeNode` interface locally (`fullName`, `children`, `nonAbsoluteChildren`) instead of importing `RouteTree` from the internal `route-tree` package. This eliminates the runtime dependency — TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
-**Module-level singleton:** `export const cacheManager = new CacheManager()` — same pattern as logger. For tests/SSR: `cacheManager.clear()` resets all caches.
+**Static facade for segment testers:** `RouteUtils.startsWithSegment`, `.endsWithSegment`, `.includesSegment`, `.areRoutesRelated` are static properties delegating to standalone functions. This provides a single import entry point while keeping functions tree-shakeable as standalone exports.
 
-**Coordinated invalidation:** `invalidateForNewRoutes()` notifies all registered caches when routes change. Caches with `onInvalidate` get targeted invalidation; others are fully cleared (safe default).
+### Removed Packages
 
-### Property-Based Tests
-
-14 property tests via `@fast-check/vitest` verify invariants:
-
-- Capacity: `size <= maxSize` always holds under arbitrary operations
-- LRU order: touched entries survive eviction, oldest untouched are evicted
-- Metrics: `hits + misses === total get() calls`, `0 <= hitRate <= 1`
-- Invalidation: matching keys evicted, non-matching preserved
-- Clear: resets size and stats to zero, idempotent
+- **`@real-router/helpers`** — all functionality migrated into `@real-router/route-utils` (segment testers + `areRoutesRelated`)
+- **`@real-router/cache-manager`** — `KeyIndexCache` and `CacheManager` were unused after RouteUtils adopted WeakMap-based caching; removed entirely
 
 ## Dependencies
 

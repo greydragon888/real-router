@@ -158,6 +158,30 @@ const UsersSection = () => {
 };
 ```
 
+#### `useRouteUtils(): RouteUtils`
+
+Get pre-computed route tree query utilities. **Never re-renders** on navigation.\
+Returns: `RouteUtils` — cached instance with chain, sibling, and descendant lookups\
+[Wiki](https://github.com/greydragon888/real-router/wiki/useRouteUtils)
+
+```tsx
+import { useRouteUtils } from "@real-router/react";
+
+const Breadcrumbs = () => {
+  const utils = useRouteUtils();
+  const chain = utils.getChain("users.profile");
+  // → ["users", "users.profile"]
+
+  return (
+    <nav>
+      {chain?.map((segment) => (
+        <span key={segment}>{segment}</span>
+      ))}
+    </nav>
+  );
+};
+```
+
 ---
 
 ### Components

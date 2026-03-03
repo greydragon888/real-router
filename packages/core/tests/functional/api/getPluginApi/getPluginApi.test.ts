@@ -124,7 +124,7 @@ describe("getPluginApi()", () => {
   });
 
   it("getTree should delegate to router.getTree", () => {
-    const tree = api.getTree() as { children: Map<string, unknown> };
+    const tree = api.getTree() as { children: ReadonlyMap<string, unknown> };
 
     expect(tree).toBeDefined();
     expect(tree.children.size).toBeGreaterThan(0);

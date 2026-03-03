@@ -57,7 +57,7 @@
   "sideEffects": false,
   "dependencies": {
     "@real-router/core": "workspace:^",
-    "@real-router/helpers": "workspace:^"
+    "@real-router/route-utils": "workspace:^"
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",

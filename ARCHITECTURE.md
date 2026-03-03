@@ -14,9 +14,8 @@ real-router/
 │   ├── browser-plugin/            # Browser history synchronization
 │   ├── logger-plugin/             # Development logging with timing
 │   ├── persistent-params-plugin/  # Parameter persistence
-│   ├── helpers/                   # Route comparison utilities
+│   ├── route-utils/                 # @real-router/route-utils — route tree queries and segment testing
 │   ├── logger/                    # @real-router/logger — isomorphic logging
-│   ├── cache-manager/             # @real-router/cache-manager — centralized LRU cache registry
 │   ├── fsm/                       # @real-router/fsm — finite state machine engine (internal)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
 │   ├── route-tree/                # Route tree building, validation, matcher factory (internal)
@@ -36,7 +35,6 @@ graph TD
         FSM["@real-router/fsm"]
         LOG["@real-router/logger"]
         TYPES["@real-router/types"]
-        CM["@real-router/cache-manager"]
     end
 
     subgraph internal [Internal packages]
@@ -62,7 +60,7 @@ graph TD
         RX["@real-router/rx"]
         LP["@real-router/logger-plugin"]
         PPP["@real-router/persistent-params-plugin"]
-        HELPERS["@real-router/helpers"]
+        ROUTEUTILS["@real-router/route-utils"]
     end
 
     BP -->|dep| CORE
@@ -73,17 +71,17 @@ graph TD
     LP -->|dep| LOG
 
     REACT -->|dep| CORE
-    REACT -->|dep| HELPERS
+    REACT -->|dep| ROUTEUTILS
 
     RX -->|dep| CORE
 
     PPP -->|dep| CORE
     PPP -.->|bundles| TG
 
-    HELPERS -->|dep| CORE
+    ROUTEUTILS -->|dep| TYPES
 ```
 
-**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/helpers`, `@real-router/cache-manager`
+**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`
 
 **Internal packages (bundled into core):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
 
