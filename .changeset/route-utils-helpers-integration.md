@@ -4,10 +4,9 @@
 
 Integrate `@real-router/helpers` into `@real-router/route-utils` (#214)
 
-Segment testing functions and route relation check are now available as both standalone exports
-and static methods on `RouteUtils`:
+`@real-router/helpers` is removed. All its functionality is now available in `@real-router/route-utils`.
 
-**Standalone functions** (same API as `@real-router/helpers`):
+**Standalone functions** (same API as the former `@real-router/helpers`):
 
 - `startsWithSegment(route, segment?)` — prefix match with currying support
 - `endsWithSegment(route, segment?)` — suffix match with currying support
@@ -22,3 +21,10 @@ and static methods on `RouteUtils`:
 - `RouteUtils.areRoutesRelated`
 
 Also exports `SegmentTestFunction` type.
+
+**Migration:**
+
+```diff
+- import { startsWithSegment, areRoutesRelated } from "@real-router/helpers";
++ import { startsWithSegment, areRoutesRelated } from "@real-router/route-utils";
+```
