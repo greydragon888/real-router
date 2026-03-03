@@ -51,6 +51,7 @@
     "mitata": "1.0.34"
   },
   "dependencies": {
+    "@real-router/types": "workspace:^",
     "route-tree": "workspace:^"
   }
 }

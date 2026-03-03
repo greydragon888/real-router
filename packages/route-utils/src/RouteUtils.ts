@@ -1,6 +1,50 @@
+import { areRoutesRelated } from "./routeRelation.js";
+import {
+  startsWithSegment,
+  endsWithSegment,
+  includesSegment,
+} from "./segmentTesters.js";
+
+import type { SegmentTestFunction } from "./types.js";
 import type { RouteTree } from "route-tree";
 
 export class RouteUtils {
+  // ===== Static facade: segment testing =====
+
+  /**
+   * Tests if a route name starts with the given segment.
+   * Supports direct calls, curried form, and `State` objects.
+   *
+   * @see {@link startsWithSegment} standalone function for details
+   */
+  static readonly startsWithSegment: SegmentTestFunction = startsWithSegment;
+
+  /**
+   * Tests if a route name ends with the given segment.
+   * Supports direct calls, curried form, and `State` objects.
+   *
+   * @see {@link endsWithSegment} standalone function for details
+   */
+  static readonly endsWithSegment: SegmentTestFunction = endsWithSegment;
+
+  /**
+   * Tests if a route name includes the given segment anywhere in its path.
+   * Supports direct calls, curried form, and `State` objects.
+   *
+   * @see {@link includesSegment} standalone function for details
+   */
+  static readonly includesSegment: SegmentTestFunction = includesSegment;
+
+  /**
+   * Checks if two routes are related in the hierarchy
+   * (same, parent-child, or child-parent).
+   *
+   * @see {@link areRoutesRelated} standalone function for details
+   */
+  static readonly areRoutesRelated = areRoutesRelated;
+
+  // ===== Instance fields =====
+
   readonly #chainCache: Map<string, readonly string[]>;
   readonly #siblingsCache: Map<string, readonly string[]>;
 
@@ -58,7 +102,6 @@ export class RouteUtils {
   isDescendantOf(child: string, parent: string): boolean {
     return child !== parent && child.startsWith(`${parent}.`);
   }
-
   #buildAll(node: RouteTree, chain: string[]): void {
     const { fullName } = node;
 

@@ -260,9 +260,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/helpers':
+      '@real-router/route-utils':
         specifier: workspace:^
-        version: link:../helpers
+        version: link:../route-utils
       '@types/react':
         specifier: '>=18.0.0'
         version: 19.2.9
@@ -306,6 +306,9 @@ importers:
 
   packages/route-utils:
     dependencies:
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
       route-tree:
         specifier: workspace:^
         version: link:../route-tree

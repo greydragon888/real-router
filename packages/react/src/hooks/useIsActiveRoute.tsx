@@ -1,6 +1,6 @@
 // packages/react/modules/hooks/useIsActiveRoute.tsx
 
-import { areRoutesRelated } from "@real-router/helpers";
+import { areRoutesRelated } from "@real-router/route-utils";
 import { useCallback, useMemo, useRef } from "react";
 
 import { useRouterSubscription } from "./useRouterSubscription";
