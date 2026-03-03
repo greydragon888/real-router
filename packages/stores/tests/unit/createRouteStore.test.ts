@@ -58,6 +58,7 @@ describe("createRouteStore", () => {
   it("snapshot updated: route = new route, previousRoute = old route", async () => {
     const store = createRouteStore(router);
     const previousState = router.getState();
+    const cleanup = store.subscribe(() => {});
 
     await router.navigate("admin");
 
@@ -65,10 +66,13 @@ describe("createRouteStore", () => {
 
     expect(snapshot.route?.name).toBe("admin");
     expect(snapshot.previousRoute).toBe(previousState);
+
+    cleanup();
   });
 
   it("multiple navigations: previousRoute tracks correctly", async () => {
     const store = createRouteStore(router);
+    const cleanup = store.subscribe(() => {});
 
     await router.navigate("users");
     const afterFirstNav = store.getSnapshot();
@@ -81,6 +85,8 @@ describe("createRouteStore", () => {
 
     expect(afterSecondNav.route?.name).toBe("admin");
     expect(afterSecondNav.previousRoute?.name).toBe("users");
+
+    cleanup();
   });
 
   it("destroy: unsubscribes from router (further navigations don't call listener)", async () => {
@@ -93,6 +99,40 @@ describe("createRouteStore", () => {
     await router.navigate("admin");
 
     expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("multiple subscribers: router.subscribe called only once", async () => {
+    const store = createRouteStore(router);
+    const spy = vi.spyOn(router, "subscribe");
+
+    const cleanup1 = store.subscribe(() => {});
+    const cleanup2 = store.subscribe(() => {});
+
+    // router.subscribe should only be called once (lazy-connection)
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    cleanup1();
+    cleanup2();
+  });
+
+  it("partial unsubscribe: router subscription stays until last listener removed", async () => {
+    const store = createRouteStore(router);
+    const listener1 = vi.fn();
+    const listener2 = vi.fn();
+
+    const cleanup1 = store.subscribe(listener1);
+
+    store.subscribe(listener2);
+
+    // Remove first listener — router subscription should stay
+    cleanup1();
+
+    await router.navigate("admin");
+
+    // listener2 still receives updates
+    expect(listener2).toHaveBeenCalledTimes(1);
+    // listener1 no longer receives updates
+    expect(listener1).not.toHaveBeenCalled();
   });
 
   it("destroy: idempotent", () => {

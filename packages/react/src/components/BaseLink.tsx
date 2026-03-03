@@ -34,7 +34,6 @@ export const BaseLink: FC<BaseLinkProps> = memo(
 
     // Use optimized hook for active state checking
     const isActive = useIsActiveRoute(
-      router,
       routeName,
       stableParams,
       activeStrict,

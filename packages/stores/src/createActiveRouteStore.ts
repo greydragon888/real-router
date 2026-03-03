@@ -33,12 +33,11 @@ export function createActiveRouteStore(
       return;
     }
 
-    const newValue = router.isActiveRoute(
-      routeName,
-      params,
-      strict,
-      ignoreQueryParams,
-    );
+    // If new route is not related, we know the route is inactive —
+    // avoid calling isActiveRoute for the optimization
+    const newValue = isNewRelated
+      ? router.isActiveRoute(routeName, params, strict, ignoreQueryParams)
+      : false;
 
     if (!Object.is(store.getSnapshot(), newValue)) {
       store._update(newValue);
