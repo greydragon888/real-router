@@ -2,12 +2,13 @@
  * RouteUtils benchmarks
  *
  * Tests all public API of RouteUtils:
- * - Construction (index building)
- * - getChain (cached hot path + cold path)
- * - getSiblings (cached hot path + wide tree)
+ * - Construction (index + eager chain/siblings building)
+ * - getChain (pre-computed lookup)
+ * - getSiblings (pre-computed lookup)
  * - isDescendantOf (string prefix check)
  * - getRouteUtils factory (WeakMap cache)
  * - Stress scenarios (large/deep/wide trees, many operations)
+ * - Construction scaling (50 → 2000 nodes)
  */
 
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
@@ -41,34 +42,12 @@ function makeSmallTree(): RouteTree {
 
 function makeMediumTree(): RouteTree {
   // 50 routes: 10 top-level, each with 4 children
-  const children = [];
-
-  for (let i = 0; i < 10; i++) {
-    const grandchildren = [];
-
-    for (let j = 0; j < 4; j++) {
-      grandchildren.push({ name: `child${j}`, path: `/child${j}` });
-    }
-
-    children.push({
-      name: `section${i}`,
-      path: `/section${i}`,
-      children: grandchildren,
-    });
-  }
-
-  return createRouteTree("", "", children);
+  return makeHierarchicalTree(10, 4);
 }
 
 function makeLargeTree(): RouteTree {
   // 500 flat routes
-  const children = [];
-
-  for (let i = 0; i < 500; i++) {
-    children.push({ name: `route${i}`, path: `/route${i}` });
-  }
-
-  return createRouteTree("", "", children);
+  return makeWideTree(500);
 }
 
 function makeDeepTree(depth: number): RouteTree {
@@ -97,6 +76,60 @@ function makeWideTree(width: number): RouteTree {
   }
 
   return createRouteTree("", "", children);
+}
+
+function makeHierarchicalTree(
+  sections: number,
+  childrenPerSection: number,
+): RouteTree {
+  const children = [];
+
+  for (let i = 0; i < sections; i++) {
+    const grandchildren = [];
+
+    for (let j = 0; j < childrenPerSection; j++) {
+      grandchildren.push({ name: `child${j}`, path: `/child${j}` });
+    }
+
+    children.push({
+      name: `section${i}`,
+      path: `/section${i}`,
+      children: grandchildren,
+    });
+  }
+
+  return createRouteTree("", "", children);
+}
+
+function makeDeep3LevelTree(l1: number, l2: number, l3: number): RouteTree {
+  // 3-level hierarchy: l1 sections × l2 groups × l3 items
+  const sections = [];
+
+  for (let i = 0; i < l1; i++) {
+    const groups = [];
+
+    for (let j = 0; j < l2; j++) {
+      const items = [];
+
+      for (let k = 0; k < l3; k++) {
+        items.push({ name: `item${k}`, path: `/item${k}` });
+      }
+
+      groups.push({
+        name: `group${j}`,
+        path: `/group${j}`,
+        children: items,
+      });
+    }
+
+    sections.push({
+      name: `section${i}`,
+      path: `/section${i}`,
+      children: groups,
+    });
+  }
+
+  return createRouteTree("", "", sections);
 }
 
 // ============================================================================
@@ -132,7 +165,7 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Section 2: getChain — hot path (cached)
+// Section 2: getChain — pre-computed lookup
 // ============================================================================
 
 boxplot(() => {
@@ -140,10 +173,8 @@ boxplot(() => {
     {
       const tree = makeSmallTree();
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache
-      utils.getChain("users.profile");
-      utils.getChain("");
+      // All chains are pre-computed, no warm-up needed
+      // Alternate routes to prevent LICM
       // Alternate routes to prevent LICM
       const names = ["users.profile", "admin.dashboard"];
       let index = 0;
@@ -156,10 +187,7 @@ boxplot(() => {
     {
       const tree = makeSmallTree();
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache
-      utils.getChain("users");
-      utils.getChain("admin");
+      // All chains are pre-computed, no warm-up needed
       const names = ["users", "admin"];
       let index = 0;
 
@@ -171,7 +199,7 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Section 3: getChain — cold path
+// Section 3: getChain — construction + first read (replaces cold path)
 // ============================================================================
 
 boxplot(() => {
@@ -179,7 +207,7 @@ boxplot(() => {
     {
       const tree = makeSmallTree();
 
-      bench("3.1 getChain: cold (fresh RouteUtils + first call)", () => {
+      bench("3.1 getChain: construct + read (small tree)", () => {
         const u = new RouteUtils(tree);
 
         do_not_optimize(u.getChain("users.profile"));
@@ -189,7 +217,7 @@ boxplot(() => {
     {
       const tree = makeMediumTree();
 
-      bench("3.2 getChain: cold, medium tree + deep name", () => {
+      bench("3.2 getChain: construct + read (medium tree)", () => {
         const u = new RouteUtils(tree);
 
         do_not_optimize(u.getChain("section5.child3"));
@@ -199,7 +227,7 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Section 4: getSiblings — hot path
+// Section 4: getSiblings — pre-computed lookup
 // ============================================================================
 
 boxplot(() => {
@@ -207,10 +235,7 @@ boxplot(() => {
     {
       const tree = makeSmallTree();
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache
-      utils.getSiblings("users");
-      utils.getSiblings("admin");
+      // All siblings are pre-computed, no warm-up needed
       const names = ["users", "admin"];
       let index = 0;
 
@@ -222,10 +247,7 @@ boxplot(() => {
     {
       const tree = makeSmallTree();
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache for nested routes
-      utils.getSiblings("users.profile");
-      utils.getSiblings("users.settings");
+      // All siblings are pre-computed, no warm-up needed
       const names = ["users.profile", "users.settings"];
       let index = 0;
 
@@ -237,7 +259,7 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Section 5: getSiblings — wide tree
+// Section 5: getSiblings — wide tree (pre-computed)
 // ============================================================================
 
 boxplot(() => {
@@ -245,10 +267,7 @@ boxplot(() => {
     {
       const tree = makeWideTree(100);
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache
-      utils.getSiblings("item0");
-      utils.getSiblings("item1");
+      // All siblings are pre-computed, no warm-up needed
       const names = ["item0", "item1"];
       let index = 0;
 
@@ -260,10 +279,7 @@ boxplot(() => {
     {
       const tree = makeWideTree(1000);
       const utils = new RouteUtils(tree);
-
-      // Pre-warm cache
-      utils.getSiblings("item0");
-      utils.getSiblings("item1");
+      // All siblings are pre-computed, no warm-up needed
       const names = ["item0", "item1"];
       let index = 0;
 
@@ -359,14 +375,13 @@ boxplot(() => {
 });
 
 // ============================================================================
-// Section 8: Stress
+// Section 8: Stress (hardened)
 // ============================================================================
 
 boxplot(() => {
   summary(() => {
     {
       const tree = makeLargeTree();
-      // All route names pre-built
       const names = Array.from({ length: 500 }, (_, i) => `route${i}`);
 
       bench("8.1 Stress: getChain on all 500 routes", () => {
@@ -381,7 +396,6 @@ boxplot(() => {
     {
       const tree = makeMediumTree();
       const utils = new RouteUtils(tree);
-      // Pre-build descendant pairs
       const pairs: [string, string][] = [];
 
       for (let i = 0; i < 10; i++) {
@@ -412,6 +426,86 @@ boxplot(() => {
 
       bench("8.4 Stress: Construction wide tree (100 children)", () => {
         do_not_optimize(new RouteUtils(wideTree));
+      }).gc("inner");
+    }
+  });
+});
+
+// ============================================================================
+// Section 9: Construction scaling (eager computation cost)
+// ============================================================================
+
+boxplot(() => {
+  summary(() => {
+    {
+      const tree = makeHierarchicalTree(10, 4); // 50 nodes
+
+      bench("9.1 Scaling: 50 nodes (10×4 hierarchy)", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeHierarchicalTree(20, 10); // 200 nodes
+
+      bench("9.2 Scaling: 200 nodes (20×10 hierarchy)", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeWideTree(500); // 500 flat nodes
+
+      bench("9.3 Scaling: 500 flat nodes", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeHierarchicalTree(50, 10); // 500 hierarchical nodes
+
+      bench("9.4 Scaling: 500 nodes (50×10 hierarchy)", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeWideTree(1000); // 1000 flat nodes
+
+      bench("9.5 Scaling: 1000 flat nodes", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeHierarchicalTree(50, 20); // 1000 hierarchical nodes
+
+      bench("9.6 Scaling: 1000 nodes (50×20 hierarchy)", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeDeep3LevelTree(10, 10, 10); // 1000 nodes, 3 levels deep
+
+      bench("9.7 Scaling: 1000 nodes (10×10×10, 3 levels)", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeWideTree(2000); // 2000 flat nodes
+
+      bench("9.8 Scaling: 2000 flat nodes", () => {
+        do_not_optimize(new RouteUtils(tree));
+      }).gc("inner");
+    }
+
+    {
+      const tree = makeHierarchicalTree(100, 20); // 2000 hierarchical nodes
+
+      bench("9.9 Scaling: 2000 nodes (100×20 hierarchy)", () => {
+        do_not_optimize(new RouteUtils(tree));
       }).gc("inner");
     }
   });
