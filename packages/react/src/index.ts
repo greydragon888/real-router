@@ -23,5 +23,7 @@ export { RouterContext, RouteContext, NavigatorContext } from "./context";
 
 export { useRouter } from "./hooks/useRouter";
 
+export { useRouteUtils } from "./hooks/useRouteUtils";
+
 // Types
 export type { Navigator } from "@real-router/core";
