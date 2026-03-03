@@ -1,5 +1,35 @@
 # @real-router/react
 
+## 0.5.0
+
+### Minor Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteUtils()` hook (#214)
+
+  New hook providing direct access to `RouteUtils` instance without manual initialization:
+
+  ```typescript
+  import { useRouteUtils } from "@real-router/react";
+
+  function Breadcrumbs() {
+    const utils = useRouteUtils();
+    const chain = utils.getChain(route.name);
+    // ...
+  }
+  ```
+
+  Internally calls `getRouteUtils(getPluginApi(router).getTree())` — returns a cached, pre-computed instance.
+
+### Patch Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate `areRoutesRelated` import from `@real-router/helpers` to `@real-router/route-utils` (#214)
+
+  Internal dependency change — no API changes for consumers.
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+  - @real-router/route-utils@0.1.0
+
 ## 0.4.12
 
 ### Patch Changes

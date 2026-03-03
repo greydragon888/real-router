@@ -1,5 +1,12 @@
 # router-benchmarks
 
+## 0.3.28
+
+### Patch Changes
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+
 ## 0.3.27
 
 ### Patch Changes
