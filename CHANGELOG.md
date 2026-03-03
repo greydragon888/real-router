@@ -5,6 +5,147 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-03]
+
+### @real-router/core@0.31.0
+
+### Minor Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `nameToIDs` from public API (#214)
+
+  **Breaking Change:** `nameToIDs` is no longer exported from `@real-router/core`.
+
+  **Migration:** Use `RouteUtils.getChain()` from `@real-router/route-utils` instead:
+
+  ```diff
+  - import { nameToIDs } from "@real-router/core";
+  - const chain = nameToIDs("users.profile");
+  + import { getPluginApi } from "@real-router/core";
+  + import { getRouteUtils } from "@real-router/route-utils";
+  + const utils = getRouteUtils(getPluginApi(router).getTree());
+  + const chain = utils.getChain("users.profile");
+  ```
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Override `PluginApi.getTree()` return type to `RouteTree` and re-export `RouteTree` (#214)
+
+  `getPluginApi(router).getTree()` now returns properly typed `RouteTree` instead of `unknown`.
+  `RouteTree` type is also re-exported from `@real-router/core` for convenience.
+
+  This is a type-only change — no runtime behavior changed.
+
+### @real-router/react@0.5.0
+
+### Minor Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouteUtils()` hook (#214)
+
+  New hook providing direct access to `RouteUtils` instance without manual initialization:
+
+  ```typescript
+  import { useRouteUtils } from "@real-router/react";
+
+  function Breadcrumbs() {
+    const utils = useRouteUtils();
+    const chain = utils.getChain(route.name);
+    // ...
+  }
+  ```
+
+  Internally calls `getRouteUtils(getPluginApi(router).getTree())` — returns a cached, pre-computed instance.
+
+### Patch Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate `areRoutesRelated` import from `@real-router/helpers` to `@real-router/route-utils` (#214)
+
+  Internal dependency change — no API changes for consumers.
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+  - @real-router/route-utils@0.1.0
+
+### @real-router/route-utils@0.1.0
+
+### Minor Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/route-utils` — cached read-only query API for route tree (#214)
+
+  New optional package providing `RouteUtils` class and `getRouteUtils()` factory with three query methods.
+  All methods return strings (route full names), not internal `RouteTree` nodes:
+  - `getChain(name)` — cumulative name segments as `string[]` (cached). Parent is `chain.at(-2)`.
+  - `getSiblings(name)` — non-absolute sibling full names excluding self (cached)
+  - `isDescendantOf(child, parent)` — O(k) string prefix check
+
+  `getRouteUtils(root)` caches instances via `WeakMap` — same root always returns same instance. Cache invalidates automatically when the immutable tree is replaced (new root on mutation).
+
+  ```typescript
+  import { getPluginApi } from "@real-router/core";
+  import { getRouteUtils } from "@real-router/route-utils";
+
+  const plugin: PluginFactory = (router) => {
+    const tree = getPluginApi(router).getTree();
+    const utils = getRouteUtils(tree);
+
+    return {
+      onTransitionSuccess(toState) {
+        const chain = utils.getChain(toState.name); // cached, no re-allocation
+      },
+    };
+  };
+  ```
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Integrate `@real-router/helpers` into `@real-router/route-utils` (#214)
+
+  `@real-router/helpers` is removed. All its functionality is now available in `@real-router/route-utils`.
+
+  **Standalone functions** (same API as the former `@real-router/helpers`):
+  - `startsWithSegment(route, segment?)` — prefix match with currying support
+  - `endsWithSegment(route, segment?)` — suffix match with currying support
+  - `includesSegment(route, segment?)` — anywhere match with currying support
+  - `areRoutesRelated(route1, route2)` — hierarchy check (same, parent-child, or child-parent)
+
+  **Static facade on `RouteUtils`**:
+  - `RouteUtils.startsWithSegment`
+  - `RouteUtils.endsWithSegment`
+  - `RouteUtils.includesSegment`
+  - `RouteUtils.areRoutesRelated`
+
+  Also exports `SegmentTestFunction` type.
+
+  **Migration:**
+
+  ```diff
+  - import { startsWithSegment, areRoutesRelated } from "@real-router/helpers";
+  + import { startsWithSegment, areRoutesRelated } from "@real-router/route-utils";
+  ```
+
+### @real-router/browser-plugin@0.6.2
+
+### Patch Changes
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+
+### @real-router/logger-plugin@0.2.35
+
+### Patch Changes
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+
+### @real-router/persistent-params-plugin@0.1.34
+
+### Patch Changes
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+
+### @real-router/rx@0.1.23
+
+### Patch Changes
+
+- Updated dependencies [[`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f), [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f)]:
+  - @real-router/core@0.31.0
+
 ## [2026-03-02]
 
 ### @real-router/core@0.30.0

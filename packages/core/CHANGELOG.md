@@ -1,5 +1,31 @@
 # @real-router/core
 
+## 0.31.0
+
+### Minor Changes
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `nameToIDs` from public API (#214)
+
+  **Breaking Change:** `nameToIDs` is no longer exported from `@real-router/core`.
+
+  **Migration:** Use `RouteUtils.getChain()` from `@real-router/route-utils` instead:
+
+  ```diff
+  - import { nameToIDs } from "@real-router/core";
+  - const chain = nameToIDs("users.profile");
+  + import { getPluginApi } from "@real-router/core";
+  + import { getRouteUtils } from "@real-router/route-utils";
+  + const utils = getRouteUtils(getPluginApi(router).getTree());
+  + const chain = utils.getChain("users.profile");
+  ```
+
+- [#215](https://github.com/greydragon888/real-router/pull/215) [`3edf0a4`](https://github.com/greydragon888/real-router/commit/3edf0a45bed5baec8838989739d98668ce26c00f) Thanks [@greydragon888](https://github.com/greydragon888)! - Override `PluginApi.getTree()` return type to `RouteTree` and re-export `RouteTree` (#214)
+
+  `getPluginApi(router).getTree()` now returns properly typed `RouteTree` instead of `unknown`.
+  `RouteTree` type is also re-exported from `@real-router/core` for convenience.
+
+  This is a type-only change — no runtime behavior changed.
+
 ## 0.30.0
 
 ### Minor Changes
