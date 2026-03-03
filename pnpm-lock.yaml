@@ -335,6 +335,16 @@ importers:
 
   packages/search-params: {}
 
+  packages/stores:
+    dependencies:
+      '@real-router/route-utils':
+        specifier: workspace:^
+        version: link:../route-utils
+    devDependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+
   packages/type-guards:
     dependencies:
       '@real-router/types':

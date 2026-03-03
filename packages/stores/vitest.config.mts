@@ -4,6 +4,6 @@ import unitConfig from "../../vitest.config.unit.mjs";
 export default mergeConfig(
   unitConfig,
   defineProject({
-    test: { environment: "node", passWithNoTests: true },
+    test: { environment: "node" },
   }),
 );
