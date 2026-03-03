@@ -85,17 +85,21 @@ function createTestRouter(): Router {
 // ============================================================================
 
 // 2.1 createRouteNodeStore factory cost (cache miss)
-// Uses fresh router each iteration to force WeakMap cache miss
-bench("2.1 createRouteNodeStore factory cost (cache miss)", () => {
+// Same router, unique nodeName each iteration → Map miss in shouldUpdateCache
+// Measures: WeakMap hit (same router) → Map miss (new nodeName) → shouldUpdateNode closure + Map.set
+{
   const router = createTestRouter();
+  let i = 0;
 
-  const store = createRouteNodeStore(router, "users");
+  bench("2.1 createRouteNodeStore factory cost (cache miss)", () => {
+    const store = createRouteNodeStore(router, `node${i++}`);
 
-  do_not_optimize(store.getSnapshot());
-  store.destroy();
+    do_not_optimize(store.getSnapshot());
+    store.destroy();
+  }).gc("inner");
 
   router.stop();
-}).gc("inner");
+}
 
 // 2.2 createRouteNodeStore factory cost (cache hit)
 // Same router reused — WeakMap cache hit on shouldUpdateNode
