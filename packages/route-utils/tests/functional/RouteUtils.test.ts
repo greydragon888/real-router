@@ -42,31 +42,10 @@ const makeRoot = () =>
   ]);
 
 describe("RouteUtils", () => {
-  let root: ReturnType<typeof makeRoot>;
   let utils: RouteUtils;
 
   beforeEach(() => {
-    root = makeRoot();
-    utils = new RouteUtils(root);
-  });
-
-  describe("getRoute", () => {
-    it("returns the node for a known route", () => {
-      expect(utils.getRoute("users")?.fullName).toBe("users");
-      expect(utils.getRoute("")?.fullName).toBe("");
-      expect(utils.getRoute("users.profile.edit.detail.extra")?.fullName).toBe(
-        "users.profile.edit.detail.extra",
-      );
-    });
-
-    it("returns undefined for unknown route", () => {
-      expect(utils.getRoute("nonexistent")).toBeUndefined();
-    });
-
-    it("returns the node for an absolute route (indexed by #buildIndex)", () => {
-      expect(utils.getRoute("modal")?.fullName).toBe("modal");
-      expect(utils.getRoute("modal")?.absolute).toBe(true);
-    });
+    utils = new RouteUtils(makeRoot());
   });
 
   describe("getChain", () => {
@@ -74,55 +53,61 @@ describe("RouteUtils", () => {
       expect(utils.getChain("nonexistent")).toBeUndefined();
     });
 
-    it("returns [root] for root", () => {
-      const chain = utils.getChain("");
-
-      expect(chain).toStrictEqual([root]);
+    it("returns [''] for root", () => {
+      expect(utils.getChain("")).toStrictEqual([""]);
     });
 
-    it("returns ancestor chain from root to node (inclusive)", () => {
-      const chain = utils.getChain("users.profile");
-
-      expect(chain?.length).toBe(3);
-      expect(chain?.[0].fullName).toBe("");
-      expect(chain?.[1].fullName).toBe("users");
-      expect(chain?.[2].fullName).toBe("users.profile");
+    it("returns [name] for 1-segment route", () => {
+      expect(utils.getChain("users")).toStrictEqual(["users"]);
     });
 
-    it("returns cached result on second call (referential equality)", () => {
-      const chain1 = utils.getChain("users.profile");
-      const chain2 = utils.getChain("users.profile");
-
-      expect(chain1).toBe(chain2);
+    it("returns cumulative segments for 2-segment route", () => {
+      expect(utils.getChain("users.profile")).toStrictEqual([
+        "users",
+        "users.profile",
+      ]);
     });
 
-    it("returns frozen array", () => {
-      const chain = utils.getChain("users");
+    it("returns cumulative segments for 3-segment route", () => {
+      expect(utils.getChain("users.profile.edit")).toStrictEqual([
+        "users",
+        "users.profile",
+        "users.profile.edit",
+      ]);
+    });
 
-      expect(Object.isFrozen(chain)).toBe(true);
+    it("returns cumulative segments for 4-segment route", () => {
+      expect(utils.getChain("users.profile.edit.detail")).toStrictEqual([
+        "users",
+        "users.profile",
+        "users.profile.edit",
+        "users.profile.edit.detail",
+      ]);
+    });
+
+    it("returns cumulative segments for 5-segment route", () => {
+      expect(utils.getChain("users.profile.edit.detail.extra")).toStrictEqual([
+        "users",
+        "users.profile",
+        "users.profile.edit",
+        "users.profile.edit.detail",
+        "users.profile.edit.detail.extra",
+      ]);
     });
 
     it("returns chain for an absolute route", () => {
-      const chain = utils.getChain("modal");
-
-      expect(chain?.length).toBe(2);
-      expect(chain?.[0].fullName).toBe("");
-      expect(chain?.[1].fullName).toBe("modal");
-    });
-  });
-
-  describe("getParent", () => {
-    it("returns undefined for unknown route", () => {
-      expect(utils.getParent("nonexistent")).toBeUndefined();
+      expect(utils.getChain("modal")).toStrictEqual(["modal"]);
     });
 
-    it("returns null for root", () => {
-      expect(utils.getParent("")).toBeNull();
+    it("returns cached result on second call (referential equality)", () => {
+      const c1 = utils.getChain("users.profile");
+      const c2 = utils.getChain("users.profile");
+
+      expect(c1).toBe(c2);
     });
 
-    it("returns the parent node for non-root routes", () => {
-      expect(utils.getParent("users")?.fullName).toBe("");
-      expect(utils.getParent("users.profile")?.fullName).toBe("users");
+    it("returns frozen array", () => {
+      expect(Object.isFrozen(utils.getChain("users"))).toBe(true);
     });
   });
 
@@ -136,17 +121,14 @@ describe("RouteUtils", () => {
     });
 
     it("returns empty array for only-child", () => {
-      const siblings = utils.getSiblings("users.profile");
-
-      expect(Array.isArray(siblings)).toBe(true);
-      expect(siblings?.length).toBe(0);
+      expect(utils.getSiblings("users.profile")).toStrictEqual([]);
     });
 
     it("returns siblings excluding self", () => {
       const siblings = utils.getSiblings("users");
 
-      expect(siblings?.map((s) => s.fullName)).toContain("admin");
-      expect(siblings?.map((s) => s.fullName)).not.toContain("users");
+      expect(siblings).toContain("admin");
+      expect(siblings).not.toContain("users");
     });
 
     it("returns cached result on second call (referential equality)", () => {
@@ -157,89 +139,22 @@ describe("RouteUtils", () => {
     });
 
     it("returns frozen array", () => {
-      const siblings = utils.getSiblings("users");
-
-      expect(Object.isFrozen(siblings)).toBe(true);
+      expect(Object.isFrozen(utils.getSiblings("users"))).toBe(true);
     });
 
     it("excludes absolute routes from siblings", () => {
-      // "modal" is absolute, so it should NOT appear in siblings of "users" or "admin"
       const siblings = utils.getSiblings("users");
 
-      expect(siblings?.map((s) => s.fullName)).not.toContain("modal");
-      // "admin" is non-absolute, so it SHOULD appear
-      expect(siblings?.map((s) => s.fullName)).toContain("admin");
+      expect(siblings).not.toContain("modal");
+      expect(siblings).toContain("admin");
     });
 
     it("returns non-absolute root children for absolute route siblings", () => {
       const siblings = utils.getSiblings("modal");
 
-      expect(siblings?.map((s) => s.fullName)).toContain("users");
-      expect(siblings?.map((s) => s.fullName)).toContain("admin");
-      expect(siblings?.map((s) => s.fullName)).not.toContain("modal");
-    });
-  });
-
-  describe("getNameSegments", () => {
-    it("returns undefined for unknown route", () => {
-      expect(utils.getNameSegments("nonexistent")).toBeUndefined();
-    });
-
-    it("returns [''] for root", () => {
-      expect(utils.getNameSegments("")).toStrictEqual([""]);
-    });
-
-    it("returns [name] for 1-segment route", () => {
-      expect(utils.getNameSegments("users")).toStrictEqual(["users"]);
-    });
-
-    it("returns prefix segments for 2-segment route", () => {
-      expect(utils.getNameSegments("users.profile")).toStrictEqual([
-        "users",
-        "users.profile",
-      ]);
-    });
-
-    it("returns prefix segments for 3-segment route", () => {
-      expect(utils.getNameSegments("users.profile.edit")).toStrictEqual([
-        "users",
-        "users.profile",
-        "users.profile.edit",
-      ]);
-    });
-
-    it("returns prefix segments for 4-segment route", () => {
-      expect(utils.getNameSegments("users.profile.edit.detail")).toStrictEqual([
-        "users",
-        "users.profile",
-        "users.profile.edit",
-        "users.profile.edit.detail",
-      ]);
-    });
-
-    it("returns prefix segments for 5-segment route (general case)", () => {
-      expect(
-        utils.getNameSegments("users.profile.edit.detail.extra"),
-      ).toStrictEqual([
-        "users",
-        "users.profile",
-        "users.profile.edit",
-        "users.profile.edit.detail",
-        "users.profile.edit.detail.extra",
-      ]);
-    });
-
-    it("returns cached result on second call (referential equality)", () => {
-      const s1 = utils.getNameSegments("users.profile");
-      const s2 = utils.getNameSegments("users.profile");
-
-      expect(s1).toBe(s2);
-    });
-
-    it("returns frozen array", () => {
-      const segs = utils.getNameSegments("users");
-
-      expect(Object.isFrozen(segs)).toBe(true);
+      expect(siblings).toContain("users");
+      expect(siblings).toContain("admin");
+      expect(siblings).not.toContain("modal");
     });
   });
 
@@ -268,19 +183,12 @@ describe("RouteUtils", () => {
 });
 
 describe("getRouteUtils", () => {
-  let root: ReturnType<typeof makeRoot>;
-
-  beforeEach(() => {
-    root = makeRoot();
-  });
-
   it("returns a RouteUtils instance", () => {
-    const u = getRouteUtils(root);
-
-    expect(u).toBeInstanceOf(RouteUtils);
+    expect(getRouteUtils(makeRoot())).toBeInstanceOf(RouteUtils);
   });
 
   it("returns the same instance for the same root (WeakMap cache)", () => {
+    const root = makeRoot();
     const u1 = getRouteUtils(root);
     const u2 = getRouteUtils(root);
 
@@ -288,9 +196,10 @@ describe("getRouteUtils", () => {
   });
 
   it("returns different instances for different roots", () => {
-    const root2 = createRouteTree("", "", [{ name: "home", path: "/" }]);
-    const u1 = getRouteUtils(root);
-    const u2 = getRouteUtils(root2);
+    const u1 = getRouteUtils(makeRoot());
+    const u2 = getRouteUtils(
+      createRouteTree("", "", [{ name: "home", path: "/" }]),
+    );
 
     expect(u1).not.toBe(u2);
   });

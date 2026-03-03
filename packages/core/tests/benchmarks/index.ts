@@ -23,7 +23,6 @@ import "./navigation/guards.bench";
 import "./helpers/freezeStateInPlace.bench";
 import "./validation/isNavigationOptions.bench";
 // import "./transitionPath/getTransitionPath.bench";
-// import "./transitionPath/nameToIDs.bench";
 // import "./routes/routeQuery/isActiveRoute.bench";
 // import "./routes/routeQuery/shouldUpdateNode.bench";
 // import "./routes/routePath/buildPath.bench";
