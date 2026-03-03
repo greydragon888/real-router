@@ -155,7 +155,7 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 | Package                                  | Description                                          |
 | ---------------------------------------- | ---------------------------------------------------- |
 | [@real-router/rx](packages/rx)           | Reactive Observable API (state$, events$, operators) |
-| [@real-router/helpers](packages/helpers) | Route comparison and checking utilities              |
+| [@real-router/route-utils](packages/route-utils) | Route tree queries and segment testing utilities |
 
 ## Documentation
 

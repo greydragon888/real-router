@@ -419,7 +419,7 @@ See the [Migration Guide](https://github.com/greydragon888/real-router/wiki/migr
 - [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) — Browser history
 - [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) — Debug logging
 - [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) — Persistent params
-- [@real-router/helpers](https://www.npmjs.com/package/@real-router/helpers) — Utilities
+- [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils) — Route tree queries and segment testing utilities
 
 ## License
 

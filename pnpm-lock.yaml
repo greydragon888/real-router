@@ -196,8 +196,6 @@ importers:
         specifier: workspace:^
         version: link:../type-guards
 
-  packages/cache-manager: {}
-
   packages/core:
     dependencies:
       '@real-router/fsm':
@@ -225,12 +223,6 @@ importers:
   packages/event-emitter: {}
 
   packages/fsm: {}
-
-  packages/helpers:
-    dependencies:
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../core
 
   packages/logger: {}
 
