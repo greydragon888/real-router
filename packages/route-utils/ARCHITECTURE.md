@@ -40,7 +40,7 @@ Instance methods that query pre-computed route tree data. Depends on `route-tree
 Stateless regex-based functions for testing route name segments. Depends only on `@real-router/types` (for `State` type).
 
 - `startsWithSegment`, `endsWithSegment`, `includesSegment` — regex testers
-- `areRoutesRelated` — pure string comparison
+- `areRoutesRelated` — pure string comparison (`===` or `.startsWith` with dot boundary)
 
 `RouteUtils` class bridges both via **static readonly facade** properties that delegate to standalone functions.
 
@@ -86,22 +86,25 @@ Absolute routes (e.g., `~/modal`) are hoisted to root level in the route tree. T
 
 `makeSegmentTester(start, end)` produces all three testers with different regex anchors:
 
-| Function            | Start Pattern | End Pattern       |
-| ------------------- | ------------- | ----------------- |
-| `startsWithSegment` | `^`           | `(?:\.\|$)`      |
-| `endsWithSegment`   | `(?:^\|.)`   | `$`               |
-| `includesSegment`   | `(?:^\|.)`   | `(?:\.\|$)`      |
+```
+startsWithSegment  →  start: ^            end: (?:\.|$)
+endsWithSegment    →  start: (?:^|\.)    end: $
+includesSegment    →  start: (?:^|\.)    end: (?:\.|$)
+```
+
+Input segments are escaped via `escapeRegExp()` before regex construction — prevents regex injection through user-provided segment strings.
 
 Each tester produced by the factory has its own `regexCache: Map<string, RegExp>` — compiled regexes are cached per segment string.
 
 ### Calling Patterns
 
-Each tester supports three overloads via a single function with conditional return type:
+Each tester supports three overloads (+ implementation signature) via conditional return type:
 
 ```
-(route, segment)     → boolean          // direct
-(route)              → (segment) → boolean  // curried
-(route, null)        → false            // null guard
+(route, segment)     → boolean                              // direct
+(route)              → (segment) → boolean                  // curried
+(route, null)        → false                                // null guard
+(route, segment?)    → boolean | ((segment) → boolean)      // implementation signature
 ```
 
 The curried form is useful for creating reusable predicates (e.g., in `filter()` callbacks).
@@ -148,7 +151,7 @@ const cache = new WeakMap<RouteTree, RouteUtils>();
 
 | Dependency           | Type    | Purpose                                                 |
 | -------------------- | ------- | ------------------------------------------------------- |
-| `route-tree`         | runtime | `RouteTree` type + `createRouteTree` for tree traversal |
+| `route-tree`         | runtime | `RouteTree` type + tree traversal via `.children` / `.nonAbsoluteChildren` |
 | `@real-router/types` | runtime | `State` type for segment tester overloads               |
 | `mitata`             | dev     | Benchmark engine                                        |
 
