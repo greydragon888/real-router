@@ -181,12 +181,13 @@ dts: {
 ```
 
 **Results:**
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Total .d.ts lines | 12,080 | 3,793 | -69% |
-| core .d.ts | 1,807 | 216 | -88% |
-| browser-plugin .d.ts | 1,831 | 500 | -73% |
-| react .d.ts | 1,813 | 80 | -96% |
+
+| Metric               | Before | After | Change |
+| -------------------- | ------ | ----- | ------ |
+| Total .d.ts lines    | 12,080 | 3,793 | -69%   |
+| core .d.ts           | 1,807  | 216   | -88%   |
+| browser-plugin .d.ts | 1,831  | 500   | -73%   |
+| react .d.ts          | 1,813  | 80    | -96%   |
 
 This approach ensures:
 
@@ -439,7 +440,7 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 `.size-limit.json` defines per-package limits:
 
 | Package                        | Limit  |
-| ------------------------------ |--------|
+| ------------------------------ | ------ |
 | @real-router/core              | 25 kB  |
 | @real-router/fsm               | 0.5 kB |
 | @real-router/react             | 2 kB   |

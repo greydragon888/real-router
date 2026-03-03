@@ -11,7 +11,7 @@ Remove `nameToIDs` from public API (#214)
 ```diff
 - import { nameToIDs } from "@real-router/core";
 - const chain = nameToIDs("users.profile");
-+ import { getRouteUtils, getPluginApi } from "@real-router/core";
++ import { getPluginApi } from "@real-router/core";
 + import { getRouteUtils } from "@real-router/route-utils";
 + const utils = getRouteUtils(getPluginApi(router).getTree());
 + const chain = utils.getChain("users.profile");
