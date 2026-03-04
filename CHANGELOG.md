@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-04]
+
+### @real-router/sources@0.1.0
+
+### Minor Changes
+
+- [#218](https://github.com/greydragon888/real-router/pull/218) [`72019f2`](https://github.com/greydragon888/real-router/commit/72019f282b6b4dc4ba8a15993e19ff0ee97e1df8) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/sources` — framework-agnostic subscription layer for router state (#217)
+
+  Three factory functions for UI adapter authors:
+  - `createRouteStore(router)` — subscribe to all navigations
+  - `createRouteNodeStore(router, nodeName)` — subscribe to specific route node
+  - `createActiveRouteStore(router, routeName, params?, options?)` — track route activity
+
+### @real-router/react@0.5.1
+
+### Patch Changes
+
+- [#218](https://github.com/greydragon888/real-router/pull/218) [`72019f2`](https://github.com/greydragon888/real-router/commit/72019f282b6b4dc4ba8a15993e19ff0ee97e1df8) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor React hooks to use `@real-router/sources` (#217)
+
+  Internal refactoring: `useRouteNode`, `useIsActiveRoute`, and `RouterProvider` now delegate
+  subscription logic to `@real-router/sources`. No public API changes.
+
+- Updated dependencies [[`72019f2`](https://github.com/greydragon888/real-router/commit/72019f282b6b4dc4ba8a15993e19ff0ee97e1df8)]:
+  - @real-router/sources@0.1.0
+
 ## [2026-03-03]
 
 ### @real-router/core@0.31.0
