@@ -225,6 +225,12 @@ describe("Persistent params plugin", () => {
         "/route2/2?mode=dev",
       );
     });
+
+    it("buildPath should work without params argument", async () => {
+      await router.navigate("route1", { id: "1", mode: "dev" });
+
+      expect(router.buildPath("home")).toBe("/?mode=dev");
+    });
   });
 
   describe("Basic Functionality - Navigate Method Overloads", () => {

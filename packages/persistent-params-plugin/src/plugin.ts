@@ -127,8 +127,6 @@ export function persistentParamsPluginFactory(
 
     const api = getPluginApi(router);
 
-    // Store original router methods for restoration
-    const originalForwardState = api.getForwardState();
     const originalRootPath = api.getRootPath();
 
     // Update router root path to include query parameters for persistent params
@@ -195,21 +193,26 @@ export function persistentParamsPluginFactory(
       return mergeParams(persistentParams, safeParams);
     }
 
-    // Intercept buildPath to inject persistent params into path construction
-    const removeBuildPathInterceptor = api.addBuildPathInterceptor(
-      (_routeName, buildPathParams) => withPersistentParams(buildPathParams),
+    /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access -- interceptor chain uses generic any signature */
+    const removeBuildPathInterceptor = api.addInterceptor(
+      "buildPath",
+      (next, route: string, navParams?: Params) =>
+        /* v8 ignore next 1 -- @preserve: navParams always provided by buildPath callers; ?? is defensive */
+        next(route, withPersistentParams(navParams ?? {})),
     );
 
-    api.setForwardState(
-      <P extends Params = Params>(routeName: string, routeParams: P) => {
-        const result = originalForwardState(routeName, routeParams);
+    const removeForwardStateInterceptor = api.addInterceptor(
+      "forwardState",
+      (next, routeName: string, routeParams: Params) => {
+        const result = next(routeName, routeParams);
 
         return {
           ...result,
-          params: withPersistentParams(result.params) as P,
+          params: withPersistentParams(result.params),
         };
       },
     );
+    /* eslint-enable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access */
 
     return {
       /**
@@ -282,7 +285,7 @@ export function persistentParamsPluginFactory(
       teardown() {
         try {
           removeBuildPathInterceptor();
-          api.setForwardState(originalForwardState);
+          removeForwardStateInterceptor();
           api.setRootPath(originalRootPath);
 
           delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
