@@ -175,7 +175,7 @@ jobs:
           git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
           git push --tags
 
-      # Create GitHub releases for each published package
+      # Create GitHub releases for packages published in previous step
       - name: Create GitHub Releases
         if: steps.unpublished.outputs.has_unpublished == 'true'
         env:
@@ -193,16 +193,13 @@ jobs:
                 continue
               fi
 
-              # Check if this version was just published (compare with npm)
-              npm_version=$(npm view "$name" version 2>/dev/null || echo "0.0.0")
+              # Check if tag exists locally (was just created by changesets publish)
+              tag="${name}@${version}"
 
-              if [ "$version" = "$npm_version" ]; then
-                # Extract package directory name for CHANGELOG path
-                pkg_dir=$(basename "$dir")
+              if git rev-parse "$tag" > /dev/null 2>&1; then
                 changelog_path="${dir}CHANGELOG.md"
-                tag="${name}@${version}"
 
-                # Check if release already exists
+                # Check if release already exists on GitHub
                 if gh release view "$tag" > /dev/null 2>&1; then
                   echo "⏭️ Release $tag already exists, skipping"
                   continue
