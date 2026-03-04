@@ -1,5 +1,27 @@
 # @real-router/core
 
+## 0.32.0
+
+### Minor Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `addBuildPathInterceptor` to `PluginApi` (#220)
+
+  Plugins can now register buildPath param interceptors via `getPluginApi(router).addBuildPathInterceptor()`. Multiple interceptors execute in FIFO registration order. Each returns an `Unsubscribe` function for safe teardown.
+
+  ```typescript
+  const api = getPluginApi(router);
+  const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
+    return { ...params, lang: getCurrentLang() };
+  });
+  ```
+
+  All `buildPath` call paths (facade, wiring, plugins) go through the interceptor pipeline via `RouterInternals`.
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/types@0.20.0
+
 ## 0.31.0
 
 ### Minor Changes

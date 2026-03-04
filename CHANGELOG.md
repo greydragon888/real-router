@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-04]
 
+### @real-router/core@0.32.0
+
+### Minor Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `addBuildPathInterceptor` to `PluginApi` (#220)
+
+  Plugins can now register buildPath param interceptors via `getPluginApi(router).addBuildPathInterceptor()`. Multiple interceptors execute in FIFO registration order. Each returns an `Unsubscribe` function for safe teardown.
+
+  ```typescript
+  const api = getPluginApi(router);
+  const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
+    return { ...params, lang: getCurrentLang() };
+  });
+  ```
+
+  All `buildPath` call paths (facade, wiring, plugins) go through the interceptor pipeline via `RouterInternals`.
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/types@0.20.0
+
+### @real-router/types@0.20.0
+
+### Minor Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `addBuildPathInterceptor` to `PluginApi` interface (#220)
+
+  New method on `PluginApi` allows plugins to register buildPath param interceptors:
+
+  ```typescript
+  addBuildPathInterceptor: (
+    fn: (routeName: string, params: Params) => Params,
+  ) => Unsubscribe;
+  ```
+
+### @real-router/browser-plugin@0.6.3
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+
+### @real-router/logger-plugin@0.2.36
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+
+### @real-router/persistent-params-plugin@0.1.35
+
+### Patch Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `buildPath` monkey patching with `addBuildPathInterceptor` (#220)
+
+  Migrated from direct `router.buildPath = ...` override to `api.addBuildPathInterceptor()`. No public API changes — internal implementation only.
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+
+### @real-router/react@0.5.2
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+  - @real-router/sources@0.1.1
+  - @real-router/route-utils@0.1.1
+
+### @real-router/route-utils@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/types@0.20.0
+
+### @real-router/rx@0.1.24
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+
+### @real-router/sources@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/types@0.20.0
+  - @real-router/route-utils@0.1.1
+
+
 ### @real-router/sources@0.1.0
 
 ### Minor Changes
