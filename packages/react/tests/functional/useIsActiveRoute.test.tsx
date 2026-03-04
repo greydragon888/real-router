@@ -29,7 +29,7 @@ describe("useIsActiveRoute", () => {
 
   it("should check if route is active", () => {
     const { result } = renderHook(
-      () => useIsActiveRoute(router, "users.view", { id: "123" }),
+      () => useIsActiveRoute("users.view", { id: "123" }),
       { wrapper: (props) => wrapper({ ...props, router }) },
     );
 
@@ -37,19 +37,17 @@ describe("useIsActiveRoute", () => {
   });
 
   it("should handle non-strict mode", () => {
-    const { result } = renderHook(
-      () => useIsActiveRoute(router, "users", {}, false),
-      { wrapper: (props) => wrapper({ ...props, router }) },
-    );
+    const { result } = renderHook(() => useIsActiveRoute("users", {}, false), {
+      wrapper: (props) => wrapper({ ...props, router }),
+    });
 
     expect(result.current).toBe(true); // "users.view" is child of "users"
   });
 
   it("should handle strict mode", () => {
-    const { result } = renderHook(
-      () => useIsActiveRoute(router, "users", {}, true),
-      { wrapper: (props) => wrapper({ ...props, router }) },
-    );
+    const { result } = renderHook(() => useIsActiveRoute("users", {}, true), {
+      wrapper: (props) => wrapper({ ...props, router }),
+    });
 
     expect(result.current).toBe(false); // Exact match required
   });
@@ -67,7 +65,7 @@ describe("useIsActiveRoute", () => {
     });
 
     const { result } = renderHook(
-      () => useIsActiveRoute(router, "users.view", { id: "123" }),
+      () => useIsActiveRoute("users.view", { id: "123" }),
       { wrapper: (props) => wrapper({ ...props, router }) },
     );
 
@@ -87,7 +85,7 @@ describe("useIsActiveRoute", () => {
     it("should update when activeStrict changes and router navigates", async () => {
       const { result, rerender } = renderHook(
         ({ strict }: { strict: boolean }) =>
-          useIsActiveRoute(router, "users", {}, strict),
+          useIsActiveRoute("users", {}, strict),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { strict: false },
@@ -135,7 +133,7 @@ describe("useIsActiveRoute", () => {
       await act(() => router.navigate("complex", complexParams));
 
       const { result } = renderHook(
-        () => useIsActiveRoute(router, "complex", complexParams),
+        () => useIsActiveRoute("complex", complexParams),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -149,7 +147,7 @@ describe("useIsActiveRoute", () => {
       // Now check with the different params - should be active
       const { result: result2 } = renderHook(
         () =>
-          useIsActiveRoute(router, "complex", {
+          useIsActiveRoute("complex", {
             ...complexParams,
             page: 2,
           }),
@@ -162,7 +160,7 @@ describe("useIsActiveRoute", () => {
     it("should handle params change dynamically", async () => {
       const { result, rerender } = renderHook(
         ({ params }: { params: Record<string, string> }) =>
-          useIsActiveRoute(router, "users.view", params),
+          useIsActiveRoute("users.view", params),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { params: { id: "123" } },
@@ -198,21 +196,21 @@ describe("useIsActiveRoute", () => {
       await router.start("/users/list");
 
       const { result: emptyParams } = renderHook(
-        () => useIsActiveRoute(router, "users.list", {}),
+        () => useIsActiveRoute("users.list", {}),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
       expect(emptyParams.current).toBe(true);
 
       const { result: undefinedParams } = renderHook(
-        () => useIsActiveRoute(router, "users.list", undefined as never),
+        () => useIsActiveRoute("users.list", undefined as never),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
       expect(undefinedParams.current).toBe(true);
 
       const { result: partialUndefined } = renderHook(
-        () => useIsActiveRoute(router, "users.list", { id: undefined }),
+        () => useIsActiveRoute("users.list", { id: undefined }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -230,7 +228,7 @@ describe("useIsActiveRoute", () => {
       await act(() => router.navigate("search", specialParams));
 
       const { result } = renderHook(
-        () => useIsActiveRoute(router, "search", specialParams),
+        () => useIsActiveRoute("search", specialParams),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -240,7 +238,7 @@ describe("useIsActiveRoute", () => {
     it("should handle numeric vs string parameters consistently", async () => {
       // Router params are always strings, so string "123" should match
       const { result: stringParam } = renderHook(
-        () => useIsActiveRoute(router, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -258,7 +256,7 @@ describe("useIsActiveRoute", () => {
   describe("Performance with frequent updates", () => {
     it("should handle 1000 navigation checks efficiently", async () => {
       const { result } = renderHook(
-        () => useIsActiveRoute(router, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -280,10 +278,9 @@ describe("useIsActiveRoute", () => {
 
       for (let i = 0; i < 10; i++) {
         hooks.push(
-          renderHook(
-            () => useIsActiveRoute(router, "users.view", { id: "123" }),
-            { wrapper: (props) => wrapper({ ...props, router }) },
-          ),
+          renderHook(() => useIsActiveRoute("users.view", { id: "123" }), {
+            wrapper: (props) => wrapper({ ...props, router }),
+          }),
         );
       }
 
@@ -307,7 +304,7 @@ describe("useIsActiveRoute", () => {
 
       const { result, rerender } = renderHook(
         ({ routeName }: { routeName: string }) =>
-          useIsActiveRoute(router, routeName, {}),
+          useIsActiveRoute(routeName, {}),
         {
           wrapper: (props) => wrapper({ ...props, router }),
           initialProps: { routeName: routes[currentIndex] },
@@ -346,7 +343,7 @@ describe("useIsActiveRoute", () => {
 
       // Non-strict: settings is parent of settings.profile.edit
       const { result: nonStrict } = renderHook(
-        () => useIsActiveRoute(router, "settings", {}, false),
+        () => useIsActiveRoute("settings", {}, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -354,7 +351,7 @@ describe("useIsActiveRoute", () => {
 
       // Strict: exact match required
       const { result: strict } = renderHook(
-        () => useIsActiveRoute(router, "settings", {}, true),
+        () => useIsActiveRoute("settings", {}, true),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -362,7 +359,7 @@ describe("useIsActiveRoute", () => {
 
       // Check intermediate level
       const { result: intermediate } = renderHook(
-        () => useIsActiveRoute(router, "settings.profile", {}, false),
+        () => useIsActiveRoute("settings.profile", {}, false),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -381,7 +378,7 @@ describe("useIsActiveRoute", () => {
 
       // Check "user" is not active when "users.view" is
       const { result: userRoute } = renderHook(
-        () => useIsActiveRoute(router, "user", {}),
+        () => useIsActiveRoute("user", {}),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -394,7 +391,7 @@ describe("useIsActiveRoute", () => {
 
       // Check "users" is not active
       const { result: usersRoute } = renderHook(
-        () => useIsActiveRoute(router, "users", {}),
+        () => useIsActiveRoute("users", {}),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -407,7 +404,7 @@ describe("useIsActiveRoute", () => {
       await act(() => router.navigate("dashboard"));
 
       const { result: dashboardCheck } = renderHook(
-        () => useIsActiveRoute(router, "dashboard", {}),
+        () => useIsActiveRoute("dashboard", {}),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -426,7 +423,7 @@ describe("useIsActiveRoute", () => {
 
       // Don't start router yet
       const { result } = renderHook(
-        () => useIsActiveRoute(newRouter, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         {
           wrapper: (props) => (
             <RouterProvider router={newRouter}>{props.children}</RouterProvider>
@@ -455,7 +452,7 @@ describe("useIsActiveRoute", () => {
 
       // Now create hook after restart
       const { result } = renderHook(
-        () => useIsActiveRoute(router, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         { wrapper: (props) => wrapper({ ...props, router }) },
       );
 
@@ -484,7 +481,7 @@ describe("useIsActiveRoute", () => {
 
       // Test with router1
       const { result: result1 } = renderHook(
-        () => useIsActiveRoute(router1, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         {
           wrapper: ({ children }) => (
             <RouterProvider router={router1}>{children}</RouterProvider>
@@ -497,7 +494,7 @@ describe("useIsActiveRoute", () => {
 
       // Test with router2
       const { result: result2 } = renderHook(
-        () => useIsActiveRoute(router2, "users.view", { id: "123" }),
+        () => useIsActiveRoute("users.view", { id: "123" }),
         {
           wrapper: ({ children }) => (
             <RouterProvider router={router2}>{children}</RouterProvider>

@@ -1,74 +1,29 @@
-// packages/react/modules/hooks/useRouteNode.tsx
-
 import { getNavigator } from "@real-router/core";
-import { useCallback, useMemo } from "react";
+import { createRouteNodeSource } from "@real-router/sources";
+import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
-import { useRouterSubscription } from "./useRouterSubscription";
-import { getCachedShouldUpdate } from "../utils";
 
-import type { RouteContext, RouteState } from "../types";
-import type { State, SubscribeState } from "@real-router/core";
+import type { RouteContext } from "../types";
 
-/**
- * Hook that subscribes to a specific route node with optimizations.
- * Provides the current and previous route when the node is affected.
- */
 export function useRouteNode(nodeName: string): RouteContext {
-  // Get router from context with error handling
   const router = useRouter();
 
-  // Get cached shouldUpdate function to avoid recreation
-  const shouldUpdate = useMemo(
-    () => getCachedShouldUpdate(router, nodeName),
+  const store = useMemo(
+    () => createRouteNodeSource(router, nodeName),
     [router, nodeName],
   );
 
-  // Stable state factory
-  // useRouteNode.tsx
-  const stateFactory = useCallback(
-    (sub?: SubscribeState): RouteState => {
-      const currentRoute = sub?.route ?? router.getState();
-
-      // Проверяем, активен ли узел
-      if (currentRoute && nodeName !== "") {
-        // Корневой узел всегда активен
-        const isNodeActive =
-          currentRoute.name === nodeName ||
-          currentRoute.name.startsWith(`${nodeName}.`);
-
-        if (!isNodeActive) {
-          return {
-            route: undefined,
-            previousRoute: sub?.previousRoute,
-          };
-        }
-      }
-
-      return {
-        route: currentRoute,
-        previousRoute: sub?.previousRoute,
-      };
-    },
-    [router, nodeName],
+  const { route, previousRoute } = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot, // SSR: router returns same state on server and client
   );
 
-  // Subscribe to router with optimization
-  const state = useRouterSubscription<RouteState>(
-    router,
-    stateFactory,
-    shouldUpdate as (newRoute: State, prevRoute?: State) => boolean,
-  );
-
-  // Return memoized context - useMemo ensures stable reference when deps unchanged
   const navigator = useMemo(() => getNavigator(router), [router]);
 
   return useMemo(
-    (): RouteContext => ({
-      navigator,
-      route: state.route,
-      previousRoute: state.previousRoute,
-    }),
-    [navigator, state.route, state.previousRoute],
+    (): RouteContext => ({ navigator, route, previousRoute }),
+    [navigator, route, previousRoute],
   );
 }

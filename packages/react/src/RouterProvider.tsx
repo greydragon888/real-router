@@ -1,11 +1,9 @@
-// packages/react/modules/RouterProvider.tsx
-
 import { getNavigator } from "@real-router/core";
+import { createRouteSource } from "@real-router/sources";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
 
-import type { RouteState } from "./types";
 import type { Router } from "@real-router/core";
 import type { FC, ReactNode } from "react";
 
@@ -18,40 +16,21 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   router,
   children,
 }) => {
-  // Get navigator instance from router
   const navigator = useMemo(() => getNavigator(router), [router]);
 
-  // Local store state to hold route information
-  const store = useMemo(() => {
-    let currentState: RouteState = {
-      route: router.getState(),
-      previousRoute: undefined,
-    };
+  // useSyncExternalStore manages the router subscription lifecycle:
+  // subscribe connects to router on first listener, unsubscribes on last.
+  // This is Strict Mode safe — no useEffect cleanup needed.
+  const store = useMemo(() => createRouteSource(router), [router]);
+  const { route, previousRoute } = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot, // SSR: router returns same state on server and client
+  );
 
-    // This will be called to return the current state snapshot
-    const getSnapshot = () => currentState;
-
-    // Subscribe to router updates and notify React when state changes
-    const subscribe = (callback: () => void) => {
-      const unsubscribe = router.subscribe(({ route, previousRoute }) => {
-        currentState = { route, previousRoute };
-        callback(); // Notify React to trigger re-render
-      });
-
-      // Note: router.subscribe() always returns a function, no need to check
-      return unsubscribe;
-    };
-
-    return { getSnapshot, subscribe };
-  }, [router]);
-
-  // Using useSyncExternalStore to manage subscription and state updates
-  const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
-
-  // Memoize RouteContext value to prevent unnecessary re-renders
   const routeContextValue = useMemo(
-    () => ({ navigator, ...state }),
-    [navigator, state],
+    () => ({ navigator, route, previousRoute }),
+    [navigator, route, previousRoute],
   );
 
   return (

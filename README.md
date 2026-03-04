@@ -150,6 +150,12 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 | [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking |
 | [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations     |
 
+### Subscription Layer
+
+| Package                                            | Description                                     |
+| -------------------------------------------------- | ----------------------------------------------- |
+| [@real-router/sources](packages/sources)           | Reactive subscription sources for UI bindings   |
+
 ### Utilities
 
 | Package                                          | Description                                          |

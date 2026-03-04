@@ -1,95 +1,36 @@
-// packages/react/modules/hooks/useIsActiveRoute.tsx
+import { createActiveRouteSource } from "@real-router/sources";
+import { useMemo, useSyncExternalStore } from "react";
 
-import { areRoutesRelated } from "@real-router/route-utils";
-import { useCallback, useMemo, useRef } from "react";
-
-import { useRouterSubscription } from "./useRouterSubscription";
+import { useRouter } from "./useRouter";
 import { useStableValue } from "./useStableValue";
-import { EMPTY_PARAMS } from "../constants";
-import { createActiveCheckKey } from "../utils";
 
-import type { Params, Router, State, SubscribeState } from "@real-router/core";
+import type { Params } from "@real-router/core";
 
-/**
- * Optimized hook to check if a route is active.
- * Minimizes unnecessary recalculations and re-renders.
- */
 export function useIsActiveRoute(
-  router: Router,
   routeName: string,
-  routeParams: Params = EMPTY_PARAMS,
-  activeStrict = false,
+  params?: Params,
+  strict = false,
   ignoreQueryParams = true,
 ): boolean {
-  // Stabilize params reference to prevent unnecessary recalculations
-  const stableParams = useStableValue(routeParams);
+  const router = useRouter();
 
-  // Create stable cache key
-  const cacheKey = useMemo(
+  // useStableValue: JSON.stringify memoization of params object.
+  // Without it, every render with a new params reference (e.g.,
+  // <Link routeParams={{ id: '123' }} />) would recreate the store.
+  const stableParams = useStableValue(params);
+
+  const store = useMemo(
     () =>
-      createActiveCheckKey(
-        routeName,
-        stableParams,
-        activeStrict,
+      createActiveRouteSource(router, routeName, stableParams, {
+        strict,
         ignoreQueryParams,
-      ),
-    [routeName, stableParams, activeStrict, ignoreQueryParams],
+      }),
+    [router, routeName, stableParams, strict, ignoreQueryParams],
   );
 
-  // Cache the active state
-  const isActiveRef = useRef<boolean | undefined>(undefined);
-  const lastCacheKeyRef = useRef<string | undefined>(undefined);
-
-  if (lastCacheKeyRef.current !== cacheKey) {
-    isActiveRef.current = undefined;
-    lastCacheKeyRef.current = cacheKey;
-  }
-
-  // Optimize shouldUpdate to skip unrelated routes
-  const shouldUpdate = useCallback(
-    (newRoute: State, prevRoute?: State) => {
-      const isNewRelated = areRoutesRelated(routeName, newRoute.name);
-      const isPrevRelated =
-        prevRoute && areRoutesRelated(routeName, prevRoute.name);
-
-      return !!(isNewRelated || isPrevRelated);
-    },
-    [routeName],
+  return useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+    store.getSnapshot, // SSR: router returns same state on server and client
   );
-
-  // Selector that performs active check
-  const selector = useCallback(
-    (sub?: SubscribeState): boolean => {
-      const currentRoute = sub?.route ?? router.getState();
-
-      // Fast path: if no current route, not active
-      if (!currentRoute) {
-        isActiveRef.current = false;
-
-        return false;
-      }
-
-      // Fast path: skip unrelated routes
-      if (!areRoutesRelated(routeName, currentRoute.name)) {
-        isActiveRef.current = false;
-
-        return false;
-      }
-
-      // Full check for related routes
-      const isActive = router.isActiveRoute(
-        routeName,
-        stableParams,
-        activeStrict,
-        ignoreQueryParams,
-      );
-
-      isActiveRef.current = isActive;
-
-      return isActive;
-    },
-    [router, routeName, stableParams, activeStrict, ignoreQueryParams],
-  );
-
-  return useRouterSubscription(router, selector, shouldUpdate);
 }

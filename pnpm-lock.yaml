@@ -255,6 +255,9 @@ importers:
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
+      '@real-router/sources':
+        specifier: workspace:^
+        version: link:../sources
       '@types/react':
         specifier: '>=18.0.0'
         version: 19.2.9
@@ -334,6 +337,22 @@ importers:
         version: link:../core
 
   packages/search-params: {}
+
+  packages/sources:
+    dependencies:
+      '@real-router/route-utils':
+        specifier: workspace:^
+        version: link:../route-utils
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+      mitata:
+        specifier: 1.0.34
+        version: 1.0.34
 
   packages/type-guards:
     dependencies:
