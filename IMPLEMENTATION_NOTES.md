@@ -1180,7 +1180,7 @@ stop()    → routerFSM.send("CANCEL")  → emitTransitionCancel()  (if transiti
 
 #### Bundle Size
 
-Size limit updated from `22.1 kB` → `25 kB` in `.size-limit.json` to accommodate FSM integration. Current: 83.6 KB raw / 22.81 KB gzip.
+Size limit updated from `22.1 kB` → `25 kB` in `.size-limit.js` to accommodate FSM integration. Current: 83.6 KB raw / 22.81 KB gzip.
 
 ### Type Guard Hierarchy
 
