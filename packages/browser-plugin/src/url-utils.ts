@@ -1,16 +1,53 @@
 // packages/browser-plugin/modules/url-utils.ts
 
 import { LOGGER_CONTEXT } from "./constants";
-import { escapeRegExp } from "./utils";
 
 import type { URLParseOptions, RegExpCache } from "./types";
 
-/**
- * Parses URL and extracts path using native URL API.
- * Handles hash mode, base path stripping, and edge cases (IPv6, Unicode).
- *
- * @returns Path string or null on parse error
- */
+const escapeRegExpCache = new Map<string, string>();
+
+export const escapeRegExp = (str: string): string => {
+  const cached = escapeRegExpCache.get(str);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  const escaped = str.replaceAll(/[$()*+.?[\\\]^{|}-]/g, String.raw`\$&`);
+
+  escapeRegExpCache.set(str, escaped);
+
+  return escaped;
+};
+
+export function extractPath(
+  pathname: string,
+  hash: string,
+  options: URLParseOptions,
+  regExpCache: RegExpCache,
+): string {
+  if (options.useHash) {
+    const hashPrefix = options.hashPrefix ?? "";
+    const escapedHashPrefix = escapeRegExp(hashPrefix);
+    const path = escapedHashPrefix
+      ? hash.replace(regExpCache.get(`^#${escapedHashPrefix}`), "")
+      : hash.slice(1);
+
+    return path || "/";
+  }
+
+  const base = options.base ?? "";
+
+  if (base) {
+    const escapedBase = escapeRegExp(base);
+    const stripped = pathname.replace(regExpCache.get(`^${escapedBase}`), "");
+
+    return stripped.startsWith("/") ? stripped : `/${stripped}`;
+  }
+
+  return pathname || "/";
+}
+
 export function urlToPath(
   url: string,
   options: URLParseOptions,
@@ -18,10 +55,6 @@ export function urlToPath(
 ): string | null {
   try {
     const parsedUrl = new URL(url, globalThis.location.origin);
-    const pathname = parsedUrl.pathname;
-    const hash = parsedUrl.hash;
-    const search = parsedUrl.search;
-    const base = options.base ?? "";
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
       console.warn(`[${LOGGER_CONTEXT}] Invalid URL protocol in ${url}`);
@@ -29,23 +62,10 @@ export function urlToPath(
       return null;
     }
 
-    if (options.useHash) {
-      const hashPrefix = options.hashPrefix ?? "";
-      const escapedHashPrefix = escapeRegExp(hashPrefix);
-      const path = escapedHashPrefix
-        ? hash.replace(regExpCache.get(`^#${escapedHashPrefix}`), "")
-        : hash.slice(1);
-
-      return path + search;
-    } else if (base) {
-      const escapedBase = escapeRegExp(base);
-      const baseRegExp = regExpCache.get(`^${escapedBase}`);
-      const stripped = pathname.replace(baseRegExp, "");
-
-      return (stripped.startsWith("/") ? "" : "/") + stripped + search;
-    }
-
-    return pathname + search;
+    return (
+      extractPath(parsedUrl.pathname, parsedUrl.hash, options, regExpCache) +
+      parsedUrl.search
+    );
   } catch (error) {
     console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
 

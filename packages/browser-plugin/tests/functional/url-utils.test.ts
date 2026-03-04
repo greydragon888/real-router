@@ -1,6 +1,11 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
-import { urlToPath, buildUrl, createRegExpCache } from "../../src/url-utils";
+import {
+  urlToPath,
+  buildUrl,
+  createRegExpCache,
+  extractPath,
+} from "../../src/url-utils";
 
 import type { URLParseOptions, RegExpCache } from "../../src/types";
 
@@ -46,6 +51,20 @@ describe("url-utils", () => {
 
     it("works with hash prefix only", () => {
       expect(buildUrl("/users", "", "#!")).toBe("#!/users");
+    });
+  });
+
+  describe("extractPath", () => {
+    let cache: RegExpCache;
+
+    beforeEach(() => {
+      cache = createRegExpCache();
+    });
+
+    it("returns root when pathname is empty and no base is set", () => {
+      const result = extractPath("", "", { useHash: false }, cache);
+
+      expect(result).toBe("/");
     });
   });
 
