@@ -1,3 +1,5 @@
+const NOOP_UNSUBSCRIBE: () => void = () => {};
+
 export class BaseSource<T> {
   #currentSnapshot: T;
   #destroyed = false;
@@ -10,7 +12,7 @@ export class BaseSource<T> {
 
   subscribe(listener: () => void): () => void {
     if (this.#destroyed) {
-      return () => {};
+      return NOOP_UNSUBSCRIBE;
     }
 
     this.#listeners.add(listener);
