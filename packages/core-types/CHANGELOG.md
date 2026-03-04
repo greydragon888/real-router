@@ -1,5 +1,19 @@
 # @real-router/types
 
+## 0.20.0
+
+### Minor Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `addBuildPathInterceptor` to `PluginApi` interface (#220)
+
+  New method on `PluginApi` allows plugins to register buildPath param interceptors:
+
+  ```typescript
+  addBuildPathInterceptor: (
+    fn: (routeName: string, params: Params) => Params,
+  ) => Unsubscribe;
+  ```
+
 ## 0.19.0
 
 ### Minor Changes

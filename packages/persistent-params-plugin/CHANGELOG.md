@@ -1,5 +1,16 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.35
+
+### Patch Changes
+
+- [#221](https://github.com/greydragon888/real-router/pull/221) [`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `buildPath` monkey patching with `addBuildPathInterceptor` (#220)
+
+  Migrated from direct `router.buildPath = ...` override to `api.addBuildPathInterceptor()`. No public API changes — internal implementation only.
+
+- Updated dependencies [[`ed81e5d`](https://github.com/greydragon888/real-router/commit/ed81e5d552b5ac8a76c7562b2479652636e5ef10)]:
+  - @real-router/core@0.32.0
+
 ## 0.1.34
 
 ### Patch Changes
