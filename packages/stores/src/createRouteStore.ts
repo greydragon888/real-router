@@ -1,5 +1,5 @@
 import type { RouteSnapshot, RouterStore } from "./types.js";
-import type { Router } from "@real-router/core";
+import type { Router } from "@real-router/types";
 
 /**
  * Creates a store for the full route state.

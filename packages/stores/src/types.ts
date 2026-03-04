@@ -1,4 +1,4 @@
-import type { State } from "@real-router/core";
+import type { State } from "@real-router/types";
 
 export interface RouteSnapshot {
   route: State | undefined;

@@ -52,10 +52,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/route-utils": "workspace:^"
-  },
-  "peerDependencies": {
-    "@real-router/core": "~0.31.0"
+    "@real-router/route-utils": "workspace:^",
+    "@real-router/types": "workspace:^"
   },
   "devDependencies": {
     "@real-router/core": "workspace:^",

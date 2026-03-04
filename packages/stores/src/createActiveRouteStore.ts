@@ -3,7 +3,7 @@ import { areRoutesRelated } from "@real-router/route-utils";
 import { createBaseStore } from "./createBaseStore.js";
 
 import type { ActiveRouteStoreOptions, RouterStore } from "./types.js";
-import type { Params, Router } from "@real-router/core";
+import type { Params, Router } from "@real-router/types";
 
 export function createActiveRouteStore(
   router: Router,

@@ -1,4 +1,4 @@
-import type { Router, State } from "@real-router/core";
+import type { Router, State } from "@real-router/types";
 
 const shouldUpdateCache = new WeakMap<
   Router,

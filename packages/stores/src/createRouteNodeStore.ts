@@ -3,7 +3,7 @@ import { createBaseStore } from "./createBaseStore.js";
 import { getCachedShouldUpdate } from "./shouldUpdateCache.js";
 
 import type { RouteNodeSnapshot, RouterStore } from "./types.js";
-import type { Router } from "@real-router/core";
+import type { Router } from "@real-router/types";
 
 export function createRouteNodeStore(
   router: Router,

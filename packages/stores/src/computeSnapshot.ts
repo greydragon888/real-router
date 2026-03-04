@@ -1,5 +1,5 @@
 import type { RouteNodeSnapshot } from "./types.js";
-import type { Router, SubscribeState } from "@real-router/core";
+import type { Router, SubscribeState } from "@real-router/types";
 
 export function computeSnapshot(
   currentSnapshot: RouteNodeSnapshot,
