@@ -437,25 +437,27 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 ### size-limit Configuration
 
-`.size-limit.json` defines per-package limits:
+`.size-limit.js` defines per-package limits:
 
-| Package                        | Limit  |
-| ------------------------------ | ------ |
-| @real-router/core              | 25 kB  |
-| @real-router/fsm               | 0.5 kB |
-| @real-router/react             | 2 kB   |
-| @real-router/rx                | 1.5 kB |
-| @real-router/browser-plugin    | 4 kB   |
-| @real-router/route-utils       | 0.5 kB |
-| path-matcher                   | 4 kB   |
-| route-tree                     | 6.5 kB |
-| search-params                  | 1.5 kB |
-| type-guards                    | 1.5 kB |
-| @real-router/logger            | 0.5 kB |
-| @real-router/logger-plugin     | 1.5 kB |
-| @real-router/persistent-params | 1.5 kB |
+| Package                               | Limit  |
+| ------------------------------------- | ------ |
+| @real-router/core                     | 25 kB  |
+| @real-router/fsm                      | 0.5 kB |
+| @real-router/react                    | 1.5 kB |
+| @real-router/sources                  | 1 kB   |
+| @real-router/rx                       | 1.5 kB |
+| @real-router/browser-plugin           | 4 kB   |
+| @real-router/route-utils              | 1 kB   |
+| @real-router/logger                   | 0.5 kB |
+| @real-router/logger-plugin            | 1.5 kB |
+| @real-router/persistent-params-plugin | 1.5 kB |
+| path-matcher                          | 4 kB   |
+| route-tree                            | 6.5 kB |
+| search-params                         | 1.5 kB |
+| type-guards                           | 1.5 kB |
+| event-emitter                         | 2 kB   |
 
-React package ignores `react` and `react-dom` from size calculation.
+React package ignores `react`, `react-dom`, `@real-router/core`, `@real-router/route-utils`, and `@real-router/sources` from size calculation.
 
 ### knip Configuration
 

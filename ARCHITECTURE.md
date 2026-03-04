@@ -10,6 +10,7 @@ real-router/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
 │   ├── react/                     # React integration (Provider, hooks, components)
+│   ├── sources/                   # @real-router/sources — subscription layer for UI bindings
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser history synchronization
 │   ├── logger-plugin/             # Development logging with timing
@@ -56,6 +57,7 @@ graph TD
 
     subgraph consumers [Consumer packages]
         BP["@real-router/browser-plugin"]
+        SOURCES["@real-router/sources"]
         REACT["@real-router/react"]
         RX["@real-router/rx"]
         LP["@real-router/logger-plugin"]
@@ -70,7 +72,11 @@ graph TD
     LP -->|dep| CORE
     LP -->|dep| LOG
 
+    SOURCES -->|dep| ROUTEUTILS
+    SOURCES -->|dep| TYPES
+
     REACT -->|dep| CORE
+    REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
 
     RX -->|dep| CORE
@@ -81,7 +87,7 @@ graph TD
     ROUTEUTILS -->|dep| TYPES
 ```
 
-**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`
+**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/sources`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`
 
 **Internal packages (bundled into core):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
 
