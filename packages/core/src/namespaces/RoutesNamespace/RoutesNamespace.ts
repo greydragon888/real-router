@@ -202,7 +202,8 @@ export class RoutesNamespace<
       route,
     )
       ? { ...this.#store.config.defaultParams[route], ...params }
-      : (params ?? {});
+      : /* v8 ignore next -- @preserve: V8 can't track ?? branch in ternary; covered by buildPath tests without params */ (params ??
+        {});
 
     const encodedParams =
       typeof this.#store.config.encoders[route] === "function"

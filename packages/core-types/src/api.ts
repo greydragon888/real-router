@@ -82,6 +82,10 @@ export interface PluginApi {
       routeParams: P,
     ) => SimpleState<P>,
   ) => void;
+
+  addBuildPathInterceptor: (
+    fn: (routeName: string, params: Params) => Params,
+  ) => Unsubscribe;
 }
 
 /**

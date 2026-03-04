@@ -128,7 +128,6 @@ export function persistentParamsPluginFactory(
     const api = getPluginApi(router);
 
     // Store original router methods for restoration
-    const originalBuildPath = router.buildPath.bind(router);
     const originalForwardState = api.getForwardState();
     const originalRootPath = api.getRootPath();
 
@@ -196,10 +195,10 @@ export function persistentParamsPluginFactory(
       return mergeParams(persistentParams, safeParams);
     }
 
-    // Override router methods to inject persistent params
-    // buildPath: needed for direct buildPath() calls (doesn't go through forwardState)
-    router.buildPath = (routeName, buildPathParams = {}) =>
-      originalBuildPath(routeName, withPersistentParams(buildPathParams));
+    // Intercept buildPath to inject persistent params into path construction
+    const removeBuildPathInterceptor = api.addBuildPathInterceptor(
+      (_routeName, buildPathParams) => withPersistentParams(buildPathParams),
+    );
 
     api.setForwardState(
       <P extends Params = Params>(routeName: string, routeParams: P) => {
@@ -282,7 +281,7 @@ export function persistentParamsPluginFactory(
        */
       teardown() {
         try {
-          router.buildPath = originalBuildPath;
+          removeBuildPathInterceptor();
           api.setForwardState(originalForwardState);
           api.setRootPath(originalRootPath);
 

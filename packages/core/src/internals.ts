@@ -60,6 +60,11 @@ export interface RouterInternals<
 
   readonly buildPath: (route: string, params?: Params) => string;
 
+  readonly buildPathInterceptors: ((
+    routeName: string,
+    params: Params,
+  ) => Params)[];
+
   readonly setRootPath: (rootPath: string) => void;
   readonly getRootPath: () => string;
 
@@ -113,4 +118,22 @@ export function registerInternals<D extends DefaultDependencies>(
   ctx: RouterInternals<D>,
 ): void {
   internals.set(router, ctx);
+}
+
+export function applyBuildPathInterceptors(
+  interceptors: readonly ((routeName: string, params: Params) => Params)[],
+  route: string,
+  params: Params | undefined,
+): Params {
+  if (interceptors.length === 0) {
+    return params ?? {};
+  }
+
+  let resolved = params ?? {};
+
+  for (const interceptor of interceptors) {
+    resolved = interceptor(route, resolved);
+  }
+
+  return resolved;
 }
