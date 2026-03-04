@@ -1,14 +1,14 @@
 /**
- * Stores Benchmarks Entry Point
+ * Sources Benchmarks Entry Point
  *
  * Run: pnpm bench
  * Results: .bench/mitata-results.json
  *
  * Categories:
- * 1. Creation - Factory cost for each store type
+ * 1. Creation - Factory cost for each source type
  * 2. Subscription - Subscribe/unsubscribe cycles, getSnapshot hot path
  * 3. Notification - Navigation event handling, dedup filtering
- * 4. Stress - Fan-out, many stores, rapid lifecycle, WeakMap cache
+ * 4. Stress - Fan-out, many sources, rapid lifecycle, WeakMap cache
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";

@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteNodeStore } from "@real-router/stores";
+import { createRouteNodeSource } from "@real-router/sources";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
@@ -10,7 +10,7 @@ export function useRouteNode(nodeName: string): RouteContext {
   const router = useRouter();
 
   const store = useMemo(
-    () => createRouteNodeStore(router, nodeName),
+    () => createRouteNodeSource(router, nodeName),
     [router, nodeName],
   );
 

@@ -1,8 +1,8 @@
 ---
-"@real-router/stores": minor
+"@real-router/sources": minor
 ---
 
-Add `@real-router/stores` — framework-agnostic subscription layer for router state (#217)
+Add `@real-router/sources` — framework-agnostic subscription layer for router state (#217)
 
 Three factory functions for UI adapter authors:
 

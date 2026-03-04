@@ -1,11 +1,11 @@
-interface BaseStore<T> {
+interface BaseSource<T> {
   subscribe: (listener: () => void) => () => void;
   getSnapshot: () => T;
   _update: (snapshot: T) => void;
   destroy: () => void;
 }
 
-export function createBaseStore<T>(initialSnapshot: T): BaseStore<T> {
+export function createBaseSource<T>(initialSnapshot: T): BaseSource<T> {
   let currentSnapshot = initialSnapshot;
   const listeners = new Set<() => void>();
   let destroyed = false;

@@ -58,7 +58,7 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
-    "@real-router/stores": "workspace:^"
+    "@real-router/sources": "workspace:^"
   },
   "devDependencies": {
     "@real-router/browser-plugin": "workspace:^",

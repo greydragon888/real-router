@@ -1,11 +1,11 @@
 import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouteStore } from "../../src/createRouteStore.js";
+import { createRouteSource } from "../../src";
 
 import type { Router } from "@real-router/core";
 
-describe("createRouteStore", () => {
+describe("createRouteSources", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -26,8 +26,8 @@ describe("createRouteStore", () => {
   });
 
   it("initial snapshot: { route: router.getState(), previousRoute: undefined }", () => {
-    const store = createRouteStore(router);
-    const snapshot = store.getSnapshot();
+    const source = createRouteSource(router);
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBe(router.getState());
     expect(snapshot.previousRoute).toBeUndefined();
@@ -35,8 +35,8 @@ describe("createRouteStore", () => {
 
   it("before router.start(): { route: undefined, previousRoute: undefined }", async () => {
     const freshRouter = createRouter([{ name: "home", path: "/" }]);
-    const store = createRouteStore(freshRouter);
-    const snapshot = store.getSnapshot();
+    const source = createRouteSource(freshRouter);
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBeUndefined();
     expect(snapshot.previousRoute).toBeUndefined();
@@ -45,10 +45,10 @@ describe("createRouteStore", () => {
   });
 
   it("listener called on navigation", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
     await router.navigate("users");
 
@@ -56,13 +56,13 @@ describe("createRouteStore", () => {
   });
 
   it("snapshot updated: route = new route, previousRoute = old route", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
     const previousState = router.getState();
-    const cleanup = store.subscribe(() => {});
+    const cleanup = source.subscribe(() => {});
 
     await router.navigate("admin");
 
-    const snapshot = store.getSnapshot();
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route?.name).toBe("admin");
     expect(snapshot.previousRoute).toBe(previousState);
@@ -71,17 +71,17 @@ describe("createRouteStore", () => {
   });
 
   it("multiple navigations: previousRoute tracks correctly", async () => {
-    const store = createRouteStore(router);
-    const cleanup = store.subscribe(() => {});
+    const source = createRouteSource(router);
+    const cleanup = source.subscribe(() => {});
 
     await router.navigate("users");
-    const afterFirstNav = store.getSnapshot();
+    const afterFirstNav = source.getSnapshot();
 
     expect(afterFirstNav.route?.name).toBe("users");
     expect(afterFirstNav.previousRoute?.name).toBe("home");
 
     await router.navigate("admin");
-    const afterSecondNav = store.getSnapshot();
+    const afterSecondNav = source.getSnapshot();
 
     expect(afterSecondNav.route?.name).toBe("admin");
     expect(afterSecondNav.previousRoute?.name).toBe("users");
@@ -90,23 +90,23 @@ describe("createRouteStore", () => {
   });
 
   it("destroy: unsubscribes from router (further navigations don't call listener)", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
-    store.destroy();
+    source.destroy();
     await router.navigate("admin");
 
     expect(listener).not.toHaveBeenCalled();
   });
 
   it("multiple subscribers: router.subscribe called only once", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
     const spy = vi.spyOn(router, "subscribe");
 
-    const cleanup1 = store.subscribe(() => {});
-    const cleanup2 = store.subscribe(() => {});
+    const cleanup1 = source.subscribe(() => {});
+    const cleanup2 = source.subscribe(() => {});
 
     // router.subscribe should only be called once (lazy-connection)
     expect(spy).toHaveBeenCalledTimes(1);
@@ -116,13 +116,13 @@ describe("createRouteStore", () => {
   });
 
   it("partial unsubscribe: router subscription stays until last listener removed", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
     const listener1 = vi.fn();
     const listener2 = vi.fn();
 
-    const cleanup1 = store.subscribe(listener1);
+    const cleanup1 = source.subscribe(listener1);
 
-    store.subscribe(listener2);
+    source.subscribe(listener2);
 
     // Remove first listener — router subscription should stay
     cleanup1();
@@ -136,38 +136,38 @@ describe("createRouteStore", () => {
   });
 
   it("destroy: idempotent", () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
 
-    store.destroy();
+    source.destroy();
 
     expect(() => {
-      store.destroy();
+      source.destroy();
     }).not.toThrowError();
   });
 
   it("post-destroy: getSnapshot still returns last snapshot", async () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
 
-    store.subscribe(() => {});
+    source.subscribe(() => {});
 
     await router.navigate("admin");
 
-    const lastSnapshot = store.getSnapshot();
+    const lastSnapshot = source.getSnapshot();
 
     expect(lastSnapshot.route?.name).toBe("admin");
 
-    store.destroy();
+    source.destroy();
 
-    expect(store.getSnapshot()).toBe(lastSnapshot);
+    expect(source.getSnapshot()).toBe(lastSnapshot);
   });
 
   it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
-    const store = createRouteStore(router);
+    const source = createRouteSource(router);
 
-    store.destroy();
+    source.destroy();
 
     const listener = vi.fn();
-    const unsubscribe = store.subscribe(listener);
+    const unsubscribe = source.subscribe(listener);
 
     expect(listener).not.toHaveBeenCalled();
     expect(() => {

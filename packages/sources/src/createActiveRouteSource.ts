@@ -1,16 +1,16 @@
 import { areRoutesRelated } from "@real-router/route-utils";
 
-import { createBaseStore } from "./createBaseStore.js";
+import { createBaseSource } from "./createBaseSource";
 
-import type { ActiveRouteStoreOptions, RouterStore } from "./types.js";
+import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
 import type { Params, Router } from "@real-router/types";
 
-export function createActiveRouteStore(
+export function createActiveRouteSource(
   router: Router,
   routeName: string,
   params?: Params,
-  options?: ActiveRouteStoreOptions,
-): RouterStore<boolean> {
+  options?: ActiveRouteSourceOptions,
+): RouterSource<boolean> {
   const strict = options?.strict ?? false;
   const ignoreQueryParams = options?.ignoreQueryParams ?? true;
 
@@ -21,7 +21,7 @@ export function createActiveRouteStore(
     ignoreQueryParams,
   );
 
-  const store = createBaseStore(initialValue);
+  const source = createBaseSource(initialValue);
 
   const unsubscribe = router.subscribe((next) => {
     const isNewRelated = areRoutesRelated(routeName, next.route.name);
@@ -39,17 +39,17 @@ export function createActiveRouteStore(
       ? router.isActiveRoute(routeName, params, strict, ignoreQueryParams)
       : false;
 
-    if (!Object.is(store.getSnapshot(), newValue)) {
-      store._update(newValue);
+    if (!Object.is(source.getSnapshot(), newValue)) {
+      source._update(newValue);
     }
   });
 
   return {
-    subscribe: store.subscribe,
-    getSnapshot: store.getSnapshot,
+    subscribe: source.subscribe,
+    getSnapshot: source.getSnapshot,
     destroy() {
       unsubscribe();
-      store.destroy();
+      source.destroy();
     },
   };
 }

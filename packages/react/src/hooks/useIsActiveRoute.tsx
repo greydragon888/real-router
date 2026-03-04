@@ -1,4 +1,4 @@
-import { createActiveRouteStore } from "@real-router/stores";
+import { createActiveRouteSource } from "@real-router/sources";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { useRouter } from "./useRouter";
@@ -21,7 +21,7 @@ export function useIsActiveRoute(
 
   const store = useMemo(
     () =>
-      createActiveRouteStore(router, routeName, stableParams, {
+      createActiveRouteSource(router, routeName, stableParams, {
         strict,
         ignoreQueryParams,
       }),

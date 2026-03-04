@@ -10,13 +10,13 @@ export interface RouteNodeSnapshot {
   previousRoute: State | undefined;
 }
 
-export interface RouterStore<T> {
+export interface RouterSource<T> {
   subscribe: (listener: () => void) => () => void;
   getSnapshot: () => T;
   destroy: () => void;
 }
 
-export interface ActiveRouteStoreOptions {
+export interface ActiveRouteSourceOptions {
   strict?: boolean;
   ignoreQueryParams?: boolean;
 }

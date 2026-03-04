@@ -255,9 +255,9 @@ importers:
       '@real-router/route-utils':
         specifier: workspace:^
         version: link:../route-utils
-      '@real-router/stores':
+      '@real-router/sources':
         specifier: workspace:^
-        version: link:../stores
+        version: link:../sources
       '@types/react':
         specifier: '>=18.0.0'
         version: 19.2.9
@@ -338,7 +338,7 @@ importers:
 
   packages/search-params: {}
 
-  packages/stores:
+  packages/sources:
     dependencies:
       '@real-router/route-utils':
         specifier: workspace:^

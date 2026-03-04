@@ -1,5 +1,5 @@
 import { getNavigator } from "@real-router/core";
-import { createRouteStore } from "@real-router/stores";
+import { createRouteSource } from "@real-router/sources";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
@@ -21,7 +21,7 @@ export const RouterProvider: FC<RouteProviderProps> = ({
   // useSyncExternalStore manages the router subscription lifecycle:
   // subscribe connects to router on first listener, unsubscribes on last.
   // This is Strict Mode safe — no useEffect cleanup needed.
-  const store = useMemo(() => createRouteStore(router), [router]);
+  const store = useMemo(() => createRouteSource(router), [router]);
   const { route, previousRoute } = useSyncExternalStore(
     store.subscribe,
     store.getSnapshot,

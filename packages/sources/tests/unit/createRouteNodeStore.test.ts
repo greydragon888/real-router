@@ -1,11 +1,11 @@
 import { createRouter } from "@real-router/core";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { createRouteNodeStore } from "../../src";
+import { createRouteNodeSource } from "../../src";
 
 import type { Router } from "@real-router/core";
 
-describe("createRouteNodeStore", () => {
+describe("createRouteNodeSources", () => {
   let router: Router;
 
   beforeEach(async () => {
@@ -26,24 +26,24 @@ describe("createRouteNodeStore", () => {
   });
 
   it("initial snapshot for active node: route = currentState, previousRoute = undefined", () => {
-    const store = createRouteNodeStore(router, "home");
-    const snapshot = store.getSnapshot();
+    const source = createRouteNodeSource(router, "home");
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBe(router.getState());
     expect(snapshot.previousRoute).toBeUndefined();
   });
 
   it("initial snapshot for inactive node: route = undefined, previousRoute = undefined", () => {
-    const store = createRouteNodeStore(router, "admin");
-    const snapshot = store.getSnapshot();
+    const source = createRouteNodeSource(router, "admin");
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBeUndefined();
     expect(snapshot.previousRoute).toBeUndefined();
   });
 
   it("root node '' is always active, returns current route", () => {
-    const store = createRouteNodeStore(router, "");
-    const snapshot = store.getSnapshot();
+    const source = createRouteNodeSource(router, "");
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBe(router.getState());
     expect(snapshot.route?.name).toBe("home");
@@ -51,8 +51,8 @@ describe("createRouteNodeStore", () => {
 
   it("before router.start(): { route: undefined, previousRoute: undefined }", () => {
     const freshRouter = createRouter([{ name: "home", path: "/" }]);
-    const store = createRouteNodeStore(freshRouter, "home");
-    const snapshot = store.getSnapshot();
+    const source = createRouteNodeSource(freshRouter, "home");
+    const snapshot = source.getSnapshot();
 
     expect(snapshot.route).toBeUndefined();
     expect(snapshot.previousRoute).toBeUndefined();
@@ -61,10 +61,10 @@ describe("createRouteNodeStore", () => {
   });
 
   it("listener NOT called when navigation doesn't affect the node", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
     // Navigate home → admin (users is not involved)
     await router.navigate("admin");
@@ -73,84 +73,84 @@ describe("createRouteNodeStore", () => {
   });
 
   it("listener called when navigating INTO the node", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
     await router.navigate("users");
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot().route?.name).toBe("users");
+    expect(source.getSnapshot().route?.name).toBe("users");
   });
 
   it("listener called when navigating OUT OF the node", async () => {
     await router.navigate("users");
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
     await router.navigate("home");
 
     expect(listener).toHaveBeenCalledTimes(1);
-    expect(store.getSnapshot().route).toBeUndefined();
+    expect(source.getSnapshot().route).toBeUndefined();
   });
 
   it("route = undefined when node is not active", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
 
     await router.navigate("users");
 
-    expect(store.getSnapshot().route?.name).toBe("users");
+    expect(source.getSnapshot().route?.name).toBe("users");
 
     await router.navigate("home");
 
-    expect(store.getSnapshot().route).toBeUndefined();
+    expect(source.getSnapshot().route).toBeUndefined();
   });
 
   it("node active for child routes (users active when on users.view)", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
 
     await router.navigate("users.view", { id: "42" });
 
-    expect(store.getSnapshot().route?.name).toBe("users.view");
+    expect(source.getSnapshot().route?.name).toBe("users.view");
   });
 
   it("dedup: same snapshot reference when navigation doesn't affect node", async () => {
-    const store = createRouteNodeStore(router, "admin");
-    const initialSnapshot = store.getSnapshot();
+    const source = createRouteNodeSource(router, "admin");
+    const initialSnapshot = source.getSnapshot();
 
     // Navigate between unrelated routes (home → users)
     await router.navigate("users");
 
     // admin is never active, snapshot reference should be identical
-    expect(store.getSnapshot()).toBe(initialSnapshot);
+    expect(source.getSnapshot()).toBe(initialSnapshot);
   });
 
-  it("two stores for same node work independently", async () => {
-    const store1 = createRouteNodeStore(router, "users");
-    const store2 = createRouteNodeStore(router, "users");
+  it("two sources for same node work independently", async () => {
+    const source1 = createRouteNodeSource(router, "users");
+    const source2 = createRouteNodeSource(router, "users");
 
     await router.navigate("users");
 
-    // Both stores reflect the navigation correctly
-    expect(store1.getSnapshot().route?.name).toBe("users");
-    expect(store2.getSnapshot().route?.name).toBe("users");
+    // Both sources reflect the navigation correctly
+    expect(source1.getSnapshot().route?.name).toBe("users");
+    expect(source2.getSnapshot().route?.name).toBe("users");
 
     // Destroying one does not affect the other
-    store1.destroy();
+    source1.destroy();
 
     await router.navigate("users.view", { id: "1" });
 
-    expect(store2.getSnapshot().route?.name).toBe("users.view");
+    expect(source2.getSnapshot().route?.name).toBe("users.view");
   });
 
   it("unsubscribe: listener no longer called after unsubscribing", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
-    const unsubscribe = store.subscribe(listener);
+    const unsubscribe = source.subscribe(listener);
 
     await router.navigate("users");
 
@@ -164,48 +164,48 @@ describe("createRouteNodeStore", () => {
   });
 
   it("destroy: unsubscribes from router", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
     const listener = vi.fn();
 
-    store.subscribe(listener);
+    source.subscribe(listener);
 
-    store.destroy();
+    source.destroy();
     await router.navigate("users");
 
     expect(listener).not.toHaveBeenCalled();
   });
 
   it("destroy: idempotent", () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
 
-    store.destroy();
+    source.destroy();
 
     expect(() => {
-      store.destroy();
+      source.destroy();
     }).not.toThrowError();
   });
 
   it("post-destroy: getSnapshot still returns last snapshot", async () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
 
     await router.navigate("users");
 
-    const lastSnapshot = store.getSnapshot();
+    const lastSnapshot = source.getSnapshot();
 
     expect(lastSnapshot.route?.name).toBe("users");
 
-    store.destroy();
+    source.destroy();
 
-    expect(store.getSnapshot()).toBe(lastSnapshot);
+    expect(source.getSnapshot()).toBe(lastSnapshot);
   });
 
   it("post-destroy: subscribe returns no-op unsubscribe (no errors)", () => {
-    const store = createRouteNodeStore(router, "users");
+    const source = createRouteNodeSource(router, "users");
 
-    store.destroy();
+    source.destroy();
 
     const listener = vi.fn();
-    const unsubscribe = store.subscribe(listener);
+    const unsubscribe = source.subscribe(listener);
 
     expect(listener).not.toHaveBeenCalled();
     expect(() => {

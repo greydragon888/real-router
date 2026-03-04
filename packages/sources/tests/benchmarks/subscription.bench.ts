@@ -1,18 +1,20 @@
 /**
- * Store subscription benchmarks
+ * Sources subscription benchmarks
  *
  * Tests the subscription lifecycle:
  * - subscribe/unsubscribe cycles (ACCUMULATION — add + remove fallback)
- * - getSnapshot hot path (NON-MUTATING — store outside bench)
+ * - getSnapshot hot path (NON-MUTATING — source outside bench)
  * - Full lifecycle: create → subscribe → destroy
  */
 
 import { createRouter } from "@real-router/core";
 import { bench, do_not_optimize } from "mitata";
 
-import { createActiveRouteStore } from "../../src/createActiveRouteStore.js";
-import { createRouteNodeStore } from "../../src/createRouteNodeStore.js";
-import { createRouteStore } from "../../src/createRouteStore.js";
+import {
+  createActiveRouteSource,
+  createRouteNodeSource,
+  createRouteSource,
+} from "../../src";
 
 import type { Route, Router } from "@real-router/core";
 
@@ -43,38 +45,38 @@ function createTestRouter(): Router {
 // 1. Subscribe + unsubscribe cycles
 // ============================================================================
 
-// 1.1 subscribe + unsubscribe on routeStore (lazy-connection)
+// 1.1 subscribe + unsubscribe on routeSources (lazy-connection)
 // Type: ACCUMULATION — subscribe + unsubscribe fallback
 // Each cycle triggers router.subscribe() and router unsubscribe (lazy)
 {
   const router = createTestRouter();
-  const store = createRouteStore(router);
+  const source = createRouteSource(router);
 
-  bench("1.1 subscribe + unsubscribe on routeStore (lazy-connection)", () => {
+  bench("1.1 subscribe + unsubscribe on routeSources (lazy-connection)", () => {
     const listener = () => {};
-    const unsub = store.subscribe(listener);
+    const unsub = source.subscribe(listener);
 
     unsub();
   }).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
-// 1.2 subscribe + unsubscribe on routeNodeStore
+// 1.2 subscribe + unsubscribe on routeNodeSources
 // Type: ACCUMULATION — subscribe + unsubscribe fallback
 {
   const router = createTestRouter();
-  const store = createRouteNodeStore(router, "users");
+  const source = createRouteNodeSource(router, "users");
 
-  bench("1.2 subscribe + unsubscribe on routeNodeStore", () => {
+  bench("1.2 subscribe + unsubscribe on routeNodeSources", () => {
     const listener = () => {};
-    const unsub = store.subscribe(listener);
+    const unsub = source.subscribe(listener);
 
     unsub();
   }).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
@@ -82,53 +84,53 @@ function createTestRouter(): Router {
 // 2. getSnapshot (hot path)
 // ============================================================================
 
-// 2.1 getSnapshot on routeStore
-// Type: NON-MUTATING — store and router outside
+// 2.1 getSnapshot on routeSources
+// Type: NON-MUTATING — source and router outside
 // This is the hottest path: called on every React render
 {
   const router = createTestRouter();
-  const store = createRouteStore(router);
+  const source = createRouteSource(router);
   // Activate lazy-connection
-  const unsub = store.subscribe(() => {});
+  const unsub = source.subscribe(() => {});
 
-  bench("2.1 getSnapshot on routeStore (hot path)", () => {
-    do_not_optimize(store.getSnapshot());
+  bench("2.1 getSnapshot on routeSources (hot path)", () => {
+    do_not_optimize(source.getSnapshot());
   }).gc("inner");
 
   unsub();
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
-// 2.2 getSnapshot on routeNodeStore
+// 2.2 getSnapshot on routeNodeSources
 // Type: NON-MUTATING
 {
   const router = createTestRouter();
-  const store = createRouteNodeStore(router, "");
-  const unsub = store.subscribe(() => {});
+  const source = createRouteNodeSource(router, "");
+  const unsub = source.subscribe(() => {});
 
-  bench("2.2 getSnapshot on routeNodeStore (hot path)", () => {
-    do_not_optimize(store.getSnapshot());
+  bench("2.2 getSnapshot on routeNodeSources (hot path)", () => {
+    do_not_optimize(source.getSnapshot());
   }).gc("inner");
 
   unsub();
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
-// 2.3 getSnapshot on activeRouteStore
+// 2.3 getSnapshot on activeRouteSources
 // Type: NON-MUTATING
 {
   const router = createTestRouter();
-  const store = createActiveRouteStore(router, "home");
-  const unsub = store.subscribe(() => {});
+  const source = createActiveRouteSource(router, "home");
+  const unsub = source.subscribe(() => {});
 
-  bench("2.3 getSnapshot on activeRouteStore (hot path)", () => {
-    do_not_optimize(store.getSnapshot());
+  bench("2.3 getSnapshot on activeRouteSources (hot path)", () => {
+    do_not_optimize(source.getSnapshot());
   }).gc("inner");
 
   unsub();
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
@@ -136,19 +138,19 @@ function createTestRouter(): Router {
 // 3. Full lifecycle
 // ============================================================================
 
-// 3.1 routeNodeStore full lifecycle (create → subscribe → destroy)
+// 3.1 routeNodeSources full lifecycle (create → subscribe → destroy)
 // Type: ONE-TIME — measure full lifecycle cost
 {
   const router = createTestRouter();
 
   bench(
-    "3.1 routeNodeStore full lifecycle (create → subscribe → destroy)",
+    "3.1 routeNodeSources full lifecycle (create → subscribe → destroy)",
     () => {
-      const store = createRouteNodeStore(router, "users");
-      const unsub = store.subscribe(() => {});
+      const source = createRouteNodeSource(router, "users");
+      const unsub = source.subscribe(() => {});
 
       unsub();
-      store.destroy();
+      source.destroy();
     },
   ).gc("inner");
 

@@ -1,14 +1,14 @@
-import type { RouteSnapshot, RouterStore } from "./types.js";
+import type { RouteSnapshot, RouterSource } from "./types.js";
 import type { Router } from "@real-router/types";
 
 /**
- * Creates a store for the full route state.
+ * Creates a source for the full route state.
  *
  * Uses a lazy-connection pattern: the router subscription is created when the
  * first listener subscribes and removed when the last listener unsubscribes.
- * This is compatible with React's useSyncExternalStore and Strict Mode.
+ * This is compatible with React's useSyncExternalSource and Strict Mode.
  */
-export function createRouteStore(router: Router): RouterStore<RouteSnapshot> {
+export function createRouteSource(router: Router): RouterSource<RouteSnapshot> {
   let currentSnapshot: RouteSnapshot = {
     route: router.getState(),
     previousRoute: undefined,

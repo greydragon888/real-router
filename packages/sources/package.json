@@ -1,5 +1,5 @@
 {
-  "name": "@real-router/stores",
+  "name": "@real-router/sources",
   "version": "0.0.1",
   "type": "commonjs",
   "description": "Framework-agnostic subscription layer for Real-Router state",
@@ -27,7 +27,7 @@
   },
   "keywords": [
     "real-router",
-    "store",
+    "source",
     "subscription",
     "state"
   ],

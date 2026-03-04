@@ -1,10 +1,10 @@
 /**
- * Store notification benchmarks
+ * Sources notification benchmarks
  *
- * Tests how stores handle navigation events:
- * - routeStore: every navigation triggers notification
- * - routeNodeStore: shouldUpdate filter + computeSnapshot + Object.is dedup
- * - activeRouteStore: areRoutesRelated filter + isActiveRoute + boolean dedup
+ * Tests how sources handle navigation events:
+ * - routeSources: every navigation triggers notification
+ * - routeNodeSources: shouldUpdate filter + computeSnapshot + Object.is dedup
+ * - activeRouteSources: areRoutesRelated filter + isActiveRoute + boolean dedup
  *
  * Operation type: NON-MUTATING — navigate doesn't mutate router
  */
@@ -12,9 +12,11 @@
 import { createRouter } from "@real-router/core";
 import { bench } from "mitata";
 
-import { createActiveRouteStore } from "../../src/createActiveRouteStore.js";
-import { createRouteNodeStore } from "../../src/createRouteNodeStore.js";
-import { createRouteStore } from "../../src/createRouteStore.js";
+import {
+  createActiveRouteSource,
+  createRouteNodeSource,
+  createRouteSource,
+} from "../../src";
 
 import type { Route, Router } from "@real-router/core";
 
@@ -44,44 +46,44 @@ function createTestRouter(): Router {
 const NAV_ROUTES = ["about", "home"];
 
 // ============================================================================
-// 1. routeStore notification
+// 1. routeSources notification
 // ============================================================================
 
-// 1.1 routeStore notification on navigation (1 listener)
+// 1.1 routeSources notification on navigation (1 listener)
 // Type: NON-MUTATING — navigate doesn't mutate router
 // Measures: router.subscribe callback → snapshot update → listener notification
 {
   const router = createTestRouter();
-  const store = createRouteStore(router);
+  const source = createRouteSource(router);
 
-  store.subscribe(() => {});
+  source.subscribe(() => {});
 
-  bench("1.1 routeStore notification on navigation (1 listener)", () => {
+  bench("1.1 routeSources notification on navigation (1 listener)", () => {
     for (let i = 0; i < 1000; i++) {
       void router.navigate(NAV_ROUTES[i % 2]);
     }
   }).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
 // ============================================================================
-// 2. routeNodeStore notification
+// 2. routeNodeSources notification
 // ============================================================================
 
-// 2.1 routeNodeStore notification — related node
+// 2.1 routeNodeSources notification — related node
 // Type: NON-MUTATING
 // Measures: shouldUpdate filter (pass) → computeSnapshot → Object.is check → notify
 {
   const router = createTestRouter();
   // Subscribe to root node "" — always active, always notified
-  const store = createRouteNodeStore(router, "");
+  const source = createRouteNodeSource(router, "");
 
-  store.subscribe(() => {});
+  source.subscribe(() => {});
 
   bench(
-    "2.1 routeNodeStore notification — related node (1000 navigations)",
+    "2.1 routeNodeSources notification — related node (1000 navigations)",
     () => {
       for (let i = 0; i < 1000; i++) {
         void router.navigate(NAV_ROUTES[i % 2]);
@@ -89,22 +91,22 @@ const NAV_ROUTES = ["about", "home"];
     },
   ).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
-// 2.2 routeNodeStore dedup — unrelated node (shouldUpdate filter)
+// 2.2 routeNodeSources dedup — unrelated node (shouldUpdate filter)
 // Type: NON-MUTATING
 // Measures: shouldUpdate returns false → no snapshot computation, no notify
 // Navigation between "home" and "about" — "users" node is unrelated
 {
   const router = createTestRouter();
-  const store = createRouteNodeStore(router, "users");
+  const source = createRouteNodeSource(router, "users");
 
-  store.subscribe(() => {});
+  source.subscribe(() => {});
 
   bench(
-    "2.2 routeNodeStore dedup — unrelated node skipped (1000 navigations)",
+    "2.2 routeNodeSources dedup — unrelated node skipped (1000 navigations)",
     () => {
       for (let i = 0; i < 1000; i++) {
         void router.navigate(NAV_ROUTES[i % 2]);
@@ -112,26 +114,26 @@ const NAV_ROUTES = ["about", "home"];
     },
   ).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
 // ============================================================================
-// 3. activeRouteStore notification
+// 3. activeRouteSources notification
 // ============================================================================
 
-// 3.1 activeRouteStore notification — related route
+// 3.1 activeRouteSources notification — related route
 // Type: NON-MUTATING
 // Measures: areRoutesRelated (pass) → isActiveRoute → boolean dedup → notify
 {
   const router = createTestRouter();
   // Track "home" — navigations between home/about toggle active state
-  const store = createActiveRouteStore(router, "home");
+  const source = createActiveRouteSource(router, "home");
 
-  store.subscribe(() => {});
+  source.subscribe(() => {});
 
   bench(
-    "3.1 activeRouteStore notification — related route (1000 navigations)",
+    "3.1 activeRouteSources notification — related route (1000 navigations)",
     () => {
       for (let i = 0; i < 1000; i++) {
         void router.navigate(NAV_ROUTES[i % 2]);
@@ -139,22 +141,22 @@ const NAV_ROUTES = ["about", "home"];
     },
   ).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
 
-// 3.2 activeRouteStore dedup — unrelated route (areRoutesRelated filter)
+// 3.2 activeRouteSources dedup — unrelated route (areRoutesRelated filter)
 // Type: NON-MUTATING
 // Measures: areRoutesRelated returns false for both new and prev → skip
 // Track "users.view" but navigate between home/about only
 {
   const router = createTestRouter();
-  const store = createActiveRouteStore(router, "users.view");
+  const source = createActiveRouteSource(router, "users.view");
 
-  store.subscribe(() => {});
+  source.subscribe(() => {});
 
   bench(
-    "3.2 activeRouteStore dedup — unrelated route skipped (1000 navigations)",
+    "3.2 activeRouteSources dedup — unrelated route skipped (1000 navigations)",
     () => {
       for (let i = 0; i < 1000; i++) {
         void router.navigate(NAV_ROUTES[i % 2]);
@@ -162,6 +164,6 @@ const NAV_ROUTES = ["about", "home"];
     },
   ).gc("inner");
 
-  store.destroy();
+  source.destroy();
   router.stop();
 }
