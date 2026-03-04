@@ -220,3 +220,19 @@ export interface Browser {
  * Extends real-router State with additional properties that may be set by external code.
  */
 export type HistoryState = State & Record<string, unknown>;
+
+/**
+ * Subset of BrowserPluginOptions needed for URL parsing operations.
+ * Intentionally a flat interface (not a discriminated union) because this is an
+ * internal type for pure functions — the calling code in plugin.ts already works
+ * with validated BrowserPluginOptions and passes correct values.
+ */
+export interface URLParseOptions {
+  readonly useHash?: boolean;
+  readonly base?: string;
+  readonly hashPrefix?: string;
+}
+
+export interface RegExpCache {
+  get: (pattern: string) => RegExp;
+}

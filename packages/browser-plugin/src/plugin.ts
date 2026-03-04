@@ -5,8 +5,8 @@ import { isStateStrict as isState } from "type-guards";
 
 import { createSafeBrowser } from "./browser";
 import { defaultOptions, LOGGER_CONTEXT, source } from "./constants";
+import { urlToPath, buildUrl, createRegExpCache } from "./url-utils";
 import {
-  escapeRegExp,
   createStateFromEvent,
   shouldSkipTransition,
   handleMissingState,
@@ -89,21 +89,7 @@ export function browserPluginFactory(
     }
   }
 
-  // Cache RegExp patterns at plugin creation for performance
-  const regExpCache = new Map<string, RegExp>();
-  const getCachedRegExp = (pattern: string): RegExp => {
-    const cached = regExpCache.get(pattern);
-
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const newRegExp = new RegExp(pattern);
-
-    regExpCache.set(pattern, newRegExp);
-
-    return newRegExp;
-  };
+  const regExpCache = createRegExpCache();
 
   // Create transition options with proper typing for exactOptionalPropertyTypes
   // replace: true is needed because popstate means URL already changed (back/forward)
@@ -121,9 +107,11 @@ export function browserPluginFactory(
     const router = routerBase as Router;
     const api = getPluginApi(routerBase);
 
-    // Store original methods for restoration on teardown
-
-    const routerStart = router.start;
+    const removeStartInterceptor = api.addInterceptor(
+      "start",
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- interceptor chain uses generic any signature
+      (next, path?: string) => next(path ?? browser.getLocation(options)),
+    );
 
     // Transition state management
     let isTransitioning = false;
@@ -134,73 +122,11 @@ export function browserPluginFactory(
     // Frozen copy of lastKnownState for immutability
     let cachedFrozenState: State | undefined;
 
-    // Options can be changed at runtime in onStart
     /* v8 ignore next -- @preserve fallback for undefined base */
     const getBase = () => options.base ?? "";
     /* v8 ignore next -- @preserve fallback for undefined hashPrefix */
     const hashPrefix = options.hashPrefix ?? "";
-    const escapedHashPrefix = escapeRegExp(hashPrefix);
     const prefix = options.useHash ? `#${hashPrefix}` : "";
-
-    // Pre-compute RegExp patterns
-    const hashPrefixRegExp = escapedHashPrefix
-      ? getCachedRegExp(`^#${escapedHashPrefix}`)
-      : null;
-
-    /**
-     * Parses URL and extracts path using native URL API.
-     * More robust than regex parsing - handles IPv6, Unicode, edge cases.
-     *
-     * @param url - URL to parse
-     * @returns Path string or null on parse error
-     */
-    const urlToPath = (url: string): string | null => {
-      try {
-        // Use URL API for reliable parsing
-        const parsedUrl = new URL(url, globalThis.location.origin);
-        const pathname = parsedUrl.pathname;
-        const hash = parsedUrl.hash;
-        const search = parsedUrl.search;
-        const base = getBase();
-
-        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-          console.warn(`[${LOGGER_CONTEXT}] Invalid URL protocol in ${url}`);
-
-          return null;
-        }
-
-        if (options.useHash) {
-          // Use cached RegExp or simple slice if no prefix
-          const path = hashPrefixRegExp
-            ? hash.replace(hashPrefixRegExp, "")
-            : hash.slice(1);
-
-          return path + search;
-        } else if (base) {
-          // Remove base prefix
-          const escapedBase = escapeRegExp(base);
-          const baseRegExp = getCachedRegExp(`^${escapedBase}`);
-          const stripped = pathname.replace(baseRegExp, "");
-
-          return (stripped.startsWith("/") ? "" : "/") + stripped + search;
-        }
-
-        return pathname + search;
-      } catch (error) {
-        // Graceful fallback instead of throw
-        console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
-
-        return null;
-      }
-    };
-
-    /**
-     * Overrides router.start to integrate with browser location.
-     * When no path is provided, resolves current browser URL automatically.
-     */
-    router.start = (path?: string) => {
-      return routerStart(path ?? browser.getLocation(options));
-    };
 
     /**
      * Builds URL from route name and params.
@@ -225,14 +151,14 @@ export function browserPluginFactory(
     router.buildUrl = (route, params) => {
       const path = router.buildPath(route, params);
 
-      return getBase() + prefix + path;
+      return buildUrl(path, getBase(), prefix);
     };
 
     /**
      * Matches URL and returns corresponding state
      */
     router.matchUrl = (url) => {
-      const path = urlToPath(url);
+      const path = urlToPath(url, options, regExpCache);
 
       return path ? api.matchPath(path) : undefined;
     };
@@ -469,8 +395,7 @@ export function browserPluginFactory(
           removePopStateListener = undefined;
         }
 
-        // Restore original router methods
-        router.start = routerStart;
+        removeStartInterceptor();
 
         // Clean up added properties
         delete (router as Partial<Router>).buildUrl;
