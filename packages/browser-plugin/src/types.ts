@@ -175,22 +175,7 @@ export interface Browser {
     path: string,
   ) => void;
 
-  /**
-   * Adds popstate/hashchange event listeners.
-   * Overloaded to support both PopStateEvent and HashChangeEvent.
-   *
-   * @param fn - Event handler
-   * @param opts - Plugin options
-   * @returns Cleanup function to remove listeners
-   */
-  addPopstateListener: ((
-    fn: (evt: PopStateEvent) => void,
-    opts: BrowserPluginOptions,
-  ) => () => void) &
-    ((
-      fn: (evt: HashChangeEvent) => void,
-      opts: BrowserPluginOptions,
-    ) => () => void);
+  addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
 
   /**
    * Gets current location path respecting plugin options
@@ -235,4 +220,12 @@ export interface URLParseOptions {
 
 export interface RegExpCache {
   get: (pattern: string) => RegExp;
+}
+
+/**
+ * Shared mutable state across BrowserPlugin instances created by the same factory.
+ * Enables cleanup of a previous instance's popstate listener when the factory is reused.
+ */
+export interface SharedFactoryState {
+  removePopStateListener: (() => void) | undefined;
 }

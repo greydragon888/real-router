@@ -54,7 +54,7 @@ describe("Browser API", () => {
     });
 
     it("adds popstate listener and returns cleanup function", () => {
-      const cleanup = safeBrowser.addPopstateListener(handler, {});
+      const cleanup = safeBrowser.addPopstateListener(handler);
 
       globalThis.dispatchEvent(new PopStateEvent("popstate"));
 
@@ -65,42 +65,6 @@ describe("Browser API", () => {
       globalThis.dispatchEvent(new PopStateEvent("popstate"));
 
       expect(handler).toHaveBeenCalledTimes(1); // Not called after cleanup
-    });
-
-    it("adds hashchange listener for Trident + useHash", () => {
-      Object.defineProperty(globalThis.navigator, "userAgent", {
-        value: "Trident",
-        configurable: true,
-      });
-
-      const hashHandler = vi.fn();
-      const cleanup = safeBrowser.addPopstateListener(hashHandler, {
-        useHash: true,
-      });
-
-      globalThis.dispatchEvent(new HashChangeEvent("hashchange"));
-
-      expect(hashHandler).toHaveBeenCalled();
-
-      cleanup();
-    });
-
-    it("does not add hashchange for modern browsers with useHash", () => {
-      Object.defineProperty(globalThis.navigator, "userAgent", {
-        value: "Chrome",
-        configurable: true,
-      });
-
-      const addEventSpy = vi.spyOn(globalThis, "addEventListener");
-
-      safeBrowser.addPopstateListener(vi.fn(), { useHash: true });
-
-      // Only popstate should be added, not hashchange
-      expect(addEventSpy).toHaveBeenCalledTimes(1);
-      expect(addEventSpy).toHaveBeenCalledWith(
-        "popstate",
-        expect.any(Function),
-      );
     });
   });
 
@@ -222,35 +186,6 @@ describe("Browser API", () => {
   });
 
   describe("SSR / non-browser environment", () => {
-    it("supportsPopStateOnHashChange returns false when window becomes undefined after creation (line 28)", () => {
-      // Create browser while window exists (gets the real browser implementation)
-      const realBrowser = createSafeBrowser();
-
-      // Store original window
-      const originalWindow = globalThis.window;
-
-      // Note: supportsPopStateOnHashChange has a defensive check for `typeof window === "undefined"`
-      // This is unreachable in practice because if we have the real browser, window must exist.
-      // We can't delete window and call addPopstateListener because it uses window.addEventListener.
-      // This is intentionally defensive code - we mark it as covered via this comment test
-      // that documents the expected behavior.
-
-      // The test verifies the normal path works correctly:
-      const handler = vi.fn();
-      const cleanup = realBrowser.addPopstateListener(handler, {
-        useHash: true,
-      });
-
-      globalThis.dispatchEvent(new PopStateEvent("popstate"));
-
-      expect(handler).toHaveBeenCalled();
-
-      cleanup();
-
-      // Restore for other tests
-      globalThis.window = originalWindow;
-    });
-
     it("returns fallback browser with warnings", () => {
       const originalWindow = globalThis.window;
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -303,7 +238,7 @@ describe("Browser API", () => {
       const fallbackBrowser = createSafeBrowser();
 
       // addPopstateListener should return a cleanup function that does nothing
-      const cleanup = fallbackBrowser.addPopstateListener(vi.fn(), {});
+      const cleanup = fallbackBrowser.addPopstateListener(vi.fn());
 
       expect(cleanup).toBeInstanceOf(Function);
       expect(() => {
@@ -480,7 +415,7 @@ describe("Browser API", () => {
     describe("addPopstateListener cleanup", () => {
       it("handles multiple cleanup calls safely", () => {
         const handler = vi.fn();
-        const cleanup = safeBrowser.addPopstateListener(handler, {});
+        const cleanup = safeBrowser.addPopstateListener(handler);
 
         cleanup();
         cleanup(); // Should not throw
@@ -489,42 +424,6 @@ describe("Browser API", () => {
         globalThis.dispatchEvent(new PopStateEvent("popstate"));
 
         expect(handler).not.toHaveBeenCalled();
-      });
-
-      it("removes both popstate and hashchange for old IE", () => {
-        const removeEventSpy = vi.spyOn(globalThis, "removeEventListener");
-
-        // Mock old IE browser
-        const originalUserAgent = globalThis.navigator.userAgent;
-
-        Object.defineProperty(globalThis.navigator, "userAgent", {
-          value: "Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0)",
-          configurable: true,
-        });
-
-        const handler = vi.fn();
-        const cleanup = safeBrowser.addPopstateListener(handler, {
-          useHash: true,
-        });
-
-        cleanup();
-
-        expect(removeEventSpy).toHaveBeenCalledWith(
-          "popstate",
-          expect.any(Function),
-        );
-        expect(removeEventSpy).toHaveBeenCalledWith(
-          "hashchange",
-          expect.any(Function),
-        );
-
-        // Restore
-        Object.defineProperty(globalThis.navigator, "userAgent", {
-          value: originalUserAgent,
-          configurable: true,
-        });
-
-        removeEventSpy.mockRestore();
       });
     });
 

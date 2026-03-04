@@ -4,7 +4,7 @@ import { logger } from "@real-router/logger";
 import { isHistoryState } from "type-guards";
 
 import { LOGGER_CONTEXT } from "./constants";
-import { escapeRegExp } from "./utils";
+import { createRegExpCache, extractPath } from "./url-utils";
 
 import type { Browser, BrowserPluginOptions, HistoryState } from "./types";
 import type { State } from "@real-router/core";
@@ -16,30 +16,6 @@ const NOOP = (): void => {};
  * Returns current base path from browser location
  */
 const getBase = () => globalThis.location.pathname;
-
-/**
- * Detects if browser supports popstate events on hash changes.
- * Old IE (Trident engine) doesn't fire popstate on hashchange.
- * Uses memoization based on userAgent for performance while remaining testable.
- */
-const supportsPopStateOnHashChange = (() => {
-  let cachedUserAgent: string | undefined;
-  let cachedResult = false;
-
-  return (): boolean => {
-    // Note: This function is only called from real browser's addPopstateListener,
-    // never from fallback browser (SSR), so window is guaranteed to exist
-    const currentUserAgent = globalThis.navigator.userAgent;
-
-    // Only recalculate if userAgent changed (or first call)
-    if (currentUserAgent !== cachedUserAgent) {
-      cachedUserAgent = currentUserAgent;
-      cachedResult = !currentUserAgent.includes("Trident");
-    }
-
-    return cachedResult;
-  };
-})();
 
 /**
  * Pushes new state to browser history
@@ -59,96 +35,25 @@ const replaceState = (
   globalThis.history.replaceState(state, title ?? "", path);
 };
 
-/**
- * Adds popstate/hashchange event listeners based on browser capabilities
- *
- * @param fn - Event handler function
- * @param opts - Browser plugin options
- * @returns Cleanup function to remove listeners
- */
-const addPopstateListener: Browser["addPopstateListener"] = (fn, opts) => {
-  const needsHashChangeListener =
-    opts.useHash && !supportsPopStateOnHashChange();
-
-  globalThis.addEventListener("popstate", fn as (evt: PopStateEvent) => void);
-
-  if (needsHashChangeListener) {
-    globalThis.addEventListener(
-      "hashchange",
-      fn as (evt: HashChangeEvent) => void,
-    );
-  }
+const addPopstateListener: Browser["addPopstateListener"] = (fn) => {
+  globalThis.addEventListener("popstate", fn);
 
   return () => {
-    globalThis.removeEventListener(
-      "popstate",
-      fn as (evt: PopStateEvent) => void,
-    );
-
-    if (needsHashChangeListener) {
-      globalThis.removeEventListener(
-        "hashchange",
-        fn as (evt: HashChangeEvent) => void,
-      );
-    }
+    globalThis.removeEventListener("popstate", fn);
   };
 };
 
-/**
- * Creates RegExp cache for getLocation optimization
- */
-const createRegExpCache = () => {
-  const cache = new Map<string, RegExp>();
+const regExpCache = createRegExpCache();
 
-  return (pattern: string): RegExp => {
-    let regex = cache.get(pattern);
-
-    if (!regex) {
-      regex = new RegExp(pattern);
-      cache.set(pattern, regex);
-    }
-
-    return regex;
-  };
-};
-
-const getCachedRegExp = createRegExpCache();
-
-/**
- * Gets current location path from browser, respecting plugin options
- *
- * @param opts - Browser plugin options
- * @returns Current path string
- */
 const getLocation = (opts: BrowserPluginOptions) => {
-  const { useHash, hashPrefix = "", base = "" } = opts;
+  const rawPath = extractPath(
+    globalThis.location.pathname,
+    globalThis.location.hash,
+    opts,
+    regExpCache,
+  );
 
-  // Optimization: skip RegExp for empty values
-  if (!hashPrefix && !base) {
-    const rawPath = useHash
-      ? globalThis.location.hash.slice(1)
-      : globalThis.location.pathname;
-    const safePath = safelyEncodePath(rawPath);
-
-    return (safePath || "/") + globalThis.location.search;
-  }
-
-  const escapedHashPrefix = escapeRegExp(hashPrefix);
-  const escapedBase = escapeRegExp(base);
-
-  const rawPath = useHash
-    ? globalThis.location.hash.replace(
-        getCachedRegExp(`^#${escapedHashPrefix}`),
-        "",
-      )
-    : globalThis.location.pathname.replace(
-        getCachedRegExp(`^${escapedBase}`),
-        "",
-      );
-
-  const safePath = safelyEncodePath(rawPath);
-
-  return (safePath || "/") + globalThis.location.search;
+  return safelyEncodePath(rawPath) + globalThis.location.search;
 };
 
 /**

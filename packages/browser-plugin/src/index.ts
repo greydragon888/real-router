@@ -5,7 +5,7 @@
 import type { Params, State } from "@real-router/core";
 
 // Main plugin factory
-export { browserPluginFactory } from "./plugin";
+export { browserPluginFactory } from "./factory";
 
 // Types
 export type { BrowserPluginOptions, Browser, HistoryState } from "./types";
