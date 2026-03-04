@@ -11,7 +11,7 @@ import { validateMakeStateArgs } from "../namespaces/StateNamespace/validators";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
-import type { DefaultDependencies, Router } from "@real-router/types";
+import type { DefaultDependencies, Params, Router } from "@real-router/types";
 
 function throwIfDisposed(isDisposed: () => boolean): void {
   if (isDisposed()) {
@@ -41,7 +41,10 @@ export function getPluginApi<
 
       return ctx.buildStateResolved(name, params);
     },
-    forwardState: (routeName, routeParams) => {
+    forwardState: <P extends Params = Params>(
+      routeName: string,
+      routeParams: P,
+    ) => {
       if (!ctx.noValidate) {
         validateStateBuilderArgs(routeName, routeParams, "forwardState");
       }
@@ -109,19 +112,22 @@ export function getPluginApi<
     },
     getOptions: ctx.getOptions,
     getTree: ctx.getTree,
-    getForwardState: () => ctx.forwardState,
-    setForwardState: (fn) => {
-      ctx.forwardState = fn;
-    },
-    addBuildPathInterceptor: (fn) => {
+    addInterceptor: (method, fn) => {
       throwIfDisposed(ctx.isDisposed);
-      ctx.buildPathInterceptors.push(fn);
+      let list = ctx.interceptors.get(method);
+
+      if (!list) {
+        list = [];
+        ctx.interceptors.set(method, list);
+      }
+
+      list.push(fn);
 
       return () => {
-        const index = ctx.buildPathInterceptors.indexOf(fn);
+        const index = list.indexOf(fn);
 
         if (index !== -1) {
-          ctx.buildPathInterceptors.splice(index, 1);
+          list.splice(index, 1);
         }
       };
     },

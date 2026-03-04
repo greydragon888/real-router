@@ -14,7 +14,7 @@ import { errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
-  applyBuildPathInterceptors,
+  createInterceptable,
   getInternals,
   registerInternals,
 } from "./internals";
@@ -43,6 +43,7 @@ import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
 import { RouterWiringBuilder, wireRouter } from "./wiring";
 
+import type { RouterInternals } from "./internals";
 import type { DependenciesStore } from "./namespaces";
 import type { Limits, PluginFactory, Route, RouterEventMap } from "./types";
 import type {
@@ -206,15 +207,16 @@ export class Router<
     // Register Internals (WeakMap for plugin/infrastructure access)
     // =========================================================================
 
-    const buildPathInterceptors: ((
-      routeName: string,
-      params: Params,
-    ) => Params)[] = [];
+    const interceptorsMap: RouterInternals["interceptors"] = new Map();
 
     registerInternals(this, {
       makeState: (name, params, path, meta, forceId) =>
         this.#state.makeState(name, params, path, meta, forceId),
-      forwardState: (name, params) => this.#routes.forwardState(name, params),
+      forwardState: createInterceptable(
+        "forwardState",
+        (name, params) => this.#routes.forwardState(name, params),
+        interceptorsMap,
+      ),
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
       matchPath: (path, matchOptions) =>
@@ -224,13 +226,24 @@ export class Router<
         this.#navigation.navigateToState(toState, fromState, opts),
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
-      buildPath: (route, params) =>
-        this.#routes.buildPath(
-          route,
-          applyBuildPathInterceptors(buildPathInterceptors, route, params),
-          this.#options.get(),
-        ),
-      buildPathInterceptors,
+      buildPath: createInterceptable(
+        "buildPath",
+        (route: string, params?: Params) =>
+          this.#routes.buildPath(route, params ?? {}, this.#options.get()),
+        interceptorsMap,
+      ),
+      start: createInterceptable(
+        "start",
+        (path: string) => {
+          if (!noValidate) {
+            RouterLifecycleNamespace.validateStartArgs([path]);
+          }
+
+          return this.#lifecycle.start(path);
+        },
+        interceptorsMap,
+      ),
+      interceptors: interceptorsMap,
       setRootPath: (rootPath) => {
         this.#routes.setRootPath(rootPath);
       },
@@ -393,18 +406,13 @@ export class Router<
   }
 
   start(startPath: string): Promise<State> {
-    // Static validation
-    if (!this.#noValidate) {
-      RouterLifecycleNamespace.validateStartArgs([startPath]);
-    }
-
     if (!this.#eventBus.canStart()) {
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
 
     this.#eventBus.sendStart();
 
-    const promiseState = this.#lifecycle
+    const promiseState = getInternals(this)
       .start(startPath)
       .catch((error: unknown) => {
         if (this.#eventBus.isReady()) {

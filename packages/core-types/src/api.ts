@@ -71,20 +71,10 @@ export interface PluginApi {
 
   getTree: () => unknown;
 
-  getForwardState: () => <P extends Params = Params>(
-    routeName: string,
-    routeParams: P,
-  ) => SimpleState<P>;
-
-  setForwardState: (
-    fn: <P extends Params = Params>(
-      routeName: string,
-      routeParams: P,
-    ) => SimpleState<P>,
-  ) => void;
-
-  addBuildPathInterceptor: (
-    fn: (routeName: string, params: Params) => Params,
+  addInterceptor: (
+    method: "start" | "buildPath" | "forwardState",
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic interceptor signature requires any
+    fn: (next: (...args: any[]) => any, ...args: any[]) => any,
   ) => Unsubscribe;
 }
 
