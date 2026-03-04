@@ -27,8 +27,14 @@ export default [
   {
     name: "@real-router/react (ESM)",
     path: "packages/react/dist/esm/index.mjs",
-    limit: "2 kB",
-    ignore: ["react", "react-dom", "@real-router/core", "@real-router/route-utils"],
+    limit: "1.5 kB",
+    ignore: [
+      "react",
+      "react-dom",
+      "@real-router/core",
+      "@real-router/route-utils",
+      "@real-router/stores",
+    ],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -48,6 +54,12 @@ export default [
   {
     name: "@real-router/route-utils (ESM)",
     path: "packages/route-utils/dist/esm/index.mjs",
+    limit: "1 kB",
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "@real-router/stores (ESM)",
+    path: "packages/stores/dist/esm/index.mjs",
     limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
