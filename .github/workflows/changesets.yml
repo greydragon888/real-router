@@ -169,7 +169,11 @@ jobs:
 
       - name: Push git tags
         if: steps.unpublished.outputs.has_unpublished == 'true'
-        run: git push --tags
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          git push --tags
 
       # Create GitHub releases for each published package
       - name: Create GitHub Releases
