@@ -33,8 +33,7 @@ describe("getPluginApi()", () => {
     expect(typeof api.buildNavigationState).toBe("function");
     expect(typeof api.getOptions).toBe("function");
     expect(typeof api.getTree).toBe("function");
-    expect(typeof api.getForwardState).toBe("function");
-    expect(typeof api.setForwardState).toBe("function");
+    expect(typeof api.addInterceptor).toBe("function");
   });
 
   it("should return a new object on each call", () => {
@@ -63,17 +62,18 @@ describe("getPluginApi()", () => {
     expect(result.name).toBe("home");
   });
 
-  it("getForwardState/setForwardState should swap forwardState", () => {
-    const original = api.getForwardState();
-
-    api.setForwardState(((_name: string, params: Record<string, unknown>) => ({
-      name: "users",
-      params,
-    })) as typeof original);
+  it("addInterceptor('forwardState') should wrap forwardState", () => {
+    const unsub = api.addInterceptor(
+      "forwardState",
+      (_next, _name: string, params: Record<string, unknown>) => ({
+        name: "users",
+        params,
+      }),
+    );
 
     expect(api.forwardState("home", {}).name).toBe("users");
 
-    api.setForwardState(original);
+    unsub();
 
     expect(api.forwardState("home", {}).name).toBe("home");
   });
