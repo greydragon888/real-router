@@ -84,9 +84,9 @@ Manages a `Set` of listener functions. Exposes `subscribe`, `getSnapshot`, `dest
 
 ### `computeSnapshot`
 
-Accepts the current snapshot and the incoming `{ route, previousRoute }` pair. Returns the current snapshot by reference if both `route` and `previousRoute` are identical to the values already in the snapshot. Otherwise returns a new snapshot object.
+Accepts the current snapshot, the router, nodeName, and an optional incoming `{ route, previousRoute }` transition. Determines whether the node is active by checking if the current route name equals or starts with `nodeName`. If the node is not active, sets `route` to `undefined`. Returns the current snapshot by reference if both `route` and `previousRoute` are identical to the values already in the snapshot. Otherwise returns a new snapshot object.
 
-This keeps the snapshot reference stable across navigations that don't affect the node, which is the common case for deeply nested route trees.
+This node-scoping logic combined with reference stability keeps the snapshot stable across navigations that don't affect the node, which is the common case for deeply nested route trees.
 
 ### `shouldUpdateCache`
 
@@ -96,7 +96,7 @@ The outer `WeakMap` key is the router instance. Using a `WeakMap` means the cach
 
 The inner `Map` key is the `nodeName` string. The value is the cached `shouldUpdateNode` predicate for that router+nodeName pair.
 
-On first access for a given router+nodeName combination, the predicate is created and sourced. Subsequent calls return the cached predicate directly.
+On first access for a given router+nodeName combination, the predicate is created and stored. Subsequent calls return the cached predicate directly.
 
 ---
 

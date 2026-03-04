@@ -35,7 +35,7 @@ const source = createRouteSource(router);
 
 // Subscribe to route changes
 const unsubscribe = source.subscribe(() => {
-  console.log("Route:", source.getSnapshot().route.name);
+  console.log("Route:", source.getSnapshot().route?.name);
 });
 
 // Clean up when done
@@ -113,7 +113,7 @@ interface RouterSource<T> {
 }
 ```
 
-`subscribe` — registers a listener and returns an unsubscribe function. Compatible with `useSyncExternalSource`.\
+`subscribe` — registers a listener and returns an unsubscribe function. Compatible with `useSyncExternalStore`.\
 `getSnapshot` — returns the current snapshot synchronously.\
 `destroy` — tears down the source and removes the router subscription.
 
@@ -139,16 +139,16 @@ import type {
 
 ## Usage Examples
 
-### With React (`useSyncExternalSource`)
+### With React (`useSyncExternalStore`)
 
 ```typescript
-import { useSyncExternalSource } from "react";
+import { useSyncExternalStore } from "react";
 import { createRouteSource } from "@real-router/sources";
 
 const source = createRouteSource(router);
 
 function CurrentRoute() {
-  const { route } = useSyncExternalSource(
+  const { route } = useSyncExternalStore(
     source.subscribe,
     source.getSnapshot,
   );
