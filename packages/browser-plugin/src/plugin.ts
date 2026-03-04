@@ -1,7 +1,6 @@
 import { isState } from "type-guards";
 
 import { LOGGER_CONTEXT } from "./constants";
-import { buildUrl, urlToPath } from "./url-utils";
 import {
   createStateFromEvent,
   handleMissingState,
@@ -9,6 +8,7 @@ import {
   shouldSkipTransition,
   updateBrowserState,
 } from "./popstate-utils";
+import { buildUrl, urlToPath } from "./url-utils";
 
 import type {
   Browser,

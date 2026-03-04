@@ -7,14 +7,14 @@ import {
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createSafeBrowser } from "../../src/browser";
-import { browserPluginFactory } from "../../src/plugin";
+import { browserPluginFactory } from "../../src/factory";
 import {
   shouldSkipTransition,
   handleMissingState,
   handleTransitionResult,
-  validateOptions,
   createStateFromEvent,
-} from "../../src/utils";
+} from "../../src/popstate-utils";
+import { validateOptions } from "../../src/validation";
 
 import type { Browser } from "../../src/types";
 import type { Router, State } from "@real-router/core";

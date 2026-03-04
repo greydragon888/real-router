@@ -15,7 +15,6 @@ import {
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser";
-import { noop } from "../../src/utils";
 import {
   createTrackingPlugin,
   createStateModifierPlugin,
@@ -27,6 +26,8 @@ import {
 
 import type { Browser, HistoryState } from "../../src/types";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+
+const noop = (): void => undefined;
 
 let router: Router;
 let currentHistoryState: State | undefined;
