@@ -116,7 +116,7 @@ api/ (standalone functions — tree-shakeable, access router via WeakMap)
     ├── getRoutesApi(router)      — route CRUD, addRoute/removeRoute
     ├── getDependenciesApi(router) — dependency CRUD, set/get/remove
     ├── getLifecycleApi(router)   — guard management, addActivateGuard/addDeactivateGuard
-    ├── getPluginApi(router)      — usePlugin/hasPlugin
+    ├── getPluginApi(router)      — plugin infrastructure, interception
     └── cloneRouter(router, deps) — SSR cloning support
 
 wiring/ (construction-time, Builder+Director pattern)
@@ -280,18 +280,32 @@ lifecycle.addActivateGuard("admin", () => (toState, fromState, signal) => {
 
 ### Plugin Interception
 
-Plugins can override facade methods to intercept operations:
+Two interception mechanisms exist in `RouterInternals`, accessed via `getPluginApi()`:
+
+**1. `forwardState` — mutable function replacement (set/get)**
+
+Intercepts state building during navigation. Only one function at a time (last writer wins):
 
 ```typescript
-// Example: persistent-params-plugin intercepts forwardState
-const originalForwardState = router.forwardState;
-router.forwardState = (name, params) => {
-  const result = originalForwardState(name, params);
+const api = getPluginApi(router);
+const originalForwardState = api.getForwardState();
+api.setForwardState((routeName, routeParams) => {
+  const result = originalForwardState(routeName, routeParams);
   return { ...result, params: withPersistentParams(result.params) };
-};
+});
 ```
 
-**Important:** Only facade methods can be intercepted, not namespace methods.
+**2. `addBuildPathInterceptor` — array pipeline (add/remove)**
+
+Intercepts `buildPath` param transformation. Multiple interceptors execute in FIFO order:
+
+```typescript
+const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
+  return { ...params, lang: getCurrentLang() };
+});
+```
+
+Both go through `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
 
 ## State Management
 
@@ -412,7 +426,7 @@ await serverRouter.start(req.url);
 await router.start(window.location.pathname);
 ```
 
-`cloneRouter()` shares immutable route tree (O(1)), copies mutable state (dependencies, options, plugins, guards).
+`cloneRouter()` rebuilds route tree from definitions (each clone gets independent tree), copies mutable state (dependencies, options, plugins, guards).
 
 ## See Also
 

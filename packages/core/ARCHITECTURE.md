@@ -177,6 +177,7 @@ getPluginApi(router): PluginApi;
 // getTree(): RouteTree                                — get compiled route tree
 // getForwardState(): ForwardFn                        — get current forwardState function
 // setForwardState(fn)                                 — replace forwardState (interception)
+// addBuildPathInterceptor(fn): Unsubscribe            — register buildPath param transformer (FIFO pipeline)
 
 cloneRouter(router, deps?): Router;
 // SSR cloning — see "Clone Router" section below
@@ -260,8 +261,9 @@ buildPath(route: string, params?: Params): string {
   if (!this.#noValidate) {
     validateBuildPathArgs(route);           // static validator
   }
-  return this.#routes.buildPath(route, params, this.#options.get()); // delegate
+  return getInternals(this).buildPath(route, params); // delegate via WeakMap
 }
+// internals.buildPath applies interceptor pipeline before RoutesNamespace.buildPath()
 ```
 
 ### WeakMap Internals Registry
@@ -279,13 +281,17 @@ export function getInternals(router: Router): RouterInternals {
 }
 
 // Router constructor
+const buildPathInterceptors = [];          // mutable array — plugin pipeline
+
 registerInternals(this, {
   makeState: (name, params, path, meta, forceId) => this.#state.makeState(...),
   matchPath: (path) => this.#routes.matchPath(...),
-  buildPath: (route, params) => this.#routes.buildPath(...),
+  buildPath: (route, params) =>            // applies interceptor pipeline, then delegates
+    this.#routes.buildPath(route, applyBuildPathInterceptors(buildPathInterceptors, route, params), ...),
+  buildPathInterceptors,                   // shared ref — plugins push/splice via getPluginApi
   forwardState: (name, params) => this.#routes.forwardState(...), // MUTABLE — plugin interception
   buildStateResolved: (name, params) => this.#routes.buildStateResolved(name, params),
-  // ... ~23 fields total
+  // ... ~24 fields total
 });
 
 // api/getRoutesApi.ts
@@ -654,18 +660,36 @@ interface Plugin {
 
 ### Plugin Interception
 
-Plugins can override `internals.forwardState` via `getPluginApi().setForwardState()` for interception:
+Two interception mechanisms exist in `RouterInternals`, accessed via `getPluginApi()`:
+
+**1. `forwardState` — mutable function replacement (set/get)**
+
+Intercepts state building during navigation. Only one function at a time (last writer wins):
 
 ```typescript
-// persistent-params-plugin swaps forwardState for interception
-const originalForwardState = ctx.forwardState;
-ctx.forwardState = (name, params) => {
-  const result = originalForwardState(name, params);
+const originalForwardState = api.getForwardState();
+api.setForwardState((routeName, routeParams) => {
+  const result = originalForwardState(routeName, routeParams);
   return { ...result, params: withPersistentParams(result.params) };
-};
+});
 ```
 
-`internals.forwardState` is the only **mutable** field in `RouterInternals` — specifically designed for plugin interception.
+**2. `addBuildPathInterceptor` — array pipeline (add/remove)**
+
+Intercepts `buildPath` param transformation. Multiple interceptors execute in FIFO order. Each receives `(routeName, params)` and returns transformed `params`:
+
+```typescript
+const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
+  return { ...params, lang: getCurrentLang() };
+});
+// unsubscribe() removes the interceptor
+```
+
+Both go through `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
+
+**Mutable fields in `RouterInternals`:**
+- `forwardState` — function reference, swapped via set/get
+- `buildPathInterceptors` — shared array reference, mutated via push/splice
 
 ## State Management
 
@@ -847,6 +871,7 @@ All limits have configurable bounds (`LIMIT_BOUNDS`) and can be set via `options
 | Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects      |
 | `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements             |
 | FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                  |
+| `applyBuildPathInterceptors` fast path  | Empty-array check skips iteration when no interceptors |
 | Lazy event listeners                    | No allocation until first subscription               |
 
 ## See Also
