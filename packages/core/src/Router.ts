@@ -13,7 +13,11 @@ import { validateRouteName } from "type-guards";
 import { errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
-import { getInternals, registerInternals } from "./internals";
+import {
+  applyBuildPathInterceptors,
+  getInternals,
+  registerInternals,
+} from "./internals";
 import {
   EventBusNamespace,
   NavigationNamespace,
@@ -202,6 +206,11 @@ export class Router<
     // Register Internals (WeakMap for plugin/infrastructure access)
     // =========================================================================
 
+    const buildPathInterceptors: ((
+      routeName: string,
+      params: Params,
+    ) => Params)[] = [];
+
     registerInternals(this, {
       makeState: (name, params, path, meta, forceId) =>
         this.#state.makeState(name, params, path, meta, forceId),
@@ -216,7 +225,12 @@ export class Router<
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
       buildPath: (route, params) =>
-        this.#routes.buildPath(route, params, this.#options.get()),
+        this.#routes.buildPath(
+          route,
+          applyBuildPathInterceptors(buildPathInterceptors, route, params),
+          this.#options.get(),
+        ),
+      buildPathInterceptors,
       setRootPath: (rootPath) => {
         this.#routes.setRootPath(rootPath);
       },
@@ -327,7 +341,7 @@ export class Router<
       validateBuildPathArgs(route);
     }
 
-    return this.#routes.buildPath(route, params, this.#options.get());
+    return getInternals(this).buildPath(route, params);
   }
 
   // ============================================================================

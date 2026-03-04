@@ -131,8 +131,11 @@ export class RouterWiringBuilder<
       },
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),
-      buildPath: (route, params) =>
-        this.routes.buildPath(route, params, this.options.get()),
+      buildPath: (route, params) => {
+        const ctx = getInternals(this.router);
+
+        return ctx.buildPath(route, params);
+      },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name: string) =>
@@ -196,8 +199,11 @@ export class RouterWiringBuilder<
   wireStateDeps(): void {
     this.state.setDependencies({
       getDefaultParams: () => this.routes.getStore().config.defaultParams,
-      buildPath: (name, params) =>
-        this.routes.buildPath(name, params, this.options.get()),
+      buildPath: (name, params) => {
+        const ctx = getInternals(this.router);
+
+        return ctx.buildPath(name, params);
+      },
       getUrlParams: (name) => this.routes.getUrlParams(name),
     });
   }

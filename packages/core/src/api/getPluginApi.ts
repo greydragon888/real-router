@@ -113,5 +113,17 @@ export function getPluginApi<
     setForwardState: (fn) => {
       ctx.forwardState = fn;
     },
+    addBuildPathInterceptor: (fn) => {
+      throwIfDisposed(ctx.isDisposed);
+      ctx.buildPathInterceptors.push(fn);
+
+      return () => {
+        const index = ctx.buildPathInterceptors.indexOf(fn);
+
+        if (index !== -1) {
+          ctx.buildPathInterceptors.splice(index, 1);
+        }
+      };
+    },
   };
 }

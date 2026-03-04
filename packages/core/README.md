@@ -323,11 +323,16 @@ await api.navigateToState(toState, fromState, opts);
 api.setRootPath("/app");
 api.getRootPath(); // "/app"
 
-// Forward state interception (used by persistent-params-plugin)
+// Forward state interception
 api.setForwardState((name, params) => ({ name, params: withPersistent(params) }));
+
+// BuildPath param interception (used by persistent-params-plugin)
+const unsub2 = api.addBuildPathInterceptor((routeName, params) => {
+  return { ...params, lang: getCurrentLang() };
+});
 ```
 
-**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `navigateToState`, `addEventListener`, `getOptions`, `getTree`, `getForwardState`, `setForwardState`
+**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `navigateToState`, `addEventListener`, `getOptions`, `getTree`, `getForwardState`, `setForwardState`, `addBuildPathInterceptor`
 
 ### SSR Cloning — `cloneRouter(router, deps?)`
 
