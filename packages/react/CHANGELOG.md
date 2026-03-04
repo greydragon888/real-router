@@ -1,5 +1,17 @@
 # @real-router/react
 
+## 0.5.1
+
+### Patch Changes
+
+- [#218](https://github.com/greydragon888/real-router/pull/218) [`72019f2`](https://github.com/greydragon888/real-router/commit/72019f282b6b4dc4ba8a15993e19ff0ee97e1df8) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor React hooks to use `@real-router/sources` (#217)
+
+  Internal refactoring: `useRouteNode`, `useIsActiveRoute`, and `RouterProvider` now delegate
+  subscription logic to `@real-router/sources`. No public API changes.
+
+- Updated dependencies [[`72019f2`](https://github.com/greydragon888/real-router/commit/72019f282b6b4dc4ba8a15993e19ff0ee97e1df8)]:
+  - @real-router/sources@0.1.0
+
 ## 0.5.0
 
 ### Minor Changes
