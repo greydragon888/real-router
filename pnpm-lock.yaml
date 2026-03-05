@@ -203,6 +203,9 @@ importers:
       '@testing-library/jest-dom':
         specifier: 6.9.1
         version: 6.9.1
+      browser-env:
+        specifier: workspace:^
+        version: link:../browser-env
       jsdom:
         specifier: 27.4.0
         version: 27.4.0
