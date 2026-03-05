@@ -1,11 +1,6 @@
 // packages/persistent-params-plugin/src/plugin.ts
 
-import {
-  buildQueryString,
-  extractOwnParams,
-  mergeParams,
-  parseQueryString,
-} from "./param-utils";
+import { extractOwnParams, mergeParams } from "./param-utils";
 import { validateParamValue } from "./validation";
 
 import type { Params, PluginApi, State, Plugin } from "@real-router/core";
@@ -33,14 +28,9 @@ export class PersistentParamsPlugin {
 
   getPlugin(): Plugin {
     try {
-      const { basePath, queryString } = parseQueryString(
-        this.#originalRootPath,
-      );
-      const newQueryString = buildQueryString(queryString, [
-        ...this.#paramNamesSet,
-      ]);
+      const queryString = [...this.#paramNamesSet].join("&");
 
-      this.#api.setRootPath(`${basePath}?${newQueryString}`);
+      this.#api.setRootPath(`${this.#originalRootPath}?${queryString}`);
     } /* v8 ignore start -- @preserve: defensive error wrapping for setRootPath failure */ catch (error) {
       throw new Error(
         `[@real-router/persistent-params-plugin] Failed to update root path: ${error instanceof Error ? error.message : String(error)}`,

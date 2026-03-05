@@ -28,69 +28,6 @@ export function extractOwnParams(params: Params): Params {
 }
 
 /**
- * Parses path into base path and query string components.
- * Handles edge cases like leading ?, multiple ?, empty path.
- *
- * @param path - Path to parse (e.g., "/route?param=value")
- * @returns Object with basePath and queryString
- *
- * @example
- * parseQueryString('/users?page=1') // { basePath: '/users', queryString: 'page=1' }
- * parseQueryString('?existing')     // { basePath: '', queryString: 'existing' }
- * parseQueryString('/path')         // { basePath: '/path', queryString: '' }
- */
-export function parseQueryString(path: string): {
-  basePath: string;
-  queryString: string;
-} {
-  const questionMarkIndex = path.indexOf("?");
-
-  /* v8 ignore start -- @preserve: getRootPath() never contains "?" — only the no-query-string branch is reachable */
-  if (questionMarkIndex === -1) {
-    /* v8 ignore stop */
-    return { basePath: path, queryString: "" };
-  }
-
-  /* v8 ignore start -- @preserve: unreachable through factory — getRootPath() has no "?" */
-  if (questionMarkIndex === 0) {
-    return { basePath: "", queryString: path.slice(1) };
-  }
-
-  return {
-    basePath: path.slice(0, questionMarkIndex),
-    queryString: path.slice(questionMarkIndex + 1),
-  };
-  /* v8 ignore stop */
-}
-
-/**
- * Builds query string from parameter names.
- * Preserves existing query parameters and appends new ones.
- *
- * @param existingQuery - Existing query string (without leading ?)
- * @param paramNames - Parameter names to append
- * @returns Combined query string
- *
- * @example
- * buildQueryString('existing=1', ['mode', 'lang']) // 'existing=1&mode&lang'
- * buildQueryString('', ['mode'])                   // 'mode'
- */
-export function buildQueryString(
-  existingQuery: string,
-  paramNames: readonly string[],
-): string {
-  /* v8 ignore next 3 -- @preserve: factory short-circuits empty params before reaching buildQueryString */
-  if (paramNames.length === 0) {
-    return existingQuery;
-  }
-
-  /* v8 ignore next -- @preserve: getRootPath() never contains query strings */
-  const separator = existingQuery ? "&" : "";
-
-  return existingQuery + separator + paramNames.join("&");
-}
-
-/**
  * Merges persistent and current parameters into a single Params object.
  * Keys explicitly set to `undefined` in current params are removed from result.
  *
