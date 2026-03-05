@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-05]
 
+### @real-router/browser-plugin@0.8.0
+
+### Minor Changes
+
+- [#232](https://github.com/greydragon888/real-router/pull/232) [`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b) Thanks [@greydragon888](https://github.com/greydragon888)! - Migrate `browser-plugin` to use `extendRouter()` for formal router extension (#231)
+
+  Replaces manual property assignment (`router.buildUrl = ...`) and deletion (`delete router.buildUrl`) with the new `extendRouter()` API. Extensions are now automatically cleaned up via the returned unsubscribe function in `teardown`.
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/core@0.34.0
+
+### @real-router/core@0.34.0
+
+### Minor Changes
+
+- [#232](https://github.com/greydragon888/real-router/pull/232) [`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b) Thanks [@greydragon888](https://github.com/greydragon888)! - Implement `extendRouter()` in `getPluginApi()` with conflict detection and dispose cleanup (#231)
+
+  `getPluginApi(router).extendRouter(extensions)` adds properties to the router instance and returns an unsubscribe function that removes them. Throws `PLUGIN_CONFLICT` if any key already exists on the router. `router.dispose()` automatically cleans up any extensions that plugins failed to remove in their `teardown`.
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/types@0.22.0
+
+### @real-router/types@0.22.0
+
+### Minor Changes
+
+- [#232](https://github.com/greydragon888/real-router/pull/232) [`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `extendRouter()` to `PluginApi` interface and `PLUGIN_CONFLICT` error code (#231)
+
+  New `extendRouter(extensions)` method on `PluginApi` allows plugins to formally extend the router instance with conflict detection. New `PLUGIN_CONFLICT` error code thrown when a plugin tries to register a property that already exists on the router.
+
+### @real-router/logger-plugin@0.2.38
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/core@0.34.0
+
+### @real-router/persistent-params-plugin@0.1.37
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/core@0.34.0
+
+### @real-router/react@0.5.4
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/core@0.34.0
+  - @real-router/sources@0.1.3
+  - @real-router/route-utils@0.1.3
+
+### @real-router/route-utils@0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/types@0.22.0
+
+### @real-router/rx@0.1.26
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/core@0.34.0
+
+### @real-router/sources@0.1.3
+
+### Patch Changes
+
+- Updated dependencies [[`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b)]:
+  - @real-router/types@0.22.0
+  - @real-router/route-utils@0.1.3
+
+
 ### @real-router/browser-plugin@0.7.0
 
 ### Minor Changes
