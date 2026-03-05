@@ -2,7 +2,16 @@
 
 /** @type {import("syncpack").RcFile} */
 export default {
-  sortFirst: ["name", "version", "type", "description", "main", "module", "types", "exports"],
+  sortFirst: [
+    "name",
+    "version",
+    "type",
+    "description",
+    "main",
+    "module",
+    "types",
+    "exports",
+  ],
   source: ["package.json", "packages/*/package.json"],
   semverGroups: [
     {
@@ -14,7 +23,15 @@ export default {
     {
       label: "Workspace packages use workspace:^",
       packages: ["**"],
-      dependencies: ["@real-router/*", "core-types", "route-tree", "type-guards", "logger", "search-params"],
+      dependencies: [
+        "@real-router/*",
+        "core-types",
+        "route-tree",
+        "type-guards",
+        "logger",
+        "search-params",
+        "browser-env",
+      ],
       dependencyTypes: ["prod", "dev", "peer"],
       range: "workspace:^",
     },
@@ -56,6 +73,7 @@ export default {
         "search-params",
         "event-emitter",
         "path-matcher",
+        "browser-env",
       ],
       pinVersion: "workspace:^",
       policy: "pinned",

@@ -178,6 +178,19 @@ importers:
         specifier: 4.0.18
         version: 4.0.18(@types/node@25.3.3)(@vitest/ui@4.0.18)(jiti@2.6.1)(jsdom@27.4.0)(terser@5.46.0)
 
+  packages/browser-env:
+    dependencies:
+      '@real-router/logger':
+        specifier: workspace:^
+        version: link:../logger
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      jsdom:
+        specifier: 27.4.0
+        version: 27.4.0
+
   packages/browser-plugin:
     dependencies:
       '@real-router/core':
