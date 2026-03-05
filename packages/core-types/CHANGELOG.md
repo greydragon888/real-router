@@ -1,5 +1,17 @@
 # @real-router/types
 
+## 0.21.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `InterceptableMethodMap` and `InterceptorFn` generic types (#224)
+
+  New generic types for type-safe interceptor registration. `InterceptableMethodMap` maps interceptable method names to their argument types, and `InterceptorFn<M>` provides the correctly-typed interceptor function signature for each method.
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `navigateToState` from `PluginApi` interface (#227)
+
+  **BREAKING CHANGE:** `navigateToState` has been removed from the `PluginApi` interface. Plugins should use `router.navigate()` instead.
+
 ## 0.20.0
 
 ### Minor Changes

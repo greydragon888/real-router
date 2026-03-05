@@ -1,5 +1,16 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.36
+
+### Patch Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor into class-based architecture (#226)
+
+  Internal refactoring: replaced monolithic factory closure with `PersistentParamsPlugin` class, migrated from legacy per-method interceptors to `addInterceptor` API, removed dead code and monkey-patching relics.
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
 ## 0.1.35
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @real-router/react
 
+## 0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+  - @real-router/sources@0.1.2
+  - @real-router/route-utils@0.1.2
+
 ## 0.5.2
 
 ### Patch Changes
