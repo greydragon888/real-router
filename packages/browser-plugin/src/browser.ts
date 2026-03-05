@@ -11,30 +11,18 @@ import {
   createHistoryFallbackBrowser,
 } from "browser-env";
 
-import { createRegExpCache, extractPath } from "./url-utils";
+import { extractPath } from "./url-utils";
 
-import type { Browser, BrowserPluginOptions, URLParseOptions } from "./types";
+import type { Browser } from "./types";
 
-const regExpCache = createRegExpCache();
-
-const getLocation = (opts: BrowserPluginOptions) => {
-  const rawPath = extractPath(
-    globalThis.location.pathname,
-    globalThis.location.hash,
-    opts as URLParseOptions,
-    regExpCache,
-  );
-
-  return safelyEncodePath(rawPath) + globalThis.location.search;
-};
-
-/**
- * Creates browser API abstraction that works in both browser and SSR environments
- *
- * @returns Browser API object
- */
-export function createSafeBrowser(): Browser {
+export function createSafeBrowser(base: string): Browser {
   if (isBrowserEnvironment()) {
+    const getLocation = () => {
+      const rawPath = extractPath(globalThis.location.pathname, base);
+
+      return safelyEncodePath(rawPath) + globalThis.location.search;
+    };
+
     return {
       pushState,
       replaceState,

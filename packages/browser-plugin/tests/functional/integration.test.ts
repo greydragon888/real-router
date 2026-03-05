@@ -35,7 +35,7 @@ let mockedBrowser: Browser;
 let unsubscribe: Unsubscribe | undefined;
 
 const createMockedBrowser = (): Browser => {
-  const safeBrowser = createSafeBrowser();
+  const safeBrowser = createSafeBrowser("");
 
   return {
     ...safeBrowser,

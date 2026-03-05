@@ -7,9 +7,7 @@ import { buildUrl, urlToPath } from "./url-utils";
 import type {
   Browser,
   BrowserPluginOptions,
-  RegExpCache,
   SharedFactoryState,
-  URLParseOptions,
 } from "./types";
 import type {
   NavigationOptions,
@@ -23,10 +21,8 @@ import type {
 export class BrowserPlugin {
   readonly #router: Router;
   readonly #api: PluginApi;
-  readonly #options: BrowserPluginOptions;
+  readonly #options: Required<BrowserPluginOptions>;
   readonly #browser: Browser;
-  readonly #regExpCache: RegExpCache;
-  readonly #prefix: string;
   readonly #transitionOptions: {
     source: string;
     replace: true;
@@ -42,9 +38,8 @@ export class BrowserPlugin {
   constructor(
     router: Router,
     api: PluginApi,
-    options: BrowserPluginOptions,
+    options: Required<BrowserPluginOptions>,
     browser: Browser,
-    regExpCache: RegExpCache,
     transitionOptions: {
       source: string;
       replace: true;
@@ -56,35 +51,22 @@ export class BrowserPlugin {
     this.#api = api;
     this.#options = options;
     this.#browser = browser;
-    this.#regExpCache = regExpCache;
     this.#transitionOptions = transitionOptions;
     this.#shared = shared;
 
-    const normalizedOptions = options as URLParseOptions;
-
-    this.#prefix = options.useHash ? `#${normalizedOptions.hashPrefix}` : "";
-
     this.#removeStartInterceptor = this.#api.addInterceptor(
       "start",
-      (next, path) => next(path ?? this.#browser.getLocation(this.#options)),
+      (next, path) => next(path ?? this.#browser.getLocation()),
     );
 
     this.#removeExtensions = this.#api.extendRouter({
       buildUrl: (route: string, params?: Params) => {
         const path = this.#router.buildPath(route, params);
 
-        return buildUrl(
-          path,
-          (this.#options as URLParseOptions).base,
-          this.#prefix,
-        );
+        return buildUrl(path, this.#options.base);
       },
       matchUrl: (url: string) => {
-        const path = urlToPath(
-          url,
-          this.#options as URLParseOptions,
-          this.#regExpCache,
-        );
+        const path = urlToPath(url, this.#options.base);
 
         return path ? this.#api.matchPath(path) : undefined;
       },
@@ -145,8 +127,7 @@ export class BrowserPlugin {
         const url = this.#router.buildUrl(toState.name, toState.params);
 
         const shouldPreserveHash =
-          !!this.#options.preserveHash &&
-          (!fromState || fromState.path === toState.path);
+          !fromState || fromState.path === toState.path;
 
         const finalUrl = shouldPreserveHash
           ? url + this.#browser.getHash()
@@ -195,12 +176,7 @@ export class BrowserPlugin {
     this.#isTransitioning = true;
 
     try {
-      const route = getRouteFromEvent(
-        evt,
-        this.#api,
-        this.#browser,
-        this.#options,
-      );
+      const route = getRouteFromEvent(evt, this.#api, this.#browser);
 
       // eslint-disable-next-line unicorn/prefer-ternary
       if (route) {

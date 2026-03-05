@@ -2,54 +2,21 @@
 
 import { LOGGER_CONTEXT } from "./constants";
 
-import type { URLParseOptions, RegExpCache } from "./types";
+export function extractPath(pathname: string, base: string): string {
+  if (base) {
+    if (pathname.startsWith(base)) {
+      const stripped = pathname.slice(base.length);
 
-const escapeRegExpCache = new Map<string, string>();
+      return stripped.startsWith("/") ? stripped : `/${stripped}`;
+    }
 
-export const escapeRegExp = (str: string): string => {
-  const cached = escapeRegExpCache.get(str);
-
-  if (cached !== undefined) {
-    return cached;
-  }
-
-  const escaped = str.replaceAll(/[$()*+.?[\\\]^{|}-]/g, String.raw`\$&`);
-
-  escapeRegExpCache.set(str, escaped);
-
-  return escaped;
-};
-
-export function extractPath(
-  pathname: string,
-  hash: string,
-  options: URLParseOptions,
-  regExpCache: RegExpCache,
-): string {
-  if (options.useHash) {
-    const escapedHashPrefix = escapeRegExp(options.hashPrefix);
-    const path = escapedHashPrefix
-      ? hash.replace(regExpCache.get(`^#${escapedHashPrefix}`), "")
-      : hash.slice(1);
-
-    return path || "/";
-  }
-
-  if (options.base) {
-    const escapedBase = escapeRegExp(options.base);
-    const stripped = pathname.replace(regExpCache.get(`^${escapedBase}`), "");
-
-    return stripped.startsWith("/") ? stripped : `/${stripped}`;
+    return pathname;
   }
 
   return pathname;
 }
 
-export function urlToPath(
-  url: string,
-  options: URLParseOptions,
-  regExpCache: RegExpCache,
-): string | null {
+export function urlToPath(url: string, base: string): string | null {
   try {
     const parsedUrl = new URL(url, globalThis.location.origin);
 
@@ -59,10 +26,7 @@ export function urlToPath(
       return null;
     }
 
-    return (
-      extractPath(parsedUrl.pathname, parsedUrl.hash, options, regExpCache) +
-      parsedUrl.search
-    );
+    return extractPath(parsedUrl.pathname, base) + parsedUrl.search;
   } catch (error) {
     console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
 
@@ -70,26 +34,6 @@ export function urlToPath(
   }
 }
 
-export function buildUrl(path: string, base: string, prefix: string): string {
-  return base + prefix + path;
-}
-
-export function createRegExpCache(): RegExpCache {
-  const cache = new Map<string, RegExp>();
-
-  return {
-    get(pattern: string): RegExp {
-      const cached = cache.get(pattern);
-
-      if (cached !== undefined) {
-        return cached;
-      }
-
-      const newRegExp = new RegExp(pattern);
-
-      cache.set(pattern, newRegExp);
-
-      return newRegExp;
-    },
-  };
+export function buildUrl(path: string, base: string): string {
+  return base + path;
 }

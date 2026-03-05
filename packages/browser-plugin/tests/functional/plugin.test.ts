@@ -24,7 +24,7 @@ let mockedBrowser: Browser;
 let unsubscribe: Unsubscribe | undefined;
 
 const createMockedBrowser = (): Browser => {
-  const safeBrowser = createSafeBrowser();
+  const safeBrowser = createSafeBrowser("");
 
   return {
     ...safeBrowser,
@@ -88,7 +88,7 @@ describe("Browser Plugin", async () => {
   describe("Core URL Operations", () => {
     describe("buildUrl", () => {
       it("builds URL without hash or base", async () => {
-        router.usePlugin(browserPluginFactory({ useHash: false }));
+        router.usePlugin(browserPluginFactory({}));
 
         expect(router.buildUrl("home", {})).toBe("/home");
         expect(router.buildUrl("users.view", { id: "123" })).toBe(
@@ -103,56 +103,16 @@ describe("Browser Plugin", async () => {
         expect(router.buildUrl("users.list", {})).toBe("/app/users/list");
       });
 
-      it("builds URL with hash", async () => {
-        router.usePlugin(browserPluginFactory({ useHash: true }));
-
-        expect(router.buildUrl("home", {})).toBe("#/home");
-        expect(router.buildUrl("users.view", { id: "1" })).toBe(
-          "#/users/view/1",
-        );
-      });
-
-      it("builds URL with hashPrefix", async () => {
-        router.usePlugin(
-          browserPluginFactory({ useHash: true, hashPrefix: "!" }),
-        );
-
-        expect(router.buildUrl("home", {})).toBe("#!/home");
-        expect(router.buildUrl("users.view", { id: "1" })).toBe(
-          "#!/users/view/1",
-        );
-      });
-
-      it("builds URL with base + hash + hashPrefix", async () => {
-        router.usePlugin(
-          browserPluginFactory({
-            base: "/app",
-            useHash: true,
-            hashPrefix: "!",
-          }),
-        );
-
-        expect(router.buildUrl("home", {})).toBe("/app#!/home");
-      });
-
       it("handles special characters in base (escapeRegExp)", async () => {
         router.usePlugin(browserPluginFactory({ base: "/app.test" }));
 
         expect(router.buildUrl("home", {})).toBe("/app.test/home");
       });
-
-      it("handles special characters in hashPrefix (escapeRegExp)", async () => {
-        router.usePlugin(
-          browserPluginFactory({ useHash: true, hashPrefix: "." }),
-        );
-
-        expect(router.buildUrl("home", {})).toBe("#./home");
-      });
     });
 
     describe("matchUrl (URL API)", () => {
       beforeEach(async () => {
-        router.usePlugin(browserPluginFactory({ useHash: false }));
+        router.usePlugin(browserPluginFactory({}));
       });
 
       it("matches standard URL", async () => {
@@ -227,36 +187,6 @@ describe("Browser Plugin", async () => {
           name: "users.view",
           params: { id: "42" },
           path: "/users/view/42",
-        });
-      });
-
-      it("matches hash URL without hashPrefix (line 163 - hashPrefixRegExp null branch)", async () => {
-        router = createRouter(routerConfig, { defaultRoute: "home" });
-        // useHash: true WITHOUT hashPrefix - hashPrefixRegExp will be null
-        router.usePlugin(browserPluginFactory({ useHash: true }));
-
-        const state = router.matchUrl("https://example.com/#/users/list");
-
-        expect(withoutMeta(state!)).toStrictEqual({
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-        });
-      });
-
-      it("matches hash URL with hashPrefix (line 163 - hashPrefixRegExp not null branch)", async () => {
-        router = createRouter(routerConfig, { defaultRoute: "home" });
-        // useHash: true WITH hashPrefix - hashPrefixRegExp will not be null
-        router.usePlugin(
-          browserPluginFactory({ useHash: true, hashPrefix: "!" }),
-        );
-
-        const state = router.matchUrl("https://example.com/#!/users/list");
-
-        expect(withoutMeta(state!)).toStrictEqual({
-          name: "users.list",
-          params: {},
-          path: "/users/list",
         });
       });
 
@@ -762,106 +692,10 @@ describe("Browser Plugin", async () => {
     });
 
     describe("Configuration Validation", () => {
-      it("physically removes preserveHash in hash mode", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        // Pass conflicting options
-        const plugin = browserPluginFactory(
-          { useHash: true, preserveHash: true } as any,
-          mockedBrowser,
-        );
-
-        // Apply plugin to access internal options
-        router.usePlugin(plugin);
-        await router.start();
-
-        // Verify warning was shown
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("preserveHash ignored in hash mode"),
-        );
-
-        // Verify preserveHash doesn't affect behavior
-        // (it should be deleted, so hash preservation shouldn't happen)
-        const url = router.buildUrl("home", {});
-
-        expect(url).toBe("#/home"); // No hash preservation
-
-        consoleSpy.mockRestore();
-      });
-
-      it("physically removes hashPrefix in history mode", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        // Pass conflicting options
-        router.usePlugin(
-          browserPluginFactory(
-            { useHash: false, hashPrefix: "!" } as any,
-            mockedBrowser,
-          ),
-        );
-        await router.start();
-
-        // Verify warning was shown
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("hashPrefix ignored in history mode"),
-        );
-
-        // Verify hashPrefix doesn't affect behavior
-        const url = router.buildUrl("home", {});
-
-        expect(url).toBe("/home"); // No hash prefix
-
-        consoleSpy.mockRestore();
-      });
-
-      it("warns when preserveHash is used with hash mode", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        router.usePlugin(
-          browserPluginFactory({ useHash: true, preserveHash: true } as any),
-        );
-
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("preserveHash ignored in hash mode"),
-        );
-
-        consoleSpy.mockRestore();
-      });
-
-      it("warns when hashPrefix is used with history mode", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        router.usePlugin(
-          browserPluginFactory({ useHash: false, hashPrefix: "!" } as any),
-        );
-
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("hashPrefix ignored in history mode"),
-        );
-
-        consoleSpy.mockRestore();
-      });
-
-      it("does not warn for valid hash mode configuration", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        router.usePlugin(
-          browserPluginFactory({ useHash: true, hashPrefix: "!" }),
-        );
-
-        expect(consoleSpy).not.toHaveBeenCalledWith(
-          expect.stringContaining("ignored"),
-        );
-
-        consoleSpy.mockRestore();
-      });
-
       it("does not warn for valid history mode configuration", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
 
-        router.usePlugin(
-          browserPluginFactory({ useHash: false, preserveHash: true }),
-        );
+        router.usePlugin(browserPluginFactory({}));
 
         expect(consoleSpy).not.toHaveBeenCalledWith(
           expect.stringContaining("ignored"),
@@ -870,40 +704,11 @@ describe("Browser Plugin", async () => {
         consoleSpy.mockRestore();
       });
 
-      it("does not warn when only useHash is provided", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        router.usePlugin(browserPluginFactory({ useHash: true }));
-
-        expect(consoleSpy).not.toHaveBeenCalledWith(
-          expect.stringContaining("ignored"),
-        );
-
-        consoleSpy.mockRestore();
-      });
-
-      it("validates option types and warns on invalid types", async () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        router.usePlugin(
-          browserPluginFactory({
-            useHash: "true" as any, // Wrong type: string instead of boolean
-            base: 123 as any, // Wrong type: number instead of string
-          }),
-        );
-
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining(
-            "Invalid type for 'useHash': expected boolean, got string",
-          ),
-        );
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining(
-            "Invalid type for 'base': expected string, got number",
-          ),
-        );
-
-        consoleSpy.mockRestore();
+      it("validates option types throw on invalid types", () => {
+        expect(() => browserPluginFactory({ base: 123 as any })).toThrowError();
+        expect(() =>
+          browserPluginFactory({ forceDeactivate: "true" as any }),
+        ).toThrowError();
       });
 
       it("does not warn for correct option types", async () => {
@@ -911,8 +716,6 @@ describe("Browser Plugin", async () => {
 
         router.usePlugin(
           browserPluginFactory({
-            useHash: true,
-            hashPrefix: "!",
             base: "/app",
             forceDeactivate: false,
           }),
@@ -923,6 +726,18 @@ describe("Browser Plugin", async () => {
         );
 
         consoleSpy.mockRestore();
+      });
+
+      it("throws Error with message for invalid base type", () => {
+        expect(() => browserPluginFactory({ base: 123 as any })).toThrowError(
+          /base.*string.*number/,
+        );
+      });
+
+      it("throws Error with message for invalid forceDeactivate type", () => {
+        expect(() =>
+          browserPluginFactory({ forceDeactivate: "true" as any }),
+        ).toThrowError(/forceDeactivate.*boolean.*string/);
       });
     });
 
@@ -1104,31 +919,6 @@ describe("Browser Plugin", async () => {
 
         expect(state).toBeDefined();
         expect(state?.params.id).toBe("John Doe");
-      });
-
-      it("handles complex base + hash + prefix combination", async () => {
-        router = createRouter(routerConfig, { defaultRoute: "home" });
-        router.usePlugin(
-          browserPluginFactory({
-            base: "/app",
-            useHash: true,
-            hashPrefix: "!",
-          }),
-        );
-
-        const url = router.buildUrl("users.view", { id: "123" });
-
-        expect(url).toBe("/app#!/users/view/123");
-
-        const state = router.matchUrl(
-          "https://example.com/app#!/users/view/123",
-        );
-
-        expect(withoutMeta(state!)).toStrictEqual({
-          name: "users.view",
-          params: { id: "123" },
-          path: "/users/view/123",
-        });
       });
 
       it("handles URL with port number", async () => {
@@ -1364,15 +1154,13 @@ describe("Browser Plugin", async () => {
         await router.start();
       });
 
-      it("handles preserveHash option on initial navigation", async () => {
+      it("preserves hash on initial navigation", async () => {
         router.stop();
         unsubscribe?.();
 
         globalThis.location.hash = "#section";
 
-        router.usePlugin(
-          browserPluginFactory({ preserveHash: true }, mockedBrowser),
-        );
+        router.usePlugin(browserPluginFactory({}, mockedBrowser));
 
         const state = await router.start();
 
@@ -1689,7 +1477,7 @@ describe("Browser Plugin", async () => {
           defaultRoute: "home",
         });
 
-        ssrRouter.usePlugin(browserPluginFactory({ preserveHash: true }));
+        ssrRouter.usePlugin(browserPluginFactory({}));
 
         await ssrRouter.start();
 
@@ -1734,47 +1522,20 @@ describe("Browser Plugin", async () => {
   });
 
   describe("Validation Edge Cases", () => {
-    it("skips validation when opts is undefined (validation.ts line 35)", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+    it("skips validation when opts is undefined (no throw)", () => {
+      expect(() => browserPluginFactory()).not.toThrowError();
 
       router.usePlugin(browserPluginFactory());
-
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Invalid type"),
-      );
-
-      consoleSpy.mockRestore();
     });
 
-    it("ignores unknown option keys (validation.ts line 41 else branch)", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+    it("ignores unknown option keys (no throw on unknown key)", () => {
+      expect(() =>
+        browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
+      ).not.toThrowError();
 
       router.usePlugin(
         browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
       );
-
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("Invalid type"),
-      );
-
-      consoleSpy.mockRestore();
-    });
-
-    it("does not warn when hashPrefix is empty string in history mode (validation.ts line 60)", () => {
-      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-      router.usePlugin(
-        browserPluginFactory(
-          { useHash: false, hashPrefix: "" } as any,
-          mockedBrowser,
-        ),
-      );
-
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        expect.stringContaining("hashPrefix ignored"),
-      );
-
-      consoleSpy.mockRestore();
     });
   });
 
