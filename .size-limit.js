@@ -85,13 +85,13 @@ export default [
   {
     name: "path-matcher (ESM)",
     path: "packages/path-matcher/dist/esm/index.mjs",
-    limit: "4 kB",
+    limit: "3.5 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
     name: "route-tree (ESM)",
     path: "packages/route-tree/dist/esm/index.mjs",
-    limit: "6.5 kB",
+    limit: "6 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -103,13 +103,13 @@ export default [
   {
     name: "type-guards (ESM)",
     path: "packages/type-guards/dist/esm/index.mjs",
-    limit: "1.5 kB",
+    limit: "1.1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
     name: "event-emitter (ESM)",
     path: "packages/event-emitter/dist/esm/index.mjs",
-    limit: "2 kB",
+    limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
 ];
