@@ -761,86 +761,6 @@ describe("Browser Plugin", async () => {
       });
     });
 
-    describe("lastKnownState Immutability", () => {
-      beforeEach(async () => {
-        unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        await router.start();
-      });
-
-      it("returns cached frozen object on repeated get", async () => {
-        router.replaceHistoryState("home");
-
-        const state1 = router.lastKnownState;
-        const state2 = router.lastKnownState;
-
-        // After optimization: same cached object returned
-        expect(state1).toBe(state2);
-        expect(Object.isFrozen(state1)).toBe(true);
-      });
-
-      it("creates new frozen object when state changes", async () => {
-        await router.navigate("users.list");
-        const state1 = router.lastKnownState;
-
-        await router.navigate("home");
-        const state2 = router.lastKnownState;
-
-        // Different states = different objects
-        expect(state1).not.toBe(state2);
-        expect(state1?.name).toBe("users.list");
-        expect(state2?.name).toBe("home");
-        expect(Object.isFrozen(state1)).toBe(true);
-        expect(Object.isFrozen(state2)).toBe(true);
-      });
-
-      it("prevents mutation of returned state", async () => {
-        router.replaceHistoryState("home");
-
-        const state = router.lastKnownState!;
-
-        expect(() => {
-          (state as any).name = "hacked";
-        }).toThrowError();
-
-        // lastKnownState is set by start() transition, not replaceHistoryState
-        // Browser at "/" matches "index" route
-        expect(state.name).toBe("index");
-      });
-
-      it("returns undefined after teardown", async () => {
-        router.replaceHistoryState("home");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        unsubscribe?.();
-
-        expect(router.lastKnownState).toBeUndefined();
-      });
-
-      it("prevents external mutations", async () => {
-        router.replaceHistoryState("home");
-
-        const state = router.lastKnownState!;
-
-        expect(() => {
-          (state as any).name = "modified";
-        }).toThrowError();
-      });
-
-      it("sets undefined when setting falsy value (line 284)", async () => {
-        router.replaceHistoryState("home");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        // Setting to undefined should set cachedFrozenState to undefined
-        // Type assertion needed due to exactOptionalPropertyTypes
-        (router as unknown as { lastKnownState: undefined }).lastKnownState =
-          undefined;
-
-        expect(router.lastKnownState).toBeUndefined();
-      });
-    });
-
     describe("Configuration Validation", () => {
       it("physically removes preserveHash in hash mode", async () => {
         const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
@@ -1570,26 +1490,6 @@ describe("Browser Plugin", async () => {
         unsubscribe();
 
         expect(removeListenerSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe("Teardown", () => {
-      it("removes lastKnownState property", async () => {
-        const unsubscribe = router.usePlugin(
-          browserPluginFactory({}, mockedBrowser),
-        );
-
-        await router.start();
-
-        await router.navigate("users.list");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        unsubscribe(); // teardown
-
-        expect(router.lastKnownState).toBeUndefined();
-        // After teardown, lastKnownState property is removed from router
-        expect("lastKnownState" in router).toBe(false);
       });
     });
   });

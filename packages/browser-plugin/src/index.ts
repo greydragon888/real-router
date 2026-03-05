@@ -41,12 +41,6 @@ declare module "@real-router/core" {
       title?: string,
     ) => void;
 
-    /**
-     * Last known router state.
-     * Added by browser plugin.
-     */
-    lastKnownState?: State;
-
     start(path?: string): Promise<State>;
   }
 }

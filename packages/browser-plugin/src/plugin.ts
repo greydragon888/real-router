@@ -94,8 +94,6 @@ export class BrowserPlugin {
         fromState: State | undefined,
         navOptions: NavigationOptions,
       ) => {
-        this.#router.lastKnownState = Object.freeze({ ...toState });
-
         const shouldReplaceHistory =
           (navOptions.replace ?? !fromState) ||
           (!!navOptions.reload &&
@@ -183,7 +181,6 @@ export class BrowserPlugin {
     delete (this.#router as Partial<Router>).buildUrl;
     delete (this.#router as Partial<Router>).matchUrl;
     delete (this.#router as Partial<Router>).replaceHistoryState;
-    delete (this.#router as Partial<Router>).lastKnownState;
   }
 
   #processDeferredEvent(): void {

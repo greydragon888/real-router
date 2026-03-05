@@ -11,3 +11,4 @@ Remove legacy artifacts from Browser interface (#228)
 - `pushState` / `replaceState` signature changed from `(state, title, path)` to `(state, path)`
 - `HistoryState` type removed
 - `isHistoryState` no longer re-exported
+- `router.lastKnownState` removed (use `router.getState()`)
