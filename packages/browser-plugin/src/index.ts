@@ -8,10 +8,10 @@ import type { Params, State } from "@real-router/core";
 export { browserPluginFactory } from "./factory";
 
 // Types
-export type { BrowserPluginOptions, Browser, HistoryState } from "./types";
+export type { BrowserPluginOptions, Browser } from "./types";
 
-// Type guards (maybe useful for consumers)
-export { isStateStrict as isState, isHistoryState } from "type-guards";
+// Type guards
+export { isStateStrict as isState } from "type-guards";
 
 /**
  * Module augmentation for real-router.

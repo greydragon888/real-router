@@ -51,7 +51,7 @@ export function browserPluginFactory(
     delete (options as unknown as Record<string, unknown>).hashPrefix;
   }
 
-  if (options.base && typeof options.base === "string") {
+  if (options.base) {
     if (!options.base.startsWith("/")) {
       options.base = `/${options.base}`;
     }

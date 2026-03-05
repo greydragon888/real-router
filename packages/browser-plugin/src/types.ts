@@ -142,23 +142,17 @@ export interface Browser {
    * Pushes new state to browser history
    *
    * @param state - History state object
-   * @param title - Document title (usually ignored by browsers)
    * @param path - URL path
    */
-  pushState: (state: HistoryState, title: string | null, path: string) => void;
+  pushState: (state: State, path: string) => void;
 
   /**
    * Replaces current history state
    *
    * @param state - History state object
-   * @param title - Document title (usually ignored by browsers)
    * @param path - URL path
    */
-  replaceState: (
-    state: HistoryState,
-    title: string | null,
-    path: string,
-  ) => void;
+  replaceState: (state: State, path: string) => void;
 
   addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
 
@@ -177,12 +171,6 @@ export interface Browser {
    */
   getHash: () => string;
 }
-
-/**
- * History state object stored in browser history.
- * Extends real-router State with additional properties that may be set by external code.
- */
-export type HistoryState = State & Record<string, unknown>;
 
 /**
  * Subset of BrowserPluginOptions needed for URL parsing operations.

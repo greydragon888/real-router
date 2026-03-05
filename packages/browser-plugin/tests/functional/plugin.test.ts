@@ -13,7 +13,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser";
 
-import type { Browser, HistoryState } from "../../src/types";
+import type { Browser } from "../../src";
 import type { Router, State, Unsubscribe } from "@real-router/core";
 
 const noop = (): void => undefined;
@@ -28,13 +28,13 @@ const createMockedBrowser = (): Browser => {
 
   return {
     ...safeBrowser,
-    pushState: (state, title, url) => {
+    pushState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.pushState(state, title, url);
+      safeBrowser.pushState(state, url);
     },
-    replaceState: (state, title, url) => {
+    replaceState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.replaceState(state, title, url);
+      safeBrowser.replaceState(state, url);
     },
   };
 };
@@ -290,7 +290,6 @@ describe("Browser Plugin", async () => {
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "index", params: {}, path: "/" }),
-        "",
         "/",
       );
     });
@@ -304,7 +303,6 @@ describe("Browser Plugin", async () => {
 
       expect(mockedBrowser.pushState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users.list" }),
-        "",
         "/users/list",
       );
     });
@@ -575,7 +573,7 @@ describe("Browser Plugin", async () => {
           new TypeError("Critical navigate error"),
         );
 
-        const validState: HistoryState = {
+        const validState: State = {
           name: "home",
           params: {},
           path: "/home",
@@ -611,7 +609,7 @@ describe("Browser Plugin", async () => {
           throw new Error("Recovery error");
         });
 
-        const validState: HistoryState = {
+        const validState: State = {
           name: "home",
           params: {},
           path: "/home",
@@ -1022,7 +1020,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "index" }),
-          "",
           "/",
         );
       });
@@ -1040,7 +1037,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
-          "",
           "/users/list",
         );
       });
@@ -1053,7 +1049,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.pushState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
-          "",
           "/users/list",
         );
       });
@@ -1068,7 +1063,6 @@ describe("Browser Plugin", async () => {
             name: "users.view",
             params: { id: "42" },
           }),
-          "",
           "/users/view/42",
         );
       });

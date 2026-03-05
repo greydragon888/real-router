@@ -11,28 +11,12 @@ import type { State } from "@real-router/core";
 /** No-operation cleanup function for fallback browser */
 const NOOP = (): void => {};
 
-/**
- * Pushes new state to browser history
- */
-const pushState = (state: State, title: string | null, path: string | URL) => {
-  /* v8 ignore next -- @preserve: title is always "" from updateBrowserState, null branch is defensive */
-  const passedTitle = title ?? "";
-
-  globalThis.history.pushState(state, passedTitle, path);
+const pushState = (state: State, path: string) => {
+  globalThis.history.pushState(state, "", path);
 };
 
-/**
- * Replaces current state in browser history
- */
-const replaceState = (
-  state: State,
-  title: string | null,
-  path: string | URL,
-) => {
-  /* v8 ignore next -- @preserve: title is always "" from updateBrowserState, null branch is defensive */
-  const passedTitle = title ?? "";
-
-  globalThis.history.replaceState(state, passedTitle, path);
+const replaceState = (state: State, path: string) => {
+  globalThis.history.replaceState(state, "", path);
 };
 
 const addPopstateListener: Browser["addPopstateListener"] = (fn) => {

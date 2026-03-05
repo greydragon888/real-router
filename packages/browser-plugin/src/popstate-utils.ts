@@ -53,8 +53,8 @@ export function updateBrowserState(
   };
 
   if (replace) {
-    browser.replaceState(historyState, "", url);
+    browser.replaceState(historyState, url);
   } else {
-    browser.pushState(historyState, "", url);
+    browser.pushState(historyState, url);
   }
 }

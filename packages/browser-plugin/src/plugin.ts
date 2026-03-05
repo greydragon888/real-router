@@ -7,7 +7,6 @@ import { buildUrl, urlToPath } from "./url-utils";
 import type {
   Browser,
   BrowserPluginOptions,
-  HistoryState,
   RegExpCache,
   SharedFactoryState,
   URLParseOptions,
@@ -254,7 +253,7 @@ export class BrowserPlugin {
           currentState.params,
         );
 
-        this.#browser.replaceState(currentState as HistoryState, "", url);
+        this.#browser.replaceState(currentState, url);
       }
     } catch (recoveryError) {
       console.error(
