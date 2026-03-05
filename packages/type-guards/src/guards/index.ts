@@ -6,7 +6,7 @@ export { isNavigationOptions } from "./navigation";
 
 export { isRouteName } from "./routes";
 
-export { isState, isStateStrict, isHistoryState } from "./state";
+export { isState, isStateStrict } from "./state";
 
 // Re-export from primitives and params (now in guards/ directory)
 export { isString, isBoolean, isObjKey, isPrimitiveValue } from "./primitives";

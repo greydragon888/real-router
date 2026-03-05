@@ -144,8 +144,7 @@ export const stateFullArbitrary = fc.record({
 }) as fc.Arbitrary<State>;
 
 /**
- * Generator for valid HistoryState (requires non-null meta)
- * Note: Optional fields must not be present (not undefined) to pass isHistoryState validation
+ * Generator for valid State with non-null meta.
  */
 export const historyStateArbitrary = fc
   .record({

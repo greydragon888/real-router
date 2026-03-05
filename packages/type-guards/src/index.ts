@@ -29,7 +29,6 @@ export {
   // State
   isState,
   isStateStrict,
-  isHistoryState,
 } from "./guards";
 
 // ============================================================================

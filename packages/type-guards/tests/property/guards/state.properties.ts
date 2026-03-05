@@ -1,12 +1,11 @@
-import { fc, test } from "@fast-check/vitest";
+import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { isState, isStateStrict, isHistoryState } from "type-guards";
+import { isState, isStateStrict } from "type-guards";
 
 import {
   stateMinimalArbitrary,
   stateFullArbitrary,
-  historyStateArbitrary,
   invalidStateArbitrary,
   arbitraryInvalidTypes,
   paramsSimpleArbitrary,
@@ -175,52 +174,6 @@ describe("State Type Guards Properties", () => {
     });
   });
 
-  describe("isHistoryState", () => {
-    test.prop([historyStateArbitrary], { numRuns: 10_000 })(
-      "returns true for valid HistoryState with meta",
-      (state) => {
-        expect(isHistoryState(state)).toBe(true);
-
-        return true;
-      },
-    );
-
-    test.prop([stateMinimalArbitrary], { numRuns: 10_000 })(
-      "returns false for State without meta",
-      (state) => {
-        // Minimal state doesn't have meta, isHistoryState requires meta
-        expect(isHistoryState(state)).toBe(false);
-
-        return true;
-      },
-    );
-
-    test.prop([invalidStateArbitrary], { numRuns: 10_000 })(
-      "returns false for invalid State",
-      (state) => {
-        expect(isHistoryState(state)).toBe(false);
-
-        return true;
-      },
-    );
-
-    test.prop([arbitraryInvalidTypes], { numRuns: 10_000 })(
-      "returns false for primitives",
-      (value) => {
-        expect(isHistoryState(value)).toBe(false);
-
-        return true;
-      },
-    );
-
-    it("handles null and undefined", () => {
-      expect(isHistoryState(null)).toBe(false);
-      expect(isHistoryState(undefined)).toBe(false);
-
-      return true;
-    });
-  });
-
   describe("Invariants between State guards", () => {
     test.prop([stateFullArbitrary], { numRuns: 10_000 })(
       "isStateStrict(x) implies isState(x)",
@@ -232,44 +185,11 @@ describe("State Type Guards Properties", () => {
         return true;
       },
     );
-
-    test.prop([historyStateArbitrary], { numRuns: 10_000 })(
-      "isState(x) with meta implies isHistoryState(x)",
-      (state) => {
-        // historyStateArbitrary always has meta
-        if (isState(state)) {
-          expect(isHistoryState(state)).toBe(true);
-        }
-
-        return true;
-      },
-    );
-
-    test.prop([fc.anything()], { numRuns: 10_000 })(
-      "!isHistoryState(x) implies !isState(x)",
-      (value) => {
-        if (!isHistoryState(value)) {
-          expect(isState(value)).toBe(false);
-        }
-
-        return true;
-      },
-    );
   });
 
   describe("Edge cases", () => {
     it("State with valid name/path", () => {
-      // isState now validates via isRequiredFields, empty strings are invalid
       expect(isState({ name: "home", path: "", params: {} })).toBe(true);
-      // isHistoryState requires meta
-      expect(
-        isHistoryState({
-          name: "home",
-          path: "",
-          params: {},
-          meta: { id: 0, params: {} },
-        }),
-      ).toBe(true);
 
       return true;
     });

@@ -24,7 +24,6 @@ import "./guards/primitives-string.bench";
 import "./guards/primitives-value.bench";
 import "./guards/routes-name.bench";
 import "./guards/state.bench";
-import "./guards/state-history.bench";
 import "./guards/state-strict.bench";
 import "./validators/routes-name.bench";
 import "./validators/state.bench";

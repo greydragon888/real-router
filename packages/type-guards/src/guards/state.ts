@@ -63,32 +63,3 @@ export function isStateStrict<
 
   return true;
 }
-
-/**
- * Type guard for HistoryState (browser plugin).
- * HistoryState must have meta object with specific structure.
- * This is stricter than regular State validation.
- *
- * @param value - Value to check
- * @returns true if value is a valid HistoryState object
- */
-export function isHistoryState(value: unknown): value is State & {
-  meta: NonNullable<State["meta"]>;
-} {
-  // Basic structure check
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  const obj = value as Record<string, unknown>;
-
-  // Check required fields and their types
-  if (!isRequiredFields(obj)) {
-    return false;
-  }
-
-  // HistoryState requires meta to be present and valid
-  // Note: The check !("meta" in obj) is redundant because isMetaFields(undefined) returns false
-  // However, we keep it for clarity and explicit error semantics
-  return "meta" in obj && isMetaFields(obj.meta);
-}

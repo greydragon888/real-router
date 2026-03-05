@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { isState, isStateStrict, isHistoryState } from "type-guards";
+import { isState, isStateStrict } from "type-guards";
 
 const noop = () => undefined;
 
@@ -143,6 +143,17 @@ describe("State Type Guards", () => {
     });
 
     describe("meta validation", () => {
+      it("accepts empty meta object", () => {
+        const state = {
+          name: "home",
+          params: {},
+          path: "/home",
+          meta: {},
+        };
+
+        expect(isStateStrict(state)).toBe(true);
+      });
+
       it("rejects non-object meta (string)", () => {
         const invalid = {
           name: "home",
@@ -189,194 +200,6 @@ describe("State Type Guards", () => {
         };
 
         expect(isStateStrict(invalid)).toBe(false);
-      });
-    });
-  });
-
-  describe("isHistoryState", () => {
-    it("validates valid history state", () => {
-      const validState = {
-        name: "home",
-        params: {},
-        path: "/home",
-        meta: {
-          id: 1,
-          params: {},
-        },
-      };
-
-      expect(isHistoryState(validState)).toBe(true);
-    });
-
-    it("rejects null and undefined", () => {
-      expect(isHistoryState(null)).toBe(false);
-      expect(isHistoryState(undefined)).toBe(false);
-    });
-
-    it("rejects non-object values", () => {
-      expect(isHistoryState("string")).toBe(false);
-      expect(isHistoryState(123)).toBe(false);
-      expect(isHistoryState(true)).toBe(false);
-      expect(isHistoryState([])).toBe(false);
-    });
-
-    it("rejects state with invalid required fields", () => {
-      // Invalid name type
-      expect(
-        isHistoryState({
-          name: 123,
-          params: {},
-          path: "/home",
-          meta: {},
-        }),
-      ).toBe(false);
-
-      // Invalid path type
-      expect(
-        isHistoryState({
-          name: "home",
-          params: {},
-          path: 123,
-          meta: {},
-        }),
-      ).toBe(false);
-
-      // Invalid params type
-      expect(
-        isHistoryState({
-          name: "home",
-          params: "invalid",
-          path: "/home",
-          meta: {},
-        }),
-      ).toBe(false);
-    });
-
-    it("validates history state with minimal meta", () => {
-      const state = {
-        name: "home",
-        params: {},
-        path: "/home",
-        meta: {},
-      };
-
-      expect(isHistoryState(state)).toBe(true);
-    });
-
-    it("rejects state without meta", () => {
-      const invalid = {
-        name: "home",
-        params: {},
-        path: "/home",
-      };
-
-      expect(isHistoryState(invalid)).toBe(false);
-    });
-
-    it("rejects state with null meta", () => {
-      const invalid = {
-        name: "home",
-        params: {},
-        path: "/home",
-        meta: null,
-      };
-
-      expect(isHistoryState(invalid)).toBe(false);
-    });
-
-    it("rejects state with non-object meta", () => {
-      const invalid = {
-        name: "home",
-        params: {},
-        path: "/home",
-        meta: "invalid",
-      };
-
-      expect(isHistoryState(invalid)).toBe(false);
-    });
-
-    it("validates history state with additional properties", () => {
-      const state = {
-        name: "home",
-        params: {},
-        path: "/home",
-        meta: {
-          id: 1,
-          params: {},
-        },
-        custom: "data", // Additional properties allowed
-      };
-
-      expect(isHistoryState(state)).toBe(true);
-    });
-
-    describe("meta.params field validation (line 157)", () => {
-      it("accepts valid params in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { params: { id: "123" } },
-          }),
-        ).toBe(true);
-      });
-
-      it("rejects invalid params in meta (nested object)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { params: { nested: { invalid: true } } },
-          }),
-        ).toBe(false);
-      });
-
-      it("rejects non-object params in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { params: "invalid" },
-          }),
-        ).toBe(false);
-      });
-    });
-
-    describe("meta.id field validation (line 159)", () => {
-      it("accepts valid id number in meta", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { id: 42 },
-          }),
-        ).toBe(true);
-      });
-
-      it("rejects non-number id in meta (string)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { id: "123" },
-          }),
-        ).toBe(false);
-      });
-
-      it("rejects non-number id in meta (object)", () => {
-        expect(
-          isHistoryState({
-            name: "home",
-            params: {},
-            path: "/home",
-            meta: { id: {} },
-          }),
-        ).toBe(false);
       });
     });
   });
