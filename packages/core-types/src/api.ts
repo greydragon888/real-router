@@ -91,6 +91,8 @@ export interface PluginApi {
     method: M,
     fn: InterceptorFn<M>,
   ) => Unsubscribe;
+
+  extendRouter: (extensions: Record<string, unknown>) => Unsubscribe;
 }
 
 /**

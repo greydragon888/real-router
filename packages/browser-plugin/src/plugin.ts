@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import type {
   NavigationOptions,
+  Params,
   PluginApi,
   Router,
   State,
@@ -36,6 +37,7 @@ export class BrowserPlugin {
   #isTransitioning = false;
   #deferredPopstateEvent: PopStateEvent | null = null;
   readonly #removeStartInterceptor: () => void;
+  readonly #removeExtensions: () => void;
 
   constructor(
     router: Router,
@@ -67,7 +69,48 @@ export class BrowserPlugin {
       (next, path) => next(path ?? this.#browser.getLocation(this.#options)),
     );
 
-    this.#augmentRouter();
+    this.#removeExtensions = this.#api.extendRouter({
+      buildUrl: (route: string, params?: Params) => {
+        const path = this.#router.buildPath(route, params);
+
+        return buildUrl(
+          path,
+          (this.#options as URLParseOptions).base,
+          this.#prefix,
+        );
+      },
+      matchUrl: (url: string) => {
+        const path = urlToPath(
+          url,
+          this.#options as URLParseOptions,
+          this.#regExpCache,
+        );
+
+        return path ? this.#api.matchPath(path) : undefined;
+      },
+      replaceHistoryState: (name: string, params: Params = {}) => {
+        const state = this.#api.buildState(name, params);
+
+        if (!state) {
+          throw new Error(
+            `[real-router] Cannot replace state: route "${name}" is not found`,
+          );
+        }
+
+        const builtState = this.#api.makeState(
+          state.name,
+          state.params,
+          this.#router.buildPath(state.name, state.params),
+          {
+            params: state.meta,
+          },
+          1, // forceId
+        );
+        const url = this.#router.buildUrl(name, params);
+
+        updateBrowserState(builtState, url, true, this.#browser);
+      },
+    });
   }
 
   getPlugin(): Plugin {
@@ -118,69 +161,15 @@ export class BrowserPlugin {
       },
 
       teardown: () => {
-        this.#cleanupAugmentation();
+        if (this.#shared.removePopStateListener) {
+          this.#shared.removePopStateListener();
+          this.#shared.removePopStateListener = undefined;
+        }
+
+        this.#removeStartInterceptor();
+        this.#removeExtensions();
       },
     };
-  }
-
-  #augmentRouter(): void {
-    const router = this.#router;
-
-    router.buildUrl = (route, params) => {
-      const path = router.buildPath(route, params);
-
-      return buildUrl(
-        path,
-        (this.#options as URLParseOptions).base,
-        this.#prefix,
-      );
-    };
-
-    router.matchUrl = (url) => {
-      const path = urlToPath(
-        url,
-        this.#options as URLParseOptions,
-        this.#regExpCache,
-      );
-
-      return path ? this.#api.matchPath(path) : undefined;
-    };
-
-    router.replaceHistoryState = (name, params = {}) => {
-      const state = this.#api.buildState(name, params);
-
-      if (!state) {
-        throw new Error(
-          `[real-router] Cannot replace state: route "${name}" is not found`,
-        );
-      }
-
-      const builtState = this.#api.makeState(
-        state.name,
-        state.params,
-        router.buildPath(state.name, state.params),
-        {
-          params: state.meta,
-        },
-        1, // forceId
-      );
-      const url = router.buildUrl(name, params);
-
-      updateBrowserState(builtState, url, true, this.#browser);
-    };
-  }
-
-  #cleanupAugmentation(): void {
-    if (this.#shared.removePopStateListener) {
-      this.#shared.removePopStateListener();
-      this.#shared.removePopStateListener = undefined;
-    }
-
-    this.#removeStartInterceptor();
-
-    delete (this.#router as Partial<Router>).buildUrl;
-    delete (this.#router as Partial<Router>).matchUrl;
-    delete (this.#router as Partial<Router>).replaceHistoryState;
   }
 
   #processDeferredEvent(): void {

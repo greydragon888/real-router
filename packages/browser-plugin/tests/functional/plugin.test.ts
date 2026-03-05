@@ -1360,7 +1360,7 @@ describe("Browser Plugin", async () => {
 
     describe("Browser State Management", () => {
       beforeEach(async () => {
-        router.usePlugin(browserPluginFactory({}, mockedBrowser));
+        unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
         await router.start();
       });
 

@@ -176,6 +176,16 @@ describe("dispose", () => {
       expect(router.isActive()).toBe(false);
     });
 
+    it("should clean up remaining router extensions on dispose", () => {
+      getPluginApi(router).extendRouter({ testProp: 42 });
+
+      expect("testProp" in router).toBe(true);
+
+      router.dispose();
+
+      expect("testProp" in router).toBe(false);
+    });
+
     it("dispose() clears dependencies", async () => {
       const r = router as Router<{ myDep: string }>;
       const deps = getDependenciesApi(r);

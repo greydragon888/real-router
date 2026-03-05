@@ -121,5 +121,46 @@ export function getPluginApi<
         }
       };
     },
+    extendRouter: (extensions: Record<string, unknown>) => {
+      throwIfDisposed(ctx.isDisposed);
+
+      const keys = Object.keys(extensions);
+
+      for (const key of keys) {
+        if (key in router) {
+          throw new RouterError(errorCodes.PLUGIN_CONFLICT, {
+            message: `Cannot extend router: property "${key}" already exists`,
+          });
+        }
+      }
+
+      for (const key of keys) {
+        (router as Record<string, unknown>)[key] = extensions[key];
+      }
+
+      const extensionRecord = { keys };
+
+      ctx.routerExtensions.push(extensionRecord);
+
+      let removed = false;
+
+      return () => {
+        if (removed) {
+          return;
+        }
+
+        removed = true;
+
+        for (const key of extensionRecord.keys) {
+          delete (router as Record<string, unknown>)[key];
+        }
+
+        const idx = ctx.routerExtensions.indexOf(extensionRecord);
+
+        if (idx !== -1) {
+          ctx.routerExtensions.splice(idx, 1);
+        }
+      };
+    },
   };
 }

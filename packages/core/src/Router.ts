@@ -270,6 +270,7 @@ export class Router<
       setState: (state) => {
         this.#state.set(state);
       },
+      routerExtensions: [],
     });
 
     // =========================================================================
@@ -457,6 +458,18 @@ export class Router<
     this.#eventBus.clearAll();
 
     this.#plugins.disposeAll();
+
+    // Safety net: clean up extensions plugins failed to remove in teardown
+    const ctx = getInternals(this);
+
+    for (const extension of ctx.routerExtensions) {
+      for (const key of extension.keys) {
+        delete (this as Record<string, unknown>)[key];
+      }
+    }
+
+    ctx.routerExtensions.length = 0;
+
     this.#routes.clearRoutes();
     this.#routeLifecycle.clearAll();
     this.#state.reset();
