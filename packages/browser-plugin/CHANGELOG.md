@@ -1,5 +1,28 @@
 # @real-router/browser-plugin
 
+## 0.7.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove legacy artifacts from Browser interface (#228)
+
+  **BREAKING CHANGE:**
+  - `mergeState` option removed from `BrowserPluginOptions`
+  - `browser.getState()` removed from `Browser` interface
+  - `pushState` / `replaceState` signature changed from `(state, title, path)` to `(state, path)`
+  - `HistoryState` type removed
+  - `isHistoryState` no longer re-exported
+  - `router.lastKnownState` removed (use `router.getState()`)
+
+### Patch Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor into class-based architecture with extracted URL utilities (#225)
+
+  Internal refactoring: replaced monolithic factory closure with `BrowserPlugin` class, extracted URL logic into dedicated `url-utils` module, removed IE/Trident dead code, and simplified popstate handling to use `router.navigate()` through the full core pipeline.
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
 ## 0.6.3
 
 ### Patch Changes

@@ -5,6 +5,119 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-05]
+
+### @real-router/browser-plugin@0.7.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove legacy artifacts from Browser interface (#228)
+
+  **BREAKING CHANGE:**
+  - `mergeState` option removed from `BrowserPluginOptions`
+  - `browser.getState()` removed from `Browser` interface
+  - `pushState` / `replaceState` signature changed from `(state, title, path)` to `(state, path)`
+  - `HistoryState` type removed
+  - `isHistoryState` no longer re-exported
+  - `router.lastKnownState` removed (use `router.getState()`)
+
+### Patch Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor into class-based architecture with extracted URL utilities (#225)
+
+  Internal refactoring: replaced monolithic factory closure with `BrowserPlugin` class, extracted URL logic into dedicated `url-utils` module, removed IE/Trident dead code, and simplified popstate handling to use `router.navigate()` through the full core pipeline.
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
+### @real-router/core@0.33.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace per-method interceptor APIs with universal `addInterceptor` (#224)
+
+  **BREAKING CHANGE:** `addBuildPathInterceptor`, `setForwardState`, and `getForwardState` have been replaced with a single `addInterceptor(method, fn)` API. New interceptable method `start` added for browser-plugin to call `router.start()` without arguments.
+
+  **Migration:**
+
+  ```diff
+  - api.addBuildPathInterceptor(fn);
+  + api.addInterceptor('buildPath', (next, route, params) => next(route, modifiedParams));
+
+  - api.setForwardState(fn);
+  + api.addInterceptor('forwardState', (next, name, params) => next(name, params));
+  ```
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `navigateToState` from public `PluginApi` (#227)
+
+  **BREAKING CHANGE:** `navigateToState` is no longer available in the plugin API. Plugins should use `router.navigate()` instead, which goes through the full navigation pipeline including middleware, guards, and interceptors.
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/types@0.21.0
+
+### @real-router/types@0.21.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `InterceptableMethodMap` and `InterceptorFn` generic types (#224)
+
+  New generic types for type-safe interceptor registration. `InterceptableMethodMap` maps interceptable method names to their argument types, and `InterceptorFn<M>` provides the correctly-typed interceptor function signature for each method.
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `navigateToState` from `PluginApi` interface (#227)
+
+  **BREAKING CHANGE:** `navigateToState` has been removed from the `PluginApi` interface. Plugins should use `router.navigate()` instead.
+
+### @real-router/logger-plugin@0.2.37
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
+### @real-router/persistent-params-plugin@0.1.36
+
+### Patch Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor into class-based architecture (#226)
+
+  Internal refactoring: replaced monolithic factory closure with `PersistentParamsPlugin` class, migrated from legacy per-method interceptors to `addInterceptor` API, removed dead code and monkey-patching relics.
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
+### @real-router/react@0.5.3
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+  - @real-router/sources@0.1.2
+  - @real-router/route-utils@0.1.2
+
+### @real-router/route-utils@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/types@0.21.0
+
+### @real-router/rx@0.1.25
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/core@0.33.0
+
+### @real-router/sources@0.1.2
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/types@0.21.0
+  - @real-router/route-utils@0.1.2
+
 ## [2026-03-04]
 
 ### @real-router/core@0.32.0

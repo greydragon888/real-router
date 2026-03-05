@@ -1,5 +1,32 @@
 # @real-router/core
 
+## 0.33.0
+
+### Minor Changes
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace per-method interceptor APIs with universal `addInterceptor` (#224)
+
+  **BREAKING CHANGE:** `addBuildPathInterceptor`, `setForwardState`, and `getForwardState` have been replaced with a single `addInterceptor(method, fn)` API. New interceptable method `start` added for browser-plugin to call `router.start()` without arguments.
+
+  **Migration:**
+
+  ```diff
+  - api.addBuildPathInterceptor(fn);
+  + api.addInterceptor('buildPath', (next, route, params) => next(route, modifiedParams));
+
+  - api.setForwardState(fn);
+  + api.addInterceptor('forwardState', (next, name, params) => next(name, params));
+  ```
+
+- [#229](https://github.com/greydragon888/real-router/pull/229) [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `navigateToState` from public `PluginApi` (#227)
+
+  **BREAKING CHANGE:** `navigateToState` is no longer available in the plugin API. Plugins should use `router.navigate()` instead, which goes through the full navigation pipeline including middleware, guards, and interceptors.
+
+### Patch Changes
+
+- Updated dependencies [[`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d), [`95f681d`](https://github.com/greydragon888/real-router/commit/95f681d53b6948d18889e6082f39eb5d1f81fd4d)]:
+  - @real-router/types@0.21.0
+
 ## 0.32.0
 
 ### Minor Changes
