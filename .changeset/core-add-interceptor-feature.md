@@ -4,14 +4,14 @@
 
 Replace per-method interceptor APIs with universal `addInterceptor` (#224)
 
-**BREAKING CHANGE:** `addStartInterceptor`, `addNavigateInterceptor`, and other per-method interceptor methods have been replaced with a single `addInterceptor(method, fn)` API.
+**BREAKING CHANGE:** `addBuildPathInterceptor`, `setForwardState`, and `getForwardState` have been replaced with a single `addInterceptor(method, fn)` API. New interceptable method `start` added for browser-plugin to call `router.start()` without arguments.
 
 **Migration:**
 
 ```diff
-- api.addStartInterceptor((args, next) => next(args));
-+ api.addInterceptor('start', (args, next) => next(args));
+- api.addBuildPathInterceptor(fn);
++ api.addInterceptor('buildPath', (next, route, params) => next(route, modifiedParams));
 
-- api.addNavigateInterceptor((args, next) => next(args));
-+ api.addInterceptor('navigate', (args, next) => next(args));
+- api.setForwardState(fn);
++ api.addInterceptor('forwardState', (next, name, params) => next(name, params));
 ```
