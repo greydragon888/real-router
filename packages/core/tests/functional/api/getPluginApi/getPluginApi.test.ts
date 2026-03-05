@@ -65,7 +65,7 @@ describe("getPluginApi()", () => {
   it("addInterceptor('forwardState') should wrap forwardState", () => {
     const unsub = api.addInterceptor(
       "forwardState",
-      (_next, _name: string, params: Record<string, unknown>) => ({
+      (_next, _name, params) => ({
         name: "users",
         params,
       }),

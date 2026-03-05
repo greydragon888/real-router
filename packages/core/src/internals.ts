@@ -61,7 +61,7 @@ export interface RouterInternals<
 
   readonly start: (path: string) => Promise<State>;
 
-  /* eslint-disable @typescript-eslint/no-explicit-any -- generic interceptor signature requires any for heterogeneous method wrapping */
+  /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different InterceptorFn<M> types under different keys */
   readonly interceptors: Map<
     string,
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
@@ -123,7 +123,7 @@ export function registerInternals<D extends DefaultDependencies>(
   internals.set(router, ctx);
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- generic interceptor chain operates on heterogeneous signatures */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- internal chain execution: type safety enforced at public API boundary (PluginApi.addInterceptor) */
 function executeInterceptorChain<T>(
   interceptors: ((next: (...args: any[]) => any, ...args: any[]) => any)[],
   original: (...args: any[]) => T,

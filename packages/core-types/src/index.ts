@@ -66,6 +66,8 @@ export type {
   RoutesApi,
   DependenciesApi,
   LifecycleApi,
+  InterceptableMethodMap,
+  InterceptorFn,
 } from "./api";
 
 // Note: RouterError type is a forward declaration matching the class in real-router package

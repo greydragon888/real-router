@@ -5,7 +5,6 @@ import { getPluginApi, RouterError } from "@real-router/core";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router, PluginApi } from "@real-router/core";
-import type { Params } from "@real-router/types";
 
 let router: Router;
 let api: PluginApi;
@@ -24,7 +23,7 @@ describe("addInterceptor('buildPath')", () => {
   });
 
   it("transforms params in facade buildPath() calls", () => {
-    api.addInterceptor("buildPath", (next, route: string, params: Params) =>
+    api.addInterceptor("buildPath", (next, route, params) =>
       next(route, { ...params, id: "intercepted-42" }),
     );
 
@@ -34,7 +33,7 @@ describe("addInterceptor('buildPath')", () => {
   });
 
   it("transforms params in buildPath() inside navigate() — state.path reflects intercepted params", async () => {
-    api.addInterceptor("buildPath", (next, route: string, params: Params) =>
+    api.addInterceptor("buildPath", (next, route, params) =>
       next(route, { ...params, id: "intercepted-99" }),
     );
 
@@ -45,12 +44,12 @@ describe("addInterceptor('buildPath')", () => {
 
   describe("pipeline composition", () => {
     it("two interceptors compose — last-added is outermost", () => {
-      api.addInterceptor("buildPath", (next, route: string, params: Params) =>
-        next(route, { ...params, id: `first-${params.id as string}` }),
+      api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: `first-${params?.id as string}` }),
       );
 
-      api.addInterceptor("buildPath", (next, route: string, params: Params) =>
-        next(route, { ...params, id: `second-${params.id as string}` }),
+      api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: `second-${params?.id as string}` }),
       );
 
       const path = router.buildPath("users.view", { id: "0" });
@@ -61,10 +60,8 @@ describe("addInterceptor('buildPath')", () => {
 
   describe("unsubscribe", () => {
     it("correctly removes interceptor from pipeline", () => {
-      const unsub = api.addInterceptor(
-        "buildPath",
-        (next, route: string, params: Params) =>
-          next(route, { ...params, id: "intercepted" }),
+      const unsub = api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: "intercepted" }),
       );
 
       unsub();
@@ -77,14 +74,11 @@ describe("addInterceptor('buildPath')", () => {
     it("interceptor is NOT called after unsubscribe", () => {
       let callCount = 0;
 
-      const unsub = api.addInterceptor(
-        "buildPath",
-        (next, route: string, params: Params) => {
-          callCount++;
+      const unsub = api.addInterceptor("buildPath", (next, route, params) => {
+        callCount++;
 
-          return next(route, params);
-        },
-      );
+        return next(route, params);
+      });
 
       router.buildPath("home");
 
@@ -98,10 +92,8 @@ describe("addInterceptor('buildPath')", () => {
     });
 
     it("double unsubscribe is a no-op", () => {
-      const unsub = api.addInterceptor(
-        "buildPath",
-        (next, route: string, params: Params) =>
-          next(route, { ...params, id: "intercepted" }),
+      const unsub = api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: "intercepted" }),
       );
 
       unsub();
@@ -128,9 +120,8 @@ describe("addInterceptor('buildPath')", () => {
       const disposedApi = getPluginApi(router);
 
       expect(() => {
-        disposedApi.addInterceptor(
-          "buildPath",
-          (next, route: string, params: Params) => next(route, params),
+        disposedApi.addInterceptor("buildPath", (next, route, params) =>
+          next(route, params),
         );
       }).toThrowError(RouterError);
     });

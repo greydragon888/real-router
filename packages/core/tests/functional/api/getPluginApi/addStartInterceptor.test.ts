@@ -20,7 +20,7 @@ describe("addInterceptor('start')", () => {
     router = createTestRouter();
     api = getPluginApi(router);
 
-    api.addInterceptor("start", (next, path: string) =>
+    api.addInterceptor("start", (next, path) =>
       next(path === "/original" ? "/home" : path),
     );
 
@@ -35,7 +35,7 @@ describe("addInterceptor('start')", () => {
 
     let receivedPath: string | undefined;
 
-    api.addInterceptor("start", (next, path: string) => {
+    api.addInterceptor("start", (next, path) => {
       receivedPath = path;
 
       return next(path);
@@ -52,13 +52,13 @@ describe("addInterceptor('start')", () => {
 
     const order: string[] = [];
 
-    api.addInterceptor("start", (next, path: string) => {
+    api.addInterceptor("start", (next, path) => {
       order.push("first");
 
       return next(path);
     });
 
-    api.addInterceptor("start", (next, path: string) => {
+    api.addInterceptor("start", (next, path) => {
       order.push("second");
 
       return next(path);

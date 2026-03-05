@@ -25,6 +25,29 @@ import type {
 } from "./router";
 
 /**
+ * Maps interceptable method names to their signatures.
+ * Used by {@link PluginApi.addInterceptor} to provide type-safe interceptor registration.
+ *
+ * To add a new interceptable method:
+ * 1. Add its signature here
+ * 2. Wrap it with `createInterceptable()` in `RouterWiringBuilder`
+ */
+export interface InterceptableMethodMap {
+  start: (path?: string) => Promise<State>;
+  buildPath: (route: string, params?: Params) => string;
+  forwardState: (routeName: string, routeParams: Params) => SimpleState;
+}
+
+/**
+ * Type-safe interceptor callback.
+ * Receives `next` (the next function in the chain) followed by the method's original parameters.
+ */
+export type InterceptorFn<M extends keyof InterceptableMethodMap> = (
+  next: InterceptableMethodMap[M],
+  ...args: Parameters<InterceptableMethodMap[M]>
+) => ReturnType<InterceptableMethodMap[M]>;
+
+/**
  * Plugin API — for plugins and infrastructure packages.
  * Hides plugin-internal methods from public autocomplete.
  */
@@ -71,10 +94,9 @@ export interface PluginApi {
 
   getTree: () => unknown;
 
-  addInterceptor: (
-    method: "start" | "buildPath" | "forwardState",
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- generic interceptor signature requires any
-    fn: (next: (...args: any[]) => any, ...args: any[]) => any,
+  addInterceptor: <M extends keyof InterceptableMethodMap>(
+    method: M,
+    fn: InterceptorFn<M>,
   ) => Unsubscribe;
 }
 
