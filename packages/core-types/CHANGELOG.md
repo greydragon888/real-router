@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.22.0
+
+### Minor Changes
+
+- [#232](https://github.com/greydragon888/real-router/pull/232) [`5613edb`](https://github.com/greydragon888/real-router/commit/5613edbce99253005ac921050f01e8d9ebec076b) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `extendRouter()` to `PluginApi` interface and `PLUGIN_CONFLICT` error code (#231)
+
+  New `extendRouter(extensions)` method on `PluginApi` allows plugins to formally extend the router instance with conflict detection. New `PLUGIN_CONFLICT` error code thrown when a plugin tries to register a property that already exists on the router.
+
 ## 0.21.0
 
 ### Minor Changes
