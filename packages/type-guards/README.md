@@ -43,7 +43,6 @@ isParamsStrict(value: unknown): value is Params
 ```typescript
 isState(value: unknown): value is State
 isStateStrict(value: unknown): value is State
-isHistoryState(value: unknown): value is HistoryState
 ```
 
 #### Navigation Guards
@@ -115,21 +114,6 @@ function addRoute(name: unknown, path: string) {
   // TypeScript now knows name is a string
   routes[name] = path;
 }
-```
-
-### History State Validation (Browser Plugin)
-
-```typescript
-import { isHistoryState } from "type-guards";
-
-const state = window.history.state;
-
-if (!isHistoryState(state)) {
-  return undefined;
-}
-
-// TypeScript knows state has meta object
-return state;
 ```
 
 ## Validation Strategies
