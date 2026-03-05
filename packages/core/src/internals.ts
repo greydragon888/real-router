@@ -5,7 +5,6 @@ import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
 import type {
   DefaultDependencies,
   EventName,
-  NavigationOptions,
   Options,
   Params,
   Plugin,
@@ -29,8 +28,7 @@ export interface RouterInternals<
     forceId?: number,
   ) => State<P, MP>;
 
-  // MUTABLE — persistent-params-plugin swaps this for interception
-  forwardState: <P extends Params = Params>(
+  readonly forwardState: <P extends Params = Params>(
     routeName: string,
     routeParams: P,
   ) => SimpleState<P>;
@@ -47,12 +45,6 @@ export interface RouterInternals<
 
   readonly getOptions: () => Options;
 
-  readonly navigateToState: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => Promise<State>;
-
   readonly addEventListener: <E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
@@ -60,10 +52,14 @@ export interface RouterInternals<
 
   readonly buildPath: (route: string, params?: Params) => string;
 
-  readonly buildPathInterceptors: ((
-    routeName: string,
-    params: Params,
-  ) => Params)[];
+  readonly start: (path: string) => Promise<State>;
+
+  /* eslint-disable @typescript-eslint/no-explicit-any -- heterogeneous map: stores different InterceptorFn<M> types under different keys */
+  readonly interceptors: Map<
+    string,
+    ((next: (...args: any[]) => any, ...args: any[]) => any)[]
+  >;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   readonly setRootPath: (rootPath: string) => void;
   readonly getRootPath: () => string;
@@ -120,20 +116,38 @@ export function registerInternals<D extends DefaultDependencies>(
   internals.set(router, ctx);
 }
 
-export function applyBuildPathInterceptors(
-  interceptors: readonly ((routeName: string, params: Params) => Params)[],
-  route: string,
-  params: Params | undefined,
-): Params {
-  if (interceptors.length === 0) {
-    return params ?? {};
-  }
-
-  let resolved = params ?? {};
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument -- internal chain execution: type safety enforced at public API boundary (PluginApi.addInterceptor) */
+function executeInterceptorChain<T>(
+  interceptors: ((next: (...args: any[]) => any, ...args: any[]) => any)[],
+  original: (...args: any[]) => T,
+  args: any[],
+): T {
+  let chain = original as (...args: any[]) => any;
 
   for (const interceptor of interceptors) {
-    resolved = interceptor(route, resolved);
+    const prev = chain;
+
+    chain = (...a: any[]) => interceptor(prev, ...a);
   }
 
-  return resolved;
+  return chain(...args) as T;
+}
+
+export function createInterceptable<T extends (...args: any[]) => any>(
+  name: string,
+  original: T,
+  interceptors: Map<
+    string,
+    ((next: (...args: any[]) => any, ...args: any[]) => any)[]
+  >,
+): T {
+  return ((...args: any[]) => {
+    const chain = interceptors.get(name);
+
+    if (!chain || chain.length === 0) {
+      return original(...args);
+    }
+
+    return executeInterceptorChain(chain, original, args);
+  }) as T;
 }

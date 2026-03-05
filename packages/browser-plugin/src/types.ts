@@ -1,4 +1,4 @@
-// packages/browser-plugin/modules/types.ts
+// packages/browser-plugin/src/types.ts
 
 import type { State } from "@real-router/core";
 
@@ -19,14 +19,6 @@ interface BaseBrowserPluginOptions {
    * @default ""
    */
   base?: string;
-
-  /**
-   * Merge new state with existing history.state when updating.
-   * Useful for preserving external state set by other code.
-   *
-   * @default false
-   */
-  mergeState?: boolean;
 }
 
 /**
@@ -147,50 +139,22 @@ export type BrowserPluginOptions = HashModeOptions | HistoryModeOptions;
  */
 export interface Browser {
   /**
-   * Gets base path from current browser location
-   *
-   * @returns Current pathname
-   */
-  getBase: () => string;
-
-  /**
    * Pushes new state to browser history
    *
    * @param state - History state object
-   * @param title - Document title (usually ignored by browsers)
    * @param path - URL path
    */
-  pushState: (state: HistoryState, title: string | null, path: string) => void;
+  pushState: (state: State, path: string) => void;
 
   /**
    * Replaces current history state
    *
    * @param state - History state object
-   * @param title - Document title (usually ignored by browsers)
    * @param path - URL path
    */
-  replaceState: (
-    state: HistoryState,
-    title: string | null,
-    path: string,
-  ) => void;
+  replaceState: (state: State, path: string) => void;
 
-  /**
-   * Adds popstate/hashchange event listeners.
-   * Overloaded to support both PopStateEvent and HashChangeEvent.
-   *
-   * @param fn - Event handler
-   * @param opts - Plugin options
-   * @returns Cleanup function to remove listeners
-   */
-  addPopstateListener: ((
-    fn: (evt: PopStateEvent) => void,
-    opts: BrowserPluginOptions,
-  ) => () => void) &
-    ((
-      fn: (evt: HashChangeEvent) => void,
-      opts: BrowserPluginOptions,
-    ) => () => void);
+  addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
 
   /**
    * Gets current location path respecting plugin options
@@ -201,13 +165,6 @@ export interface Browser {
   getLocation: (opts: BrowserPluginOptions) => string;
 
   /**
-   * Gets current history state with validation
-   *
-   * @returns Valid history state or undefined
-   */
-  getState: () => HistoryState | undefined;
-
-  /**
    * Gets current URL hash
    *
    * @returns Hash string (including #)
@@ -216,7 +173,25 @@ export interface Browser {
 }
 
 /**
- * History state object stored in browser history.
- * Extends real-router State with additional properties that may be set by external code.
+ * Subset of BrowserPluginOptions needed for URL parsing operations.
+ * Intentionally a flat interface (not a discriminated union) because this is an
+ * internal type for pure functions — the calling code in plugin.ts already works
+ * with validated BrowserPluginOptions and passes correct values.
  */
-export type HistoryState = State & Record<string, unknown>;
+export interface URLParseOptions {
+  readonly useHash: boolean;
+  readonly base: string;
+  readonly hashPrefix: string;
+}
+
+export interface RegExpCache {
+  get: (pattern: string) => RegExp;
+}
+
+/**
+ * Shared mutable state across BrowserPlugin instances created by the same factory.
+ * Enables cleanup of a previous instance's popstate listener when the factory is reused.
+ */
+export interface SharedFactoryState {
+  removePopStateListener: (() => void) | undefined;
+}

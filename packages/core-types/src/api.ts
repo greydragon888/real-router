@@ -10,7 +10,6 @@ import type {
   State,
   SimpleState,
   StateMetaInput,
-  NavigationOptions,
   Unsubscribe,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
@@ -23,6 +22,29 @@ import type {
   Route,
   RouteConfigUpdate,
 } from "./router";
+
+/**
+ * Maps interceptable method names to their signatures.
+ * Used by {@link PluginApi.addInterceptor} to provide type-safe interceptor registration.
+ *
+ * To add a new interceptable method:
+ * 1. Add its signature here
+ * 2. Wrap it with `createInterceptable()` in `RouterWiringBuilder`
+ */
+export interface InterceptableMethodMap {
+  start: (path?: string) => Promise<State>;
+  buildPath: (route: string, params?: Params) => string;
+  forwardState: (routeName: string, routeParams: Params) => SimpleState;
+}
+
+/**
+ * Type-safe interceptor callback.
+ * Receives `next` (the next function in the chain) followed by the method's original parameters.
+ */
+export type InterceptorFn<M extends keyof InterceptableMethodMap> = (
+  next: InterceptableMethodMap[M],
+  ...args: Parameters<InterceptableMethodMap[M]>
+) => ReturnType<InterceptableMethodMap[M]>;
 
 /**
  * Plugin API — for plugins and infrastructure packages.
@@ -54,12 +76,6 @@ export interface PluginApi {
   setRootPath: (rootPath: string) => void;
   getRootPath: () => string;
 
-  navigateToState: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => Promise<State>;
-
   addEventListener: <E extends EventName>(
     eventName: E,
     cb: Plugin[EventMethodMap[E]],
@@ -71,20 +87,9 @@ export interface PluginApi {
 
   getTree: () => unknown;
 
-  getForwardState: () => <P extends Params = Params>(
-    routeName: string,
-    routeParams: P,
-  ) => SimpleState<P>;
-
-  setForwardState: (
-    fn: <P extends Params = Params>(
-      routeName: string,
-      routeParams: P,
-    ) => SimpleState<P>,
-  ) => void;
-
-  addBuildPathInterceptor: (
-    fn: (routeName: string, params: Params) => Params,
+  addInterceptor: <M extends keyof InterceptableMethodMap>(
+    method: M,
+    fn: InterceptorFn<M>,
   ) => Unsubscribe;
 }
 

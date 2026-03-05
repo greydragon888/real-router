@@ -7,7 +7,7 @@ import type { Params, StateMeta } from "@real-router/types";
 
 /**
  * Type guard for meta object fields if present.
- * Used by both isStateStrict and isHistoryState.
+ * Used by isStateStrict.
  *
  * @param meta - Value to check
  * @returns true if meta has valid StateMeta structure
@@ -29,17 +29,13 @@ export function isMetaFields<MP extends Params = Params>(
   }
 
   // Check id field if present
-  if ("id" in obj && typeof obj.id !== "number") {
-    return false;
-  }
-
-  return true;
+  return !("id" in obj) || typeof obj.id === "number";
 }
 
 /**
  * Type guard helper that checks if required State fields have valid types.
  * Validates that name, path, and params exist and have correct types.
- * Used by both isStateStrict and isHistoryState.
+ * Used by isState and isStateStrict.
  *
  * @param obj - Object to check
  * @returns true if object has valid required fields

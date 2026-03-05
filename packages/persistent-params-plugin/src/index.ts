@@ -2,4 +2,4 @@
 
 export { PersistentParamsConfig } from "./types";
 
-export { persistentParamsPluginFactory } from "./plugin";
+export { persistentParamsPluginFactory } from "./factory";

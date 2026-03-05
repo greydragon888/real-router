@@ -15,7 +15,6 @@ import {
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser";
-import { noop } from "../../src/utils";
 import {
   createTrackingPlugin,
   createStateModifierPlugin,
@@ -25,8 +24,10 @@ import {
   createAsyncPlugin,
 } from "../helpers/mockPlugins";
 
-import type { Browser, HistoryState } from "../../src/types";
+import type { Browser } from "../../src/types";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+
+const noop = (): void => undefined;
 
 let router: Router;
 let currentHistoryState: State | undefined;
@@ -38,16 +39,14 @@ const createMockedBrowser = (): Browser => {
 
   return {
     ...safeBrowser,
-    getBase: () => globalThis.location.pathname,
-    pushState: (state, title, url) => {
+    pushState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.pushState(state, title, url);
+      safeBrowser.pushState(state, url);
     },
-    replaceState: (state, title, url) => {
+    replaceState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.replaceState(state, title, url);
+      safeBrowser.replaceState(state, url);
     },
-    getState: () => currentHistoryState as HistoryState,
   };
 };
 

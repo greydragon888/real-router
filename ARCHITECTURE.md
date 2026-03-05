@@ -280,32 +280,32 @@ lifecycle.addActivateGuard("admin", () => (toState, fromState, signal) => {
 
 ### Plugin Interception
 
-Two interception mechanisms exist in `RouterInternals`, accessed via `getPluginApi()`:
-
-**1. `forwardState` — mutable function replacement (set/get)**
-
-Intercepts state building during navigation. Only one function at a time (last writer wins):
+Plugins intercept router methods via a universal `addInterceptor()` API, accessed through `getPluginApi()`:
 
 ```typescript
 const api = getPluginApi(router);
-const originalForwardState = api.getForwardState();
-api.setForwardState((routeName, routeParams) => {
-  const result = originalForwardState(routeName, routeParams);
+
+// Intercept forwardState to merge persistent params
+const unsub = api.addInterceptor("forwardState", (next, routeName, routeParams) => {
+  const result = next(routeName, routeParams);
   return { ...result, params: withPersistentParams(result.params) };
 });
+
+// Intercept start to make path optional (browser-plugin injects location)
+api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
 ```
 
-**2. `addBuildPathInterceptor` — array pipeline (add/remove)**
+**`InterceptableMethodMap`** defines which methods can be intercepted:
 
-Intercepts `buildPath` param transformation. Multiple interceptors execute in FIFO order:
+| Method         | Signature                                              | Used by                    |
+| -------------- | ------------------------------------------------------ | -------------------------- |
+| `start`        | `(path?: string) => Promise<State>`                    | browser-plugin             |
+| `buildPath`    | `(route: string, params?: Params) => string`           | persistent-params-plugin   |
+| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin |
 
-```typescript
-const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
-  return { ...params, lang: getCurrentLang() };
-});
-```
+Multiple interceptors per method execute in FIFO order. Each receives `next` (the original or previously-wrapped function) plus the method's arguments. `addInterceptor()` returns an unsubscribe function.
 
-Both go through `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
+Interceptors are applied via `createInterceptable()` in `RouterInternals`, ensuring all call paths (facade, wiring, plugins) are intercepted.
 
 ## State Management
 

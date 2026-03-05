@@ -5,13 +5,13 @@
 import type { Params, State } from "@real-router/core";
 
 // Main plugin factory
-export { browserPluginFactory } from "./plugin";
+export { browserPluginFactory } from "./factory";
 
 // Types
-export type { BrowserPluginOptions, Browser, HistoryState } from "./types";
+export type { BrowserPluginOptions, Browser } from "./types";
 
-// Type guards (maybe useful for consumers)
-export { isStateStrict as isState, isHistoryState } from "type-guards";
+// Type guards
+export { isStateStrict as isState } from "type-guards";
 
 /**
  * Module augmentation for real-router.
@@ -40,12 +40,6 @@ declare module "@real-router/core" {
       params?: Params,
       title?: string,
     ) => void;
-
-    /**
-     * Last known router state.
-     * Added by browser plugin.
-     */
-    lastKnownState?: State;
 
     start(path?: string): Promise<State>;
   }

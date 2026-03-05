@@ -5,12 +5,11 @@ import { getPluginApi, RouterError } from "@real-router/core";
 import { createTestRouter } from "../../../helpers";
 
 import type { Router, PluginApi } from "@real-router/core";
-import type { Params } from "@real-router/types";
 
 let router: Router;
 let api: PluginApi;
 
-describe("addBuildPathInterceptor", () => {
+describe("addInterceptor('buildPath')", () => {
   beforeEach(async () => {
     router = createTestRouter();
     api = getPluginApi(router);
@@ -24,10 +23,9 @@ describe("addBuildPathInterceptor", () => {
   });
 
   it("transforms params in facade buildPath() calls", () => {
-    api.addBuildPathInterceptor((_routeName: string, params: Params) => ({
-      ...params,
-      id: "intercepted-42",
-    }));
+    api.addInterceptor("buildPath", (next, route, params) =>
+      next(route, { ...params, id: "intercepted-42" }),
+    );
 
     const path = router.buildPath("users.view", { id: "original" });
 
@@ -35,10 +33,9 @@ describe("addBuildPathInterceptor", () => {
   });
 
   it("transforms params in buildPath() inside navigate() — state.path reflects intercepted params", async () => {
-    api.addBuildPathInterceptor((_routeName: string, params: Params) => ({
-      ...params,
-      id: "intercepted-99",
-    }));
+    api.addInterceptor("buildPath", (next, route, params) =>
+      next(route, { ...params, id: "intercepted-99" }),
+    );
 
     const state = await router.navigate("users.view", { id: "original" });
 
@@ -46,30 +43,25 @@ describe("addBuildPathInterceptor", () => {
   });
 
   describe("pipeline composition", () => {
-    it("two interceptors compose in FIFO registration order", () => {
-      api.addBuildPathInterceptor((_routeName: string, params: Params) => ({
-        ...params,
-        id: `first-${params.id as string}`,
-      }));
+    it("two interceptors compose — last-added is outermost", () => {
+      api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: `first-${params?.id as string}` }),
+      );
 
-      api.addBuildPathInterceptor((_routeName: string, params: Params) => ({
-        ...params,
-        id: `second-${params.id as string}`,
-      }));
+      api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: `second-${params?.id as string}` }),
+      );
 
       const path = router.buildPath("users.view", { id: "0" });
 
-      expect(path).toBe("/users/view/second-first-0");
+      expect(path).toBe("/users/view/first-second-0");
     });
   });
 
   describe("unsubscribe", () => {
     it("correctly removes interceptor from pipeline", () => {
-      const unsub = api.addBuildPathInterceptor(
-        (_routeName: string, params: Params) => ({
-          ...params,
-          id: "intercepted",
-        }),
+      const unsub = api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: "intercepted" }),
       );
 
       unsub();
@@ -82,13 +74,11 @@ describe("addBuildPathInterceptor", () => {
     it("interceptor is NOT called after unsubscribe", () => {
       let callCount = 0;
 
-      const unsub = api.addBuildPathInterceptor(
-        (_routeName: string, params: Params) => {
-          callCount++;
+      const unsub = api.addInterceptor("buildPath", (next, route, params) => {
+        callCount++;
 
-          return params;
-        },
-      );
+        return next(route, params);
+      });
 
       router.buildPath("home");
 
@@ -102,11 +92,8 @@ describe("addBuildPathInterceptor", () => {
     });
 
     it("double unsubscribe is a no-op", () => {
-      const unsub = api.addBuildPathInterceptor(
-        (_routeName: string, params: Params) => ({
-          ...params,
-          id: "intercepted",
-        }),
+      const unsub = api.addInterceptor("buildPath", (next, route, params) =>
+        next(route, { ...params, id: "intercepted" }),
       );
 
       unsub();
@@ -133,8 +120,8 @@ describe("addBuildPathInterceptor", () => {
       const disposedApi = getPluginApi(router);
 
       expect(() => {
-        disposedApi.addBuildPathInterceptor(
-          (_routeName: string, params: Params) => params,
+        disposedApi.addInterceptor("buildPath", (next, route, params) =>
+          next(route, params),
         );
       }).toThrowError(RouterError);
     });

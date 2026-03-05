@@ -91,22 +91,24 @@ export const createStateModifierPlugin = (
 
   return (router) => {
     const api = getPluginApi(router);
-    const originalForwardState = api.getForwardState();
 
-    api.setForwardState(((name: string, params: Params) => {
-      const result = originalForwardState(name, params);
-      const modifiedParams: Params = { ...result.params };
+    const removeInterceptor = api.addInterceptor(
+      "forwardState",
+      (next, name: string, params: Params) => {
+        const result = next(name, params) as { name: string; params: Params };
+        const modifiedParams: Params = { ...result.params };
 
-      modifyState({ params: modifiedParams } as unknown as State);
+        modifyState({ params: modifiedParams } as unknown as State);
 
-      return { name: result.name, params: modifiedParams };
-    }) as typeof originalForwardState);
+        return { name: result.name, params: modifiedParams };
+      },
+    );
 
     return {
       ...(modifyOnStart && { onStart: () => {} }),
       ...(modifyOnSuccess && { onTransitionSuccess: () => {} }),
       teardown() {
-        api.setForwardState(originalForwardState);
+        removeInterceptor();
       },
     };
   };
@@ -190,18 +192,20 @@ export const createPersistentParamsPlugin = (
 
   return (router) => {
     const api = getPluginApi(router);
-    const originalForwardState = api.getForwardState();
 
-    api.setForwardState(((name: string, params: Params) => {
-      const result = originalForwardState(name, params);
+    const removeInterceptor = api.addInterceptor(
+      "forwardState",
+      (next, name: string, params: Params) => {
+        const result = next(name, params) as { name: string; params: Params };
 
-      const mergedParams: Params = {
-        ...persistentParamsValues,
-        ...result.params,
-      };
+        const mergedParams: Params = {
+          ...persistentParamsValues,
+          ...result.params,
+        };
 
-      return { name: result.name, params: mergedParams };
-    }) as typeof originalForwardState);
+        return { name: result.name, params: mergedParams };
+      },
+    );
 
     return {
       onTransitionSuccess: (toState: State) => {
@@ -212,7 +216,7 @@ export const createPersistentParamsPlugin = (
         });
       },
       teardown() {
-        api.setForwardState(originalForwardState);
+        removeInterceptor();
       },
     };
   };
@@ -283,7 +287,5 @@ export const createAsyncPlugin = (
   _options: AsyncPluginOptions = {},
 ): PluginFactory => {
   // eslint-disable-next-line unicorn/consistent-function-scoping
-  const factory: PluginFactory = () => ({});
-
-  return factory;
+  return () => ({});
 };

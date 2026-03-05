@@ -29,7 +29,6 @@ export interface DefaultBrowserPluginOptions {
   forceDeactivate: boolean;
   useHash: boolean;
   base: string;
-  mergeState: boolean;
   preserveHash: boolean;
   hashPrefix: string;
 }
@@ -39,7 +38,6 @@ export const defaultOptions: DefaultBrowserPluginOptions = {
   useHash: false,
   hashPrefix: "",
   base: "",
-  mergeState: false,
   preserveHash: true,
 };
 

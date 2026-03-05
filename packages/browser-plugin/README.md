@@ -40,7 +40,7 @@ router.usePlugin(
   }),
 );
 
-router.start();
+await router.start();
 ```
 
 ---
@@ -66,7 +66,6 @@ router.navigate("products", { id: "123" });
 | `preserveHash`    | `boolean` | `true`  | Keep URL hash fragment during navigation. Only with `useHash: false` |
 | `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"`)                            |
 | `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward                |
-| `mergeState`      | `boolean` | `false` | Merge with existing `history.state`                                  |
 
 **Type Safety:** Options use discriminated union — `hashPrefix` and `preserveHash` are mutually exclusive at compile time.
 
@@ -79,6 +78,7 @@ See [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-co
 The plugin extends the router with browser-specific methods:
 
 #### `router.buildUrl(name: string, params?: Params): string`
+
 Build full URL with base path and hash prefix.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -86,16 +86,12 @@ Returns: `string` — full URL\
 [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ```typescript
-const state = router.lastKnownState;
-// Returns frozen copy of state or undefined
-
-if (state) {
-  console.log("Last route:", state.name);
-  console.log("Parameters:", state.params);
-}
+router.buildUrl("users", { id: "123" });
+// => "/app/users/123" (with base "/app")
 ```
 
 #### `router.matchUrl(url: string): State | undefined`
+
 Parse URL to router state.\
 `url: string` — URL to parse\
 Returns: `State | undefined`\
@@ -112,6 +108,7 @@ router.navigate("page3");
 ```
 
 #### `router.replaceHistoryState(name: string, params?: Params, title?: string): void`
+
 Update browser URL without triggering navigation.\
 `name: string` — route name\
 `params?: Params` — route parameters\
@@ -122,11 +119,6 @@ Returns: `void`\
 ```typescript
 router.replaceHistoryState("users", { id: "456" });
 ```
-
-#### `router.lastKnownState: State | undefined`
-Last successful navigation state (readonly).\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 
 ---
 
@@ -169,12 +161,11 @@ router.usePlugin(
   }),
 );
 
-router.addDeactivateGuard("checkout", () => (toState, fromState, done) => {
-  if (hasUnsavedChanges()) {
-    done({ error: new Error("Unsaved changes") });
-  } else {
-    done();
-  }
+import { getLifecycleApi } from "@real-router/core";
+
+const lifecycle = getLifecycleApi(router);
+lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
+  return !hasUnsavedChanges(); // false blocks navigation
 });
 ```
 

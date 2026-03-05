@@ -1,248 +1,153 @@
-// packages/browser-plugin/modules/plugin.ts
+import { RouterError } from "@real-router/core";
 
-import { getPluginApi } from "@real-router/core";
-import { isStateStrict as isState } from "type-guards";
+import { LOGGER_CONTEXT } from "./constants";
+import { getRouteFromEvent, updateBrowserState } from "./popstate-utils";
+import { buildUrl, urlToPath } from "./url-utils";
 
-import { createSafeBrowser } from "./browser";
-import { defaultOptions, LOGGER_CONTEXT, source } from "./constants";
-import {
-  escapeRegExp,
-  createStateFromEvent,
-  shouldSkipTransition,
-  handleMissingState,
-  updateBrowserState,
-  handleTransitionResult,
-  validateOptions,
-} from "./utils";
-
-import type { BrowserPluginOptions, Browser, HistoryState } from "./types";
 import type {
-  PluginFactory,
+  Browser,
+  BrowserPluginOptions,
+  RegExpCache,
+  SharedFactoryState,
+  URLParseOptions,
+} from "./types";
+import type {
+  NavigationOptions,
+  PluginApi,
   Router,
-  RouterError,
   State,
+  Plugin,
 } from "@real-router/core";
 
-/**
- * Browser plugin factory for real-router.
- * Integrates router with browser history API.
- *
- * Features:
- * - Syncs router state with browser history (pushState/replaceState)
- * - Handles popstate events for browser back/forward navigation
- * - Supports hash-based routing for legacy browsers
- * - Provides URL building and matching utilities
- * - SSR-safe with graceful fallbacks
- * - Runtime validation warns about conflicting options
- *
- * @param opts - Plugin configuration options
- * @param browser - Browser API abstraction (for testing/SSR)
- * @returns Plugin factory function
- *
- * @example
- * ```ts
- * // Hash routing
- * router.usePlugin(browserPluginFactory({ useHash: true, hashPrefix: "!" }));
- *
- * // History routing with hash preservation
- * router.usePlugin(browserPluginFactory({ useHash: false, preserveHash: true }));
- * ```
- */
-export function browserPluginFactory(
-  opts?: Partial<BrowserPluginOptions>,
-  browser: Browser = createSafeBrowser(),
-): PluginFactory {
-  // Validate user-provided options before merging with defaults
-  const hasInvalidTypes = validateOptions(opts, defaultOptions);
-
-  let options = { ...defaultOptions, ...opts } as BrowserPluginOptions;
-
-  // Skip normalization if invalid types detected (prevents runtime errors)
-  if (hasInvalidTypes) {
-    console.warn(
-      `[${LOGGER_CONTEXT}] Using default options due to invalid types`,
-    );
-    options = { ...defaultOptions } as BrowserPluginOptions;
-  }
-
-  // Remove conflicting properties based on mode to prevent misuse
-  // This ensures options object is clean even if JS users pass invalid config
-  if (options.useHash === true) {
-    // Hash mode: remove history-only options
-    delete (options as unknown as Record<string, unknown>).preserveHash;
-  } else {
-    // History mode (default): remove hash-only options
-    delete (options as unknown as Record<string, unknown>).hashPrefix;
-  }
-
-  // Normalize base path to prevent common configuration errors
-  // Type check needed for runtime safety (JS users may pass wrong types)
-  if (options.base && typeof options.base === "string") {
-    // Ensure leading slash for absolute paths
-    if (!options.base.startsWith("/")) {
-      options.base = `/${options.base}`;
-    }
-
-    // Remove trailing slash to prevent double slashes
-    if (options.base.endsWith("/")) {
-      options.base = options.base.slice(0, -1);
-    }
-  }
-
-  // Cache RegExp patterns at plugin creation for performance
-  const regExpCache = new Map<string, RegExp>();
-  const getCachedRegExp = (pattern: string): RegExp => {
-    const cached = regExpCache.get(pattern);
-
-    if (cached !== undefined) {
-      return cached;
-    }
-
-    const newRegExp = new RegExp(pattern);
-
-    regExpCache.set(pattern, newRegExp);
-
-    return newRegExp;
+export class BrowserPlugin {
+  readonly #router: Router;
+  readonly #api: PluginApi;
+  readonly #options: BrowserPluginOptions;
+  readonly #browser: Browser;
+  readonly #regExpCache: RegExpCache;
+  readonly #prefix: string;
+  readonly #transitionOptions: {
+    source: string;
+    replace: true;
+    forceDeactivate?: boolean;
   };
+  readonly #shared: SharedFactoryState;
 
-  // Create transition options with proper typing for exactOptionalPropertyTypes
-  // replace: true is needed because popstate means URL already changed (back/forward)
-  const forceDeactivate = options.forceDeactivate;
-  /* v8 ignore next 4 -- @preserve both branches tested, coverage tool limitation */
-  const transitionOptions =
-    forceDeactivate === undefined
-      ? { source, replace: true }
-      : { forceDeactivate, source, replace: true };
+  #isTransitioning = false;
+  #deferredPopstateEvent: PopStateEvent | null = null;
+  readonly #removeStartInterceptor: () => void;
 
-  let removePopStateListener: (() => void) | undefined;
+  constructor(
+    router: Router,
+    api: PluginApi,
+    options: BrowserPluginOptions,
+    browser: Browser,
+    regExpCache: RegExpCache,
+    transitionOptions: {
+      source: string;
+      replace: true;
+      forceDeactivate?: boolean;
+    },
+    shared: SharedFactoryState,
+  ) {
+    this.#router = router;
+    this.#api = api;
+    this.#options = options;
+    this.#browser = browser;
+    this.#regExpCache = regExpCache;
+    this.#transitionOptions = transitionOptions;
+    this.#shared = shared;
 
-  return function browserPlugin(routerBase) {
-    // Cast to augmented Router (class + module augmentation: buildUrl, matchUrl, etc.)
-    const router = routerBase as Router;
-    const api = getPluginApi(routerBase);
+    const normalizedOptions = options as URLParseOptions;
 
-    // Store original methods for restoration on teardown
+    this.#prefix = options.useHash ? `#${normalizedOptions.hashPrefix}` : "";
 
-    const routerStart = router.start;
+    this.#removeStartInterceptor = this.#api.addInterceptor(
+      "start",
+      (next, path) => next(path ?? this.#browser.getLocation(this.#options)),
+    );
 
-    // Transition state management
-    let isTransitioning = false;
+    this.#augmentRouter();
+  }
 
-    // Deferred popstate event queue (stores only the last event)
-    let deferredPopstateEvent: PopStateEvent | null = null;
-
-    // Frozen copy of lastKnownState for immutability
-    let cachedFrozenState: State | undefined;
-
-    // Options can be changed at runtime in onStart
-    /* v8 ignore next -- @preserve fallback for undefined base */
-    const getBase = () => options.base ?? "";
-    /* v8 ignore next -- @preserve fallback for undefined hashPrefix */
-    const hashPrefix = options.hashPrefix ?? "";
-    const escapedHashPrefix = escapeRegExp(hashPrefix);
-    const prefix = options.useHash ? `#${hashPrefix}` : "";
-
-    // Pre-compute RegExp patterns
-    const hashPrefixRegExp = escapedHashPrefix
-      ? getCachedRegExp(`^#${escapedHashPrefix}`)
-      : null;
-
-    /**
-     * Parses URL and extracts path using native URL API.
-     * More robust than regex parsing - handles IPv6, Unicode, edge cases.
-     *
-     * @param url - URL to parse
-     * @returns Path string or null on parse error
-     */
-    const urlToPath = (url: string): string | null => {
-      try {
-        // Use URL API for reliable parsing
-        const parsedUrl = new URL(url, globalThis.location.origin);
-        const pathname = parsedUrl.pathname;
-        const hash = parsedUrl.hash;
-        const search = parsedUrl.search;
-        const base = getBase();
-
-        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-          console.warn(`[${LOGGER_CONTEXT}] Invalid URL protocol in ${url}`);
-
-          return null;
+  getPlugin(): Plugin {
+    return {
+      onStart: () => {
+        if (this.#shared.removePopStateListener) {
+          this.#shared.removePopStateListener();
         }
 
-        if (options.useHash) {
-          // Use cached RegExp or simple slice if no prefix
-          const path = hashPrefixRegExp
-            ? hash.replace(hashPrefixRegExp, "")
-            : hash.slice(1);
+        this.#shared.removePopStateListener = this.#browser.addPopstateListener(
+          (evt: PopStateEvent) => void this.#onPopState(evt),
+        );
+      },
 
-          return path + search;
-        } else if (base) {
-          // Remove base prefix
-          const escapedBase = escapeRegExp(base);
-          const baseRegExp = getCachedRegExp(`^${escapedBase}`);
-          const stripped = pathname.replace(baseRegExp, "");
-
-          return (stripped.startsWith("/") ? "" : "/") + stripped + search;
+      onStop: () => {
+        if (this.#shared.removePopStateListener) {
+          this.#shared.removePopStateListener();
+          this.#shared.removePopStateListener = undefined;
         }
+      },
 
-        return pathname + search;
-      } catch (error) {
-        // Graceful fallback instead of throw
-        console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
+      onTransitionSuccess: (
+        toState: State,
+        fromState: State | undefined,
+        navOptions: NavigationOptions,
+      ) => {
+        const shouldReplaceHistory =
+          (navOptions.replace ?? !fromState) ||
+          (!!navOptions.reload &&
+            this.#router.areStatesEqual(toState, fromState, false));
 
-        return null;
-      }
+        const url = this.#router.buildUrl(toState.name, toState.params);
+
+        const shouldPreserveHash =
+          !!this.#options.preserveHash &&
+          (!fromState || fromState.path === toState.path);
+
+        const finalUrl = shouldPreserveHash
+          ? url + this.#browser.getHash()
+          : url;
+
+        updateBrowserState(
+          toState,
+          finalUrl,
+          shouldReplaceHistory,
+          this.#browser,
+        );
+      },
+
+      teardown: () => {
+        this.#cleanupAugmentation();
+      },
     };
+  }
 
-    /**
-     * Overrides router.start to integrate with browser location.
-     * When no path is provided, resolves current browser URL automatically.
-     */
-    router.start = (path?: string) => {
-      return routerStart(path ?? browser.getLocation(options));
-    };
+  #augmentRouter(): void {
+    const router = this.#router;
 
-    /**
-     * Builds URL from route name and params.
-     * Adds base path and hash prefix according to options.
-     *
-     * @security
-     * When using buildUrl output in templates:
-     * - ✅ SAFE: Modern frameworks (React, Vue, Angular) auto-escape in templates
-     * - ✅ SAFE: Setting href attribute via DOM API (element.href = url)
-     * - ❌ UNSAFE: Using innerHTML or similar without escaping
-     *
-     * @example
-     * // Safe - React auto-escapes
-     * <Link to={router.buildUrl('users', params)} />
-     *
-     * // Safe - Vue auto-escapes
-     * <router-link :to="router.buildUrl('users', params)" />
-     *
-     * // Unsafe - manual HTML construction
-     * element.innerHTML = `<a href="${router.buildUrl('users', params)}">Link</a>`; // ❌ DON'T
-     */
     router.buildUrl = (route, params) => {
       const path = router.buildPath(route, params);
 
-      return getBase() + prefix + path;
+      return buildUrl(
+        path,
+        (this.#options as URLParseOptions).base,
+        this.#prefix,
+      );
     };
 
-    /**
-     * Matches URL and returns corresponding state
-     */
     router.matchUrl = (url) => {
-      const path = urlToPath(url);
+      const path = urlToPath(
+        url,
+        this.#options as URLParseOptions,
+        this.#regExpCache,
+      );
 
-      return path ? api.matchPath(path) : undefined;
+      return path ? this.#api.matchPath(path) : undefined;
     };
 
-    /**
-     * Replaces current history state without triggering navigation.
-     * Useful for updating URL without causing a full transition.
-     */
     router.replaceHistoryState = (name, params = {}) => {
-      const state = api.buildState(name, params);
+      const state = this.#api.buildState(name, params);
 
       if (!state) {
         throw new Error(
@@ -250,7 +155,7 @@ export function browserPluginFactory(
         );
       }
 
-      const builtState = api.makeState(
+      const builtState = this.#api.makeState(
         state.name,
         state.params,
         router.buildPath(state.name, state.params),
@@ -261,223 +166,97 @@ export function browserPluginFactory(
       );
       const url = router.buildUrl(name, params);
 
-      updateBrowserState(builtState, url, true, browser, options);
+      updateBrowserState(builtState, url, true, this.#browser);
     };
+  }
 
-    /**
-     * lastKnownState: Immutable reference to last successful state.
-     * Uses caching to avoid creating new objects on every read.
-     * Optimized: Single copy + freeze operation instead of double copying.
-     */
-    Object.defineProperty(router, "lastKnownState", {
-      get() {
-        // Note: After teardown, this property is deleted from router,
-        // so this getter is only called while plugin is active
-        return cachedFrozenState;
-      },
-      set(value?: State) {
-        // Create frozen copy in one operation (no double copying)
-        cachedFrozenState = value ? Object.freeze({ ...value }) : undefined;
-      },
-      enumerable: true,
-      configurable: true,
-    });
-
-    /**
-     * Processes a deferred popstate event if one exists.
-     * Called after transition completes.
-     */
-    function processDeferredEvent() {
-      if (deferredPopstateEvent) {
-        const event = deferredPopstateEvent;
-
-        deferredPopstateEvent = null; // Clear before processing
-        console.warn(`[${LOGGER_CONTEXT}] Processing deferred popstate event`);
-        void onPopState(event);
-      }
+  #cleanupAugmentation(): void {
+    if (this.#shared.removePopStateListener) {
+      this.#shared.removePopStateListener();
+      this.#shared.removePopStateListener = undefined;
     }
 
-    /**
-     * Main popstate event handler.
-     * Protected against concurrent transitions and handles errors gracefully.
-     * Defers events during transitions to prevent browser history desync.
-     */
-    async function onPopState(evt: PopStateEvent) {
-      // Race condition protection: defer event if transition in progress
-      if (isTransitioning) {
-        console.warn(
-          `[${LOGGER_CONTEXT}] Transition in progress, deferring popstate event`,
-        );
-        // Store only the latest event (skip intermediate states)
-        deferredPopstateEvent = evt;
+    this.#removeStartInterceptor();
 
-        return;
-      }
+    delete (this.#router as Partial<Router>).buildUrl;
+    delete (this.#router as Partial<Router>).matchUrl;
+    delete (this.#router as Partial<Router>).replaceHistoryState;
+  }
 
-      // Top-level error recovery
-      try {
-        const routerState = router.getState();
-        const state = createStateFromEvent(evt, api, browser, options);
-        const isNewState = !isState(evt.state);
+  #processDeferredEvent(): void {
+    if (this.#deferredPopstateEvent) {
+      const event = this.#deferredPopstateEvent;
 
-        // Handle missing state
-        if (!state && handleMissingState(router, api, transitionOptions)) {
-          return;
-        }
+      this.#deferredPopstateEvent = null;
+      console.warn(`[${LOGGER_CONTEXT}] Processing deferred popstate event`);
+      void this.#onPopState(event);
+    }
+  }
 
-        // Skip if states are equal
-        if (shouldSkipTransition(state, routerState, router)) {
-          return;
-        }
+  async #onPopState(evt: PopStateEvent): Promise<void> {
+    if (this.#isTransitioning) {
+      console.warn(
+        `[${LOGGER_CONTEXT}] Transition in progress, deferring popstate event`,
+      );
+      this.#deferredPopstateEvent = evt;
 
-        // Execute transition with race protection
-        // state is guaranteed to be defined here because:
-        // 1. handleMissingState handles !state case (line 339)
-        // 2. shouldSkipTransition returns true when !state (utils.ts:129)
-        /* v8 ignore start: defensive guard - state guaranteed defined by control flow above */
-        if (!state) {
-          return;
-        }
-        /* v8 ignore stop */
-
-        isTransitioning = true;
-
-        try {
-          // transitionOptions includes replace: true, which is passed to TRANSITION_SUCCESS
-          const toState = await api.navigateToState(
-            state,
-            routerState,
-            transitionOptions,
-          );
-
-          handleTransitionResult(
-            undefined,
-            toState,
-            routerState,
-            isNewState,
-            router,
-            browser,
-            options,
-          );
-        } catch (error) {
-          handleTransitionResult(
-            error as RouterError,
-            undefined,
-            routerState,
-            isNewState,
-            router,
-            browser,
-            options,
-          );
-        } finally {
-          isTransitioning = false;
-          // Process any deferred popstate events after transition completes
-          processDeferredEvent();
-        }
-      } catch (error) {
-        isTransitioning = false;
-        console.error(
-          `[${LOGGER_CONTEXT}] Critical error in onPopState`,
-          error,
-        );
-
-        // Attempt recovery: sync browser with router state
-        try {
-          const currentState = router.getState();
-
-          if (currentState) {
-            const url = router.buildUrl(currentState.name, currentState.params);
-
-            browser.replaceState(currentState as HistoryState, "", url);
-          }
-        } catch (recoveryError) {
-          // If recovery fails, there's nothing more we can do
-          console.error(
-            `[${LOGGER_CONTEXT}] Failed to recover from critical error`,
-            recoveryError,
-          );
-        }
-
-        // Process any deferred events even after error
-        processDeferredEvent();
-      }
+      return;
     }
 
-    return {
-      /**
-       * Called when router.start() is invoked.
-       * Sets up browser history integration.
-       */
-      onStart: () => {
-        if (removePopStateListener) {
-          removePopStateListener();
-        }
+    this.#isTransitioning = true;
 
-        removePopStateListener = browser.addPopstateListener(
-          (evt: PopStateEvent) => void onPopState(evt),
-          options,
+    try {
+      const route = getRouteFromEvent(
+        evt,
+        this.#api,
+        this.#browser,
+        this.#options,
+      );
+
+      // eslint-disable-next-line unicorn/prefer-ternary
+      if (route) {
+        await this.#router.navigate(
+          route.name,
+          route.params,
+          this.#transitionOptions,
         );
-      },
+      } else {
+        await this.#router.navigateToDefault({
+          ...this.#transitionOptions,
+          reload: true,
+          replace: true,
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof RouterError)) {
+        this.#recoverFromCriticalError(error);
+      }
+    } finally {
+      this.#isTransitioning = false;
+      this.#processDeferredEvent();
+    }
+  }
 
-      /**
-       * Called when router.stop() is invoked.
-       * Cleans up event listeners.
-       */
-      onStop: () => {
-        if (removePopStateListener) {
-          removePopStateListener();
-          removePopStateListener = undefined;
-        }
-      },
+  #recoverFromCriticalError(error: unknown): void {
+    console.error(`[${LOGGER_CONTEXT}] Critical error in onPopState`, error);
 
-      /**
-       * Called after successful navigation.
-       * Updates browser history with new state.
-       */
-      onTransitionSuccess: (toState, fromState, navOptions) => {
-        router.lastKnownState = toState;
+    try {
+      const currentState = this.#router.getState();
 
-        // Determine if we should replace or push history entry
-        const replaceHistory =
-          (navOptions.replace ?? !fromState) ||
-          (!!navOptions.reload &&
-            router.areStatesEqual(toState, fromState, false));
+      /* v8 ignore next -- @preserve: router always has state after start(); defensive guard for edge cases */
+      if (currentState) {
+        const url = this.#router.buildUrl(
+          currentState.name,
+          currentState.params,
+        );
 
-        // Build URL with base and hash prefix
-        const url = router.buildUrl(toState.name, toState.params);
-
-        // Preserve hash fragment if configured
-        // Note: preserveHash is deleted in hash mode, so it's always undefined there
-        const shouldPreserveHash =
-          options.preserveHash &&
-          (!fromState || fromState.path === toState.path);
-
-        const finalUrl = shouldPreserveHash ? url + browser.getHash() : url;
-
-        // Update browser history
-        updateBrowserState(toState, finalUrl, replaceHistory, browser, options);
-      },
-
-      /**
-       * Called when plugin is unsubscribed.
-       * Restores original router state for clean teardown.
-       */
-      teardown: () => {
-        // Remove event listeners
-        if (removePopStateListener) {
-          removePopStateListener();
-          removePopStateListener = undefined;
-        }
-
-        // Restore original router methods
-        router.start = routerStart;
-
-        // Clean up added properties
-        delete (router as Partial<Router>).buildUrl;
-        delete (router as Partial<Router>).matchUrl;
-        delete (router as Partial<Router>).replaceHistoryState;
-        delete (router as Partial<Router>).lastKnownState;
-      },
-    };
-  };
+        this.#browser.replaceState(currentState, url);
+      }
+    } catch (recoveryError) {
+      console.error(
+        `[${LOGGER_CONTEXT}] Failed to recover from critical error`,
+        recoveryError,
+      );
+    }
+  }
 }

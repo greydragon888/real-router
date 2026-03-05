@@ -437,25 +437,7 @@ Ignores: `*.d.ts`, `*.test.ts`, `*.bench.ts`, `*.spec.ts`
 
 ### size-limit Configuration
 
-`.size-limit.js` defines per-package limits:
-
-| Package                               | Limit  |
-| ------------------------------------- | ------ |
-| @real-router/core                     | 25 kB  |
-| @real-router/fsm                      | 0.5 kB |
-| @real-router/react                    | 1.5 kB |
-| @real-router/sources                  | 1 kB   |
-| @real-router/rx                       | 1.5 kB |
-| @real-router/browser-plugin           | 4 kB   |
-| @real-router/route-utils              | 1 kB   |
-| @real-router/logger                   | 0.5 kB |
-| @real-router/logger-plugin            | 1.5 kB |
-| @real-router/persistent-params-plugin | 1.5 kB |
-| path-matcher                          | 4 kB   |
-| route-tree                            | 6.5 kB |
-| search-params                         | 1.5 kB |
-| type-guards                           | 1.5 kB |
-| event-emitter                         | 2 kB   |
+`.size-limit.js` defines per-package limits.
 
 React package ignores `react`, `react-dom`, `@real-router/core`, `@real-router/route-utils`, and `@real-router/sources` from size calculation.
 
@@ -1042,12 +1024,12 @@ Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`
 
 ### Plugin Interception Pattern
 
-**Problem discovered:** After moving `buildState` logic into `RoutesNamespace`, tests for `@real-router/persistent-params-plugin` failed.
+**Problem discovered:** After moving business logic into namespaces, plugins could no longer intercept router methods by overriding `router.forwardState` (monkey-patching). The namespace calls its own `forwardState`, bypassing any plugin override on the router facade.
 
-**Root cause:** Plugin intercepts `router.forwardState()` to merge persistent params:
+**Original (broken) approach:** Plugins monkey-patched router methods directly:
 
 ```typescript
-// persistent-params-plugin
+// persistent-params-plugin (old approach)
 const originalForwardState = router.forwardState;
 router.forwardState = (name, params) => {
   const result = originalForwardState(name, params);
@@ -1055,54 +1037,20 @@ router.forwardState = (name, params) => {
 };
 ```
 
-Original code in Router.ts:
+**Solution:** Universal `addInterceptor()` API on `PluginApi`:
 
 ```typescript
-buildState(routeName, routeParams) {
-  const { name, params } = this.forwardState(routeName, routeParams); // ✅ Interceptable
-  return createRouteState(segments, params);
-}
+// persistent-params-plugin (new approach)
+const api = getPluginApi(router);
+api.addInterceptor("forwardState", (next, routeName, routeParams) => {
+  const result = next(routeName, routeParams);
+  return { ...result, params: withPersistentParams(result.params) };
+});
 ```
 
-After moving to namespace:
+**Implementation:** `createInterceptable(fn, interceptors, method)` in `internals.ts` wraps router methods at wiring time. When an interceptor is registered, the wrapped method executes the interceptor chain (FIFO order) before calling the original. The `InterceptableMethodMap` interface defines interceptable methods: `start`, `buildPath`, `forwardState`.
 
-```typescript
-// RoutesNamespace.ts
-buildState(routeName, routeParams) {
-  const { name, params } = this.forwardState(routeName, routeParams); // ❌ NOT interceptable!
-  return createRouteState(segments, params);
-}
-```
-
-The namespace calls its own `forwardState`, bypassing plugin interception on `router.forwardState`.
-
-**Solution:** Keep interception points at facade level:
-
-```typescript
-// Router.ts (facade)
-buildState(routeName, routeParams) {
-  // Call forwardState at FACADE level (interceptable by plugins)
-  const { name, params } = this.forwardState(routeName, routeParams);
-
-  // Delegate to namespace with already-resolved values
-  return this.#routes.buildStateResolved(name, params);
-}
-
-// RoutesNamespace.ts
-buildStateResolved(resolvedName, resolvedParams) {
-  // No forwardState call - values already resolved
-  const segments = getSegmentsByName(this.#tree, resolvedName);
-  return createRouteState({ segments, params: resolvedParams }, resolvedName);
-}
-```
-
-**Rule:** Methods that plugins may intercept must be called at facade level, not inside namespaces.
-
-**Affected methods:**
-
-- `forwardState` — intercepted by persistent-params-plugin
-- `navigate` — could be intercepted for analytics
-- `buildPath` — could be intercepted for URL rewriting
+**Rule:** Methods that plugins may intercept must go through `RouterInternals` (WeakMap-based), not be called directly on namespace instances.
 
 ### Standalone API Extraction (Modular Architecture)
 

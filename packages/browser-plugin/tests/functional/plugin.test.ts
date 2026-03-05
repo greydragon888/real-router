@@ -12,10 +12,11 @@ import {
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
 import { createSafeBrowser } from "../../src/browser";
-import { noop } from "../../src/utils";
 
-import type { Browser, HistoryState } from "../../src/types";
+import type { Browser } from "../../src";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+
+const noop = (): void => undefined;
 
 let router: Router;
 let currentHistoryState: State | undefined;
@@ -27,16 +28,14 @@ const createMockedBrowser = (): Browser => {
 
   return {
     ...safeBrowser,
-    getBase: () => globalThis.location.pathname,
-    pushState: (state, title, url) => {
+    pushState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.pushState(state, title, url);
+      safeBrowser.pushState(state, url);
     },
-    replaceState: (state, title, url) => {
+    replaceState: (state, url) => {
       currentHistoryState = state;
-      safeBrowser.replaceState(state, title, url);
+      safeBrowser.replaceState(state, url);
     },
-    getState: () => currentHistoryState as HistoryState,
   };
 };
 
@@ -291,7 +290,6 @@ describe("Browser Plugin", async () => {
 
       expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "index", params: {}, path: "/" }),
-        "",
         "/",
       );
     });
@@ -305,7 +303,6 @@ describe("Browser Plugin", async () => {
 
       expect(mockedBrowser.pushState).toHaveBeenCalledWith(
         expect.objectContaining({ name: "users.list" }),
-        "",
         "/users/list",
       );
     });
@@ -357,6 +354,7 @@ describe("Browser Plugin", async () => {
 
     it("skips transition for equal states", async () => {
       const subscribeSpy = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error");
 
       router.subscribe(subscribeSpy);
 
@@ -366,7 +364,12 @@ describe("Browser Plugin", async () => {
         new PopStateEvent("popstate", { state: currentState }),
       );
 
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       expect(subscribeSpy).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
     });
 
     it("restores state on CANNOT_DEACTIVATE", async () => {
@@ -542,35 +545,35 @@ describe("Browser Plugin", async () => {
       it("recovers from critical error in onPopState", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-        vi.spyOn(router, "getState").mockImplementation(() => {
-          throw new Error("Critical error");
-        });
-
-        vi.spyOn(mockedBrowser, "replaceState");
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical error"),
+        );
 
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: null }),
         );
 
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error in onPopState"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
 
         consoleSpy.mockRestore();
       });
 
-      it("recovers by syncing browser state after critical error (lines 385-387)", async () => {
+      it("recovers by syncing browser state after critical error", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
         const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
         await router.navigate("users.list");
 
-        vi.spyOn(router, "areStatesEqual").mockImplementation(() => {
-          throw new Error("Critical areStatesEqual error");
-        });
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical navigate error"),
+        );
 
-        const validState: HistoryState = {
+        const validState: State = {
           name: "home",
           params: {},
           path: "/home",
@@ -585,7 +588,7 @@ describe("Browser Plugin", async () => {
 
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
 
         expect(replaceStateSpy).toHaveBeenCalled();
@@ -593,20 +596,20 @@ describe("Browser Plugin", async () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles recovery failure gracefully (lines 389-395)", async () => {
+      it("handles recovery failure gracefully", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         await router.navigate("users.list");
 
-        vi.spyOn(router, "areStatesEqual").mockImplementation(() => {
-          throw new Error("Critical areStatesEqual error");
-        });
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical navigate error"),
+        );
 
         vi.spyOn(router, "buildUrl").mockImplementation(() => {
           throw new Error("Recovery error");
         });
 
-        const validState: HistoryState = {
+        const validState: State = {
           name: "home",
           params: {},
           path: "/home",
@@ -621,7 +624,7 @@ describe("Browser Plugin", async () => {
 
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Failed to recover"),
@@ -755,101 +758,6 @@ describe("Browser Plugin", async () => {
 
         vi.unstubAllGlobals();
         consoleSpy.mockRestore();
-      });
-    });
-
-    describe("lastKnownState Immutability", () => {
-      beforeEach(async () => {
-        unsubscribe = router.usePlugin(browserPluginFactory({}, mockedBrowser));
-        await router.start();
-      });
-
-      it("returns cached frozen object on repeated get", async () => {
-        router.replaceHistoryState("home");
-
-        const state1 = router.lastKnownState;
-        const state2 = router.lastKnownState;
-
-        // After optimization: same cached object returned
-        expect(state1).toBe(state2);
-        expect(Object.isFrozen(state1)).toBe(true);
-      });
-
-      it("creates new frozen object when state changes", async () => {
-        await router.navigate("users.list");
-        const state1 = router.lastKnownState;
-
-        await router.navigate("home");
-        const state2 = router.lastKnownState;
-
-        // Different states = different objects
-        expect(state1).not.toBe(state2);
-        expect(state1?.name).toBe("users.list");
-        expect(state2?.name).toBe("home");
-        expect(Object.isFrozen(state1)).toBe(true);
-        expect(Object.isFrozen(state2)).toBe(true);
-      });
-
-      it("prevents mutation of returned state", async () => {
-        router.replaceHistoryState("home");
-
-        const state = router.lastKnownState!;
-
-        expect(() => {
-          (state as any).name = "hacked";
-        }).toThrowError();
-
-        // lastKnownState is set by start() transition, not replaceHistoryState
-        // Browser at "/" matches "index" route
-        expect(state.name).toBe("index");
-      });
-
-      it("returns undefined after teardown", async () => {
-        router.replaceHistoryState("home");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        unsubscribe?.();
-
-        expect(router.lastKnownState).toBeUndefined();
-      });
-
-      it("prevents external mutations", async () => {
-        router.replaceHistoryState("home");
-
-        const state = router.lastKnownState!;
-
-        expect(() => {
-          (state as any).name = "modified";
-        }).toThrowError();
-      });
-
-      it("sets undefined when setting falsy value (line 284)", async () => {
-        router.replaceHistoryState("home");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        // Setting to undefined should set cachedFrozenState to undefined
-        // Type assertion needed due to exactOptionalPropertyTypes
-        (router as unknown as { lastKnownState: undefined }).lastKnownState =
-          undefined;
-
-        expect(router.lastKnownState).toBeUndefined();
-      });
-
-      it("stores copy on set", async () => {
-        const externalState = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: { id: 1, params: {} },
-        };
-
-        router.lastKnownState = externalState;
-
-        externalState.name = "modified";
-
-        expect(router.lastKnownState.name).toBe("home"); // Not affected
       });
     });
 
@@ -1007,7 +915,6 @@ describe("Browser Plugin", async () => {
             hashPrefix: "!",
             base: "/app",
             forceDeactivate: false,
-            mergeState: true,
           }),
         );
 
@@ -1033,7 +940,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "index" }),
-          "",
           "/",
         );
       });
@@ -1051,7 +957,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
-          "",
           "/users/list",
         );
       });
@@ -1064,7 +969,6 @@ describe("Browser Plugin", async () => {
 
         expect(mockedBrowser.pushState).toHaveBeenCalledWith(
           expect.objectContaining({ name: "users.list" }),
-          "",
           "/users/list",
         );
       });
@@ -1079,7 +983,6 @@ describe("Browser Plugin", async () => {
             name: "users.view",
             params: { id: "42" },
           }),
-          "",
           "/users/view/42",
         );
       });
@@ -1461,27 +1364,6 @@ describe("Browser Plugin", async () => {
         await router.start();
       });
 
-      it("handles mergeState option correctly", async () => {
-        currentHistoryState = { external: "data" } as any;
-
-        // Create a NEW router
-        router = createRouter(routerConfig, {
-          defaultRoute: "home",
-          queryParamsMode: "default",
-        });
-
-        unsubscribe = router.usePlugin(
-          browserPluginFactory({ mergeState: true }, mockedBrowser),
-        );
-
-        await router.start();
-
-        const state = mockedBrowser.getState();
-
-        expect(state?.external).toBe("data");
-        expect(state?.name).toBe("index");
-      });
-
       it("handles preserveHash option on initial navigation", async () => {
         router.stop();
         unsubscribe?.();
@@ -1608,62 +1490,6 @@ describe("Browser Plugin", async () => {
         unsubscribe();
 
         expect(removeListenerSpy).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    describe("Teardown", () => {
-      it("removes lastKnownState property", async () => {
-        const unsubscribe = router.usePlugin(
-          browserPluginFactory({}, mockedBrowser),
-        );
-
-        await router.start();
-
-        await router.navigate("users.list");
-
-        expect(router.lastKnownState).toBeDefined();
-
-        unsubscribe(); // teardown
-
-        expect(router.lastKnownState).toBeUndefined();
-        // After teardown, lastKnownState property is removed from router
-        expect("lastKnownState" in router).toBe(false);
-      });
-    });
-
-    describe("mergeState Option", () => {
-      it("merges with existing history.state", async () => {
-        const existingState = {
-          name: "legacy",
-          params: { old: true },
-          path: "/legacy",
-          custom: "data",
-        };
-
-        globalThis.history.replaceState(existingState, "", "/legacy");
-        currentHistoryState = existingState;
-
-        router = createRouter(routerConfig, {
-          defaultRoute: "home",
-          allowNotFound: true,
-        });
-
-        router.usePlugin(
-          browserPluginFactory({ mergeState: true }, mockedBrowser),
-        );
-
-        vi.spyOn(mockedBrowser, "replaceState");
-
-        await router.start();
-
-        expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
-          expect.objectContaining({
-            custom: "data", // Preserved from existing state
-            name: router.getState()?.name,
-          }),
-          "",
-          expect.any(String),
-        );
       });
     });
   });
@@ -1815,6 +1641,162 @@ describe("Browser Plugin", async () => {
           "/new/users/view/42",
         );
       });
+    });
+  });
+
+  describe("Real Browser (no mock)", () => {
+    describe("safelyEncodePath catch block (browser.ts lines 69-71)", () => {
+      it("returns original path when decodeURI throws on malformed percent-encoding", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+        // Truncated UTF-8 sequence causes decodeURI to throw URIError
+        globalThis.history.replaceState({}, "", "/%E0%A4%A");
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({}));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()).toBeDefined();
+          expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("Could not encode path"),
+            expect.any(URIError),
+          );
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+          warnSpy.mockRestore();
+        }
+      });
+    });
+  });
+
+  describe("SSR Fallback Browser (browser.ts lines 112-157)", () => {
+    it("uses fallback browser and covers all lifecycle methods", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const originalWindow = globalThis.window;
+
+      // @ts-expect-error — simulating SSR by removing window
+      delete globalThis.window;
+
+      try {
+        const ssrRouter = createRouter(routerConfig, {
+          defaultRoute: "home",
+        });
+
+        ssrRouter.usePlugin(browserPluginFactory({ preserveHash: true }));
+
+        await ssrRouter.start();
+
+        expect(ssrRouter.getState()).toBeDefined();
+
+        await ssrRouter.navigate("users.list");
+
+        expect(ssrRouter.getState()?.name).toBe("users.list");
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("non-browser environment"),
+        );
+
+        ssrRouter.stop();
+      } finally {
+        globalThis.window = originalWindow;
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe("Popstate Edge Cases", () => {
+    it("skips transition when popstate resolves to no matching route and no default route (lines 60, 85)", async () => {
+      const noDefaultRouter = createRouter(
+        [{ name: "home", path: "/home" }],
+        {},
+      );
+
+      noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await noDefaultRouter.start("/home");
+
+      globalThis.history.replaceState({}, "", "/nonexistent");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(noDefaultRouter.getState()?.name).toBe("home");
+
+      noDefaultRouter.stop();
+    });
+  });
+
+  describe("Validation Edge Cases", () => {
+    it("skips validation when opts is undefined (validation.ts line 35)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(browserPluginFactory());
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Invalid type"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("ignores unknown option keys (validation.ts line 41 else branch)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(
+        browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
+      );
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Invalid type"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("does not warn when hashPrefix is empty string in history mode (validation.ts line 60)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(
+        browserPluginFactory(
+          { useHash: false, hashPrefix: "" } as any,
+          mockedBrowser,
+        ),
+      );
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("hashPrefix ignored"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("Popstate Meta Params Edge Case", () => {
+    it("handles popstate with meta missing params field (popstate-utils.ts line 40)", async () => {
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await router.start();
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: {
+            name: "home",
+            params: {},
+            path: "/home",
+            meta: { id: 5 },
+          },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("home");
     });
   });
 

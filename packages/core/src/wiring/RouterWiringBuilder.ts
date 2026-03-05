@@ -13,7 +13,7 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
-import type { DefaultDependencies } from "@real-router/types";
+import type { DefaultDependencies, Params } from "@real-router/types";
 
 export class RouterWiringBuilder<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -81,7 +81,7 @@ export class RouterWiringBuilder<
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       getDependency: (name) =>
         this.dependenciesStore.dependencies[name] as Dependencies[typeof name],
-      forwardState: (name, params) => {
+      forwardState: <P extends Params = Params>(name: string, params: P) => {
         const ctx = getInternals(this.router);
 
         if (!ctx.noValidate) {
@@ -118,7 +118,10 @@ export class RouterWiringBuilder<
       setState: (state) => {
         this.state.set(state);
       },
-      buildStateWithSegments: (routeName, routeParams) => {
+      buildStateWithSegments: <P extends Params = Params>(
+        routeName: string,
+        routeParams: P,
+      ) => {
         const ctx = getInternals(this.router);
 
         if (!ctx.noValidate) {

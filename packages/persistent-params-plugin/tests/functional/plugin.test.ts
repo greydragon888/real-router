@@ -3,8 +3,6 @@ import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";
 
-import { parseQueryString } from "../../src/utils";
-
 import type { Router } from "@real-router/core";
 
 let router: Router;
@@ -224,6 +222,12 @@ describe("Persistent params plugin", () => {
       expect(router.buildPath("route2", { id: "2" })).toBe(
         "/route2/2?mode=dev",
       );
+    });
+
+    it("buildPath should work without params argument", async () => {
+      await router.navigate("route1", { id: "1", mode: "dev" });
+
+      expect(router.buildPath("home")).toBe("/?mode=dev");
     });
   });
 
@@ -547,75 +551,6 @@ describe("Persistent params plugin", () => {
     });
   });
 
-  describe("Utils Unit Tests", () => {
-    describe("parseQueryString", () => {
-      it("should handle empty string", async () => {
-        const result = parseQueryString("");
-
-        expect(result).toStrictEqual({
-          basePath: "",
-          queryString: "",
-        });
-      });
-
-      it("should handle just question mark", async () => {
-        const result = parseQueryString("?");
-
-        expect(result).toStrictEqual({
-          basePath: "",
-          queryString: "",
-        });
-      });
-
-      it("should handle path without query string", async () => {
-        const result = parseQueryString("/users/list");
-
-        expect(result).toStrictEqual({
-          basePath: "/users/list",
-          queryString: "",
-        });
-      });
-
-      it("should handle path with query string", async () => {
-        const result = parseQueryString("/users/list?page=1&sort=asc");
-
-        expect(result).toStrictEqual({
-          basePath: "/users/list",
-          queryString: "page=1&sort=asc",
-        });
-      });
-
-      it("should handle query string starting with question mark", async () => {
-        const result = parseQueryString("?page=1");
-
-        expect(result).toStrictEqual({
-          basePath: "",
-          queryString: "page=1",
-        });
-      });
-
-      it("should handle multiple question marks (takes first)", async () => {
-        const result = parseQueryString("/path?query1?query2");
-
-        expect(result).toStrictEqual({
-          basePath: "/path",
-          queryString: "query1?query2",
-        });
-      });
-
-      it("should handle complex paths with special characters", async () => {
-        const result = parseQueryString(
-          "/api/v2/users?filter=active&sort=name",
-        );
-
-        expect(result).toStrictEqual({
-          basePath: "/api/v2/users",
-          queryString: "filter=active&sort=name",
-        });
-      });
-    });
-  });
-
   describe("Input Validation", () => {
     describe("Invalid Types", () => {
       it("should throw on null params", () => {
@@ -659,6 +594,38 @@ describe("Persistent params plugin", () => {
       it("should throw on array with empty strings", () => {
         expect(() => {
           persistentParamsPlugin(["mode", ""]);
+        }).toThrowError(/Invalid params configuration/);
+      });
+
+      it("should throw on array with keys containing special characters", () => {
+        expect(() => {
+          persistentParamsPlugin(["valid", "param=bad"]);
+        }).toThrowError(/Invalid params configuration/);
+      });
+
+      it("should throw on array with keys containing whitespace", () => {
+        expect(() => {
+          persistentParamsPlugin(["param name"]);
+        }).toThrowError(/Invalid params configuration/);
+      });
+    });
+
+    describe("Invalid Object Keys", () => {
+      it("should throw on object with empty string key", () => {
+        expect(() => {
+          persistentParamsPlugin({ "": "value" });
+        }).toThrowError(/Invalid params configuration/);
+      });
+
+      it("should throw on object with keys containing special characters", () => {
+        expect(() => {
+          persistentParamsPlugin({ "bad=key": "value" });
+        }).toThrowError(/Invalid params configuration/);
+      });
+
+      it("should throw on object with keys containing question mark", () => {
+        expect(() => {
+          persistentParamsPlugin({ "bad?key": "value" });
         }).toThrowError(/Invalid params configuration/);
       });
     });
@@ -800,29 +767,6 @@ describe("Persistent params plugin", () => {
         }).not.toThrowError();
 
         router2.stop();
-      });
-    });
-
-    describe("Double Initialization Protection", () => {
-      it("should prevent double initialization", () => {
-        router.usePlugin(persistentParamsPlugin(["mode"]));
-
-        expect(() => {
-          router.usePlugin(persistentParamsPlugin(["mode"]));
-        }).toThrowError(/already initialized/);
-      });
-
-      it("should not wrap methods multiple times", async () => {
-        router.usePlugin(persistentParamsPlugin(["mode"]));
-        const firstWrap = router.buildPath;
-
-        try {
-          router.usePlugin(persistentParamsPlugin(["mode"]));
-        } catch {
-          // Expected error
-        }
-
-        expect(router.buildPath).toBe(firstWrap);
       });
     });
 

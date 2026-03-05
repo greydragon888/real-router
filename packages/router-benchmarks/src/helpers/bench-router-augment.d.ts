@@ -1,6 +1,5 @@
 import type {
   EventName,
-  NavigationOptions,
   Options,
   Params,
   State,
@@ -33,12 +32,6 @@ declare module "@real-router/core" {
       eventName: EventName,
       cb: (...args: any[]) => void,
     ): Unsubscribe;
-
-    navigateToState(
-      toState: State,
-      fromState: State | undefined,
-      opts: NavigationOptions,
-    ): Promise<State>;
 
     getOptions(): Options;
 

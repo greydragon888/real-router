@@ -1,299 +1,137 @@
-// packages/persistent-params-plugin/modules/plugin.ts
+// packages/persistent-params-plugin/src/plugin.ts
 
-import { getPluginApi } from "@real-router/core";
+import { extractOwnParams, mergeParams } from "./param-utils";
+import { validateParamValue } from "./validation";
 
-import { PLUGIN_MARKER } from "./constants";
-import {
-  buildQueryString,
-  extractOwnParams,
-  isValidParamsConfig,
-  mergeParams,
-  parseQueryString,
-  validateParamValue,
-} from "./utils";
+import type { Params, PluginApi, State, Plugin } from "@real-router/core";
 
-import type { PersistentParamsConfig } from "./types";
-import type { Params, PluginFactory, Plugin } from "@real-router/core";
+export class PersistentParamsPlugin {
+  readonly #api: PluginApi;
+  readonly #paramNamesSet: Set<string>;
+  readonly #originalRootPath: string;
 
-/**
- * Factory for the persistent parameters' plugin.
- *
- * This plugin allows you to specify certain route parameters to be persisted across
- * all navigation transitions. Persisted parameters are automatically merged into
- * route parameters when building paths or states.
- *
- * Key features:
- * - Automatic persistence of query parameters across navigations
- * - Support for default values
- * - Type-safe (only primitives: string, number, boolean)
- * - Immutable internal state
- * - Protection against prototype pollution
- * - Full teardown support (can be safely unsubscribed)
- *
- * If a persisted parameter is explicitly set to `undefined` during navigation,
- * it will be removed from the persisted state and omitted from subsequent URLs.
- *
- * The plugin also adjusts the router's root path to include query parameters for
- * all persistent params, ensuring correct URL construction.
- *
- * @param params - Either an array of parameter names (strings) to persist,
- *                 or an object mapping parameter names to initial values.
- *                 If an array, initial values will be `undefined`.
- *
- * @returns A PluginFactory that creates the persistent params plugin instance.
- *
- * @example
- * // Persist parameters without default values
- * router.usePlugin(persistentParamsPlugin(['mode', 'lang']));
- *
- * @example
- * // Persist parameters with default values
- * router.usePlugin(persistentParamsPlugin({ mode: 'dev', lang: 'en' }));
- *
- * @example
- * // Removing a persisted parameter
- * router.navigate('route', { mode: undefined }); // mode will be removed
- *
- * @example
- * // Unsubscribing (full cleanup)
- * const unsubscribe = router.usePlugin(persistentParamsPlugin(['mode']));
- * unsubscribe(); // Restores original router state
- *
- * @throws {TypeError} If params is not a valid array of strings or object with primitives
- * @throws {Error} If plugin is already initialized on this router instance
- */
-export function persistentParamsPluginFactory(
-  params: PersistentParamsConfig = {},
-): PluginFactory {
-  // Validate input configuration
-  if (!isValidParamsConfig(params)) {
-    let actualType: string;
+  #persistentParams: Readonly<Params>;
+  #removeBuildPathInterceptor: (() => void) | undefined;
+  #removeForwardStateInterceptor: (() => void) | undefined;
 
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    if (params === null) {
-      actualType = "null";
-    } else if (Array.isArray(params)) {
-      actualType = "array with invalid items";
-    } else {
-      actualType = typeof params;
-    }
-
-    throw new TypeError(
-      `[@real-router/persistent-params-plugin] Invalid params configuration. ` +
-        `Expected array of non-empty strings or object with primitive values, got ${actualType}.`,
-    );
+  constructor(
+    api: PluginApi,
+    persistentParams: Readonly<Params>,
+    paramNamesSet: Set<string>,
+    originalRootPath: string,
+  ) {
+    this.#api = api;
+    this.#persistentParams = persistentParams;
+    this.#paramNamesSet = paramNamesSet;
+    this.#originalRootPath = originalRootPath;
   }
 
-  // Empty configuration - valid but does nothing
-  if (Array.isArray(params) && params.length === 0) {
-    return () => ({});
-  }
-
-  if (!Array.isArray(params) && Object.keys(params).length === 0) {
-    return () => ({});
-  }
-
-  return (router): Plugin => {
-    // Check if plugin is already initialized on this router
-    if (PLUGIN_MARKER in router) {
-      throw new Error(
-        `[@real-router/persistent-params-plugin] Plugin already initialized on this router. ` +
-          `To reconfigure, first unsubscribe the existing plugin using the returned unsubscribe function.`,
-      );
-    }
-
-    // Mark router as initialized
-    (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER] = true;
-
-    // Initialize frozen persistent parameters
-    let persistentParams: Readonly<Params>;
-
-    if (Array.isArray(params)) {
-      const initial: Params = {};
-
-      for (const param of params) {
-        initial[param] = undefined;
-      }
-
-      persistentParams = Object.freeze(initial);
-    } else {
-      persistentParams = Object.freeze({ ...params });
-    }
-
-    // Track parameter names
-    const paramNamesSet = new Set<string>(
-      Array.isArray(params) ? [...params] : Object.keys(params),
-    );
-
-    const api = getPluginApi(router);
-
-    // Store original router methods for restoration
-    const originalForwardState = api.getForwardState();
-    const originalRootPath = api.getRootPath();
-
-    // Update router root path to include query parameters for persistent params
+  getPlugin(): Plugin {
     try {
-      const { basePath, queryString } = parseQueryString(originalRootPath);
-      const newQueryString = buildQueryString(queryString, [...paramNamesSet]);
+      const queryString = [...this.#paramNamesSet].join("&");
 
-      api.setRootPath(`${basePath}?${newQueryString}`);
+      this.#api.setRootPath(`${this.#originalRootPath}?${queryString}`);
     } /* v8 ignore start -- @preserve: defensive error wrapping for setRootPath failure */ catch (error) {
-      delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
-
       throw new Error(
         `[@real-router/persistent-params-plugin] Failed to update root path: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       );
     } /* v8 ignore stop */
 
-    /**
-     * Merges persistent parameters with current navigation parameters.
-     * Validates all parameter values before merging.
-     *
-     * @param additionalParams - Parameters passed during navigation
-     * @returns Merged parameters object
-     * @throws {TypeError} If any parameter value is invalid (not a primitive)
-     */
-
-    function withPersistentParams(additionalParams: Params): Params {
-      // Extract safe params (prevent prototype pollution)
-      const safeParams = extractOwnParams(additionalParams);
-
-      // Validate and collect parameters to remove in a single pass
-      const paramsToRemove: string[] = [];
-
-      for (const key of Object.keys(safeParams)) {
-        const value = safeParams[key];
-
-        // If undefined and tracked, mark for removal (skip validation)
-        if (value === undefined && paramNamesSet.has(key)) {
-          paramsToRemove.push(key);
-        } else {
-          // Validate all other parameters
-          validateParamValue(key, value);
-        }
-      }
-
-      // Process all removals in one batch
-      if (paramsToRemove.length > 0) {
-        // Remove from both Set
-        for (const key of paramsToRemove) {
-          paramNamesSet.delete(key);
-        }
-
-        // Update persistentParams once (batch freeze)
-        const newParams: Params = { ...persistentParams };
-
-        for (const key of paramsToRemove) {
-          delete newParams[key];
-        }
-
-        persistentParams = Object.freeze(newParams);
-      }
-
-      // Merge persistent and current params
-      return mergeParams(persistentParams, safeParams);
-    }
-
-    // Intercept buildPath to inject persistent params into path construction
-    const removeBuildPathInterceptor = api.addBuildPathInterceptor(
-      (_routeName, buildPathParams) => withPersistentParams(buildPathParams),
+    this.#removeBuildPathInterceptor = this.#api.addInterceptor(
+      "buildPath",
+      (next, route, navParams) =>
+        next(route, this.#withPersistentParams(navParams ?? {})),
     );
 
-    api.setForwardState(
-      <P extends Params = Params>(routeName: string, routeParams: P) => {
-        const result = originalForwardState(routeName, routeParams);
+    this.#removeForwardStateInterceptor = this.#api.addInterceptor(
+      "forwardState",
+      (next, routeName, routeParams) => {
+        const result = next(routeName, routeParams);
 
         return {
           ...result,
-          params: withPersistentParams(result.params) as P,
+          params: this.#withPersistentParams(result.params),
         };
       },
     );
 
     return {
-      /**
-       * Updates persistent parameters after successful transition.
-       * Only processes parameters that are tracked and have changed.
-       *
-       * @param toState - Target state after successful transition
-       */
-      onTransitionSuccess(toState) {
-        try {
-          // Collect changed parameters and removals
-          const updates: Params = {};
-          const removals: string[] = [];
-          let hasChanges = false;
-
-          for (const key of paramNamesSet) {
-            const value = toState.params[key];
-
-            // If parameter is not in state params or is undefined, mark for removal
-            if (!Object.hasOwn(toState.params, key) || value === undefined) {
-              /* v8 ignore next 6 -- @preserve: defensive removal for states committed via navigateToState bypassing forwardState */
-              if (
-                Object.hasOwn(persistentParams, key) &&
-                persistentParams[key] !== undefined
-              ) {
-                removals.push(key);
-                hasChanges = true;
-              }
-
-              continue;
-            }
-
-            // Validate type before storing
-            validateParamValue(key, value);
-
-            // Only update if value actually changed
-            if (persistentParams[key] !== value) {
-              updates[key] = value;
-              hasChanges = true;
-            }
-          }
-
-          // Create new frozen object only if there were changes
-          if (hasChanges) {
-            const newParams: Params = { ...persistentParams, ...updates };
-
-            /* v8 ignore next 3 -- @preserve: removals only populated by defensive navigateToState path above */
-            for (const key of removals) {
-              delete newParams[key];
-            }
-
-            persistentParams = Object.freeze(newParams);
-          }
-        } catch (error) {
-          // Log error but don't break navigation
-          /* v8 ignore next 5 -- @preserve defensive: validation happens before navigate() */
-          console.error(
-            "persistent-params-plugin",
-            "Error updating persistent params:",
-            error,
-          );
-        }
+      onTransitionSuccess: (toState) => {
+        this.#onTransitionSuccess(toState);
       },
-
-      /**
-       * Cleanup function to restore original router state.
-       * Restores all overridden methods and paths.
-       * Called when plugin is unsubscribed.
-       */
-      teardown() {
-        try {
-          removeBuildPathInterceptor();
-          api.setForwardState(originalForwardState);
-          api.setRootPath(originalRootPath);
-
-          delete (router as unknown as Record<symbol, boolean>)[PLUGIN_MARKER];
-        } /* v8 ignore start -- @preserve: defensive error logging for teardown failure */ catch (error) {
-          console.error(
-            "persistent-params-plugin",
-            "Error during teardown:",
-            error,
-          );
-        } /* v8 ignore stop */
+      teardown: () => {
+        this.#teardown();
       },
     };
-  };
+  }
+
+  #withPersistentParams(additionalParams: Params): Params {
+    const safeParams = extractOwnParams(additionalParams);
+    let newParams: Params | undefined;
+
+    for (const key of Object.keys(safeParams)) {
+      const value = safeParams[key];
+
+      if (value === undefined && this.#paramNamesSet.has(key)) {
+        this.#paramNamesSet.delete(key);
+        newParams ??= { ...this.#persistentParams };
+        delete newParams[key];
+      } else {
+        validateParamValue(key, value);
+      }
+    }
+
+    if (newParams) {
+      this.#persistentParams = Object.freeze(newParams);
+    }
+
+    return mergeParams(this.#persistentParams, safeParams);
+  }
+
+  #onTransitionSuccess(toState: State): void {
+    let newParams: Params | undefined;
+
+    for (const key of this.#paramNamesSet) {
+      const value = toState.params[key];
+
+      if (!Object.hasOwn(toState.params, key) || value === undefined) {
+        /* v8 ignore next 4 -- @preserve: defensive removal for states committed via navigateToState bypassing forwardState */
+        if (
+          Object.hasOwn(this.#persistentParams, key) &&
+          this.#persistentParams[key] !== undefined
+        ) {
+          newParams ??= { ...this.#persistentParams };
+          delete newParams[key];
+        }
+
+        continue;
+      }
+
+      validateParamValue(key, value);
+
+      if (this.#persistentParams[key] !== value) {
+        newParams ??= { ...this.#persistentParams };
+        newParams[key] = value;
+      }
+    }
+
+    if (newParams) {
+      this.#persistentParams = Object.freeze(newParams);
+    }
+  }
+
+  #teardown(): void {
+    try {
+      this.#removeBuildPathInterceptor?.();
+      this.#removeForwardStateInterceptor?.();
+      this.#api.setRootPath(this.#originalRootPath);
+    } /* v8 ignore start -- @preserve: defensive error logging for teardown failure */ catch (error) {
+      console.error(
+        "persistent-params-plugin",
+        "Error during teardown:",
+        error,
+      );
+    } /* v8 ignore stop */
+  }
 }
