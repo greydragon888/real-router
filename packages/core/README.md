@@ -37,7 +37,7 @@ await router.navigate("users.profile", { id: "123" });
 
 ## Router API
 
-The Router class provides core lifecycle, navigation, state, and subscription methods. 
+The Router class provides core lifecycle, navigation, state, and subscription methods.
 Domain-specific operations (routes, dependencies, guards, plugin infrastructure, cloning) are available through standalone API functions for tree-shaking.
 
 ### `createRouter(routes?, options?, dependencies?)`
@@ -286,10 +286,13 @@ lifecycle.addDeactivateGuard("editor", () => async (toState, fromState) => {
 });
 
 // Guards receive AbortSignal for cooperative cancellation
-lifecycle.addActivateGuard("dashboard", () => async (toState, fromState, signal) => {
-  const res = await fetch("/api/auth", { signal }); // auto-cancelled on abort
-  return res.ok;
-});
+lifecycle.addActivateGuard(
+  "dashboard",
+  () => async (toState, fromState, signal) => {
+    const res = await fetch("/api/auth", { signal }); // auto-cancelled on abort
+    return res.ok;
+  },
+);
 
 // Remove guards
 lifecycle.removeActivateGuard("admin");
@@ -312,9 +315,12 @@ const state = api.matchPath("/users/123");
 const builtState = api.makeState("users.profile", { id: "123" });
 
 // Event system
-const unsub = api.addEventListener(events.TRANSITION_START, (toState, fromState) => {
-  console.log("Starting:", toState.name);
-});
+const unsub = api.addEventListener(
+  events.TRANSITION_START,
+  (toState, fromState) => {
+    console.log("Starting:", toState.name);
+  },
+);
 
 // Root path management
 api.setRootPath("/app");
@@ -327,9 +333,18 @@ api.addInterceptor("forwardState", (next, name, params) => {
 });
 
 api.addInterceptor("start", (next, path) => next(path ?? getLocation()));
+
+// Router instance extension (used by plugins to add methods)
+const removeExtensions = api.extendRouter({
+  buildUrl: (name, params) => buildUrlFromPath(name, params),
+  matchUrl: (url) => matchUrlToState(url),
+});
+// Extensions are assigned directly to the router instance
+// Throws PLUGIN_CONFLICT if any key already exists
+// removeExtensions() cleans up on plugin teardown
 ```
 
-**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `addEventListener`, `getOptions`, `getTree`, `addInterceptor`
+**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `addEventListener`, `getOptions`, `getTree`, `addInterceptor`, `extendRouter`
 
 ### SSR Cloning — `cloneRouter(router, deps?)`
 
@@ -392,18 +407,19 @@ try {
 }
 ```
 
-| Code                     | Description                       |
-| ------------------------ | --------------------------------- |
-| `ROUTE_NOT_FOUND`        | Route doesn't exist               |
-| `CANNOT_ACTIVATE`        | Blocked by canActivate guard      |
-| `CANNOT_DEACTIVATE`      | Blocked by canDeactivate guard    |
-| `CANCELLED`              | Navigation was cancelled          |
-| `SAME_STATES`            | Already at target route           |
-| `NOT_STARTED`            | Router not started                |
-| `NO_START_PATH_OR_STATE` | `start()` called without a path   |
-| `ALREADY_STARTED`        | Router already started            |
-| `TRANSITION_ERR`         | Generic transition error          |
-| `DISPOSED`               | Router has been disposed          |
+| Code                     | Description                                  |
+| ------------------------ | -------------------------------------------- |
+| `ROUTE_NOT_FOUND`        | Route doesn't exist                          |
+| `CANNOT_ACTIVATE`        | Blocked by canActivate guard                 |
+| `CANNOT_DEACTIVATE`      | Blocked by canDeactivate guard               |
+| `CANCELLED`              | Navigation was cancelled                     |
+| `SAME_STATES`            | Already at target route                      |
+| `NOT_STARTED`            | Router not started                           |
+| `NO_START_PATH_OR_STATE` | `start()` called without a path              |
+| `ALREADY_STARTED`        | Router already started                       |
+| `TRANSITION_ERR`         | Generic transition error                     |
+| `DISPOSED`               | Router has been disposed                     |
+| `PLUGIN_CONFLICT`        | Plugin extends router with existing property |
 
 See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for details.
 

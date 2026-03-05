@@ -1052,6 +1052,37 @@ api.addInterceptor("forwardState", (next, routeName, routeParams) => {
 
 **Rule:** Methods that plugins may intercept must go through `RouterInternals` (WeakMap-based), not be called directly on namespace instances.
 
+### Router Extension Pattern
+
+**Problem:** Plugins that add methods to the router instance (e.g., `browser-plugin` adding `buildUrl`, `matchUrl`, `replaceHistoryState`) used manual property assignment with no conflict detection and manual cleanup:
+
+```typescript
+// browser-plugin (old approach)
+Object.assign(this.#router, { buildUrl, matchUrl, replaceHistoryState });
+// teardown:
+delete (this.#router as any).buildUrl;
+delete (this.#router as any).matchUrl;
+delete (this.#router as any).replaceHistoryState;
+```
+
+Issues: no conflict detection if two plugins assign the same key, manual `delete` cleanup is error-prone, no safety net if plugin forgets cleanup.
+
+**Solution:** `extendRouter()` on `PluginApi`:
+
+```typescript
+// browser-plugin (new approach)
+const api = getPluginApi(router);
+const removeExtensions = api.extendRouter({
+  buildUrl,
+  matchUrl,
+  replaceHistoryState,
+});
+// teardown:
+removeExtensions(); // idempotent, auto-cleans all keys
+```
+
+**Implementation:** `extendRouter()` in `getPluginApi.ts` uses a two-loop pattern (validate-all, then assign-all) for atomicity. Throws `RouterError(PLUGIN_CONFLICT)` if any key already exists. Tracks assigned keys in `RouterInternals.routerExtensions` for safety-net cleanup during `dispose()`.
+
 ### Standalone API Extraction (Modular Architecture)
 
 **Problem:** All API surface was on the Router class, making it impossible to tree-shake unused features (e.g., dependency management, guard management, cloning).

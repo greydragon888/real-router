@@ -33,6 +33,7 @@ describe("getPluginApi()", () => {
     expect(typeof api.getOptions).toBe("function");
     expect(typeof api.getTree).toBe("function");
     expect(typeof api.addInterceptor).toBe("function");
+    expect(typeof api.extendRouter).toBe("function");
   });
 
   it("should return a new object on each call", () => {

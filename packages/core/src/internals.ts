@@ -90,6 +90,7 @@ export interface RouterInternals<
   readonly isTransitioning: () => boolean;
   readonly clearState: () => void;
   readonly setState: (state: State) => void;
+  readonly routerExtensions: { keys: string[] }[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- existential type: stores RouterInternals for all Dependencies types

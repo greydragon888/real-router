@@ -35,6 +35,7 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
   TRANSITION_ERR: "TRANSITION_ERR", // Generic transition failure
   TRANSITION_CANCELLED: "CANCELLED", // Navigation cancelled by user or new navigation
   ROUTER_DISPOSED: "DISPOSED", // Router has been disposed
+  PLUGIN_CONFLICT: "PLUGIN_CONFLICT", // Plugin tried to extend router with already-existing property
 });
 
 /**
