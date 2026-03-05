@@ -5,7 +5,6 @@ import type { EventMethodMap, GuardFnFactory, PluginFactory } from "./types";
 import type {
   DefaultDependencies,
   EventName,
-  NavigationOptions,
   Options,
   Params,
   Plugin,
@@ -45,12 +44,6 @@ export interface RouterInternals<
   ) => State<P, MP> | undefined;
 
   readonly getOptions: () => Options;
-
-  readonly navigateToState: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => Promise<State>;
 
   readonly addEventListener: <E extends EventName>(
     eventName: E,
@@ -158,4 +151,3 @@ export function createInterceptable<T extends (...args: any[]) => any>(
     return executeInterceptorChain(chain, original, args);
   }) as T;
 }
-/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

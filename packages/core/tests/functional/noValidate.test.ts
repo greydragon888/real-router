@@ -258,16 +258,6 @@ describe("core/noValidate option", () => {
           router.navigateToDefault().catch(() => {}),
         ).not.toThrowError();
       });
-
-      it("should skip validation in navigateToState", async () => {
-        await router.start("/home");
-
-        const state = getPluginApi(router).makeState("home", {}, "/home");
-
-        expect(() =>
-          getPluginApi(router).navigateToState(state, undefined, {}),
-        ).not.toThrowError();
-      });
     });
 
     // Cloning

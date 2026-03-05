@@ -357,6 +357,7 @@ describe("Browser Plugin", async () => {
 
     it("skips transition for equal states", async () => {
       const subscribeSpy = vi.fn();
+      const consoleSpy = vi.spyOn(console, "error");
 
       router.subscribe(subscribeSpy);
 
@@ -366,7 +367,12 @@ describe("Browser Plugin", async () => {
         new PopStateEvent("popstate", { state: currentState }),
       );
 
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
       expect(subscribeSpy).not.toHaveBeenCalled();
+      expect(consoleSpy).not.toHaveBeenCalled();
+
+      consoleSpy.mockRestore();
     });
 
     it("restores state on CANNOT_DEACTIVATE", async () => {
@@ -542,33 +548,33 @@ describe("Browser Plugin", async () => {
       it("recovers from critical error in onPopState", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-        vi.spyOn(router, "getState").mockImplementation(() => {
-          throw new Error("Critical error");
-        });
-
-        vi.spyOn(mockedBrowser, "replaceState");
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical error"),
+        );
 
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: null }),
         );
 
+        await new Promise((resolve) => setTimeout(resolve, 10));
+
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error in onPopState"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
 
         consoleSpy.mockRestore();
       });
 
-      it("recovers by syncing browser state after critical error (lines 385-387)", async () => {
+      it("recovers by syncing browser state after critical error", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
         const replaceStateSpy = vi.spyOn(mockedBrowser, "replaceState");
 
         await router.navigate("users.list");
 
-        vi.spyOn(router, "areStatesEqual").mockImplementation(() => {
-          throw new Error("Critical areStatesEqual error");
-        });
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical navigate error"),
+        );
 
         const validState: HistoryState = {
           name: "home",
@@ -585,7 +591,7 @@ describe("Browser Plugin", async () => {
 
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
 
         expect(replaceStateSpy).toHaveBeenCalled();
@@ -593,14 +599,14 @@ describe("Browser Plugin", async () => {
         consoleSpy.mockRestore();
       });
 
-      it("handles recovery failure gracefully (lines 389-395)", async () => {
+      it("handles recovery failure gracefully", async () => {
         const consoleSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
         await router.navigate("users.list");
 
-        vi.spyOn(router, "areStatesEqual").mockImplementation(() => {
-          throw new Error("Critical areStatesEqual error");
-        });
+        vi.spyOn(router, "navigate").mockRejectedValue(
+          new TypeError("Critical navigate error"),
+        );
 
         vi.spyOn(router, "buildUrl").mockImplementation(() => {
           throw new Error("Recovery error");
@@ -621,7 +627,7 @@ describe("Browser Plugin", async () => {
 
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Critical error"),
-          expect.any(Error),
+          expect.any(TypeError),
         );
         expect(consoleSpy).toHaveBeenCalledWith(
           expect.stringContaining("Failed to recover"),

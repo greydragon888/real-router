@@ -28,7 +28,6 @@ describe("getPluginApi()", () => {
     expect(typeof api.matchPath).toBe("function");
     expect(typeof api.setRootPath).toBe("function");
     expect(typeof api.getRootPath).toBe("function");
-    expect(typeof api.navigateToState).toBe("function");
     expect(typeof api.addEventListener).toBe("function");
     expect(typeof api.buildNavigationState).toBe("function");
     expect(typeof api.getOptions).toBe("function");
@@ -93,15 +92,6 @@ describe("getPluginApi()", () => {
     api.setRootPath("");
   });
 
-  it("navigateToState should delegate to router.navigateToState", async () => {
-    await router.start("/home");
-    const toState = api.makeState("users", {}, "/users");
-    const fromState = router.getState();
-    const result = await api.navigateToState(toState, fromState, {});
-
-    expect(result.name).toBe("users");
-  });
-
   it("addEventListener should register event listeners", async () => {
     await router.start("/home");
     let called = false;
@@ -159,23 +149,6 @@ describe("getPluginApi()", () => {
 
     expect(() => {
       disposedApi.setRootPath("/app");
-    }).toThrowError(RouterError);
-  });
-
-  it("should throw ROUTER_DISPOSED for navigateToState after dispose", () => {
-    router.dispose();
-
-    const disposedApi = getPluginApi(router);
-    const state = {
-      name: "home",
-      params: {},
-      path: "/home",
-      meta: { id: 1, params: {} },
-    };
-
-    // throwIfDisposed is synchronous — throws before the async body runs
-    expect(() => {
-      void disposedApi.navigateToState(state, undefined, {});
     }).toThrowError(RouterError);
   });
 

@@ -1,10 +1,7 @@
+import { RouterError } from "@real-router/core";
+
 import { LOGGER_CONTEXT } from "./constants";
-import {
-  createStateFromEvent,
-  handleMissingState,
-  shouldSkipTransition,
-  updateBrowserState,
-} from "./popstate-utils";
+import { getRouteFromEvent, updateBrowserState } from "./popstate-utils";
 import { buildUrl, urlToPath } from "./url-utils";
 
 import type {
@@ -39,7 +36,7 @@ export class BrowserPlugin {
 
   #isTransitioning = false;
   #deferredPopstateEvent: PopStateEvent | null = null;
-  #removeStartInterceptor: (() => void) | undefined;
+  readonly #removeStartInterceptor: () => void;
 
   constructor(
     router: Router,
@@ -65,16 +62,16 @@ export class BrowserPlugin {
     const normalizedOptions = options as URLParseOptions;
 
     this.#prefix = options.useHash ? `#${normalizedOptions.hashPrefix}` : "";
-  }
 
-  getPlugin(): Plugin {
     this.#removeStartInterceptor = this.#api.addInterceptor(
       "start",
       (next, path) => next(path ?? this.#browser.getLocation(this.#options)),
     );
 
     this.#augmentRouter();
+  }
 
+  getPlugin(): Plugin {
     return {
       onStart: () => {
         if (this.#shared.removePopStateListener) {
@@ -183,11 +180,7 @@ export class BrowserPlugin {
       this.#shared.removePopStateListener = undefined;
     }
 
-    /* v8 ignore next 4 -- @preserve: defensive guard, always set in constructor */
-    if (this.#removeStartInterceptor) {
-      this.#removeStartInterceptor();
-      this.#removeStartInterceptor = undefined;
-    }
+    this.#removeStartInterceptor();
 
     delete (this.#router as Partial<Router>).buildUrl;
     delete (this.#router as Partial<Router>).matchUrl;
@@ -215,61 +208,34 @@ export class BrowserPlugin {
       return;
     }
 
-    try {
-      const transition = this.#prepareTransition(evt);
-
-      if (!transition) {
-        return;
-      }
-
-      await this.#navigate(transition);
-    } catch (error) {
-      this.#isTransitioning = false;
-      this.#recoverFromCriticalError(error);
-      this.#processDeferredEvent();
-    }
-  }
-
-  #prepareTransition(evt: PopStateEvent) {
-    const routerState = this.#router.getState();
-    const state = createStateFromEvent(
-      evt,
-      this.#api,
-      this.#browser,
-      this.#options,
-    );
-
-    if (
-      !state &&
-      handleMissingState(this.#router, this.#api, this.#transitionOptions)
-    ) {
-      return;
-    }
-
-    if (!state || shouldSkipTransition(state, routerState, this.#router)) {
-      return;
-    }
-
-    return { state, routerState };
-  }
-
-  async #navigate(transition: {
-    state: State;
-    routerState: State | undefined;
-  }): Promise<void> {
-    const { state, routerState } = transition;
-
     this.#isTransitioning = true;
 
     try {
-      await this.#api.navigateToState(
-        state,
-        routerState,
-        this.#transitionOptions,
+      const route = getRouteFromEvent(
+        evt,
+        this.#api,
+        this.#browser,
+        this.#options,
       );
-    } catch {
-      // Transition errors (CANNOT_DEACTIVATE, etc.) are expected.
-      // Success is handled by the router FSM chain (TRANSITION_SUCCESS event).
+
+      // eslint-disable-next-line unicorn/prefer-ternary
+      if (route) {
+        await this.#router.navigate(
+          route.name,
+          route.params,
+          this.#transitionOptions,
+        );
+      } else {
+        await this.#router.navigateToDefault({
+          ...this.#transitionOptions,
+          reload: true,
+          replace: true,
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof RouterError)) {
+        this.#recoverFromCriticalError(error);
+      }
     } finally {
       this.#isTransitioning = false;
       this.#processDeferredEvent();
@@ -282,6 +248,7 @@ export class BrowserPlugin {
     try {
       const currentState = this.#router.getState();
 
+      /* v8 ignore next -- @preserve: router always has state after start(); defensive guard for edge cases */
       if (currentState) {
         const url = this.#router.buildUrl(
           currentState.name,

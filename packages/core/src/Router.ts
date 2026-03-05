@@ -69,7 +69,7 @@ import type { CreateMatcherOptions } from "route-tree";
  * - RoutesNamespace: route tree operations
  * - RouteLifecycleNamespace: canActivate/canDeactivate guards
  * - PluginsNamespace: plugin lifecycle
- * - NavigationNamespace: navigate, navigateToState
+ * - NavigationNamespace: navigate
  * - RouterLifecycleNamespace: start, stop, isStarted
  *
  * @internal This class implementation is internal. Use createRouter() instead.
@@ -222,8 +222,6 @@ export class Router<
       matchPath: (path, matchOptions) =>
         this.#routes.matchPath(path, matchOptions),
       getOptions: () => this.#options.get(),
-      navigateToState: (toState, fromState, opts) =>
-        this.#navigation.navigateToState(toState, fromState, opts),
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
       buildPath: createInterceptable(

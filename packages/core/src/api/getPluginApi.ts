@@ -1,7 +1,6 @@
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
 import { validateListenerArgs } from "../namespaces/EventBusNamespace/validators";
-import { validateNavigateToStateArgs } from "../namespaces/NavigationNamespace/validators";
 import {
   validateMatchPathArgs,
   validateSetRootPathArgs,
@@ -68,15 +67,6 @@ export function getPluginApi<
       ctx.setRootPath(rootPath);
     },
     getRootPath: ctx.getRootPath,
-    navigateToState: (toState, fromState, opts) => {
-      throwIfDisposed(ctx.isDisposed);
-
-      if (!ctx.noValidate) {
-        validateNavigateToStateArgs(toState, fromState, opts);
-      }
-
-      return ctx.navigateToState(toState, fromState, opts);
-    },
     addEventListener: (eventName, cb) => {
       throwIfDisposed(ctx.isDisposed);
 

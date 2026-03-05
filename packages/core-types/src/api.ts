@@ -10,7 +10,6 @@ import type {
   State,
   SimpleState,
   StateMetaInput,
-  NavigationOptions,
   Unsubscribe,
 } from "./base";
 import type { EventMethodMap, EventName } from "./constants";
@@ -76,12 +75,6 @@ export interface PluginApi {
 
   setRootPath: (rootPath: string) => void;
   getRootPath: () => string;
-
-  navigateToState: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => Promise<State>;
 
   addEventListener: <E extends EventName>(
     eventName: E,
