@@ -1,4 +1,4 @@
-// packages/browser-plugin/modules/url-utils.ts
+// packages/browser-plugin/src/url-utils.ts
 
 import { LOGGER_CONTEXT } from "./constants";
 
@@ -27,8 +27,7 @@ export function extractPath(
   regExpCache: RegExpCache,
 ): string {
   if (options.useHash) {
-    const hashPrefix = options.hashPrefix ?? "";
-    const escapedHashPrefix = escapeRegExp(hashPrefix);
+    const escapedHashPrefix = escapeRegExp(options.hashPrefix);
     const path = escapedHashPrefix
       ? hash.replace(regExpCache.get(`^#${escapedHashPrefix}`), "")
       : hash.slice(1);
@@ -36,16 +35,14 @@ export function extractPath(
     return path || "/";
   }
 
-  const base = options.base ?? "";
-
-  if (base) {
-    const escapedBase = escapeRegExp(base);
+  if (options.base) {
+    const escapedBase = escapeRegExp(options.base);
     const stripped = pathname.replace(regExpCache.get(`^${escapedBase}`), "");
 
     return stripped.startsWith("/") ? stripped : `/${stripped}`;
   }
 
-  return pathname || "/";
+  return pathname;
 }
 
 export function urlToPath(

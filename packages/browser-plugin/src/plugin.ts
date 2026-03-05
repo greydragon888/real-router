@@ -1,10 +1,7 @@
-import { isState } from "type-guards";
-
 import { LOGGER_CONTEXT } from "./constants";
 import {
   createStateFromEvent,
   handleMissingState,
-  handleTransitionResult,
   shouldSkipTransition,
   updateBrowserState,
 } from "./popstate-utils";
@@ -16,12 +13,12 @@ import type {
   HistoryState,
   RegExpCache,
   SharedFactoryState,
+  URLParseOptions,
 } from "./types";
 import type {
   NavigationOptions,
   PluginApi,
   Router,
-  RouterError,
   State,
   Plugin,
 } from "@real-router/core";
@@ -33,7 +30,6 @@ export class BrowserPlugin {
   readonly #browser: Browser;
   readonly #regExpCache: RegExpCache;
   readonly #prefix: string;
-  readonly #getBase: () => string;
   readonly #transitionOptions: {
     source: string;
     replace: true;
@@ -43,7 +39,6 @@ export class BrowserPlugin {
 
   #isTransitioning = false;
   #deferredPopstateEvent: PopStateEvent | null = null;
-  #cachedFrozenState: State | undefined;
   #removeStartInterceptor: (() => void) | undefined;
 
   constructor(
@@ -67,20 +62,15 @@ export class BrowserPlugin {
     this.#transitionOptions = transitionOptions;
     this.#shared = shared;
 
-    /* v8 ignore next -- @preserve fallback for undefined base */
-    this.#getBase = () => options.base ?? "";
-    /* v8 ignore next -- @preserve fallback for undefined hashPrefix */
-    const hashPrefix = options.hashPrefix ?? "";
+    const normalizedOptions = options as URLParseOptions;
 
-    this.#prefix = options.useHash ? `#${hashPrefix}` : "";
+    this.#prefix = options.useHash ? `#${normalizedOptions.hashPrefix}` : "";
   }
 
   getPlugin(): Plugin {
     this.#removeStartInterceptor = this.#api.addInterceptor(
       "start",
-      (next, path?: string) =>
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- interceptor chain uses generic any signature
-        next(path ?? this.#browser.getLocation(this.#options)),
+      (next, path) => next(path ?? this.#browser.getLocation(this.#options)),
     );
 
     this.#augmentRouter();
@@ -108,7 +98,7 @@ export class BrowserPlugin {
         fromState: State | undefined,
         navOptions: NavigationOptions,
       ) => {
-        this.#router.lastKnownState = toState;
+        this.#router.lastKnownState = Object.freeze({ ...toState });
 
         const replaceHistory =
           (navOptions.replace ?? !fromState) ||
@@ -146,11 +136,19 @@ export class BrowserPlugin {
     router.buildUrl = (route, params) => {
       const path = router.buildPath(route, params);
 
-      return buildUrl(path, this.#getBase(), this.#prefix);
+      return buildUrl(
+        path,
+        (this.#options as URLParseOptions).base,
+        this.#prefix,
+      );
     };
 
     router.matchUrl = (url) => {
-      const path = urlToPath(url, this.#options, this.#regExpCache);
+      const path = urlToPath(
+        url,
+        this.#options as URLParseOptions,
+        this.#regExpCache,
+      );
 
       return path ? this.#api.matchPath(path) : undefined;
     };
@@ -177,17 +175,6 @@ export class BrowserPlugin {
 
       updateBrowserState(builtState, url, true, this.#browser, this.#options);
     };
-
-    Object.defineProperty(router, "lastKnownState", {
-      get: () => this.#cachedFrozenState,
-      set: (value?: State) => {
-        this.#cachedFrozenState = value
-          ? Object.freeze({ ...value })
-          : undefined;
-      },
-      enumerable: true,
-      configurable: true,
-    });
   }
 
   #cleanupAugmentation(): void {
@@ -259,54 +246,30 @@ export class BrowserPlugin {
       return;
     }
 
-    if (shouldSkipTransition(state, routerState, this.#router)) {
+    if (!state || shouldSkipTransition(state, routerState, this.#router)) {
       return;
     }
 
-    /* v8 ignore start: defensive guard - state guaranteed defined by control flow above */
-    if (!state) {
-      return;
-    }
-    /* v8 ignore stop */
-
-    return { state, routerState, isNewState: !isState(evt.state) };
+    return { state, routerState };
   }
 
   async #navigate(transition: {
     state: State;
     routerState: State | undefined;
-    isNewState: boolean;
   }): Promise<void> {
-    const { state, routerState, isNewState } = transition;
+    const { state, routerState } = transition;
 
     this.#isTransitioning = true;
 
     try {
-      const toState = await this.#api.navigateToState(
+      await this.#api.navigateToState(
         state,
         routerState,
         this.#transitionOptions,
       );
-
-      handleTransitionResult(
-        undefined,
-        toState,
-        routerState,
-        isNewState,
-        this.#router,
-        this.#browser,
-        this.#options,
-      );
-    } catch (error) {
-      handleTransitionResult(
-        error as RouterError,
-        undefined,
-        routerState,
-        isNewState,
-        this.#router,
-        this.#browser,
-        this.#options,
-      );
+    } catch {
+      // Transition errors (CANNOT_DEACTIVATE, etc.) are expected.
+      // Success is handled by the router FSM chain (TRANSITION_SUCCESS event).
     } finally {
       this.#isTransitioning = false;
       this.#processDeferredEvent();

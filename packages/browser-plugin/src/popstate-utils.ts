@@ -1,4 +1,3 @@
-import { errorCodes } from "@real-router/core";
 import { isStateStrict as isState } from "type-guards";
 
 import type { BrowserPluginOptions, HistoryState, Browser } from "./types";
@@ -6,7 +5,6 @@ import type {
   PluginApi,
   Router,
   NavigationOptions,
-  RouterError,
   State,
 } from "@real-router/core";
 
@@ -52,14 +50,10 @@ export function createStateFromEvent(
  * @returns true if transition should be skipped
  */
 export function shouldSkipTransition(
-  newState: State | undefined,
+  newState: State,
   currentState: State | undefined,
   router: Router,
 ): boolean {
-  if (!newState) {
-    return true;
-  }
-
   return !!(
     currentState && router.areStatesEqual(newState, currentState, false)
   );
@@ -129,46 +123,5 @@ export function updateBrowserState(
     browser.replaceState(finalState, "", url);
   } else {
     browser.pushState(finalState, "", url);
-  }
-}
-
-/**
- * Handles transition result (success or error)
- *
- * Success case is handled by the router FSM chain (TRANSITION_SUCCESS event).
- * This function only handles error cases that need URL restoration.
- *
- * @param err - Router error or undefined if successful
- * @param toState - Target state
- * @param fromState - Source state
- * @param isNewState - Whether this is a new state (not from history)
- * @param router - Router instance
- * @param browser - Browser API instance
- * @param options - Browser plugin options
- */
-export function handleTransitionResult(
-  err: RouterError | undefined,
-  toState: State | undefined,
-  fromState: State | undefined,
-  isNewState: boolean,
-  router: Router,
-  browser: Browser,
-  options: BrowserPluginOptions,
-): void {
-  // Success case handled by the router FSM chain (TRANSITION_SUCCESS event)
-  if (!err) {
-    return;
-  }
-
-  // Handle CANNOT_DEACTIVATE - restore previous URL
-  if (
-    err.code === errorCodes.CANNOT_DEACTIVATE &&
-    toState &&
-    fromState &&
-    !isNewState
-  ) {
-    const url = router.buildUrl(fromState.name, fromState.params);
-
-    updateBrowserState(fromState, url, true, browser, options);
   }
 }

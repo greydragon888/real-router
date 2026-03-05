@@ -39,7 +39,6 @@ const createMockedBrowser = (): Browser => {
 
   return {
     ...safeBrowser,
-    getBase: () => globalThis.location.pathname,
     pushState: (state, title, url) => {
       currentHistoryState = state;
       safeBrowser.pushState(state, title, url);

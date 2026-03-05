@@ -1,4 +1,4 @@
-// packages/browser-plugin/modules/types.ts
+// packages/browser-plugin/src/types.ts
 
 import type { State } from "@real-router/core";
 
@@ -147,13 +147,6 @@ export type BrowserPluginOptions = HashModeOptions | HistoryModeOptions;
  */
 export interface Browser {
   /**
-   * Gets base path from current browser location
-   *
-   * @returns Current pathname
-   */
-  getBase: () => string;
-
-  /**
    * Pushes new state to browser history
    *
    * @param state - History state object
@@ -213,9 +206,9 @@ export type HistoryState = State & Record<string, unknown>;
  * with validated BrowserPluginOptions and passes correct values.
  */
 export interface URLParseOptions {
-  readonly useHash?: boolean;
-  readonly base?: string;
-  readonly hashPrefix?: string;
+  readonly useHash: boolean;
+  readonly base: string;
+  readonly hashPrefix: string;
 }
 
 export interface RegExpCache {

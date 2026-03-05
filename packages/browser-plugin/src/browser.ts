@@ -6,22 +6,25 @@ import { isHistoryState } from "type-guards";
 import { LOGGER_CONTEXT } from "./constants";
 import { createRegExpCache, extractPath } from "./url-utils";
 
-import type { Browser, BrowserPluginOptions, HistoryState } from "./types";
+import type {
+  Browser,
+  BrowserPluginOptions,
+  HistoryState,
+  URLParseOptions,
+} from "./types";
 import type { State } from "@real-router/core";
 
 /** No-operation cleanup function for fallback browser */
 const NOOP = (): void => {};
 
 /**
- * Returns current base path from browser location
- */
-const getBase = () => globalThis.location.pathname;
-
-/**
  * Pushes new state to browser history
  */
 const pushState = (state: State, title: string | null, path: string | URL) => {
-  globalThis.history.pushState(state, title ?? "", path);
+  /* v8 ignore next -- @preserve: title is always "" from updateBrowserState, null branch is defensive */
+  const passedTitle = title ?? "";
+
+  globalThis.history.pushState(state, passedTitle, path);
 };
 
 /**
@@ -32,7 +35,10 @@ const replaceState = (
   title: string | null,
   path: string | URL,
 ) => {
-  globalThis.history.replaceState(state, title ?? "", path);
+  /* v8 ignore next -- @preserve: title is always "" from updateBrowserState, null branch is defensive */
+  const passedTitle = title ?? "";
+
+  globalThis.history.replaceState(state, passedTitle, path);
 };
 
 const addPopstateListener: Browser["addPopstateListener"] = (fn) => {
@@ -49,7 +55,7 @@ const getLocation = (opts: BrowserPluginOptions) => {
   const rawPath = extractPath(
     globalThis.location.pathname,
     globalThis.location.hash,
-    opts,
+    opts as URLParseOptions,
     regExpCache,
   );
 
@@ -124,11 +130,6 @@ function createFallbackBrowser(): Browser {
   };
 
   return {
-    getBase: () => {
-      warnOnce("getBase");
-
-      return "";
-    },
     pushState: () => {
       warnOnce("pushState");
     },
@@ -170,7 +171,6 @@ export function createSafeBrowser(): Browser {
 
   return isBrowser
     ? {
-        getBase,
         pushState,
         replaceState,
         addPopstateListener,

@@ -28,7 +28,6 @@ const createMockedBrowser = (): Browser => {
 
   return {
     ...safeBrowser,
-    getBase: () => globalThis.location.pathname,
     pushState: (state, title, url) => {
       currentHistoryState = state;
       safeBrowser.pushState(state, title, url);
@@ -836,21 +835,6 @@ describe("Browser Plugin", async () => {
           undefined;
 
         expect(router.lastKnownState).toBeUndefined();
-      });
-
-      it("stores copy on set", async () => {
-        const externalState = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: { id: 1, params: {} },
-        };
-
-        router.lastKnownState = externalState;
-
-        externalState.name = "modified";
-
-        expect(router.lastKnownState.name).toBe("home"); // Not affected
       });
     });
 
@@ -1816,6 +1800,256 @@ describe("Browser Plugin", async () => {
           "/new/users/view/42",
         );
       });
+    });
+  });
+
+  describe("Real Browser (no mock)", () => {
+    describe("safelyEncodePath catch block (browser.ts lines 69-71)", () => {
+      it("returns original path when decodeURI throws on malformed percent-encoding", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+        // Truncated UTF-8 sequence causes decodeURI to throw URIError
+        globalThis.history.replaceState({}, "", "/%E0%A4%A");
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({}));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()).toBeDefined();
+          expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining("Could not encode path"),
+            expect.any(URIError),
+          );
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+          warnSpy.mockRestore();
+        }
+      });
+    });
+
+    describe("getState() validation (browser.ts lines 82-97)", () => {
+      it("returns undefined when history.state is null (line 82)", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+        globalThis.history.replaceState(null, "", "/");
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()?.name).toBe("index");
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+          warnSpy.mockRestore();
+        }
+      });
+
+      it("returns undefined and warns when history.state is invalid (lines 87-94)", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+        globalThis.history.replaceState({ invalid: true }, "", "/");
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()?.name).toBe("index");
+          expect(warnSpy).toHaveBeenCalledWith(
+            expect.stringContaining(
+              "History state is not a valid state object",
+            ),
+            expect.objectContaining({ invalid: true }),
+          );
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+          warnSpy.mockRestore();
+        }
+      });
+
+      it("returns valid state for merge (line 97)", async () => {
+        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+        // Pre-set valid HistoryState so getState() returns it on first merge
+        globalThis.history.replaceState(
+          {
+            name: "index",
+            params: {},
+            path: "/",
+            meta: { id: 1, params: {} },
+          },
+          "",
+          "/",
+        );
+
+        try {
+          const realRouter = createRouter(routerConfig, {
+            defaultRoute: "home",
+          });
+
+          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
+
+          await realRouter.start();
+
+          expect(realRouter.getState()?.name).toBe("index");
+
+          // Exercises real pushState (module-level) + getState with valid history
+          await realRouter.navigate("users.list");
+
+          expect(realRouter.getState()?.name).toBe("users.list");
+
+          realRouter.stop();
+        } finally {
+          globalThis.history.replaceState({}, "", "/");
+          warnSpy.mockRestore();
+        }
+      });
+    });
+  });
+
+  describe("SSR Fallback Browser (browser.ts lines 112-157)", () => {
+    it("uses fallback browser and covers all lifecycle methods", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+      const originalWindow = globalThis.window;
+
+      // @ts-expect-error — simulating SSR by removing window
+      delete globalThis.window;
+
+      try {
+        const ssrRouter = createRouter(routerConfig, {
+          defaultRoute: "home",
+        });
+
+        ssrRouter.usePlugin(
+          browserPluginFactory({ preserveHash: true, mergeState: true }),
+        );
+
+        await ssrRouter.start();
+
+        expect(ssrRouter.getState()).toBeDefined();
+
+        await ssrRouter.navigate("users.list");
+
+        expect(ssrRouter.getState()?.name).toBe("users.list");
+
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining("non-browser environment"),
+        );
+
+        ssrRouter.stop();
+      } finally {
+        globalThis.window = originalWindow;
+        warnSpy.mockRestore();
+      }
+    });
+  });
+
+  describe("Popstate Edge Cases", () => {
+    it("skips transition when popstate resolves to no matching route and no default route (lines 60, 85)", async () => {
+      const noDefaultRouter = createRouter(
+        [{ name: "home", path: "/home" }],
+        {},
+      );
+
+      noDefaultRouter.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await noDefaultRouter.start("/home");
+
+      globalThis.history.replaceState({}, "", "/nonexistent");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(noDefaultRouter.getState()?.name).toBe("home");
+
+      noDefaultRouter.stop();
+    });
+  });
+
+  describe("Validation Edge Cases", () => {
+    it("skips validation when opts is undefined (validation.ts line 35)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(browserPluginFactory());
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Invalid type"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("ignores unknown option keys (validation.ts line 41 else branch)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(
+        browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
+      );
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Invalid type"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+
+    it("does not warn when hashPrefix is empty string in history mode (validation.ts line 60)", () => {
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+
+      router.usePlugin(
+        browserPluginFactory(
+          { useHash: false, hashPrefix: "" } as any,
+          mockedBrowser,
+        ),
+      );
+
+      expect(consoleSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("hashPrefix ignored"),
+      );
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe("Popstate Meta Params Edge Case", () => {
+    it("handles popstate with meta missing params field (popstate-utils.ts line 40)", async () => {
+      router.usePlugin(browserPluginFactory({}, mockedBrowser));
+      await router.start();
+
+      globalThis.dispatchEvent(
+        new PopStateEvent("popstate", {
+          state: {
+            name: "home",
+            params: {},
+            path: "/home",
+            meta: { id: 5 },
+          },
+        }),
+      );
+
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(router.getState()?.name).toBe("home");
     });
   });
 
