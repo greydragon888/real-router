@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.node.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./.tsbuildinfo-node"
+  },
+  "include": ["*.mts", "../../*.mts"]
+}

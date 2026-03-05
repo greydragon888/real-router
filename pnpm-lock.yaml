@@ -241,6 +241,31 @@ importers:
 
   packages/fsm: {}
 
+  packages/hash-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+      '@real-router/logger':
+        specifier: workspace:^
+        version: link:../logger
+      '@real-router/types':
+        specifier: workspace:^
+        version: link:../core-types
+    devDependencies:
+      '@testing-library/jest-dom':
+        specifier: 6.9.1
+        version: 6.9.1
+      browser-env:
+        specifier: workspace:^
+        version: link:../browser-env
+      jsdom:
+        specifier: 27.4.0
+        version: 27.4.0
+      type-guards:
+        specifier: workspace:^
+        version: link:../type-guards
+
   packages/logger: {}
 
   packages/logger-plugin:
