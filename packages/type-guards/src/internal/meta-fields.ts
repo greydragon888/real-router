@@ -29,11 +29,7 @@ export function isMetaFields<MP extends Params = Params>(
   }
 
   // Check id field if present
-  if ("id" in obj && typeof obj.id !== "number") {
-    return false;
-  }
-
-  return true;
+  return !("id" in obj) || typeof obj.id === "number";
 }
 
 /**

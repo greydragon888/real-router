@@ -29,17 +29,6 @@ const addPopstateListener: Browser["addPopstateListener"] = (fn) => {
 
 const regExpCache = createRegExpCache();
 
-const getLocation = (opts: BrowserPluginOptions) => {
-  const rawPath = extractPath(
-    globalThis.location.pathname,
-    globalThis.location.hash,
-    opts as URLParseOptions,
-    regExpCache,
-  );
-
-  return safelyEncodePath(rawPath) + globalThis.location.search;
-};
-
 /**
  * Safely encodes/decodes path to normalize URL encoding
  *
@@ -54,6 +43,17 @@ const safelyEncodePath = (path: string): string => {
 
     return path;
   }
+};
+
+const getLocation = (opts: BrowserPluginOptions) => {
+  const rawPath = extractPath(
+    globalThis.location.pathname,
+    globalThis.location.hash,
+    opts as URLParseOptions,
+    regExpCache,
+  );
+
+  return safelyEncodePath(rawPath) + globalThis.location.search;
 };
 
 /**
