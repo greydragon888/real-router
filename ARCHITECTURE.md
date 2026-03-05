@@ -116,7 +116,7 @@ api/ (standalone functions — tree-shakeable, access router via WeakMap)
     ├── getRoutesApi(router)      — route CRUD, addRoute/removeRoute
     ├── getDependenciesApi(router) — dependency CRUD, set/get/remove
     ├── getLifecycleApi(router)   — guard management, addActivateGuard/addDeactivateGuard
-    ├── getPluginApi(router)      — plugin infrastructure, interception
+    ├── getPluginApi(router)      — plugin infrastructure, interception, router extension
     └── cloneRouter(router, deps) — SSR cloning support
 
 wiring/ (construction-time, Builder+Director pattern)
@@ -286,26 +286,48 @@ Plugins intercept router methods via a universal `addInterceptor()` API, accesse
 const api = getPluginApi(router);
 
 // Intercept forwardState to merge persistent params
-const unsub = api.addInterceptor("forwardState", (next, routeName, routeParams) => {
-  const result = next(routeName, routeParams);
-  return { ...result, params: withPersistentParams(result.params) };
-});
+const unsub = api.addInterceptor(
+  "forwardState",
+  (next, routeName, routeParams) => {
+    const result = next(routeName, routeParams);
+    return { ...result, params: withPersistentParams(result.params) };
+  },
+);
 
 // Intercept start to make path optional (browser-plugin injects location)
-api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
+api.addInterceptor("start", (next, path) =>
+  next(path ?? browser.getLocation()),
+);
 ```
 
 **`InterceptableMethodMap`** defines which methods can be intercepted:
 
-| Method         | Signature                                              | Used by                    |
-| -------------- | ------------------------------------------------------ | -------------------------- |
-| `start`        | `(path?: string) => Promise<State>`                    | browser-plugin             |
-| `buildPath`    | `(route: string, params?: Params) => string`           | persistent-params-plugin   |
+| Method         | Signature                                                 | Used by                  |
+| -------------- | --------------------------------------------------------- | ------------------------ |
+| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin           |
+| `buildPath`    | `(route: string, params?: Params) => string`              | persistent-params-plugin |
 | `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin |
 
 Multiple interceptors per method execute in FIFO order. Each receives `next` (the original or previously-wrapped function) plus the method's arguments. `addInterceptor()` returns an unsubscribe function.
 
 Interceptors are applied via `createInterceptable()` in `RouterInternals`, ensuring all call paths (facade, wiring, plugins) are intercepted.
+
+### Router Extension
+
+Plugins can formally extend the router instance with new properties via `extendRouter()`:
+
+```typescript
+const api = getPluginApi(router);
+
+const removeExtensions = api.extendRouter({
+  buildUrl: (name, params) => buildUrlImpl(name, params),
+  matchUrl: (url) => matchUrlImpl(url),
+});
+```
+
+**Conflict detection:** Throws `RouterError(PLUGIN_CONFLICT)` if any key already exists on the router. Validation is atomic — all keys checked before any assigned.
+
+**Cleanup:** Returns unsubscribe function. Extensions are also tracked in `RouterInternals.routerExtensions` for safety-net cleanup during `dispose()`.
 
 ## State Management
 

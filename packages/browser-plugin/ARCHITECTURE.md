@@ -13,7 +13,8 @@ Contains no navigation business logic — only URL synchronization and browser e
 **Integration points with the core:**
 
 - `addInterceptor("start", ...)` — makes `path` in `router.start()` optional
-- `declare module "@real-router/core"` — adds `buildUrl`, `matchUrl`, `replaceHistoryState` methods to the `Router` interface
+- `extendRouter()` — formally registers `buildUrl`, `matchUrl`, `replaceHistoryState` on the router instance with conflict detection and automatic cleanup
+- `declare module "@real-router/core"` — adds compile-time types for the above methods to the `Router` interface
 - Plugin hooks (`onStart`, `onStop`, `onTransitionSuccess`, `teardown`) — react to router events
 
 ## Package Structure
@@ -85,7 +86,7 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
                             │
                             │  Constructor:
                             │  - registers start interceptor
-                            │  - calls #augmentRouter()
+                            │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
                             │
                             └── .getPlugin()  → Plugin { onStart, onStop, ... }
 ```
@@ -95,7 +96,7 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
 - `factory.ts` runs once — expensive operations (validation, cache creation) don't repeat on every `usePlugin()` call
 - `BrowserPlugin` holds mutable state (`#isTransitioning`, `#deferredPopstateEvent`) — a class with private fields fits better than a closure
 - Testability: `BrowserPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
-- Lifecycle: the constructor registers the interceptor and augments the router immediately; `teardown` rolls back the changes
+- Lifecycle: the constructor registers the interceptor and extends the router via `api.extendRouter()`; `teardown` calls the returned unsubscribe to remove extensions
 
 ### Creation Flow
 
@@ -195,11 +196,18 @@ If provided, it passes it through as-is.
 
 - `addInterceptor` is an official core API designed for plugins
 - Interceptors execute in FIFO order; multiple plugins can intercept the same method
-- `#removeStartInterceptor` stores the unsubscribe function — called in `#cleanupAugmentation()` on `teardown`
+- `#removeStartInterceptor` stores the unsubscribe function — called in `teardown`
 
-## Router Augmentation via declare module
+## Router Augmentation
 
-### Mechanism
+### Two layers
+
+Router extension involves two layers:
+
+1. **Compile-time types** — `declare module "@real-router/core"` in `index.ts` augments the `Router` interface so TypeScript knows about the new methods.
+2. **Runtime registration** — `api.extendRouter({...})` in `plugin.ts` adds the actual methods to the router instance with conflict detection and automatic cleanup.
+
+### Type Augmentation (index.ts)
 
 TypeScript allows extending existing interfaces via `declare module`. The plugin adds methods to the `Router` interface from the core:
 
@@ -219,53 +227,54 @@ declare module "@real-router/core" {
 }
 ```
 
-### Runtime Method Addition
+### Runtime Registration via extendRouter (plugin.ts)
 
-TypeScript augmentation is type-level only. The actual methods are added in the `BrowserPlugin` constructor:
+TypeScript augmentation is type-level only. The actual methods are registered in the `BrowserPlugin` constructor via `api.extendRouter()`:
 
 ```typescript
-// plugin.ts, lines 128-173
-#augmentRouter(): void {
-  const router = this.#router;
-
-  router.buildUrl = (route, params) => {
-    const path = router.buildPath(route, params);
-    return buildUrl(path, (this.#options as URLParseOptions).base, this.#prefix);
-  };
-
-  router.matchUrl = (url) => {
-    const path = urlToPath(url, this.#options as URLParseOptions, this.#regExpCache);
+// plugin.ts, constructor
+this.#removeExtensions = this.#api.extendRouter({
+  buildUrl: (route: string, params?: Params) => {
+    const path = this.#router.buildPath(route, params);
+    return buildUrl(
+      path,
+      (this.#options as URLParseOptions).base,
+      this.#prefix,
+    );
+  },
+  matchUrl: (url: string) => {
+    const path = urlToPath(
+      url,
+      this.#options as URLParseOptions,
+      this.#regExpCache,
+    );
     return path ? this.#api.matchPath(path) : undefined;
-  };
-
-  router.replaceHistoryState = (name, params = {}) => {
+  },
+  replaceHistoryState: (name: string, params: Params = {}) => {
     // ... buildState + makeState + updateBrowserState
-  };
-}
+  },
+});
 ```
+
+`extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 
 ### Cleanup on teardown
 
 ```typescript
-// plugin.ts, lines 175-187
-#cleanupAugmentation(): void {
+// plugin.ts, teardown
+teardown: () => {
   if (this.#shared.removePopStateListener) {
     this.#shared.removePopStateListener();
     this.#shared.removePopStateListener = undefined;
   }
-
   this.#removeStartInterceptor();
-
-  delete (this.#router as Partial<Router>).buildUrl;
-  delete (this.#router as Partial<Router>).matchUrl;
-  delete (this.#router as Partial<Router>).replaceHistoryState;
-}
+  this.#removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
+},
 ```
 
-**Why `delete` instead of assigning `undefined`?**
+The unsubscribe function returned by `extendRouter()` handles property removal — no manual `delete` casts needed.
 
-`delete` fully removes the property from the object — after `teardown`, accessing `router.buildUrl` throws a `TypeError` (property doesn't exist) rather than returning `undefined`.
-That's an explicit error, not a silent failure.
+As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
 **Why not Proxy?**
 
@@ -575,7 +584,8 @@ router.usePlugin(browserPluginFactory(opts))
         │
         ├── new BrowserPlugin(...)
         │     ├── Registers start interceptor
-        │     └── #augmentRouter() → adds buildUrl, matchUrl, replaceHistoryState
+        │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
+        │           → stores returned unsubscribe as #removeExtensions
         │
         └── plugin.getPlugin() → { onStart, onStop, onTransitionSuccess, teardown }
 
@@ -602,10 +612,9 @@ unsubscribe() or router.dispose()
         │
         ▼
   Plugin.teardown()
-        └── #cleanupAugmentation()
-              ├── Removes popstate listener
-              ├── Unregisters start interceptor
-              └── delete router.buildUrl, matchUrl, replaceHistoryState
+        ├── Removes popstate listener
+        ├── Unregisters start interceptor (#removeStartInterceptor)
+        └── Removes router extensions (#removeExtensions)
 ```
 
 ## Routing Modes

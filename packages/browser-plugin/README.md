@@ -75,7 +75,7 @@ See [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-co
 
 ## Added Router Methods
 
-The plugin extends the router with browser-specific methods:
+The plugin extends the router instance with browser-specific methods (via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/core#extendrouter)):
 
 #### `router.buildUrl(name: string, params?: Params): string`
 

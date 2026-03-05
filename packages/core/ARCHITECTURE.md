@@ -4,10 +4,10 @@
 
 ## Overview
 
-`@real-router/core` is the **main package** of the router — a facade over 9 namespaces with FSM-driven lifecycle, plugin system, and tree-shakeable standalone API functions. 
+`@real-router/core` is the **main package** of the router — a facade over 9 namespaces with FSM-driven lifecycle, plugin system, and tree-shakeable standalone API functions.
 All state transitions go through a finite state machine; all events flow through a typed event emitter.
 
-**Key role:** Thin facade (`Router.ts`) validates inputs and delegates to namespace classes. No business logic in the facade itself. 
+**Key role:** Thin facade (`Router.ts`) validates inputs and delegates to namespace classes. No business logic in the facade itself.
 Standalone API functions (`getRoutesApi`, `getPluginApi`, etc.) access router internals via a `WeakMap` registry — enabling tree-shaking without exposing private state.
 
 ## Package Structure
@@ -175,6 +175,7 @@ getPluginApi(router): PluginApi;
 // getOptions(): Options                               — get router options
 // getTree(): RouteTree                                — get compiled route tree
 // addInterceptor(method, fn): Unsubscribe             — register method interceptor (FIFO pipeline)
+// extendRouter(extensions): Unsubscribe               — assign properties to router instance (conflict detection + auto-cleanup)
 
 cloneRouter(router, deps?): Router;
 // SSR cloning — see "Clone Router" section below
@@ -548,10 +549,10 @@ createRouter([
 ]);
 ```
 
-Child names are automatically prefixed with parent name via dot notation. 
+Child names are automatically prefixed with parent name via dot notation.
 The resulting full name (e.g. `"users.profile"`) is used for navigation and guards.
 
-**Dots are forbidden in route `name`** — hierarchy is defined only via `children` array or `{ parent }` option in `addRoute()`. 
+**Dots are forbidden in route `name`** — hierarchy is defined only via `children` array or `{ parent }` option in `addRoute()`.
 A name containing a dot throws `TypeError` at registration time.
 
 ### ForwardTo (Route Aliasing)
@@ -636,7 +637,11 @@ interface Plugin {
     fromState?: State,
     opts?: NavigationOptions,
   ): void;
-  onTransitionError?(toState?: State, fromState?: State, error?: RouterError): void;
+  onTransitionError?(
+    toState?: State,
+    fromState?: State,
+    error?: RouterError,
+  ): void;
   onTransitionCancel?(toState: State, fromState?: State): void;
   teardown?(): void;
 }
@@ -674,10 +679,13 @@ api.addInterceptor("buildPath", (next, route, params) =>
 );
 
 // Wrap start to make path optional (browser-plugin injects location)
-api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
+api.addInterceptor("start", (next, path) =>
+  next(path ?? browser.getLocation()),
+);
 ```
 
 **`InterceptableMethodMap`** defines interceptable methods:
+
 - `start: (path?: string) => Promise<State>`
 - `buildPath: (route: string, params?: Params) => string`
 - `forwardState: (routeName: string, routeParams: Params) => SimpleState`
@@ -686,8 +694,10 @@ Multiple interceptors per method execute in FIFO order. Each receives `next` (or
 
 Internally, `createInterceptable()` in `internals.ts` wraps methods at wiring time. Interceptor chains are stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
 
-**Mutable field in `RouterInternals`:**
+**Mutable fields in `RouterInternals`:**
+
 - `interceptors` — `Map<string, InterceptorFn[]>`, mutated via `addInterceptor()` / unsubscribe
+- `routerExtensions` — `{ keys: string[] }[]`, tracks keys added by each `extendRouter()` call for cleanup
 
 ## State Management
 
@@ -782,10 +792,11 @@ router.dispose(); // Idempotent — safe to call multiple times
 4. FSM → DISPOSED (terminal state)
 5. Clear event listeners
 6. Dispose plugins (remove event listeners + call `teardown()`)
-7. Clear routes + lifecycle guards
-8. Reset state
-9. Clear dependencies
-10. Replace mutating methods with `throwDisposed()`
+7. Clean up remaining router extensions (safety net — normally cleaned up by plugin teardown)
+8. Clear routes + lifecycle guards
+9. Reset state
+10. Clear dependencies
+11. Replace mutating methods with `throwDisposed()`
 
 After dispose: All mutating methods throw `RouterError(ROUTER_DISPOSED)`.
 
@@ -845,32 +856,33 @@ All limits have configurable bounds (`LIMIT_BOUNDS`) and can be set via `options
 
 ## Error Codes
 
-| Code                     | Value                      | When                                     |
-| ------------------------ | -------------------------- | ---------------------------------------- |
-| `ROUTER_NOT_STARTED`     | `"NOT_STARTED"`            | `navigate()` before `start()`            |
-| `NO_START_PATH_OR_STATE` | `"NO_START_PATH_OR_STATE"` | `start()` without initial route          |
-| `ROUTER_ALREADY_STARTED` | `"ALREADY_STARTED"`        | `start()` called twice                   |
-| `ROUTE_NOT_FOUND`        | `"ROUTE_NOT_FOUND"`        | Navigation to non-existent route         |
-| `SAME_STATES`            | `"SAME_STATES"`            | Navigate to current route without reload |
-| `CANNOT_DEACTIVATE`      | `"CANNOT_DEACTIVATE"`      | Deactivation guard blocked navigation    |
-| `CANNOT_ACTIVATE`        | `"CANNOT_ACTIVATE"`        | Activation guard blocked navigation      |
-| `TRANSITION_ERR`         | `"TRANSITION_ERR"`         | Generic transition failure               |
-| `TRANSITION_CANCELLED`   | `"CANCELLED"`              | Navigation cancelled (user/concurrent)   |
-| `ROUTER_DISPOSED`        | `"DISPOSED"`               | Router has been disposed                 |
+| Code                     | Value                      | When                                                 |
+| ------------------------ | -------------------------- | ---------------------------------------------------- |
+| `ROUTER_NOT_STARTED`     | `"NOT_STARTED"`            | `navigate()` before `start()`                        |
+| `NO_START_PATH_OR_STATE` | `"NO_START_PATH_OR_STATE"` | `start()` without initial route                      |
+| `ROUTER_ALREADY_STARTED` | `"ALREADY_STARTED"`        | `start()` called twice                               |
+| `ROUTE_NOT_FOUND`        | `"ROUTE_NOT_FOUND"`        | Navigation to non-existent route                     |
+| `SAME_STATES`            | `"SAME_STATES"`            | Navigate to current route without reload             |
+| `CANNOT_DEACTIVATE`      | `"CANNOT_DEACTIVATE"`      | Deactivation guard blocked navigation                |
+| `CANNOT_ACTIVATE`        | `"CANNOT_ACTIVATE"`        | Activation guard blocked navigation                  |
+| `TRANSITION_ERR`         | `"TRANSITION_ERR"`         | Generic transition failure                           |
+| `TRANSITION_CANCELLED`   | `"CANCELLED"`              | Navigation cancelled (user/concurrent)               |
+| `ROUTER_DISPOSED`        | `"DISPOSED"`               | Router has been disposed                             |
+| `PLUGIN_CONFLICT`        | `"PLUGIN_CONFLICT"`        | Plugin tried to extend router with existing property |
 
 ## Performance Characteristics
 
-| Optimization                            | Purpose                                              |
-| --------------------------------------- | ---------------------------------------------------- |
-| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths        |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation |
-| `noValidate` option                     | Skips all argument validation in production          |
-| `static #onSuppressedError` callback    | One allocation per class, not per `navigate()` call  |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects      |
-| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements             |
-| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                  |
+| Optimization                            | Purpose                                                |
+| --------------------------------------- | ------------------------------------------------------ |
+| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths          |
+| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation   |
+| `noValidate` option                     | Skips all argument validation in production            |
+| `static #onSuppressedError` callback    | One allocation per class, not per `navigate()` call    |
+| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects        |
+| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements               |
+| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                    |
 | `applyBuildPathInterceptors` fast path  | Empty-array check skips iteration when no interceptors |
-| Lazy event listeners                    | No allocation until first subscription               |
+| Lazy event listeners                    | No allocation until first subscription                 |
 
 ## See Also
 
