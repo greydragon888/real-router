@@ -97,7 +97,7 @@ export class BrowserPlugin {
       ) => {
         this.#router.lastKnownState = Object.freeze({ ...toState });
 
-        const replaceHistory =
+        const shouldReplaceHistory =
           (navOptions.replace ?? !fromState) ||
           (!!navOptions.reload &&
             this.#router.areStatesEqual(toState, fromState, false));
@@ -105,7 +105,7 @@ export class BrowserPlugin {
         const url = this.#router.buildUrl(toState.name, toState.params);
 
         const shouldPreserveHash =
-          this.#options.preserveHash &&
+          !!this.#options.preserveHash &&
           (!fromState || fromState.path === toState.path);
 
         const finalUrl = shouldPreserveHash
@@ -115,9 +115,8 @@ export class BrowserPlugin {
         updateBrowserState(
           toState,
           finalUrl,
-          replaceHistory,
+          shouldReplaceHistory,
           this.#browser,
-          this.#options,
         );
       },
 
@@ -170,7 +169,7 @@ export class BrowserPlugin {
       );
       const url = router.buildUrl(name, params);
 
-      updateBrowserState(builtState, url, true, this.#browser, this.#options);
+      updateBrowserState(builtState, url, true, this.#browser);
     };
   }
 

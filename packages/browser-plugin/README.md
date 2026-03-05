@@ -66,7 +66,7 @@ router.navigate("products", { id: "123" });
 | `preserveHash`    | `boolean` | `true`  | Keep URL hash fragment during navigation. Only with `useHash: false` |
 | `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"`)                            |
 | `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward                |
-| `mergeState`      | `boolean` | `false` | Merge with existing `history.state`                                  |
+
 
 **Type Safety:** Options use discriminated union — `hashPrefix` and `preserveHash` are mutually exclusive at compile time.
 

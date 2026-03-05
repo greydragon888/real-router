@@ -36,7 +36,6 @@ const createMockedBrowser = (): Browser => {
       currentHistoryState = state;
       safeBrowser.replaceState(state, title, url);
     },
-    getState: () => currentHistoryState as HistoryState,
   };
 };
 
@@ -998,7 +997,6 @@ describe("Browser Plugin", async () => {
             hashPrefix: "!",
             base: "/app",
             forceDeactivate: false,
-            mergeState: true,
           }),
         );
 
@@ -1452,27 +1450,6 @@ describe("Browser Plugin", async () => {
         await router.start();
       });
 
-      it("handles mergeState option correctly", async () => {
-        currentHistoryState = { external: "data" } as any;
-
-        // Create a NEW router
-        router = createRouter(routerConfig, {
-          defaultRoute: "home",
-          queryParamsMode: "default",
-        });
-
-        unsubscribe = router.usePlugin(
-          browserPluginFactory({ mergeState: true }, mockedBrowser),
-        );
-
-        await router.start();
-
-        const state = mockedBrowser.getState();
-
-        expect(state?.external).toBe("data");
-        expect(state?.name).toBe("index");
-      });
-
       it("handles preserveHash option on initial navigation", async () => {
         router.stop();
         unsubscribe?.();
@@ -1619,42 +1596,6 @@ describe("Browser Plugin", async () => {
         expect(router.lastKnownState).toBeUndefined();
         // After teardown, lastKnownState property is removed from router
         expect("lastKnownState" in router).toBe(false);
-      });
-    });
-
-    describe("mergeState Option", () => {
-      it("merges with existing history.state", async () => {
-        const existingState = {
-          name: "legacy",
-          params: { old: true },
-          path: "/legacy",
-          custom: "data",
-        };
-
-        globalThis.history.replaceState(existingState, "", "/legacy");
-        currentHistoryState = existingState;
-
-        router = createRouter(routerConfig, {
-          defaultRoute: "home",
-          allowNotFound: true,
-        });
-
-        router.usePlugin(
-          browserPluginFactory({ mergeState: true }, mockedBrowser),
-        );
-
-        vi.spyOn(mockedBrowser, "replaceState");
-
-        await router.start();
-
-        expect(mockedBrowser.replaceState).toHaveBeenCalledWith(
-          expect.objectContaining({
-            custom: "data", // Preserved from existing state
-            name: router.getState()?.name,
-          }),
-          "",
-          expect.any(String),
-        );
       });
     });
   });
@@ -1839,98 +1780,6 @@ describe("Browser Plugin", async () => {
         }
       });
     });
-
-    describe("getState() validation (browser.ts lines 82-97)", () => {
-      it("returns undefined when history.state is null (line 82)", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        globalThis.history.replaceState(null, "", "/");
-
-        try {
-          const realRouter = createRouter(routerConfig, {
-            defaultRoute: "home",
-          });
-
-          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
-
-          await realRouter.start();
-
-          expect(realRouter.getState()?.name).toBe("index");
-
-          realRouter.stop();
-        } finally {
-          globalThis.history.replaceState({}, "", "/");
-          warnSpy.mockRestore();
-        }
-      });
-
-      it("returns undefined and warns when history.state is invalid (lines 87-94)", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        globalThis.history.replaceState({ invalid: true }, "", "/");
-
-        try {
-          const realRouter = createRouter(routerConfig, {
-            defaultRoute: "home",
-          });
-
-          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
-
-          await realRouter.start();
-
-          expect(realRouter.getState()?.name).toBe("index");
-          expect(warnSpy).toHaveBeenCalledWith(
-            expect.stringContaining(
-              "History state is not a valid state object",
-            ),
-            expect.objectContaining({ invalid: true }),
-          );
-
-          realRouter.stop();
-        } finally {
-          globalThis.history.replaceState({}, "", "/");
-          warnSpy.mockRestore();
-        }
-      });
-
-      it("returns valid state for merge (line 97)", async () => {
-        const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-
-        // Pre-set valid HistoryState so getState() returns it on first merge
-        globalThis.history.replaceState(
-          {
-            name: "index",
-            params: {},
-            path: "/",
-            meta: { id: 1, params: {} },
-          },
-          "",
-          "/",
-        );
-
-        try {
-          const realRouter = createRouter(routerConfig, {
-            defaultRoute: "home",
-          });
-
-          realRouter.usePlugin(browserPluginFactory({ mergeState: true }));
-
-          await realRouter.start();
-
-          expect(realRouter.getState()?.name).toBe("index");
-
-          // Exercises real pushState (module-level) + getState with valid history
-          await realRouter.navigate("users.list");
-
-          expect(realRouter.getState()?.name).toBe("users.list");
-
-          realRouter.stop();
-        } finally {
-          globalThis.history.replaceState({}, "", "/");
-          warnSpy.mockRestore();
-        }
-      });
-    });
   });
 
   describe("SSR Fallback Browser (browser.ts lines 112-157)", () => {
@@ -1946,9 +1795,7 @@ describe("Browser Plugin", async () => {
           defaultRoute: "home",
         });
 
-        ssrRouter.usePlugin(
-          browserPluginFactory({ preserveHash: true, mergeState: true }),
-        );
+        ssrRouter.usePlugin(browserPluginFactory({ preserveHash: true }));
 
         await ssrRouter.start();
 

@@ -24,7 +24,7 @@ import {
   createAsyncPlugin,
 } from "../helpers/mockPlugins";
 
-import type { Browser, HistoryState } from "../../src/types";
+import type { Browser } from "../../src/types";
 import type { Router, State, Unsubscribe } from "@real-router/core";
 
 const noop = (): void => undefined;
@@ -47,7 +47,6 @@ const createMockedBrowser = (): Browser => {
       currentHistoryState = state;
       safeBrowser.replaceState(state, title, url);
     },
-    getState: () => currentHistoryState as HistoryState,
   };
 };
 

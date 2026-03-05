@@ -1,17 +1,11 @@
 // packages/browser-plugin/modules/browser.ts
 
 import { logger } from "@real-router/logger";
-import { isHistoryState } from "type-guards";
 
 import { LOGGER_CONTEXT } from "./constants";
 import { createRegExpCache, extractPath } from "./url-utils";
 
-import type {
-  Browser,
-  BrowserPluginOptions,
-  HistoryState,
-  URLParseOptions,
-} from "./types";
+import type { Browser, BrowserPluginOptions, URLParseOptions } from "./types";
 import type { State } from "@real-router/core";
 
 /** No-operation cleanup function for fallback browser */
@@ -79,31 +73,6 @@ const safelyEncodePath = (path: string): string => {
 };
 
 /**
- * Gets current history state with validation.
- * Returns undefined instead of throwing for safer error handling.
- *
- * @returns Valid history state or undefined
- */
-const getState = (): HistoryState | undefined => {
-  if (!globalThis.history.state) {
-    return undefined;
-  }
-
-  // Validate state structure instead of throwing
-  if (!isHistoryState(globalThis.history.state)) {
-    logger.warn(
-      LOGGER_CONTEXT,
-      "History state is not a valid state object, ignoring",
-      globalThis.history.state,
-    );
-
-    return undefined;
-  }
-
-  return globalThis.history.state as HistoryState;
-};
-
-/**
  * Gets current URL hash
  */
 const getHash = () => globalThis.location.hash;
@@ -146,12 +115,6 @@ function createFallbackBrowser(): Browser {
 
       return "";
     },
-    getState: () => {
-      warnOnce("getState");
-
-      // eslint-disable-next-line unicorn/no-useless-undefined
-      return undefined;
-    },
     getHash: () => {
       warnOnce("getHash");
 
@@ -175,7 +138,6 @@ export function createSafeBrowser(): Browser {
         replaceState,
         addPopstateListener,
         getLocation,
-        getState,
         getHash,
       }
     : createFallbackBrowser();

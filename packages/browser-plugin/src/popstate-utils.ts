@@ -38,37 +38,23 @@ export function getRouteFromEvent(
  * @param url - URL to set
  * @param replace - Whether to replace instead of push
  * @param browser - Browser API instance
- * @param options - Browser plugin options
  */
 export function updateBrowserState(
   state: State,
   url: string,
   replace: boolean,
   browser: Browser,
-  options: BrowserPluginOptions,
 ): void {
-  const trimmedState: Record<string, unknown> & {
-    name: string;
-    params: Params;
-    path: string;
-  } = {
+  const historyState = {
     meta: state.meta,
     name: state.name,
     params: state.params,
     path: state.path,
   };
 
-  const currentBrowserState = options.mergeState
-    ? browser.getState()
-    : undefined;
-
-  const finalState = currentBrowserState
-    ? { ...currentBrowserState, ...trimmedState }
-    : trimmedState;
-
   if (replace) {
-    browser.replaceState(finalState, "", url);
+    browser.replaceState(historyState, "", url);
   } else {
-    browser.pushState(finalState, "", url);
+    browser.pushState(historyState, "", url);
   }
 }

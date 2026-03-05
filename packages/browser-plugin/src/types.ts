@@ -19,14 +19,6 @@ interface BaseBrowserPluginOptions {
    * @default ""
    */
   base?: string;
-
-  /**
-   * Merge new state with existing history.state when updating.
-   * Useful for preserving external state set by other code.
-   *
-   * @default false
-   */
-  mergeState?: boolean;
 }
 
 /**
@@ -177,13 +169,6 @@ export interface Browser {
    * @returns Current path string
    */
   getLocation: (opts: BrowserPluginOptions) => string;
-
-  /**
-   * Gets current history state with validation
-   *
-   * @returns Valid history state or undefined
-   */
-  getState: () => HistoryState | undefined;
 
   /**
    * Gets current URL hash
