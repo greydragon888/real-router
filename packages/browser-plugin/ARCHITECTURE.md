@@ -4,8 +4,7 @@
 
 ## Overview
 
-`@real-router/browser-plugin` synchronizes router state with the browser URL and handles back/forward navigation.
-The plugin supports two modes: History API (`pushState`/`replaceState`) and hash routing (`#/path`).
+`@real-router/browser-plugin` synchronizes router state with the browser URL and handles back/forward navigation using the History API (`pushState`/`replaceState`).
 
 **Core role:** A thin adapter between the browser environment and the platform-agnostic router core.
 Contains no navigation business logic — only URL synchronization and browser event handling.
@@ -281,72 +280,34 @@ As a safety net, `router.dispose()` also cleans up any extensions that plugins f
 `Router` uses private fields (`#state`, `#routes`, etc.) — they're inaccessible through a `Proxy`.
 Adding methods directly to the instance is the only way to give them access to the plugin's closure.
 
-## Type System: Discriminated Union
+## Type System
 
-### The Problem of Mutually Exclusive Options
-
-`hashPrefix` only makes sense in hash mode. `preserveHash` only makes sense in history mode. Their combined use needs to be forbidden at the type level.
-
-### Solution: discriminated union with never
+### BrowserPluginOptions
 
 ```typescript
-// types.ts, lines 39-98
-interface HashModeOptions extends BaseBrowserPluginOptions {
-  useHash: true;
-  hashPrefix?: string;
-  preserveHash?: never; // ← forbidden in hash mode
-}
-
-interface HistoryModeOptions extends BaseBrowserPluginOptions {
-  useHash?: false;
+// types.ts
+interface BrowserPluginOptions {
+  forceDeactivate?: boolean;
+  base?: string;
   preserveHash?: boolean;
-  hashPrefix?: never; // ← forbidden in history mode
-}
-
-type BrowserPluginOptions = HashModeOptions | HistoryModeOptions;
-```
-
-The discriminant is the `useHash` field. TypeScript narrows the type through it:
-
-```typescript
-// ❌ Compile error:
-const opts: BrowserPluginOptions = { useHash: true, preserveHash: true };
-// ✅ Valid:
-const opts: BrowserPluginOptions = { useHash: true, hashPrefix: "!" };
-```
-
-### DefaultBrowserPluginOptions — flat type for defaults
-
-```typescript
-// constants.ts, lines 28-42
-interface DefaultBrowserPluginOptions {
-  forceDeactivate: boolean;
-  useHash: boolean;
-  base: string;
-  preserveHash: boolean;
-  hashPrefix: string;
 }
 ```
 
-You can't create an object of type `BrowserPluginOptions` that contains both `hashPrefix` and `preserveHash` — one of them is always `never`.
-That's why a separate flat type `DefaultBrowserPluginOptions` is used to store default values for all options.
-
-It also serves as a schema for validation: `validateOptions()` iterates over the keys of `defaultOptions` and checks types via `typeof defaultOptions[key]`.
+Options are validated at runtime via `validateOptions()` in `validation.ts`.
 
 ### URLParseOptions — flat type for pure functions
 
 ```typescript
-// types.ts, lines 181-185
+// types.ts
 interface URLParseOptions {
-  readonly useHash: boolean;
   readonly base: string;
-  readonly hashPrefix: string;
+  readonly preserveHash: boolean;
 }
 ```
 
 Pure functions in `url-utils.ts` and `popstate-utils.ts` accept `URLParseOptions` rather than `BrowserPluginOptions`.
 The reason: calling code in `plugin.ts` already works with validated options and passes correct values.
-The flat type is simpler to use inside pure functions — no need to handle discriminated union branches.
+The flat type is simpler to use inside pure functions.
 
 ## SharedFactoryState
 
@@ -469,15 +430,9 @@ The intermediate `page2` state is skipped — this is expected behavior.
 
 All functions in `url-utils.ts` are pure (no side effects, no direct access to globals).
 
-**`extractPath(pathname, hash, options, regExpCache)`** — lines 23-46:
+**`extractPath(pathname, options, regExpCache)`**:
 
 ```
-Hash mode (options.useHash = true):
-  hash = "#!/users/123"
-  hashPrefix = "!"
-  → escapeRegExp("!") = "\\!"
-  → hash.replace(/^#\\!/, "") = "/users/123"
-
 History mode with base:
   pathname = "/app/users/123"
   base = "/app"
@@ -487,20 +442,19 @@ History mode without base:
   → pathname as-is
 ```
 
-**`urlToPath(url, options, regExpCache)`** — lines 48-71:
+**`urlToPath(url, options, regExpCache)`**:
 
 Parses a full URL via `new URL()`. Checks the protocol (`http:` or `https:`).
 Returns `null` for an invalid URL — calling code handles `null` explicitly.
 
-**`buildUrl(path, base, prefix)`** — line 73:
+**`buildUrl(path, base)`**:
 
-Simple concatenation: `base + prefix + path`.
-The prefix is computed once in the `BrowserPlugin` constructor (line 63): `options.useHash ? "#" + hashPrefix : ""`.
+Simple concatenation: `base + path`.
 
 ### RegExp Caching
 
 ```typescript
-// url-utils.ts, lines 7-21 and 77-95
+// url-utils.ts
 const escapeRegExpCache = new Map<string, string>(); // module-level singleton
 
 export function createRegExpCache(): RegExpCache {
@@ -515,11 +469,11 @@ export function createRegExpCache(): RegExpCache {
 
 Two levels of caching:
 
-1. `escapeRegExpCache` — module-level singleton, caches `escapeRegExp()` results. Base path and hashPrefix strings are escaped once for the lifetime of the module.
-2. `RegExpCache` — per-factory instance, created in `browserPluginFactory()` (line 64). Caches compiled `RegExp` objects by pattern. One `RegExp` per pattern — not recreated on every `extractPath()` call.
+1. `escapeRegExpCache` — module-level singleton, caches `escapeRegExp()` results. Base path strings are escaped once for the lifetime of the module.
+2. `RegExpCache` — per-factory instance, created in `browserPluginFactory()`. Caches compiled `RegExp` objects by pattern. One `RegExp` per pattern — not recreated on every `extractPath()` call.
 
 **Why two caches?** `escapeRegExpCache` is global because string escaping doesn't depend on plugin configuration.
-`RegExpCache` is per-factory because patterns depend on the `base` and `hashPrefix` of a specific instance.
+`RegExpCache` is per-factory because patterns depend on the `base` of a specific instance.
 
 ## Popstate Utilities
 
@@ -562,17 +516,10 @@ In `#onPopState`, errors fall into two categories:
 
 ## Options Validation
 
-`validation.ts` performs two kinds of checks:
-
-**Type checking** (`validateOptionType`): iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
+`validation.ts` performs type checking via `validateOptionType`: iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
 On mismatch — a console warning, `hasInvalidTypes = true`.
 
-**Mode conflict checking:**
-
-- `useHash: true` + `preserveHash` → warning (option is ignored)
-- `useHash: false` + non-empty `hashPrefix` → warning (option is ignored)
-
-If `hasInvalidTypes === true`, `factory.ts` falls back to `defaultOptions` entirely (lines 41-46). This guards against accidentally passing wrong types — the plugin continues working with safe defaults.
+If `hasInvalidTypes === true`, `factory.ts` falls back to `defaultOptions` entirely. This guards against accidentally passing wrong types — the plugin continues working with safe defaults.
 
 ## Plugin Lifecycle
 
@@ -617,49 +564,27 @@ unsubscribe() or router.dispose()
         └── Removes router extensions (#removeExtensions)
 ```
 
-## Routing Modes
-
-### History Mode (default)
+## History Mode
 
 ```
 URL: https://example.com/app/users/123
 
 base = "/app"
-prefix = ""
 
 buildUrl("users.profile", { id: "123" })
   → buildPath() = "/users/123"
-  → buildUrl("/users/123", "/app", "") = "/app/users/123"
+  → buildUrl("/users/123", "/app") = "/app/users/123"
 
-extractPath("/app/users/123", "", { useHash: false, base: "/app" })
+extractPath("/app/users/123", { base: "/app" })
   → "/users/123"
 ```
 
 Requires a server-side fallback (all paths → `index.html`).
 
-### Hash Mode
-
-```
-URL: https://example.com/#!/users/123
-
-useHash = true
-hashPrefix = "!"
-prefix = "#!"
-
-buildUrl("users.profile", { id: "123" })
-  → buildPath() = "/users/123"
-  → buildUrl("/users/123", "", "#!") = "#!/users/123"
-
-extractPath("/", "#!/users/123", { useHash: true, hashPrefix: "!" })
-  → hash.replace(/^#\\!/, "") = "/users/123"
-```
-
-No server configuration needed — all routing lives in the hash.
-
-### preserveHash (History Mode only)
+### preserveHash
 
 ```typescript
-// plugin.ts, lines 106-118
+// plugin.ts
 const shouldPreserveHash =
   !!this.#options.preserveHash &&
   (!fromState || fromState.path === toState.path);
@@ -671,15 +596,14 @@ The hash fragment (`#section`) is preserved only when navigating to the same pat
 
 ## Performance
 
-| Optimization                           | Location                         | Effect                                                |
-| -------------------------------------- | -------------------------------- | ----------------------------------------------------- |
-| `escapeRegExpCache` (module-level Map) | `url-utils.ts`, line 7           | String escaping happens once per module lifetime      |
-| `RegExpCache` (per-factory Map)        | `url-utils.ts`, lines 77-95      | RegExp compilation happens once per pattern           |
-| `#prefix` computed in constructor      | `plugin.ts`, line 63             | `"#" + hashPrefix` concatenation doesn't repeat       |
-| `#isTransitioning` flag                | `plugin.ts`, lines 36, 200-207   | Blocks concurrent popstate processing without a queue |
-| Last-write-wins for deferred events    | `plugin.ts`, lines 37, 204       | Intermediate states are skipped without accumulation  |
-| `historyState` as a subset of State    | `popstate-utils.ts`, lines 48-53 | Less data stored in `history.state`                   |
-| `createSafeBrowser()` called once      | `factory.ts`, line 35            | Environment check doesn't repeat                      |
+| Optimization                           | Location            | Effect                                                |
+| -------------------------------------- | ------------------- | ----------------------------------------------------- |
+| `escapeRegExpCache` (module-level Map) | `url-utils.ts`      | String escaping happens once per module lifetime      |
+| `RegExpCache` (per-factory Map)        | `url-utils.ts`      | RegExp compilation happens once per pattern           |
+| `#isTransitioning` flag                | `plugin.ts`         | Blocks concurrent popstate processing without a queue |
+| Last-write-wins for deferred events    | `plugin.ts`         | Intermediate states are skipped without accumulation  |
+| `historyState` as a subset of State    | `popstate-utils.ts` | Less data stored in `history.state`                   |
+| `createSafeBrowser()` called once      | `factory.ts`        | Environment check doesn't repeat                      |
 
 ## Related Documents
 
