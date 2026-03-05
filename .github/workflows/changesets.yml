@@ -171,9 +171,10 @@ jobs:
         if: steps.unpublished.outputs.has_unpublished == 'true'
         env:
           GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+          HUSKY: 0
         run: |
-          git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-          git push --tags
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git"
+          git push origin --tags
 
       # Create GitHub releases for packages published in previous step
       - name: Create GitHub Releases
