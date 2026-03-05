@@ -169,15 +169,12 @@ getPluginApi(router): PluginApi;
 // forwardState(routeName, routeParams)               — resolve forwarding → SimpleState
 // matchPath(path): State | undefined                 — match URL to State
 // buildNavigationState(name, params?): State | undefined — full navigation state with path
-// navigateToState(toState, fromState?, opts?)         — direct state navigation
 // addEventListener(eventName, cb): Unsubscribe        — manual event subscription
 // setRootPath(rootPath)                               — set router root path prefix
 // getRootPath(): string                               — get current root path
 // getOptions(): Options                               — get router options
 // getTree(): RouteTree                                — get compiled route tree
-// getForwardState(): ForwardFn                        — get current forwardState function
-// setForwardState(fn)                                 — replace forwardState (interception)
-// addBuildPathInterceptor(fn): Unsubscribe            — register buildPath param transformer (FIFO pipeline)
+// addInterceptor(method, fn): Unsubscribe             — register method interceptor (FIFO pipeline)
 
 cloneRouter(router, deps?): Router;
 // SSR cloning — see "Clone Router" section below
@@ -660,36 +657,37 @@ interface Plugin {
 
 ### Plugin Interception
 
-Two interception mechanisms exist in `RouterInternals`, accessed via `getPluginApi()`:
-
-**1. `forwardState` — mutable function replacement (set/get)**
-
-Intercepts state building during navigation. Only one function at a time (last writer wins):
+Plugins intercept router methods via a universal `addInterceptor()` API:
 
 ```typescript
-const originalForwardState = api.getForwardState();
-api.setForwardState((routeName, routeParams) => {
-  const result = originalForwardState(routeName, routeParams);
+const api = getPluginApi(router);
+
+// Wrap forwardState to inject persistent params
+api.addInterceptor("forwardState", (next, routeName, routeParams) => {
+  const result = next(routeName, routeParams);
   return { ...result, params: withPersistentParams(result.params) };
 });
+
+// Wrap buildPath to inject persistent params into URL building
+api.addInterceptor("buildPath", (next, route, params) =>
+  next(route, withPersistentParams(params ?? {})),
+);
+
+// Wrap start to make path optional (browser-plugin injects location)
+api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
 ```
 
-**2. `addBuildPathInterceptor` — array pipeline (add/remove)**
+**`InterceptableMethodMap`** defines interceptable methods:
+- `start: (path?: string) => Promise<State>`
+- `buildPath: (route: string, params?: Params) => string`
+- `forwardState: (routeName: string, routeParams: Params) => SimpleState`
 
-Intercepts `buildPath` param transformation. Multiple interceptors execute in FIFO order. Each receives `(routeName, params)` and returns transformed `params`:
+Multiple interceptors per method execute in FIFO order. Each receives `next` (original or previously-wrapped function) plus the method's arguments.
 
-```typescript
-const unsubscribe = api.addBuildPathInterceptor((routeName, params) => {
-  return { ...params, lang: getCurrentLang() };
-});
-// unsubscribe() removes the interceptor
-```
+Internally, `createInterceptable()` in `internals.ts` wraps methods at wiring time. Interceptor chains are stored in `RouterInternals.interceptors` (`Map<string, InterceptorFn[]>`).
 
-Both go through `RouterInternals` WeakMap, ensuring all call paths (facade, wiring, plugins) are intercepted.
-
-**Mutable fields in `RouterInternals`:**
-- `forwardState` — function reference, swapped via set/get
-- `buildPathInterceptors` — shared array reference, mutated via push/splice
+**Mutable field in `RouterInternals`:**
+- `interceptors` — `Map<string, InterceptorFn[]>`, mutated via `addInterceptor()` / unsubscribe
 
 ## State Management
 

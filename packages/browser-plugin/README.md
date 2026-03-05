@@ -40,7 +40,7 @@ router.usePlugin(
   }),
 );
 
-router.start();
+await router.start();
 ```
 
 ---
@@ -169,12 +169,11 @@ router.usePlugin(
   }),
 );
 
-router.addDeactivateGuard("checkout", () => (toState, fromState, done) => {
-  if (hasUnsavedChanges()) {
-    done({ error: new Error("Unsaved changes") });
-  } else {
-    done();
-  }
+import { getLifecycleApi } from "@real-router/core";
+
+const lifecycle = getLifecycleApi(router);
+lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
+  return !hasUnsavedChanges(); // false blocks navigation
 });
 ```
 

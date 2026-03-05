@@ -316,23 +316,20 @@ const unsub = api.addEventListener(events.TRANSITION_START, (toState, fromState)
   console.log("Starting:", toState.name);
 });
 
-// Navigation with pre-built state
-await api.navigateToState(toState, fromState, opts);
-
 // Root path management
 api.setRootPath("/app");
 api.getRootPath(); // "/app"
 
-// Forward state interception
-api.setForwardState((name, params) => ({ name, params: withPersistent(params) }));
-
-// BuildPath param interception (used by persistent-params-plugin)
-const unsub2 = api.addBuildPathInterceptor((routeName, params) => {
-  return { ...params, lang: getCurrentLang() };
+// Method interception (used by plugins)
+api.addInterceptor("forwardState", (next, name, params) => {
+  const result = next(name, params);
+  return { ...result, params: withPersistent(result.params) };
 });
+
+api.addInterceptor("start", (next, path) => next(path ?? getLocation()));
 ```
 
-**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `navigateToState`, `addEventListener`, `getOptions`, `getTree`, `getForwardState`, `setForwardState`, `addBuildPathInterceptor`
+**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `addEventListener`, `getOptions`, `getTree`, `addInterceptor`
 
 ### SSR Cloning — `cloneRouter(router, deps?)`
 
