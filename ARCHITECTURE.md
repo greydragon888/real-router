@@ -12,12 +12,14 @@ real-router/
 │   ├── react/                     # React integration (Provider, hooks, components)
 │   ├── sources/                   # @real-router/sources — subscription layer for UI bindings
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
-│   ├── browser-plugin/            # Browser history synchronization
+│   ├── browser-plugin/            # Browser History API synchronization
+│   ├── hash-plugin/               # Hash-based routing (#/path)
 │   ├── logger-plugin/             # Development logging with timing
 │   ├── persistent-params-plugin/  # Parameter persistence
-│   ├── route-utils/                 # @real-router/route-utils — route tree queries and segment testing
+│   ├── route-utils/               # @real-router/route-utils — route tree queries and segment testing
 │   ├── logger/                    # @real-router/logger — isomorphic logging
 │   ├── fsm/                       # @real-router/fsm — finite state machine engine (internal)
+│   ├── browser-env/               # Shared browser abstractions for plugins (internal)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
 │   ├── route-tree/                # Route tree building, validation, matcher factory (internal)
 │   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
@@ -42,6 +44,7 @@ graph TD
         TG[type-guards] -->|dep| TYPES
         RT[route-tree] -->|dep| PM
         RT -->|dep| SP
+        BE[browser-env] -->|dep| CORE
     end
 
     subgraph core [Core]
@@ -57,6 +60,7 @@ graph TD
 
     subgraph consumers [Consumer packages]
         BP["@real-router/browser-plugin"]
+        HP["@real-router/hash-plugin"]
         SOURCES["@real-router/sources"]
         REACT["@real-router/react"]
         RX["@real-router/rx"]
@@ -68,6 +72,11 @@ graph TD
     BP -->|dep| CORE
     BP -->|dep| LOG
     BP -.->|bundles| TG
+    BP -.->|bundles| BE
+
+    HP -->|dep| CORE
+    HP -.->|bundles| TG
+    HP -.->|bundles| BE
 
     LP -->|dep| CORE
     LP -->|dep| LOG
@@ -87,9 +96,9 @@ graph TD
     ROUTEUTILS -->|dep| TYPES
 ```
 
-**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/sources`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`
+**Public packages:** `@real-router/core`, `@real-router/types`, `@real-router/react`, `@real-router/sources`, `@real-router/rx`, `@real-router/browser-plugin`, `@real-router/hash-plugin`, `@real-router/logger-plugin`, `@real-router/persistent-params-plugin`, `@real-router/route-utils`
 
-**Internal packages (bundled into core):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`
+**Internal packages (bundled into consumers):** `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
 
 **Internal packages (separate, not bundled):** `@real-router/logger`, `@real-router/fsm`
 

@@ -4,8 +4,7 @@
 
 ## Overview
 
-`@real-router/browser-plugin` synchronizes router state with the browser URL and handles back/forward navigation.
-The plugin supports two modes: History API (`pushState`/`replaceState`) and hash routing (`#/path`).
+`@real-router/browser-plugin` synchronizes router state with the browser URL and handles back/forward navigation using the History API (`pushState`/`replaceState`).
 
 **Core role:** A thin adapter between the browser environment and the platform-agnostic router core.
 Contains no navigation business logic — only URL synchronization and browser event handling.
@@ -25,11 +24,9 @@ browser-plugin/
 │   ├── index.ts           — Public API + module augmentation
 │   ├── factory.ts         — browserPluginFactory (validation, normalization, instance creation)
 │   ├── plugin.ts          — BrowserPlugin class (runtime behavior)
-│   ├── browser.ts         — Browser API abstraction (createSafeBrowser, createFallbackBrowser)
-│   ├── types.ts           — Types (BrowserPluginOptions, Browser, SharedFactoryState, URLParseOptions)
-│   ├── url-utils.ts       — Pure URL utility functions (extractPath, buildUrl, RegExpCache)
-│   ├── popstate-utils.ts  — Pure popstate utility functions (getRouteFromEvent, updateBrowserState)
-│   ├── validation.ts      — Options validation (validateOptions, validateOptionType)
+│   ├── types.ts           — Types (BrowserPluginOptions)
+│   ├── url-utils.ts       — Pure URL utility functions (extractPath, buildUrl, urlToPath)
+│   ├── validation.ts      — Options validation (delegates to browser-env)
 │   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
 ```
 
@@ -39,28 +36,24 @@ browser-plugin/
 index.ts
     └── factory.ts
             ├── plugin.ts
-            │       ├── popstate-utils.ts
-            │       │       └── types.ts
             │       ├── url-utils.ts
             │       │       └── constants.ts
-            │       └── constants.ts
-            ├── browser.ts
-            │       └── url-utils.ts
+            │       └── browser-env (shared abstractions)
             ├── validation.ts
             │       └── constants.ts
             ├── constants.ts
             └── url-utils.ts
 
-types.ts  ← imported by all modules
+types.ts  ← imported by factory.ts, plugin.ts, validation.ts
 ```
 
 External dependencies:
 
-| Dependency            | What it provides                             | Used in                               |
-| --------------------- | -------------------------------------------- | ------------------------------------- |
-| `@real-router/core`   | `RouterError`, `getPluginApi`, types         | `factory.ts`, `plugin.ts`, `index.ts` |
-| `@real-router/logger` | `logger` singleton                           | `browser.ts`                          |
-| `type-guards`         | `isStateStrict` (`history.state` validation) | `popstate-utils.ts`, `index.ts`       |
+| Dependency          | What it provides                                                        | Used in                                                    |
+| ------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                      |
+| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `url-utils.ts` |
+| `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                      |
 
 ## Factory + Class Pattern
 
@@ -73,8 +66,8 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
         │
         │  Runs once on call:
         │  - validateOptions()
-        │  - base path normalization
-        │  - createRegExpCache()
+        │  - base path normalization (normalizeBase from browser-env)
+        │  - createSafeBrowser() if no browser provided
         │  - transitionOptions construction
         │  - SharedFactoryState creation
         │
@@ -85,29 +78,40 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
                 └── new BrowserPlugin(router, api, options, browser, ...)
                             │
                             │  Constructor:
-                            │  - registers start interceptor
+                            │  - registers start interceptor (via browser-env)
                             │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
+                            │  - creates popstate handler and lifecycle (via browser-env)
                             │
                             └── .getPlugin()  → Plugin { onStart, onStop, ... }
 ```
 
 **Why this split instead of a single object?**
 
-- `factory.ts` runs once — expensive operations (validation, cache creation) don't repeat on every `usePlugin()` call
-- `BrowserPlugin` holds mutable state (`#isTransitioning`, `#deferredPopstateEvent`) — a class with private fields fits better than a closure
+- `factory.ts` runs once — expensive operations (validation, browser creation) don't repeat on every `usePlugin()` call
+- `BrowserPlugin` wires together browser-env helpers with plugin-specific URL logic — a class encapsulates the setup cleanly
 - Testability: `BrowserPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
 - Lifecycle: the constructor registers the interceptor and extends the router via `api.extendRouter()`; `teardown` calls the returned unsubscribe to remove extensions
 
 ### Creation Flow
 
 ```typescript
-// factory.ts, lines 33-88
-export function browserPluginFactory(opts?, browser = createSafeBrowser()): PluginFactory {
-  const hasInvalidTypes = validateOptions(opts, defaultOptions);
-  let options = { ...defaultOptions, ...opts } as BrowserPluginOptions;
-  // ... normalization ...
-  const regExpCache = createRegExpCache();
-  const transitionOptions = { source, replace: true, forceDeactivate? };
+// factory.ts
+export function browserPluginFactory(opts?, browser?): PluginFactory {
+  validateOptions(opts);
+  const options = { ...defaultOptions, ...opts };
+  options.base = normalizeBase(options.base);
+
+  const resolvedBrowser =
+    browser ??
+    createSafeBrowser(
+      () =>
+        safelyEncodePath(
+          extractPath(globalThis.location.pathname, options.base),
+        ) + globalThis.location.search,
+      "browser-plugin",
+    );
+
+  const transitionOptions = { forceDeactivate, source, replace: true };
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
   return function browserPlugin(routerBase) {
@@ -115,10 +119,9 @@ export function browserPluginFactory(opts?, browser = createSafeBrowser()): Plug
       routerBase,
       getPluginApi(routerBase),
       options,
-      browser,
-      regExpCache,
+      resolvedBrowser,
       transitionOptions,
-      shared
+      shared,
     );
 
     return plugin.getPlugin();
@@ -128,49 +131,16 @@ export function browserPluginFactory(opts?, browser = createSafeBrowser()): Plug
 
 ## Browser API Abstraction
 
-### Browser Interface
+The `Browser` interface, `createSafeBrowser()`, `createFallbackBrowser()`, `safelyEncodePath()`, and all SSR fallback logic live in the private `browser-env` package — shared between `browser-plugin` and `hash-plugin`.
 
-```typescript
-// types.ts, lines 140-173
-interface Browser {
-  pushState: (state: State, path: string) => void;
-  replaceState: (state: State, path: string) => void;
-  addPopstateListener: (fn: (evt: PopStateEvent) => void) => () => void;
-  getLocation: (opts: BrowserPluginOptions) => string;
-  getHash: () => string;
-}
-```
+See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on the Browser interface and its two implementations.
 
-### Two Implementations
+**Key points for browser-plugin:**
 
-```
-createSafeBrowser()                         createFallbackBrowser()
-        │                                            │
-        │  Checks the environment:                   │  SSR / non-browser:
-        │  typeof globalThis.window !== "undefined"  │  - all methods are no-ops
-        │  && !!globalThis.history                   │  - warn-once on first call
-        │                                            │  - addPopstateListener → NOOP
-        ▼                                            ▼
-  Real functions:                           Safe stubs:
-  - history.pushState()                     - pushState: () => {}
-  - history.replaceState()                  - replaceState: () => {}
-  - addEventListener("popstate", ...)       - getLocation: () => ""
-  - extractPath() + safelyEncodePath()      - getHash: () => ""
-```
-
-**Why the abstraction?**
-
-- **SSR safety:** `window`, `history`, and `location` are unavailable on the server. Without the abstraction, any import of the plugin would break SSR.
-- **Testability:** tests pass a mock `Browser` object directly to `BrowserPlugin` — no need to mock globals.
-- **Dependency injection:** `browserPluginFactory(opts, browser)` accepts `browser` as a second argument — a standard DI pattern.
-
-`createSafeBrowser()` is called once when `browserPluginFactory()` is invoked (line 35 in `factory.ts`).
-The result is passed into the closure and then into `BrowserPlugin`.
-
-### safelyEncodePath
-
-`browser.ts`, line 38. Normalizes URL encoding via `encodeURI(decodeURI(path))`.
-If the path is already partially encoded, double-encoding won't occur. Parse errors are caught and the original path is returned.
+- `browserPluginFactory(opts, browser)` accepts an optional `browser` argument for DI / testing
+- If not provided, `createSafeBrowser()` from `browser-env` is called once during factory creation
+- The `getLocation` callback passed to `createSafeBrowser` uses `extractPath(pathname, base)` + `safelyEncodePath()` — plugin-specific URL logic
+- Tests pass a mock `Browser` object directly — no need to mock globals
 
 ## Start Interceptor Integration
 
@@ -182,13 +152,11 @@ The plugin needs to make `path` optional without changing the core's signature.
 ### Solution: addInterceptor
 
 ```typescript
-// plugin.ts, lines 65-68
-this.#removeStartInterceptor = this.#api.addInterceptor("start", (next, path) =>
-  next(path ?? this.#browser.getLocation(this.#options)),
-);
+// plugin.ts constructor
+this.#removeStartInterceptor = createStartInterceptor(api, browser);
 ```
 
-The interceptor intercepts calls to `router.start(path?)`.
+`createStartInterceptor` from `browser-env` registers an interceptor that intercepts calls to `router.start(path?)`.
 If `path` is not provided, it substitutes the current browser URL via `browser.getLocation()`.
 If provided, it passes it through as-is.
 
@@ -233,46 +201,43 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 
 ```typescript
 // plugin.ts, constructor
-this.#removeExtensions = this.#api.extendRouter({
-  buildUrl: (route: string, params?: Params) => {
-    const path = this.#router.buildPath(route, params);
-    return buildUrl(
-      path,
-      (this.#options as URLParseOptions).base,
-      this.#prefix,
-    );
-  },
+this.#removeExtensions = api.extendRouter({
+  buildUrl: pluginBuildUrl, // buildPath() + buildUrl(path, base)
   matchUrl: (url: string) => {
-    const path = urlToPath(
-      url,
-      this.#options as URLParseOptions,
-      this.#regExpCache,
-    );
-    return path ? this.#api.matchPath(path) : undefined;
+    const path = urlToPath(url, options.base);
+    return path ? api.matchPath(path) : undefined;
   },
-  replaceHistoryState: (name: string, params: Params = {}) => {
-    // ... buildState + makeState + updateBrowserState
-  },
+  replaceHistoryState: createReplaceHistoryState(
+    api,
+    router,
+    browser,
+    pluginBuildUrl,
+  ),
 });
 ```
+
+`createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it builds state via `api.buildState`/`api.makeState` and calls `browser.replaceState`.
 
 `extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 
 ### Cleanup on teardown
 
+Lifecycle hooks (`onStart`, `onStop`, `teardown`) are created by `createPopstateLifecycle` from `browser-env`:
+
 ```typescript
-// plugin.ts, teardown
-teardown: () => {
-  if (this.#shared.removePopStateListener) {
-    this.#shared.removePopStateListener();
-    this.#shared.removePopStateListener = undefined;
-  }
-  this.#removeStartInterceptor();
-  this.#removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
-},
+// plugin.ts, constructor
+this.#lifecycle = createPopstateLifecycle({
+  browser,
+  shared,
+  handler,
+  cleanup: () => {
+    this.#removeStartInterceptor();
+    this.#removeExtensions(); // ← removes buildUrl, matchUrl, replaceHistoryState
+  },
+});
 ```
 
-The unsubscribe function returned by `extendRouter()` handles property removal — no manual `delete` casts needed.
+`teardown` removes the popstate listener, then calls the `cleanup` callback which unregisters the start interceptor and router extensions.
 
 As a safety net, `router.dispose()` also cleans up any extensions that plugins failed to remove in their `teardown`.
 
@@ -281,101 +246,40 @@ As a safety net, `router.dispose()` also cleans up any extensions that plugins f
 `Router` uses private fields (`#state`, `#routes`, etc.) — they're inaccessible through a `Proxy`.
 Adding methods directly to the instance is the only way to give them access to the plugin's closure.
 
-## Type System: Discriminated Union
+## Type System
 
-### The Problem of Mutually Exclusive Options
-
-`hashPrefix` only makes sense in hash mode. `preserveHash` only makes sense in history mode. Their combined use needs to be forbidden at the type level.
-
-### Solution: discriminated union with never
+### BrowserPluginOptions
 
 ```typescript
-// types.ts, lines 39-98
-interface HashModeOptions extends BaseBrowserPluginOptions {
-  useHash: true;
-  hashPrefix?: string;
-  preserveHash?: never; // ← forbidden in hash mode
-}
-
-interface HistoryModeOptions extends BaseBrowserPluginOptions {
-  useHash?: false;
-  preserveHash?: boolean;
-  hashPrefix?: never; // ← forbidden in history mode
-}
-
-type BrowserPluginOptions = HashModeOptions | HistoryModeOptions;
-```
-
-The discriminant is the `useHash` field. TypeScript narrows the type through it:
-
-```typescript
-// ❌ Compile error:
-const opts: BrowserPluginOptions = { useHash: true, preserveHash: true };
-// ✅ Valid:
-const opts: BrowserPluginOptions = { useHash: true, hashPrefix: "!" };
-```
-
-### DefaultBrowserPluginOptions — flat type for defaults
-
-```typescript
-// constants.ts, lines 28-42
-interface DefaultBrowserPluginOptions {
-  forceDeactivate: boolean;
-  useHash: boolean;
-  base: string;
-  preserveHash: boolean;
-  hashPrefix: string;
+// types.ts
+interface BrowserPluginOptions {
+  forceDeactivate?: boolean;
+  base?: string;
 }
 ```
 
-You can't create an object of type `BrowserPluginOptions` that contains both `hashPrefix` and `preserveHash` — one of them is always `never`.
-That's why a separate flat type `DefaultBrowserPluginOptions` is used to store default values for all options.
+Options are validated at runtime via `validateOptions()` in `validation.ts`, which delegates to `createOptionsValidator` from `browser-env`.
 
-It also serves as a schema for validation: `validateOptions()` iterates over the keys of `defaultOptions` and checks types via `typeof defaultOptions[key]`.
+Pure functions in `url-utils.ts` accept `base: string` directly rather than the full options object — the calling code in `plugin.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
 
-### URLParseOptions — flat type for pure functions
-
-```typescript
-// types.ts, lines 181-185
-interface URLParseOptions {
-  readonly useHash: boolean;
-  readonly base: string;
-  readonly hashPrefix: string;
-}
-```
-
-Pure functions in `url-utils.ts` and `popstate-utils.ts` accept `URLParseOptions` rather than `BrowserPluginOptions`.
-The reason: calling code in `plugin.ts` already works with validated options and passes correct values.
-The flat type is simpler to use inside pure functions — no need to handle discriminated union branches.
+Types shared between browser-plugin and hash-plugin (`Browser`, `SharedFactoryState`, etc.) live in `browser-env`.
 
 ## SharedFactoryState
 
+`SharedFactoryState` is defined in `browser-env` and shared between browser-plugin and hash-plugin:
+
 ```typescript
-// types.ts, lines 195-197
 interface SharedFactoryState {
   removePopStateListener: (() => void) | undefined;
 }
 ```
 
-The `shared` object is created once in `browserPluginFactory()` and passed to all `BrowserPlugin` instances created by that factory.
+The `shared` object is created once in `browserPluginFactory()` and passed to `createPopstateLifecycle` from `browser-env`.
 
 **Why is it needed?**
 
 The factory may be called again — for example, during hot module replacement (HMR) or when reusing the factory with different routers.
-Each new `BrowserPlugin` registers its own popstate listener in `onStart`. Without `shared`, the previous listener would remain in memory.
-
-```typescript
-// plugin.ts, lines 75-89
-onStart: () => {
-  if (this.#shared.removePopStateListener) {
-    this.#shared.removePopStateListener();  // ← remove the previous instance's listener
-  }
-
-  this.#shared.removePopStateListener = this.#browser.addPopstateListener(
-    (evt: PopStateEvent) => void this.#onPopState(evt),
-  );
-},
-```
+Each new plugin instance registers its own popstate listener in `onStart`. Without `shared`, the previous listener would remain in memory.
 
 `shared` is intentionally mutable. It's the only shared state between instances of the same factory.
 
@@ -390,14 +294,13 @@ router.navigate(name, params, opts)
         ▼
   Plugin.onTransitionSuccess(toState, fromState, navOptions)
         │
-        ├── Compute shouldReplaceHistory:
-        │     navOptions.replace ?? !fromState
-        │     || (reload && areStatesEqual(to, from))
+        ├── shouldReplaceHistory(navOptions, toState, fromState, router)
+        │     (from browser-env: replace ?? !fromState || reload && statesEqual)
         │
         ├── url = router.buildUrl(toState.name, toState.params)
-        │         └── router.buildPath() + buildUrl(path, base, prefix)
+        │         └── router.buildPath() + buildUrl(path, base)
         │
-        ├── If preserveHash && paths match:
+        ├── If paths match (hash preservation):
         │     finalUrl = url + browser.getHash()
         │
         └── updateBrowserState(toState, finalUrl, shouldReplace, browser)
@@ -408,24 +311,26 @@ router.navigate(name, params, opts)
 
 ## Data Flow: popstate (back/forward buttons)
 
+Popstate handling is fully delegated to `browser-env` via `createPopstateHandler` + `createPopstateLifecycle`. The flow is identical for browser-plugin and hash-plugin:
+
 ```
 User clicks back or forward
         │
         ▼
-  browser.addPopstateListener → #onPopState(evt)
+  browser.addPopstateListener → handler(evt)  (from createPopstateHandler)
         │
-        ├── #isTransitioning === true?
-        │     YES: #deferredPopstateEvent = evt  (last-write-wins)
+        ├── isTransitioning === true?
+        │     YES: deferredPopstateEvent = evt  (last-write-wins)
         │          return
         │
-        ├── #isTransitioning = true
+        ├── isTransitioning = true
         │
-        ├── getRouteFromEvent(evt, api, browser, options)
+        ├── getRouteFromEvent(evt, api, browser)
         │     │
         │     ├── isState(evt.state)?
         │     │     YES: { name: evt.state.name, params: evt.state.params }
         │     │
-        │     └── NO: api.matchPath(browser.getLocation(options))
+        │     └── NO: api.matchPath(browser.getLocation())
         │               └── URL matching as fallback
         │
         ├── route found?
@@ -434,25 +339,21 @@ User clicks back or forward
         │
         ├── catch (error):
         │     error instanceof RouterError? → ignore (CANNOT_DEACTIVATE, etc.)
-        │     otherwise: #recoverFromCriticalError(error)
+        │     otherwise: recoverFromCriticalError(error)
         │               └── browser.replaceState(currentState, buildUrl(...))
         │
         └── finally:
-              #isTransitioning = false
-              #processDeferredEvent()
-                    └── if #deferredPopstateEvent !== null:
-                          event = #deferredPopstateEvent
-                          #deferredPopstateEvent = null
-                          void #onPopState(event)
+              isTransitioning = false
+              processDeferredEvent()
 ```
 
 ### Deferred popstate Handling
 
 Rapid back/forward clicks generate multiple popstate events in quick succession. Processing each one is pointless — only the final state matters.
 
-The `#isTransitioning` flag blocks concurrent processing.
-New events are written to `#deferredPopstateEvent` — each one overwrites the previous (last-write-wins).
-After the current transition completes, `#processDeferredEvent()` processes the last deferred event.
+The `isTransitioning` flag blocks concurrent processing.
+New events are written to `deferredPopstateEvent` — each one overwrites the previous (last-write-wins).
+After the current transition completes, `processDeferredEvent()` processes the last deferred event.
 
 ```
 Click 1 → onPopState → isTransitioning=true → navigate("page1")...
@@ -463,116 +364,51 @@ navigate("page1") done → processDeferredEvent → navigate("page3")
 
 The intermediate `page2` state is skipped — this is expected behavior.
 
+See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
+
 ## URL Utilities
 
 ### url-utils.ts — pure functions
 
 All functions in `url-utils.ts` are pure (no side effects, no direct access to globals).
 
-**`extractPath(pathname, hash, options, regExpCache)`** — lines 23-46:
+**`extractPath(pathname, base)`**:
 
 ```
-Hash mode (options.useHash = true):
-  hash = "#!/users/123"
-  hashPrefix = "!"
-  → escapeRegExp("!") = "\\!"
-  → hash.replace(/^#\\!/, "") = "/users/123"
-
-History mode with base:
+With base:
   pathname = "/app/users/123"
   base = "/app"
-  → pathname.replace(/^\/app/, "") = "/users/123"
+  → pathname.slice(base.length) = "/users/123"
 
-History mode without base:
+Without base:
   → pathname as-is
 ```
 
-**`urlToPath(url, options, regExpCache)`** — lines 48-71:
+Uses `String.startsWith()` + `String.slice()` — no regex needed for history mode base stripping.
 
-Parses a full URL via `new URL()`. Checks the protocol (`http:` or `https:`).
-Returns `null` for an invalid URL — calling code handles `null` explicitly.
+**`urlToPath(url, base)`**:
 
-**`buildUrl(path, base, prefix)`** — line 73:
+Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
+Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
-Simple concatenation: `base + prefix + path`.
-The prefix is computed once in the `BrowserPlugin` constructor (line 63): `options.useHash ? "#" + hashPrefix : ""`.
+**`buildUrl(path, base)`**:
 
-### RegExp Caching
+Simple concatenation: `base + path`.
 
-```typescript
-// url-utils.ts, lines 7-21 and 77-95
-const escapeRegExpCache = new Map<string, string>(); // module-level singleton
+## Popstate Utilities, Error Recovery
 
-export function createRegExpCache(): RegExpCache {
-  const cache = new Map<string, RegExp>();
-  return {
-    get(pattern: string): RegExp {
-      // lazy RegExp creation by pattern
-    },
-  };
-}
-```
+Popstate event handling (`getRouteFromEvent`, `updateBrowserState`), critical error recovery, and deferred event processing all live in `browser-env` — shared between browser-plugin and hash-plugin.
 
-Two levels of caching:
+See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on:
 
-1. `escapeRegExpCache` — module-level singleton, caches `escapeRegExp()` results. Base path and hashPrefix strings are escaped once for the lifetime of the module.
-2. `RegExpCache` — per-factory instance, created in `browserPluginFactory()` (line 64). Caches compiled `RegExp` objects by pattern. One `RegExp` per pattern — not recreated on every `extractPath()` call.
-
-**Why two caches?** `escapeRegExpCache` is global because string escaping doesn't depend on plugin configuration.
-`RegExpCache` is per-factory because patterns depend on the `base` and `hashPrefix` of a specific instance.
-
-## Popstate Utilities
-
-### popstate-utils.ts — pure functions
-
-**`getRouteFromEvent(evt, api, browser, options)`** — lines 19-32:
-
-A two-level strategy for getting a route from a popstate event:
-
-1. **From `history.state`:** `isStateStrict(evt.state)` checks the object structure (presence of `name`, `params`, `path`, `meta`). If valid, `name` and `params` are taken directly. This is the fast path — no URL parsing needed.
-2. **From the URL:** if `history.state` is invalid (external code wrote something to history, or the user opened the URL directly) — `api.matchPath(browser.getLocation(options))` matches the current URL against the route tree.
-
-**`updateBrowserState(state, url, replace, browser)`** — lines 42-60:
-
-Creates `historyState` as a subset of `State` (only `meta`, `name`, `params`, `path`) and calls `pushState` or `replaceState`. The full `State` object is not stored in `history.state` — only the fields needed to restore the route.
-
-## Critical Error Recovery
-
-```typescript
-// plugin.ts, lines 243-264
-#recoverFromCriticalError(error: unknown): void {
-  console.error(`[${LOGGER_CONTEXT}] Critical error in onPopState`, error);
-
-  try {
-    const currentState = this.#router.getState();
-    if (currentState) {
-      const url = this.#router.buildUrl(currentState.name, currentState.params);
-      this.#browser.replaceState(currentState, url);
-    }
-  } catch (recoveryError) {
-    console.error(`[${LOGGER_CONTEXT}] Failed to recover from critical error`, recoveryError);
-  }
-}
-```
-
-In `#onPopState`, errors fall into two categories:
-
-- `RouterError` (e.g., `CANNOT_DEACTIVATE`, `SAME_STATES`) — expected router errors, ignored. The browser has already changed the URL but the router stayed on the previous route — this is normal.
-- Any other error — critical. The plugin attempts to restore the browser URL to the last known state via `replaceState`. This prevents the URL and router state from going out of sync.
+- Route extraction from popstate events (history.state validation → URL matching fallback)
+- `historyState` as a subset of `State` (only `meta`, `name`, `params`, `path` stored in `history.state`)
+- Error categorization (RouterError = expected, anything else = critical recovery via `replaceState`)
 
 ## Options Validation
 
-`validation.ts` performs two kinds of checks:
-
-**Type checking** (`validateOptionType`): iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
-On mismatch — a console warning, `hasInvalidTypes = true`.
-
-**Mode conflict checking:**
-
-- `useHash: true` + `preserveHash` → warning (option is ignored)
-- `useHash: false` + non-empty `hashPrefix` → warning (option is ignored)
-
-If `hasInvalidTypes === true`, `factory.ts` falls back to `defaultOptions` entirely (lines 41-46). This guards against accidentally passing wrong types — the plugin continues working with safe defaults.
+`validation.ts` delegates to `createOptionsValidator` from `browser-env`. The validator iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
+On mismatch — throws a plain `Error` with a descriptive message (e.g., `[browser-plugin] Invalid type for 'base': expected string, got number`).
 
 ## Plugin Lifecycle
 
@@ -617,69 +453,43 @@ unsubscribe() or router.dispose()
         └── Removes router extensions (#removeExtensions)
 ```
 
-## Routing Modes
-
-### History Mode (default)
+## History Mode
 
 ```
 URL: https://example.com/app/users/123
 
 base = "/app"
-prefix = ""
 
 buildUrl("users.profile", { id: "123" })
   → buildPath() = "/users/123"
-  → buildUrl("/users/123", "/app", "") = "/app/users/123"
+  → buildUrl("/users/123", "/app") = "/app/users/123"
 
-extractPath("/app/users/123", "", { useHash: false, base: "/app" })
+extractPath("/app/users/123", { base: "/app" })
   → "/users/123"
 ```
 
 Requires a server-side fallback (all paths → `index.html`).
 
-### Hash Mode
-
-```
-URL: https://example.com/#!/users/123
-
-useHash = true
-hashPrefix = "!"
-prefix = "#!"
-
-buildUrl("users.profile", { id: "123" })
-  → buildPath() = "/users/123"
-  → buildUrl("/users/123", "", "#!") = "#!/users/123"
-
-extractPath("/", "#!/users/123", { useHash: true, hashPrefix: "!" })
-  → hash.replace(/^#\\!/, "") = "/users/123"
-```
-
-No server configuration needed — all routing lives in the hash.
-
-### preserveHash (History Mode only)
+### Hash Fragment Preservation
 
 ```typescript
-// plugin.ts, lines 106-118
-const shouldPreserveHash =
-  !!this.#options.preserveHash &&
-  (!fromState || fromState.path === toState.path);
+// plugin.ts
+const shouldPreserveHash = !fromState || fromState.path === toState.path;
 
 const finalUrl = shouldPreserveHash ? url + this.#browser.getHash() : url;
 ```
 
-The hash fragment (`#section`) is preserved only when navigating to the same path. On a route change, the hash is cleared.
+The hash fragment (`#section`) is always preserved when navigating to the same path (or on first navigation). On a route change, the hash is cleared.
 
 ## Performance
 
-| Optimization                           | Location                         | Effect                                                |
-| -------------------------------------- | -------------------------------- | ----------------------------------------------------- |
-| `escapeRegExpCache` (module-level Map) | `url-utils.ts`, line 7           | String escaping happens once per module lifetime      |
-| `RegExpCache` (per-factory Map)        | `url-utils.ts`, lines 77-95      | RegExp compilation happens once per pattern           |
-| `#prefix` computed in constructor      | `plugin.ts`, line 63             | `"#" + hashPrefix` concatenation doesn't repeat       |
-| `#isTransitioning` flag                | `plugin.ts`, lines 36, 200-207   | Blocks concurrent popstate processing without a queue |
-| Last-write-wins for deferred events    | `plugin.ts`, lines 37, 204       | Intermediate states are skipped without accumulation  |
-| `historyState` as a subset of State    | `popstate-utils.ts`, lines 48-53 | Less data stored in `history.state`                   |
-| `createSafeBrowser()` called once      | `factory.ts`, line 35            | Environment check doesn't repeat                      |
+| Optimization                        | Location       | Effect                                                |
+| ----------------------------------- | -------------- | ----------------------------------------------------- |
+| `String.startsWith` + `slice`       | `url-utils.ts` | No regex needed for base path stripping               |
+| `isTransitioning` flag              | `browser-env`  | Blocks concurrent popstate processing without a queue |
+| Last-write-wins for deferred events | `browser-env`  | Intermediate states are skipped without accumulation  |
+| `historyState` as a subset of State | `browser-env`  | Less data stored in `history.state`                   |
+| `createSafeBrowser()` called once   | `factory.ts`   | Environment check doesn't repeat                      |
 
 ## Related Documents
 

@@ -146,15 +146,16 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 
 | Package                                                                    | Description                                  |
 | -------------------------------------------------------------------------- | -------------------------------------------- |
-| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser history and URL synchronization      |
+| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser History API and URL synchronization  |
+| [@real-router/hash-plugin](packages/hash-plugin)                           | Hash-based routing (`#/path`)                |
 | [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking |
 | [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations     |
 
 ### Subscription Layer
 
-| Package                                            | Description                                     |
-| -------------------------------------------------- | ----------------------------------------------- |
-| [@real-router/sources](packages/sources)           | Reactive subscription sources for UI bindings   |
+| Package                                  | Description                                   |
+| ---------------------------------------- | --------------------------------------------- |
+| [@real-router/sources](packages/sources) | Reactive subscription sources for UI bindings |
 
 ### Utilities
 

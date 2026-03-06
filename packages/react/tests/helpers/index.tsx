@@ -42,11 +42,7 @@ export function createTestRouterWithADefaultRouter(): Router {
     queryParamsMode: "loose",
   });
 
-  router.usePlugin(
-    browserPluginFactory({
-      useHash: false,
-    }),
-  );
+  router.usePlugin(browserPluginFactory({}));
 
   return router;
 }

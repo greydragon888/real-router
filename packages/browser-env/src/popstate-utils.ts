@@ -1,6 +1,6 @@
 import { isStateStrict as isState } from "type-guards";
 
-import type { BrowserPluginOptions, Browser } from "./types";
+import type { Browser } from "./types";
 import type { PluginApi, State, Params } from "@real-router/core";
 
 /**
@@ -13,20 +13,18 @@ import type { PluginApi, State, Params } from "@real-router/core";
  * @param evt - PopStateEvent from browser
  * @param api - PluginApi instance
  * @param browser - Browser API instance
- * @param options - Browser plugin options
  * @returns Route identifier or undefined
  */
 export function getRouteFromEvent(
   evt: PopStateEvent,
   api: PluginApi,
   browser: Browser,
-  options: BrowserPluginOptions,
 ): { name: string; params: Params } | undefined {
   if (isState(evt.state)) {
     return { name: evt.state.name, params: evt.state.params };
   }
 
-  const state = api.matchPath(browser.getLocation(options));
+  const state = api.matchPath(browser.getLocation());
 
   return state ? { name: state.name, params: state.params } : undefined;
 }

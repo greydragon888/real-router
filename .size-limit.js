@@ -40,7 +40,7 @@ export default [
   {
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",
-    limit: "3 kB",
+    limit: "2.5 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
@@ -110,6 +110,13 @@ export default [
     name: "event-emitter (ESM)",
     path: "packages/event-emitter/dist/esm/index.mjs",
     limit: "1 kB",
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "browser-env (ESM)",
+    path: "packages/browser-env/dist/esm/index.mjs",
+    limit: "2 kB",
+    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
 ];

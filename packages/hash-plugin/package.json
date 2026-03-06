@@ -1,0 +1,62 @@
+{
+  "name": "@real-router/hash-plugin",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "description": "Hash-based routing plugin for Real-Router",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "keywords": [
+    "real-router",
+    "hash",
+    "routing",
+    "navigation"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/greydragon888/real-router",
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "scripts": {
+    "test": "vitest",
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "6.9.1",
+    "browser-env": "workspace:^",
+    "jsdom": "27.4.0",
+    "type-guards": "workspace:^"
+  }
+}
