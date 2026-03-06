@@ -34,3 +34,5 @@ export {
   createReplaceHistoryState,
   shouldReplaceHistory,
 } from "./plugin-utils";
+
+export { safeParseUrl } from "./url-parsing";

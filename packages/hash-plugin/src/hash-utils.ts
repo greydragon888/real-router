@@ -1,5 +1,7 @@
 // packages/hash-plugin/src/hash-utils.ts
 
+import { safeParseUrl } from "browser-env";
+
 import { LOGGER_CONTEXT } from "./constants";
 
 export interface RegExpCache {
@@ -63,35 +65,15 @@ export function extractHashPath(
   return path || "/";
 }
 
-/**
- * Parse a hash URL to extract the route path.
- *
- * @param url - URL to parse
- * @param hashPrefix - Hash prefix to strip
- * @param regExpCache - RegExp cache
- * @returns Extracted path with search params, or null on error
- */
 export function hashUrlToPath(
   url: string,
   hashPrefix: string,
   regExpCache: RegExpCache,
 ): string | null {
-  try {
-    const parsedUrl = new URL(url, globalThis.location.origin);
+  const parsedUrl = safeParseUrl(url, LOGGER_CONTEXT);
 
-    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-      console.warn(`[${LOGGER_CONTEXT}] Invalid URL protocol in ${url}`);
-
-      return null;
-    }
-
-    return (
-      extractHashPath(parsedUrl.hash, hashPrefix, regExpCache) +
-      parsedUrl.search
-    );
-  } catch (error) /* v8 ignore start */ {
-    console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
-
-    return null;
-  } /* v8 ignore stop */
+  return parsedUrl
+    ? extractHashPath(parsedUrl.hash, hashPrefix, regExpCache) +
+        parsedUrl.search
+    : null;
 }
