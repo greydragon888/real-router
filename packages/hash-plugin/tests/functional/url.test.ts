@@ -1,0 +1,204 @@
+import { createRouter } from "@real-router/core";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
+
+import { hashPluginFactory } from "@real-router/hash-plugin";
+
+import {
+  noop,
+  routerConfig,
+  withoutMeta,
+  createMockedBrowser,
+} from "../helpers/testUtils";
+
+import type { Router } from "@real-router/core";
+import type { Browser } from "browser-env";
+
+let router: Router;
+let mockedBrowser: Browser;
+
+describe("Hash Plugin — URL Operations", () => {
+  beforeEach(() => {
+    mockedBrowser = createMockedBrowser(noop);
+    globalThis.history.replaceState({}, "", "/");
+
+    router = createRouter(routerConfig, {
+      defaultRoute: "home",
+      queryParamsMode: "default",
+    });
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  describe("Core URL Operations", () => {
+    describe("buildUrl", () => {
+      it("builds hash URL without base or prefix", () => {
+        router.usePlugin(hashPluginFactory({}, mockedBrowser));
+
+        expect(router.buildUrl("home", {})).toBe("#/home");
+        expect(router.buildUrl("users.view", { id: "123" })).toBe(
+          "#/users/view/123",
+        );
+      });
+
+      it("builds URL with hashPrefix", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        expect(router.buildUrl("home", {})).toBe("#!/home");
+        expect(router.buildUrl("users.list", {})).toBe("#!/users/list");
+      });
+
+      it("builds URL with base path", () => {
+        router.usePlugin(hashPluginFactory({ base: "/app" }, mockedBrowser));
+
+        expect(router.buildUrl("home", {})).toBe("/app#/home");
+        expect(router.buildUrl("users.list", {})).toBe("/app#/users/list");
+      });
+
+      it("builds URL with base and hashPrefix", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { base: "/app", hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        expect(router.buildUrl("home", {})).toBe("/app#!/home");
+      });
+    });
+
+    describe("matchUrl", () => {
+      beforeEach(() => {
+        router.usePlugin(hashPluginFactory({}, mockedBrowser));
+      });
+
+      it("matches URL with hash fragment", () => {
+        const state = router.matchUrl("https://example.com/#/users/list");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "users.list",
+          params: {},
+          path: "/users/list",
+        });
+      });
+
+      it("matches URL with hash and params", () => {
+        const state = router.matchUrl("https://example.com/#/users/view/42");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "users.view",
+          params: { id: "42" },
+          path: "/users/view/42",
+        });
+      });
+
+      it("matches URL with search params", () => {
+        const state = router.matchUrl(
+          "https://example.com/#/users/list?page=1&sort=asc",
+        );
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "users.list",
+          params: { page: "1", sort: "asc" },
+          path: "/users/list",
+        });
+      });
+
+      it("returns undefined for invalid protocol", () => {
+        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
+        const state = router.matchUrl("file:///home/user/file.html");
+
+        expect(state).toBeUndefined();
+        expect(consoleSpy).toHaveBeenCalledWith(
+          expect.stringContaining("Invalid URL protocol"),
+        );
+
+        consoleSpy.mockRestore();
+      });
+
+      it("returns undefined when hash does not match any route", () => {
+        const state = router.matchUrl("https://example.com/#/nonexistent-path");
+
+        expect(state).toBeUndefined();
+      });
+    });
+
+    describe("matchUrl with hashPrefix", () => {
+      it("matches URL with hashPrefix", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const state = router.matchUrl("https://example.com/#!/users/list");
+
+        expect(withoutMeta(state!)).toStrictEqual({
+          name: "users.list",
+          params: {},
+          path: "/users/list",
+        });
+      });
+
+      it("reuses cached regexp on repeated matchUrl calls", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const first = router.matchUrl("https://example.com/#!/home");
+        const second = router.matchUrl("https://example.com/#!/users/list");
+
+        expect(first!.name).toBe("home");
+        expect(second!.name).toBe("users.list");
+      });
+    });
+  });
+
+  describe("Base Path Normalization", () => {
+    it("normalizes base without leading slash", () => {
+      router.usePlugin(hashPluginFactory({ base: "app" }, mockedBrowser));
+
+      expect(router.buildUrl("home", {})).toBe("/app#/home");
+    });
+
+    it("normalizes base with trailing slash", () => {
+      router.usePlugin(hashPluginFactory({ base: "/app/" }, mockedBrowser));
+
+      expect(router.buildUrl("home", {})).toBe("/app#/home");
+    });
+
+    it("normalizes base with both issues", () => {
+      router.usePlugin(hashPluginFactory({ base: "app/" }, mockedBrowser));
+
+      expect(router.buildUrl("home", {})).toBe("/app#/home");
+    });
+
+    it("handles empty base", () => {
+      router.usePlugin(hashPluginFactory({ base: "" }, mockedBrowser));
+
+      expect(router.buildUrl("home", {})).toBe("#/home");
+    });
+
+    it("matches URL with base path", () => {
+      router.usePlugin(hashPluginFactory({ base: "/app" }, mockedBrowser));
+
+      const state = router.matchUrl("https://example.com/app#/users/list");
+
+      expect(withoutMeta(state!)).toStrictEqual({
+        name: "users.list",
+        params: {},
+        path: "/users/list",
+      });
+    });
+  });
+});
