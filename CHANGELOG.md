@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-06]
+
+### @real-router/browser-plugin@0.9.0
+
+### Minor Changes
+
+- [#235](https://github.com/greydragon888/real-router/pull/235) [`9bf5901`](https://github.com/greydragon888/real-router/commit/9bf5901a2ff8ff51428ef15cc90cfd8159b9a379) Thanks [@greydragon888](https://github.com/greydragon888)! - BREAKING: Remove hash routing mode (#234)
+
+  Use `@real-router/hash-plugin` for hash-based routing.
+  - Remove `useHash`, `hashPrefix`, `preserveHash` options
+  - `BrowserPluginOptions` is now `{ forceDeactivate?, base? }`
+  - URL hash fragment (`#section`) is always preserved during navigation
+  - Invalid option types now throw `Error` instead of warning and falling back to defaults
+
+### @real-router/hash-plugin@0.1.0
+
+### Minor Changes
+
+- [#235](https://github.com/greydragon888/real-router/pull/235) [`9bf5901`](https://github.com/greydragon888/real-router/commit/9bf5901a2ff8ff51428ef15cc90cfd8159b9a379) Thanks [@greydragon888](https://github.com/greydragon888)! - Standalone hash-based routing plugin (#234)
+
+  New `@real-router/hash-plugin` package for hash-based routing (`example.com/#/path`).
+
+  ```typescript
+  import { hashPluginFactory } from "@real-router/hash-plugin";
+
+  router.usePlugin(hashPluginFactory({ hashPrefix: "!", base: "/app" }));
+  ```
+
+  - `hashPrefix` — character after `#` (default: `""`, e.g. `"!"` for `#!/path`)
+  - `base` — base path prefix (default: `""`)
+  - `forceDeactivate` — force deactivation on navigation (default: `false`)
+
 ## [2026-03-05]
 
 ### @real-router/browser-plugin@0.8.0

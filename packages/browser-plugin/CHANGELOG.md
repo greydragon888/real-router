@@ -1,5 +1,17 @@
 # @real-router/browser-plugin
 
+## 0.9.0
+
+### Minor Changes
+
+- [#235](https://github.com/greydragon888/real-router/pull/235) [`9bf5901`](https://github.com/greydragon888/real-router/commit/9bf5901a2ff8ff51428ef15cc90cfd8159b9a379) Thanks [@greydragon888](https://github.com/greydragon888)! - BREAKING: Remove hash routing mode (#234)
+
+  Use `@real-router/hash-plugin` for hash-based routing.
+  - Remove `useHash`, `hashPrefix`, `preserveHash` options
+  - `BrowserPluginOptions` is now `{ forceDeactivate?, base? }`
+  - URL hash fragment (`#section`) is always preserved during navigation
+  - Invalid option types now throw `Error` instead of warning and falling back to defaults
+
 ## 0.8.0
 
 ### Minor Changes
