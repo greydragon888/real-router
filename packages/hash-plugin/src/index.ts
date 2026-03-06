@@ -8,7 +8,9 @@ import type { Params, State } from "@real-router/core";
 export { hashPluginFactory } from "./factory";
 
 // Types
-export type { HashPluginOptions, Browser } from "./types";
+export type { HashPluginOptions } from "./types";
+
+export type { Browser } from "browser-env";
 
 // Type guards
 export { isStateStrict as isState } from "type-guards";

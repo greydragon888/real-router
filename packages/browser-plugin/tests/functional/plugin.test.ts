@@ -1,4 +1,5 @@
 import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
+import { createSafeBrowser } from "browser-env";
 import {
   describe,
   beforeAll,
@@ -11,10 +12,8 @@ import {
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { createSafeBrowser } from "../../src/browser";
-
-import type { Browser } from "../../src";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+import type { Browser } from "browser-env";
 
 const noop = (): void => undefined;
 
@@ -24,7 +23,10 @@ let mockedBrowser: Browser;
 let unsubscribe: Unsubscribe | undefined;
 
 const createMockedBrowser = (): Browser => {
-  const safeBrowser = createSafeBrowser("");
+  const safeBrowser = createSafeBrowser(
+    () => globalThis.location.pathname + globalThis.location.search,
+    "browser-plugin",
+  );
 
   return {
     ...safeBrowser,

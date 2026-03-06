@@ -1,5 +1,3 @@
-// packages/hash-plugin/src/popstate-utils.ts
-
 import { isStateStrict as isState } from "type-guards";
 
 import type { Browser } from "./types";

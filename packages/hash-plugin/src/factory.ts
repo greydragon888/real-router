@@ -1,24 +1,19 @@
-// packages/hash-plugin/src/factory.ts
-
 import { getPluginApi } from "@real-router/core";
+import {
+  createSafeBrowser,
+  normalizeBase,
+  safelyEncodePath,
+} from "browser-env";
 
-import { createSafeBrowser } from "./browser";
 import { defaultOptions, source } from "./constants";
-import { createRegExpCache } from "./hash-utils";
+import { createRegExpCache, extractHashPath } from "./hash-utils";
 import { HashPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
-import type { HashPluginOptions, Browser, SharedFactoryState } from "./types";
+import type { HashPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
+import type { Browser, SharedFactoryState } from "browser-env";
 
-/**
- * Hash-based routing plugin factory for real-router.
- * Integrates router with browser hash for navigation.
- *
- * @param opts - Plugin configuration options
- * @param browser - Browser API abstraction (for testing/SSR)
- * @returns Plugin factory function
- */
 export function hashPluginFactory(
   opts?: Partial<HashPluginOptions>,
   browser?: Browser,
@@ -27,19 +22,22 @@ export function hashPluginFactory(
 
   const options: Required<HashPluginOptions> = { ...defaultOptions, ...opts };
 
-  if (options.base) {
-    if (!options.base.startsWith("/")) {
-      options.base = `/${options.base}`;
-    }
-
-    if (options.base.endsWith("/")) {
-      options.base = options.base.slice(0, -1);
-    }
-  }
+  options.base = normalizeBase(options.base);
 
   const regExpCache = createRegExpCache();
   const resolvedBrowser =
-    browser ?? createSafeBrowser(options.hashPrefix, regExpCache);
+    browser ??
+    createSafeBrowser(
+      () =>
+        safelyEncodePath(
+          extractHashPath(
+            globalThis.location.hash,
+            options.hashPrefix,
+            regExpCache,
+          ),
+        ) + globalThis.location.search,
+      "hash-plugin",
+    );
 
   const transitionOptions = {
     forceDeactivate: options.forceDeactivate,

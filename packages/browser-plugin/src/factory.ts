@@ -1,16 +1,18 @@
 import { getPluginApi } from "@real-router/core";
+import {
+  createSafeBrowser,
+  normalizeBase,
+  safelyEncodePath,
+} from "browser-env";
 
-import { createSafeBrowser } from "./browser";
 import { defaultOptions, source } from "./constants";
 import { BrowserPlugin } from "./plugin";
+import { extractPath } from "./url-utils";
 import { validateOptions } from "./validation";
 
-import type {
-  BrowserPluginOptions,
-  Browser,
-  SharedFactoryState,
-} from "./types";
+import type { BrowserPluginOptions } from "./types";
 import type { PluginFactory, Router } from "@real-router/core";
+import type { Browser, SharedFactoryState } from "browser-env";
 
 export function browserPluginFactory(
   opts?: Partial<BrowserPluginOptions>,
@@ -23,17 +25,17 @@ export function browserPluginFactory(
     ...opts,
   };
 
-  if (options.base) {
-    if (!options.base.startsWith("/")) {
-      options.base = `/${options.base}`;
-    }
+  options.base = normalizeBase(options.base);
 
-    if (options.base.endsWith("/")) {
-      options.base = options.base.slice(0, -1);
-    }
-  }
-
-  const resolvedBrowser = browser ?? createSafeBrowser(options.base);
+  const resolvedBrowser =
+    browser ??
+    createSafeBrowser(
+      () =>
+        safelyEncodePath(
+          extractPath(globalThis.location.pathname, options.base),
+        ) + globalThis.location.search,
+      "browser-plugin",
+    );
 
   const forceDeactivate = options.forceDeactivate;
   const transitionOptions = { forceDeactivate, source, replace: true as const };

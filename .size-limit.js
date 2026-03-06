@@ -112,4 +112,11 @@ export default [
     limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "browser-env (ESM)",
+    path: "packages/browser-env/dist/esm/index.mjs",
+    limit: "2 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 ];

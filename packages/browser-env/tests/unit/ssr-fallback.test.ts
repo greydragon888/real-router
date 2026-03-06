@@ -1,4 +1,3 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 import {
@@ -12,7 +11,7 @@ describe("createWarnOnce", () => {
   });
 
   it("warns on first call only", () => {
-    const warnSpy = vi.spyOn(logger, "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const warnOnce = createWarnOnce("test-context");
 
     warnOnce("pushState");
@@ -22,21 +21,21 @@ describe("createWarnOnce", () => {
   });
 
   it("includes method name in warning message", () => {
-    const warnSpy = vi.spyOn(logger, "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const warnOnce = createWarnOnce("test-context");
 
     warnOnce("pushState");
 
-    expect(warnSpy.mock.calls[0][1]).toContain("pushState");
+    expect(warnSpy.mock.calls[0][0]).toContain("pushState");
   });
 
   it("includes context string in warning message", () => {
-    const warnSpy = vi.spyOn(logger, "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const warnOnce = createWarnOnce("my-plugin");
 
     warnOnce("pushState");
 
-    expect(warnSpy.mock.calls[0][1]).toContain("my-plugin");
+    expect(warnSpy.mock.calls[0][0]).toContain("my-plugin");
   });
 });
 
@@ -78,7 +77,7 @@ describe("createHistoryFallbackBrowser", () => {
   });
 
   it("only warns once across multiple method calls", () => {
-    const warnSpy = vi.spyOn(logger, "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const browser = createHistoryFallbackBrowser("ctx");
 
     browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");

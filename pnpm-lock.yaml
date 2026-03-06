@@ -180,12 +180,12 @@ importers:
 
   packages/browser-env:
     dependencies:
-      '@real-router/logger':
+      '@real-router/core':
         specifier: workspace:^
-        version: link:../logger
-      '@real-router/types':
+        version: link:../core
+      type-guards:
         specifier: workspace:^
-        version: link:../core-types
+        version: link:../type-guards
     devDependencies:
       jsdom:
         specifier: 27.4.0
@@ -249,9 +249,6 @@ importers:
       '@real-router/logger':
         specifier: workspace:^
         version: link:../logger
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1

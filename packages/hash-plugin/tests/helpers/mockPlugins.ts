@@ -1,7 +1,8 @@
-import { createSafeBrowser } from "../../src/browser";
-import { createRegExpCache } from "../../src/hash-utils";
+import { createSafeBrowser, safelyEncodePath } from "browser-env";
 
-import type { Browser } from "../../src/types";
+import { createRegExpCache, extractHashPath } from "../../src/hash-utils";
+
+import type { Browser } from "browser-env";
 
 export type OnStateChangeFn = (state: unknown) => void;
 
@@ -10,7 +11,13 @@ export function createMockedBrowser(
   hashPrefix = "",
 ): Browser {
   const regExpCache = createRegExpCache();
-  const safeBrowser = createSafeBrowser(hashPrefix, regExpCache);
+  const safeBrowser = createSafeBrowser(
+    () =>
+      safelyEncodePath(
+        extractHashPath(globalThis.location.hash, hashPrefix, regExpCache),
+      ) + globalThis.location.search,
+    "hash-plugin",
+  );
 
   return {
     ...safeBrowser,

@@ -1,5 +1,5 @@
 import type { HistoryBrowser } from "./types";
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 export const pushState = (state: State, path: string): void => {
   globalThis.history.pushState(state, "", path);

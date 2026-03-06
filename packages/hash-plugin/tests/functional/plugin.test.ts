@@ -1,5 +1,11 @@
 import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
 import {
+  createSafeBrowser,
+  getRouteFromEvent,
+  safelyEncodePath,
+  updateBrowserState,
+} from "browser-env";
+import {
   describe,
   beforeAll,
   beforeEach,
@@ -11,7 +17,6 @@ import {
 
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
-import { createSafeBrowser } from "../../src/browser";
 import {
   escapeRegExp,
   createRegExpCache,
@@ -19,15 +24,11 @@ import {
   buildHashUrl,
   hashUrlToPath,
 } from "../../src/hash-utils";
-import {
-  getRouteFromEvent,
-  updateBrowserState,
-} from "../../src/popstate-utils";
 import { validateOptions } from "../../src/validation";
 import { createMockedBrowser } from "../helpers/mockPlugins";
 
-import type { Browser } from "../../src/types";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+import type { Browser } from "browser-env";
 
 const noop = (): void => undefined;
 
@@ -331,6 +332,19 @@ describe("Hash Plugin", async () => {
     it("factory does not throw when opts is undefined", () => {
       expect(() => hashPluginFactory()).not.toThrowError();
     });
+
+    it("factory creates working browser when none provided", async () => {
+      globalThis.history.replaceState({}, "", "/#/home");
+
+      const testRouter = createRouter(routerConfig, { defaultRoute: "home" });
+
+      testRouter.usePlugin(hashPluginFactory());
+      await testRouter.start();
+
+      expect(testRouter.getState()?.name).toBe("home");
+
+      testRouter.stop();
+    });
   });
 
   describe("Popstate Utilities", () => {
@@ -449,7 +463,13 @@ describe("Hash Plugin", async () => {
     it("getLocation reads hash and returns path", () => {
       globalThis.history.replaceState({}, "", "/#/home");
       const cache = createRegExpCache();
-      const browser = createSafeBrowser("", cache);
+      const browser = createSafeBrowser(
+        () =>
+          safelyEncodePath(
+            extractHashPath(globalThis.location.hash, "", cache),
+          ) + globalThis.location.search,
+        "hash-plugin",
+      );
 
       expect(browser.getLocation()).toBe("/home");
     });
@@ -457,7 +477,13 @@ describe("Hash Plugin", async () => {
     it("getLocation extracts path with hashPrefix", () => {
       globalThis.history.replaceState({}, "", "/#!/home");
       const cache = createRegExpCache();
-      const browser = createSafeBrowser("!", cache);
+      const browser = createSafeBrowser(
+        () =>
+          safelyEncodePath(
+            extractHashPath(globalThis.location.hash, "!", cache),
+          ) + globalThis.location.search,
+        "hash-plugin",
+      );
 
       expect(browser.getLocation()).toBe("/home");
     });
@@ -465,7 +491,13 @@ describe("Hash Plugin", async () => {
     it("getLocation returns / for empty hash", () => {
       globalThis.history.replaceState({}, "", "/");
       const cache = createRegExpCache();
-      const browser = createSafeBrowser("", cache);
+      const browser = createSafeBrowser(
+        () =>
+          safelyEncodePath(
+            extractHashPath(globalThis.location.hash, "", cache),
+          ) + globalThis.location.search,
+        "hash-plugin",
+      );
 
       expect(browser.getLocation()).toBe("/");
     });
@@ -473,7 +505,13 @@ describe("Hash Plugin", async () => {
     it("getLocation includes search params", () => {
       globalThis.history.replaceState({}, "", "/#/home?page=1");
       const cache = createRegExpCache();
-      const browser = createSafeBrowser("", cache);
+      const browser = createSafeBrowser(
+        () =>
+          safelyEncodePath(
+            extractHashPath(globalThis.location.hash, "", cache),
+          ) + globalThis.location.search,
+        "hash-plugin",
+      );
 
       expect(browser.getLocation()).toBe("/home?page=1");
     });

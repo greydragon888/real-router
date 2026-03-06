@@ -39,8 +39,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/logger": "workspace:^",
-    "@real-router/types": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "type-guards": "workspace:^"
   },
   "devDependencies": {
     "jsdom": "27.4.0"

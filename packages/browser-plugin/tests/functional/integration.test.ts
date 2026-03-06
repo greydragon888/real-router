@@ -2,6 +2,7 @@
 // Uses mock plugins to test various edge cases and scenarios
 
 import { createRouter } from "@real-router/core";
+import { createSafeBrowser } from "browser-env";
 import {
   describe,
   beforeAll,
@@ -14,7 +15,6 @@ import {
 
 import { browserPluginFactory } from "@real-router/browser-plugin";
 
-import { createSafeBrowser } from "../../src/browser";
 import {
   createTrackingPlugin,
   createStateModifierPlugin,
@@ -24,8 +24,8 @@ import {
   createAsyncPlugin,
 } from "../helpers/mockPlugins";
 
-import type { Browser } from "../../src/types";
 import type { Router, State, Unsubscribe } from "@real-router/core";
+import type { Browser } from "browser-env";
 
 const noop = (): void => undefined;
 
@@ -35,7 +35,10 @@ let mockedBrowser: Browser;
 let unsubscribe: Unsubscribe | undefined;
 
 const createMockedBrowser = (): Browser => {
-  const safeBrowser = createSafeBrowser("");
+  const safeBrowser = createSafeBrowser(
+    () => globalThis.location.pathname + globalThis.location.search,
+    "browser-plugin",
+  );
 
   return {
     ...safeBrowser,

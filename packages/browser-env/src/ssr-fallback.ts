@@ -1,7 +1,3 @@
-import { logger } from "@real-router/logger";
-
-import { LOGGER_CONTEXT } from "./constants";
-
 import type { HistoryBrowser } from "./types";
 
 const NOOP = (): void => {};
@@ -11,9 +7,8 @@ export const createWarnOnce = (context: string) => {
 
   return (method: string): void => {
     if (!hasWarned) {
-      logger.warn(
-        LOGGER_CONTEXT,
-        `Browser API is running in a non-browser environment (context: "${context}"). ` +
+      console.warn(
+        `[browser-env] Browser API is running in a non-browser environment (context: "${context}"). ` +
           `Method "${method}" is a no-op. ` +
           `This is expected for SSR, but may indicate misconfiguration if you expected browser behavior.`,
       );

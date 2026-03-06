@@ -1,7 +1,28 @@
-import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-import { safelyEncodePath } from "../../src/utils";
+import { normalizeBase, safelyEncodePath } from "../../src/utils";
+
+describe("normalizeBase", () => {
+  it("returns empty string unchanged", () => {
+    expect(normalizeBase("")).toBe("");
+  });
+
+  it("prepends leading slash if missing", () => {
+    expect(normalizeBase("app")).toBe("/app");
+  });
+
+  it("removes trailing slash", () => {
+    expect(normalizeBase("/app/")).toBe("/app");
+  });
+
+  it("prepends slash and removes trailing slash", () => {
+    expect(normalizeBase("app/")).toBe("/app");
+  });
+
+  it("returns already-normalized base unchanged", () => {
+    expect(normalizeBase("/app")).toBe("/app");
+  });
+});
 
 describe("safelyEncodePath", () => {
   beforeEach(() => {
@@ -21,12 +42,12 @@ describe("safelyEncodePath", () => {
   });
 
   it("returns original path and warns on malformed URI", () => {
-    const warnSpy = vi.spyOn(logger, "warn");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const malformed = "%invalid";
     const result = safelyEncodePath(malformed);
 
     expect(result).toBe(malformed);
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][1]).toContain(malformed);
+    expect(warnSpy.mock.calls[0][0]).toContain(malformed);
   });
 });
