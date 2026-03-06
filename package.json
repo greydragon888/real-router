@@ -127,7 +127,8 @@
       "minimatch@10": "~10.2.3",
       "ajv@6": "~6.14.0",
       "ajv@8": "~8.18.0",
-      "underscore": ">=1.13.8"
+      "underscore": ">=1.13.8",
+      "http-proxy-agent": ">=7.0.2"
     }
   },
   "packageManager": "pnpm@10.24.0"
