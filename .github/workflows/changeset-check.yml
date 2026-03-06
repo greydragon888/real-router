@@ -20,8 +20,13 @@ jobs:
           # Get files changed in PR
           CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
 
-          # Public packages that require changesets
-          PUBLIC_PACKAGES="core|core-types|react|browser-plugin|logger|logger-plugin|helpers|persistent-params-plugin"
+          PUBLIC_PACKAGES=""
+          for dir in packages/*/; do
+            [ -f "$dir/package.json" ] || continue
+            if ! grep -q '"private"' "$dir/package.json"; then
+              PUBLIC_PACKAGES="${PUBLIC_PACKAGES:+$PUBLIC_PACKAGES|}$(basename "$dir")"
+            fi
+          done
 
           # Check if any source files in public packages changed
           SOURCE_CHANGED=$(echo "$CHANGED" | grep -E "^packages/($PUBLIC_PACKAGES)/src/" || true)
@@ -135,7 +140,14 @@ jobs:
           fi
 
           # --- Check 3: Private packages in changesets ---
-          PRIVATE_PKGS="path-matcher|route-tree|router-benchmarks|search-params|type-guards"
+          PRIVATE_PKGS=""
+          for dir in packages/*/; do
+            [ -f "$dir/package.json" ] || continue
+            if grep -q '"private"' "$dir/package.json"; then
+              pkg=$(grep -m1 '"name"' "$dir/package.json" | sed 's/.*"name"[[:space:]]*:[[:space:]]*"//;s/".*//')
+              PRIVATE_PKGS="${PRIVATE_PKGS:+$PRIVATE_PKGS|}$pkg"
+            fi
+          done
           PRIVATE_IN_CS=""
           for file in $CHANGESETS; do
             if [ -f "$file" ]; then
@@ -244,7 +256,7 @@ jobs:
                 '',
                 fileList,
                 '',
-                '**Why this matters:** Private packages (`path-matcher`, `route-tree`, `router-benchmarks`, `search-params`, `type-guards`) are not published to npm and should not have changesets.',
+                '**Why this matters:** Private packages (with `"private": true` in package.json) are not published to npm and should not have changesets.',
                 '',
                 '**How to fix:** Remove the private package from the changeset frontmatter. Only include public `@real-router/*` packages.',
               ].join('\n'));

@@ -235,7 +235,10 @@ jobs:
             echo "=== After fallback: pushed=$PUSHED ==="
           fi
 
-      # Create GitHub releases for packages published in previous step
+      # Create GitHub releases for packages published in previous step.
+      # Two-pass approach: GitHub Releases page shows newest-first, so we
+      # create dep-bump-only releases first (they sink to the bottom) and
+      # releases with actual code changes last (they float to the top).
       - name: Create GitHub Releases
         if: steps.unpublished.outputs.has_unpublished == 'true'
         env:
@@ -243,51 +246,62 @@ jobs:
         run: |
           RELEASES_CREATED=""
 
-          for dir in packages/*/; do
-            if [ -f "$dir/package.json" ]; then
-              name=$(node -p "require('./${dir}package.json').name")
-              version=$(node -p "require('./${dir}package.json').version")
-              private=$(node -p "require('./${dir}package.json').private || false")
+          has_own_changes() {
+            local changelog="$1/CHANGELOG.md"
+            [ -f "$changelog" ] || return 1
+            awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog" \
+              | grep -E '^- ' | grep -qvF 'Updated dependencies'
+          }
 
-              if [ "$private" = "true" ]; then
-                continue
-              fi
+          create_release() {
+            local dir="$1"
+            [ -f "$dir/package.json" ] || return
 
-              # Check if tag exists locally (was just created by changesets publish)
-              tag="${name}@${version}"
+            local name version private tag changelog_path NOTES PRERELEASE_FLAG
+            name=$(node -p "require('./${dir}package.json').name")
+            version=$(node -p "require('./${dir}package.json').version")
+            private=$(node -p "require('./${dir}package.json').private || false")
 
-              if git rev-parse "$tag" > /dev/null 2>&1; then
-                changelog_path="${dir}CHANGELOG.md"
+            [ "$private" = "true" ] && return
 
-                # Check if release already exists on GitHub
-                if gh release view "$tag" > /dev/null 2>&1; then
-                  echo "⏭️ Release $tag already exists, skipping"
-                  continue
-                fi
+            tag="${name}@${version}"
+            git rev-parse "$tag" > /dev/null 2>&1 || return
 
-                # Extract release notes from CHANGELOG (content between first ## and second ##)
-                if [ -f "$changelog_path" ]; then
-                  NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog_path")
-                else
-                  NOTES="Release ${version}"
-                fi
-
-                # Determine if prerelease
-                PRERELEASE_FLAG=""
-                if echo "$version" | grep -q "-"; then
-                  PRERELEASE_FLAG="--prerelease"
-                fi
-
-                echo "🏷️ Creating release: $tag"
-                gh release create "$tag" \
-                  --title "$name@$version" \
-                  --notes "$NOTES" \
-                  $PRERELEASE_FLAG
-
-                RELEASES_CREATED="$RELEASES_CREATED $tag"
-                echo "✅ Created release: $tag"
-              fi
+            if gh release view "$tag" > /dev/null 2>&1; then
+              echo "⏭️ Release $tag already exists, skipping"
+              return
             fi
+
+            changelog_path="${dir}CHANGELOG.md"
+            if [ -f "$changelog_path" ]; then
+              NOTES=$(awk '/^## /{if(found) exit; found=1; next} found{print}' "$changelog_path")
+            else
+              NOTES="Release ${version}"
+            fi
+
+            PRERELEASE_FLAG=""
+            if echo "$version" | grep -q "-"; then
+              PRERELEASE_FLAG="--prerelease"
+            fi
+
+            echo "🏷️ Creating release: $tag"
+            gh release create "$tag" \
+              --title "$name@$version" \
+              --notes "$NOTES" \
+              $PRERELEASE_FLAG
+
+            RELEASES_CREATED="$RELEASES_CREATED $tag"
+            echo "✅ Created release: $tag"
+          }
+
+          # Pass 1: Dep-bump-only releases (created first → appear last on GitHub)
+          for dir in packages/*/; do
+            has_own_changes "$dir" || create_release "$dir"
+          done
+
+          # Pass 2: Featured releases (created last → appear first on GitHub)
+          for dir in packages/*/; do
+            has_own_changes "$dir" && create_release "$dir"
           done
 
           if [ -n "$RELEASES_CREATED" ]; then
