@@ -1,6 +1,6 @@
 {
   "name": "@real-router/hash-plugin",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "type": "commonjs",
   "description": "Hash-based routing plugin for Real-Router",
   "main": "./dist/cjs/index.js",
