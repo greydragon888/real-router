@@ -35,7 +35,6 @@ router.usePlugin(browserPluginFactory());
 // With options
 router.usePlugin(
   browserPluginFactory({
-    useHash: false,
     base: "/app",
   }),
 );
@@ -50,24 +49,21 @@ await router.start();
 ```typescript
 router.usePlugin(
   browserPluginFactory({
-    useHash: true, // Required for hashPrefix
-    hashPrefix: "!",
+    base: "/app",
+    forceDeactivate: true,
   }),
 );
 
 router.navigate("products", { id: "123" });
-// URL: http://example.com/#!/products/123
+// URL: http://example.com/app/products/123
 ```
 
-| Option            | Type      | Default | Description                                                          |
-| ----------------- | --------- | ------- | -------------------------------------------------------------------- |
-| `useHash`         | `boolean` | `false` | Use hash routing (`#/path`) instead of History API                   |
-| `hashPrefix`      | `string`  | `""`    | Hash prefix (e.g., `"!"` → `#!/path`). Only with `useHash: true`     |
-| `preserveHash`    | `boolean` | `true`  | Keep URL hash fragment during navigation. Only with `useHash: false` |
-| `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"`)                            |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward                |
+| Option            | Type      | Default | Description                                           |
+| ----------------- | --------- | ------- | ----------------------------------------------------- |
+| `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"`)             |
+| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward |
 
-**Type Safety:** Options use discriminated union — `hashPrefix` and `preserveHash` are mutually exclusive at compile time.
+> **Looking for hash routing?** Use [`@real-router/hash-plugin`](https://www.npmjs.com/package/@real-router/hash-plugin) instead.
 
 See [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-configuration-options) for detailed option descriptions and examples.
 
@@ -79,7 +75,7 @@ The plugin extends the router instance with browser-specific methods (via [`exte
 
 #### `router.buildUrl(name: string, params?: Params): string`
 
-Build full URL with base path and hash prefix.\
+Build full URL with base path.\
 `name: string` — route name\
 `params?: Params` — route parameters\
 Returns: `string` — full URL\
@@ -124,32 +120,17 @@ router.replaceHistoryState("users", { id: "456" });
 
 ## Usage Examples
 
-### History Mode (default)
+### With Base Path
 
 ```typescript
 router.usePlugin(
   browserPluginFactory({
     base: "/app",
-    preserveHash: true,
   }),
 );
 
 router.navigate("users", { id: "123" });
 // URL: /app/users/123
-```
-
-### Hash Mode
-
-```typescript
-router.usePlugin(
-  browserPluginFactory({
-    useHash: true,
-    hashPrefix: "!",
-  }),
-);
-
-router.navigate("users", { id: "123" });
-// URL: #!/users/123
 ```
 
 ### Form Protection
@@ -199,6 +180,7 @@ Full documentation available on the [Wiki](https://github.com/greydragon888/real
 ## Related Packages
 
 - [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
+- [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) — Hash-based routing (`#/path`)
 - [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
 - [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) — Debug logging
 

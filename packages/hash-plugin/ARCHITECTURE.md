@@ -4,10 +4,10 @@
 
 ## Overview
 
-`@real-router/browser-plugin` synchronizes router state with the browser URL and handles back/forward navigation using the History API (`pushState`/`replaceState`).
+`@real-router/hash-plugin` synchronizes router state with the browser URL using hash-based routing (`#/path`). All routing information lives in the URL hash fragment — no server configuration needed.
 
-**Core role:** A thin adapter between the browser environment and the platform-agnostic router core.
-Contains no navigation business logic — only URL synchronization and browser event handling.
+**Core role:** A thin adapter between the browser hash and the platform-agnostic router core.
+Contains no navigation business logic — only hash URL synchronization and browser event handling.
 
 **Integration points with the core:**
 
@@ -19,13 +19,13 @@ Contains no navigation business logic — only URL synchronization and browser e
 ## Package Structure
 
 ```
-browser-plugin/
+hash-plugin/
 ├── src/
 │   ├── index.ts           — Public API + module augmentation
-│   ├── factory.ts         — browserPluginFactory (validation, normalization, instance creation)
-│   ├── plugin.ts          — BrowserPlugin class (runtime behavior)
-│   ├── types.ts           — Types (BrowserPluginOptions)
-│   ├── url-utils.ts       — Pure URL utility functions (extractPath, buildUrl, urlToPath)
+│   ├── factory.ts         — hashPluginFactory (validation, normalization, instance creation)
+│   ├── plugin.ts          — HashPlugin class (runtime behavior)
+│   ├── types.ts           — Types (HashPluginOptions)
+│   ├── hash-utils.ts      — Hash URL utility functions (extractHashPath, hashUrlToPath, RegExpCache)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
 │   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
 ```
@@ -36,37 +36,38 @@ browser-plugin/
 index.ts
     └── factory.ts
             ├── plugin.ts
-            │       ├── url-utils.ts
+            │       ├── hash-utils.ts
             │       │       └── constants.ts
             │       └── browser-env (shared abstractions)
             ├── validation.ts
             │       └── constants.ts
             ├── constants.ts
-            └── url-utils.ts
+            └── hash-utils.ts
 
 types.ts  ← imported by factory.ts, plugin.ts, validation.ts
 ```
 
 External dependencies:
 
-| Dependency          | What it provides                                                        | Used in                                                    |
-| ------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                      |
-| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `url-utils.ts` |
-| `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                      |
+| Dependency          | What it provides                                                        | Used in                                                     |
+| ------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `@real-router/core` | `getPluginApi`, types (`Router`, `PluginApi`, `State`, etc.)            | `factory.ts`, `plugin.ts`, `index.ts`                       |
+| `browser-env`       | Browser abstraction, popstate handling, validation, URL parsing helpers | `factory.ts`, `plugin.ts`, `validation.ts`, `hash-utils.ts` |
+| `type-guards`       | `isStateStrict` (`history.state` validation)                            | `index.ts` (re-exported as `isState`)                       |
 
 ## Factory + Class Pattern
 
 ### Separation of Concerns
 
-`browserPluginFactory()` in `factory.ts` and `BrowserPlugin` in `plugin.ts` are intentionally separate:
+`hashPluginFactory()` in `factory.ts` and `HashPlugin` in `plugin.ts` are intentionally separate:
 
 ```
-browserPluginFactory(opts?, browser?)   ← factory.ts
+hashPluginFactory(opts?, browser?)   ← factory.ts
         │
         │  Runs once on call:
         │  - validateOptions()
         │  - base path normalization (normalizeBase from browser-env)
+        │  - createRegExpCache() for hash prefix patterns
         │  - createSafeBrowser() if no browser provided
         │  - transitionOptions construction
         │  - SharedFactoryState creation
@@ -75,7 +76,7 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
-                └── new BrowserPlugin(router, api, options, browser, ...)
+                └── new HashPlugin(router, api, options, browser, regExpCache, ...)
                             │
                             │  Constructor:
                             │  - registers start interceptor (via browser-env)
@@ -87,39 +88,45 @@ browserPluginFactory(opts?, browser?)   ← factory.ts
 
 **Why this split instead of a single object?**
 
-- `factory.ts` runs once — expensive operations (validation, browser creation) don't repeat on every `usePlugin()` call
-- `BrowserPlugin` wires together browser-env helpers with plugin-specific URL logic — a class encapsulates the setup cleanly
-- Testability: `BrowserPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
+- `factory.ts` runs once — expensive operations (validation, cache creation, browser detection) don't repeat on every `usePlugin()` call
+- `HashPlugin` wires together browser-env helpers with hash-specific URL logic — a class encapsulates the setup cleanly
+- Testability: `HashPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
 - Lifecycle: the constructor registers the interceptor and extends the router via `api.extendRouter()`; `teardown` calls the returned unsubscribe to remove extensions
 
 ### Creation Flow
 
 ```typescript
 // factory.ts
-export function browserPluginFactory(opts?, browser?): PluginFactory {
+export function hashPluginFactory(opts?, browser?): PluginFactory {
   validateOptions(opts);
   const options = { ...defaultOptions, ...opts };
   options.base = normalizeBase(options.base);
 
+  const regExpCache = createRegExpCache();
   const resolvedBrowser =
     browser ??
     createSafeBrowser(
       () =>
         safelyEncodePath(
-          extractPath(globalThis.location.pathname, options.base),
+          extractHashPath(
+            globalThis.location.hash,
+            options.hashPrefix,
+            regExpCache,
+          ),
         ) + globalThis.location.search,
-      "browser-plugin",
+      "hash-plugin",
     );
 
   const transitionOptions = { forceDeactivate, source, replace: true };
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
-  return function browserPlugin(routerBase) {
-    const plugin = new BrowserPlugin(
+  return function hashPlugin(routerBase) {
+    const plugin = new HashPlugin(
       routerBase,
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
+      regExpCache,
       transitionOptions,
       shared,
     );
@@ -135,11 +142,11 @@ The `Browser` interface, `createSafeBrowser()`, `createFallbackBrowser()`, `safe
 
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on the Browser interface and its two implementations.
 
-**Key points for browser-plugin:**
+**Key points for hash-plugin:**
 
-- `browserPluginFactory(opts, browser)` accepts an optional `browser` argument for DI / testing
+- `hashPluginFactory(opts, browser)` accepts an optional `browser` argument for DI / testing
 - If not provided, `createSafeBrowser()` from `browser-env` is called once during factory creation
-- The `getLocation` callback passed to `createSafeBrowser` uses `extractPath(pathname, base)` + `safelyEncodePath()` — plugin-specific URL logic
+- The `getLocation` callback passed to `createSafeBrowser` uses `extractHashPath(hash, hashPrefix, regExpCache)` + `safelyEncodePath()` — plugin-specific hash URL logic
 - Tests pass a mock `Browser` object directly — no need to mock globals
 
 ## Start Interceptor Integration
@@ -180,7 +187,7 @@ Router extension involves two layers:
 TypeScript allows extending existing interfaces via `declare module`. The plugin adds methods to the `Router` interface from the core:
 
 ```typescript
-// index.ts, lines 20-46
+// index.ts
 declare module "@real-router/core" {
   interface Router {
     buildUrl: (name: string, params?: Params) => string;
@@ -197,14 +204,14 @@ declare module "@real-router/core" {
 
 ### Runtime Registration via extendRouter (plugin.ts)
 
-TypeScript augmentation is type-level only. The actual methods are registered in the `BrowserPlugin` constructor via `api.extendRouter()`:
+TypeScript augmentation is type-level only. The actual methods are registered in the `HashPlugin` constructor via `api.extendRouter()`:
 
 ```typescript
 // plugin.ts, constructor
 this.#removeExtensions = api.extendRouter({
-  buildUrl: pluginBuildUrl, // buildPath() + buildUrl(path, base)
+  buildUrl: pluginBuildUrl, // buildPath() + base + "#" + hashPrefix + path
   matchUrl: (url: string) => {
-    const path = urlToPath(url, options.base);
+    const path = hashUrlToPath(url, options.hashPrefix, regExpCache);
     return path ? api.matchPath(path) : undefined;
   },
   replaceHistoryState: createReplaceHistoryState(
@@ -217,8 +224,6 @@ this.#removeExtensions = api.extendRouter({
 ```
 
 `createReplaceHistoryState` from `browser-env` creates the `replaceHistoryState` method — it builds state via `api.buildState`/`api.makeState` and calls `browser.replaceState`.
-
-`extendRouter()` validates that no property with the same name already exists on the router (throws `PLUGIN_CONFLICT` if it does), adds the properties, and returns an unsubscribe function that removes them.
 
 ### Cleanup on teardown
 
@@ -248,19 +253,18 @@ Adding methods directly to the instance is the only way to give them access to t
 
 ## Type System
 
-### BrowserPluginOptions
+### HashPluginOptions
 
 ```typescript
 // types.ts
-interface BrowserPluginOptions {
-  forceDeactivate?: boolean;
+interface HashPluginOptions {
+  hashPrefix?: string;
   base?: string;
+  forceDeactivate?: boolean;
 }
 ```
 
 Options are validated at runtime via `validateOptions()` in `validation.ts`, which delegates to `createOptionsValidator` from `browser-env`.
-
-Pure functions in `url-utils.ts` accept `base: string` directly rather than the full options object — the calling code in `plugin.ts` already works with validated `Required<BrowserPluginOptions>` and passes the specific values needed.
 
 Types shared between browser-plugin and hash-plugin (`Browser`, `SharedFactoryState`, etc.) live in `browser-env`.
 
@@ -274,7 +278,7 @@ interface SharedFactoryState {
 }
 ```
 
-The `shared` object is created once in `browserPluginFactory()` and passed to `createPopstateLifecycle` from `browser-env`.
+The `shared` object is created once in `hashPluginFactory()` and passed to `createPopstateLifecycle` from `browser-env`.
 
 **Why is it needed?**
 
@@ -298,16 +302,15 @@ router.navigate(name, params, opts)
         │     (from browser-env: replace ?? !fromState || reload && statesEqual)
         │
         ├── url = router.buildUrl(toState.name, toState.params)
-        │         └── router.buildPath() + buildUrl(path, base)
+        │         └── router.buildPath() + base + "#" + hashPrefix + path
         │
-        ├── If paths match (hash preservation):
-        │     finalUrl = url + browser.getHash()
-        │
-        └── updateBrowserState(toState, finalUrl, shouldReplace, browser)
+        └── updateBrowserState(toState, url, shouldReplace, browser)
                   │
                   ├── Create historyState = { meta, name, params, path }
                   └── browser.pushState() or browser.replaceState()
 ```
+
+**Note:** Unlike browser-plugin, hash-plugin does NOT preserve hash fragments (the hash IS the route).
 
 ## Data Flow: popstate (back/forward buttons)
 
@@ -331,7 +334,7 @@ User clicks back or forward
         │     │     YES: { name: evt.state.name, params: evt.state.params }
         │     │
         │     └── NO: api.matchPath(browser.getLocation())
-        │               └── URL matching as fallback
+        │               └── Hash URL matching as fallback
         │
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
@@ -355,45 +358,64 @@ The `isTransitioning` flag blocks concurrent processing.
 New events are written to `deferredPopstateEvent` — each one overwrites the previous (last-write-wins).
 After the current transition completes, `processDeferredEvent()` processes the last deferred event.
 
-```
-Click 1 → onPopState → isTransitioning=true → navigate("page1")...
-Click 2 → onPopState → isTransitioning=true → deferred = evt2
-Click 3 → onPopState → isTransitioning=true → deferred = evt3  (evt2 discarded)
-navigate("page1") done → processDeferredEvent → navigate("page3")
-```
-
-The intermediate `page2` state is skipped — this is expected behavior.
-
 See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementation details.
 
-## URL Utilities
+## Hash Utilities
 
-### url-utils.ts — pure functions
+### hash-utils.ts
 
-All functions in `url-utils.ts` are pure (no side effects, no direct access to globals).
+Hash-specific URL functions. Unlike browser-plugin (which uses simple `String.slice`), hash-plugin needs regex for prefix stripping.
 
-**`extractPath(pathname, base)`**:
+**`extractHashPath(hash, hashPrefix, regExpCache)`**:
 
 ```
-With base:
-  pathname = "/app/users/123"
-  base = "/app"
-  → pathname.slice(base.length) = "/users/123"
+Hash without prefix:
+  hash = "#/users/123"
+  hashPrefix = ""
+  → hash.slice(1) = "/users/123"
 
-Without base:
-  → pathname as-is
+Hash with prefix:
+  hash = "#!/users/123"
+  hashPrefix = "!"
+  → escapeRegExp("!") = "\\!"
+  → hash.replace(/^#\\!/, "") = "/users/123"
+
+Empty hash:
+  → "/"
 ```
 
-Uses `String.startsWith()` + `String.slice()` — no regex needed for history mode base stripping.
-
-**`urlToPath(url, base)`**:
+**`hashUrlToPath(url, hashPrefix, regExpCache)`**:
 
 Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
 Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
-**`buildUrl(path, base)`**:
+**`escapeRegExp(str)`**:
 
-Simple concatenation: `base + path`.
+Escapes regex-special characters in `hashPrefix`. Results are cached in a module-level `Map`.
+
+### RegExp Caching
+
+```typescript
+// hash-utils.ts
+const escapeRegExpCache = new Map<string, string>(); // module-level singleton
+
+export function createRegExpCache(): RegExpCache {
+  const cache = new Map<string, RegExp>();
+  return {
+    get(pattern: string): RegExp {
+      // lazy RegExp creation by pattern
+    },
+  };
+}
+```
+
+Two levels of caching:
+
+1. `escapeRegExpCache` — module-level singleton, caches `escapeRegExp()` results. Hash prefix strings are escaped once for the lifetime of the module.
+2. `RegExpCache` — per-factory instance, created in `hashPluginFactory()`. Caches compiled `RegExp` objects by pattern. One `RegExp` per pattern — not recreated on every `extractHashPath()` call.
+
+**Why two caches?** `escapeRegExpCache` is global because string escaping doesn't depend on plugin configuration.
+`RegExpCache` is per-factory because patterns depend on the `hashPrefix` of a specific instance.
 
 ## Popstate Utilities, Error Recovery
 
@@ -408,17 +430,17 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on
 ## Options Validation
 
 `validation.ts` delegates to `createOptionsValidator` from `browser-env`. The validator iterates over the keys of the provided options, compares `typeof value` against `typeof defaultOptions[key]`.
-On mismatch — throws a plain `Error` with a descriptive message (e.g., `[browser-plugin] Invalid type for 'base': expected string, got number`).
+On mismatch — throws `Error` with a descriptive message (`[hash-plugin] Invalid type for '${key}': expected ${expected}, got ${actual}`).
 
 ## Plugin Lifecycle
 
 ```
-router.usePlugin(browserPluginFactory(opts))
+router.usePlugin(hashPluginFactory(opts))
         │
         ▼
-  browserPlugin(router)  ← called by the core
+  hashPlugin(router)  ← called by the core
         │
-        ├── new BrowserPlugin(...)
+        ├── new HashPlugin(...)
         │     ├── Registers start interceptor
         │     └── api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
         │           → stores returned unsubscribe as #removeExtensions
@@ -453,46 +475,65 @@ unsubscribe() or router.dispose()
         └── Removes router extensions (#removeExtensions)
 ```
 
-## History Mode
+## Hash Mode
 
 ```
-URL: https://example.com/app/users/123
+URL: https://example.com/#!/users/123
 
-base = "/app"
+hashPrefix = "!"
+base = ""
 
 buildUrl("users.profile", { id: "123" })
   → buildPath() = "/users/123"
-  → buildUrl("/users/123", "/app") = "/app/users/123"
+  → base + "#" + hashPrefix + path = "#!/users/123"
 
-extractPath("/app/users/123", { base: "/app" })
-  → "/users/123"
+extractHashPath("#!/users/123", "!", regExpCache)
+  → hash.replace(/^#\\!/, "") = "/users/123"
 ```
 
-Requires a server-side fallback (all paths → `index.html`).
+No server configuration needed — all routing lives in the hash.
 
-### Hash Fragment Preservation
+### With base path
 
-```typescript
-// plugin.ts
-const shouldPreserveHash = !fromState || fromState.path === toState.path;
+```
+URL: https://example.com/app#!/users/123
 
-const finalUrl = shouldPreserveHash ? url + this.#browser.getHash() : url;
+hashPrefix = "!"
+base = "/app"
+
+buildUrl("users.profile", { id: "123" })
+  → "/app#!/users/123"
 ```
 
-The hash fragment (`#section`) is always preserved when navigating to the same path (or on first navigation). On a route change, the hash is cleared.
+`base` is prepended before the hash fragment. Useful when the app is served from a subpath.
 
 ## Performance
 
-| Optimization                        | Location       | Effect                                                |
-| ----------------------------------- | -------------- | ----------------------------------------------------- |
-| `String.startsWith` + `slice`       | `url-utils.ts` | No regex needed for base path stripping               |
-| `isTransitioning` flag              | `browser-env`  | Blocks concurrent popstate processing without a queue |
-| Last-write-wins for deferred events | `browser-env`  | Intermediate states are skipped without accumulation  |
-| `historyState` as a subset of State | `browser-env`  | Less data stored in `history.state`                   |
-| `createSafeBrowser()` called once   | `factory.ts`   | Environment check doesn't repeat                      |
+| Optimization                           | Location        | Effect                                                |
+| -------------------------------------- | --------------- | ----------------------------------------------------- |
+| `escapeRegExpCache` (module-level Map) | `hash-utils.ts` | String escaping happens once per module lifetime      |
+| `RegExpCache` (per-factory Map)        | `hash-utils.ts` | RegExp compilation happens once per pattern           |
+| `isTransitioning` flag                 | `browser-env`   | Blocks concurrent popstate processing without a queue |
+| Last-write-wins for deferred events    | `browser-env`   | Intermediate states are skipped without accumulation  |
+| `historyState` as a subset of State    | `browser-env`   | Less data stored in `history.state`                   |
+| `createSafeBrowser()` called once      | `factory.ts`    | Environment check doesn't repeat                      |
+
+## Differences from browser-plugin
+
+| Aspect             | browser-plugin                             | hash-plugin                             |
+| ------------------ | ------------------------------------------ | --------------------------------------- |
+| URL format         | `/app/users/123`                           | `#!/users/123`                          |
+| Path extraction    | `String.startsWith` + `slice`              | RegExp with cached `escapeRegExp`       |
+| Hash preservation  | Preserves hash when paths match            | N/A — hash IS the route                 |
+| RegExpCache        | Not needed                                 | Per-factory, caches compiled patterns   |
+| Server config      | Requires fallback (all paths → index.html) | No server config needed                 |
+| `buildUrl` formula | `base + path`                              | `base + "#" + hashPrefix + path`        |
+| Options            | `forceDeactivate`, `base`                  | `forceDeactivate`, `base`, `hashPrefix` |
 
 ## Related Documents
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor)
+- [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) — Shared browser abstractions
+- [browser-plugin/ARCHITECTURE.md](../browser-plugin/ARCHITECTURE.md) — History API plugin (sibling)
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents
