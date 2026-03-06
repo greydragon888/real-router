@@ -8,6 +8,12 @@ This folder contains changeset files that describe changes to be included in the
 # Create a new changeset interactively
 pnpm changeset
 
+# Create with a message (skip summary prompt)
+pnpm changeset --message "Add noValidate option (#42)"
+
+# Detect changed packages relative to a specific branch
+pnpm changeset --since=develop
+
 # Or create manually: .changeset/descriptive-name.md
 ```
 
@@ -17,7 +23,7 @@ pnpm changeset
 - **One file per logical change** — each changeset describes one feature, fix, or refactor
 - **Separate by type** — don't mix features, fixes, and performance improvements in one changeset
 - **Public packages only** — skip private packages (`"private": true` in package.json)
-- **Include PR/issue reference** — add `(#XX)` to title for traceability in release notes
+- **Include PR/issue reference** — add `(#XX)` to title for traceability in release notes. Issue references like `#123` are auto-linked to GitHub in generated CHANGELOGs
 - Multi-package changeset (one file, multiple packages) = same text copied to ALL packages' CHANGELOGs (use only when truly identical change)
 
 ## File Naming Convention
@@ -296,9 +302,9 @@ Our CI enforces changeset rules (all checks block merge):
 # .github/workflows/changeset-check.yml
 - If source files changed → changeset REQUIRED
 - If changeset exists:
-  - Must include PR/issue reference (#XX)
-  - Must contain only one package per file
-  - Must not reference private packages
+    - Must include PR/issue reference (#XX)
+    - Must contain only one package per file
+    - Must not reference private packages
 ```
 
 **Escape hatch:** Add `#trivial` to PR title to skip changeset requirement.
