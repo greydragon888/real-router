@@ -197,9 +197,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
     devDependencies:
       '@testing-library/jest-dom':
         specifier: 6.9.1
@@ -268,9 +265,6 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
-      '@real-router/logger':
-        specifier: workspace:^
-        version: link:../logger
 
   packages/path-matcher: {}
 

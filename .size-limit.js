@@ -45,6 +45,13 @@ export default [
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
+    name: "@real-router/hash-plugin (ESM)",
+    path: "packages/hash-plugin/dist/esm/index.mjs",
+    limit: "2.5 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
     name: "@real-router/logger-plugin (ESM)",
     path: "packages/logger-plugin/dist/esm/index.mjs",
     limit: "1.5 kB",

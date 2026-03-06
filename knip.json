@@ -32,7 +32,6 @@
   "ignore": [],
   "ignoreDependencies": [
     "@real-router/browser-plugin",
-    "@real-router/logger",
     "@stryker-mutator/api",
     "jsdom"
   ],
