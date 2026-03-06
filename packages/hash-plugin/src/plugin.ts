@@ -7,7 +7,7 @@ import {
   updateBrowserState,
 } from "browser-env";
 
-import { buildHashUrl, hashUrlToPath } from "./hash-utils";
+import { hashUrlToPath } from "./hash-utils";
 
 import type { RegExpCache } from "./hash-utils";
 import type { HashPluginOptions } from "./types";
@@ -49,7 +49,7 @@ export class HashPlugin {
     const pluginBuildUrl = (route: string, params?: Params) => {
       const path = router.buildPath(route, params);
 
-      return buildHashUrl(path, options.base, options.hashPrefix);
+      return `${options.base}#${options.hashPrefix}${path}`;
     };
 
     this.#removeExtensions = api.extendRouter({

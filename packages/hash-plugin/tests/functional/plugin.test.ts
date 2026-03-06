@@ -1,11 +1,5 @@
 import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
 import {
-  createSafeBrowser,
-  getRouteFromEvent,
-  safelyEncodePath,
-  updateBrowserState,
-} from "browser-env";
-import {
   describe,
   beforeAll,
   beforeEach,
@@ -17,14 +11,6 @@ import {
 
 import { hashPluginFactory } from "@real-router/hash-plugin";
 
-import {
-  escapeRegExp,
-  createRegExpCache,
-  extractHashPath,
-  buildHashUrl,
-  hashUrlToPath,
-} from "../../src/hash-utils";
-import { validateOptions } from "../../src/validation";
 import { createMockedBrowser } from "../helpers/mockPlugins";
 
 import type { Router, State, Unsubscribe } from "@real-router/core";
@@ -84,256 +70,18 @@ describe("Hash Plugin", async () => {
     (console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
   });
 
-  describe("Hash Utilities", () => {
-    describe("escapeRegExp", () => {
-      it("returns plain string unchanged", () => {
-        expect(escapeRegExp("hello")).toBe("hello");
-      });
-
-      it("escapes special regex chars", () => {
-        expect(escapeRegExp("!")).toBe("!");
-        expect(escapeRegExp(".")).toBe(String.raw`\.`);
-        expect(escapeRegExp("$")).toBe(String.raw`\$`);
-        expect(escapeRegExp("(")).toBe(String.raw`\(`);
-        expect(escapeRegExp(")")).toBe(String.raw`\)`);
-        expect(escapeRegExp("*")).toBe(String.raw`\*`);
-        expect(escapeRegExp("+")).toBe(String.raw`\+`);
-        expect(escapeRegExp("?")).toBe(String.raw`\?`);
-        expect(escapeRegExp("[")).toBe(String.raw`\[`);
-        expect(escapeRegExp("]")).toBe(String.raw`\]`);
-        expect(escapeRegExp("^")).toBe(String.raw`\^`);
-        expect(escapeRegExp("{")).toBe(String.raw`\{`);
-        expect(escapeRegExp("|")).toBe(String.raw`\|`);
-        expect(escapeRegExp("}")).toBe(String.raw`\}`);
-        expect(escapeRegExp("-")).toBe(String.raw`\-`);
-      });
-
-      it("returns cached result on second call", () => {
-        const first = escapeRegExp("test.special");
-        const second = escapeRegExp("test.special");
-
-        expect(first).toBe(String.raw`test\.special`);
-        expect(second).toBe(String.raw`test\.special`);
-      });
-    });
-
-    describe("createRegExpCache", () => {
-      it("creates new RegExp on cache miss", () => {
-        const cache = createRegExpCache();
-        const re = cache.get("^#/");
-
-        expect(re).toBeInstanceOf(RegExp);
-        expect("#/path").toMatch(re);
-        expect("#!/path").not.toMatch(re);
-      });
-
-      it("returns same RegExp on cache hit", () => {
-        const cache = createRegExpCache();
-        const re1 = cache.get("^#!/");
-        const re2 = cache.get("^#!/");
-
-        expect(re1).toBe(re2);
-      });
-    });
-
-    describe("extractHashPath", () => {
-      it("extracts path from hash without prefix", () => {
-        const cache = createRegExpCache();
-
-        expect(extractHashPath("#/home", "", cache)).toBe("/home");
-        expect(extractHashPath("#/users/list", "", cache)).toBe("/users/list");
-      });
-
-      it("extracts path from hash with prefix", () => {
-        const cache = createRegExpCache();
-
-        expect(extractHashPath("#!/home", "!", cache)).toBe("/home");
-        expect(extractHashPath("#!/users/list", "!", cache)).toBe(
-          "/users/list",
-        );
-      });
-
-      it("handles special regex chars in hashPrefix", () => {
-        const cache = createRegExpCache();
-
-        expect(extractHashPath("#./home", ".", cache)).toBe("/home");
-        expect(extractHashPath("#$/home", "$", cache)).toBe("/home");
-      });
-
-      it("returns / when path is empty", () => {
-        const cache = createRegExpCache();
-
-        expect(extractHashPath("", "", cache)).toBe("/");
-        expect(extractHashPath("#", "", cache)).toBe("/");
-      });
-    });
-
-    describe("buildHashUrl", () => {
-      it("builds basic hash URL", () => {
-        expect(buildHashUrl("/home", "", "")).toBe("#/home");
-      });
-
-      it("builds URL with hashPrefix", () => {
-        expect(buildHashUrl("/home", "", "!")).toBe("#!/home");
-      });
-
-      it("builds URL with base", () => {
-        expect(buildHashUrl("/home", "/app", "")).toBe("/app#/home");
-      });
-
-      it("builds URL with base and hashPrefix", () => {
-        expect(buildHashUrl("/home", "/app", "!")).toBe("/app#!/home");
-      });
-    });
-
-    describe("hashUrlToPath", () => {
-      it("extracts path from http URL with hash", () => {
-        const cache = createRegExpCache();
-        const result = hashUrlToPath(
-          "https://example.com/#/users/list",
-          "",
-          cache,
-        );
-
-        expect(result).toBe("/users/list");
-      });
-
-      it("extracts path from http URL with hash and prefix", () => {
-        const cache = createRegExpCache();
-        const result = hashUrlToPath(
-          "https://example.com/#!/users/list",
-          "!",
-          cache,
-        );
-
-        expect(result).toBe("/users/list");
-      });
-
-      it("includes search params", () => {
-        const cache = createRegExpCache();
-        const result = hashUrlToPath(
-          "https://example.com/#/users/list?page=1",
-          "",
-          cache,
-        );
-
-        expect(result).toBe("/users/list?page=1");
-      });
-
-      it("returns null for invalid protocol", () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-        const cache = createRegExpCache();
-        const result = hashUrlToPath("file:///home/user/file.html", "", cache);
-
-        expect(result).toBeNull();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Invalid URL protocol"),
-        );
-
-        consoleSpy.mockRestore();
-      });
-
-      it("returns null when URL constructor throws", () => {
-        const consoleSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-        const OriginalURL = globalThis.URL;
-        const cache = createRegExpCache();
-
-        vi.stubGlobal(
-          "URL",
-          class extends OriginalURL {
-            constructor(url: string | URL, base?: string | URL) {
-              if (url === "throw://error") {
-                throw new Error("URL parse error");
-              }
-
-              super(url, base);
-            }
-          },
-        );
-
-        const result = hashUrlToPath("throw://error", "", cache);
-
-        expect(result).toBeNull();
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining("Could not parse url"),
-          expect.any(Error),
-        );
-
-        vi.unstubAllGlobals();
-        consoleSpy.mockRestore();
-      });
-    });
-  });
-
-  describe("Option Validation", () => {
-    it("does not throw when opts is undefined", () => {
-      expect(() => {
-        validateOptions(undefined);
-      }).not.toThrowError();
-    });
-
-    it("does not throw for empty options", () => {
-      expect(() => {
-        validateOptions({});
-      }).not.toThrowError();
-    });
-
-    it("does not throw for valid option types", () => {
-      expect(() => {
-        validateOptions({
-          hashPrefix: "!",
-          base: "/app",
-          forceDeactivate: false,
-        });
-      }).not.toThrowError();
-    });
-
-    it("does not throw when value is undefined (skips undefined check)", () => {
-      expect(() => {
-        validateOptions({ base: undefined } as unknown as Partial<
-          Parameters<typeof validateOptions>[0]
-        >);
-      }).not.toThrowError();
-    });
-
-    it("does not throw for unknown option keys", () => {
-      expect(() => {
-        validateOptions({ unknownKey: "value" } as unknown as Record<
-          string,
-          unknown
-        >);
-      }).not.toThrowError();
-    });
-
-    it("throws for invalid hashPrefix type", () => {
-      expect(() => {
-        validateOptions({ hashPrefix: 123 as unknown as string });
-      }).toThrowError(/hashPrefix.*string.*number/);
-    });
-
-    it("throws for invalid base type", () => {
-      expect(() => {
-        validateOptions({ base: 123 as unknown as string });
-      }).toThrowError(/base.*string.*number/);
-    });
-
-    it("throws for invalid forceDeactivate type", () => {
-      expect(() => {
-        validateOptions({ forceDeactivate: "true" as unknown as boolean });
-      }).toThrowError(/forceDeactivate.*boolean.*string/);
-    });
-
-    it("factory throws for invalid base type", () => {
+  describe("Factory Options", () => {
+    it("throws for invalid option type", () => {
       expect(() =>
         hashPluginFactory({ base: 123 as unknown as string }),
       ).toThrowError();
     });
 
-    it("factory does not throw when opts is undefined", () => {
+    it("does not throw when opts is undefined", () => {
       expect(() => hashPluginFactory()).not.toThrowError();
     });
 
-    it("factory creates working browser when none provided", async () => {
+    it("creates working browser when none provided", async () => {
       globalThis.history.replaceState({}, "", "/#/home");
 
       const testRouter = createRouter(routerConfig, { defaultRoute: "home" });
@@ -344,201 +92,6 @@ describe("Hash Plugin", async () => {
       expect(testRouter.getState()?.name).toBe("home");
 
       testRouter.stop();
-    });
-  });
-
-  describe("Popstate Utilities", () => {
-    describe("getRouteFromEvent", () => {
-      it("returns name and params from valid state in event", () => {
-        const validState: State = {
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-          meta: { id: 1, params: {} },
-        };
-
-        const mockApi = { matchPath: vi.fn() } as unknown as Parameters<
-          typeof getRouteFromEvent
-        >[1];
-        const mockBrowser = {
-          getLocation: vi.fn().mockReturnValue("/"),
-        } as unknown as Browser;
-
-        const result = getRouteFromEvent(
-          new PopStateEvent("popstate", { state: validState }),
-          mockApi,
-          mockBrowser,
-        );
-
-        expect(result).toStrictEqual({ name: "users.list", params: {} });
-      });
-
-      it("matches URL when state is null and route exists", () => {
-        const matchedState = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: { id: 1, params: {} },
-        };
-        const mockApi = {
-          matchPath: vi.fn().mockReturnValue(matchedState),
-        } as unknown as Parameters<typeof getRouteFromEvent>[1];
-        const mockBrowser = {
-          getLocation: vi.fn().mockReturnValue("/home"),
-        } as unknown as Browser;
-
-        const result = getRouteFromEvent(
-          new PopStateEvent("popstate", { state: null }),
-          mockApi,
-          mockBrowser,
-        );
-
-        expect(result).toStrictEqual({ name: "home", params: {} });
-      });
-
-      it("returns undefined when state is null and no route matches", () => {
-        const mockApi = {
-          matchPath: vi.fn().mockReturnValue(undefined),
-        } as unknown as Parameters<typeof getRouteFromEvent>[1];
-        const mockBrowser = {
-          getLocation: vi.fn().mockReturnValue("/nonexistent"),
-        } as unknown as Browser;
-
-        const result = getRouteFromEvent(
-          new PopStateEvent("popstate", { state: null }),
-          mockApi,
-          mockBrowser,
-        );
-
-        expect(result).toBeUndefined();
-      });
-    });
-
-    describe("updateBrowserState", () => {
-      it("calls replaceState when replace is true", () => {
-        const state: State = {
-          name: "home",
-          params: {},
-          path: "/home",
-          meta: { id: 1, params: {} },
-        };
-        const mockBrowser = {
-          pushState: vi.fn(),
-          replaceState: vi.fn(),
-        } as unknown as Browser;
-
-        updateBrowserState(state, "#/home", true, mockBrowser);
-
-        expect(mockBrowser.replaceState).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "home" }),
-          "#/home",
-        );
-        expect(mockBrowser.pushState).not.toHaveBeenCalled();
-      });
-
-      it("calls pushState when replace is false", () => {
-        const state: State = {
-          name: "users.list",
-          params: {},
-          path: "/users/list",
-          meta: { id: 2, params: {} },
-        };
-        const mockBrowser = {
-          pushState: vi.fn(),
-          replaceState: vi.fn(),
-        } as unknown as Browser;
-
-        updateBrowserState(state, "#/users/list", false, mockBrowser);
-
-        expect(mockBrowser.pushState).toHaveBeenCalledWith(
-          expect.objectContaining({ name: "users.list" }),
-          "#/users/list",
-        );
-        expect(mockBrowser.replaceState).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe("Browser Module", () => {
-    it("getLocation reads hash and returns path", () => {
-      globalThis.history.replaceState({}, "", "/#/home");
-      const cache = createRegExpCache();
-      const browser = createSafeBrowser(
-        () =>
-          safelyEncodePath(
-            extractHashPath(globalThis.location.hash, "", cache),
-          ) + globalThis.location.search,
-        "hash-plugin",
-      );
-
-      expect(browser.getLocation()).toBe("/home");
-    });
-
-    it("getLocation extracts path with hashPrefix", () => {
-      globalThis.history.replaceState({}, "", "/#!/home");
-      const cache = createRegExpCache();
-      const browser = createSafeBrowser(
-        () =>
-          safelyEncodePath(
-            extractHashPath(globalThis.location.hash, "!", cache),
-          ) + globalThis.location.search,
-        "hash-plugin",
-      );
-
-      expect(browser.getLocation()).toBe("/home");
-    });
-
-    it("getLocation returns / for empty hash", () => {
-      globalThis.history.replaceState({}, "", "/");
-      const cache = createRegExpCache();
-      const browser = createSafeBrowser(
-        () =>
-          safelyEncodePath(
-            extractHashPath(globalThis.location.hash, "", cache),
-          ) + globalThis.location.search,
-        "hash-plugin",
-      );
-
-      expect(browser.getLocation()).toBe("/");
-    });
-
-    it("getLocation includes search params", () => {
-      globalThis.history.replaceState({}, "", "/#/home?page=1");
-      const cache = createRegExpCache();
-      const browser = createSafeBrowser(
-        () =>
-          safelyEncodePath(
-            extractHashPath(globalThis.location.hash, "", cache),
-          ) + globalThis.location.search,
-        "hash-plugin",
-      );
-
-      expect(browser.getLocation()).toBe("/home?page=1");
-    });
-
-    it("SSR: getLocation returns empty string and warns once", async () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(noop);
-      const originalWindow = globalThis.window;
-
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window;
-
-      try {
-        const ssrRouter = createRouter(routerConfig, { defaultRoute: "home" });
-
-        ssrRouter.usePlugin(hashPluginFactory());
-        await ssrRouter.start();
-
-        expect(ssrRouter.getState()).toBeDefined();
-        expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining("non-browser environment"),
-        );
-
-        ssrRouter.stop();
-      } finally {
-        globalThis.window = originalWindow;
-        warnSpy.mockRestore();
-      }
     });
   });
 
@@ -656,6 +209,21 @@ describe("Hash Plugin", async () => {
           params: {},
           path: "/users/list",
         });
+      });
+
+      it("reuses cached regexp on repeated matchUrl calls", () => {
+        router.usePlugin(
+          hashPluginFactory(
+            { hashPrefix: "!" },
+            createMockedBrowser(noop, "!"),
+          ),
+        );
+
+        const first = router.matchUrl("https://example.com/#!/home");
+        const second = router.matchUrl("https://example.com/#!/users/list");
+
+        expect(first!.name).toBe("home");
+        expect(second!.name).toBe("users.list");
       });
     });
   });

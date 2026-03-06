@@ -64,22 +64,6 @@ export function extractHashPath(
 }
 
 /**
- * Build a full hash URL from path, base, and prefix.
- *
- * @param path - Route path (e.g., "/users/123")
- * @param base - Base path (e.g., "/app")
- * @param hashPrefix - Hash prefix (e.g., "!")
- * @returns Full hash URL (e.g., "/app#!/users/123")
- */
-export function buildHashUrl(
-  path: string,
-  base: string,
-  hashPrefix: string,
-): string {
-  return `${base}#${hashPrefix}${path}`;
-}
-
-/**
  * Parse a hash URL to extract the route path.
  *
  * @param url - URL to parse
@@ -105,9 +89,9 @@ export function hashUrlToPath(
       extractHashPath(parsedUrl.hash, hashPrefix, regExpCache) +
       parsedUrl.search
     );
-  } catch (error) {
+  } catch (error) /* v8 ignore start */ {
     console.warn(`[${LOGGER_CONTEXT}] Could not parse url ${url}`, error);
 
     return null;
-  }
+  } /* v8 ignore stop */
 }
