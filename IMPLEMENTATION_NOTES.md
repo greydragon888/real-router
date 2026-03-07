@@ -1130,9 +1130,12 @@ Router supports permanent disposal via `router.dispose()`. RouterFSM transitions
 
 After each navigation, `state.transition` contains `TransitionMeta` with:
 
+- `reload` — `true` after `navigate(..., { reload: true })` (optional)
+- `redirected` — `true` if navigation was redirected via `forwardTo` (optional)
 - `phase` — last pipeline phase reached (`"deactivating"` | `"activating"`)
 - `from` — previous route name (undefined on first navigation)
 - `reason` — always `"success"` for resolved navigations
+- `blocker` — guard name that blocked the transition (reserved, not yet populated by core)
 - `segments` — `{ deactivated, activated, intersection }` (all deeply frozen arrays)
 
 `TransitionMeta` is built by `NavigationNamespace` after each successful navigation and attached to the state object before freezing. Transition timing is available via `@real-router/logger-plugin`.

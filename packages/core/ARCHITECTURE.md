@@ -199,6 +199,8 @@ interface State<P, MP> {
 type TransitionReason = "success" | "blocked" | "cancelled" | "error";
 
 interface TransitionMeta {
+  readonly reload?: boolean; // true after navigate(..., { reload: true })
+  readonly redirected?: boolean; // true if navigation was redirected via forwardTo
   phase: "deactivating" | "activating"; // always "activating" on success (type allows both)
   from?: string; // previous route name
   reason: TransitionReason; // outcome of the transition
@@ -279,15 +281,27 @@ export function getInternals(router: Router): RouterInternals {
 }
 
 // Router constructor
-const buildPathInterceptors = [];          // mutable array — plugin pipeline
+const interceptorsMap = new Map();         // shared interceptor chains — plugins add via getPluginApi
 
 registerInternals(this, {
   makeState: (name, params, path, meta, forceId) => this.#state.makeState(...),
-  matchPath: (path) => this.#routes.matchPath(...),
-  buildPath: (route, params) =>            // applies interceptor pipeline, then delegates
-    this.#routes.buildPath(route, applyBuildPathInterceptors(buildPathInterceptors, route, params), ...),
-  buildPathInterceptors,                   // shared ref — plugins push/splice via getPluginApi
-  forwardState: (name, params) => this.#routes.forwardState(...), // MUTABLE — plugin interception
+  matchPath: (path, matchOptions) => this.#routes.matchPath(...),
+  forwardState: createInterceptable(       // wrapped at construction time — all call paths intercepted
+    "forwardState",
+    (name, params) => this.#routes.forwardState(name, params),
+    interceptorsMap,
+  ),
+  buildPath: createInterceptable(
+    "buildPath",
+    (route, params) => this.#routes.buildPath(route, params ?? {}, this.#options.get()),
+    interceptorsMap,
+  ),
+  start: createInterceptable(
+    "start",
+    (path) => { ... },
+    interceptorsMap,
+  ),
+  interceptors: interceptorsMap,           // shared ref — plugins push/splice via getPluginApi
   buildStateResolved: (name, params) => this.#routes.buildStateResolved(name, params),
   // ... ~24 fields total
 });
@@ -461,7 +475,7 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            │
            ▼
 ┌──────────────────────┐
-│  Build TransitionMeta│  { phase, from, reason, segments }
+│  Build TransitionMeta│  { reload?, redirected?, phase, from, reason, blocker?, segments }
 │  + deep freeze       │  Object.freeze(transitionMeta)
 └──────────┬───────────┘
            │
@@ -881,7 +895,7 @@ All limits have configurable bounds (`LIMIT_BOUNDS`) and can be set via `options
 | Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects        |
 | `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements               |
 | FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                    |
-| `applyBuildPathInterceptors` fast path  | Empty-array check skips iteration when no interceptors |
+| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors |
 | Lazy event listeners                    | No allocation until first subscription                 |
 
 ## See Also
