@@ -394,15 +394,15 @@ describe("core/routes/routeTree/getRoute", () => {
         );
       });
 
-      it("should handle system prefix @@ routes", () => {
-        // System routes with @@ prefix bypass pattern validation
-        // This is documented behavior for internal router routes
-        routesApi.add({ name: "@@system", path: "/system" });
+      it("should block adding routes with @@ prefix", () => {
+        expect(() => {
+          routesApi.add({ name: "@@system", path: "/system" });
+        }).toThrowError(/reserved "@@" prefix/);
+      });
 
-        const route = routesApi.get("@@system");
-
-        expect(route?.name).toBe("@@system");
-        expect(route?.path).toBe("/system");
+      it("should allow reading @@ prefix routes via get", () => {
+        expect(() => routesApi.get("@@system")).not.toThrowError();
+        expect(routesApi.get("@@system")).toBeUndefined();
       });
     });
 
