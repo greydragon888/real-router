@@ -14,6 +14,8 @@ import {
   registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
 import {
+  throwIfInternalRoute,
+  throwIfInternalRouteInArray,
   validateAddRouteArgs,
   validateClearRoutes,
   validateParentOption,
@@ -460,6 +462,7 @@ export function getRoutesApi<
           validateParentOption(parentName);
         }
 
+        throwIfInternalRouteInArray(routeArray, "addRoute");
         validateAddRouteArgs(routeArray);
 
         store.treeOperations.validateRoutes(
@@ -478,6 +481,7 @@ export function getRoutesApi<
 
       if (!ctx.noValidate) {
         validateRemoveRouteArgs(name);
+        throwIfInternalRoute(name, "removeRoute");
       }
 
       const canRemove = validateRemoveRoute(
@@ -505,6 +509,7 @@ export function getRoutesApi<
 
       if (!ctx.noValidate) {
         validateUpdateRouteBasicArgs(name, updates);
+        throwIfInternalRoute(name, "updateRoute");
       }
 
       const {
@@ -629,6 +634,7 @@ export function getRoutesApi<
       }
 
       if (!ctx.noValidate) {
+        throwIfInternalRouteInArray(routeArray, "replaceRoutes");
         validateAddRouteArgs(routeArray);
         store.treeOperations.validateRoutes(routeArray);
       }

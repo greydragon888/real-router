@@ -1133,20 +1133,11 @@ describe("core/routes/removeRoute", () => {
       }).toThrowError(TypeError);
     });
 
-    // 12.8: System routes (@@prefix)
-    it("should handle system route prefix gracefully", async () => {
-      const { logger } = await import("@real-router/logger");
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
-
-      // System routes bypass pattern validation but don't exist
-      routesApi.remove("@@real-router/UNKNOWN");
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.removeRoute",
-        'Route "@@real-router/UNKNOWN" not found. No changes made.',
-      );
-
-      warnSpy.mockRestore();
+    // 12.8: System routes (@@prefix) — blocked by internal route protection
+    it("should throw when trying to remove @@ prefix route", () => {
+      expect(() => {
+        routesApi.remove("@@real-router/UNKNOWN");
+      }).toThrowError(/reserved "@@" prefix/);
     });
 
     // 12.9: Deep nesting (10+ levels)

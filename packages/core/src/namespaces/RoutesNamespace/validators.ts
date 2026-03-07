@@ -30,6 +30,35 @@ import type {
 } from "@real-router/types";
 import type { Matcher, RouteTree } from "route-tree";
 
+// SECURITY: Reserved prefix for system routes (e.g., @@router/UNKNOWN_ROUTE).
+// Internal code (RouterWiringBuilder, routesStore) bypasses this check.
+const INTERNAL_ROUTE_PREFIX = "@@";
+
+export function throwIfInternalRoute(name: string, methodName: string): void {
+  if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
+    throw new Error(
+      `[router.${methodName}] Route name "${name}" uses the reserved "${INTERNAL_ROUTE_PREFIX}" prefix. Routes with this prefix are internal and cannot be modified through the public API.`,
+    );
+  }
+}
+
+export function throwIfInternalRouteInArray(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
+  routes: readonly Route<any>[],
+  methodName: string,
+): void {
+  for (const route of routes) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime safety
+    if (route && typeof route === "object" && typeof route.name === "string") {
+      throwIfInternalRoute(route.name, methodName);
+
+      if (route.children) {
+        throwIfInternalRouteInArray(route.children, methodName);
+      }
+    }
+  }
+}
+
 /**
  * Validates removeRoute arguments.
  */
