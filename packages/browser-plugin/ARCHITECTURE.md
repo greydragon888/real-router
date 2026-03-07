@@ -111,7 +111,7 @@ export function browserPluginFactory(opts?, browser?): PluginFactory {
       "browser-plugin",
     );
 
-  const transitionOptions = { forceDeactivate, source, replace: true };
+  const transitionOptions = { forceDeactivate, source, replace: true as const };
   const shared: SharedFactoryState = { removePopStateListener: undefined };
 
   return function browserPlugin(routerBase) {
@@ -385,10 +385,12 @@ Without base:
 ```
 
 Uses `String.startsWith()` + `String.slice()` — no regex needed for history mode base stripping.
+The result is normalized to always start with `/` (e.g. base `"/app"` with pathname `"/app"` → `"/"` not `""`).
 
 **`urlToPath(url, base)`**:
 
 Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
+Preserves search params: the result is `extractPath(pathname, base) + search`.
 Returns `null` for invalid URLs — calling code handles `null` explicitly.
 
 **`buildUrl(path, base)`**:
