@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/internal/performance-marks.ts
+// packages/logger-plugin/src/internal/performance-marks.ts
 
 /**
  * Checks if Performance API is supported in the current environment.
@@ -14,7 +14,7 @@ export const supportsPerformanceAPI = (): boolean => {
 /**
  * Performance tracker interface with mark and measure methods.
  */
-interface PerformanceTracker {
+export interface PerformanceTracker {
   mark: (name: string) => void;
   measure: (measureName: string, startMark: string, endMark: string) => void;
 }

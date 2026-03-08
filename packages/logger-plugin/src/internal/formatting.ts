@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/internal/formatting.ts
+// packages/logger-plugin/src/internal/formatting.ts
 
 import type { State } from "@real-router/core";
 

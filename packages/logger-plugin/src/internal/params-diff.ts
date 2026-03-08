@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/internal/params-diff.ts
+// packages/logger-plugin/src/internal/params-diff.ts
 
 import type { Params } from "@real-router/core";
 

@@ -13,10 +13,14 @@
 ```
 logger-plugin/
 ├── src/
-│   ├── plugin.ts                      — Plugin factory + lifecycle hooks (242 lines)
+│   ├── factory.ts                     — loggerPluginFactory: validates options, merges defaults,
+│   │                                    returns PluginFactory → new LoggerPlugin(config).getPlugin()
+│   ├── plugin.ts                      — LoggerPlugin class: pre-computes flags in constructor,
+│   │                                    getPlugin() returns Plugin with lifecycle hooks + teardown
+│   ├── validation.ts                  — validateOptions: level, context, boolean flags (TypeError)
 │   ├── types.ts                       — LoggerPluginConfig, LogLevel
-│   ├── constants.ts                   — DEFAULT_CONFIG
-│   ├── index.ts                       — Public API exports
+│   ├── constants.ts                   — LOGGER_CONTEXT, ERROR_PREFIX, DEFAULT_CONFIG
+│   ├── index.ts                       — Public API exports (loggerPluginFactory + types)
 │   └── internal/
 │       ├── console-groups.ts          — Console group manager (74 lines)
 │       ├── formatting.ts             — Route name, timing, label formatting (56 lines)
@@ -39,10 +43,10 @@ graph LR
     end
 ```
 
-| Import source         | What it uses                        | Purpose                                |
-| --------------------- | ----------------------------------- | -------------------------------------- |
-| **@real-router/core** | `PluginFactory` type                | Plugin factory return type             |
-| **@real-router/core** | `State`, `RouterError`, `Params`    | Lifecycle hook parameter types         |
+| Import source         | What it uses                     | Purpose                        |
+| --------------------- | -------------------------------- | ------------------------------ |
+| **@real-router/core** | `PluginFactory` type             | Plugin factory return type     |
+| **@real-router/core** | `State`, `RouterError`, `Params` | Lifecycle hook parameter types |
 
 ## Public API
 
@@ -54,12 +58,6 @@ function loggerPluginFactory(
 ): PluginFactory;
 ```
 
-### loggerPlugin — Default Singleton
-
-```typescript
-const loggerPlugin: PluginFactory; // loggerPluginFactory() with defaults
-```
-
 ### Types
 
 ```typescript
@@ -67,10 +65,10 @@ type LogLevel = "all" | "transitions" | "errors" | "none";
 
 interface LoggerPluginConfig {
   usePerformanceMarks?: boolean; // Performance API marks/measures (default: false)
-  level?: LogLevel;              // Log level filter (default: "all")
-  showTiming?: boolean;          // Transition timing in ms/μs (default: true)
-  showParamsDiff?: boolean;      // Params diff for same-route nav (default: true)
-  context?: string;              // Console prefix (default: "logger-plugin")
+  level?: LogLevel; // Log level filter (default: "all")
+  showTiming?: boolean; // Transition timing in ms/μs (default: true)
+  showParamsDiff?: boolean; // Params diff for same-route nav (default: true)
+  context?: string; // Console prefix (default: "logger-plugin")
 }
 ```
 
@@ -90,42 +88,44 @@ const DEFAULT_CONFIG: Required<LoggerPluginConfig> = {
 
 Not exported — used internally by `loggerPluginFactory` to merge with user options.
 
-**Note:** `showParamsDiff` defaults to `true` in `DEFAULT_CONFIG`, while the JSDoc `@default` says `false`. The runtime default is `true`.
-
 ### Pre-Computed Flags
 
 ```typescript
-// Computed once at factory creation — no runtime condition checks
-const logLifecycle = config.level === "all";
-const logTransition = config.level !== "none" && config.level !== "errors";
-const logWarning = logTransition;
-const logError = config.level !== "none";
-const shouldLogParams = logTransition && config.showParamsDiff;
-const shouldShowTiming = config.showTiming;
-const prefix = `[${config.context}]`;
+// Computed once in LoggerPlugin constructor — no runtime condition checks
+readonly #logLifecycle = config.level === "all";
+readonly #logTransition = config.level !== "none" && config.level !== "errors";
+readonly #logWarning = this.#logTransition;
+readonly #logError = config.level !== "none";
+readonly #shouldLogParams = this.#logTransition && config.showParamsDiff;
+readonly #shouldShowTiming = config.showTiming;
+readonly #prefix = `[${config.context}]`;
 ```
 
-| Level          | logLifecycle | logTransition | logWarning | logError |
-| -------------- | ------------ | ------------- | ---------- | -------- |
-| `"all"`        | true         | true          | true       | true     |
-| `"transitions"`| false        | true          | true       | true     |
-| `"errors"`     | false        | false         | false      | true     |
-| `"none"`       | false        | false         | false      | false    |
+| Level           | logLifecycle | logTransition | logWarning | logError |
+| --------------- | ------------ | ------------- | ---------- | -------- |
+| `"all"`         | true         | true          | true       | true     |
+| `"transitions"` | false        | true          | true       | true     |
+| `"errors"`      | false        | false         | false      | true     |
+| `"none"`        | false        | false         | false      | false    |
 
 ### Plugin Instance State
 
 ```typescript
-// Created per router instance (inside factory return)
-let transitionStartTime: number | null = null; // Timing start
-let transitionLabel = "";                       // "{from}→{to}" for perf marks
-let startMarkName = "";                         // "router:transition-start:{label}"
+// Private fields on LoggerPlugin — created per router instance
+#transitionStartTime: number | null = null;
+#transitionLabel = "";
+#startMarkName = "";
 ```
 
 ### Internal Managers
 
 ```typescript
-const groups: GroupManager = createGroupManager(supportsConsoleGroups());
-const perf: PerformanceTracker = createPerformanceTracker(config.usePerformanceMarks, config.context);
+// Created in LoggerPlugin constructor
+readonly #groups: GroupManager = createGroupManager(supportsConsoleGroups());
+readonly #perf: PerformanceTracker = createPerformanceTracker(
+  config.usePerformanceMarks,
+  config.context,
+);
 ```
 
 Both use the **capability detection + no-op pattern**: if the environment lacks `console.group` or `performance.mark`, all calls become no-ops.
@@ -137,12 +137,14 @@ Both use the **capability detection + no-op pattern**: if the environment lacks 
 ```
 router.usePlugin(loggerPluginFactory(options))
     │
+    ├── validateOptions(options)
     ├── Config merge: { ...DEFAULT_CONFIG, ...options }
-    ├── Pre-compute flags (logLifecycle, logTransition, etc.)
     └── Return factory → called per router instance
             │
-            ├── Create GroupManager + PerformanceTracker
-            └── Return plugin object with 6 hooks:
+            └── new LoggerPlugin(config).getPlugin()
+                    │
+                    ├── Constructor: create GroupManager + PerformanceTracker
+                    └── getPlugin() returns plugin object with 6 hooks:
 
 onStart()
     ├── perf.mark("router:start")
@@ -185,15 +187,15 @@ teardown()
     └── resetTransitionState()
 ```
 
-### resetTransitionState()
+### #resetTransitionState()
 
 ```typescript
-const resetTransitionState = (): void => {
-  groups.close();
-  transitionLabel = "";
-  startMarkName = "";
-  transitionStartTime = null;
-};
+#resetTransitionState(): void {
+  this.#groups.close();
+  this.#transitionLabel = "";
+  this.#startMarkName = "";
+  this.#transitionStartTime = null;
+}
 ```
 
 Called **after** timing is read — preserves `transitionStartTime` until log message is formatted.
@@ -255,36 +257,36 @@ createPerformanceTracker(enabled, context)
 
 When `usePerformanceMarks: true`:
 
-| Event              | Mark name                               | Measure name                              |
-| ------------------ | --------------------------------------- | ----------------------------------------- |
-| Router start       | `router:start`                          | —                                         |
-| Transition start   | `router:transition-start:{from}→{to}`   | —                                         |
-| Transition success | `router:transition-end:{from}→{to}`     | `router:transition:{from}→{to}`           |
-| Transition cancel  | `router:transition-cancel:{from}→{to}`  | `router:transition-cancelled:{from}→{to}` |
-| Transition error   | `router:transition-error:{from}→{to}`   | `router:transition-failed:{from}→{to}`    |
-| Router stop        | `router:stop`                           | `router:lifetime`                         |
+| Event              | Mark name                              | Measure name                              |
+| ------------------ | -------------------------------------- | ----------------------------------------- |
+| Router start       | `router:start`                         | —                                         |
+| Transition start   | `router:transition-start:{from}→{to}`  | —                                         |
+| Transition success | `router:transition-end:{from}→{to}`    | `router:transition:{from}→{to}`           |
+| Transition cancel  | `router:transition-cancel:{from}→{to}` | `router:transition-cancelled:{from}→{to}` |
+| Transition error   | `router:transition-error:{from}→{to}`  | `router:transition-failed:{from}→{to}`    |
+| Router stop        | `router:stop`                          | `router:lifetime`                         |
 
 All marks/measures are visible in browser DevTools Performance tab.
 
 ## Console Output
 
-| Hook                 | Method         | Guard          | Format                                          |
-| -------------------- | -------------- | -------------- | ----------------------------------------------- |
-| `onStart`            | `console.log`  | `logLifecycle` | `[ctx] Router started`                          |
-| `onStop`             | `console.log`  | `logLifecycle` | `[ctx] Router stopped`                          |
-| `onTransitionStart`  | `console.log`  | `logTransition`| `[ctx] Transition: {from} → {to}`               |
-| `onTransitionSuccess`| `console.log`  | `logTransition`| `[ctx] Transition success (Xms)`                |
-| `onTransitionCancel` | `console.warn` | `logWarning`   | `[ctx] Transition cancelled (Xms)`              |
-| `onTransitionError`  | `console.error`| `logError`     | `[ctx] Transition error: {code} (Xms)`          |
-| params diff          | `console.log`  | `shouldLogParams` | `[ctx]  Changed: { ... }, Added: {...}`      |
+| Hook                  | Method          | Guard             | Format                                  |
+| --------------------- | --------------- | ----------------- | --------------------------------------- |
+| `onStart`             | `console.log`   | `logLifecycle`    | `[ctx] Router started`                  |
+| `onStop`              | `console.log`   | `logLifecycle`    | `[ctx] Router stopped`                  |
+| `onTransitionStart`   | `console.log`   | `logTransition`   | `[ctx] Transition: {from} → {to}`       |
+| `onTransitionSuccess` | `console.log`   | `logTransition`   | `[ctx] Transition success (Xms)`        |
+| `onTransitionCancel`  | `console.warn`  | `logWarning`      | `[ctx] Transition cancelled (Xms)`      |
+| `onTransitionError`   | `console.error` | `logError`        | `[ctx] Transition error: {code} (Xms)`  |
+| params diff           | `console.log`   | `shouldLogParams` | `[ctx]  Changed: { ... }, Added: {...}` |
 
 ## Environment Detection
 
-| API                  | Check                                                                   | Fallback                          |
-| -------------------- | ----------------------------------------------------------------------- | --------------------------------- |
-| `console.group`      | `typeof console !== "undefined"` + `group` + `groupEnd` are functions   | Groups disabled (no-op)           |
-| `performance.mark`   | `typeof performance !== "undefined"` + `mark` + `measure` are functions | Marks/measures disabled (no-op)   |
-| `performance.now`    | `typeof performance !== "undefined"` + `now` is a function              | Monotonic `Date.now()` wrapper    |
+| API                | Check                                                                   | Fallback                        |
+| ------------------ | ----------------------------------------------------------------------- | ------------------------------- |
+| `console.group`    | `typeof console !== "undefined"` + `group` + `groupEnd` are functions   | Groups disabled (no-op)         |
+| `performance.mark` | `typeof performance !== "undefined"` + `mark` + `measure` are functions | Marks/measures disabled (no-op) |
+| `performance.now`  | `typeof performance !== "undefined"` + `now` is a function              | Monotonic `Date.now()` wrapper  |
 
 All checks happen once (at manager/provider creation), not per call.
 
