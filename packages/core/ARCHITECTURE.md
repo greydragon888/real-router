@@ -325,7 +325,7 @@ export function getRoutesApi(router: Router): RoutesApi {
 
 ### Wiring System (Builder + Director)
 
-Namespaces have circular dependencies (e.g., `NavigationNamespace` needs `EventBusNamespace`, `RouterLifecycleNamespace` needs `NavigationNamespace`). Resolved via **setter injection** in a fixed order:
+Namespaces have linear dependencies (e.g., `RouterLifecycleNamespace` → `NavigationNamespace` → `EventBusNamespace`). They are constructed independently, then wired via **setter injection** in a fixed order:
 
 ```typescript
 // wireRouter.ts — Director
@@ -490,6 +490,31 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            ▼
   Promise resolves with finalState
 ```
+
+### Error Routing in navigate()
+
+Errors during navigation are routed through two different paths depending on FSM state:
+
+| Path            | Method                                            | When                                                             | Effect                                   |
+| --------------- | ------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
+| **Via FSM**     | `sendFail()` → `fsm.send(FAIL)`                   | FSM is in READY or TRANSITIONING                                 | FSM transitions → action emits `$$error` |
+| **Direct emit** | `emitTransitionError()` → `emitter.emit($$error)` | Error before FSM transition (e.g., ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
+
+The branching logic lives in `RouterWiringBuilder` (wiring layer), not in `EventBusNamespace`. When an error occurs before `startTransition()` (e.g., route not found, same states), the wiring checks `isReady()`: if READY — sends through FSM (`sendFail`); if TRANSITIONING — emits directly to avoid disturbing the ongoing transition.
+
+Inside the transition pipeline (after `startTransition()`), errors are routed by `routeTransitionError()`:
+
+- `TRANSITION_CANCELLED`, `ROUTE_NOT_FOUND` → already handled (FSM received CANCEL), no additional routing
+- All other errors → `sendTransitionFail` → `sendFail()`
+
+**Naming convention:**
+
+`EventBusNamespace` methods follow a strict prefix convention:
+
+- `send*` — routes through FSM (triggers FSM state transition, FSM action emits event): `sendStart`, `sendStop`, `sendDispose`, `sendStarted`, `sendNavigate`, `sendComplete`, `sendFail`, `sendCancel`
+- `emit*` — emits directly to EventEmitter (bypasses FSM): `emitRouterStart`, `emitRouterStop`, `emitTransitionStart`, `emitTransitionSuccess`, `emitTransitionError`, `emitTransitionCancel`
+
+`NavigationDependencies` applies the same convention to its error-related deps: `sendTransitionFail` (FSM) vs `emitTransitionError` (conditional, see above).
 
 ### navigateToNotFound() — Pipeline Bypass
 

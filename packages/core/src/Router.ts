@@ -430,7 +430,7 @@ export class Router<
 
   stop(): this {
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
+    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
 
     if (!this.#eventBus.isReady() && !this.#eventBus.isTransitioning()) {
       return this;
@@ -448,7 +448,7 @@ export class Router<
     }
 
     this.#navigation.abortCurrentNavigation();
-    this.#eventBus.cancelTransitionIfRunning(this.#state.get());
+    this.#eventBus.sendCancelIfTransitioning(this.#state.get());
 
     if (this.#eventBus.isReady() || this.#eventBus.isTransitioning()) {
       this.#lifecycle.stop();
@@ -504,31 +504,12 @@ export class Router<
 
     const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
 
-    for (const segment of toDeactivate) {
-      if (
-        !this.#routeLifecycle.checkDeactivateGuardSync(
-          segment,
-          toState,
-          fromState,
-        )
-      ) {
-        return false;
-      }
-    }
-
-    for (const segment of toActivate) {
-      if (
-        !this.#routeLifecycle.checkActivateGuardSync(
-          segment,
-          toState,
-          fromState,
-        )
-      ) {
-        return false;
-      }
-    }
-
-    return true;
+    return this.#routeLifecycle.canNavigateTo(
+      toDeactivate,
+      toActivate,
+      toState,
+      fromState,
+    );
   }
 
   // ============================================================================

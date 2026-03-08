@@ -1,10 +1,11 @@
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import {
   createRouter,
   constants,
   events,
   errorCodes,
+  getLifecycleApi,
   getPluginApi,
   UNKNOWN_ROUTE,
 } from "@real-router/core";
@@ -256,6 +257,173 @@ describe("router.navigateToNotFound()", () => {
       router.dispose();
 
       expect(() => router.navigateToNotFound()).toThrowError();
+    });
+  });
+
+  describe("concurrent transition cancellation", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("should cancel in-flight navigation when called during transition", async () => {
+      vi.useFakeTimers();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { allowNotFound: true },
+      );
+      await router.start("/");
+
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      const navigatePromise = router.navigate("users");
+
+      router.navigateToNotFound("/unknown");
+
+      await vi.runAllTimersAsync();
+
+      await expect(navigatePromise).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+    });
+
+    it("should set state to UNKNOWN_ROUTE after cancelling transition", async () => {
+      vi.useFakeTimers();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { allowNotFound: true },
+      );
+      await router.start("/");
+
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      void router.navigate("users");
+
+      const state = router.navigateToNotFound("/unknown");
+
+      await vi.runAllTimersAsync();
+
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
+      expect(state.path).toBe("/unknown");
+      expect(router.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
+    });
+
+    it("should emit TRANSITION_CANCEL for the aborted navigation", async () => {
+      vi.useFakeTimers();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { allowNotFound: true },
+      );
+      await router.start("/");
+
+      const onCancel = vi.fn();
+
+      getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, onCancel);
+
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      void router.navigate("users");
+
+      router.navigateToNotFound("/unknown");
+
+      await vi.runAllTimersAsync();
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+    });
+
+    it("should emit TRANSITION_SUCCESS for navigateToNotFound after cancel", async () => {
+      vi.useFakeTimers();
+
+      router = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { allowNotFound: true },
+      );
+      await router.start("/");
+
+      const onSuccess = vi.fn();
+
+      getPluginApi(router).addEventListener(
+        events.TRANSITION_SUCCESS,
+        onSuccess,
+      );
+
+      const lifecycle = getLifecycleApi(router);
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              resolve(true);
+            }, 100);
+          }),
+      );
+
+      void router.navigate("users");
+
+      router.navigateToNotFound("/unknown");
+
+      await vi.runAllTimersAsync();
+
+      expect(onSuccess).toHaveBeenCalledTimes(1);
+      expect(onSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ name: constants.UNKNOWN_ROUTE }),
+        expect.anything(),
+        { replace: true },
+      );
+    });
+
+    it("should work when no transition is in progress", async () => {
+      router = createTestRouter({ allowNotFound: true });
+      await router.start("/home");
+
+      const state = router.navigateToNotFound("/test");
+
+      expect(state.name).toBe(constants.UNKNOWN_ROUTE);
     });
   });
 

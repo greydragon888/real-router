@@ -1,14 +1,12 @@
 // packages/core/src/wiring/RouterWiringBuilder.ts
 
 import { getInternals } from "../internals";
+import { resolveOption } from "../namespaces/OptionsNamespace";
 import { validateStateBuilderArgs } from "../namespaces/RoutesNamespace/validators";
 
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
-import type {
-  NavigationDependencies,
-  TransitionDependencies,
-} from "../namespaces/NavigationNamespace";
+import type { NavigationDependencies } from "../namespaces/NavigationNamespace";
 import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
@@ -56,11 +54,8 @@ export class RouterWiringBuilder<
   }
 
   wireRouteLifecycleDeps(): void {
-    this.routeLifecycle.setRouter(this.router);
-
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
+      compileFactory: this.createCompileFactory(),
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
@@ -97,14 +92,11 @@ export class RouterWiringBuilder<
   }
 
   wirePluginsDeps(): void {
-    this.plugins.setRouter(this.router);
-
     const pluginsDeps: PluginsDependencies<Dependencies> = {
       addEventListener: (eventName, cb) =>
         this.eventBus.addEventListener(eventName, cb),
       canNavigate: () => this.eventBus.canBeginTransition(),
-      getDependency: <K extends keyof Dependencies>(dependencyName: K) =>
-        this.dependenciesStore.dependencies[dependencyName] as Dependencies[K],
+      compileFactory: this.createCompileFactory(),
     };
 
     this.plugins.setDependencies(pluginsDeps);
@@ -141,47 +133,54 @@ export class RouterWiringBuilder<
       },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
-      getDependency: (name: string) =>
-        this.dependenciesStore.dependencies[name as keyof Dependencies],
+      resolveDefault: () => {
+        const options = this.options.get();
+
+        return {
+          route: resolveOption(
+            options.defaultRoute,
+            (name: string) =>
+              this.dependenciesStore.dependencies[name as keyof Dependencies],
+          ),
+          params: resolveOption(
+            options.defaultParams,
+            /* v8 ignore next -- @preserve: unreachable unless defaultParams is a callback that calls getDependency */
+            (name: string) =>
+              this.dependenciesStore.dependencies[name as keyof Dependencies],
+          ),
+        };
+      },
       startTransition: (toState, fromState) => {
-        this.eventBus.beginTransition(toState, fromState);
+        this.eventBus.sendNavigate(toState, fromState);
       },
       cancelNavigation: () => {
-        this.eventBus.cancelTransition(
+        this.eventBus.sendCancel(
           this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
           this.state.get(),
         );
       },
       sendTransitionDone: (state, fromState, opts) => {
-        this.eventBus.completeTransition(state, fromState, opts);
+        this.eventBus.sendComplete(state, fromState, opts);
       },
-      sendTransitionBlocked: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
-      },
-      sendTransitionError: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
+      sendTransitionFail: (toState, fromState, error) => {
+        this.eventBus.sendFail(toState, fromState, error);
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.eventBus.emitOrFailTransitionError(toState, fromState, error);
+        this.eventBus.sendFailSafe(toState, fromState, error);
       },
       emitTransitionSuccess: (toState, fromState, opts) => {
         this.eventBus.emitTransitionSuccess(toState, fromState, opts);
       },
-    };
-
-    this.navigation.setDependencies(navigationDeps);
-    this.navigation.setCanNavigate(() => this.eventBus.canBeginTransition());
-
-    const transitionDeps: TransitionDependencies = {
+      canNavigate: () => this.eventBus.canBeginTransition(),
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
       isActive: () => this.router.isActive(),
       isTransitioning: () => this.eventBus.isTransitioning(),
-      clearCanDeactivate: (name) => {
+      clearCanDeactivate: (name: string) => {
         this.routeLifecycle.clearCanDeactivate(name);
       },
     };
 
-    this.navigation.setTransitionDependencies(transitionDeps);
+    this.navigation.setDependencies(navigationDeps);
   }
 
   wireLifecycleDeps(): void {
@@ -195,10 +194,10 @@ export class RouterWiringBuilder<
       },
       matchPath: (path) => this.routes.matchPath(path, this.options.get()),
       completeStart: () => {
-        this.eventBus.completeStart();
+        this.eventBus.sendStarted();
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
+        this.eventBus.sendFail(toState, fromState, error);
       },
     };
 
@@ -215,5 +214,23 @@ export class RouterWiringBuilder<
       },
       getUrlParams: (name) => this.routes.getUrlParams(name),
     });
+  }
+
+  private createCompileFactory() {
+    const { router, dependenciesStore } = this;
+
+    return <T>(
+      factory: (
+        router: WiringOptions<Dependencies>["router"],
+        getDependency: <K extends keyof Dependencies>(
+          name: K,
+        ) => Dependencies[K],
+      ) => T,
+    ): T =>
+      factory(
+        router,
+        <K extends keyof Dependencies>(name: K) =>
+          dependenciesStore.dependencies[name] as Dependencies[K],
+      );
   }
 }

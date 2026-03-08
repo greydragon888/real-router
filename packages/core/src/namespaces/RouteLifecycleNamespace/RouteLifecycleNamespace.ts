@@ -8,7 +8,6 @@ import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
-import type { Router } from "../../Router";
 import type { GuardFnFactory, Limits } from "../../types";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
@@ -48,24 +47,9 @@ export class RouteLifecycleNamespace<
   readonly #definitionActivateGuardNames = new Set<string>();
   readonly #definitionDeactivateGuardNames = new Set<string>();
 
-  #router!: Router<Dependencies>;
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
 
-  /**
-   * Injects the router instance during wiring phase.
-   *
-   * @param router - Router instance to use for factory compilation
-   */
-  setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
-  }
-
-  /**
-   * Injects namespace dependencies (getDependency accessor) during wiring phase.
-   *
-   * @param deps - Dependencies object containing getDependency accessor
-   */
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
   }
@@ -268,50 +252,41 @@ export class RouteLifecycleNamespace<
     return [this.#canDeactivateFunctions, this.#canActivateFunctions];
   }
 
-  /**
-   * Synchronously checks the canActivate guard for a route.
-   * Returns `true` if no guard is registered or the guard allows activation.
-   * Returns `false` if the guard blocks, returns a Promise, or throws.
-   *
-   * @param name - Route name to check the guard for
-   * @param toState - Target navigation state
-   * @param fromState - Current state (`undefined` on initial navigation)
-   */
-  checkActivateGuardSync(
-    name: string,
+  canNavigateTo(
+    toDeactivate: string[],
+    toActivate: string[],
     toState: State,
     fromState: State | undefined,
   ): boolean {
-    return this.#checkGuardSync(
-      this.#canActivateFunctions,
-      name,
-      toState,
-      fromState,
-      "checkActivateGuardSync",
-    );
-  }
+    for (const segment of toDeactivate) {
+      if (
+        !this.#checkGuardSync(
+          this.#canDeactivateFunctions,
+          segment,
+          toState,
+          fromState,
+          "canNavigateTo",
+        )
+      ) {
+        return false;
+      }
+    }
 
-  /**
-   * Synchronously checks the canDeactivate guard for a route.
-   * Returns `true` if no guard is registered or the guard allows deactivation.
-   * Returns `false` if the guard blocks, returns a Promise, or throws.
-   *
-   * @param name - Route name to check the guard for
-   * @param toState - Target navigation state
-   * @param fromState - Current state (`undefined` on initial navigation)
-   */
-  checkDeactivateGuardSync(
-    name: string,
-    toState: State,
-    fromState: State | undefined,
-  ): boolean {
-    return this.#checkGuardSync(
-      this.#canDeactivateFunctions,
-      name,
-      toState,
-      fromState,
-      "checkDeactivateGuardSync",
-    );
+    for (const segment of toActivate) {
+      if (
+        !this.#checkGuardSync(
+          this.#canActivateFunctions,
+          segment,
+          toState,
+          fromState,
+          "canNavigateTo",
+        )
+      ) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   // =========================================================================
@@ -361,8 +336,7 @@ export class RouteLifecycleNamespace<
     this.#registering.add(name);
 
     try {
-      // Lifecycle factories receive full router as part of their public API
-      const fn = factory(this.#router, this.#deps.getDependency);
+      const fn = this.#deps.compileFactory(factory);
 
       if (typeof fn !== "function") {
         throw new TypeError(

@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { getTypeDescription } from "type-guards";
 
-import { errorCodes } from "../constants";
+import { throwIfDisposed } from "./helpers";
 import { computeThresholds } from "../helpers";
 import { getInternals } from "../internals";
 import {
@@ -11,17 +11,10 @@ import {
   validateDependencyName,
   validateSetDependencyArgs,
 } from "../namespaces/DependenciesNamespace/validators";
-import { RouterError } from "../RouterError";
 
 import type { DependenciesApi } from "./types";
-import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
+import type { DependenciesStore } from "../namespaces";
 import type { DefaultDependencies, Router } from "@real-router/types";
-
-function throwIfDisposed(isDisposed: () => boolean): void {
-  if (isDisposed()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
-  }
-}
 
 // =============================================================================
 // Module-private CRUD functions

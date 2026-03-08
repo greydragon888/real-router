@@ -16,7 +16,7 @@ import type {
  *
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
- */
+ **/
 export interface NavigationDependencies {
   /** Get router options */
   getOptions: () => Options;
@@ -54,8 +54,8 @@ export interface NavigationDependencies {
     ignoreQueryParams?: boolean,
   ) => boolean;
 
-  /** Get a dependency by name (untyped — used only for resolveOption) */
-  getDependency: (name: string) => unknown;
+  /** Resolve defaultRoute and defaultParams options (static value or callback) */
+  resolveDefault: () => { route: string; params: Params };
 
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;
@@ -70,15 +70,8 @@ export interface NavigationDependencies {
     opts: NavigationOptions,
   ) => void;
 
-  /** Send FAIL event to routerFSM (transition blocked) */
-  sendTransitionBlocked: (
-    toState: State,
-    fromState: State | undefined,
-    error: unknown,
-  ) => void;
-
-  /** Send FAIL event to routerFSM (transition error) */
-  sendTransitionError: (
+  /** Send FAIL event to routerFSM */
+  sendTransitionFail: (
     toState: State,
     fromState: State | undefined,
     error: unknown,
@@ -97,6 +90,21 @@ export interface NavigationDependencies {
     fromState?: State,
     opts?: NavigationOptions,
   ) => void;
+
+  /** Check if navigation can begin (router is started) */
+  canNavigate: () => boolean;
+
+  /** Get lifecycle functions (canDeactivate, canActivate maps) */
+  getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
+
+  /** Check if router is active (for cancellation check on stop()) */
+  isActive: () => boolean;
+
+  /** Check if a transition is currently in progress */
+  isTransitioning: () => boolean;
+
+  /** Clear canDeactivate guard for a route */
+  clearCanDeactivate: (name: string) => void;
 }
 
 export interface TransitionOutput {
@@ -109,21 +117,4 @@ export interface TransitionOutput {
       intersection: string;
     };
   };
-}
-
-/**
- * Dependencies required for the transition function.
- */
-export interface TransitionDependencies {
-  /** Get lifecycle functions (canDeactivate, canActivate maps) */
-  getLifecycleFunctions: () => [Map<string, GuardFn>, Map<string, GuardFn>];
-
-  /** Check if router is active (for cancellation check on stop()) */
-  isActive: () => boolean;
-
-  /** Check if a transition is currently in progress */
-  isTransitioning: () => boolean;
-
-  /** Clear canDeactivate guard for a route */
-  clearCanDeactivate: (name: string) => void;
 }

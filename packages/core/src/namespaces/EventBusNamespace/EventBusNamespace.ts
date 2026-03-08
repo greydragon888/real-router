@@ -84,16 +84,16 @@ export class EventBusNamespace {
     this.#fsm.send(routerEvents.DISPOSE);
   }
 
-  completeStart(): void {
+  sendStarted(): void {
     this.#fsm.send(routerEvents.STARTED);
   }
 
-  beginTransition(toState: State, fromState?: State): void {
+  sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
     this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
   }
 
-  completeTransition(
+  sendComplete(
     state: State,
     fromState?: State,
     opts: NavigationOptions = {},
@@ -106,28 +106,22 @@ export class EventBusNamespace {
     this.#currentToState = undefined;
   }
 
-  failTransition(toState?: State, fromState?: State, error?: unknown): void {
+  sendFail(toState?: State, fromState?: State, error?: unknown): void {
     this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
     this.#currentToState = undefined;
   }
 
-  cancelTransition(toState: State, fromState?: State): void {
-    this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
-    this.#currentToState = undefined;
-  }
-
-  emitOrFailTransitionError(
-    toState?: State,
-    fromState?: State,
-    error?: unknown,
-  ): void {
-    if (this.#fsm.getState() === routerStates.READY) {
-      this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
+  sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
+    if (this.isReady()) {
+      this.sendFail(toState, fromState, error);
     } else {
-      // TRANSITIONING: concurrent navigation with invalid args.
-      // Direct emit to avoid disturbing the ongoing transition.
       this.emitTransitionError(toState, fromState, error as RouterError);
     }
+  }
+
+  sendCancel(toState: State, fromState?: State): void {
+    this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
+    this.#currentToState = undefined;
   }
 
   canBeginTransition(): boolean {
@@ -195,12 +189,12 @@ export class EventBusNamespace {
     this.#emitter.setLimits(limits);
   }
 
-  cancelTransitionIfRunning(fromState: State | undefined): void {
+  sendCancelIfTransitioning(fromState: State | undefined): void {
     if (!this.canCancel()) {
       return;
     }
 
-    this.cancelTransition(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+    this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
   }
 
   #setupFSMActions(): void {

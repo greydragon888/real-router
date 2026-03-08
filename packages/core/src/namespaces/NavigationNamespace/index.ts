@@ -2,4 +2,4 @@
 
 export { NavigationNamespace } from "./NavigationNamespace";
 
-export type { NavigationDependencies, TransitionDependencies } from "./types";
+export type { NavigationDependencies } from "./types";

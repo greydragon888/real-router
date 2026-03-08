@@ -11,13 +11,8 @@ import {
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { nameToIDs } from "../../transitionPath";
-import { resolveOption } from "../OptionsNamespace";
 
-import type {
-  NavigationDependencies,
-  TransitionDependencies,
-  TransitionOutput,
-} from "./types";
+import type { NavigationDependencies, TransitionOutput } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -63,15 +58,7 @@ function routeTransitionError(
     return;
   }
 
-  /* v8 ignore next 7 -- @preserve: defensive guard for unexpected error codes (e.g. future error types); else branch unreachable after middleware became fire-and-forget */
-  if (
-    routerError.code === errorCodes.CANNOT_ACTIVATE ||
-    routerError.code === errorCodes.CANNOT_DEACTIVATE
-  ) {
-    deps.sendTransitionBlocked(toState, fromState, routerError);
-  } else {
-    deps.sendTransitionError(toState, fromState, routerError);
-  }
+  deps.sendTransitionFail(toState, fromState, routerError);
 }
 
 function buildSuccessState(
@@ -106,9 +93,7 @@ function buildSuccessState(
  * Handles navigate(), navigateToDefault(), navigateToNotFound(), and transition state.
  */
 export class NavigationNamespace {
-  #canNavigate!: () => boolean;
   #deps!: NavigationDependencies;
-  #transitionDeps!: TransitionDependencies;
   #currentController: AbortController | null = null;
 
   // =========================================================================
@@ -135,24 +120,8 @@ export class NavigationNamespace {
   // Dependency injection
   // =========================================================================
 
-  setCanNavigate(fn: () => boolean): void {
-    this.#canNavigate = fn;
-  }
-
-  /**
-   * Sets dependencies for navigation operations.
-   * Must be called before using navigation methods.
-   */
   setDependencies(deps: NavigationDependencies): void {
     this.#deps = deps;
-  }
-
-  /**
-   * Sets dependencies for transition operations.
-   * Must be called before using navigation methods.
-   */
-  setTransitionDependencies(deps: TransitionDependencies): void {
-    this.#transitionDeps = deps;
   }
 
   // =========================================================================
@@ -168,7 +137,7 @@ export class NavigationNamespace {
     params: Params,
     opts: NavigationOptions,
   ): Promise<State> {
-    if (!this.#canNavigate()) {
+    if (!this.#deps.canNavigate()) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
     }
 
@@ -212,19 +181,7 @@ export class NavigationNamespace {
       throw err;
     }
 
-    const transitionDeps = this.#transitionDeps;
-
-    if (transitionDeps.isTransitioning()) {
-      logger.warn(
-        "router.navigate",
-        "Concurrent navigation detected on shared router instance. " +
-          "For SSR, use cloneRouter() to create isolated instance per request.",
-      );
-      this.#currentController?.abort(
-        new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
-      deps.cancelNavigation();
-    }
+    this.#abortPreviousNavigation();
 
     const controller = new AbortController();
 
@@ -252,7 +209,7 @@ export class NavigationNamespace {
 
     try {
       const { state: finalState, meta: transitionOutput } = await transition(
-        transitionDeps,
+        deps,
         toState,
         fromState,
         opts,
@@ -283,7 +240,7 @@ export class NavigationNamespace {
           routeName: finalState.name,
         });
 
-        deps.sendTransitionError(finalState, fromState, err);
+        deps.sendTransitionFail(finalState, fromState, err);
 
         throw err;
       }
@@ -313,26 +270,20 @@ export class NavigationNamespace {
       });
     }
 
-    const resolvedRoute = resolveOption(
-      options.defaultRoute,
-      deps.getDependency,
-    );
+    const { route, params } = deps.resolveDefault();
 
-    if (!resolvedRoute) {
+    if (!route) {
       throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
         routeName: "defaultRoute resolved to empty",
       });
     }
 
-    const resolvedParams = resolveOption(
-      options.defaultParams,
-      deps.getDependency,
-    );
-
-    return this.navigate(resolvedRoute, resolvedParams, opts);
+    return this.navigate(route, params, opts);
   }
 
   navigateToNotFound(path: string): State {
+    this.#abortPreviousNavigation();
+
     const fromState = this.#deps.getState();
     const deactivated: string[] = fromState
       ? nameToIDs(fromState.name).toReversed()
@@ -377,5 +328,19 @@ export class NavigationNamespace {
       new RouterError(errorCodes.TRANSITION_CANCELLED),
     );
     this.#currentController = null;
+  }
+
+  #abortPreviousNavigation(): void {
+    if (this.#deps.isTransitioning()) {
+      logger.warn(
+        "router.navigate",
+        "Concurrent navigation detected on shared router instance. " +
+          "For SSR, use cloneRouter() to create isolated instance per request.",
+      );
+      this.#currentController?.abort(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
+      this.#deps.cancelNavigation();
+    }
   }
 }
