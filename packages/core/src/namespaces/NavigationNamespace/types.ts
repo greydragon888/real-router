@@ -90,6 +90,13 @@ export interface NavigationDependencies {
     fromState: State | undefined,
     error: unknown,
   ) => void;
+
+  /** Emit TRANSITION_SUCCESS event to listeners (without FSM transition) */
+  emitTransitionSuccess: (
+    toState: State,
+    fromState?: State,
+    opts?: NavigationOptions,
+  ) => void;
 }
 
 export interface TransitionOutput {

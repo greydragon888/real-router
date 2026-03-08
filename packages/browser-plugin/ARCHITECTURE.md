@@ -335,7 +335,8 @@ User clicks back or forward
         │
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
-        │     NO:  await router.navigateToDefault({ ...transitionOptions, reload: true, replace: true })
+        │     NO + allowNotFound: router.navigateToNotFound(browser.getLocation())
+        │     NO + !allowNotFound: await router.navigateToDefault({ ...transitionOptions, reload: true, replace: true })
         │
         ├── catch (error):
         │     error instanceof RouterError? → ignore (CANNOT_DEACTIVATE, etc.)

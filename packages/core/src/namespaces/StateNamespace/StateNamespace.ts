@@ -3,7 +3,6 @@
 import { getTypeDescription, validateState } from "type-guards";
 
 import { areParamValuesEqual, getUrlParamsFromMeta } from "./helpers";
-import { constants } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -179,20 +178,6 @@ export class StateNamespace {
     };
 
     return freezeStateInPlace(state);
-  }
-
-  /**
-   * Creates a frozen state object for the "not found" route.
-   */
-  makeNotFoundState(path: string): State {
-    return this.makeState<{ path: string }>(
-      constants.UNKNOWN_ROUTE,
-      { path },
-      path,
-      {
-        params: {},
-      },
-    );
   }
 
   // =========================================================================

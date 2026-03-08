@@ -1,6 +1,7 @@
 // packages/core/src/index.ts
 
 // Router-dependent types (re-exported from @real-router/types)
+
 export type {
   BuildStateResultWithSegments,
   GuardFnFactory,
@@ -34,7 +35,7 @@ export type {
 
 export type { ErrorCodes, Constants } from "./constants";
 
-export { events, constants, errorCodes } from "./constants";
+export { events, constants, errorCodes, UNKNOWN_ROUTE } from "./constants";
 
 // RouterError class (migrated from router-error package)
 export { RouterError } from "./RouterError";

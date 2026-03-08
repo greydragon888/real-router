@@ -32,7 +32,7 @@ core/
 │   ├── namespaces/
 │   │   ├── RoutesNamespace/         — Route tree, path operations, forwarding
 │   │   ├── StateNamespace/          — State storage (current, previous)
-│   │   ├── NavigationNamespace/     — navigate(), transition pipeline
+│   │   ├── NavigationNamespace/     — navigate(), navigateToNotFound(), transition pipeline
 │   │   ├── EventBusNamespace/       — FSM + EventEmitter, subscribe
 │   │   ├── PluginsNamespace/        — Plugin lifecycle
 │   │   ├── RouteLifecycleNamespace/ — canActivate/canDeactivate guards
@@ -116,6 +116,7 @@ class Router<D extends DefaultDependencies> {
     options?: NavigationOptions,
   ): Promise<State>;
   navigateToDefault(options?: NavigationOptions): Promise<State>;
+  navigateToNotFound(path?: string): State;
   canNavigateTo(name: string, params?: Params): boolean;
 
   // Plugins & Subscription
@@ -244,7 +245,7 @@ Router.ts (facade — validates and delegates)
     ├── RoutesNamespace           — route tree, matchPath(), buildPath(), forwarding
     ├── RouteLifecycleNamespace   — canActivate/canDeactivate guard registry
     ├── PluginsNamespace          — plugin lifecycle (factory → instance → hooks)
-    ├── NavigationNamespace       — navigate(), transition pipeline, AbortController
+    ├── NavigationNamespace       — navigate(), navigateToNotFound(), transition pipeline, AbortController
     ├── EventBusNamespace         — FSM + EventEmitter encapsulation
     └── RouterLifecycleNamespace  — start(), stop()
 ```
@@ -333,17 +334,16 @@ function wireRouter(builder: RouterWiringBuilder) {
   builder.wireRouteLifecycleDeps(); // 2. Guard registry gets router + getDependency
   builder.wireRoutesDeps(); // 3. Routes gets guards + state (registers pending handlers)
   builder.wirePluginsDeps(); // 4. Plugins get addEventListener + canNavigate
-  builder.wireNavigationDeps(); // 5. Navigation gets state, routes, eventBus
-  builder.wireLifecycleDeps(); // 6. RouterLifecycle gets matchPath, completeStart
+  builder.wireNavigationDeps(); // 5. Navigation gets state, routes, eventBus + canNavigate
+  builder.wireLifecycleDeps(); // 6. RouterLifecycle gets navigate, navigateToNotFound, matchPath
   builder.wireStateDeps(); // 7. State gets defaultParams, buildPath, getUrlParams
-  builder.wireCyclicDeps(); // 8. Resolve circular: Navigation ↔ RouterLifecycle
 }
 ```
 
 **Order matters:**
 
 - `wireRouteLifecycleDeps()` BEFORE `wireRoutesDeps()` — route registration triggers guard registration which requires `RouteLifecycleNamespace` to be ready
-- `wireCyclicDeps()` LAST — resolves circular references via direct property assignment
+- `wireNavigationDeps()` BEFORE `wireLifecycleDeps()` — lifecycle deps reference `NavigationNamespace.navigate()` which requires navigation deps to be set
 
 ## Router FSM
 
@@ -422,7 +422,8 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            ▼
 ┌──────────────────────┐
 │  Build target state  │  buildStateWithSegments() (internally calls forwardState())
-│  + SAME_STATES check │  areStatesEqual(from, to, false) → compares ALL params incl. query
+│  + force replace     │  forceReplaceFromUnknown(opts, fromState) — auto replace from UNKNOWN_ROUTE
+│  + SAME_STATES check │  fromState && areStatesEqual(from, to, false) → compares ALL params incl. query
 └──────────┬───────────┘
            │
            ▼
@@ -489,6 +490,41 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            ▼
   Promise resolves with finalState
 ```
+
+### navigateToNotFound() — Pipeline Bypass
+
+`navigateToNotFound(path?)` is a **synchronous** method that bypasses the entire navigate() pipeline:
+
+```
+ router.navigateToNotFound(path?)
+           │
+           ▼
+ ┌──────────────────────┐
+ │  Check isActive()    │  Not active → throw ROUTER_NOT_STARTED
+ └──────────┬───────────┘
+           │
+           ▼
+ ┌──────────────────────┐
+ │  Resolve path        │  path ?? currentState.path
+ └──────────┬───────────┘
+           │
+           ▼
+ ┌──────────────────────┐
+ │  Build UNKNOWN_ROUTE │  { name: UNKNOWN_ROUTE, params: {}, path, transition }
+ │  state + freeze      │  TransitionMeta: deactivated segments from current state
+ └──────────┬───────────┘
+           │
+           ▼
+ ┌──────────────────────┐
+ │  setState()          │  Directly sets state (no FSM transition)
+ │  emit $$success      │  emitTransitionSuccess(state, fromState, { replace: true })
+ └──────────┬───────────┘
+           │
+           ▼
+   Returns State (synchronous)
+```
+
+**No guards, no FSM transition, no AbortController.** Only `TRANSITION_SUCCESS` is emitted (no `TRANSITION_START`). Plugin authors must not assume every `onTransitionSuccess` is preceded by `onTransitionStart`.
 
 ### Transition Path Calculation
 
@@ -626,11 +662,20 @@ Setting any property to `null` removes it. Cannot be called during active naviga
 
 ### UNKNOWN_ROUTE Constant
 
-`constants.UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE"` — special route name for 404 states:
+`constants.UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE"` — special route name for 404 states. Also exported as standalone `UNKNOWN_ROUTE` for direct imports:
 
-- Created by `matchPath()` when no route matches the URL
-- **Activation guards are skipped** for UNKNOWN_ROUTE in the transition pipeline
+```typescript
+import { UNKNOWN_ROUTE } from "@real-router/core";
+// or
+import { constants } from "@real-router/core";
+constants.UNKNOWN_ROUTE; // same value
+```
+
+- Set programmatically via `router.navigateToNotFound(path?)` — bypasses guards and transition pipeline
 - Used by `start(path)` when path doesn't match any route and `allowNotFound` option is set
+- Used by browser-plugin and hash-plugin popstate handlers for unmatched URLs
+- UNKNOWN_ROUTE state shape: `{ name: UNKNOWN_ROUTE, params: {}, path: "/the/url", transition: TransitionMeta }`
+- **Navigating FROM UNKNOWN_ROUTE** auto-forces `replace: true` to prevent history pollution
 
 ## Plugin System
 
@@ -673,6 +718,8 @@ interface Plugin {
 | `onTransitionCancel`  | `$$cancel`   | Navigation cancelled      |
 
 **Plugins are observers** — they react to events but cannot block or modify transitions. Guards handle blocking.
+
+**Note:** `onTransitionSuccess` can fire without a preceding `onTransitionStart` — this happens when `navigateToNotFound()` is called. The `opts` parameter will have `replace: true` and no `signal`.
 
 ### Plugin Interception
 

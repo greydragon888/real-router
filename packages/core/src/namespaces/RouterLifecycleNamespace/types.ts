@@ -1,10 +1,20 @@
 // packages/core/src/namespaces/RouterLifecycleNamespace/types.ts
 
-import type { Options, Params, State } from "@real-router/types";
+import type {
+  NavigationOptions,
+  Options,
+  Params,
+  State,
+} from "@real-router/types";
 
 export interface RouterLifecycleDependencies {
   getOptions: () => Options;
-  makeNotFoundState: (path: string) => State;
+  navigate: (
+    name: string,
+    params: Params,
+    opts: NavigationOptions,
+  ) => Promise<State>;
+  navigateToNotFound: (path: string) => State;
   clearState: () => void;
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,

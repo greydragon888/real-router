@@ -181,7 +181,7 @@ function pointOfDifference(
  * Validation significantly slows down nameToIDs execution.
  * The input should be validated by the function/method that calls nameToIDs.
  */
-function nameToIDs(name: string): string[] {
+export function nameToIDs(name: string): string[] {
   // ===== FAST PATH 1: Empty string (root route) =====
   // Most common in initial navigation
   if (!name) {

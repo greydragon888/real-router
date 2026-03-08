@@ -306,6 +306,7 @@ export class Router<
     // Navigation
     this.navigate = this.navigate.bind(this);
     this.navigateToDefault = this.navigateToDefault.bind(this);
+    this.navigateToNotFound = this.navigateToNotFound.bind(this);
 
     // Subscription
     this.subscribe = this.subscribe.bind(this);
@@ -623,6 +624,17 @@ export class Router<
     return promiseState;
   }
 
+  navigateToNotFound(path?: string): State {
+    if (!this.#eventBus.isActive()) {
+      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- isActive() guarantees state exists
+    const resolvedPath = path ?? this.#state.get()!.path;
+
+    return this.#navigation.navigateToNotFound(resolvedPath);
+  }
+
   /**
    * Pre-allocated callback for #suppressUnhandledRejection.
    * Avoids creating a new closure on every navigate() call.
@@ -653,6 +665,7 @@ export class Router<
   #markDisposed(): void {
     this.navigate = throwDisposed as never;
     this.navigateToDefault = throwDisposed as never;
+    this.navigateToNotFound = throwDisposed as never;
     this.start = throwDisposed as never;
     this.stop = throwDisposed as never;
     this.usePlugin = throwDisposed as never;

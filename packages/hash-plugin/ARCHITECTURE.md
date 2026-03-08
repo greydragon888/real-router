@@ -25,7 +25,7 @@ hash-plugin/
 │   ├── factory.ts         — hashPluginFactory (validation, normalization, instance creation)
 │   ├── plugin.ts          — HashPlugin class (runtime behavior)
 │   ├── types.ts           — Types (HashPluginOptions)
-│   ├── hash-utils.ts      — Hash URL utility functions (extractHashPath, hashUrlToPath, RegExpCache)
+│   ├── hash-utils.ts      — Hash URL utility functions (extractHashPath, hashUrlToPath, createHashPrefixRegex)
 │   ├── validation.ts      — Options validation (delegates to browser-env)
 │   └── constants.ts       — Constants (defaultOptions, source, LOGGER_CONTEXT)
 ```
@@ -67,7 +67,7 @@ hashPluginFactory(opts?, browser?)   ← factory.ts
         │  Runs once on call:
         │  - validateOptions()
         │  - base path normalization (normalizeBase from browser-env)
-        │  - createRegExpCache() for hash prefix patterns
+        │  - createHashPrefixRegex(hashPrefix) → RegExp | null (pre-computed once)
         │  - createSafeBrowser() if no browser provided
         │  - transitionOptions construction
         │  - SharedFactoryState creation
@@ -76,10 +76,11 @@ hashPluginFactory(opts?, browser?)   ← factory.ts
                 │
                 │  Called by the router on router.usePlugin():
                 │
-                └── new HashPlugin(router, api, options, browser, regExpCache, ...)
+                └── new HashPlugin(router, api, options, browser, prefixRegex, ...)
                             │
                             │  Constructor:
                             │  - registers start interceptor (via browser-env)
+                            │  - pre-computes urlPrefix = `${base}#${hashPrefix}`
                             │  - calls api.extendRouter({buildUrl, matchUrl, replaceHistoryState})
                             │  - creates popstate handler and lifecycle (via browser-env)
                             │
@@ -88,7 +89,7 @@ hashPluginFactory(opts?, browser?)   ← factory.ts
 
 **Why this split instead of a single object?**
 
-- `factory.ts` runs once — expensive operations (validation, cache creation, browser detection) don't repeat on every `usePlugin()` call
+- `factory.ts` runs once — expensive operations (validation, regex pre-computation, browser detection) don't repeat on every `usePlugin()` call
 - `HashPlugin` wires together browser-env helpers with hash-specific URL logic — a class encapsulates the setup cleanly
 - Testability: `HashPlugin` can be instantiated directly with mock `Browser` and `PluginApi` objects
 - Lifecycle: the constructor registers the interceptor and extends the router via `api.extendRouter()`; `teardown` calls the returned unsubscribe to remove extensions
@@ -102,17 +103,13 @@ export function hashPluginFactory(opts?, browser?): PluginFactory {
   const options = { ...defaultOptions, ...opts };
   options.base = normalizeBase(options.base);
 
-  const regExpCache = createRegExpCache();
+  const prefixRegex = createHashPrefixRegex(options.hashPrefix);
   const resolvedBrowser =
     browser ??
     createSafeBrowser(
       () =>
         safelyEncodePath(
-          extractHashPath(
-            globalThis.location.hash,
-            options.hashPrefix,
-            regExpCache,
-          ),
+          extractHashPath(globalThis.location.hash, prefixRegex),
         ) + globalThis.location.search,
       "hash-plugin",
     );
@@ -126,7 +123,7 @@ export function hashPluginFactory(opts?, browser?): PluginFactory {
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
-      regExpCache,
+      prefixRegex,
       transitionOptions,
       shared,
     );
@@ -146,7 +143,7 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for details on
 
 - `hashPluginFactory(opts, browser)` accepts an optional `browser` argument for DI / testing
 - If not provided, `createSafeBrowser()` from `browser-env` is called once during factory creation
-- The `getLocation` callback passed to `createSafeBrowser` uses `extractHashPath(hash, hashPrefix, regExpCache)` + `safelyEncodePath()` — plugin-specific hash URL logic
+- The `getLocation` callback passed to `createSafeBrowser` uses `extractHashPath(hash, prefixRegex)` + `safelyEncodePath()` — plugin-specific hash URL logic
 - Tests pass a mock `Browser` object directly — no need to mock globals
 
 ## Start Interceptor Integration
@@ -208,10 +205,14 @@ TypeScript augmentation is type-level only. The actual methods are registered in
 
 ```typescript
 // plugin.ts, constructor
+const urlPrefix = `${options.base}#${options.hashPrefix}`;
+const pluginBuildUrl = (route: string, params?: Params) =>
+  urlPrefix + router.buildPath(route, params);
+
 this.#removeExtensions = api.extendRouter({
-  buildUrl: pluginBuildUrl, // buildPath() + base + "#" + hashPrefix + path
+  buildUrl: pluginBuildUrl, // pre-computed urlPrefix + buildPath()
   matchUrl: (url: string) => {
-    const path = hashUrlToPath(url, options.hashPrefix, regExpCache);
+    const path = hashUrlToPath(url, prefixRegex);
     return path ? api.matchPath(path) : undefined;
   },
   replaceHistoryState: createReplaceHistoryState(
@@ -302,7 +303,7 @@ router.navigate(name, params, opts)
         │     (from browser-env: replace ?? !fromState || reload && statesEqual)
         │
         ├── url = router.buildUrl(toState.name, toState.params)
-        │         └── router.buildPath() + base + "#" + hashPrefix + path
+        │         └── pre-computed urlPrefix + router.buildPath()
         │
         └── updateBrowserState(toState, url, shouldReplace, browser)
                   │
@@ -338,7 +339,8 @@ User clicks back or forward
         │
         ├── route found?
         │     YES: await router.navigate(route.name, route.params, transitionOptions)
-        │     NO:  await router.navigateToDefault({ ...transitionOptions, reload: true, replace: true })
+        │     NO + allowNotFound: router.navigateToNotFound(browser.getLocation())
+        │     NO + !allowNotFound: await router.navigateToDefault({ ...transitionOptions, reload: true, replace: true })
         │
         ├── catch (error):
         │     error instanceof RouterError? → ignore (CANNOT_DEACTIVATE, etc.)
@@ -366,56 +368,37 @@ See [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) for implementa
 
 Hash-specific URL functions. Unlike browser-plugin (which uses simple `String.slice`), hash-plugin needs regex for prefix stripping.
 
-**`extractHashPath(hash, hashPrefix, regExpCache)`**:
+**`createHashPrefixRegex(hashPrefix)`**:
+
+Pre-computes a `RegExp` for hash prefix stripping at factory creation time. Returns `null` when prefix is empty (uses simple `hash.slice(1)` instead).
+
+```typescript
+createHashPrefixRegex(""); // → null
+createHashPrefixRegex("!"); // → /^#\!/
+createHashPrefixRegex("."); // → /^#\./  (special chars escaped)
+```
+
+Internally calls `escapeRegExp(str)` — a private function that escapes regex-special characters in the hash prefix.
+
+**`extractHashPath(hash, prefixRegex)`**:
 
 ```
-Hash without prefix:
+Hash without prefix (prefixRegex = null):
   hash = "#/users/123"
-  hashPrefix = ""
   → hash.slice(1) = "/users/123"
 
-Hash with prefix:
+Hash with prefix (prefixRegex = /^#\!/):
   hash = "#!/users/123"
-  hashPrefix = "!"
-  → escapeRegExp("!") = "\\!"
   → hash.replace(/^#\\!/, "") = "/users/123"
 
 Empty hash:
   → "/"
 ```
 
-**`hashUrlToPath(url, hashPrefix, regExpCache)`**:
+**`hashUrlToPath(url, prefixRegex)`**:
 
 Delegates URL parsing to `safeParseUrl` from `browser-env` (validates protocol, handles errors).
 Returns `null` for invalid URLs — calling code handles `null` explicitly.
-
-**`escapeRegExp(str)`**:
-
-Escapes regex-special characters in `hashPrefix`. Results are cached in a module-level `Map`.
-
-### RegExp Caching
-
-```typescript
-// hash-utils.ts
-const escapeRegExpCache = new Map<string, string>(); // module-level singleton
-
-export function createRegExpCache(): RegExpCache {
-  const cache = new Map<string, RegExp>();
-  return {
-    get(pattern: string): RegExp {
-      // lazy RegExp creation by pattern
-    },
-  };
-}
-```
-
-Two levels of caching:
-
-1. `escapeRegExpCache` — module-level singleton, caches `escapeRegExp()` results. Hash prefix strings are escaped once for the lifetime of the module.
-2. `RegExpCache` — per-factory instance, created in `hashPluginFactory()`. Caches compiled `RegExp` objects by pattern. One `RegExp` per pattern — not recreated on every `extractHashPath()` call.
-
-**Why two caches?** `escapeRegExpCache` is global because string escaping doesn't depend on plugin configuration.
-`RegExpCache` is per-factory because patterns depend on the `hashPrefix` of a specific instance.
 
 ## Popstate Utilities, Error Recovery
 
@@ -485,9 +468,9 @@ base = ""
 
 buildUrl("users.profile", { id: "123" })
   → buildPath() = "/users/123"
-  → base + "#" + hashPrefix + path = "#!/users/123"
+  → urlPrefix + "/users/123" = "#!/users/123"   (urlPrefix = "" + "#" + "!" = "#!")
 
-extractHashPath("#!/users/123", "!", regExpCache)
+extractHashPath("#!/users/123", prefixRegex)   (prefixRegex = /^#\!/)
   → hash.replace(/^#\\!/, "") = "/users/123"
 ```
 
@@ -509,26 +492,26 @@ buildUrl("users.profile", { id: "123" })
 
 ## Performance
 
-| Optimization                           | Location        | Effect                                                |
-| -------------------------------------- | --------------- | ----------------------------------------------------- |
-| `escapeRegExpCache` (module-level Map) | `hash-utils.ts` | String escaping happens once per module lifetime      |
-| `RegExpCache` (per-factory Map)        | `hash-utils.ts` | RegExp compilation happens once per pattern           |
-| `isTransitioning` flag                 | `browser-env`   | Blocks concurrent popstate processing without a queue |
-| Last-write-wins for deferred events    | `browser-env`   | Intermediate states are skipped without accumulation  |
-| `historyState` as a subset of State    | `browser-env`   | Less data stored in `history.state`                   |
-| `createSafeBrowser()` called once      | `factory.ts`    | Environment check doesn't repeat                      |
+| Optimization                           | Location      | Effect                                                 |
+| -------------------------------------- | ------------- | ------------------------------------------------------ |
+| `createHashPrefixRegex` (pre-computed) | `factory.ts`  | RegExp compiled once at factory creation, not per call |
+| Pre-computed `urlPrefix`               | `plugin.ts`   | `buildUrl` is simple string concatenation              |
+| `isTransitioning` flag                 | `browser-env` | Blocks concurrent popstate processing without a queue  |
+| Last-write-wins for deferred events    | `browser-env` | Intermediate states are skipped without accumulation   |
+| `historyState` as a subset of State    | `browser-env` | Less data stored in `history.state`                    |
+| `createSafeBrowser()` called once      | `factory.ts`  | Environment check doesn't repeat                       |
 
 ## Differences from browser-plugin
 
-| Aspect             | browser-plugin                             | hash-plugin                             |
-| ------------------ | ------------------------------------------ | --------------------------------------- |
-| URL format         | `/app/users/123`                           | `#!/users/123`                          |
-| Path extraction    | `String.startsWith` + `slice`              | RegExp with cached `escapeRegExp`       |
-| Hash preservation  | Preserves hash when paths match            | N/A — hash IS the route                 |
-| RegExpCache        | Not needed                                 | Per-factory, caches compiled patterns   |
-| Server config      | Requires fallback (all paths → index.html) | No server config needed                 |
-| `buildUrl` formula | `base + path`                              | `base + "#" + hashPrefix + path`        |
-| Options            | `forceDeactivate`, `base`                  | `forceDeactivate`, `base`, `hashPrefix` |
+| Aspect             | browser-plugin                             | hash-plugin                                     |
+| ------------------ | ------------------------------------------ | ----------------------------------------------- |
+| URL format         | `/app/users/123`                           | `#!/users/123`                                  |
+| Path extraction    | `String.startsWith` + `slice`              | Pre-computed RegExp via `createHashPrefixRegex` |
+| Hash preservation  | Preserves hash when paths match            | N/A — hash IS the route                         |
+| Regex              | Not needed                                 | Pre-computed once at factory time               |
+| Server config      | Requires fallback (all paths → index.html) | No server config needed                         |
+| `buildUrl` formula | `base + path`                              | `urlPrefix + path` (pre-computed prefix)        |
+| Options            | `forceDeactivate`, `base`                  | `forceDeactivate`, `base`, `hashPrefix`         |
 
 ## Related Documents
 

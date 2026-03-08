@@ -147,7 +147,7 @@ describe("Hash Plugin — URL Operations", () => {
         });
       });
 
-      it("reuses cached regexp on repeated matchUrl calls", () => {
+      it("reuses pre-computed regexp on repeated matchUrl calls", () => {
         router.usePlugin(
           hashPluginFactory(
             { hashPrefix: "!" },

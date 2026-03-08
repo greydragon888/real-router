@@ -139,7 +139,7 @@ describe("router.start() - arguments validation", () => {
 
       expect(currentState).toBeDefined();
       expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(currentState?.params.path).toBe("/invalid/path");
+      expect(currentState?.path).toBe("/invalid/path");
     });
   });
 
@@ -216,7 +216,7 @@ describe("router.start() - arguments validation", () => {
 
       expect(state).toBeDefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(state?.params.path).toBe("/invalid/path");
+      expect(state?.path).toBe("/invalid/path");
     });
   });
 });

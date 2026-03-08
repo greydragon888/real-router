@@ -1,6 +1,6 @@
 import { createSafeBrowser, safelyEncodePath } from "browser-env";
 
-import { createRegExpCache, extractHashPath } from "../../src/hash-utils";
+import { createHashPrefixRegex, extractHashPath } from "../../src/hash-utils";
 
 import type { Browser } from "browser-env";
 
@@ -10,12 +10,11 @@ export function createMockedBrowser(
   onStateChange: OnStateChangeFn = () => {},
   hashPrefix = "",
 ): Browser {
-  const regExpCache = createRegExpCache();
+  const prefixRegex = createHashPrefixRegex(hashPrefix);
   const safeBrowser = createSafeBrowser(
     () =>
-      safelyEncodePath(
-        extractHashPath(globalThis.location.hash, hashPrefix, regExpCache),
-      ) + globalThis.location.search,
+      safelyEncodePath(extractHashPath(globalThis.location.hash, prefixRegex)) +
+      globalThis.location.search,
     "hash-plugin",
   );
 

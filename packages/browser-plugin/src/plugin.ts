@@ -69,6 +69,7 @@ export class BrowserPlugin {
       router,
       api,
       browser,
+      allowNotFound: api.getOptions().allowNotFound,
       transitionOptions,
       loggerContext: "browser-plugin",
       buildUrl: (name: string, params?: Params) =>

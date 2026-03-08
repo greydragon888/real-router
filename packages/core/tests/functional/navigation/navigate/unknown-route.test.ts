@@ -109,6 +109,78 @@ describe("router.navigate() - unknown route", () => {
       expect(middleware).toHaveBeenCalledTimes(1);
     });
 
+    it("should force replace: true when navigating FROM UNKNOWN_ROUTE", async () => {
+      const onTransitionSuccess = vi.fn();
+
+      const freshRouter = createRouter(
+        [{ name: "profile", path: "/profile" }],
+        { allowNotFound: true },
+      );
+
+      freshRouter.usePlugin(() => ({ onTransitionSuccess }));
+
+      await freshRouter.start("/unknown-path");
+
+      expect(freshRouter.getState()?.name).toBe(constants.UNKNOWN_ROUTE);
+
+      onTransitionSuccess.mockClear();
+
+      await freshRouter.navigate("profile");
+
+      expect(onTransitionSuccess).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "profile" }),
+        expect.objectContaining({ name: constants.UNKNOWN_ROUTE }),
+        expect.objectContaining({ replace: true }),
+      );
+    });
+
+    it("should force replace: true even when not explicitly passed", async () => {
+      const onTransitionSuccess = vi.fn();
+
+      const freshRouter = createRouter(
+        [{ name: "profile", path: "/profile" }],
+        { allowNotFound: true },
+      );
+
+      freshRouter.usePlugin(() => ({ onTransitionSuccess }));
+
+      await freshRouter.start("/unknown-path");
+
+      onTransitionSuccess.mockClear();
+
+      await freshRouter.navigate("profile", {}, {});
+
+      expect(onTransitionSuccess).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ replace: true }),
+      );
+    });
+
+    it("should NOT force replace when navigating from a normal route", async () => {
+      const onTransitionSuccess = vi.fn();
+
+      const freshRouter = createRouter(
+        [
+          { name: "home", path: "/home" },
+          { name: "profile", path: "/profile" },
+        ],
+        { allowNotFound: true },
+      );
+
+      freshRouter.usePlugin(() => ({ onTransitionSuccess }));
+
+      await freshRouter.start("/home");
+
+      onTransitionSuccess.mockClear();
+
+      await freshRouter.navigate("profile");
+
+      const navOpts = onTransitionSuccess.mock.calls[0][2];
+
+      expect(navOpts.replace).toBeUndefined();
+    });
+
     it("should handle blocked transitions from existing route when allowNotFound disabled", async () => {
       // Test without allowNotFound to see normal ROUTE_NOT_FOUND behavior
       const strictRouter = createRouter(

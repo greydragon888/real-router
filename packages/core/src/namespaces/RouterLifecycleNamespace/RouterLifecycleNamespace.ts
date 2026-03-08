@@ -6,13 +6,9 @@ import { RouterError } from "../../RouterError";
 import type { RouterLifecycleDependencies } from "./types";
 import type { NavigationOptions, State } from "@real-router/types";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CYCLIC DEPENDENCIES
-// ═══════════════════════════════════════════════════════════════════════════════
-// RouterLifecycle → Navigation.navigateToState() (for start transitions)
-//
-// Solution: functional references configured in Router.#setupDependencies()
-// ═══════════════════════════════════════════════════════════════════════════════
+const REPLACE_OPTS: NavigationOptions = { replace: true };
+
+Object.freeze(REPLACE_OPTS);
 
 /**
  * Independent namespace for managing router lifecycle.
@@ -21,17 +17,6 @@ import type { NavigationOptions, State } from "@real-router/types";
  * by RouterFSM in the facade (Router.ts).
  */
 export class RouterLifecycleNamespace {
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Functional references for cyclic dependencies
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Dependencies injected via setDependencies (replaces full router reference)
-  #navigateToState!: (
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ) => Promise<State>;
-
   #deps!: RouterLifecycleDependencies;
 
   // =========================================================================
@@ -55,20 +40,6 @@ export class RouterLifecycleNamespace {
   // =========================================================================
 
   /**
-   * Sets the navigateToState reference (cyclic dependency on NavigationNamespace).
-   * Must be called before using start().
-   */
-  setNavigateToState(
-    fn: (
-      toState: State,
-      fromState: State | undefined,
-      opts: NavigationOptions,
-    ) => Promise<State>,
-  ): void {
-    this.#navigateToState = fn;
-  }
-
-  /**
    * Sets dependencies for lifecycle operations.
    * Must be called before using lifecycle methods.
    */
@@ -90,10 +61,6 @@ export class RouterLifecycleNamespace {
     const deps = this.#deps;
     const options = deps.getOptions();
 
-    const startOptions: NavigationOptions = {
-      replace: true,
-    };
-
     const matchedState = deps.matchPath(startPath);
 
     if (!matchedState && !options.allowNotFound) {
@@ -108,25 +75,15 @@ export class RouterLifecycleNamespace {
 
     deps.completeStart();
 
-    let finalState: State;
-
     if (matchedState) {
-      finalState = await this.#navigateToState(
-        matchedState,
-        undefined,
-        startOptions,
-      );
-    } else {
-      const notFoundState = deps.makeNotFoundState(startPath);
-
-      finalState = await this.#navigateToState(
-        notFoundState,
-        undefined,
-        startOptions,
+      return deps.navigate(
+        matchedState.name,
+        matchedState.params,
+        REPLACE_OPTS,
       );
     }
 
-    return finalState;
+    return deps.navigateToNotFound(startPath);
   }
 
   /**

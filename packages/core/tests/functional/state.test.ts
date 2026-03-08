@@ -208,7 +208,7 @@ describe("core/stateBuilder", () => {
 
       expect(state?.name).toBe("@@router/UNKNOWN_ROUTE");
       expect(state?.path).toBe("/completely/unknown/path");
-      expect(state?.params).toStrictEqual({ path: "/completely/unknown/path" });
+      expect(state?.params).toStrictEqual({});
 
       freshRouter.stop();
     });

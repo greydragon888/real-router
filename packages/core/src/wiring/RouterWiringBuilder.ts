@@ -164,9 +164,13 @@ export class RouterWiringBuilder<
       emitTransitionError: (toState, fromState, error) => {
         this.eventBus.emitOrFailTransitionError(toState, fromState, error);
       },
+      emitTransitionSuccess: (toState, fromState, opts) => {
+        this.eventBus.emitTransitionSuccess(toState, fromState, opts);
+      },
     };
 
     this.navigation.setDependencies(navigationDeps);
+    this.navigation.setCanNavigate(() => this.eventBus.canBeginTransition());
 
     const transitionDeps: TransitionDependencies = {
       getLifecycleFunctions: () => this.routeLifecycle.getFunctions(),
@@ -183,7 +187,9 @@ export class RouterWiringBuilder<
   wireLifecycleDeps(): void {
     const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.options.get(),
-      makeNotFoundState: (path) => this.state.makeNotFoundState(path),
+      navigate: (name, params, opts) =>
+        this.navigation.navigate(name, params, opts),
+      navigateToNotFound: (path) => this.navigation.navigateToNotFound(path),
       clearState: () => {
         this.state.set(undefined);
       },
@@ -209,13 +215,5 @@ export class RouterWiringBuilder<
       },
       getUrlParams: (name) => this.routes.getUrlParams(name),
     });
-  }
-
-  wireCyclicDeps(): void {
-    this.navigation.setCanNavigate(() => this.eventBus.canBeginTransition());
-
-    this.lifecycle.setNavigateToState((toState, fromState, opts) =>
-      this.navigation.navigateToState(toState, fromState, opts),
-    );
   }
 }

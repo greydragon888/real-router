@@ -42,8 +42,10 @@ export const errorCodes: ErrorCodeToValueMap = Object.freeze({
  * General router constants.
  * Special route names and identifiers.
  */
+export const UNKNOWN_ROUTE = "@@router/UNKNOWN_ROUTE";
+
 export const constants: Constants = {
-  UNKNOWN_ROUTE: "@@router/UNKNOWN_ROUTE", // Special route for 404/not found states
+  UNKNOWN_ROUTE,
 };
 
 /**
