@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
 import { validateRouteName } from "type-guards";
 
-import { errorCodes } from "../constants";
+import { throwIfDisposed } from "./helpers";
 import { getInternals } from "../internals";
 import {
   clearConfigEntries,
@@ -25,7 +25,6 @@ import {
   validateUpdateRouteBasicArgs,
   validateUpdateRoutePropertyTypes,
 } from "../namespaces/RoutesNamespace/validators";
-import { RouterError } from "../RouterError";
 
 import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";
@@ -435,12 +434,6 @@ function getRouteConfig<
 // ============================================================================
 // API factory
 // ============================================================================
-
-function throwIfDisposed(isDisposed: () => boolean): void {
-  if (isDisposed()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
-  }
-}
 
 export function getRoutesApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,

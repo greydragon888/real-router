@@ -1,3 +1,4 @@
+import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
 import { validateListenerArgs } from "../namespaces/EventBusNamespace/validators";
@@ -11,12 +12,6 @@ import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
 import type { DefaultDependencies, Params, Router } from "@real-router/types";
-
-function throwIfDisposed(isDisposed: () => boolean): void {
-  if (isDisposed()) {
-    throw new RouterError(errorCodes.ROUTER_DISPOSED);
-  }
-}
 
 export function getPluginApi<
   Dependencies extends DefaultDependencies = DefaultDependencies,
