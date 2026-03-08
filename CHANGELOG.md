@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-08]
 
+### @real-router/core@0.35.1
+
+### Patch Changes
+
+- [#245](https://github.com/greydragon888/real-router/pull/245) [`5d00dd5`](https://github.com/greydragon888/real-router/commit/5d00dd52894687ac884a625a450e6c8ad8b989ff) Thanks [@greydragon888](https://github.com/greydragon888)! - Simplify error routing and consolidate namespace DI ([#244](https://github.com/greydragon888/real-router/issues/244))
+
+  Internal refactoring with no public API changes:
+  - Merge `sendTransitionBlocked` + `sendTransitionError` into single `sendTransitionFail`
+  - Apply `send*`/`emit*` naming convention to EventBusNamespace methods
+  - Eliminate `TransitionDependencies` interface, merge into `NavigationDependencies`
+  - Replace `setRouter()` + `getDependency` with `compileFactory` in RouteLifecycle and Plugins namespaces
+  - Extract `throwIfDisposed` to shared `api/helpers.ts`
+  - Move guard-checking loop from `Router.canNavigateTo()` to `RouteLifecycleNamespace.canNavigateTo()`
+  - Merge `resolveDefaultRoute` + `resolveDefaultParams` into `resolveDefault()`
+
+- [#245](https://github.com/greydragon888/real-router/pull/245) [`5d00dd5`](https://github.com/greydragon888/real-router/commit/5d00dd52894687ac884a625a450e6c8ad8b989ff) Thanks [@greydragon888](https://github.com/greydragon888)! - Abort in-flight transition when `navigateToNotFound()` is called ([#244](https://github.com/greydragon888/real-router/issues/244))
+
+  Previously, calling `navigateToNotFound()` during an active async transition left two concurrent state mutations racing against each other. Now `navigateToNotFound()` aborts the in-flight transition via `AbortController` and sends FSM CANCEL event before setting state.
+
+
 ### @real-router/core@0.35.0
 
 ### Minor Changes
