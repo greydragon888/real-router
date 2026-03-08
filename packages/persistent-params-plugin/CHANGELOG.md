@@ -1,5 +1,19 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.39
+
+### Patch Changes
+
+- [#248](https://github.com/greydragon888/real-router/pull/248) [`fec1640`](https://github.com/greydragon888/real-router/commit/fec16407675ed5d9062c507e4ec2c05d1f9bf353) Thanks [@greydragon888](https://github.com/greydragon888)! - Refactor internals to align with browser-plugin architecture ([#247](https://github.com/greydragon888/real-router/issues/247))
+  - Extract `LOGGER_CONTEXT` and `ERROR_PREFIX` into `constants.ts`
+  - Move initialization (param parsing, Set/freeze) from closure to factory level
+  - Move side effects (`setRootPath`, `addInterceptor`) from `getPlugin()` to constructor with rollback on partial failure
+  - Simplify teardown: remove global try/catch, wrap only `setRootPath` (throws during `router.dispose()`)
+  - Remove duplicate `extractOwnParams` call from `mergeParams`
+  - Add typed noop pattern (`EMPTY_PLUGIN`) for empty config
+  - Fix `export { PersistentParamsConfig }` → `export type { PersistentParamsConfig }`
+  - Add unit tests for `extractOwnParams` and `mergeParams`
+
 ## 0.1.38
 
 ### Patch Changes
