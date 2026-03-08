@@ -237,6 +237,8 @@ const state = await router.navigate(name, params, options)
 
 On error at any step: FSM sends `FAIL` → `emitTransitionError()`, Promise rejects with `RouterError`.
 
+**`navigateToNotFound()`** bypasses this pipeline entirely — sets state directly and emits only `TRANSITION_SUCCESS` (no guards, no AbortController, no `TRANSITION_START`). Always uses `replace: true`. Navigating away from UNKNOWN_ROUTE auto-forces `replace: true` to prevent history pollution.
+
 **Cancellation sources:** `signal.aborted` (external AbortController), concurrent navigation (aborts previous controller), `stop()`, `dispose()`. All checked via `isCancelled = () => signal.aborted || !deps.isActive()`.
 
 ### Navigation API
@@ -271,6 +273,9 @@ router.navigate("fast-route"); // Previous promise rejects with TRANSITION_CANCE
 const controller = new AbortController();
 router.navigate("route", {}, { signal: controller.signal });
 controller.abort(); // rejects with TRANSITION_CANCELLED
+
+// Synchronous not-found state (bypasses transition pipeline entirely)
+const state = router.navigateToNotFound("/unknown/path");
 
 // Permanent disposal (cannot restart)
 router.dispose();

@@ -56,6 +56,7 @@ const handler = createPopstateHandler({
   router,
   api,
   browser,
+  allowNotFound: api.getOptions().allowNotFound,
   transitionOptions: { source: "popstate", replace: true },
   loggerContext: "browser-plugin",
   buildUrl: (name, params) => router.buildUrl(name, params),
@@ -68,7 +69,10 @@ const handler = createPopstateHandler({
 popstate event
   ├── transition in progress? → defer event (keep only last)
   ├── valid history.state? → router.navigate(name, params)
-  ├── no state? → match URL → router.navigate() or navigateToDefault()
+  ├── no state? → match URL:
+  │     ├── route found → router.navigate()
+  │     ├── allowNotFound? → router.navigateToNotFound(browser.getLocation())
+  │     └── else → router.navigateToDefault()
   ├── RouterError? → ignore (expected: CANNOT_DEACTIVATE, etc.)
   └── other error? → replaceState to current route (recovery)
 ```
@@ -308,10 +312,11 @@ createSafeBrowser(getLocation, context)
 Browser back/forward
   → popstate event
     → handler (createPopstateHandler)
-      ├── isTransitioning? → defer (keep only last event)
+      ├── isTransitioning? → defer (keep only last)
       └── not transitioning:
             ├── getRouteFromEvent() → route found → router.navigate()
-            ├── no route → router.navigateToDefault()
+            ├── no route + allowNotFound → router.navigateToNotFound(browser.getLocation())
+            ├── no route + !allowNotFound → router.navigateToDefault()
             ├── RouterError → ignore (expected)
             └── other error → recoverFromCriticalError() → replaceState
           finally:
