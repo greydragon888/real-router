@@ -1,5 +1,6 @@
 // packages/persistent-params-plugin/src/plugin.ts
 
+import { ERROR_PREFIX } from "./constants";
 import { extractOwnParams, mergeParams } from "./param-utils";
 import { validateParamValue } from "./validation";
 
@@ -9,10 +10,10 @@ export class PersistentParamsPlugin {
   readonly #api: PluginApi;
   readonly #paramNamesSet: Set<string>;
   readonly #originalRootPath: string;
+  readonly #removeBuildPathInterceptor: () => void;
+  readonly #removeForwardStateInterceptor: () => void;
 
   #persistentParams: Readonly<Params>;
-  #removeBuildPathInterceptor: (() => void) | undefined;
-  #removeForwardStateInterceptor: (() => void) | undefined;
 
   constructor(
     api: PluginApi,
@@ -24,38 +25,46 @@ export class PersistentParamsPlugin {
     this.#persistentParams = persistentParams;
     this.#paramNamesSet = paramNamesSet;
     this.#originalRootPath = originalRootPath;
-  }
 
-  getPlugin(): Plugin {
+    let removeBuildPath: (() => void) | undefined;
+    let removeForwardState: (() => void) | undefined;
+
     try {
-      const queryString = [...this.#paramNamesSet].join("&");
+      api.setRootPath(`${originalRootPath}?${[...paramNamesSet].join("&")}`);
 
-      this.#api.setRootPath(`${this.#originalRootPath}?${queryString}`);
-    } /* v8 ignore start -- @preserve: defensive error wrapping for setRootPath failure */ catch (error) {
+      removeBuildPath = api.addInterceptor(
+        "buildPath",
+        (next, route, navParams) =>
+          next(route, this.#withPersistentParams(navParams ?? {})),
+      );
+
+      removeForwardState = api.addInterceptor(
+        "forwardState",
+        (next, routeName, routeParams) => {
+          const result = next(routeName, routeParams);
+
+          return {
+            ...result,
+            params: this.#withPersistentParams(result.params),
+          };
+        },
+      );
+    } /* v8 ignore start -- @preserve: rollback on partial initialization failure */ catch (error) {
+      removeBuildPath?.();
+      removeForwardState?.();
+      api.setRootPath(originalRootPath);
+
       throw new Error(
-        `[@real-router/persistent-params-plugin] Failed to update root path: ${error instanceof Error ? error.message : String(error)}`,
+        `${ERROR_PREFIX} Failed to initialize: ${error instanceof Error ? error.message : String(error)}`,
         { cause: error },
       );
     } /* v8 ignore stop */
 
-    this.#removeBuildPathInterceptor = this.#api.addInterceptor(
-      "buildPath",
-      (next, route, navParams) =>
-        next(route, this.#withPersistentParams(navParams ?? {})),
-    );
+    this.#removeBuildPathInterceptor = removeBuildPath;
+    this.#removeForwardStateInterceptor = removeForwardState;
+  }
 
-    this.#removeForwardStateInterceptor = this.#api.addInterceptor(
-      "forwardState",
-      (next, routeName, routeParams) => {
-        const result = next(routeName, routeParams);
-
-        return {
-          ...result,
-          params: this.#withPersistentParams(result.params),
-        };
-      },
-    );
-
+  getPlugin(): Plugin {
     return {
       onTransitionSuccess: (toState) => {
         this.#onTransitionSuccess(toState);
@@ -122,16 +131,17 @@ export class PersistentParamsPlugin {
   }
 
   #teardown(): void {
+    this.#removeBuildPathInterceptor();
+    this.#removeForwardStateInterceptor();
+
+    /* v8 ignore start -- @preserve: setRootPath throws RouterError(ROUTER_DISPOSED) during router.dispose() */
     try {
-      this.#removeBuildPathInterceptor?.();
-      this.#removeForwardStateInterceptor?.();
       this.#api.setRootPath(this.#originalRootPath);
-    } /* v8 ignore start -- @preserve: defensive error logging for teardown failure */ catch (error) {
-      console.error(
-        "persistent-params-plugin",
-        "Error during teardown:",
-        error,
-      );
-    } /* v8 ignore stop */
+    } catch {
+      // Expected during router.dispose(): FSM enters DISPOSED before plugin teardown,
+      // so setRootPath's throwIfDisposed() check throws. Restoring rootPath on a
+      // destroyed router is unnecessary — swallow silently.
+    }
+    /* v8 ignore stop */
   }
 }
