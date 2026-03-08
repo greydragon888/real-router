@@ -6,7 +6,7 @@ import {
 } from "browser-env";
 
 import { defaultOptions, source } from "./constants";
-import { createRegExpCache, extractHashPath } from "./hash-utils";
+import { createHashPrefixRegex, extractHashPath } from "./hash-utils";
 import { HashPlugin } from "./plugin";
 import { validateOptions } from "./validation";
 
@@ -24,17 +24,13 @@ export function hashPluginFactory(
 
   options.base = normalizeBase(options.base);
 
-  const regExpCache = createRegExpCache();
+  const prefixRegex = createHashPrefixRegex(options.hashPrefix);
   const resolvedBrowser =
     browser ??
     createSafeBrowser(
       () =>
         safelyEncodePath(
-          extractHashPath(
-            globalThis.location.hash,
-            options.hashPrefix,
-            regExpCache,
-          ),
+          extractHashPath(globalThis.location.hash, prefixRegex),
         ) + globalThis.location.search,
       "hash-plugin",
     );
@@ -53,7 +49,7 @@ export function hashPluginFactory(
       getPluginApi(routerBase),
       options,
       resolvedBrowser,
-      regExpCache,
+      prefixRegex,
       transitionOptions,
       shared,
     );

@@ -9,7 +9,6 @@ import {
 
 import { hashUrlToPath } from "./hash-utils";
 
-import type { RegExpCache } from "./hash-utils";
 import type { HashPluginOptions } from "./types";
 import type {
   NavigationOptions,
@@ -33,7 +32,7 @@ export class HashPlugin {
     api: PluginApi,
     options: Required<HashPluginOptions>,
     browser: Browser,
-    regExpCache: RegExpCache,
+    prefixRegex: RegExp | null,
     transitionOptions: {
       source: string;
       replace: true;
@@ -46,16 +45,14 @@ export class HashPlugin {
 
     this.#removeStartInterceptor = createStartInterceptor(api, browser);
 
-    const pluginBuildUrl = (route: string, params?: Params) => {
-      const path = router.buildPath(route, params);
-
-      return `${options.base}#${options.hashPrefix}${path}`;
-    };
+    const urlPrefix = `${options.base}#${options.hashPrefix}`;
+    const pluginBuildUrl = (route: string, params?: Params) =>
+      urlPrefix + router.buildPath(route, params);
 
     this.#removeExtensions = api.extendRouter({
       buildUrl: pluginBuildUrl,
       matchUrl: (url: string) => {
-        const path = hashUrlToPath(url, options.hashPrefix, regExpCache);
+        const path = hashUrlToPath(url, prefixRegex);
 
         return path ? api.matchPath(path) : undefined;
       },
