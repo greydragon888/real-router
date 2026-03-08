@@ -1,5 +1,24 @@
 # @real-router/logger-plugin
 
+## 0.3.0
+
+### Minor Changes
+
+- [#251](https://github.com/greydragon888/real-router/pull/251) [`7ec0fdf`](https://github.com/greydragon888/real-router/commit/7ec0fdfbf3d815c4fafe9599c70d8ffa7d54c4e7) Thanks [@greydragon888](https://github.com/greydragon888)! - Align logger-plugin with plugin architecture conventions ([#250](https://github.com/greydragon888/real-router/issues/250))
+
+  **BREAKING CHANGE:** Removed `loggerPlugin` singleton export. Use `loggerPluginFactory()` instead.
+
+  **Migration:**
+
+  ```diff
+  - import { loggerPlugin } from "@real-router/logger-plugin";
+  - router.usePlugin(loggerPlugin);
+  + import { loggerPluginFactory } from "@real-router/logger-plugin";
+  + router.usePlugin(loggerPluginFactory());
+  ```
+
+  Internal changes: converted closure to `LoggerPlugin` class with `getPlugin()` pattern, extracted factory.ts, added options validation, added LOGGER_CONTEXT/ERROR_PREFIX constants, fixed stale path comments.
+
 ## 0.2.39
 
 ### Patch Changes
