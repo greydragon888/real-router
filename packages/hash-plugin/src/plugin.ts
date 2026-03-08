@@ -71,6 +71,7 @@ export class HashPlugin {
       router,
       api,
       browser,
+      allowNotFound: api.getOptions().allowNotFound,
       transitionOptions,
       loggerContext: "hash-plugin",
       buildUrl: (name: string, params?: Params) =>

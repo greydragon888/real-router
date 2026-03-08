@@ -10,6 +10,7 @@ import {
 } from "./validators";
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
+import { nameToIDs } from "../../transitionPath";
 import { resolveOption } from "../OptionsNamespace";
 
 import type {
@@ -23,6 +24,13 @@ import type {
   State,
   TransitionMeta,
 } from "@real-router/types";
+
+const FROZEN_ACTIVATED: string[] = [constants.UNKNOWN_ROUTE];
+
+Object.freeze(FROZEN_ACTIVATED);
+const FROZEN_REPLACE_OPTS: NavigationOptions = { replace: true };
+
+Object.freeze(FROZEN_REPLACE_OPTS);
 
 /**
  * Independent namespace for managing navigation.
@@ -277,9 +285,46 @@ export class NavigationNamespace {
     return this.navigate(resolvedRoute, resolvedParams, opts);
   }
 
-  /**
-   * Aborts the current in-flight navigation, if any.
-   */
+  navigateToNotFound(path: string): State {
+    const fromState = this.#deps.getState();
+    const deactivated: string[] = fromState
+      ? nameToIDs(fromState.name).toReversed()
+      : [];
+
+    Object.freeze(deactivated);
+
+    const segments: TransitionMeta["segments"] = {
+      deactivated,
+      activated: FROZEN_ACTIVATED,
+      intersection: "",
+    };
+
+    Object.freeze(segments);
+
+    const transitionMeta: TransitionMeta = {
+      phase: "activating",
+      ...(fromState && { from: fromState.name }),
+      reason: "success",
+      segments,
+    };
+
+    Object.freeze(transitionMeta);
+
+    const state: State = {
+      name: constants.UNKNOWN_ROUTE,
+      params: {} as Params,
+      path,
+      transition: transitionMeta,
+    };
+
+    Object.freeze(state);
+
+    this.#deps.setState(state);
+    this.#deps.emitTransitionSuccess(state, fromState, FROZEN_REPLACE_OPTS);
+
+    return state;
+  }
+
   abortCurrentNavigation(): void {
     this.#currentController?.abort(
       new RouterError(errorCodes.TRANSITION_CANCELLED),

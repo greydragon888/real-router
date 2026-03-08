@@ -164,6 +164,9 @@ export class RouterWiringBuilder<
       emitTransitionError: (toState, fromState, error) => {
         this.eventBus.emitOrFailTransitionError(toState, fromState, error);
       },
+      emitTransitionSuccess: (toState, fromState, opts) => {
+        this.eventBus.emitTransitionSuccess(toState, fromState, opts);
+      },
     };
 
     this.navigation.setDependencies(navigationDeps);
@@ -183,7 +186,7 @@ export class RouterWiringBuilder<
   wireLifecycleDeps(): void {
     const lifecycleDeps: RouterLifecycleDependencies = {
       getOptions: () => this.options.get(),
-      makeNotFoundState: (path) => this.state.makeNotFoundState(path),
+      navigateToNotFound: (path) => this.navigation.navigateToNotFound(path),
       clearState: () => {
         this.state.set(undefined);
       },

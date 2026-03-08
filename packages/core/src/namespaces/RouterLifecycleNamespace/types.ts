@@ -4,7 +4,7 @@ import type { Options, Params, State } from "@real-router/types";
 
 export interface RouterLifecycleDependencies {
   getOptions: () => Options;
-  makeNotFoundState: (path: string) => State;
+  navigateToNotFound: (path: string) => State;
   clearState: () => void;
   matchPath: <P extends Params = Params, MP extends Params = Params>(
     path: string,

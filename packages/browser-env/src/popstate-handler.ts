@@ -9,6 +9,7 @@ export interface PopstateHandlerDeps {
   router: Router;
   api: PluginApi;
   browser: Browser;
+  allowNotFound: boolean;
   transitionOptions: {
     source: string;
     replace: true;
@@ -74,13 +75,14 @@ export function createPopstateHandler(
     try {
       const route = getRouteFromEvent(evt, deps.api, deps.browser);
 
-      // eslint-disable-next-line unicorn/prefer-ternary
       if (route) {
         await deps.router.navigate(
           route.name,
           route.params,
           deps.transitionOptions,
         );
+      } else if (deps.allowNotFound) {
+        deps.router.navigateToNotFound(deps.browser.getLocation());
       } else {
         await deps.router.navigateToDefault({
           ...deps.transitionOptions,

@@ -290,6 +290,8 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
   ) => Promise<State>;
 
   navigateToDefault: (options?: NavigationOptions) => Promise<State>;
+
+  navigateToNotFound: (path?: string) => State;
 }
 
 // =============================================================================

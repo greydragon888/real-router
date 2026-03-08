@@ -176,7 +176,7 @@ describe("router.start() - path string scenarios", () => {
       const currentState = router.getState();
 
       expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(currentState?.params.path).toBe("/invalid/path");
+      expect(currentState?.path).toBe("/invalid/path");
     });
 
     it("should successfully transition to not found state", async () => {
@@ -197,12 +197,12 @@ describe("router.start() - path string scenarios", () => {
       expect(transitionSuccessListener).toHaveBeenCalledTimes(1);
       expect(state).toBeDefined();
       expect(state?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(state?.params.path).toBe("/some/invalid/path");
+      expect(state?.path).toBe("/some/invalid/path");
 
       const currentState = router.getState();
 
       expect(currentState?.name).toBe(constants.UNKNOWN_ROUTE);
-      expect(currentState?.params.path).toBe("/some/invalid/path");
+      expect(currentState?.path).toBe("/some/invalid/path");
     });
 
     it("should prefer allowNotFound over defaultRoute when both are set", async () => {

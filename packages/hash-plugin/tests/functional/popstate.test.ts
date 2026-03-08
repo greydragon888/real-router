@@ -76,13 +76,35 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
       expect(router.getState()?.name).toBe("home");
     });
 
-    it("navigates to default when hash does not match any route", async () => {
+    it("navigates to not found when allowNotFound is true and hash does not match any route", async () => {
       globalThis.history.replaceState({}, "", "/#/nonexistent");
-      const navigateSpy = vi.spyOn(router, "navigateToDefault");
+      const navigateSpy = vi.spyOn(router, "navigateToNotFound");
 
       globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
 
       expect(navigateSpy).toHaveBeenCalled();
+    });
+
+    it("navigates to default when allowNotFound is false and hash does not match any route", async () => {
+      router.stop();
+
+      const restrictedRouter = createRouter(routerConfig, {
+        defaultRoute: "home",
+        queryParamsMode: "default",
+        allowNotFound: false,
+      });
+
+      restrictedRouter.usePlugin(hashPluginFactory({}, mockedBrowser));
+      await restrictedRouter.start();
+
+      globalThis.history.replaceState({}, "", "/#/nonexistent");
+      const navigateSpy = vi.spyOn(restrictedRouter, "navigateToDefault");
+
+      globalThis.dispatchEvent(new PopStateEvent("popstate", { state: null }));
+
+      expect(navigateSpy).toHaveBeenCalled();
+
+      restrictedRouter.stop();
     });
 
     it("skips transition for equal states (RouterError is silenced)", async () => {
@@ -347,7 +369,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
   });
 
   describe("Popstate edge cases", () => {
-    it("handles null state when no route matches and no default route", async () => {
+    it("navigates to not found when no route matches and allowNotFound is true", async () => {
       const noDefaultRouter = createRouter(
         [{ name: "home", path: "/home" }],
         {},
@@ -362,7 +384,7 @@ describe("Hash Plugin — Popstate & Error Recovery", async () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      expect(noDefaultRouter.getState()?.name).toBe("home");
+      expect(noDefaultRouter.getState()?.name).toBe("@@router/UNKNOWN_ROUTE");
 
       noDefaultRouter.stop();
     });

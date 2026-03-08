@@ -108,25 +108,11 @@ export class RouterLifecycleNamespace {
 
     deps.completeStart();
 
-    let finalState: State;
-
     if (matchedState) {
-      finalState = await this.#navigateToState(
-        matchedState,
-        undefined,
-        startOptions,
-      );
-    } else {
-      const notFoundState = deps.makeNotFoundState(startPath);
-
-      finalState = await this.#navigateToState(
-        notFoundState,
-        undefined,
-        startOptions,
-      );
+      return this.#navigateToState(matchedState, undefined, startOptions);
     }
 
-    return finalState;
+    return deps.navigateToNotFound(startPath);
   }
 
   /**
