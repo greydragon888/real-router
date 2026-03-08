@@ -58,11 +58,8 @@ export interface NavigationDependencies {
     ignoreQueryParams?: boolean,
   ) => boolean;
 
-  /** Resolve defaultRoute option (static value or callback) */
-  resolveDefaultRoute: () => string;
-
-  /** Resolve defaultParams option (static value or callback) */
-  resolveDefaultParams: () => Params;
+  /** Resolve defaultRoute and defaultParams options (static value or callback) */
+  resolveDefault: () => { route: string; params: Params };
 
   /** Start transition and send NAVIGATE event to routerFSM */
   startTransition: (toState: State, fromState: State | undefined) => void;

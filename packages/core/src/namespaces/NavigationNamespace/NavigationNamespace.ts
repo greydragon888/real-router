@@ -181,17 +181,7 @@ export class NavigationNamespace {
       throw err;
     }
 
-    if (deps.isTransitioning()) {
-      logger.warn(
-        "router.navigate",
-        "Concurrent navigation detected on shared router instance. " +
-          "For SSR, use cloneRouter() to create isolated instance per request.",
-      );
-      this.#currentController?.abort(
-        new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
-      deps.cancelNavigation();
-    }
+    this.#abortPreviousNavigation();
 
     const controller = new AbortController();
 
@@ -280,26 +270,19 @@ export class NavigationNamespace {
       });
     }
 
-    const resolvedRoute = deps.resolveDefaultRoute();
+    const { route, params } = deps.resolveDefault();
 
-    if (!resolvedRoute) {
+    if (!route) {
       throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
         routeName: "defaultRoute resolved to empty",
       });
     }
 
-    const resolvedParams = deps.resolveDefaultParams();
-
-    return this.navigate(resolvedRoute, resolvedParams, opts);
+    return this.navigate(route, params, opts);
   }
 
   navigateToNotFound(path: string): State {
-    if (this.#deps.isTransitioning()) {
-      this.#currentController?.abort(
-        new RouterError(errorCodes.TRANSITION_CANCELLED),
-      );
-      this.#deps.cancelNavigation();
-    }
+    this.#abortPreviousNavigation();
 
     const fromState = this.#deps.getState();
     const deactivated: string[] = fromState
@@ -345,5 +328,19 @@ export class NavigationNamespace {
       new RouterError(errorCodes.TRANSITION_CANCELLED),
     );
     this.#currentController = null;
+  }
+
+  #abortPreviousNavigation(): void {
+    if (this.#deps.isTransitioning()) {
+      logger.warn(
+        "router.navigate",
+        "Concurrent navigation detected on shared router instance. " +
+          "For SSR, use cloneRouter() to create isolated instance per request.",
+      );
+      this.#currentController?.abort(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
+      this.#deps.cancelNavigation();
+    }
   }
 }

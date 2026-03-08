@@ -111,6 +111,14 @@ export class EventBusNamespace {
     this.#currentToState = undefined;
   }
 
+  sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
+    if (this.isReady()) {
+      this.sendFail(toState, fromState, error);
+    } else {
+      this.emitTransitionError(toState, fromState, error as RouterError);
+    }
+  }
+
   sendCancel(toState: State, fromState?: State): void {
     this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
     this.#currentToState = undefined;

@@ -11,7 +11,6 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
-import type { RouterError } from "../RouterError";
 import type { DefaultDependencies, Params } from "@real-router/types";
 
 export class RouterWiringBuilder<
@@ -56,12 +55,7 @@ export class RouterWiringBuilder<
 
   wireRouteLifecycleDeps(): void {
     const routeLifecycleDeps: RouteLifecycleDependencies<Dependencies> = {
-      compileFactory: (factory) =>
-        factory(
-          this.router,
-          <K extends keyof Dependencies>(name: K) =>
-            this.dependenciesStore.dependencies[name] as Dependencies[K],
-        ),
+      compileFactory: this.createCompileFactory(),
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
@@ -102,12 +96,7 @@ export class RouterWiringBuilder<
       addEventListener: (eventName, cb) =>
         this.eventBus.addEventListener(eventName, cb),
       canNavigate: () => this.eventBus.canBeginTransition(),
-      compileFactory: (factory) =>
-        factory(
-          this.router,
-          <K extends keyof Dependencies>(name: K) =>
-            this.dependenciesStore.dependencies[name] as Dependencies[K],
-        ),
+      compileFactory: this.createCompileFactory(),
     };
 
     this.plugins.setDependencies(pluginsDeps);
@@ -144,24 +133,22 @@ export class RouterWiringBuilder<
       },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
-      resolveDefaultRoute: () => {
+      resolveDefault: () => {
         const options = this.options.get();
 
-        return resolveOption(
-          options.defaultRoute,
-          (name: string) =>
-            this.dependenciesStore.dependencies[name as keyof Dependencies],
-        );
-      },
-      resolveDefaultParams: () => {
-        const options = this.options.get();
-
-        return resolveOption(
-          options.defaultParams,
-          /* v8 ignore next -- @preserve: identical to resolveDefaultRoute callback above; unreachable unless defaultParams is a callback that calls getDependency */
-          (name: string) =>
-            this.dependenciesStore.dependencies[name as keyof Dependencies],
-        );
+        return {
+          route: resolveOption(
+            options.defaultRoute,
+            (name: string) =>
+              this.dependenciesStore.dependencies[name as keyof Dependencies],
+          ),
+          params: resolveOption(
+            options.defaultParams,
+            /* v8 ignore next -- @preserve: unreachable unless defaultParams is a callback that calls getDependency */
+            (name: string) =>
+              this.dependenciesStore.dependencies[name as keyof Dependencies],
+          ),
+        };
       },
       startTransition: (toState, fromState) => {
         this.eventBus.sendNavigate(toState, fromState);
@@ -179,15 +166,7 @@ export class RouterWiringBuilder<
         this.eventBus.sendFail(toState, fromState, error);
       },
       emitTransitionError: (toState, fromState, error) => {
-        if (this.eventBus.isReady()) {
-          this.eventBus.sendFail(toState, fromState, error);
-        } else {
-          this.eventBus.emitTransitionError(
-            toState,
-            fromState,
-            error as RouterError,
-          );
-        }
+        this.eventBus.sendFailSafe(toState, fromState, error);
       },
       emitTransitionSuccess: (toState, fromState, opts) => {
         this.eventBus.emitTransitionSuccess(toState, fromState, opts);
@@ -235,5 +214,23 @@ export class RouterWiringBuilder<
       },
       getUrlParams: (name) => this.routes.getUrlParams(name),
     });
+  }
+
+  private createCompileFactory() {
+    const { router, dependenciesStore } = this;
+
+    return <T>(
+      factory: (
+        router: WiringOptions<Dependencies>["router"],
+        getDependency: <K extends keyof Dependencies>(
+          name: K,
+        ) => Dependencies[K],
+      ) => T,
+    ): T =>
+      factory(
+        router,
+        <K extends keyof Dependencies>(name: K) =>
+          dependenciesStore.dependencies[name] as Dependencies[K],
+      );
   }
 }
