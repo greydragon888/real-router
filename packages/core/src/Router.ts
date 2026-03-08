@@ -504,31 +504,12 @@ export class Router<
 
     const { toDeactivate, toActivate } = getTransitionPath(toState, fromState);
 
-    for (const segment of toDeactivate) {
-      if (
-        !this.#routeLifecycle.checkDeactivateGuardSync(
-          segment,
-          toState,
-          fromState,
-        )
-      ) {
-        return false;
-      }
-    }
-
-    for (const segment of toActivate) {
-      if (
-        !this.#routeLifecycle.checkActivateGuardSync(
-          segment,
-          toState,
-          fromState,
-        )
-      ) {
-        return false;
-      }
-    }
-
-    return true;
+    return this.#routeLifecycle.canNavigateTo(
+      toDeactivate,
+      toActivate,
+      toState,
+      fromState,
+    );
   }
 
   // ============================================================================

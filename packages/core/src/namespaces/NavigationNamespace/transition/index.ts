@@ -5,11 +5,14 @@ import { constants, errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
 import { getTransitionPath } from "../../../transitionPath";
 
-import type { TransitionDependencies, TransitionOutput } from "../types";
+import type { NavigationDependencies, TransitionOutput } from "../types";
 import type { NavigationOptions, State } from "@real-router/types";
 
 export async function transition(
-  deps: TransitionDependencies,
+  deps: Pick<
+    NavigationDependencies,
+    "getLifecycleFunctions" | "isActive" | "clearCanDeactivate"
+  >,
   toState: State,
   fromState: State | undefined,
   opts: NavigationOptions,

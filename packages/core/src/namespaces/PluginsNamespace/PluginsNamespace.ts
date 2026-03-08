@@ -12,7 +12,6 @@ import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
 import type { PluginsDependencies } from "./types";
-import type { Router } from "../../Router";
 import type { Limits, PluginFactory } from "../../types";
 import type {
   DefaultDependencies,
@@ -32,7 +31,6 @@ export class PluginsNamespace<
   readonly #plugins = new Set<PluginFactory<Dependencies>>();
   readonly #unsubscribes = new Set<Unsubscribe>();
 
-  #router!: Router<Dependencies>;
   #deps!: PluginsDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
 
@@ -76,10 +74,6 @@ export class PluginsNamespace<
   // =========================================================================
   // Dependency injection
   // =========================================================================
-
-  setRouter(router: Router<Dependencies>): void {
-    this.#router = router;
-  }
 
   setDependencies(deps: PluginsDependencies<Dependencies>): void {
     this.#deps = deps;
@@ -289,9 +283,7 @@ export class PluginsNamespace<
   }
 
   #startPlugin(pluginFactory: PluginFactory<Dependencies>): Unsubscribe {
-    // Bind getDependency to preserve 'this' context when called from factory
-    // Plugin factories receive full router as part of their public API
-    const appliedPlugin = pluginFactory(this.#router, this.#deps.getDependency);
+    const appliedPlugin = this.#deps.compileFactory(pluginFactory);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
 
