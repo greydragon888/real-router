@@ -325,7 +325,7 @@ export function getRoutesApi(router: Router): RoutesApi {
 
 ### Wiring System (Builder + Director)
 
-Namespaces have circular dependencies (e.g., `NavigationNamespace` needs `EventBusNamespace`, `RouterLifecycleNamespace` needs `NavigationNamespace`). Resolved via **setter injection** in a fixed order:
+Namespaces have linear dependencies (e.g., `RouterLifecycleNamespace` → `NavigationNamespace` → `EventBusNamespace`). They are constructed independently, then wired via **setter injection** in a fixed order:
 
 ```typescript
 // wireRouter.ts — Director
@@ -490,6 +490,25 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
            ▼
   Promise resolves with finalState
 ```
+
+### Error Routing in navigate()
+
+Errors during navigation are routed through two different paths depending on FSM state:
+
+| Path            | Method                                          | When                                                             | Effect                                   |
+| --------------- | ----------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------- |
+| **Via FSM**     | `sendTransitionFail` → `fsm.send(FAIL)`         | FSM is in READY or TRANSITIONING                                 | FSM transitions → action emits `$$error` |
+| **Direct emit** | `emitTransitionError` → `emitter.emit($$error)` | Error before FSM transition (e.g., ROUTE_NOT_FOUND, SAME_STATES) | Emits directly, FSM state unchanged      |
+
+`EventBusNamespace.emitOrFailTransitionError()` encapsulates this branching: if FSM is in READY state, it sends through FSM (`fsm.send(FAIL)`); if TRANSITIONING, it emits directly to avoid disturbing the ongoing transition. This method is used for errors that occur before `startTransition()` (e.g., route not found, same states).
+
+Inside the transition pipeline (after `startTransition()`), errors are routed by `routeTransitionError()`:
+
+- `TRANSITION_CANCELLED`, `ROUTE_NOT_FOUND` → already handled (FSM received CANCEL), no additional routing
+- `CANNOT_ACTIVATE`, `CANNOT_DEACTIVATE` → `sendTransitionBlocked` → `fsm.send(FAIL)`
+- Other errors → `sendTransitionError` → `fsm.send(FAIL)`
+
+**Note:** `sendTransitionBlocked` and `sendTransitionError` currently both call `eventBus.failTransition()` — the semantic distinction exists only in names.
 
 ### navigateToNotFound() — Pipeline Bypass
 

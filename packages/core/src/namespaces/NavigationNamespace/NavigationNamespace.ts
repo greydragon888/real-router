@@ -333,6 +333,13 @@ export class NavigationNamespace {
   }
 
   navigateToNotFound(path: string): State {
+    if (this.#transitionDeps.isTransitioning()) {
+      this.#currentController?.abort(
+        new RouterError(errorCodes.TRANSITION_CANCELLED),
+      );
+      this.#deps.cancelNavigation();
+    }
+
     const fromState = this.#deps.getState();
     const deactivated: string[] = fromState
       ? nameToIDs(fromState.name).toReversed()
