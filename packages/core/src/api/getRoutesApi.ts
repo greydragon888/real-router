@@ -28,9 +28,8 @@ import {
 
 import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";
-import type { RouteLifecycleNamespace } from "../namespaces/RouteLifecycleNamespace";
-import type { RoutesStore } from "../namespaces/RoutesNamespace/routesStore";
-import type { RouteConfig } from "../namespaces/RoutesNamespace/types";
+import type { RouteLifecycleNamespace, RouteConfig } from "../namespaces";
+import type { RoutesStore } from "../namespaces/RoutesNamespace";
 import type { GuardFnFactory, Route } from "../types";
 import type {
   DefaultDependencies,

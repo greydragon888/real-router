@@ -13,7 +13,7 @@ import {
 } from "../namespaces/DependenciesNamespace/validators";
 
 import type { DependenciesApi } from "./types";
-import type { DependenciesStore } from "../namespaces/DependenciesNamespace/dependenciesStore";
+import type { DependenciesStore } from "../namespaces";
 import type { DefaultDependencies, Router } from "@real-router/types";
 
 // =============================================================================
