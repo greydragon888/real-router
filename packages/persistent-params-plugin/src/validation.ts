@@ -2,6 +2,8 @@
 
 import { isPrimitiveValue } from "type-guards";
 
+import { ERROR_PREFIX } from "./constants";
+
 import type { PersistentParamsConfig } from "./types";
 
 const INVALID_PARAM_KEY_REGEX = /[\s#%&/=?\\]/;
@@ -10,7 +12,7 @@ const INVALID_CHARS_MESSAGE = String.raw`Cannot contain: = & ? # % / \ or whites
 export function validateParamKey(key: string): void {
   if (INVALID_PARAM_KEY_REGEX.test(key)) {
     throw new TypeError(
-      `[@real-router/persistent-params-plugin] Invalid parameter name "${key}". ${INVALID_CHARS_MESSAGE}`,
+      `${ERROR_PREFIX} Invalid parameter name "${key}". ${INVALID_CHARS_MESSAGE}`,
     );
   }
 }
@@ -86,7 +88,7 @@ export function isValidParamsConfig(
 export function validateParamValue(key: string, value: unknown): void {
   if (value === null) {
     throw new TypeError(
-      `[@real-router/persistent-params-plugin] Parameter "${key}" cannot be null. ` +
+      `${ERROR_PREFIX} Parameter "${key}" cannot be null. ` +
         `Use undefined to remove the parameter from persistence.`,
     );
   }
@@ -95,7 +97,7 @@ export function validateParamValue(key: string, value: unknown): void {
     const actualType = Array.isArray(value) ? "array" : typeof value;
 
     throw new TypeError(
-      `[@real-router/persistent-params-plugin] Parameter "${key}" must be a primitive value ` +
+      `${ERROR_PREFIX} Parameter "${key}" must be a primitive value ` +
         `(string, number, or boolean), got ${actualType}. ` +
         `Objects and arrays are not supported in URL parameters.`,
     );
@@ -121,7 +123,7 @@ export function validateConfig(params: unknown): void {
     }
 
     throw new TypeError(
-      `[@real-router/persistent-params-plugin] Invalid params configuration. ` +
+      `${ERROR_PREFIX} Invalid params configuration. ` +
         `Expected array of non-empty strings or object with primitive values, got ${actualType}.`,
     );
   }

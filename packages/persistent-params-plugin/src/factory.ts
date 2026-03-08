@@ -1,4 +1,4 @@
-// packages/persistent-params-plugin/modules/factory.ts
+// packages/persistent-params-plugin/src/factory.ts
 
 import { getPluginApi } from "@real-router/core";
 
@@ -8,7 +8,9 @@ import { validateConfig } from "./validation";
 import type { PersistentParamsConfig } from "./types";
 import type { Params, PluginFactory, Plugin } from "@real-router/core";
 
-const noop = () => ({});
+// Shared singleton — frozen by core on first use. Do not add properties.
+const EMPTY_PLUGIN: Plugin = {};
+const noop: PluginFactory = () => EMPTY_PLUGIN;
 
 /**
  * Factory for the persistent parameters' plugin.
@@ -62,43 +64,33 @@ export function persistentParamsPluginFactory(
 ): PluginFactory {
   validateConfig(params);
 
-  // Empty configuration - valid but does nothing
-  if (Array.isArray(params) && params.length === 0) {
+  const paramNames = Array.isArray(params) ? params : Object.keys(params);
+
+  if (paramNames.length === 0) {
     return noop;
   }
 
-  if (!Array.isArray(params) && Object.keys(params).length === 0) {
-    return noop;
+  const initialParams: Params = {};
+
+  if (Array.isArray(params)) {
+    for (const param of params) {
+      initialParams[param] = undefined;
+    }
+  } else {
+    Object.assign(initialParams, params);
   }
+
+  Object.freeze(initialParams);
+
+  const paramNamesSet = new Set<string>(paramNames);
 
   return (router): Plugin => {
-    // Initialize frozen persistent parameters
-    let persistentParams: Readonly<Params>;
-
-    if (Array.isArray(params)) {
-      const initial: Params = {};
-
-      for (const param of params) {
-        initial[param] = undefined;
-      }
-
-      persistentParams = Object.freeze(initial);
-    } else {
-      persistentParams = Object.freeze({ ...params });
-    }
-
-    const paramNamesSet = new Set<string>(
-      Array.isArray(params) ? [...params] : Object.keys(params),
-    );
-
     const api = getPluginApi(router);
-    const originalRootPath = api.getRootPath();
-
     const plugin = new PersistentParamsPlugin(
       api,
-      persistentParams,
-      paramNamesSet,
-      originalRootPath,
+      initialParams,
+      new Set(paramNamesSet),
+      api.getRootPath(),
     );
 
     return plugin.getPlugin();

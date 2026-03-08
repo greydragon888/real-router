@@ -1,5 +1,5 @@
-// packages/persistent-params-plugin/modules/index.ts
+// packages/persistent-params-plugin/src/index.ts
 
-export { PersistentParamsConfig } from "./types";
+export type { PersistentParamsConfig } from "./types";
 
 export { persistentParamsPluginFactory } from "./factory";
