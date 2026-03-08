@@ -367,7 +367,7 @@ describe("Persistent params plugin", () => {
         expect(state?.path).toBe("/route2/2");
       });
 
-      it("should allow re-adding removed parameter", async () => {
+      it("should include explicitly passed parameter in current transition even after removal", async () => {
         await router.navigate("route1", { id: "1", mode: "dev" });
         await router.navigate("route2", { id: "2", mode: undefined });
         await router.navigate("route3", { id: "3", mode: "test" });
@@ -375,6 +375,15 @@ describe("Persistent params plugin", () => {
         const state = router.getState();
 
         expect(state?.path).toBe("/route3/3?mode=test");
+      });
+
+      it("should NOT re-persist parameter after removal and explicit re-pass", async () => {
+        await router.navigate("route1", { id: "1", mode: "dev" });
+        await router.navigate("route2", { id: "2", mode: undefined });
+        await router.navigate("route3", { id: "3", mode: "test" });
+        await router.navigate("route1", { id: "4" });
+
+        expect(router.getState()?.path).toBe("/route1/4");
       });
     });
 
