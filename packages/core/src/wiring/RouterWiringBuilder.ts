@@ -13,6 +13,7 @@ import type { PluginsDependencies } from "../namespaces/PluginsNamespace";
 import type { RouteLifecycleDependencies } from "../namespaces/RouteLifecycleNamespace";
 import type { RouterLifecycleDependencies } from "../namespaces/RouterLifecycleNamespace";
 import type { RoutesDependencies } from "../namespaces/RoutesNamespace";
+import type { RouterError } from "../RouterError";
 import type { DefaultDependencies, Params } from "@real-router/types";
 
 export class RouterWiringBuilder<
@@ -144,25 +145,30 @@ export class RouterWiringBuilder<
       getDependency: (name: string) =>
         this.dependenciesStore.dependencies[name as keyof Dependencies],
       startTransition: (toState, fromState) => {
-        this.eventBus.beginTransition(toState, fromState);
+        this.eventBus.sendNavigate(toState, fromState);
       },
       cancelNavigation: () => {
-        this.eventBus.cancelTransition(
+        this.eventBus.sendCancel(
           this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
           this.state.get(),
         );
       },
       sendTransitionDone: (state, fromState, opts) => {
-        this.eventBus.completeTransition(state, fromState, opts);
+        this.eventBus.sendComplete(state, fromState, opts);
       },
-      sendTransitionBlocked: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
-      },
-      sendTransitionError: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
+      sendTransitionFail: (toState, fromState, error) => {
+        this.eventBus.sendFail(toState, fromState, error);
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.eventBus.emitOrFailTransitionError(toState, fromState, error);
+        if (this.eventBus.isReady()) {
+          this.eventBus.sendFail(toState, fromState, error);
+        } else {
+          this.eventBus.emitTransitionError(
+            toState,
+            fromState,
+            error as RouterError,
+          );
+        }
       },
       emitTransitionSuccess: (toState, fromState, opts) => {
         this.eventBus.emitTransitionSuccess(toState, fromState, opts);
@@ -195,10 +201,10 @@ export class RouterWiringBuilder<
       },
       matchPath: (path) => this.routes.matchPath(path, this.options.get()),
       completeStart: () => {
-        this.eventBus.completeStart();
+        this.eventBus.sendStarted();
       },
       emitTransitionError: (toState, fromState, error) => {
-        this.eventBus.failTransition(toState, fromState, error);
+        this.eventBus.sendFail(toState, fromState, error);
       },
     };
 

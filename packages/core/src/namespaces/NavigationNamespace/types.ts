@@ -16,6 +16,10 @@ import type {
  *
  * These are function references from other namespaces/facade,
  * avoiding the need to pass the entire Router object.
+ *
+ * **Naming convention:**
+ * - `send*` — routes through FSM (triggers FSM state transition, FSM action emits event)
+ * - `emit*` — emits directly to EventEmitter (bypasses FSM, used by `navigateToNotFound`)
  */
 export interface NavigationDependencies {
   /** Get router options */
@@ -70,15 +74,8 @@ export interface NavigationDependencies {
     opts: NavigationOptions,
   ) => void;
 
-  /** Send FAIL event to routerFSM (transition blocked) */
-  sendTransitionBlocked: (
-    toState: State,
-    fromState: State | undefined,
-    error: unknown,
-  ) => void;
-
-  /** Send FAIL event to routerFSM (transition error) */
-  sendTransitionError: (
+  /** Send FAIL event to routerFSM */
+  sendTransitionFail: (
     toState: State,
     fromState: State | undefined,
     error: unknown,
