@@ -1,4 +1,4 @@
-// packages/persistent-params-plugin/modules/types.ts
+// packages/persistent-params-plugin/src/types.ts
 
 /**
  * Configuration for persistent parameters' plugin.
