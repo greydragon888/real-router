@@ -32,17 +32,71 @@ const FROZEN_REPLACE_OPTS: NavigationOptions = { replace: true };
 
 Object.freeze(FROZEN_REPLACE_OPTS);
 
+function stripSignal({
+  signal: _,
+  ...rest
+}: NavigationOptions): NavigationOptions {
+  return rest;
+}
+
+function routeTransitionError(
+  deps: NavigationDependencies,
+  error: unknown,
+  toState: State,
+  fromState: State | undefined,
+): void {
+  const routerError = error as RouterError;
+
+  if (
+    routerError.code === errorCodes.TRANSITION_CANCELLED ||
+    routerError.code === errorCodes.ROUTE_NOT_FOUND
+  ) {
+    return;
+  }
+
+  /* v8 ignore next 7 -- @preserve: defensive guard for unexpected error codes (e.g. future error types); else branch unreachable after middleware became fire-and-forget */
+  if (
+    routerError.code === errorCodes.CANNOT_ACTIVATE ||
+    routerError.code === errorCodes.CANNOT_DEACTIVATE
+  ) {
+    deps.sendTransitionBlocked(toState, fromState, routerError);
+  } else {
+    deps.sendTransitionError(toState, fromState, routerError);
+  }
+}
+
+function buildSuccessState(
+  finalState: State,
+  transitionOutput: TransitionOutput["meta"],
+  fromState: State | undefined,
+  opts: NavigationOptions,
+): State {
+  const transitionMeta: TransitionMeta = {
+    phase: transitionOutput.phase,
+    ...(fromState?.name !== undefined && { from: fromState.name }),
+    reason: "success",
+    segments: transitionOutput.segments,
+    ...(opts.reload !== undefined && { reload: opts.reload }),
+    ...(opts.redirected !== undefined && { redirected: opts.redirected }),
+  };
+
+  Object.freeze(transitionMeta.segments.deactivated);
+  Object.freeze(transitionMeta.segments.activated);
+  Object.freeze(transitionMeta.segments);
+  Object.freeze(transitionMeta);
+
+  return {
+    ...finalState,
+    transition: transitionMeta,
+  };
+}
+
 /**
  * Independent namespace for managing navigation.
  *
- * Handles navigate(), navigateToDefault(), navigateToState(), and transition state.
+ * Handles navigate(), navigateToDefault(), navigateToNotFound(), and transition state.
  */
 export class NavigationNamespace {
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Functional reference for cyclic dependency
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // Dependencies injected via setDependencies (replaces full router reference)
   #canNavigate!: () => boolean;
   #deps!: NavigationDependencies;
   #transitionDeps!: TransitionDependencies;
@@ -72,10 +126,6 @@ export class NavigationNamespace {
   // Dependency injection
   // =========================================================================
 
-  /**
-   * Sets the canNavigate check (cyclic dependency on EventBusNamespace).
-   * Must be called before using navigate().
-   */
   setCanNavigate(fn: () => boolean): void {
     this.#canNavigate = fn;
   }
@@ -139,6 +189,7 @@ export class NavigationNamespace {
     const fromState = deps.getState();
 
     if (
+      fromState &&
       !opts.reload &&
       !opts.force &&
       deps.areStatesEqual(fromState, toState, false)
@@ -150,19 +201,6 @@ export class NavigationNamespace {
       throw err;
     }
 
-    return this.navigateToState(toState, fromState, opts);
-  }
-
-  /**
-   * Internal navigation function that accepts pre-built state.
-   * Used by RouterLifecycleNamespace for start() transitions.
-   */
-  async navigateToState(
-    toState: State,
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ): Promise<State> {
-    const deps = this.#deps;
     const transitionDeps = this.#transitionDeps;
 
     if (transitionDeps.isTransitioning()) {
@@ -214,7 +252,7 @@ export class NavigationNamespace {
         finalState.name === constants.UNKNOWN_ROUTE ||
         deps.hasRoute(finalState.name)
       ) {
-        const stateWithTransition = NavigationNamespace.#buildSuccessState(
+        const stateWithTransition = buildSuccessState(
           finalState,
           transitionOutput,
           fromState,
@@ -224,9 +262,7 @@ export class NavigationNamespace {
         deps.setState(stateWithTransition);
 
         const transitionOpts =
-          opts.signal === undefined
-            ? opts
-            : NavigationNamespace.#stripSignal(opts);
+          opts.signal === undefined ? opts : stripSignal(opts);
 
         deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
 
@@ -241,11 +277,11 @@ export class NavigationNamespace {
         throw err;
       }
     } catch (error) {
-      this.#routeTransitionError(error, toState, fromState);
+      routeTransitionError(deps, error, toState, fromState);
 
       throw error;
     } finally {
-      controller.abort(); // Cleanup: removes listener on external signal
+      controller.abort();
       if (this.#currentController === controller) {
         this.#currentController = null;
       }
@@ -330,77 +366,5 @@ export class NavigationNamespace {
       new RouterError(errorCodes.TRANSITION_CANCELLED),
     );
     this.#currentController = null;
-  }
-
-  // =========================================================================
-  // Private methods
-  // =========================================================================
-
-  /**
-   * Strips the non-serializable `signal` field from NavigationOptions.
-   */
-  static #stripSignal(opts: NavigationOptions): NavigationOptions {
-    // eslint-disable-next-line sonarjs/no-unused-vars
-    const { signal: _, ...rest } = opts;
-
-    return rest;
-  }
-
-  /**
-   * Builds the final state with frozen TransitionMeta attached.
-   */
-  static #buildSuccessState(
-    finalState: State,
-    transitionOutput: TransitionOutput["meta"],
-    fromState: State | undefined,
-    opts: NavigationOptions,
-  ): State {
-    const transitionMeta: TransitionMeta = {
-      phase: transitionOutput.phase,
-      ...(fromState?.name !== undefined && { from: fromState.name }),
-      reason: "success",
-      segments: transitionOutput.segments,
-      ...(opts.reload !== undefined && { reload: opts.reload }),
-      ...(opts.redirected !== undefined && { redirected: opts.redirected }),
-    };
-
-    Object.freeze(transitionMeta.segments.deactivated);
-    Object.freeze(transitionMeta.segments.activated);
-    Object.freeze(transitionMeta.segments);
-    Object.freeze(transitionMeta);
-
-    return {
-      ...finalState,
-      transition: transitionMeta,
-    };
-  }
-
-  /**
-   * Routes a caught transition error to the correct FSM event.
-   */
-  #routeTransitionError(
-    error: unknown,
-    toState: State,
-    fromState: State | undefined,
-  ): void {
-    const routerError = error as RouterError;
-
-    // Already routed: cancel/stop sent CANCEL, sendTransitionError called in try block
-    if (
-      routerError.code === errorCodes.TRANSITION_CANCELLED ||
-      routerError.code === errorCodes.ROUTE_NOT_FOUND
-    ) {
-      return;
-    }
-
-    /* v8 ignore next 7 -- @preserve: defensive guard for unexpected error codes (e.g. future error types); else branch unreachable after middleware became fire-and-forget */
-    if (
-      routerError.code === errorCodes.CANNOT_ACTIVATE ||
-      routerError.code === errorCodes.CANNOT_DEACTIVATE
-    ) {
-      this.#deps.sendTransitionBlocked(toState, fromState, routerError);
-    } else {
-      this.#deps.sendTransitionError(toState, fromState, routerError);
-    }
   }
 }

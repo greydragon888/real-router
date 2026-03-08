@@ -10,8 +10,8 @@ import type { DefaultDependencies } from "@real-router/types";
  * - `wireLimits()` first: all namespaces must have limits before any other setup
  * - `wireRouteLifecycleDeps()` BEFORE `wireRoutesDeps()`: RoutesNamespace.setDependencies()
  *   registers pending canActivate handlers which require RouteLifecycleNamespace to be ready
- * - `wireCyclicDeps()` LAST: resolves circular references between NavigationNamespace and
- *   RouterLifecycleNamespace (they depend on each other via direct property assignment)
+ * - `wireNavigationDeps()` BEFORE `wireLifecycleDeps()`: lifecycle deps reference
+ *   NavigationNamespace.navigate() which requires navigation deps to be set
  */
 export function wireRouter<Dependencies extends DefaultDependencies>(
   builder: RouterWiringBuilder<Dependencies>,
@@ -23,5 +23,4 @@ export function wireRouter<Dependencies extends DefaultDependencies>(
   builder.wireNavigationDeps();
   builder.wireLifecycleDeps();
   builder.wireStateDeps();
-  builder.wireCyclicDeps();
 }
