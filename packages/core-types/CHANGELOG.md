@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.23.0
+
+### Minor Changes
+
+- [#242](https://github.com/greydragon888/real-router/pull/242) [`039b6f9`](https://github.com/greydragon888/real-router/commit/039b6f99b75207a59182bf7d1f8a65b8497a539f) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `navigateToNotFound` to `Router` interface ([#241](https://github.com/greydragon888/real-router/issues/241))
+
+  New method signature: `navigateToNotFound(path?: string): State`.
+
 ## 0.22.0
 
 ### Minor Changes
