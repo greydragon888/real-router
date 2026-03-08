@@ -1,4 +1,4 @@
-// packages/persistent-params-plugin/modules/param-utils.ts
+// packages/persistent-params-plugin/src/param-utils.ts
 
 import type { Params } from "@real-router/core";
 
@@ -29,34 +29,17 @@ export function extractOwnParams(params: Params): Params {
 
 /**
  * Merges persistent and current parameters into a single Params object.
- * Keys explicitly set to `undefined` in current params are removed from result.
  *
- * Creates a new immutable object - does not mutate input parameters.
+ * IMPORTANT: `current` must be pre-sanitized via `extractOwnParams()` by the caller.
+ * This function does NOT perform prototype pollution protection on its own.
  *
  * @param persistent - Frozen persistent parameters
- * @param current - Current parameters from navigation
- * @returns New Params object with merged values
- *
- * @example
- * const persistent = { lang: 'en', theme: 'dark' };
- * const current = { theme: 'light', mode: 'dev' };
- * mergeParams(persistent, current); // { lang: 'en', theme: 'light', mode: 'dev' }
- *
- * @example
- * // Removing parameters with undefined
- * const persistent = { lang: 'en', theme: 'dark' };
- * const current = { theme: undefined };
- * mergeParams(persistent, current); // { lang: 'en' } (theme removed)
+ * @param current - Pre-sanitized current parameters (own properties only)
  */
 export function mergeParams(
   persistent: Readonly<Params>,
   current: Params,
 ): Params {
-  // Safely extract own properties from current params
-  const safeCurrentParams = extractOwnParams(current);
-
-  // Start with persistent params, but EXCLUDE undefined values
-  // (undefined values don't appear in URLs, so we shouldn't include them)
   const result: Params = {};
 
   for (const key in persistent) {
@@ -65,15 +48,12 @@ export function mergeParams(
     }
   }
 
-  // Apply current params
-  for (const key of Object.keys(safeCurrentParams)) {
-    const value = safeCurrentParams[key];
+  for (const key of Object.keys(current)) {
+    const value = current[key];
 
     if (value === undefined) {
-      // Remove param if explicitly set to undefined
       delete result[key];
     } else {
-      // Add or update param
       result[key] = value;
     }
   }
