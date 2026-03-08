@@ -32,6 +32,15 @@ const FROZEN_REPLACE_OPTS: NavigationOptions = { replace: true };
 
 Object.freeze(FROZEN_REPLACE_OPTS);
 
+function forceReplaceFromUnknown(
+  opts: NavigationOptions,
+  fromState: State | undefined,
+): NavigationOptions {
+  return fromState?.name === constants.UNKNOWN_ROUTE && !opts.replace
+    ? { ...opts, replace: true }
+    : opts;
+}
+
 function stripSignal({
   signal: _,
   ...rest
@@ -187,6 +196,8 @@ export class NavigationNamespace {
     );
 
     const fromState = deps.getState();
+
+    opts = forceReplaceFromUnknown(opts, fromState);
 
     if (
       fromState &&
