@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/internal/timing.ts
+// packages/logger-plugin/src/internal/timing.ts
 
 /**
  * Function that returns high-resolution timestamp in milliseconds.

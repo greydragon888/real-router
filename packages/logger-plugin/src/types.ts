@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/types.ts
+// packages/logger-plugin/src/types.ts
 
 /**
  * Logging level for router events.
@@ -53,7 +53,7 @@ export interface LoggerPluginConfig {
    * Only applies when navigating within the same route.
    * Helps identify which parameters changed during navigation.
    *
-   * @default false
+   * @default true
    */
   showParamsDiff?: boolean;
 

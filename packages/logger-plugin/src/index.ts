@@ -1,9 +1,5 @@
-// packages/logger-plugin/modules/index.ts
+// packages/logger-plugin/src/index.ts
 
-// Public API exports for real-router-logger-plugin
+export { loggerPluginFactory } from "./factory";
 
-// Main plugin factory and instance
-export { loggerPluginFactory, loggerPlugin } from "./plugin";
-
-// Types
 export type { LoggerPluginConfig, LogLevel } from "./types";

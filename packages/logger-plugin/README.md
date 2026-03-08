@@ -55,20 +55,12 @@ import { loggerPluginFactory } from "@real-router/logger-plugin";
 router.usePlugin(loggerPluginFactory());
 
 // With custom options
-router.usePlugin(loggerPluginFactory({
-  level: "errors",
-  showTiming: false,
-}));
-```
-
-### `loggerPlugin`
-
-Ready-to-use plugin instance with default settings. Provided for backward compatibility.
-
-```typescript
-import { loggerPlugin } from "@real-router/logger-plugin";
-
-router.usePlugin(loggerPlugin);
+router.usePlugin(
+  loggerPluginFactory({
+    level: "errors",
+    showTiming: false,
+  }),
+);
 ```
 
 ---
@@ -87,28 +79,36 @@ router.usePlugin(loggerPlugin);
 
 ```typescript
 // With custom context for multiple routers
-router.usePlugin(loggerPluginFactory({
-  context: "main-router",
-}));
+router.usePlugin(
+  loggerPluginFactory({
+    context: "main-router",
+  }),
+);
 
 // Performance profiling enabled
-router.usePlugin(loggerPluginFactory({
-  usePerformanceMarks: true,
-  showTiming: true,
-}));
+router.usePlugin(
+  loggerPluginFactory({
+    usePerformanceMarks: true,
+    showTiming: true,
+  }),
+);
 
 // Errors only (for production-like environments)
-router.usePlugin(loggerPluginFactory({
-  level: "errors",
-  showTiming: false,
-}));
+router.usePlugin(
+  loggerPluginFactory({
+    level: "errors",
+    showTiming: false,
+  }),
+);
 
 // Minimal output
-router.usePlugin(loggerPluginFactory({
-  level: "transitions",
-  showParamsDiff: false,
-  showTiming: false,
-}));
+router.usePlugin(
+  loggerPluginFactory({
+    level: "transitions",
+    showParamsDiff: false,
+    showTiming: false,
+  }),
+);
 ```
 
 See [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin#3-configuration-options) for detailed descriptions.

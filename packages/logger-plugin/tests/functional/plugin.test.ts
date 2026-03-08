@@ -1,7 +1,7 @@
 import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { loggerPlugin, loggerPluginFactory } from "../../src";
+import { loggerPluginFactory } from "../../src";
 
 import type { Router, LifecycleApi } from "@real-router/core";
 
@@ -47,7 +47,7 @@ describe("@real-router/logger-plugin", () => {
 
   describe("Basic Functionality", () => {
     beforeEach(() => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
     });
 
     it("should log router start event", async () => {
@@ -145,22 +145,22 @@ describe("@real-router/logger-plugin", () => {
       vi.useRealTimers();
     });
 
-    it("should format route name as (none) when undefined", async () => {
+    it("should format route name as (none) when fromState is undefined", async () => {
       await router.start("/");
-      loggerSpy.mockClear();
-
-      await router.navigate("users");
 
       expect(loggerSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[logger-plugin] Transition: home → users"),
-        expect.any(Object),
+        "[logger-plugin] Transition: (none) → home",
+        expect.objectContaining({
+          from: undefined,
+          to: expect.objectContaining({ name: "home" }),
+        }),
       );
     });
   });
 
   describe("Console Groups", () => {
     it("should open group on transition start", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users");
@@ -169,7 +169,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should close group on transition success", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users");
@@ -178,7 +178,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should close group on transition error", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       try {
         await router.navigate("nonexistent");
@@ -191,7 +191,7 @@ describe("@real-router/logger-plugin", () => {
 
     it("should close group on transition cancel", async () => {
       lifecycle.addDeactivateGuard("home", () => () => false);
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       try {
         await router.navigate("users");
@@ -205,7 +205,7 @@ describe("@real-router/logger-plugin", () => {
     it("should close any open group on router stop", async () => {
       vi.useFakeTimers();
 
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
 
       await router.start("/");
 
@@ -239,7 +239,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should not open multiple groups for same transition", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       consoleGroupSpy.mockClear(); // Clear calls from start
 
@@ -250,7 +250,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should auto-detect console.group support", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users");
@@ -266,7 +266,7 @@ describe("@real-router/logger-plugin", () => {
 
       delete (console as any).group;
 
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users");
@@ -281,7 +281,7 @@ describe("@real-router/logger-plugin", () => {
 
       delete (console as any).groupEnd;
 
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users", {}, {});
@@ -296,25 +296,15 @@ describe("@real-router/logger-plugin", () => {
 
       delete (globalThis as any).console;
 
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
 
       expect(() => router.start("/")).not.toThrowError();
 
       globalThis.console = originalConsole;
     });
 
-    it("should not open group twice for same transition", async () => {
-      router.usePlugin(loggerPlugin);
-      await router.start("/");
-      consoleGroupSpy.mockClear();
-
-      await router.navigate("users");
-
-      expect(consoleGroupSpy).toHaveBeenCalledTimes(1);
-    });
-
     it("should handle rapid transitions correctly", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
 
       await router.navigate("users", {}, {});
@@ -326,7 +316,7 @@ describe("@real-router/logger-plugin", () => {
     it("should cleanup on teardown", async () => {
       vi.useFakeTimers();
 
-      const unsubscribe = router.usePlugin(loggerPlugin);
+      const unsubscribe = router.usePlugin(loggerPluginFactory());
 
       await router.start("/");
 
@@ -368,7 +358,7 @@ describe("@real-router/logger-plugin", () => {
       });
 
       router.usePlugin(customPlugin());
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
 
       await router.start("/");
 
@@ -378,7 +368,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should log nested route transitions", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       loggerSpy.mockClear();
 
@@ -391,7 +381,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should log transitions with parameters", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       loggerSpy.mockClear();
 
@@ -411,7 +401,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should handle router restart", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       router.stop();
       loggerSpy.mockClear();
@@ -424,7 +414,7 @@ describe("@real-router/logger-plugin", () => {
 
   describe("Params Diff Feature", () => {
     it("should show params diff when navigating within same route (default behavior)", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       loggerSpy.mockClear();
 
@@ -441,7 +431,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should not show diff when navigating to different route", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       loggerSpy.mockClear();
 
@@ -459,7 +449,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should not show diff when params are identical", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       await router.navigate("users.view", { id: "123" });
       loggerSpy.mockClear();
@@ -481,8 +471,8 @@ describe("@real-router/logger-plugin", () => {
   });
 
   describe("Backward Compatibility", () => {
-    it("should work with default loggerPlugin export", async () => {
-      router.usePlugin(loggerPlugin);
+    it("should work with default loggerPluginFactory", async () => {
+      router.usePlugin(loggerPluginFactory());
 
       await router.start("/");
 
@@ -490,7 +480,7 @@ describe("@real-router/logger-plugin", () => {
     });
 
     it("should maintain behavior for default usage", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       loggerSpy.mockClear();
       consoleGroupSpy.mockClear();
@@ -508,7 +498,7 @@ describe("@real-router/logger-plugin", () => {
 
   describe("Stress Testing", () => {
     it("should handle 100 transitions without errors", async () => {
-      router.usePlugin(loggerPlugin);
+      router.usePlugin(loggerPluginFactory());
       await router.start("/");
       for (let i = 0; i < 100; i++) {
         await router.navigate(i % 2 ? "users" : "admin");
@@ -756,6 +746,90 @@ describe("@real-router/logger-plugin", () => {
         await router.start("/");
 
         expect(loggerSpy).toHaveBeenCalledWith("[my-router] Router started");
+      });
+    });
+
+    describe("usePerformanceMarks option", () => {
+      let perfMarkSpy: ReturnType<typeof vi.spyOn>;
+      let perfMeasureSpy: ReturnType<typeof vi.spyOn>;
+
+      beforeEach(() => {
+        perfMarkSpy = vi.spyOn(performance, "mark");
+        perfMeasureSpy = vi.spyOn(performance, "measure");
+      });
+
+      it("should create perf marks on successful transition", async () => {
+        router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+        await router.start("/");
+        perfMarkSpy.mockClear();
+        perfMeasureSpy.mockClear();
+
+        await router.navigate("users");
+
+        expect(perfMarkSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-start:"),
+        );
+        expect(perfMarkSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-end:"),
+        );
+        expect(perfMeasureSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition:"),
+          expect.stringContaining("router:transition-start:"),
+          expect.stringContaining("router:transition-end:"),
+        );
+      });
+
+      it("should create perf marks on cancelled transition", async () => {
+        lifecycle.addActivateGuard(
+          "users",
+          () => () => new Promise<boolean>(() => {}),
+        );
+        router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+        await router.start("/");
+        perfMarkSpy.mockClear();
+        perfMeasureSpy.mockClear();
+
+        const navPromise = router.navigate("users");
+
+        await router.navigate("admin");
+
+        try {
+          await navPromise;
+        } catch {
+          // Expected TRANSITION_CANCELLED
+        }
+
+        expect(perfMarkSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-cancel:"),
+        );
+        expect(perfMeasureSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-cancelled:"),
+          expect.stringContaining("router:transition-start:"),
+          expect.stringContaining("router:transition-cancel:"),
+        );
+      });
+
+      it("should create perf marks on errored transition", async () => {
+        lifecycle.addDeactivateGuard("home", () => () => false);
+        router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
+        await router.start("/");
+        perfMarkSpy.mockClear();
+        perfMeasureSpy.mockClear();
+
+        try {
+          await router.navigate("users");
+        } catch {
+          // Expected TRANSITION_CANCELLED error
+        }
+
+        expect(perfMarkSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-error:"),
+        );
+        expect(perfMeasureSpy).toHaveBeenCalledWith(
+          expect.stringContaining("router:transition-failed:"),
+          expect.stringContaining("router:transition-start:"),
+          expect.stringContaining("router:transition-error:"),
+        );
       });
     });
   });

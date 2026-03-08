@@ -1,4 +1,4 @@
-// packages/logger-plugin/modules/internal/console-groups.ts
+// packages/logger-plugin/src/internal/console-groups.ts
 
 /**
  * Checks if console.group is supported in the current environment.
@@ -14,7 +14,7 @@ export const supportsConsoleGroups = (): boolean => {
 /**
  * Manager for handling console groups
  */
-interface GroupManager {
+export interface GroupManager {
   /**
    * Opens a group if it's not already open
    */
