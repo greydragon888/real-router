@@ -69,7 +69,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
 
     it("should export BaseLinkProps type", () => {
       const linkProps: import("@real-router/react/legacy").BaseLinkProps = {
-        router: router,
+        router,
         routeName: "test",
       };
 
