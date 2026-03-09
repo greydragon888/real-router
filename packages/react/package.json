@@ -6,6 +6,13 @@
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
   "types": "./dist/esm/index.d.mts",
+  "typesVersions": {
+    "*": {
+      "legacy": [
+        "./dist/cjs/legacy.d.ts"
+      ]
+    }
+  },
   "exports": {
     ".": {
       "development": "./src/index.ts",
