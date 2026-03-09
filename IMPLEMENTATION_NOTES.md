@@ -629,6 +629,76 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Note:** `eslint-plugin-react-hooks` is kept as-is — `@eslint-react` does not replace `rules-of-hooks` or `exhaustive-deps`.
 
+## React 18/19 Split via Subpath Exports
+
+### Problem
+
+`@real-router/react` needs to support both React 18 and React 19.2+. React 19.2 stabilized `<Activity>` — new components like `ActivityRouteNode` require React 19.2+. Options considered:
+
+| Approach                                       | Pros                              | Cons                                                   |
+| ---------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
+| Separate package (`@real-router/react-legacy`) | Clear separation                  | Duplicated code, double maintenance, double versioning |
+| Runtime version checks                         | Single package                    | Bundle bloat, complexity, fragile                      |
+| **Subpath exports**                            | Single package, zero runtime cost | Slightly more complex `exports` field                  |
+
+### Solution
+
+Subpath exports: `@real-router/react` (React 19.2+) and `@real-router/react/legacy` (React 18+).
+
+```jsonc
+// package.json
+{
+  "exports": {
+    ".": {
+      /* main entry — full API */
+    },
+    "./legacy": {
+      /* legacy entry — without React 19.2-only components */
+    },
+  },
+}
+```
+
+### Architecture
+
+Flat structure — all shared code in `src/`. The `modern/` subfolder holds React 19.2-only components. Entry points are pure re-export files:
+
+- `src/index.ts` — all exports (shared + modern)
+- `src/legacy.ts` — shared exports only (no modern)
+
+No barrel files — both entry points use explicit imports. No code duplication.
+
+### Build
+
+`tsup.config.mts` uses multi-entry to produce shared chunks:
+
+```ts
+export default createIsomorphicConfig({
+  custom: {
+    entry: {
+      index: "src/index.ts",
+      legacy: "src/legacy.ts",
+    },
+  },
+});
+```
+
+tsup generates a shared chunk for code common to both entries — no duplication in the output.
+
+### Key Decision: `useContext` vs `use()`
+
+`use()` (React 19) and `useContext` are functionally identical for unconditional context reads. Hooks always call unconditionally, no try/catch or conditional blocks. `use()` advantage (conditional reads) is unused. Therefore `useContext` + `<Context.Provider value>` is the target for shared code — works in React 18 and 19 identically.
+
+`modern/` is reserved exclusively for components that require React 19.2-only APIs (`<Activity>`), not for hooks.
+
+### Testing Strategy
+
+Full test suite runs against the main entry point. Legacy entry gets a single smoke test (export availability, basic render, navigation) — since both entries re-export the same code.
+
+### Details
+
+Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHITECTURE.md)
+
 ## Module Resolution: `customConditions` + `development` Export Condition
 
 ### Problem
