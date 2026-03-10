@@ -1,5 +1,22 @@
 # @real-router/react
 
+## 0.8.0
+
+### Minor Changes
+
+- [#268](https://github.com/greydragon888/real-router/pull/268) [`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouterTransition` hook ([#259](https://github.com/greydragon888/real-router/issues/259))
+
+  New hook for tracking router transition state. Returns `RouterTransitionSnapshot`
+  with `isTransitioning`, `toRoute`, and `fromRoute`. Useful for progress bars,
+  loading overlays, and disabling navigation during async guards.
+
+  Available in both entry points (`@real-router/react` and `@real-router/react/legacy`).
+
+### Patch Changes
+
+- Updated dependencies [[`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358)]:
+  - @real-router/sources@0.2.0
+
 ## 0.7.0
 
 ### Minor Changes
