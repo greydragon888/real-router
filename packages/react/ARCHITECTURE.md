@@ -55,7 +55,7 @@ src/
 │   ├── useRoute.tsx            # Full route state from context (every navigation)
 │   ├── useNavigator.tsx        # Navigator from context (never re-renders)
 │   ├── useRouteNode.tsx        # Node-scoped subscription via useSyncExternalStore
-│   ├── useIsActiveRoute.tsx    # Active state subscription via useSyncExternalStore
+│   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
@@ -107,7 +107,7 @@ These three hooks use `useContext()` — works in both React 18 and 19. (`use()`
 
 ```
 useRouteNode(name)              — createRouteNodeSource(router, name)
-useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)
+useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
 RouterProvider                  — createRouteSource(router)
 ```
 
@@ -121,7 +121,7 @@ These subscribe to `@real-router/sources` stores. The source creates a `{ subscr
 Link (memo + areLinkPropsEqual)
 ├── useRouter() — router instance from context (never re-renders)
 ├── useStableValue() — stabilizes routeParams/routeOptions objects
-├── useIsActiveRoute() — subscription for active/inactive CSS
+├── useIsActiveRoute() — subscription for active/inactive CSS (internal hook)
 ├── href = router.buildUrl() || router.buildPath()
 └── onClick → void router.navigate(...)   # fire-and-forget
 ```
@@ -163,7 +163,7 @@ router emits TRANSITION_SUCCESS
     │
     └──► createActiveRouteSource.subscribe callback → boolean snapshot
             └──► if changed: useSyncExternalStore triggers re-render
-                    └──► useIsActiveRoute() / Link active CSS updates
+                    └──► Link active CSS updates (via internal useIsActiveRoute)
 ```
 
 ## Type System

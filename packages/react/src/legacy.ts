@@ -14,8 +14,6 @@ export { useRouter } from "./hooks/useRouter";
 
 export { useRouteUtils } from "./hooks/useRouteUtils";
 
-export { useIsActiveRoute } from "./hooks/useIsActiveRoute";
-
 export { useRouterTransition } from "./hooks/useRouterTransition";
 
 // Context

@@ -8,7 +8,6 @@ import {
   useNavigator,
   useRouter,
   useRouteUtils,
-  useIsActiveRoute,
   useRouterTransition,
   RouterProvider,
   RouterContext,
@@ -54,7 +53,6 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       expect(useNavigator).toBeDefined();
       expect(useRouter).toBeDefined();
       expect(useRouteUtils).toBeDefined();
-      expect(useIsActiveRoute).toBeDefined();
       expect(useRouterTransition).toBeDefined();
     });
 
