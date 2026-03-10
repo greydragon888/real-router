@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-10]
 
+### @real-router/react@0.9.0
+
+### Minor Changes
+
+- [#272](https://github.com/greydragon888/real-router/pull/272) [`a54d5f9`](https://github.com/greydragon888/real-router/commit/a54d5f9907dea7025af41eff21d1dde6d42ecf29) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `<RouteView>` declarative routing component ([#260](https://github.com/greydragon888/real-router/issues/260))
+
+  Declarative compound component for view-level routing. Replaces imperative if/switch patterns with JSX:
+
+  ```tsx
+  <RouteView nodeName="">
+    <RouteView.Match segment="users">
+      <UsersPage />
+    </RouteView.Match>
+    <RouteView.Match segment="settings">
+      <SettingsPage />
+    </RouteView.Match>
+    <RouteView.NotFound>
+      <NotFoundPage />
+    </RouteView.NotFound>
+  </RouteView>
+  ```
+
+
 ### @real-router/react@0.8.0
 
 ### Minor Changes
