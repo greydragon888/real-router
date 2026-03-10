@@ -3,8 +3,6 @@
 // Components
 export { Link } from "./components/Link";
 
-export { RouteView } from "./components/RouteView";
-
 // Hooks
 export { useRouteNode } from "./hooks/useRouteNode";
 
@@ -27,12 +25,6 @@ export { RouterContext, RouteContext, NavigatorContext } from "./context";
 
 // Types
 export type { LinkProps } from "./types";
-
-export type {
-  RouteViewProps,
-  RouteViewMatchProps,
-  RouteViewNotFoundProps,
-} from "./components/RouteView";
 
 export type { Navigator } from "@real-router/core";
 
