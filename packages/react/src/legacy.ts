@@ -1,4 +1,4 @@
-// Main entry point — React 19.2+
+// Legacy entry point — React 18+
 
 // Components
 export { BaseLink } from "./components/BaseLink";

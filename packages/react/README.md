@@ -1,7 +1,7 @@
 # @real-router/react
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![React](https://img.shields.io/badge/React-18+-61DAFB.svg)](https://reactjs.org/)
+[![React](https://img.shields.io/badge/React-19.2+-61DAFB.svg)](https://react.dev/)
 
 React integration for Real-Router — hooks, components, and context providers.
 
@@ -18,6 +18,25 @@ bun add @real-router/react @real-router/core @real-router/browser-plugin
 ```
 
 **Peer Dependencies:** `react` >= 18.0.0
+
+## Entry Points
+
+The package provides two entry points via subpath exports:
+
+| Import Path                 | React Version | Description                               |
+| --------------------------- | ------------- | ----------------------------------------- |
+| `@real-router/react`        | 19.2+         | Full API (default)                        |
+| `@real-router/react/legacy` | 18+           | Same API minus React 19.2-only components |
+
+```tsx
+// React 19.2+ (default) — full API
+import { RouterProvider, useRouteNode, Link } from "@real-router/react";
+
+// React 18+ — without React 19.2-only components
+import { RouterProvider, useRouteNode, Link } from "@real-router/react/legacy";
+```
+
+Both entry points share the same underlying code — `/legacy` is a re-export subset that excludes components requiring React 19.2+ APIs (e.g., `<Activity>`).
 
 ## Quick Start
 
@@ -222,6 +241,19 @@ Low-level link component. Requires router instance as prop.\
 `router: Router` — router instance\
 Props: same as `Link`\
 [Wiki](https://github.com/greydragon888/real-router/wiki/BaseLink)
+
+---
+
+## Migration from React 18
+
+If upgrading from an older version that targeted React 18:
+
+```diff
+- import { useRouteNode, Link } from '@real-router/react';
++ import { useRouteNode, Link } from '@real-router/react/legacy';
+```
+
+One import path change. API is identical.
 
 ---
 

@@ -138,9 +138,9 @@ This is a **monorepo** containing multiple packages. Install only what you need:
 
 ### Framework Integration
 
-| Package                              | Description                                     |
-| ------------------------------------ | ----------------------------------------------- |
-| [@real-router/react](packages/react) | React integration (Provider, hooks, components) |
+| Package                              | Description                                                                      |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| [@real-router/react](packages/react) | React 19.2+ integration (Provider, hooks, components). React 18+ via `./legacy`. |
 
 ### Plugins
 

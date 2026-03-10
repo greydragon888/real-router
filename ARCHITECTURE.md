@@ -9,7 +9,7 @@ real-router/
 ├── packages/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
-│   ├── react/                     # React integration (Provider, hooks, components)
+│   ├── react/                     # React integration (dual entry: main for 19.2+, /legacy for 18+)
 │   ├── sources/                   # @real-router/sources — subscription layer for UI bindings
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
@@ -84,6 +84,7 @@ graph TD
     SOURCES -->|dep| ROUTEUTILS
     SOURCES -->|dep| TYPES
 
+    REACT["@real-router/react<br/>(main + /legacy)"]
     REACT -->|dep| CORE
     REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
