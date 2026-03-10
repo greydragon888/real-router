@@ -1,5 +1,13 @@
 # @real-router/sources
 
+## 0.2.1
+
+### Patch Changes
+
+- [#276](https://github.com/greydragon888/real-router/pull/276) [`7faf4c2`](https://github.com/greydragon888/real-router/commit/7faf4c24189b7f21c4c309503000e13317ffc01a) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `RouteNodeSource` leaking router subscriptions on unmount ([#270](https://github.com/greydragon888/real-router/issues/270))
+
+  Converted `RouteNodeSource` from eager to lazy-connection pattern: the router subscription is now created on the first listener and removed when the last listener unsubscribes. Snapshot is reconciled with current router state on reconnection to handle Activity hide/show cycles. `destroy()` remains available but is no longer required.
+
 ## 0.2.0
 
 ### Minor Changes
