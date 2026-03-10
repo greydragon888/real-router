@@ -47,7 +47,7 @@ src/
 ├── legacy.ts                   # Legacy entry point (React 18+)
 ├── RouterProvider.tsx           # Context provider — wires router to React tree
 ├── context.ts                  # Three React contexts (RouterContext, RouteContext, NavigatorContext)
-├── types.ts                    # RouteState, RouteContext, BaseLinkProps
+├── types.ts                    # RouteState, RouteContext, LinkProps
 ├── constants.ts                # EMPTY_PARAMS, EMPTY_OPTIONS (frozen singletons)
 ├── utils.ts                    # shouldNavigate() — click filtering
 ├── hooks/
@@ -59,10 +59,7 @@ src/
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
-    ├── BaseLink.tsx            # Low-level link with custom memo + active state
-    ├── Link.tsx                # BaseLink + useRouter (no route subscription)
-    ├── ConnectedLink.tsx       # BaseLink + useRouter + useRoute (every navigation)
-    ├── interfaces.ts           # BaseLinkProps with HTMLAnchorElement extension
+    ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
     └── modern/                 # [future] React 19.2-only components (ActivityRouteNode)
 ```
 
@@ -115,22 +112,17 @@ These subscribe to `@real-router/sources` stores. The source creates a `{ subscr
 ## Component Architecture
 
 ```
-BaseLink (memo + custom arePropsEqual)
-├── useIsActiveRoute() — subscription for active/inactive CSS
+Link (memo + areLinkPropsEqual)
+├── useRouter() — router instance from context (never re-renders)
 ├── useStableValue() — stabilizes routeParams/routeOptions objects
+├── useIsActiveRoute() — subscription for active/inactive CSS
 ├── href = router.buildUrl() || router.buildPath()
-└── onClick → router.navigate().catch(() => {})   # fire-and-forget
-
-Link = useRouter() + BaseLink
-   └── No route subscription — active state handled internally by BaseLink
-
-ConnectedLink = useRouter() + useRoute() + BaseLink
-   └── Re-renders on every navigation (for previousRoute-dependent logic)
+└── onClick → void router.navigate(...)   # fire-and-forget
 ```
 
-**BaseLink custom memo:** Uses `JSON.stringify` comparison for `routeParams` and `routeOptions` (objects), strict equality for primitives. Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`.
+**Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `JSON.stringify` for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`.
 
-**Navigation:** Fire-and-forget `router.navigate(...).catch(() => {})`. No success/error callbacks — users should call `router.navigate()` directly with `await` for per-navigation result handling.
+**Navigation:** Fire-and-forget `void router.navigate(...)`. No success/error callbacks — users should call `router.navigate()` directly with `await` for per-navigation result handling.
 
 ## Performance Optimizations
 
@@ -138,7 +130,7 @@ ConnectedLink = useRouter() + useRoute() + BaseLink
 | ---------------------------- | ---------------------- | --------------------------------------------------------------------------- |
 | Node-scoped subscriptions    | `useRouteNode`         | `shouldUpdateNode()` from `@real-router/sources` filters irrelevant changes |
 | JSON reference stabilization | `useStableValue`       | `JSON.stringify` memoization prevents new-object-per-render dependencies    |
-| Custom memo                  | `BaseLink`             | Deep equality on params/options, strict on primitives                       |
+| Custom memo comparator       | `Link`                 | `areLinkPropsEqual`: JSON for params/options, `===` for primitives          |
 | Frozen singletons            | `constants.ts`         | `EMPTY_PARAMS`, `EMPTY_OPTIONS` avoid allocation for default props          |
 | WeakMap caching              | `@real-router/sources` | Per-router selector functions cached, auto-evicted on GC                    |
 | Memoized navigator           | `RouterProvider`       | `getNavigator(router)` via `useMemo` — stable reference                     |
@@ -165,7 +157,7 @@ router emits TRANSITION_SUCCESS
     │
     └──► createActiveRouteSource.subscribe callback → boolean snapshot
             └──► if changed: useSyncExternalStore triggers re-render
-                    └──► useIsActiveRoute() / BaseLink active CSS updates
+                    └──► useIsActiveRoute() / Link active CSS updates
 ```
 
 ## Type System
@@ -178,22 +170,22 @@ interface RouteState<P extends Params = Params, MP extends Params = Params> {
 
 type RouteContext = { navigator: Navigator } & RouteState;
 
-interface BaseLinkProps {
-  router: Router;
+interface LinkProps<
+  P extends Params = Params,
+> extends HTMLAttributes<HTMLAnchorElement> {
   routeName: string;
-  routeParams?: Params;
-  routeOptions?: { reload?: boolean; replace?: boolean };
+  routeParams?: P;
+  routeOptions?: NavigationOptions;
   activeClassName?: string; // default: "active"
   activeStrict?: boolean; // default: false
   ignoreQueryParams?: boolean; // default: true
-  // ... HTMLAnchorElement attributes
+  target?: string;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
+  onMouseOver?: MouseEventHandler<HTMLAnchorElement>;
 }
 ```
 
-Two `BaseLinkProps` definitions exist:
-
-- `types.ts` — simplified, exported publicly via entry points
-- `components/interfaces.ts` — full version extending `HTMLAttributes<HTMLAnchorElement>`, used internally by components
+Single `LinkProps` definition in `types.ts`, extending `HTMLAttributes<HTMLAnchorElement>`. Exported publicly via both entry points.
 
 ## Testing Strategy
 
@@ -217,7 +209,7 @@ tests/
 | #   | RFC                                                        | Impact                                                                | Status      |
 | --- | ---------------------------------------------------------- | --------------------------------------------------------------------- | ----------- |
 | 1   | [react-18-19-split](/.claude/RFC-react-18-19-split.md)     | Infrastructure — dual entry points, `useContext` / `.Provider` syntax | Implemented |
-| 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                          | Draft       |
+| 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                          | Implemented |
 | 3   | [useRouterTransition](/.claude/RFC-useRouterTransition.md) | New hook for transition state                                         | Draft       |
 | 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                               | Draft       |
 | 5   | [react-activity](/.claude/RFC-react-activity.md)           | ActivityRouteNode in `components/modern/` (React 19.2 only)           | Draft       |

@@ -1,11 +1,7 @@
 // Main entry point — React 19.2+
 
 // Components
-export { BaseLink } from "./components/BaseLink";
-
 export { Link } from "./components/Link";
-
-export { ConnectedLink } from "./components/ConnectedLink";
 
 // Hooks
 export { useRouteNode } from "./hooks/useRouteNode";
@@ -26,6 +22,6 @@ export { RouterProvider } from "./RouterProvider";
 export { RouterContext, RouteContext, NavigatorContext } from "./context";
 
 // Types
-export type { BaseLinkProps } from "./types";
+export type { LinkProps } from "./types";
 
 export type { Navigator } from "@real-router/core";
