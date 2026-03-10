@@ -3,7 +3,7 @@
 // Components
 export { Link } from "./components/Link";
 
-export { RouteView } from "./components/RouteView";
+export { RouteView } from "./components/modern/RouteView";
 
 // Hooks
 export { useRouteNode } from "./hooks/useRouteNode";
@@ -32,7 +32,7 @@ export type {
   RouteViewProps,
   RouteViewMatchProps,
   RouteViewNotFoundProps,
-} from "./components/RouteView";
+} from "./components/modern/RouteView";
 
 export type { Navigator } from "@real-router/core";
 

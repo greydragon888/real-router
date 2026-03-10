@@ -20,7 +20,7 @@ Two entry points via `package.json` subpath exports. Single codebase, no duplica
 @real-router/react/legacy   →  src/legacy.ts   →  Same API minus React 19.2-only components (React 18+)
 ```
 
-Both files are pure re-exports. The difference: `index.ts` will include `components/modern/*` exports (e.g. `ActivityRouteNode`), `legacy.ts` will not. Currently both export the same set — modern components don't exist yet.
+Both files are pure re-exports. The difference: `index.ts` includes `components/modern/*` exports (e.g. `RouteView` with `keepAlive` support via React Activity), `legacy.ts` does not.
 
 **Build output** (tsup multi-entry with shared chunks):
 
@@ -60,8 +60,13 @@ src/
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
-    ├── RouteView.tsx           # Declarative route matching (RouteView + Match + NotFound)
-    └── modern/                 # [future] React 19.2-only components (ActivityRouteNode)
+    └── modern/
+        └── RouteView/          # React 19.2-only — declarative route matching with keepAlive
+            ├── index.ts        # Barrel re-exports
+            ├── RouteView.tsx   # RouteViewRoot + compound export (RouteView.Match, RouteView.NotFound)
+            ├── types.ts        # RouteViewProps, MatchProps, NotFoundProps
+            ├── components.tsx  # Match, NotFound marker components
+            └── helpers.tsx     # collectElements, buildRenderList, isSegmentMatch
 ```
 
 ## Context Architecture
@@ -207,13 +212,13 @@ tests/
 
 ## Pending Changes (RFC Roadmap)
 
-| #   | RFC                                                        | Impact                                                                | Status      |
-| --- | ---------------------------------------------------------- | --------------------------------------------------------------------- | ----------- |
-| 1   | [react-18-19-split](/.claude/RFC-react-18-19-split.md)     | Infrastructure — dual entry points, `useContext` / `.Provider` syntax | Implemented |
-| 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                          | Implemented |
-| 3   | [useRouterTransition](/.claude/RFC-useRouterTransition.md) | New hook for transition state                                         | Draft       |
-| 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                               | Implemented |
-| 5   | [react-activity](/.claude/RFC-react-activity.md)           | ActivityRouteNode in `components/modern/` (React 19.2 only)           | Draft       |
+| #   | RFC                                                        | Impact                                                                     | Status      |
+| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ----------- |
+| 1   | [react-18-19-split](/.claude/RFC-react-18-19-split.md)     | Infrastructure — dual entry points, `useContext` / `.Provider` syntax      | Implemented |
+| 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                               | Implemented |
+| 3   | [useRouterTransition](/.claude/RFC-useRouterTransition.md) | New hook for transition state                                              | Draft       |
+| 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                                    | Implemented |
+| 5   | [react-activity](/.claude/RFC-react-activity.md)           | `keepAlive` prop on `RouteView.Match` via React Activity (React 19.2 only) | Implemented |
 
 ## See Also
 

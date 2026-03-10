@@ -2,10 +2,7 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
-  // Components
   Link,
-  RouteView,
-  // Hooks
   useRouteNode,
   useRoute,
   useNavigator,
@@ -13,7 +10,6 @@ import {
   useRouteUtils,
   useIsActiveRoute,
   useRouterTransition,
-  // Context
   RouterProvider,
   RouterContext,
   RouteContext,
@@ -44,9 +40,12 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
   describe("exports availability", () => {
     it("should export all components", () => {
       expect(Link).toBeDefined();
-      expect(RouteView).toBeDefined();
-      expect(RouteView.Match).toBeDefined();
-      expect(RouteView.NotFound).toBeDefined();
+    });
+
+    it("should not export RouteView (React 19.2+ only)", async () => {
+      const legacyModule = await import("@real-router/react/legacy");
+
+      expect(legacyModule).not.toHaveProperty("RouteView");
     });
 
     it("should export all hooks", () => {
@@ -77,13 +76,10 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       expect(linkProps.routeName).toBe("test");
     });
 
-    it("should export RouteView types", () => {
-      const props: import("@real-router/react/legacy").RouteViewProps = {
-        nodeName: "",
-        children: null,
-      };
+    it("should not export RouteView types", async () => {
+      const legacyModule = await import("@real-router/react/legacy");
 
-      expect(props.nodeName).toBe("");
+      expect(legacyModule).not.toHaveProperty("RouteView");
     });
   });
 
