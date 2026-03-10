@@ -101,9 +101,30 @@ Call `source.destroy()` when the source is no longer needed.
 
 ---
 
+### `createTransitionSource(router)`
+
+Creates a source that tracks the router's transition lifecycle. Updates on `TRANSITION_START`, `TRANSITION_SUCCESS`, `TRANSITION_ERROR`, and `TRANSITION_CANCEL` events. Unlike other sources, this uses eager subscription (subscribes to events immediately, not lazily on first listener).\
+`router: Router` — router instance\
+Returns: `RouterSource<RouterTransitionSnapshot>`
+
+```typescript
+const source = createTransitionSource(router);
+
+source.subscribe(() => {
+  const { isTransitioning, toRoute, fromRoute } = source.getSnapshot();
+  if (isTransitioning) {
+    console.log(`Navigating: ${fromRoute?.name} → ${toRoute?.name}`);
+  }
+});
+```
+
+Call `source.destroy()` when the source is no longer needed.
+
+---
+
 ### `RouterSource<T>` Interface
 
-All three factories return a `RouterSource<T>`:
+All four factories return a `RouterSource<T>`:
 
 ```typescript
 interface RouterSource<T> {
@@ -126,14 +147,16 @@ import type {
   RouterSource,
   RouteSnapshot,
   RouteNodeSnapshot,
+  RouterTransitionSnapshot,
   ActiveRouteSourceOptions,
 } from "@real-router/sources";
 ```
 
 `RouteSnapshot` — full router state: `{ route: State | undefined, previousRoute: State | undefined }`\
 `RouteNodeSnapshot` — node-scoped state: `{ route: State | undefined, previousRoute: State | undefined }`\
+`RouterTransitionSnapshot` — transition state: `{ isTransitioning: boolean, toRoute: State | null, fromRoute: State | null }`\
 `ActiveRouteSourceOptions` — options for `createActiveRouteSource`: `{ strict?: boolean, ignoreQueryParams?: boolean }`\
-`RouterSource<T>` — the source interface returned by all three factories
+`RouterSource<T>` — the source interface returned by all four factories
 
 ---
 
