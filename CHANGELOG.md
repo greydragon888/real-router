@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-10]
 
+### @real-router/react@0.7.0
+
+### Minor Changes
+
+- [#266](https://github.com/greydragon888/real-router/pull/266) [`9c759cb`](https://github.com/greydragon888/real-router/commit/9c759cbafb1334e10d4987bf48b0fb3165dafb73) Thanks [@greydragon888](https://github.com/greydragon888)! - **BREAKING:** Consolidate Link components — remove `BaseLink` and `ConnectedLink` ([#258](https://github.com/greydragon888/real-router/issues/258))
+  - `Link` now subscribes to active state via `useIsActiveRoute` — re-renders only when its own active status changes
+  - `BaseLink` removed — `Link` takes router from context automatically
+  - `ConnectedLink` removed — `Link` provides the same granular reactivity with less overhead
+  - `BaseLinkProps` type replaced by `LinkProps<P>`
+  - Removed: `data-route` and `data-active` HTML attributes
+  - Fix: `routeOptions` (reload, replace) now correctly passed to navigation (previously silently dropped by `Link` and `ConnectedLink`)
+
+
 ### @real-router/react@0.6.0
 
 ### Minor Changes
