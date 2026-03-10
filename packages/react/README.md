@@ -258,6 +258,8 @@ Declarative route matching component. Subscribes to a route node and renders the
 `nodeName: string` — route node to subscribe to (`""` for root)\
 [Wiki](https://github.com/greydragon888/real-router/wiki/RouteView)
 
+> **Note:** `RouteView` is only available from the main entry point (`@real-router/react`). It requires React 19.2+ for `keepAlive` support via `<Activity>`.
+
 ```tsx
 import { RouteView } from "@real-router/react";
 
@@ -274,18 +276,35 @@ import { RouteView } from "@real-router/react";
 </RouteView>;
 ```
 
+##### `keepAlive`
+
+`<RouteView.Match>` accepts an optional `keepAlive` prop. When enabled, the matched component's state and DOM are preserved when navigating away, using React 19.2's `<Activity>` API.
+
+```tsx
+<RouteView nodeName="">
+  <RouteView.Match segment="users" keepAlive>
+    <UsersPage /> {/* State preserved when navigating away */}
+  </RouteView.Match>
+  <RouteView.Match segment="settings">
+    <SettingsPage /> {/* Unmounts normally */}
+  </RouteView.Match>
+</RouteView>
+```
+
+When the user navigates away from a `keepAlive` match, the component is hidden (via `<Activity mode="hidden">`) rather than unmounted. Navigating back restores the previous state instantly without re-mounting.
+
 ---
 
 ## Migration from React 18
 
-If upgrading from an older version that targeted React 18:
+If your app uses React 18 (or < 19.2), use the legacy entry point:
 
 ```diff
 - import { useRouteNode, Link } from '@real-router/react';
 + import { useRouteNode, Link } from '@real-router/react/legacy';
 ```
 
-One import path change. API is identical.
+One import path change. All hooks and `Link` work identically. The only difference: `RouteView` (which uses React 19.2's `<Activity>` for `keepAlive`) is not available from `/legacy`. Use `useRouteNode` with a switch/case pattern instead.
 
 ---
 
