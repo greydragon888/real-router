@@ -1,14 +1,15 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter, getRoutesApi } from "@real-router/core";
 import { render, screen, act } from "@testing-library/react";
-import { describe, beforeEach, afterEach, it, expect } from "vitest";
+import { useEffect, useRef } from "react";
+import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
-import type { ReactNode } from "react";
+import type { FC, ReactNode } from "react";
 
 describe("RouteView", () => {
   let router: Router;
@@ -466,6 +467,396 @@ describe("RouteView", () => {
       });
 
       expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("keepAlive", () => {
+    it("should wrap keepAlive Match in Activity mode=visible when active", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+      expect(screen.getByTestId("list")).toBeVisible();
+    });
+
+    it("should hide keepAlive Match via Activity mode=hidden on deactivation", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+      expect(screen.getByTestId("list")).not.toBeVisible();
+      expect(screen.getByTestId("view")).toBeVisible();
+    });
+
+    it("should not render keepAlive Match before first activation (lazy mount)", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list">
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+            <RouteView.Match segment="view" keepAlive>
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+      expect(screen.queryByTestId("view")).not.toBeInTheDocument();
+    });
+
+    it("should not change behavior of regular Match without keepAlive", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list">
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.queryByTestId("list")).not.toBeInTheDocument();
+      expect(screen.getByTestId("view")).toBeInTheDocument();
+    });
+
+    it("should render multiple keepAlive matches simultaneously (visible + hidden)", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+            <RouteView.Match segment="view" keepAlive>
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeVisible();
+      expect(screen.queryByTestId("view")).not.toBeInTheDocument();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("list")).toBeInTheDocument();
+      expect(screen.getByTestId("list")).not.toBeVisible();
+      expect(screen.getByTestId("view")).toBeVisible();
+    });
+
+    it("should switch Activity back to visible on reactivation", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <div data-testid="list">List</div>
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("list")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("list")).not.toBeVisible();
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(screen.getByTestId("list")).toBeVisible();
+      expect(screen.queryByTestId("view")).not.toBeInTheDocument();
+    });
+
+    it("should call useEffect cleanup on hidden and setup on visible", async () => {
+      const setup = vi.fn();
+      const cleanup = vi.fn();
+
+      const TrackedComponent: FC = () => {
+        useEffect(() => {
+          setup();
+
+          return () => {
+            cleanup();
+          };
+        }, []);
+
+        return <div data-testid="tracked">Tracked</div>;
+      };
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <TrackedComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      const setupAfterMount = setup.mock.calls.length;
+      const cleanupAfterMount = cleanup.mock.calls.length;
+
+      expect(setupAfterMount).toBeGreaterThan(0);
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(cleanup.mock.calls.length).toBeGreaterThan(cleanupAfterMount);
+
+      const setupBeforeReactivation = setup.mock.calls.length;
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(setup.mock.calls.length).toBeGreaterThan(setupBeforeReactivation);
+    });
+
+    it("should work with keepAlive + exact matching", async () => {
+      await router.start("/users");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" exact keepAlive>
+              <div data-testid="users-exact">Users Exact</div>
+            </RouteView.Match>
+            <RouteView.Match segment="about">
+              <div data-testid="about">About</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users-exact")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("about");
+      });
+
+      expect(screen.getByTestId("users-exact")).not.toBeVisible();
+      expect(screen.getByTestId("about")).toBeVisible();
+    });
+
+    it("should render NotFound and keep hidden keepAlive on UNKNOWN_ROUTE", async () => {
+      const notFoundRouter = createRouter(
+        [
+          { name: "test", path: "/" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+          { name: "about", path: "/about" },
+        ],
+        { defaultRoute: "test", allowNotFound: true },
+      );
+
+      notFoundRouter.usePlugin(browserPluginFactory({}));
+      await notFoundRouter.start("/users/list");
+
+      render(
+        <RouterProvider router={notFoundRouter}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" keepAlive>
+              <div data-testid="users">Users</div>
+            </RouteView.Match>
+            <RouteView.NotFound>
+              <div data-testid="not-found">404</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users")).toBeVisible();
+
+      act(() => {
+        notFoundRouter.navigateToNotFound("/unknown");
+      });
+
+      expect(screen.getByTestId("users")).not.toBeVisible();
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+
+      notFoundRouter.stop();
+    });
+
+    it("should render NotFound on UNKNOWN_ROUTE without keepAlive (unchanged)", async () => {
+      const notFoundRouter = createRouter(
+        [
+          { name: "test", path: "/" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+        ],
+        { defaultRoute: "test", allowNotFound: true },
+      );
+
+      notFoundRouter.usePlugin(browserPluginFactory({}));
+      await notFoundRouter.start("/users/list");
+
+      render(
+        <RouterProvider router={notFoundRouter}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="users">Users</div>
+            </RouteView.Match>
+            <RouteView.NotFound>
+              <div data-testid="not-found">404</div>
+            </RouteView.NotFound>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+
+      act(() => {
+        notFoundRouter.navigateToNotFound("/unknown");
+      });
+
+      expect(screen.queryByTestId("users")).not.toBeInTheDocument();
+      expect(screen.getByTestId("not-found")).toBeInTheDocument();
+
+      notFoundRouter.stop();
+    });
+
+    it("should preserve DOM state across hide/show cycles", async () => {
+      const InputComponent: FC = () => {
+        const inputRef = useRef<HTMLInputElement>(null);
+
+        return (
+          <input ref={inputRef} data-testid="input" defaultValue="typed" />
+        );
+      };
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="users">
+            <RouteView.Match segment="list" keepAlive>
+              <InputComponent />
+            </RouteView.Match>
+            <RouteView.Match segment="view">
+              <div data-testid="view">View</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      const input = screen.getByTestId("input");
+
+      expect((input as HTMLInputElement).value).toBe("typed");
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      const restoredInput = screen.getByTestId("input");
+
+      expect((restoredInput as HTMLInputElement).value).toBe("typed");
+    });
+
+    it("should work with multiple RouteView at same level independently", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" keepAlive>
+              <div data-testid="nav-users">Nav Users</div>
+            </RouteView.Match>
+            <RouteView.Match segment="about">
+              <div data-testid="nav-about">Nav About</div>
+            </RouteView.Match>
+          </RouteView>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users" keepAlive>
+              <div data-testid="content-users">Content Users</div>
+            </RouteView.Match>
+            <RouteView.Match segment="about">
+              <div data-testid="content-about">Content About</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("nav-users")).toBeVisible();
+      expect(screen.getByTestId("content-users")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("about");
+      });
+
+      expect(screen.getByTestId("nav-users")).not.toBeVisible();
+      expect(screen.getByTestId("content-users")).not.toBeVisible();
+      expect(screen.getByTestId("nav-about")).toBeVisible();
+      expect(screen.getByTestId("content-about")).toBeVisible();
     });
   });
 });
