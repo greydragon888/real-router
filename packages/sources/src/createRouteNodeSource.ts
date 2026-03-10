@@ -3,7 +3,7 @@ import { computeSnapshot } from "./computeSnapshot.js";
 import { getCachedShouldUpdate } from "./shouldUpdateCache.js";
 
 import type { RouteNodeSnapshot, RouterSource } from "./types.js";
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core";
 
 class RouteNodeSource implements RouterSource<RouteNodeSnapshot> {
   readonly #source: BaseSource<RouteNodeSnapshot>;

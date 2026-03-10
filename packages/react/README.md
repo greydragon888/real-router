@@ -201,6 +201,29 @@ const Breadcrumbs = () => {
 };
 ```
 
+#### `useRouterTransition(): RouterTransitionSnapshot`
+
+Track router transition lifecycle (start/success/error/cancel). **Re-renders on transition start and end.**\
+Returns: `RouterTransitionSnapshot` — `{ isTransitioning: boolean, toRoute: State | null, fromRoute: State | null }`
+
+```tsx
+import { useRouterTransition } from "@real-router/react";
+
+const GlobalProgress = () => {
+  const { isTransitioning, toRoute, fromRoute } = useRouterTransition();
+
+  if (!isTransitioning) return null;
+
+  return (
+    <div className="progress-bar">
+      Navigating from {fromRoute?.name} to {toRoute?.name}…
+    </div>
+  );
+};
+```
+
+Useful for progress bars, loading overlays, and disabling UI during async navigation guards. Returns `{ isTransitioning: false, toRoute: null, fromRoute: null }` when idle.
+
 ---
 
 ### Components

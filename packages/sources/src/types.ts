@@ -1,4 +1,4 @@
-import type { State } from "@real-router/types";
+import type { State } from "@real-router/core";
 
 export interface RouteSnapshot {
   route: State | undefined;
@@ -19,4 +19,10 @@ export interface RouterSource<T> {
 export interface ActiveRouteSourceOptions {
   strict?: boolean;
   ignoreQueryParams?: boolean;
+}
+
+export interface RouterTransitionSnapshot {
+  isTransitioning: boolean;
+  toRoute: State | null;
+  fromRoute: State | null;
 }

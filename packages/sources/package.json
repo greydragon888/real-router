@@ -52,11 +52,10 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@real-router/route-utils": "workspace:^",
-    "@real-router/types": "workspace:^"
+    "@real-router/core": "workspace:^",
+    "@real-router/route-utils": "workspace:^"
   },
   "devDependencies": {
-    "@real-router/core": "workspace:^",
     "mitata": "1.0.34"
   }
 }

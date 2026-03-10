@@ -9,6 +9,7 @@
  * 2. Subscription - Subscribe/unsubscribe cycles, getSnapshot hot path
  * 3. Notification - Navigation event handling, dedup filtering
  * 4. Stress - Fan-out, many sources, rapid lifecycle, WeakMap cache
+ * 5. Transition - Event-based transition source lifecycle and notification
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -21,6 +22,7 @@ import "./creation.bench";
 import "./subscription.bench";
 import "./notification.bench";
 import "./stress.bench";
+import "./transition.bench";
 
 // ============================================================================
 // Run benchmarks and save results

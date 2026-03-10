@@ -82,7 +82,7 @@ graph TD
     LP -->|dep| LOG
 
     SOURCES -->|dep| ROUTEUTILS
-    SOURCES -->|dep| TYPES
+    SOURCES -->|dep| CORE
 
     REACT["@real-router/react<br/>(main + /legacy)"]
     REACT -->|dep| CORE
