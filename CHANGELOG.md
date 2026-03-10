@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-10]
+
+### @real-router/react@0.6.0
+
+### Minor Changes
+
+- [#263](https://github.com/greydragon888/real-router/pull/263) [`7cdb227`](https://github.com/greydragon888/real-router/commit/7cdb2271f765a1839efc3e1fe6f1a20301ded408) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `./legacy` subpath export for React 18+ compatibility ([#257](https://github.com/greydragon888/real-router/issues/257))
+
+  **BREAKING:** Main entry point (`@real-router/react`) now targets React 19.2+. React 18 users must switch to the legacy entry.
+
+  **Migration:**
+
+  ```diff
+  - import { RouterProvider, useRouteNode, Link } from '@real-router/react';
+  + import { RouterProvider, useRouteNode, Link } from '@real-router/react/legacy';
+  ```
+
+  Both entry points share the same code and export the same API. The `/legacy` entry excludes future React 19.2-only components (e.g., `ActivityRouteNode`).
+
 ## [2026-03-08]
 
 ### @real-router/logger-plugin@0.3.0
