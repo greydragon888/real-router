@@ -4,6 +4,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import {
   // Components
   Link,
+  RouteView,
   // Hooks
   useRouteNode,
   useRoute,
@@ -43,6 +44,9 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
   describe("exports availability", () => {
     it("should export all components", () => {
       expect(Link).toBeDefined();
+      expect(RouteView).toBeDefined();
+      expect(RouteView.Match).toBeDefined();
+      expect(RouteView.NotFound).toBeDefined();
     });
 
     it("should export all hooks", () => {
@@ -71,6 +75,15 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       };
 
       expect(linkProps.routeName).toBe("test");
+    });
+
+    it("should export RouteView types", () => {
+      const props: import("@real-router/react/legacy").RouteViewProps = {
+        nodeName: "",
+        children: null,
+      };
+
+      expect(props.nodeName).toBe("");
     });
   });
 

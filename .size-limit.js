@@ -12,18 +12,15 @@ const addDevelopmentCondition = (config) => ({
 });
 
 export default [
+  // ── Core ──────────────────────────────────────────────────────────
   {
     name: "@real-router/core (ESM)",
     path: "packages/core/dist/esm/index.mjs",
     limit: "25 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
-  {
-    name: "@real-router/fsm (ESM)",
-    path: "packages/fsm/dist/esm/index.mjs",
-    limit: "0.5 kB",
-    modifyEsbuildConfig: addDevelopmentCondition,
-  },
+
+  // ── UI Bindings ───────────────────────────────────────────────────
   {
     name: "@real-router/react (ESM)",
     path: "packages/react/dist/esm/index.mjs",
@@ -37,6 +34,22 @@ export default [
     ],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/sources (ESM)",
+    path: "packages/sources/dist/esm/index.mjs",
+    limit: "1 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "@real-router/rx (ESM)",
+    path: "packages/rx/dist/esm/index.mjs",
+    limit: "1.5 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+
+  // ── Plugins ───────────────────────────────────────────────────────
   {
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",
@@ -64,30 +77,34 @@ export default [
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
-  {
-    name: "@real-router/rx (ESM)",
-    path: "packages/rx/dist/esm/index.mjs",
-    limit: "1.5 kB",
-    ignore: ["@real-router/core"],
-    modifyEsbuildConfig: addDevelopmentCondition,
-  },
+
+  // ── Utilities ─────────────────────────────────────────────────────
   {
     name: "@real-router/route-utils (ESM)",
     path: "packages/route-utils/dist/esm/index.mjs",
     limit: "1 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+
+  // ── Standalone (zero deps) ────────────────────────────────────────
   {
-    name: "@real-router/sources (ESM)",
-    path: "packages/sources/dist/esm/index.mjs",
-    limit: "1 kB",
-    ignore: ["@real-router/core"],
+    name: "@real-router/fsm (ESM)",
+    path: "packages/fsm/dist/esm/index.mjs",
+    limit: "0.5 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
     name: "@real-router/logger (ESM)",
     path: "packages/logger/dist/esm/index.mjs",
     limit: "0.5 kB",
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+
+  // ── Internal (bundled into consumers) ─────────────────────────────
+  {
+    name: "route-tree (ESM)",
+    path: "packages/route-tree/dist/esm/index.mjs",
+    limit: "6 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -97,9 +114,10 @@ export default [
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
-    name: "route-tree (ESM)",
-    path: "packages/route-tree/dist/esm/index.mjs",
-    limit: "6 kB",
+    name: "browser-env (ESM)",
+    path: "packages/browser-env/dist/esm/index.mjs",
+    limit: "2 kB",
+    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -118,13 +136,6 @@ export default [
     name: "event-emitter (ESM)",
     path: "packages/event-emitter/dist/esm/index.mjs",
     limit: "1 kB",
-    modifyEsbuildConfig: addDevelopmentCondition,
-  },
-  {
-    name: "browser-env (ESM)",
-    path: "packages/browser-env/dist/esm/index.mjs",
-    limit: "2 kB",
-    ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
 ];
