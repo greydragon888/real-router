@@ -77,7 +77,7 @@ export const Link: FC<LinkProps> = memo(
         }
 
         evt.preventDefault();
-        void router.navigate(routeName, stableParams, stableOptions);
+        router.navigate(routeName, stableParams, stableOptions).catch(() => {});
       },
       [onClick, target, router, routeName, stableParams, stableOptions],
     );
