@@ -1,5 +1,5 @@
 import type { RouteSnapshot, RouterSource } from "./types.js";
-import type { Router } from "@real-router/types";
+import type { Router } from "@real-router/core";
 
 class RouteSource implements RouterSource<RouteSnapshot> {
   #routerUnsubscribe: (() => void) | null = null;

@@ -3,7 +3,7 @@ import { areRoutesRelated } from "@real-router/route-utils";
 import { BaseSource } from "./BaseSource";
 
 import type { ActiveRouteSourceOptions, RouterSource } from "./types.js";
-import type { Params, Router } from "@real-router/types";
+import type { Params, Router } from "@real-router/core";
 
 class ActiveRouteSource implements RouterSource<boolean> {
   readonly #source: BaseSource<boolean>;

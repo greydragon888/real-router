@@ -371,16 +371,13 @@ importers:
 
   packages/sources:
     dependencies:
-      '@real-router/route-utils':
-        specifier: workspace:^
-        version: link:../route-utils
-      '@real-router/types':
-        specifier: workspace:^
-        version: link:../core-types
-    devDependencies:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/route-utils':
+        specifier: workspace:^
+        version: link:../route-utils
+    devDependencies:
       mitata:
         specifier: 1.0.34
         version: 1.0.34
