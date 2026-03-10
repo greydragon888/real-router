@@ -207,7 +207,7 @@ const Breadcrumbs = () => {
 
 #### `<Link routeName={string} routeParams={object} ...props>`
 
-Navigation link with automatic active state detection.\
+Navigation link with automatic active state detection. Re-renders only when its own active status changes.\
 `routeName: string` — target route name\
 `routeParams?: Params` — route parameters\
 `routeOptions?: { reload?, replace? }` — navigation options\
@@ -229,19 +229,6 @@ import { Link } from "@real-router/react";
 </Link>;
 ```
 
-#### `<ConnectedLink ...props>`
-
-Same as `Link`, but re-renders on every route change.\
-Props: same as `Link`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/ConnectedLink)
-
-#### `<BaseLink router={router} ...props>`
-
-Low-level link component. Requires router instance as prop.\
-`router: Router` — router instance\
-Props: same as `Link`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/BaseLink)
-
 ---
 
 ## Migration from React 18
@@ -262,7 +249,7 @@ One import path change. API is identical.
 | API                                           | react-router5 | @real-router/react |
 | --------------------------------------------- | ------------- | ------------------ |
 | `RouterProvider`                              | ✓             | ✓                  |
-| `Link`, `ConnectedLink`, `BaseLink`           | ✓             | ✓                  |
+| `Link`                                        | ✓             | ✓                  |
 | `useRouter`, `useRoute`, `useRouteNode`       | ✓             | ✓                  |
 | `withRouter`, `withRoute`, `routeNode`        | ✓             | ❌ Use hooks       |
 | `Router`, `Route`, `RouteNode` (render props) | ✓             | ❌ Use hooks       |

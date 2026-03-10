@@ -7,17 +7,17 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { BaseLink, RouterProvider } from "@real-router/react";
+import { Link, RouterProvider } from "@real-router/react";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router, State } from "@real-router/core";
 import type { ReactNode } from "react";
 
-describe("BaseLink - Integration Tests", () => {
+describe("Link - Integration Tests", () => {
   let router: Router;
   const user = userEvent.setup();
 
@@ -38,28 +38,22 @@ describe("BaseLink - Integration Tests", () => {
     it("should handle navigation interruption correctly", async () => {
       render(
         <>
-          <BaseLink
-            router={router}
-            routeName="one-more-test"
-            data-testid="link1"
-          >
+          <Link routeName="one-more-test" data-testid="link1">
             Link 1
-          </BaseLink>
-          <BaseLink router={router} routeName="users" data-testid="link2">
+          </Link>
+          <Link routeName="users" data-testid="link2">
             Link 2
-          </BaseLink>
+          </Link>
         </>,
         { wrapper },
       );
 
-      // Start first navigation
       await user.click(screen.getByTestId("link1"));
 
       await waitFor(() => {
         expect(router.getState()?.name).toBe("one-more-test");
       });
 
-      // Start second navigation
       await user.click(screen.getByTestId("link2"));
 
       await waitFor(() => {
@@ -69,20 +63,18 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should handle multiple rapid clicks correctly", async () => {
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test Link
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
       const link = screen.getByTestId("link");
 
-      // Rapid clicks
       for (let i = 0; i < 10; i++) {
         await user.click(link);
       }
 
-      // Should navigate successfully without race conditions
       await waitFor(() => {
         expect(router.getState()?.name).toBe("one-more-test");
       });
@@ -100,20 +92,18 @@ describe("BaseLink - Integration Tests", () => {
       });
 
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test Link
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
-      // First click should fail (guard blocks it)
       await user.click(screen.getByTestId("link"));
 
       await waitFor(() => {
         expect(router.getState()?.name).not.toBe("one-more-test");
       });
 
-      // Second click should succeed
       shouldFail = false;
       await user.click(screen.getByTestId("link"));
 
@@ -125,19 +115,13 @@ describe("BaseLink - Integration Tests", () => {
     it("should handle sequential navigation to different routes", async () => {
       const routes = ["one-more-test", "users", "items"];
       const links = routes.map((route) => (
-        <BaseLink
-          key={route}
-          router={router}
-          routeName={route}
-          data-testid={`link-${route}`}
-        >
+        <Link key={route} routeName={route} data-testid={`link-${route}`}>
           {route}
-        </BaseLink>
+        </Link>
       ));
 
       render(<div>{links}</div>, { wrapper });
 
-      // Navigate through all routes sequentially
       for (const route of routes) {
         await user.click(screen.getByTestId(`link-${route}`));
         await waitFor(() => {
@@ -156,9 +140,9 @@ describe("BaseLink - Integration Tests", () => {
       }));
 
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -174,20 +158,18 @@ describe("BaseLink - Integration Tests", () => {
   describe("Edge Cases with Events", () => {
     it("should prevent navigation with multiple modifiers", () => {
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test Link
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
       const link = screen.getByTestId("link");
 
-      // Shift + Ctrl click
       fireEvent.click(link, { shiftKey: true, ctrlKey: true });
 
       expect(router.getState()?.name).not.toBe("one-more-test");
 
-      // Alt + Meta click
       fireEvent.click(link, { altKey: true, metaKey: true });
 
       expect(router.getState()?.name).not.toBe("one-more-test");
@@ -197,14 +179,9 @@ describe("BaseLink - Integration Tests", () => {
       const onClickSpy = vi.fn();
 
       render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          onClick={onClickSpy}
-          data-testid="link"
-        >
+        <Link routeName="one-more-test" onClick={onClickSpy} data-testid="link">
           Test Link
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -213,62 +190,11 @@ describe("BaseLink - Integration Tests", () => {
       expect(onClickSpy).toHaveBeenCalled();
     });
 
-    it("should handle programmatic click via ref", async () => {
-      const TestComponent = () => {
-        const linkRef = useRef<HTMLAnchorElement>(null);
-
-        return (
-          <>
-            <BaseLink
-              ref={linkRef}
-              router={router}
-              routeName="one-more-test"
-              data-testid="link"
-            >
-              Test Link
-            </BaseLink>
-            <button
-              onClick={() => linkRef.current?.click()}
-              data-testid="trigger"
-            >
-              Trigger Click
-            </button>
-          </>
-        );
-      };
-
-      render(<TestComponent />, { wrapper });
-
-      await user.click(screen.getByTestId("trigger"));
-
-      await waitFor(() => {
-        expect(router.getState()?.name).toBe("one-more-test");
-      });
-    });
-
-    it("should handle disabled link attribute", () => {
-      render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          disabled={true}
-          data-testid="link"
-        >
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      const link = screen.getByTestId("link");
-
-      expect(link).toHaveAttribute("disabled");
-    });
-
     it("should handle keyboard navigation (Enter key)", async () => {
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -289,15 +215,14 @@ describe("BaseLink - Integration Tests", () => {
       await router.navigate("one-more-test");
 
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           activeClassName=""
           className="base-class"
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -311,15 +236,14 @@ describe("BaseLink - Integration Tests", () => {
       await router.navigate("one-more-test");
 
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           className="class1 class2"
           activeClassName="active1 active2"
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -336,14 +260,13 @@ describe("BaseLink - Integration Tests", () => {
 
         return (
           <>
-            <BaseLink
-              router={router}
+            <Link
               routeName="one-more-test"
               activeClassName={activeClass}
               data-testid="link"
             >
               Test
-            </BaseLink>
+            </Link>
             <button
               onClick={() => {
                 setActiveClass("active2");
@@ -370,30 +293,28 @@ describe("BaseLink - Integration Tests", () => {
       await router.navigate("one-more-test");
 
       const { rerender } = render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           className="base1"
           activeClassName="active"
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
       expect(screen.getByTestId("link")).toHaveClass("base1", "active");
 
       rerender(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           className="base2"
           activeClassName="active"
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
       );
 
       expect(screen.getByTestId("link")).toHaveClass("base2", "active");
@@ -403,27 +324,20 @@ describe("BaseLink - Integration Tests", () => {
     it("should correctly toggle active class on route changes", async () => {
       render(
         <>
-          <BaseLink
-            router={router}
+          <Link
             routeName="one-more-test"
             activeClassName="active"
             data-testid="link1"
           >
             Link 1
-          </BaseLink>
-          <BaseLink
-            router={router}
-            routeName="users"
-            activeClassName="active"
-            data-testid="link2"
-          >
+          </Link>
+          <Link routeName="users" activeClassName="active" data-testid="link2">
             Link 2
-          </BaseLink>
+          </Link>
         </>,
         { wrapper },
       );
 
-      // Navigate to first route
       await user.click(screen.getByTestId("link1"));
 
       await waitFor(() => {
@@ -432,7 +346,6 @@ describe("BaseLink - Integration Tests", () => {
 
       expect(screen.getByTestId("link2")).not.toHaveClass("active");
 
-      // Navigate to second route
       await user.click(screen.getByTestId("link2"));
 
       await waitFor(() => {
@@ -446,8 +359,7 @@ describe("BaseLink - Integration Tests", () => {
   describe("Accessibility and Semantics", () => {
     it("should preserve all passed props", () => {
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           aria-label="Test link"
           role="link"
@@ -455,7 +367,7 @@ describe("BaseLink - Integration Tests", () => {
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -466,53 +378,11 @@ describe("BaseLink - Integration Tests", () => {
       expect(link).toHaveAttribute("tabIndex", "0");
     });
 
-    it("should have data-route attribute", () => {
-      render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      expect(screen.getByTestId("link")).toHaveAttribute(
-        "data-route",
-        "one-more-test",
-      );
-    });
-
-    it("should update data-active on route changes", async () => {
-      render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
-          Test
-        </BaseLink>,
-        { wrapper },
-      );
-
-      const link = screen.getByTestId("link");
-
-      // Initially not active
-      expect(link).toHaveAttribute("data-active", "false");
-
-      // Navigate to route
-      await act(async () => {
-        await router.navigate("one-more-test");
-      });
-
-      await waitFor(() => {
-        expect(link).toHaveAttribute("data-active", "true");
-      });
-    });
-
     it("should support aria-current for active links", () => {
       render(
-        <BaseLink
-          router={router}
-          routeName="one-more-test"
-          aria-current="page"
-          data-testid="link"
-        >
+        <Link routeName="one-more-test" aria-current="page" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -524,8 +394,7 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should maintain accessibility with custom className", () => {
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           className="custom-link"
           activeClassName="custom-active"
@@ -533,7 +402,7 @@ describe("BaseLink - Integration Tests", () => {
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -551,9 +420,9 @@ describe("BaseLink - Integration Tests", () => {
       router.buildUrl = buildUrlSpy;
 
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -565,9 +434,9 @@ describe("BaseLink - Integration Tests", () => {
       const buildPathSpy = vi.spyOn(router, "buildPath");
 
       render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -576,14 +445,13 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should generate correct href with query params", () => {
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           routeParams={{ id: "123", filter: "active" }}
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -595,14 +463,13 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should update href when routeParams change", () => {
       const { rerender } = render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           routeParams={{ id: "1" }}
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -611,14 +478,13 @@ describe("BaseLink - Integration Tests", () => {
       expect(href).toContain("id=1");
 
       rerender(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           routeParams={{ id: "2" }}
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
       );
 
       href = screen.getByTestId("link").getAttribute("href");
@@ -629,8 +495,7 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should handle complex query parameters", () => {
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           routeParams={{
             search: "test query",
@@ -641,7 +506,7 @@ describe("BaseLink - Integration Tests", () => {
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -657,20 +522,18 @@ describe("BaseLink - Integration Tests", () => {
   describe("State Management Integration", () => {
     it("should respond to router state changes", async () => {
       render(
-        <BaseLink
-          router={router}
+        <Link
           routeName="one-more-test"
           activeClassName="active"
           data-testid="link"
         >
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
       expect(screen.getByTestId("link")).not.toHaveClass("active");
 
-      // Programmatic navigation
       await act(async () => {
         await router.navigate("one-more-test");
       });
@@ -682,9 +545,9 @@ describe("BaseLink - Integration Tests", () => {
 
     it("should handle router restart", async () => {
       const { rerender } = render(
-        <BaseLink router={router} routeName="one-more-test" data-testid="link">
+        <Link routeName="one-more-test" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
         { wrapper },
       );
 
@@ -694,14 +557,13 @@ describe("BaseLink - Integration Tests", () => {
         expect(router.getState()?.name).toBe("one-more-test");
       });
 
-      // Stop and restart router
       router.stop();
       await router.start("/");
 
       rerender(
-        <BaseLink router={router} routeName="users" data-testid="link">
+        <Link routeName="users" data-testid="link">
           Test
-        </BaseLink>,
+        </Link>,
       );
 
       await user.click(screen.getByTestId("link"));

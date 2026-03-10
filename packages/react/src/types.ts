@@ -1,7 +1,10 @@
-// packages/react/modules/types.ts
-
-import type { Params, Navigator, Router, State } from "@real-router/core";
-import type { MouseEvent, ReactNode } from "react";
+import type {
+  NavigationOptions,
+  Params,
+  Navigator,
+  State,
+} from "@real-router/core";
+import type { HTMLAttributes, MouseEventHandler } from "react";
 
 export interface RouteState<
   P extends Params = Params,
@@ -15,22 +18,16 @@ export type RouteContext = {
   navigator: Navigator;
 } & RouteState;
 
-export interface BaseLinkProps {
-  [key: string]: unknown;
-  router: Router;
+export interface LinkProps<
+  P extends Params = Params,
+> extends HTMLAttributes<HTMLAnchorElement> {
   routeName: string;
-  routeParams?: Params;
-  routeOptions?: {
-    [key: string]: unknown;
-    reload?: boolean;
-    replace?: boolean;
-  };
-  className?: string;
+  routeParams?: P;
+  routeOptions?: NavigationOptions;
   activeClassName?: string;
   activeStrict?: boolean;
   ignoreQueryParams?: boolean;
-  onClick?: (evt: MouseEvent<HTMLAnchorElement>) => void;
   target?: string;
-  children?: ReactNode;
-  previousRoute?: State;
+  onClick?: MouseEventHandler<HTMLAnchorElement>;
+  onMouseOver?: MouseEventHandler<HTMLAnchorElement>;
 }

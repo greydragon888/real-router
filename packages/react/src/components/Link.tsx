@@ -1,16 +1,109 @@
-// packages/react/modules/components/Link.tsx
+import { memo, useCallback, useMemo } from "react";
 
-import { BaseLink } from "./BaseLink";
+import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
+import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
+import { useStableValue } from "../hooks/useStableValue";
+import { shouldNavigate } from "../utils";
 
-import type { BaseLinkProps } from "./interfaces";
-import type { FC } from "react";
+import type { LinkProps } from "../types";
+import type { FC, MouseEvent } from "react";
 
-export const Link: FC<Omit<BaseLinkProps, "router">> = (props) => {
-  const router = useRouter();
+function areLinkPropsEqual(
+  prev: Readonly<LinkProps>,
+  next: Readonly<LinkProps>,
+): boolean {
+  return (
+    prev.routeName === next.routeName &&
+    prev.className === next.className &&
+    prev.activeClassName === next.activeClassName &&
+    prev.activeStrict === next.activeStrict &&
+    prev.ignoreQueryParams === next.ignoreQueryParams &&
+    prev.onClick === next.onClick &&
+    prev.target === next.target &&
+    prev.style === next.style &&
+    prev.children === next.children &&
+    JSON.stringify(prev.routeParams) === JSON.stringify(next.routeParams) &&
+    JSON.stringify(prev.routeOptions) === JSON.stringify(next.routeOptions)
+  );
+}
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { route, previousRoute, routeOptions, ...linkProps } = props;
+export const Link: FC<LinkProps> = memo(
+  ({
+    routeName,
+    routeParams = EMPTY_PARAMS,
+    routeOptions = EMPTY_OPTIONS,
+    className,
+    activeClassName = "active",
+    activeStrict = false,
+    ignoreQueryParams = true,
+    onClick,
+    target,
+    children,
+    ...props
+  }) => {
+    const router = useRouter();
 
-  return <BaseLink router={router} {...linkProps} />;
-};
+    const stableParams = useStableValue(routeParams);
+    const stableOptions = useStableValue(routeOptions);
+
+    const isActive = useIsActiveRoute(
+      routeName,
+      stableParams,
+      activeStrict,
+      ignoreQueryParams,
+    );
+
+    const href = useMemo(() => {
+      if (typeof router.buildUrl === "function") {
+        return router.buildUrl(routeName, stableParams);
+      }
+
+      return router.buildPath(routeName, stableParams);
+    }, [router, routeName, stableParams]);
+
+    const handleClick = useCallback(
+      (evt: MouseEvent<HTMLAnchorElement>) => {
+        if (onClick) {
+          onClick(evt);
+
+          if (evt.defaultPrevented) {
+            return;
+          }
+        }
+
+        if (!shouldNavigate(evt) || target === "_blank") {
+          return;
+        }
+
+        evt.preventDefault();
+        void router.navigate(routeName, stableParams, stableOptions);
+      },
+      [onClick, target, router, routeName, stableParams, stableOptions],
+    );
+
+    const finalClassName = useMemo(() => {
+      if (isActive && activeClassName) {
+        return className
+          ? `${className} ${activeClassName}`.trim()
+          : activeClassName;
+      }
+
+      return className ?? undefined;
+    }, [isActive, className, activeClassName]);
+
+    return (
+      <a
+        {...props}
+        href={href}
+        className={finalClassName}
+        onClick={handleClick}
+      >
+        {children}
+      </a>
+    );
+  },
+  areLinkPropsEqual,
+);
+
+Link.displayName = "Link";

@@ -3,9 +3,7 @@ import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import {
   // Components
-  BaseLink,
   Link,
-  ConnectedLink,
   // Hooks
   useRouteNode,
   useRoute,
@@ -43,9 +41,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
 
   describe("exports availability", () => {
     it("should export all components", () => {
-      expect(BaseLink).toBeDefined();
       expect(Link).toBeDefined();
-      expect(ConnectedLink).toBeDefined();
     });
 
     it("should export all hooks", () => {
@@ -67,9 +63,8 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       expect(RouterProvider).toBeDefined();
     });
 
-    it("should export BaseLinkProps type", () => {
-      const linkProps: import("@real-router/react/legacy").BaseLinkProps = {
-        router,
+    it("should export LinkProps type", () => {
+      const linkProps: import("@real-router/react/legacy").LinkProps = {
         routeName: "test",
       };
 
