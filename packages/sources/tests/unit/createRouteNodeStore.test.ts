@@ -66,7 +66,6 @@ describe("createRouteNodeSources", () => {
 
     source.subscribe(listener);
 
-    // Navigate home → admin (users is not involved)
     await router.navigate("admin");
 
     expect(listener).not.toHaveBeenCalled();
@@ -100,6 +99,8 @@ describe("createRouteNodeSources", () => {
   it("route = undefined when node is not active", async () => {
     const source = createRouteNodeSource(router, "users");
 
+    source.subscribe(() => {});
+
     await router.navigate("users");
 
     expect(source.getSnapshot().route?.name).toBe("users");
@@ -112,6 +113,8 @@ describe("createRouteNodeSources", () => {
   it("node active for child routes (users active when on users.view)", async () => {
     const source = createRouteNodeSource(router, "users");
 
+    source.subscribe(() => {});
+
     await router.navigate("users.view", { id: "42" });
 
     expect(source.getSnapshot().route?.name).toBe("users.view");
@@ -119,12 +122,13 @@ describe("createRouteNodeSources", () => {
 
   it("dedup: same snapshot reference when navigation doesn't affect node", async () => {
     const source = createRouteNodeSource(router, "admin");
+
+    source.subscribe(() => {});
+
     const initialSnapshot = source.getSnapshot();
 
-    // Navigate between unrelated routes (home → users)
     await router.navigate("users");
 
-    // admin is never active, snapshot reference should be identical
     expect(source.getSnapshot()).toBe(initialSnapshot);
   });
 
@@ -132,13 +136,14 @@ describe("createRouteNodeSources", () => {
     const source1 = createRouteNodeSource(router, "users");
     const source2 = createRouteNodeSource(router, "users");
 
+    source1.subscribe(() => {});
+    source2.subscribe(() => {});
+
     await router.navigate("users");
 
-    // Both sources reflect the navigation correctly
     expect(source1.getSnapshot().route?.name).toBe("users");
     expect(source2.getSnapshot().route?.name).toBe("users");
 
-    // Destroying one does not affect the other
     source1.destroy();
 
     await router.navigate("users.view", { id: "1" });
@@ -188,6 +193,8 @@ describe("createRouteNodeSources", () => {
   it("post-destroy: getSnapshot still returns last snapshot", async () => {
     const source = createRouteNodeSource(router, "users");
 
+    source.subscribe(() => {});
+
     await router.navigate("users");
 
     const lastSnapshot = source.getSnapshot();
@@ -211,5 +218,69 @@ describe("createRouteNodeSources", () => {
     expect(() => {
       unsubscribe();
     }).not.toThrowError();
+  });
+
+  it("lazy: does not subscribe to router until first listener", () => {
+    const originalSubscribe = router.subscribe.bind(router);
+    let subscribeCalls = 0;
+
+    vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+      subscribeCalls++;
+
+      return originalSubscribe(listener);
+    });
+
+    createRouteNodeSource(router, "users");
+
+    expect(subscribeCalls).toBe(0);
+  });
+
+  it("lazy: unsubscribes from router when last listener removed", () => {
+    const originalSubscribe = router.subscribe.bind(router);
+    let unsubscribeCalls = 0;
+
+    vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+      const unsub = originalSubscribe(listener);
+
+      return () => {
+        unsubscribeCalls++;
+        unsub();
+      };
+    });
+
+    const source = createRouteNodeSource(router, "users");
+
+    const unsub1 = source.subscribe(() => {});
+    const unsub2 = source.subscribe(() => {});
+
+    unsub1();
+
+    expect(unsubscribeCalls).toBe(0);
+
+    unsub2();
+
+    expect(unsubscribeCalls).toBe(1);
+  });
+
+  it("lazy: re-subscribes to router when new listener added after all removed", () => {
+    const originalSubscribe = router.subscribe.bind(router);
+    let subscribeCalls = 0;
+
+    vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+      subscribeCalls++;
+
+      return originalSubscribe(listener);
+    });
+
+    const source = createRouteNodeSource(router, "users");
+    const unsub = source.subscribe(() => {});
+
+    expect(subscribeCalls).toBe(1);
+
+    unsub();
+
+    source.subscribe(() => {});
+
+    expect(subscribeCalls).toBe(2);
   });
 });

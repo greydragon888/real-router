@@ -37,7 +37,7 @@ export default [
   {
     name: "@real-router/sources (ESM)",
     path: "packages/sources/dist/esm/index.mjs",
-    limit: "1 kB",
+    limit: "1.5 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
