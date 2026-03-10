@@ -60,6 +60,7 @@ src/
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
+    ├── RouteView.tsx           # Declarative route matching (RouteView + Match + NotFound)
     └── modern/                 # [future] React 19.2-only components (ActivityRouteNode)
 ```
 
@@ -211,7 +212,7 @@ tests/
 | 1   | [react-18-19-split](/.claude/RFC-react-18-19-split.md)     | Infrastructure — dual entry points, `useContext` / `.Provider` syntax | Implemented |
 | 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                          | Implemented |
 | 3   | [useRouterTransition](/.claude/RFC-useRouterTransition.md) | New hook for transition state                                         | Draft       |
-| 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                               | Draft       |
+| 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                               | Implemented |
 | 5   | [react-activity](/.claude/RFC-react-activity.md)           | ActivityRouteNode in `components/modern/` (React 19.2 only)           | Draft       |
 
 ## See Also

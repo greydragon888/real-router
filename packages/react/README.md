@@ -252,6 +252,28 @@ import { Link } from "@real-router/react";
 </Link>;
 ```
 
+#### `<RouteView nodeName={string}>`
+
+Declarative route matching component. Subscribes to a route node and renders the first matched segment.\
+`nodeName: string` — route node to subscribe to (`""` for root)\
+[Wiki](https://github.com/greydragon888/real-router/wiki/RouteView)
+
+```tsx
+import { RouteView } from "@real-router/react";
+
+<RouteView nodeName="">
+  <RouteView.Match segment="users">
+    <UsersPage />
+  </RouteView.Match>
+  <RouteView.Match segment="settings">
+    <SettingsPage />
+  </RouteView.Match>
+  <RouteView.NotFound>
+    <NotFoundPage />
+  </RouteView.NotFound>
+</RouteView>;
+```
+
 ---
 
 ## Migration from React 18
