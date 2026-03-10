@@ -16,6 +16,8 @@ export { useRouteUtils } from "./hooks/useRouteUtils";
 
 export { useIsActiveRoute } from "./hooks/useIsActiveRoute";
 
+export { useRouterTransition } from "./hooks/useRouterTransition";
+
 // Context
 export { RouterProvider } from "./RouterProvider";
 
@@ -25,3 +27,5 @@ export { RouterContext, RouteContext, NavigatorContext } from "./context";
 export type { LinkProps } from "./types";
 
 export type { Navigator } from "@real-router/core";
+
+export type { RouterTransitionSnapshot } from "@real-router/sources";

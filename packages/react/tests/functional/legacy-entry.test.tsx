@@ -11,6 +11,7 @@ import {
   useRouter,
   useRouteUtils,
   useIsActiveRoute,
+  useRouterTransition,
   // Context
   RouterProvider,
   RouterContext,
@@ -51,6 +52,7 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       expect(useRouter).toBeDefined();
       expect(useRouteUtils).toBeDefined();
       expect(useIsActiveRoute).toBeDefined();
+      expect(useRouterTransition).toBeDefined();
     });
 
     it("should export context objects", () => {
