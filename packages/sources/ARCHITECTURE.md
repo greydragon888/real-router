@@ -7,9 +7,9 @@
 ```
 src/
 ├── createRouteSource.ts       — Full route state source with lazy-connection pattern
-├── createRouteNodeSource.ts   — Node-scoped source using shouldUpdateNode filter
+├── createRouteNodeSource.ts   — Node-scoped source with lazy-connection pattern + shouldUpdateNode filter
 ├── createActiveRouteSource.ts — Boolean active-route source using areRoutesRelated filter
-├── createBaseSource.ts        — Internal Set-based listener management (not exported)
+├── BaseSource.ts              — Internal Set-based listener management (not exported)
 ├── computeSnapshot.ts        — Same-reference snapshot optimization for route nodes
 ├── shouldUpdateCache.ts      — WeakMap<Router, Map<string, fn>> two-level cache
 ├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, ActiveRouteSourceOptions
@@ -18,17 +18,19 @@ src/
 
 ## Two Source Patterns
 
-### 1. Lazy-Connection (`createRouteSource`)
+### 1. Lazy-Connection (`createRouteSource`, `createRouteNodeSource`)
 
 Subscribes to the router on the first listener and unsubscribes when all listeners are removed. No router subscription exists when there are zero listeners.
 
-Because the subscription is driven by listener count, a mount/unmount/remount cycle doesn't leave a dangling subscription.
+Because the subscription is driven by listener count, a mount/unmount/remount cycle doesn't leave a dangling subscription. Compatible with React's `useSyncExternalStore` and Strict Mode.
 
-No `destroy()` call is required. The source cleans itself up automatically when the last listener unsubscribes.
+`createRouteNodeSource` reconciles its snapshot with the current router state on each reconnection. This handles Activity hide/show cycles where the source was disconnected and missed navigation events.
 
-### 2. Eager-Connection (`createRouteNodeSource`, `createActiveRouteSource`)
+No `destroy()` call is required. The source cleans itself up automatically when the last listener unsubscribes. `destroy()` is still available for explicit teardown.
 
-The factory subscribes to the router immediately via `router.subscribe()` and delegates listener management to `createBaseSource`. The router subscription is active for the lifetime of the source, regardless of how many listeners are attached.
+### 2. Eager-Connection (`createActiveRouteSource`, `createTransitionSource`)
+
+The factory subscribes to the router immediately via `router.subscribe()` and delegates listener management to `BaseSource`. The router subscription is active for the lifetime of the source, regardless of how many listeners are attached.
 
 Call `source.destroy()` to remove the router subscription and release resources. Failing to call `destroy()` leaves the subscription active, preventing the router from dropping the callback reference.
 
@@ -76,11 +78,11 @@ The `Object.is` dedup guard prevents a notification when the active state hasn't
 
 ## Internal Modules
 
-### `createBaseSource`
+### `BaseSource`
 
-Manages a `Set` of listener functions. Exposes `subscribe`, `getSnapshot`, `destroy`, and an internal `_update` method.
+Manages a `Set` of listener functions. Exposes `subscribe`, `getSnapshot`, `updateSnapshot`, and `destroy`.
 
-`subscribe` adds the listener to the Set and returns an unsubscribe function that removes it. `destroy` sets a `destroyed` flag and clears the listener Set. After `destroy`, `subscribe` returns a no-op and `_update` is a no-op. Note: `createBaseSource` does not manage the router subscription — the wrapping factory handles that separately.
+`subscribe` adds the listener to the Set and returns an unsubscribe function that removes it. `destroy` sets a `destroyed` flag and clears the listener Set. After `destroy`, `subscribe` returns a no-op and `updateSnapshot` is a no-op. Used by `createActiveRouteSource` and `createTransitionSource`. Note: `BaseSource` does not manage the router subscription — the wrapping factory handles that separately.
 
 ### `computeSnapshot`
 

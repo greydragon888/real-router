@@ -60,7 +60,7 @@ const source = createRouteSource(router);
 
 ### `createRouteNodeSource(router, nodeName)`
 
-Creates a source scoped to a specific route node. Only updates when the node is in the transition path, avoiding unnecessary re-renders for unrelated navigations.\
+Creates a source scoped to a specific route node. Only updates when the node is in the transition path, avoiding unnecessary re-renders for unrelated navigations. Uses a lazy-connection pattern: subscribes to the router on the first listener and unsubscribes when all listeners are removed.\
 `router: Router` — router instance\
 `nodeName: string` — route node name to scope updates to\
 Returns: `RouterSource<RouteNodeSnapshot>`
@@ -68,8 +68,6 @@ Returns: `RouterSource<RouteNodeSnapshot>`
 ```typescript
 const source = createRouteNodeSource(router, "users");
 ```
-
-Call `source.destroy()` when the source is no longer needed.
 
 ---
 
@@ -209,8 +207,8 @@ const unsubscribe = source.subscribe(() => {
   console.log("Users section route:", route?.name);
 });
 
-// Tear down completely when the component unmounts
-source.destroy();
+// Later, clean up (automatically unsubscribes from router)
+unsubscribe();
 ```
 
 ---

@@ -1,8 +1,7 @@
 /**
- * Confirmation tests for known issues in useRouteNode / sources layer.
+ * Regression tests for resolved issues in useRouteNode / sources layer.
  *
- * These tests document existing behavior (bugs). When the issues are resolved,
- * update the assertions to match the corrected behavior.
+ * These tests verify that previously reported bugs remain fixed.
  */
 import { getNavigator } from "@real-router/core";
 import { createRouteNodeSource, createRouteSource } from "@real-router/sources";
@@ -12,7 +11,7 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
 
-describe("useRouteNode — known issues", () => {
+describe("useRouteNode — regression tests", () => {
   let router: Router;
 
   beforeEach(() => {
@@ -23,22 +22,25 @@ describe("useRouteNode — known issues", () => {
     router.stop();
   });
 
-  describe("Issue 1: RouteNodeSource leaks router subscriptions on unmount", () => {
-    /**
-     * RouteNodeSource subscribes to router eagerly in the constructor.
-     * useRouteNode creates the source via useMemo and passes
-     * source.subscribe/getSnapshot to useSyncExternalStore.
-     *
-     * When the component unmounts, useSyncExternalStore calls the unsubscribe
-     * returned by source.subscribe — but that only removes the React listener
-     * from BaseSource's internal Set. Nobody calls source.destroy(), so the
-     * router.subscribe callback is NEVER removed.
-     *
-     * Contrast with createRouteSource which uses a lazy-connection pattern:
-     * subscribe to router on first listener, unsubscribe on zero listeners.
-     */
+  describe("Issue #270: RouteNodeSource no longer leaks router subscriptions", () => {
+    it("lazy subscription: does not subscribe to router until first listener", async () => {
+      await router.start("/");
 
-    it("eager subscription: removing all listeners does NOT unsubscribe from router", async () => {
+      const originalSubscribe = router.subscribe.bind(router);
+      let subscribeCalls = 0;
+
+      vi.spyOn(router, "subscribe").mockImplementation((listener) => {
+        subscribeCalls++;
+
+        return originalSubscribe(listener);
+      });
+
+      createRouteNodeSource(router, "users");
+
+      expect(subscribeCalls).toBe(0);
+    });
+
+    it("removing all listeners unsubscribes from router", async () => {
       await router.start("/");
 
       const originalSubscribe = router.subscribe.bind(router);
@@ -56,25 +58,16 @@ describe("useRouteNode — known issues", () => {
       });
 
       const source = createRouteNodeSource(router, "users");
-
-      // Eager: subscribes to router immediately in constructor
-      expect(subscribeCalls).toBe(1);
-
-      // Simulate what useSyncExternalStore does: add listener, then remove it
       const unsub = source.subscribe(() => {});
 
+      expect(subscribeCalls).toBe(1);
+
       unsub();
-
-      // BUG: removing all listeners does NOT unsubscribe from router
-      expect(unsubscribeCalls).toBe(0);
-
-      // Only explicit destroy() cleans it up — but useRouteNode never calls it
-      source.destroy();
 
       expect(unsubscribeCalls).toBe(1);
     });
 
-    it("leaked subscriptions accumulate: N sources = N zombie router subscriptions", async () => {
+    it("N mount/unmount cycles produce zero leaked subscriptions", async () => {
       await router.start("/");
 
       const originalSubscribe = router.subscribe.bind(router);
@@ -97,48 +90,40 @@ describe("useRouteNode — known issues", () => {
         const source = createRouteNodeSource(router, "users");
         const unsub = source.subscribe(() => {});
 
-        // Simulate unmount: remove listener (what useSyncExternalStore does)
         unsub();
       }
 
-      // Each source subscribed to router eagerly
       expect(subscribeCalls).toBe(count);
-
-      // BUG: none of the router subscriptions are cleaned up
-      expect(unsubscribeCalls).toBe(0);
+      expect(unsubscribeCalls).toBe(count);
     });
 
-    it("zombie subscriptions still receive and process navigation events", async () => {
+    it("no zombie callbacks after all listeners removed", async () => {
       await router.start("/");
 
-      let zombieCallbackCount = 0;
+      let callbackCount = 0;
       const originalSubscribe = router.subscribe.bind(router);
 
       vi.spyOn(router, "subscribe").mockImplementation((listener) => {
         const wrappedListener: typeof listener = (state) => {
-          zombieCallbackCount++;
+          callbackCount++;
           listener(state);
         };
 
         return originalSubscribe(wrappedListener);
       });
 
-      // Create source, add listener, remove listener (simulates mount/unmount)
       const source = createRouteNodeSource(router, "users");
       const unsub = source.subscribe(() => {});
 
       unsub();
-      zombieCallbackCount = 0;
+      callbackCount = 0;
 
-      // Navigate — the zombie subscription still processes this event
       await router.navigate("users.list");
 
-      expect(zombieCallbackCount).toBeGreaterThan(0);
-
-      source.destroy();
+      expect(callbackCount).toBe(0);
     });
 
-    it("contrast: createRouteSource (lazy pattern) does NOT leak", async () => {
+    it("matches createRouteSource lazy pattern", async () => {
       await router.start("/");
 
       const originalSubscribe = router.subscribe.bind(router);
@@ -157,17 +142,14 @@ describe("useRouteNode — known issues", () => {
 
       const source = createRouteSource(router);
 
-      // Lazy: no router subscription until first listener
       expect(subscribeCalls).toBe(0);
 
       const unsub = source.subscribe(() => {});
 
-      // First listener triggers router subscription
       expect(subscribeCalls).toBe(1);
 
       unsub();
 
-      // Last listener removed → router subscription cleaned up
       expect(unsubscribeCalls).toBe(1);
     });
   });
