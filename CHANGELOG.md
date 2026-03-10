@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-10]
 
+### @real-router/react@0.10.0
+
+### Minor Changes
+
+- [#274](https://github.com/greydragon888/real-router/pull/274) [`d254b69`](https://github.com/greydragon888/real-router/commit/d254b690624e6000b9f4bd6b139309943e405ca3) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `keepAlive` prop to `<RouteView.Match>` ([#261](https://github.com/greydragon888/real-router/issues/261))
+
+  New `keepAlive` prop on `<RouteView.Match>` uses React 19.2 `<Activity>` API to hide deactivated matches instead of unmounting them, preserving DOM and React state:
+
+  ```tsx
+  <RouteView nodeName="">
+    <RouteView.Match segment="users" keepAlive>
+      <UsersPage />
+    </RouteView.Match>
+  </RouteView>
+  ```
+
+- [#274](https://github.com/greydragon888/real-router/pull/274) [`d254b69`](https://github.com/greydragon888/real-router/commit/d254b690624e6000b9f4bd6b139309943e405ca3) Thanks [@greydragon888](https://github.com/greydragon888)! - Move `<RouteView>` to React 19.2+ only entry point ([#261](https://github.com/greydragon888/real-router/issues/261))
+
+  **BREAKING CHANGE:** `<RouteView>` is no longer available via `@real-router/react/legacy`.
+
+  **Migration:** Use `useRouteNode` + conditional rendering in React 18:
+
+  ```tsx
+  const { route } = useRouteNode("");
+  if (startsWithSegment(route.name, "users")) return <UsersPage />;
+  ```
+
+  Or upgrade to React 19.2+ and import from `@real-router/react`.
+
+
 ### @real-router/react@0.9.0
 
 ### Minor Changes
