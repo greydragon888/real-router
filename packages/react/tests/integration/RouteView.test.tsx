@@ -275,4 +275,75 @@ describe("RouteView - Integration Tests", () => {
       expect(screen.getByTestId("nested-list")).toBeInTheDocument();
     });
   });
+
+  describe("Nested RouteView with keepAlive", () => {
+    const NestedKeepAliveApp: FC = () => (
+      <RouterProvider router={router}>
+        <RouteView nodeName="">
+          <RouteView.Match segment="users" keepAlive>
+            <RouteView nodeName="users">
+              <RouteView.Match segment="list" keepAlive>
+                <div data-testid="users-list">Users List</div>
+              </RouteView.Match>
+              <RouteView.Match segment="view">
+                <div data-testid="users-view">Users View</div>
+              </RouteView.Match>
+            </RouteView>
+          </RouteView.Match>
+          <RouteView.Match segment="about">
+            <div data-testid="about">About</div>
+          </RouteView.Match>
+        </RouteView>
+      </RouterProvider>
+    );
+
+    it("should unmount inner content when navigating to different root segment", async () => {
+      await router.start("/users/list");
+
+      render(<NestedKeepAliveApp />);
+
+      expect(screen.getByTestId("users-list")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("about");
+      });
+
+      expect(screen.queryByTestId("users-list")).not.toBeInTheDocument();
+      expect(screen.getByTestId("about")).toBeVisible();
+    });
+
+    it("should preserve inner keepAlive when navigating between child segments", async () => {
+      await router.start("/users/list");
+
+      render(<NestedKeepAliveApp />);
+
+      expect(screen.getByTestId("users-list")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("users.view", { id: "1" });
+      });
+
+      expect(screen.getByTestId("users-list")).not.toBeVisible();
+      expect(screen.getByTestId("users-view")).toBeVisible();
+    });
+
+    it("should restore full nested chain on return navigation", async () => {
+      await router.start("/users/list");
+
+      render(<NestedKeepAliveApp />);
+
+      await act(async () => {
+        await router.navigate("about");
+      });
+
+      expect(screen.getByTestId("about")).toBeVisible();
+
+      await act(async () => {
+        await router.navigate("users.list");
+      });
+
+      expect(screen.queryByTestId("about")).not.toBeInTheDocument();
+      expect(screen.getByTestId("users-list")).toBeVisible();
+    });
+  });
 });
