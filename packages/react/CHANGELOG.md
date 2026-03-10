@@ -1,5 +1,26 @@
 # @real-router/react
 
+## 0.11.0
+
+### Minor Changes
+
+- [#281](https://github.com/greydragon888/real-router/pull/281) [`84d5831`](https://github.com/greydragon888/real-router/commit/84d5831384fccacf0f91e02d17a4f79abcaa7975) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove `useIsActiveRoute` from public API ([#280](https://github.com/greydragon888/real-router/issues/280))
+
+  **Breaking Change:** `useIsActiveRoute` is no longer exported from `@real-router/react` or `@real-router/react/legacy`. The hook remains as an internal utility used by `<Link>`.
+
+  **Migration:**
+
+  ```diff
+  - import { useIsActiveRoute } from "@real-router/react";
+  - const isActive = useIsActiveRoute("users.profile", { id });
+
+  + import { useRouteNode } from "@real-router/react";
+  + const { route } = useRouteNode("users");
+  + const isActive = route?.name === "users.profile";
+  ```
+
+  Or use `<Link>` which handles active state automatically via render props.
+
 ## 0.10.0
 
 ### Minor Changes
