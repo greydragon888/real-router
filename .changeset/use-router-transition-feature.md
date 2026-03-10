@@ -2,7 +2,7 @@
 "@real-router/react": minor
 ---
 
-Add `useRouterTransition` hook (#XX)
+Add `useRouterTransition` hook (#259)
 
 New hook for tracking router transition state. Returns `RouterTransitionSnapshot`
 with `isTransitioning`, `toRoute`, and `fromRoute`. Useful for progress bars,
