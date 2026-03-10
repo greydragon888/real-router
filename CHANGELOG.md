@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-10]
 
+### @real-router/react@0.8.0
+
+### Minor Changes
+
+- [#268](https://github.com/greydragon888/real-router/pull/268) [`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `useRouterTransition` hook ([#259](https://github.com/greydragon888/real-router/issues/259))
+
+  New hook for tracking router transition state. Returns `RouterTransitionSnapshot`
+  with `isTransitioning`, `toRoute`, and `fromRoute`. Useful for progress bars,
+  loading overlays, and disabling navigation during async guards.
+
+  Available in both entry points (`@real-router/react` and `@real-router/react/legacy`).
+
+### Patch Changes
+
+- Updated dependencies [[`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358)]:
+  - @real-router/sources@0.2.0
+
+### @real-router/sources@0.2.0
+
+### Minor Changes
+
+- [#268](https://github.com/greydragon888/real-router/pull/268) [`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createTransitionSource` for transition lifecycle subscriptions ([#259](https://github.com/greydragon888/real-router/issues/259))
+
+  New source that tracks router transition state (start/success/error/cancel)
+  via `getPluginApi().addEventListener()`. Provides `RouterTransitionSnapshot`
+  with `isTransitioning`, `toRoute`, and `fromRoute`.
+
+  Dependency change: `@real-router/core` replaces `@real-router/types`.
+
+
 ### @real-router/react@0.7.0
 
 ### Minor Changes

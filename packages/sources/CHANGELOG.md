@@ -1,5 +1,17 @@
 # @real-router/sources
 
+## 0.2.0
+
+### Minor Changes
+
+- [#268](https://github.com/greydragon888/real-router/pull/268) [`c6955b9`](https://github.com/greydragon888/real-router/commit/c6955b9f0b67939ba3983855290246960482d358) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `createTransitionSource` for transition lifecycle subscriptions ([#259](https://github.com/greydragon888/real-router/issues/259))
+
+  New source that tracks router transition state (start/success/error/cancel)
+  via `getPluginApi().addEventListener()`. Provides `RouterTransitionSnapshot`
+  with `isTransitioning`, `toRoute`, and `fromRoute`.
+
+  Dependency change: `@real-router/core` replaces `@real-router/types`.
+
 ## 0.1.4
 
 ### Patch Changes
