@@ -1,5 +1,11 @@
 import { createRouter, getLifecycleApi } from "@real-router/core";
-import { act, render, renderHook, screen } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from "@testing-library/react";
 import { useState } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
@@ -277,9 +283,7 @@ describe("useRouterTransition", () => {
     });
 
     // 2. Mount TransitionDisplay mid-transition
-    act(() => {
-      screen.getByTestId("show").click();
-    });
+    fireEvent.click(screen.getByTestId("show"));
 
     // 3. Source was created with IDLE_SNAPSHOT, START already fired
     //    → isTransitioning is false (source missed the event)
