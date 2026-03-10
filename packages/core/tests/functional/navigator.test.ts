@@ -31,9 +31,17 @@ describe("core/getNavigator", () => {
     expect(Object.keys(navigator)).toHaveLength(5);
   });
 
-  it("returns new instance each call", () => {
+  it("returns cached instance for same router", () => {
     const nav1 = getNavigator(router);
     const nav2 = getNavigator(router);
+
+    expect(nav1).toBe(nav2);
+  });
+
+  it("returns different instances for different routers", () => {
+    const router2 = createTestRouter();
+    const nav1 = getNavigator(router);
+    const nav2 = getNavigator(router2);
 
     expect(nav1).not.toBe(nav2);
   });
