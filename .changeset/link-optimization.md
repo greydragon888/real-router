@@ -2,7 +2,7 @@
 "@real-router/react": minor
 ---
 
-**BREAKING:** Consolidate Link components — remove `BaseLink` and `ConnectedLink`
+**BREAKING:** Consolidate Link components — remove `BaseLink` and `ConnectedLink` (#258)
 
 - `Link` now subscribes to active state via `useIsActiveRoute` — re-renders only when its own active status changes
 - `BaseLink` removed — `Link` takes router from context automatically
