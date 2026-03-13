@@ -1,7 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 
-import { errorCodes, getPluginApi, RouterError } from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,

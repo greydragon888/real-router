@@ -1,10 +1,10 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getDependenciesApi } from "@real-router/core";
-
 import { createDependenciesTestRouter, type TestDependencies } from "./setup";
+import { getDependenciesApi } from "../../../src/api";
 
-import type { DependenciesApi, Router } from "@real-router/core";
+import type { DependenciesApi } from "../../../src/api";
+import type { Router } from "@real-router/core";
 
 let router: Router<TestDependencies>;
 let deps: DependenciesApi<TestDependencies>;

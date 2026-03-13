@@ -1,4 +1,5 @@
-import { createRouter, getLifecycleApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { persistentParamsPluginFactory as persistentParamsPlugin } from "@real-router/persistent-params-plugin";

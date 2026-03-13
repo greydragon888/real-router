@@ -1,6 +1,7 @@
 import { describe, afterEach, it, expect } from "vitest";
 
-import { getPluginApi, errorCodes, RouterError } from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   createStressRouter,

@@ -1,7 +1,8 @@
 import { logger } from "@real-router/logger";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { errorCodes, getPluginApi } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import { events } from "./setup";
 import { createTestRouter } from "../../helpers";

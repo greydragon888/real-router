@@ -1,6 +1,6 @@
 import { describe, afterEach, it, expect } from "vitest";
 
-import { getPluginApi, getRoutesApi } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   createStressRouter,

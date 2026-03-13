@@ -1,6 +1,7 @@
 import { describe, afterEach, it, expect } from "vitest";
 
-import { getLifecycleApi, errorCodes, RouterError } from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
 

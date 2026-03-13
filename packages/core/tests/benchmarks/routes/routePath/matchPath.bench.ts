@@ -23,7 +23,9 @@
 
 import { bench, boxplot, summary } from "mitata";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+
+import { getPluginApi } from "../../../../src/api";
 
 import type { Params, Route, Router } from "@real-router/core";
 

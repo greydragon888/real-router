@@ -1,17 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getLifecycleApi, getRoutesApi } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type {
-  GuardFnFactory,
-  LifecycleApi,
-  Params,
-  Route,
-  Router,
-  RoutesApi,
-} from "@real-router/core";
+import type { GuardFnFactory, Params, Route, Router } from "@real-router/core";
+import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;

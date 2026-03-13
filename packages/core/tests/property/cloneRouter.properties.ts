@@ -1,12 +1,8 @@
 import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import {
-  cloneRouter,
-  errorCodes,
-  getRoutesApi,
-  RouterError,
-} from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
+import { cloneRouter, getRoutesApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -92,7 +88,7 @@ describe("cloneRouter Properties", () => {
 
   it("cloned router preserves guards from source", async () => {
     const source = createFixtureRouter();
-    const { getLifecycleApi } = await import("@real-router/core");
+    const { getLifecycleApi } = await import("@real-router/core/api");
     const lifecycle = getLifecycleApi(source);
 
     lifecycle.addActivateGuard("admin.settings", () => () => false);

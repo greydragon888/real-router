@@ -1,11 +1,7 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import {
-  createRouter,
-  errorCodes,
-  constants,
-  getLifecycleApi,
-} from "@real-router/core";
+import { createRouter, errorCodes, constants } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 

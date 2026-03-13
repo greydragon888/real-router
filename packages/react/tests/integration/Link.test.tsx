@@ -1,4 +1,4 @@
-import { getLifecycleApi } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import {
   screen,
   render,

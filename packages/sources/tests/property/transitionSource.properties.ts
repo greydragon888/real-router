@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { getLifecycleApi } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, expect, vi } from "vitest";
 
 import {

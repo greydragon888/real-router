@@ -1,11 +1,11 @@
 import { fc } from "@fast-check/vitest";
 
+import { createRouter } from "@real-router/core";
 import {
-  createRouter,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import type { Route, Router, State, Params } from "@real-router/core";
 

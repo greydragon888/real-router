@@ -1,12 +1,10 @@
 import { describe, beforeEach, it, expect } from "vitest";
 
-import {
-  createRouter,
-  getDependenciesApi,
-  errorCodes,
-} from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
+import { getDependenciesApi } from "@real-router/core/api";
 
-import type { Router, DependenciesApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { DependenciesApi } from "@real-router/core/api";
 
 interface Deps {
   foo?: number;

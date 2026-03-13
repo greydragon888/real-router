@@ -1,4 +1,5 @@
-import { createRouter, getLifecycleApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

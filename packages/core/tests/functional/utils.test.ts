@@ -1,6 +1,7 @@
 import { describe, afterEach, beforeEach, it, expect, beforeAll } from "vitest";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter, omitMeta } from "../helpers";
 

@@ -1,7 +1,8 @@
 import { createRouteTree, createMatcher } from "route-tree";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   buildNameFromSegments,
@@ -9,7 +10,8 @@ import {
 } from "../../src/namespaces/RoutesNamespace/RoutesNamespace";
 import { createTestRouter } from "../helpers";
 
-import type { Router, Route, RoutesApi } from "@real-router/core";
+import type { Router, Route } from "@real-router/core";
+import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;

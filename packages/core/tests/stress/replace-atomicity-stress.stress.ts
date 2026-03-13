@@ -1,6 +1,6 @@
 import { describe, afterEach, it, expect } from "vitest";
 
-import { getRoutesApi, getPluginApi } from "@real-router/core";
+import { getRoutesApi, getPluginApi } from "@real-router/core/api";
 
 import {
   createFlatRoutes,

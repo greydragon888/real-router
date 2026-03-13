@@ -15,7 +15,9 @@
 
 import { bench, boxplot, summary } from "mitata";
 
-import { createRouter, events, getPluginApi } from "@real-router/core";
+import { createRouter, events } from "@real-router/core";
+
+import { getPluginApi } from "../../../src/api";
 
 import type { NavigationOptions, State } from "@real-router/types";
 

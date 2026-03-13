@@ -1,9 +1,5 @@
-import {
-  createRouter,
-  getLifecycleApi,
-  getPluginApi,
-  events,
-} from "@real-router/core";
+import { createRouter, events } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import { createTransitionSource } from "../../src";

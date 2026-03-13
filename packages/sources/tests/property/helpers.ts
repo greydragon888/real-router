@@ -1,5 +1,6 @@
 import { fc } from "@fast-check/vitest";
-import { createRouter, getLifecycleApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import type { Route, Router, Params } from "@real-router/core";
 

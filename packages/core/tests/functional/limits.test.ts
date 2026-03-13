@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 
+import { createRouter, events } from "@real-router/core";
 import {
-  createRouter,
   cloneRouter,
-  events,
   getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import type { Router } from "@real-router/core";
 

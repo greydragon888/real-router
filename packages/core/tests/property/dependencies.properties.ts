@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { getDependenciesApi } from "@real-router/core";
+import { getDependenciesApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -10,7 +10,7 @@ import {
   NUM_RUNS,
 } from "./helpers";
 
-import type { DependenciesApi } from "@real-router/core";
+import type { DependenciesApi } from "@real-router/core/api";
 
 type AnyDepsApi = DependenciesApi<Record<string, unknown>>;
 

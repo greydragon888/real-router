@@ -44,20 +44,4 @@ export { createRouter } from "./createRouter";
 
 export { getNavigator } from "./getNavigator";
 
-// Factory API (Phase 0: parallel API for modular architecture)
-export {
-  getPluginApi,
-  getRoutesApi,
-  getDependenciesApi,
-  getLifecycleApi,
-  cloneRouter,
-} from "./api";
-
-export type {
-  PluginApi,
-  RoutesApi,
-  DependenciesApi,
-  LifecycleApi,
-} from "./api";
-
 export type { RouteTree } from "route-tree";

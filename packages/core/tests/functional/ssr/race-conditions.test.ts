@@ -1,14 +1,15 @@
 import { logger } from "@real-router/logger";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import {
   cloneRouter,
-  createRouter,
   getLifecycleApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
-import type { LifecycleApi, Route, Router } from "@real-router/core";
+import type { Route, Router } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
 import type { LogCallback } from "@real-router/logger";
 
 const routes: Route[] = [

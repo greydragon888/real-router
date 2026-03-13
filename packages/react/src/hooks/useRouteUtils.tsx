@@ -1,6 +1,6 @@
 // packages/react/modules/hooks/useRouteUtils.tsx
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { getRouteUtils } from "@real-router/route-utils";
 
 import { useRouter } from "./useRouter";

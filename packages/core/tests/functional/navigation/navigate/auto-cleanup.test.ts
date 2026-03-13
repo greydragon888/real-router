@@ -1,9 +1,11 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getLifecycleApi, createRouter, errorCodes } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
-import type { Router, LifecycleApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
 
 const noop = () => undefined;
 

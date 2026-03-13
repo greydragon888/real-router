@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 
-import { cloneRouter, getLifecycleApi, getRoutesApi } from "@real-router/core";
+import {
+  cloneRouter,
+  getLifecycleApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import {
   createFlatRoutes,

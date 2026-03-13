@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { events, getPluginApi } from "@real-router/core";
+import { events } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   createStressRouter,

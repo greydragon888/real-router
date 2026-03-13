@@ -4,7 +4,8 @@ import { ERROR_PREFIX } from "./constants";
 import { extractOwnParams, mergeParams } from "./param-utils";
 import { validateParamValue } from "./validation";
 
-import type { Params, PluginApi, State, Plugin } from "@real-router/core";
+import type { Params, State, Plugin } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 export class PersistentParamsPlugin {
   readonly #api: PluginApi;
