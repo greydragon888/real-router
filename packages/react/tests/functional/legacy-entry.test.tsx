@@ -10,9 +10,6 @@ import {
   useRouteUtils,
   useRouterTransition,
   RouterProvider,
-  RouterContext,
-  RouteContext,
-  NavigatorContext,
 } from "@real-router/react/legacy";
 
 import { createTestRouterWithADefaultRouter } from "../helpers";
@@ -56,10 +53,12 @@ describe("legacy entry point (@real-router/react/legacy)", () => {
       expect(useRouterTransition).toBeDefined();
     });
 
-    it("should export context objects", () => {
-      expect(RouterContext).toBeDefined();
-      expect(RouteContext).toBeDefined();
-      expect(NavigatorContext).toBeDefined();
+    it("should not export raw context objects", async () => {
+      const legacyModule = await import("@real-router/react/legacy");
+
+      expect(legacyModule).not.toHaveProperty("RouterContext");
+      expect(legacyModule).not.toHaveProperty("RouteContext");
+      expect(legacyModule).not.toHaveProperty("NavigatorContext");
     });
 
     it("should export RouterProvider", () => {
