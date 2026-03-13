@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-13]
 
+### @real-router/sources@0.2.2
+
+### Patch Changes
+
+- [#301](https://github.com/greydragon888/real-router/pull/301) [`830df9a`](https://github.com/greydragon888/real-router/commit/830df9ade36273df81acaef74926c7f4e9eacc0b) Thanks [@greydragon888](https://github.com/greydragon888)! - Deduplicate all source implementations via `BaseSource` composition ([#287](https://github.com/greydragon888/real-router/issues/287))
+
+  Replaced all 4 wrapper classes (`RouteSource`, `RouteNodeSource`, `ActiveRouteSource`, `TransitionSource`) with factory functions that compose `BaseSource` directly. Added `onFirstSubscribe`/`onLastUnsubscribe`/`onDestroy` lifecycle hooks and auto-bound methods to `BaseSource`, eliminating all jscpd-reported code clones in the package.
+
+
 ### @real-router/react@0.12.0
 
 ### Minor Changes
