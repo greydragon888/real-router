@@ -1,5 +1,13 @@
 # @real-router/react
 
+## 0.12.2
+
+### Patch Changes
+
+- [#305](https://github.com/greydragon888/real-router/pull/305) [`ab5d8f5`](https://github.com/greydragon888/real-router/commit/ab5d8f5b27c7901632645c53367b5e42e5e765cf) Thanks [@greydragon888](https://github.com/greydragon888)! - Replace `use()` with `useContext()` in hooks for React 18 compatibility ([#288](https://github.com/greydragon888/real-router/issues/288))
+
+  `useRouter`, `useRoute`, and `useNavigator` used React 19's `use()` API, breaking the `@real-router/react/legacy` entry point on React 18. Replaced with `useContext()` which is available in both React 18 and 19.
+
 ## 0.12.1
 
 ### Patch Changes
