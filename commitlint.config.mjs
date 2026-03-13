@@ -32,7 +32,7 @@ export const SCOPES = [
   "rx",
   "event-emitter",
   "route-utils",
-  "stores",
+  "sources",
   "router-benchmarks",
   "deps",
   "config",
