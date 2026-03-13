@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-13]
+
+### @real-router/react@0.12.0
+
+### Minor Changes
+
+- [#299](https://github.com/greydragon888/real-router/pull/299) [`89351ba`](https://github.com/greydragon888/real-router/commit/89351ba3633087f488d30ea478c38c6de8f6b36e) Thanks [@greydragon888](https://github.com/greydragon888)! - Remove raw Context exports from public API ([#283](https://github.com/greydragon888/real-router/issues/283))
+
+  **Breaking Change:** `RouterContext`, `RouteContext`, and `NavigatorContext` are no longer exported from `@real-router/react` or `@real-router/react/legacy`. Use the corresponding hooks instead.
+
+  **Migration:**
+
+  ```diff
+  - import { RouterContext } from "@real-router/react";
+  - const router = useContext(RouterContext);
+  + import { useRouter } from "@real-router/react";
+  + const router = useRouter();
+  ```
+
+  ```diff
+  - import { RouteContext } from "@real-router/react";
+  - const routeState = useContext(RouteContext);
+  + import { useRoute } from "@real-router/react";
+  + const { route, previousRoute } = useRoute();
+  ```
+
+  ```diff
+  - import { NavigatorContext } from "@real-router/react";
+  - const navigator = useContext(NavigatorContext);
+  + import { useNavigator } from "@real-router/react";
+  + const navigator = useNavigator();
+  ```
+
 ## [2026-03-10]
 
 ### @real-router/react@0.11.0
