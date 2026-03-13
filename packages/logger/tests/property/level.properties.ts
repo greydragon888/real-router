@@ -1,5 +1,5 @@
 import { test } from "@fast-check/vitest";
-import { describe, beforeEach, afterEach, expect } from "vitest";
+import { describe, beforeAll, beforeEach, afterAll, expect } from "vitest";
 
 import { logger } from "@real-router/logger";
 
@@ -16,13 +16,14 @@ import {
 const noop = () => {};
 
 describe("Logger Level Filtering Properties", () => {
-  beforeEach(() => {
-    // Mock console methods
+  beforeAll(() => {
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
+  });
 
-    // Reset logger to default state
+  beforeEach(() => {
+    vi.clearAllMocks();
     logger.configure({
       level: "all",
       callback: undefined,
@@ -30,10 +31,8 @@ describe("Logger Level Filtering Properties", () => {
     });
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
+  afterAll(() => {
     vi.restoreAllMocks();
-    // Reset logger state
     logger.configure({
       level: "all",
       callback: undefined,
@@ -74,8 +73,6 @@ describe("Logger Level Filtering Properties", () => {
 
         // Result should be the same
         expect(callCount1).toBe(callCount2);
-
-        return true;
       },
     );
   });
@@ -100,8 +97,6 @@ describe("Logger Level Filtering Properties", () => {
       expect(console.log).not.toHaveBeenCalled();
       expect(console.warn).not.toHaveBeenCalled();
       expect(console.error).not.toHaveBeenCalled();
-
-      return true;
     });
 
     test.prop([logLevelArbitrary, contextArbitrary, messageArbitrary], {
@@ -123,8 +118,6 @@ describe("Logger Level Filtering Properties", () => {
 
         // Corresponding console method should be called
         expect(console[messageLevel]).toHaveBeenCalledTimes(1);
-
-        return true;
       },
     );
   });
@@ -163,8 +156,6 @@ describe("Logger Level Filtering Properties", () => {
           // Message should not be filtered
           expect(console[messageLevel]).toHaveBeenCalledTimes(1);
         }
-
-        return true;
       },
     );
   });
@@ -176,8 +167,12 @@ describe("Logger Level Filtering Properties", () => {
     )(
       "messages are always formatted with context correctly",
       (messageLevel, context, message, args) => {
-        // Use level=all to ensure message passes
-        logger.configure({ level: "all" });
+        vi.clearAllMocks();
+        logger.configure({
+          level: "all",
+          callback: undefined,
+          callbackIgnoresLevel: false,
+        });
 
         logger[messageLevel](context, message, ...args);
 
@@ -188,8 +183,6 @@ describe("Logger Level Filtering Properties", () => {
           expectedMessage,
           ...args,
         );
-
-        return true;
       },
     );
   });
@@ -201,7 +194,12 @@ describe("Logger Level Filtering Properties", () => {
     )(
       "additional arguments are passed to console correctly",
       (messageLevel, context, message, args) => {
-        logger.configure({ level: "all" });
+        vi.clearAllMocks();
+        logger.configure({
+          level: "all",
+          callback: undefined,
+          callbackIgnoresLevel: false,
+        });
 
         logger[messageLevel](context, message, ...args);
 
@@ -212,8 +210,6 @@ describe("Logger Level Filtering Properties", () => {
           expectedMessage,
           ...args,
         );
-
-        return true;
       },
     );
   });
@@ -241,8 +237,6 @@ describe("Logger Level Filtering Properties", () => {
         } else {
           expect(console.error).toHaveBeenCalledTimes(1);
         }
-
-        return true;
       },
     );
 
@@ -268,8 +262,6 @@ describe("Logger Level Filtering Properties", () => {
         } else {
           expect(console.warn).toHaveBeenCalledTimes(1);
         }
-
-        return true;
       },
     );
 
@@ -295,8 +287,6 @@ describe("Logger Level Filtering Properties", () => {
         } else {
           expect(console.log).not.toHaveBeenCalled();
         }
-
-        return true;
       },
     );
   });
@@ -349,8 +339,6 @@ describe("Logger Level Filtering Properties", () => {
         } else {
           expect(callCount2).toBe(1);
         }
-
-        return true;
       },
     );
   });

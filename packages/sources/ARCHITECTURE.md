@@ -131,3 +131,9 @@ On first access for a given router+nodeName combination, the predicate is create
 - Tests cover only the public API (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`)
 - `v8 ignore @preserve` used for defensive guards that are unreachable via the public API
 - Benchmarks use the mitata engine, not vitest bench
+
+---
+
+## See Also
+
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants

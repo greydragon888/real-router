@@ -43,6 +43,7 @@
   },
   "scripts": {
     "test": "vitest",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
@@ -56,7 +57,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",
     "browser-env": "workspace:^",
-    "jsdom": "27.4.0",
+    "jsdom": "28.1.0",
     "type-guards": "workspace:^"
   }
 }

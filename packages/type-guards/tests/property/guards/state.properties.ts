@@ -1,7 +1,7 @@
 import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { isState, isStateStrict } from "type-guards";
+import { isParams, isRouteName, isState, isStateStrict } from "type-guards";
 
 import {
   stateMinimalArbitrary,
@@ -19,8 +19,6 @@ describe("State Type Guards Properties", () => {
       "always returns true for minimal valid State",
       (state) => {
         expect(isState(state)).toBe(true);
-
-        return true;
       },
     );
 
@@ -28,8 +26,6 @@ describe("State Type Guards Properties", () => {
       "always returns true for full State with meta",
       (state) => {
         expect(isState(state)).toBe(true);
-
-        return true;
       },
     );
 
@@ -43,8 +39,6 @@ describe("State Type Guards Properties", () => {
         //
         // invalidStateArbitrary generates invalid states, so all should be false
         expect(isState(state)).toBe(false);
-
-        return true;
       },
     );
 
@@ -52,8 +46,6 @@ describe("State Type Guards Properties", () => {
       "returns false for primitives",
       (value) => {
         expect(isState(value)).toBe(false);
-
-        return true;
       },
     );
 
@@ -65,16 +57,12 @@ describe("State Type Guards Properties", () => {
 
         expect(result1).toBe(result2);
         expect(result1).toBe(true);
-
-        return true;
       },
     );
 
     it("handles null and undefined", () => {
       expect(isState(null)).toBe(false);
       expect(isState(undefined)).toBe(false);
-
-      return true;
     });
 
     test.prop(
@@ -84,8 +72,6 @@ describe("State Type Guards Properties", () => {
       const state = { name, path, params };
 
       expect(isState(state)).toBe(true);
-
-      return true;
     });
   });
 
@@ -94,8 +80,6 @@ describe("State Type Guards Properties", () => {
       "always returns true for minimal valid State",
       (state) => {
         expect(isStateStrict(state)).toBe(true);
-
-        return true;
       },
     );
 
@@ -122,8 +106,6 @@ describe("State Type Guards Properties", () => {
         } else {
           expect(result).toBe(true);
         }
-
-        return true;
       },
     );
 
@@ -152,8 +134,6 @@ describe("State Type Guards Properties", () => {
         } else {
           expect(isStateStrict(state)).toBe(false);
         }
-
-        return true;
       },
     );
 
@@ -161,16 +141,12 @@ describe("State Type Guards Properties", () => {
       "returns false for primitives",
       (value) => {
         expect(isStateStrict(value)).toBe(false);
-
-        return true;
       },
     );
 
     it("handles null and undefined", () => {
       expect(isStateStrict(null)).toBe(false);
       expect(isStateStrict(undefined)).toBe(false);
-
-      return true;
     });
   });
 
@@ -181,8 +157,25 @@ describe("State Type Guards Properties", () => {
         if (isStateStrict(state)) {
           expect(isState(state)).toBe(true);
         }
+      },
+    );
 
-        return true;
+    // ===================================================================
+    // INV 83: isState component decomposition
+    // ===================================================================
+    test.prop(
+      [validRouteNameArbitrary, validRoutePathArbitrary, paramsSimpleArbitrary],
+      { numRuns: 5000 },
+    )(
+      "isState(x) implies isRouteName(x.name) and isParams(x.params)",
+      (name, path, params) => {
+        const state = { name, path, params };
+
+        if (isState(state)) {
+          expect(isRouteName(state.name)).toBe(true);
+          expect(typeof state.path).toBe("string");
+          expect(isParams(state.params)).toBe(true);
+        }
       },
     );
   });
@@ -190,8 +183,6 @@ describe("State Type Guards Properties", () => {
   describe("Edge cases", () => {
     it("State with valid name/path", () => {
       expect(isState({ name: "home", path: "", params: {} })).toBe(true);
-
-      return true;
     });
 
     test.prop([validRouteNameArbitrary, validRoutePathArbitrary], {
@@ -200,8 +191,6 @@ describe("State Type Guards Properties", () => {
       const state = { name, path, params: {} };
 
       expect(isState(state)).toBe(true);
-
-      return true;
     });
 
     it("State with additional fields", () => {
@@ -213,8 +202,6 @@ describe("State Type Guards Properties", () => {
       };
 
       expect(isState(state)).toBe(true);
-
-      return true;
     });
 
     test.prop([stateMinimalArbitrary], { numRuns: 2000 })(
@@ -230,8 +217,6 @@ describe("State Type Guards Properties", () => {
         // Both results should be true
         expect(result1).toBe(true);
         expect(result2).toBe(true);
-
-        return true;
       },
     );
   });

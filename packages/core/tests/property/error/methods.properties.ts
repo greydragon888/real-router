@@ -32,8 +32,6 @@ describe("RouterError Methods Properties", () => {
         // If message was custom, it is preserved
         expect(err.message).toBe(messageBefore);
       }
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary], { numRuns: 5000 })(
@@ -59,8 +57,6 @@ describe("RouterError Methods Properties", () => {
           // If initialCode was custom, message was not updated
           expect(err.message).toBe(initialCode);
         }
-
-        return true;
       },
     );
 
@@ -79,8 +75,6 @@ describe("RouterError Methods Properties", () => {
 
         expect(code1).toBe(code2);
         expect(message1).toBe(message2);
-
-        return true;
       },
     );
   });
@@ -105,8 +99,6 @@ describe("RouterError Methods Properties", () => {
       if (errorData.cause !== undefined) {
         expect(err.cause).toBe(errorData.cause);
       }
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary], { numRuns: 1000 })(
@@ -121,8 +113,6 @@ describe("RouterError Methods Properties", () => {
         expect(() => {
           err.setErrorInstance(undefined as unknown as Error);
         }).toThrowError(TypeError);
-
-        return true;
       },
     );
 
@@ -147,8 +137,6 @@ describe("RouterError Methods Properties", () => {
         err.setErrorInstance(nativeErr2);
 
         expect(err.message).toBe(errorData2.message);
-
-        return true;
       },
     );
   });
@@ -177,8 +165,6 @@ describe("RouterError Methods Properties", () => {
             expect(err.getField(key)).toBe(value);
           }
         }
-
-        return true;
       },
     );
 
@@ -206,8 +192,6 @@ describe("RouterError Methods Properties", () => {
         expect(typeof err.getField).toBe("function");
         expect(typeof err.setAdditionalFields).toBe("function");
         expect(typeof err.setErrorInstance).toBe("function");
-
-        return true;
       },
     );
 
@@ -252,8 +236,6 @@ describe("RouterError Methods Properties", () => {
           expect(err.hasField(key)).toBe(true);
         }
       }
-
-      return true;
     });
   });
 
@@ -268,8 +250,6 @@ describe("RouterError Methods Properties", () => {
 
         expect(err.hasField(nonExistentKey)).toBe(false);
         expect(err.getField(nonExistentKey)).toBe(undefined);
-
-        return true;
       },
     );
 
@@ -293,8 +273,6 @@ describe("RouterError Methods Properties", () => {
             expect(err.getField(key)).toBe(value);
           }
         }
-
-        return true;
       },
     );
 
@@ -308,8 +286,6 @@ describe("RouterError Methods Properties", () => {
 
         expect(err.hasField("message")).toBe(true);
         expect(err.getField("message")).toBe(code); // message = code by default
-
-        return true;
       },
     );
   });

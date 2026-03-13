@@ -747,6 +747,7 @@ export default tsEslint.config(
       "**/tests/**/*.test.tsx",
       "**/tests/**/*.properties.ts",
       "**/tests/**/helpers.ts",
+      "**/tests/**/*.stress.ts",
     ],
     plugins: {
       vitest: vitestPlugin,
@@ -820,6 +821,8 @@ export default tsEslint.config(
       // Property tests often need conditional assertions based on generated data
       "vitest/no-conditional-in-test": "off",
       "vitest/no-conditional-expect": "off",
+      // test/it come from @fast-check/vitest, not vitest — fixer would add duplicate imports
+      "vitest/prefer-importing-vitest-globals": "off",
     },
   },
 

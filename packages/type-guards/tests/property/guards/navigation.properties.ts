@@ -17,15 +17,11 @@ describe("Router Type Guards Properties", () => {
       "always returns true for valid NavigationOptions",
       (options) => {
         expect(isNavigationOptions(options)).toBe(true);
-
-        return true;
       },
     );
 
     it("returns true for empty object", () => {
       expect(isNavigationOptions({})).toBe(true);
-
-      return true;
     });
 
     test.prop([invalidNavigationOptionsArbitrary], { numRuns: 5000 })(
@@ -34,8 +30,6 @@ describe("Router Type Guards Properties", () => {
         expect(
           isNavigationOptions(options as unknown as NavigationOptions),
         ).toBe(false);
-
-        return true;
       },
     );
 
@@ -43,8 +37,6 @@ describe("Router Type Guards Properties", () => {
       "returns false for primitives",
       (value) => {
         expect(isNavigationOptions(value as null)).toBe(false);
-
-        return true;
       },
     );
 
@@ -56,33 +48,30 @@ describe("Router Type Guards Properties", () => {
 
         expect(result1).toBe(result2);
         expect(result1).toBe(true);
-
-        return true;
       },
     );
 
     it("handles null and undefined", () => {
       expect(isNavigationOptions(null)).toBe(false);
       expect(isNavigationOptions(undefined)).toBe(false);
-
-      return true;
     });
 
     it("handles all optional fields", () => {
       expect(isNavigationOptions({ replace: true })).toBe(true);
       expect(isNavigationOptions({ reload: true })).toBe(true);
       expect(isNavigationOptions({ force: true })).toBe(true);
+      expect(isNavigationOptions({ forceDeactivate: true })).toBe(true);
+      expect(isNavigationOptions({ redirected: true })).toBe(true);
+      expect(
+        isNavigationOptions({ signal: new AbortController().signal }),
+      ).toBe(true);
       expect(isNavigationOptions({ state: { custom: "value" } })).toBe(true);
-
-      return true;
     });
 
     test.prop([fc.boolean()], { numRuns: 2000 })(
       "correctly validates replace field",
       (replace) => {
         expect(isNavigationOptions({ replace })).toBe(true);
-
-        return true;
       },
     );
 
@@ -90,8 +79,6 @@ describe("Router Type Guards Properties", () => {
       "correctly validates reload field",
       (reload) => {
         expect(isNavigationOptions({ reload })).toBe(true);
-
-        return true;
       },
     );
 
@@ -99,8 +86,6 @@ describe("Router Type Guards Properties", () => {
       "correctly validates force field",
       (force) => {
         expect(isNavigationOptions({ force })).toBe(true);
-
-        return true;
       },
     );
 
@@ -108,10 +93,37 @@ describe("Router Type Guards Properties", () => {
       "correctly validates state field",
       (state) => {
         expect(isNavigationOptions({ state })).toBe(true);
-
-        return true;
       },
     );
+
+    test.prop([fc.boolean()], { numRuns: 2000 })(
+      "correctly validates forceDeactivate field",
+      (forceDeactivate) => {
+        expect(isNavigationOptions({ forceDeactivate })).toBe(true);
+      },
+    );
+
+    test.prop([fc.boolean()], { numRuns: 2000 })(
+      "correctly validates redirected field",
+      (redirected) => {
+        expect(isNavigationOptions({ redirected })).toBe(true);
+      },
+    );
+
+    test.prop([fc.constant(0).map(() => new AbortController().signal)], {
+      numRuns: 2000,
+    })("correctly validates signal field (AbortSignal)", (signal) => {
+      expect(isNavigationOptions({ signal })).toBe(true);
+    });
+
+    test.prop(
+      [fc.oneof(fc.string(), fc.integer(), fc.constant(null), fc.object())],
+      { numRuns: 2000 },
+    )("rejects non-AbortSignal values for signal field", (signal) => {
+      expect(
+        isNavigationOptions({ signal } as unknown as NavigationOptions),
+      ).toBe(false);
+    });
   });
 
   describe("Edge cases", () => {
@@ -124,19 +136,30 @@ describe("Router Type Guards Properties", () => {
       );
       expect(
         isNavigationOptions({
+          forceDeactivate: null as unknown as boolean,
+        }),
+      ).toBe(false);
+      expect(
+        isNavigationOptions({ redirected: null as unknown as boolean }),
+      ).toBe(false);
+      expect(
+        isNavigationOptions({ signal: null as unknown as AbortSignal }),
+      ).toBe(false);
+      expect(
+        isNavigationOptions({
           state: null as unknown as Record<string, unknown>,
         }),
-      ).toBe(true); // state can be null
-
-      return true;
+      ).toBe(true); // state is not validated by the guard
     });
 
     it("NavigationOptions with undefined values", () => {
       expect(isNavigationOptions({ replace: undefined })).toBe(true);
       expect(isNavigationOptions({ reload: undefined })).toBe(true);
+      expect(isNavigationOptions({ force: undefined })).toBe(true);
+      expect(isNavigationOptions({ forceDeactivate: undefined })).toBe(true);
+      expect(isNavigationOptions({ redirected: undefined })).toBe(true);
+      expect(isNavigationOptions({ signal: undefined })).toBe(true);
       expect(isNavigationOptions({ state: undefined })).toBe(true);
-
-      return true;
     });
 
     test.prop([navigationOptionsArbitrary], { numRuns: 2000 })(
@@ -152,8 +175,6 @@ describe("Router Type Guards Properties", () => {
         // Both results should be true
         expect(result1).toBe(true);
         expect(result2).toBe(true);
-
-        return true;
       },
     );
   });

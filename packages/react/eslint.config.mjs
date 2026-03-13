@@ -416,7 +416,7 @@ export default tsEslint.config(
   // VITEST CONFIGURATION FOR .test.tsx FILES
   // ============================================
   {
-    files: ["tests/**/*.test.tsx"],
+    files: ["tests/**/*.test.tsx", "tests/**/*.stress.tsx"],
     plugins: {
       vitest: vitestPlugin,
     },
@@ -480,7 +480,7 @@ export default tsEslint.config(
   // - prefer-user-event-setup rule (v7.14.0)
   // - Static configuration generation for better performance (v7.13.6)
   {
-    files: ["**/*.test.tsx"],
+    files: ["**/*.test.tsx", "**/*.stress.tsx"],
     ...testingLibraryPlugin.configs["flat/react"],
     rules: {
       ...testingLibraryPlugin.configs["flat/react"].rules,
@@ -490,6 +490,32 @@ export default tsEslint.config(
       // Direct DOM node access (e.g., element.click()) - warn instead of error
       // Prefer userEvent.click(element) or fireEvent.click(element)
       "testing-library/no-node-access": "warn",
+    },
+  },
+
+  // ============================================
+  // STRESS TEST OVERRIDES (applied after testing-library config)
+  // ============================================
+  // These rules are incompatible with stress test patterns and are disabled here.
+  // Stress tests intentionally:
+  //   - Use explicit cleanup() for correctness between cycles
+  //   - Name render results descriptively (e.g., routeAfterMount)
+  //   - Destructure from render() for convenience
+  //   - Create components dynamically inside loops for unique subscriptions
+  //   - Use array index keys for dynamically generated components
+  //   - Access DOM nodes directly for precise verification
+  {
+    files: ["tests/**/*.stress.tsx"],
+    rules: {
+      "import-x/no-extraneous-dependencies": "off",
+      "testing-library/no-manual-cleanup": "off",
+      "testing-library/render-result-naming-convention": "off",
+      "testing-library/prefer-screen-queries": "off",
+      "testing-library/no-container": "off",
+      "testing-library/no-node-access": "off",
+      "testing-library/no-unnecessary-act": "off",
+      "@eslint-react/no-nested-component-definitions": "off",
+      "@eslint-react/no-array-index-key": "off",
     },
   },
 

@@ -41,11 +41,11 @@ graph LR
     SP -.->|provides| TYPES[Format types]
 ```
 
-| Consumer       | What it uses          | Purpose                                    |
-| -------------- | --------------------- | ------------------------------------------ |
-| **route-tree** | `parse()`             | DI into SegmentMatcher as `parseQueryString` |
-| **route-tree** | `build()`             | DI into SegmentMatcher as `buildQueryString` |
-| **route-tree** | `ArrayFormat`, etc.   | Type re-exports for public API             |
+| Consumer       | What it uses        | Purpose                                      |
+| -------------- | ------------------- | -------------------------------------------- |
+| **route-tree** | `parse()`           | DI into SegmentMatcher as `parseQueryString` |
+| **route-tree** | `build()`           | DI into SegmentMatcher as `buildQueryString` |
+| **route-tree** | `ArrayFormat`, etc. | Type re-exports for public API               |
 
 **Key design:** `route-tree` wraps `parse`/`build` with route-specific options at matcher creation time:
 
@@ -53,8 +53,8 @@ graph LR
 // route-tree/createMatcher.ts
 const qp = options?.queryParams;
 new SegmentMatcher({
-  parseQueryString: (qs) => parse(qs, qp),  // DI: search-params
-  buildQueryString: (p) => build(p, qp),     // DI: search-params
+  parseQueryString: (qs) => parse(qs, qp), // DI: search-params
+  buildQueryString: (p) => build(p, qp), // DI: search-params
 });
 ```
 
@@ -83,25 +83,31 @@ keep(path: string, paramsToKeep: string[], opts?: Options): KeepResponse
 
 ```typescript
 // Format types
-type ArrayFormat   = "none" | "brackets" | "index" | "comma";
+type ArrayFormat = "none" | "brackets" | "index" | "comma";
 type BooleanFormat = "none" | "string" | "empty-true";
-type NullFormat    = "default" | "hidden";
+type NullFormat = "default" | "hidden";
 
 // Options
 interface Options {
-  arrayFormat?: ArrayFormat;     // default: "none"
+  arrayFormat?: ArrayFormat; // default: "none"
   booleanFormat?: BooleanFormat; // default: "none"
-  nullFormat?: NullFormat;       // default: "default"
+  nullFormat?: NullFormat; // default: "default"
 }
 
 // Parameter types
 type QueryParamPrimitive = string | number | boolean | null;
-type QueryParamValue     = QueryParamPrimitive | QueryParamPrimitive[];
-type SearchParams        = Record<string, QueryParamValue | undefined>;
+type QueryParamValue = QueryParamPrimitive | QueryParamPrimitive[];
+type SearchParams = Record<string, QueryParamValue | undefined>;
 
 // Response types
-interface OmitResponse { querystring: string; removedParams: Record<string, unknown>; }
-interface KeepResponse { querystring: string; keptParams: Record<string, unknown>; }
+interface OmitResponse {
+  querystring: string;
+  removedParams: Record<string, unknown>;
+}
+interface KeepResponse {
+  querystring: string;
+  keptParams: Record<string, unknown>;
+}
 
 // Also exported
 interface FinalOptions {
@@ -134,7 +140,7 @@ OptionsWithStrategies { ...options, strategies: ResolvedStrategies }
 ```typescript
 interface BooleanStrategy {
   encode(name: string, value: boolean): string;
-  decodeUndefined(): DecodeResult;        // key-only params (no "=")
+  decodeUndefined(): DecodeResult; // key-only params (no "=")
   decodeRaw(rawValue: string): boolean | null;
   decodeValue(decodedValue: string): DecodeResult;
 }
@@ -152,27 +158,27 @@ interface ArrayStrategy {
 
 #### Array Formats
 
-| Format       | Encode example            | Parse example              |
-| ------------ | ------------------------- | -------------------------- |
-| `"none"`     | `a=1&a=2`                | Repeated keys → array      |
-| `"brackets"` | `a[]=1&a[]=2`            | `[]` suffix → array        |
-| `"index"`    | `a[0]=1&a[1]=2`          | Numeric index → array      |
-| `"comma"`    | `a=1,2`                  | Comma-separated → array    |
+| Format       | Encode example  | Parse example           |
+| ------------ | --------------- | ----------------------- |
+| `"none"`     | `a=1&a=2`       | Repeated keys → array   |
+| `"brackets"` | `a[]=1&a[]=2`   | `[]` suffix → array     |
+| `"index"`    | `a[0]=1&a[1]=2` | Numeric index → array   |
+| `"comma"`    | `a=1,2`         | Comma-separated → array |
 
 #### Boolean Formats
 
-| Format         | `true` encodes as | `false` encodes as | Parsing                             |
-| -------------- | ----------------- | ------------------ | ----------------------------------- |
-| `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string      |
-| `"string"`     | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`      |
+| Format         | `true` encodes as | `false` encodes as | Parsing                                           |
+| -------------- | ----------------- | ------------------ | ------------------------------------------------- |
+| `"none"`       | `flag=true`       | `flag=false`       | No conversion — remains string                    |
+| `"string"`     | `flag=true`       | `flag=false`       | `"true"`/`"false"` → `boolean`                    |
 | `"empty-true"` | `flag`            | `flag=false`       | Key-only → `true`, value passed through as string |
 
 #### Null Formats
 
-| Format      | Encodes as | Parsing                     |
-| ----------- | ---------- | --------------------------- |
-| `"default"` | `key`      | Key-only → `null` (via boolean strategy's `decodeUndefined()`) |
-| `"hidden"`  | *(omitted)* | N/A (hidden nulls not in QS) |
+| Format      | Encodes as  | Parsing                                                        |
+| ----------- | ----------- | -------------------------------------------------------------- |
+| `"default"` | `key`       | Key-only → `null` (via boolean strategy's `decodeUndefined()`) |
+| `"hidden"`  | _(omitted)_ | N/A (hidden nulls not in QS)                                   |
 
 ## Core Algorithms
 
@@ -211,9 +217,9 @@ parse(path, opts?)
 
 **Dual parsing modes:**
 
-| Mode                    | Trigger      | Behavior                        |
-| ----------------------- | ------------ | ------------------------------- |
-| `parseSimple()`         | No options   | String values only, no strategies |
+| Mode                       | Trigger          | Behavior                                |
+| -------------------------- | ---------------- | --------------------------------------- |
+| `parseSimple()`            | No options       | String values only, no strategies       |
 | Full parse with strategies | Options provided | Boolean/null conversion, array handling |
 
 ### Build Flow
@@ -324,25 +330,25 @@ No circular dependencies.
 
 ### Complexity
 
-| Operation    | Complexity | Notes                                   |
-| ------------ | ---------- | --------------------------------------- |
-| `parse()`    | O(n)       | n = query string length, single pass    |
-| `build()`    | O(n)       | n = total value lengths                 |
-| `omit()`     | O(n + m)   | n = query string length, m = omit set   |
-| `keep()`     | O(n + m)   | n = query string length, m = keep set   |
-| `parseInto()`| O(n)       | Same as parse, no object allocation     |
+| Operation     | Complexity | Notes                                 |
+| ------------- | ---------- | ------------------------------------- |
+| `parse()`     | O(n)       | n = query string length, single pass  |
+| `build()`     | O(n)       | n = total value lengths               |
+| `omit()`      | O(n + m)   | n = query string length, m = omit set |
+| `keep()`      | O(n + m)   | n = query string length, m = keep set |
+| `parseInto()` | O(n)       | Same as parse, no object allocation   |
 
 ### Optimizations
 
-| Optimization                  | Benefit                                      |
-| ----------------------------- | -------------------------------------------- |
-| Empty string fast path        | O(1) for empty query strings                 |
-| No-options fast path          | Skip strategy resolution (most common case)  |
-| `DEFAULT_OPTIONS` constant    | Cached default strategies, no allocation      |
-| Index-based iteration         | No `split("&")` intermediate array            |
-| `decodeValue` two-check       | Most values skip decoding entirely            |
-| Set-based omit/keep           | O(1) per-param lookup instead of O(m) scan    |
-| `parseInto()` mutation        | Avoids intermediate object + `Object.assign`  |
+| Optimization               | Benefit                                      |
+| -------------------------- | -------------------------------------------- |
+| Empty string fast path     | O(1) for empty query strings                 |
+| No-options fast path       | Skip strategy resolution (most common case)  |
+| `DEFAULT_OPTIONS` constant | Cached default strategies, no allocation     |
+| Index-based iteration      | No `split("&")` intermediate array           |
+| `decodeValue` two-check    | Most values skip decoding entirely           |
+| Set-based omit/keep        | O(1) per-param lookup instead of O(m) scan   |
+| `parseInto()` mutation     | Avoids intermediate object + `Object.assign` |
 
 ### Memory
 
@@ -353,15 +359,16 @@ No circular dependencies.
 
 ## Error Handling
 
-| Case                        | Behavior                                               |
-| --------------------------- | ------------------------------------------------------ |
-| Invalid array element type  | `TypeError` during `build()` (only string/number/boolean allowed) |
-| `undefined` values          | Skipped in `build()` (not serializable)                |
-| Objects in params            | Fallback to `String(obj)` → `"[object Object]"`        |
-| Malformed query string       | Best-effort parse (missing `=` → `null` value)          |
+| Case                       | Behavior                                                          |
+| -------------------------- | ----------------------------------------------------------------- |
+| Invalid array element type | `TypeError` during `build()` (only string/number/boolean allowed) |
+| `undefined` values         | Skipped in `build()` (not serializable)                           |
+| Objects in params          | Fallback to `String(obj)` → `"[object Object]"`                   |
+| Malformed query string     | Best-effort parse (missing `=` → `null` value)                    |
 
 ## See Also
 
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [route-tree ARCHITECTURE.md](../route-tree/ARCHITECTURE.md) — Integration layer
 - [path-matcher ARCHITECTURE.md](../path-matcher/ARCHITECTURE.md) — URL matching engine
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture

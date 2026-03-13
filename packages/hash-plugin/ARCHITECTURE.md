@@ -519,4 +519,5 @@ buildUrl("users.profile", { id: "123" })
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor)
 - [browser-env/ARCHITECTURE.md](../browser-env/ARCHITECTURE.md) — Shared browser abstractions
 - [browser-plugin/ARCHITECTURE.md](../browser-plugin/ARCHITECTURE.md) — History API plugin (sibling)
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents

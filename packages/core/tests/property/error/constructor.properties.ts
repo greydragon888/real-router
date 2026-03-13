@@ -36,8 +36,6 @@ describe("RouterError Constructor Properties", () => {
           expect(err1.redirect).toBe(undefined);
           expect(err2.redirect).toBe(undefined);
         }
-
-        return true;
       },
     );
   });
@@ -52,8 +50,6 @@ describe("RouterError Constructor Properties", () => {
 
         expect(err.code).toBe(code);
         expect(typeof err.code).toBe("string");
-
-        return true;
       },
     );
 
@@ -67,8 +63,6 @@ describe("RouterError Constructor Properties", () => {
       } else {
         expect(err.message).toBe(message);
       }
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary], { numRuns: 10_000 })(
@@ -78,8 +72,6 @@ describe("RouterError Constructor Properties", () => {
 
         expect(err).toBeInstanceOf(Error);
         expect(err).toBeInstanceOf(RouterError);
-
-        return true;
       },
     );
 
@@ -102,8 +94,6 @@ describe("RouterError Constructor Properties", () => {
         } else {
           expect(err.redirect).toBe(undefined);
         }
-
-        return true;
       },
     );
   });
@@ -136,8 +126,6 @@ describe("RouterError Constructor Properties", () => {
         // Methods should work
         expect(err.hasField("code")).toBe(true);
         expect(err.getField("code")).toBe(code);
-
-        return true;
       },
     );
   });
@@ -162,8 +150,6 @@ describe("RouterError Constructor Properties", () => {
             expect((err as Record<string, unknown>)[key]).toBe(value);
           }
         }
-
-        return true;
       },
     );
 
@@ -187,8 +173,6 @@ describe("RouterError Constructor Properties", () => {
             expect(err.getField(key)).toBe(customFields[key]);
           }
         }
-
-        return true;
       },
     );
   });
@@ -210,8 +194,6 @@ describe("RouterError Constructor Properties", () => {
         } else {
           expect(err.redirect).toBe(undefined);
         }
-
-        return true;
       },
     );
   });

@@ -226,12 +226,9 @@ export const invalidStateArbitrary = fc.oneof(
     path: validRoutePathArbitrary,
     params: paramsSimpleArbitrary,
   }) as fc.Arbitrary<Record<string, unknown>>,
-  // Invalid route path (double slashes)
-  fc.record({
-    name: validRouteNameArbitrary,
-    path: fc.constantFrom("//", "/test//path", "test//path"),
-    params: paramsSimpleArbitrary,
-  }) as fc.Arbitrary<Record<string, unknown>>,
+  // Note: "invalid path format" (e.g. double slashes) is NOT included here
+  // because isState only checks typeof path === "string", not path format.
+  // Path format validation happens at the route tree level, not in type guards.
 );
 
 // ============================================================================
@@ -247,6 +244,12 @@ export const navigationOptionsArbitrary: fc.Arbitrary<NavigationOptions> =
     replace: fc.option(fc.boolean(), { nil: undefined }),
     reload: fc.option(fc.boolean(), { nil: undefined }),
     force: fc.option(fc.boolean(), { nil: undefined }),
+    forceDeactivate: fc.option(fc.boolean(), { nil: undefined }),
+    redirected: fc.option(fc.boolean(), { nil: undefined }),
+    signal: fc.option(
+      fc.constant(0).map(() => new AbortController().signal),
+      { nil: undefined },
+    ),
     state: fc.option(fc.dictionary(fc.string(), fc.anything()), {
       nil: undefined,
     }),
@@ -267,6 +270,18 @@ export const invalidNavigationOptionsArbitrary = fc.oneof(
   // Wrong types for force
   fc.record({
     force: fc.oneof(fc.string(), fc.integer(), fc.constant(null)),
+  }) as fc.Arbitrary<Record<string, unknown>>,
+  // Wrong types for forceDeactivate
+  fc.record({
+    forceDeactivate: fc.oneof(fc.string(), fc.integer(), fc.constant(null)),
+  }) as fc.Arbitrary<Record<string, unknown>>,
+  // Wrong types for redirected
+  fc.record({
+    redirected: fc.oneof(fc.string(), fc.integer(), fc.constant(null)),
+  }) as fc.Arbitrary<Record<string, unknown>>,
+  // Wrong types for signal (must be AbortSignal or undefined)
+  fc.record({
+    signal: fc.oneof(fc.string(), fc.integer(), fc.constant(null), fc.object()),
   }) as fc.Arbitrary<Record<string, unknown>>,
 );
 

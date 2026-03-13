@@ -6,7 +6,9 @@
 > A simple, powerful, view-agnostic, modular and extensible router for JavaScript applications.
 
 > **Warning**
-> This project is in **active development** (pre-1.0). The API is not stable and may change between releases. Use at your own risk until a stable 1.0 release.
+> This project is pre-1.0. The core API and plugin interfaces are considered stable and are unlikely to change.
+> Minor versions may include new features but aim to preserve backward compatibility.
+> A 1.0 release will follow once the full API surface has been validated in production use.
 
 Real-Router is an **independent routing solution** inspired by the declarative routing philosophy of [router5](https://github.com/router5/router5), built from scratch with modern JavaScript, TypeScript-first design, and performance optimizations.
 
@@ -33,6 +35,15 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 | URL building       | 5–10x faster                          |
 | Memory allocations | 1.5x fewer                            |
 | Scaling            | Both O(1) — stable at any route count |
+
+### Reliability
+
+Verified by 99 stress tests covering 100% of the public API:
+
+- **Zero memory leaks**: Heap stable across thousands of navigations, route mutations, and plugin cycles (50+ heap snapshots)
+- **Clean disposal**: `dispose()` fully releases all resources; GC collects >50% of disposed routers immediately
+- **Concurrent-safe**: Fire-and-forget navigations, guard removal during execution, and route CRUD under load — no race conditions
+- **Robust error handling**: All error paths validated under storm conditions (1,000+ error cycles)
 
 ### Modern Architecture
 

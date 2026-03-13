@@ -28,8 +28,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState(state, method);
           }).not.toThrowError();
-
-          return true;
         },
       );
 
@@ -39,8 +37,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState(state, method);
           }).not.toThrowError();
-
-          return true;
         },
       );
 
@@ -50,8 +46,6 @@ describe("State Validators - Property-Based Tests", () => {
         expect(() => {
           validateState(state, method);
         }).not.toThrowError();
-
-        return true;
       });
     });
 
@@ -62,8 +56,6 @@ describe("State Validators - Property-Based Tests", () => {
         expect(() => {
           validateState(state, method);
         }).toThrowError(TypeError);
-
-        return true;
       });
 
       test.prop([arbitraryInvalidTypes, methodNameArbitrary], {
@@ -72,8 +64,6 @@ describe("State Validators - Property-Based Tests", () => {
         expect(() => {
           validateState(value, method);
         }).toThrowError(TypeError);
-
-        return true;
       });
 
       test.prop([methodNameArbitrary], { numRuns: 1000 })(
@@ -82,8 +72,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState(null, method);
           }).toThrowError(TypeError);
-
-          return true;
         },
       );
 
@@ -93,8 +81,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState(undefined, method);
           }).toThrowError(TypeError);
-
-          return true;
         },
       );
     });
@@ -112,8 +98,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(error).toBeInstanceOf(TypeError);
           expect((error as Error).message).toContain(`[${method}]`);
         }
-
-        return true;
       });
 
       test.prop([arbitraryInvalidTypes, methodNameArbitrary], {
@@ -131,8 +115,6 @@ describe("State Validators - Property-Based Tests", () => {
               "Invalid state structure",
             );
           }
-
-          return true;
         },
       );
 
@@ -153,8 +135,6 @@ describe("State Validators - Property-Based Tests", () => {
             /null|undefined|string|number|boolean|symbol|function|array|object/,
           );
         }
-
-        return true;
       });
 
       test.prop([methodNameArbitrary], { numRuns: 1000 })(
@@ -168,8 +148,6 @@ describe("State Validators - Property-Based Tests", () => {
             expect(error).toBeInstanceOf(TypeError);
             expect((error as Error).message).toContain("Expected State object");
           }
-
-          return true;
         },
       );
     });
@@ -202,8 +180,6 @@ describe("State Validators - Property-Based Tests", () => {
 
           expect(result1).toBe(result2);
           expect(result1).toBe("success"); // Minimal state is always valid
-
-          return true;
         },
       );
 
@@ -232,8 +208,6 @@ describe("State Validators - Property-Based Tests", () => {
 
         expect(result1).toBe(result2);
         expect(result1).toBe("error"); // Invalid state is always invalid
-
-        return true;
       });
     });
 
@@ -254,8 +228,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(unknownState).toHaveProperty("name");
           expect(unknownState).toHaveProperty("params");
           expect(unknownState).toHaveProperty("path");
-
-          return true;
         },
       );
     });
@@ -267,8 +239,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState({}, method);
           }).toThrowError(TypeError);
-
-          return true;
         },
       );
 
@@ -278,8 +248,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState({ name: "home" }, method);
           }).toThrowError(TypeError);
-
-          return true;
         },
       );
 
@@ -289,8 +257,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState({ name: "home", params: {} }, method);
           }).toThrowError(TypeError);
-
-          return true;
         },
       );
 
@@ -300,8 +266,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState({ name: "home", params: {}, path: "/" }, method);
           }).not.toThrowError();
-
-          return true;
         },
       );
 
@@ -320,8 +284,6 @@ describe("State Validators - Property-Based Tests", () => {
               method,
             );
           }).not.toThrowError();
-
-          return true;
         },
       );
     });
@@ -345,8 +307,6 @@ describe("State Validators - Property-Based Tests", () => {
           expect(() => {
             validateState(state, method);
           }).not.toThrowError();
-
-          return true;
         },
       );
     });
@@ -366,8 +326,6 @@ describe("State Validators - Property-Based Tests", () => {
           }
 
           expect(validateStateResult).toBe(isStateResult);
-
-          return true;
         },
       );
 
@@ -381,8 +339,6 @@ describe("State Validators - Property-Based Tests", () => {
 
           // Both calls succeeded - test passes
           expect(true).toBe(true);
-
-          return true;
         },
       );
     });

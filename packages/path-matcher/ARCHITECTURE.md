@@ -505,6 +505,7 @@ No circular dependencies.
 
 ## See Also
 
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [route-tree ARCHITECTURE.md](../route-tree/ARCHITECTURE.md) — Integration layer
 - [search-params ARCHITECTURE.md](../search-params/ARCHITECTURE.md) — Query string handling
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture

@@ -15,8 +15,6 @@ describe("RouterError Message Formatting Properties", () => {
         const err = new RouterError(code);
 
         expect(err.message).toContain(code);
-
-        return true;
       },
     );
 
@@ -31,8 +29,6 @@ describe("RouterError Message Formatting Properties", () => {
         } else {
           expect(err.message.length).toBeGreaterThan(0);
         }
-
-        return true;
       },
     );
 
@@ -45,8 +41,6 @@ describe("RouterError Message Formatting Properties", () => {
         const isPrintable = /^[\t\n\u0020-\u007E]*$/.test(err.message);
 
         expect(isPrintable).toBe(true);
-
-        return true;
       },
     );
 
@@ -57,8 +51,6 @@ describe("RouterError Message Formatting Properties", () => {
         const err2 = new RouterError(code);
 
         expect(err1.message).toBe(err2.message);
-
-        return true;
       },
     );
   });
@@ -73,8 +65,6 @@ describe("RouterError Message Formatting Properties", () => {
         const err = new RouterError(code, { message: customMessage });
 
         expect(err.message).toBe(customMessage);
-
-        return true;
       },
     );
 
@@ -84,8 +74,6 @@ describe("RouterError Message Formatting Properties", () => {
       const err = new RouterError(code, { message: emptyMessage });
 
       expect(err.message).toBe("");
-
-      return true;
     });
 
     test.prop(
@@ -98,8 +86,6 @@ describe("RouterError Message Formatting Properties", () => {
 
         expect(err.message).toBe(unicode);
         expect(err.message).toHaveLength(unicode.length);
-
-        return true;
       },
     );
 
@@ -123,8 +109,6 @@ describe("RouterError Message Formatting Properties", () => {
         if (msg1 !== msg2) {
           expect(err1.message).not.toBe(err2.message);
         }
-
-        return true;
       },
     );
   });
@@ -138,8 +122,6 @@ describe("RouterError Message Formatting Properties", () => {
       err.setCode("ERR2");
 
       expect(err.code).toBe("ERR2");
-
-      return true;
     });
 
     test.prop(
@@ -160,8 +142,6 @@ describe("RouterError Message Formatting Properties", () => {
 
         // Custom message should remain unchanged
         expect(err.message).toBe(customMessage);
-
-        return true;
       },
     );
   });
@@ -173,8 +153,6 @@ describe("RouterError Message Formatting Properties", () => {
         const err = new RouterError(code);
 
         expect(err.message.length).toBeLessThan(1000);
-
-        return true;
       },
     );
 
@@ -188,8 +166,6 @@ describe("RouterError Message Formatting Properties", () => {
         if (err.message.length > 0 && err.message !== code) {
           expect(err.message[0]).not.toBe(" ");
         }
-
-        return true;
       },
     );
 
@@ -203,8 +179,6 @@ describe("RouterError Message Formatting Properties", () => {
         if (err.message.length > 0 && err.message !== code) {
           expect(err.message.at(-1)).not.toBe(" ");
         }
-
-        return true;
       },
     );
 
@@ -216,8 +190,6 @@ describe("RouterError Message Formatting Properties", () => {
 
       expect(err.message).toBe(longMsg);
       expect(err.message).toHaveLength(longMsg.length);
-
-      return true;
     });
   });
 
@@ -237,8 +209,6 @@ describe("RouterError Message Formatting Properties", () => {
 
         expect(err.message).toBe(message);
         expect(err.message).toContain(specialChar);
-
-        return true;
       },
     );
 
@@ -258,8 +228,6 @@ describe("RouterError Message Formatting Properties", () => {
         const err = new RouterError(code, { message });
 
         expect(err.message).toBe(message);
-
-        return true;
       },
     );
 
@@ -271,8 +239,6 @@ describe("RouterError Message Formatting Properties", () => {
       const err = new RouterError(code, { message });
 
       expect(err.message).toBe(message);
-
-      return true;
     });
   });
 
@@ -286,8 +252,6 @@ describe("RouterError Message Formatting Properties", () => {
       const json = err.toJSON();
 
       expect(json.message).toBe(customMessage);
-
-      return true;
     });
 
     test.prop(
@@ -301,8 +265,6 @@ describe("RouterError Message Formatting Properties", () => {
         const json = structuredClone(err);
 
         expect(json.message).toBe(customMessage);
-
-        return true;
       },
     );
 
@@ -316,8 +278,6 @@ describe("RouterError Message Formatting Properties", () => {
         const json = structuredClone(err);
 
         expect(json.message).toBe(err.message);
-
-        return true;
       },
     );
   });
@@ -333,8 +293,6 @@ describe("RouterError Message Formatting Properties", () => {
       const err = new RouterError(code, { message: emptyMsg });
 
       expect(err.message).toBe("");
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary], { numRuns: 1000 })(
@@ -349,8 +307,6 @@ describe("RouterError Message Formatting Properties", () => {
           expect(err.message.length).toBeGreaterThan(0);
           expect(err.message).toContain(code);
         }
-
-        return true;
       },
     );
 
@@ -370,8 +326,6 @@ describe("RouterError Message Formatting Properties", () => {
       expect(err.stack).toContain("Error: test");
       // message will change to "test" from Error.message
       expect(err.message).toBe("test");
-
-      return true;
     });
   });
 
@@ -403,8 +357,6 @@ describe("RouterError Message Formatting Properties", () => {
 
         expect(containsCodeOrKey).toBe(true);
       }
-
-      return true;
     });
 
     test.prop(
@@ -419,8 +371,6 @@ describe("RouterError Message Formatting Properties", () => {
 
       expect(err.message).toBe(customMessage);
       expect(err.code).toBe(code);
-
-      return true;
     });
   });
 });

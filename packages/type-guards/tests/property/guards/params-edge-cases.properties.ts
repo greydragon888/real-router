@@ -22,8 +22,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
     )("isParams accepts undefined values via isValidParamValue", (params) => {
       // Line 15-16: if (value === undefined || value === null) return true
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -37,8 +35,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
     )("isParams accepts null values via isValidParamValue", (params) => {
       // Line 15-16: if (value === undefined || value === null) return true
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
   });
 
@@ -50,8 +46,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { flags: boolArray };
 
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -67,16 +61,12 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { mixed: mixedArray };
 
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
 
     it("isParams accepts arrays containing only boolean", () => {
       expect(isParams({ a: [true, false, true] })).toBe(true);
       expect(isParams({ b: [false] })).toBe(true);
       expect(isParams({ c: [true, true, true, false, false] })).toBe(true);
-
-      return true;
     });
   });
 
@@ -90,8 +80,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { items: arrayOfObjects };
 
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -107,8 +95,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { mixed: mixedArray };
 
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
 
     it("isParams accepts arrays with nested objects", () => {
@@ -122,8 +108,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
           ],
         }),
       ).toBe(true);
-
-      return true;
     });
 
     test.prop([fc.array(fc.constant(null), { minLength: 1, maxLength: 3 })], {
@@ -134,8 +118,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { nulls: nullArray };
 
       expect(isParams(params)).toBe(true);
-
-      return true;
     });
   });
 
@@ -147,8 +129,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
         const params = { nested: nestedParams };
 
         expect(isParams(params)).toBe(true);
-
-        return true;
       },
     );
 
@@ -163,8 +143,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
     )("isParams accepts deeply nested structures", (complexObject) => {
       // Line 73: recursive validation of nested objects
       expect(isParams(complexObject)).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -184,8 +162,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
         const params = { record: simpleRecord };
 
         expect(isParams(params)).toBe(true);
-
-        return true;
       },
     );
 
@@ -214,8 +190,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
           },
         }),
       ).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -234,8 +208,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       (mixedParams) => {
         // Validates both paths: lines 68-69 and line 73
         expect(isParams(mixedParams)).toBe(true);
-
-        return true;
       },
     );
   });
@@ -260,8 +232,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       // - objects in arrays (49-52)
       // - nested objects (58-74)
       expect(isParams(complexParams)).toBe(true);
-
-      return true;
     });
 
     it("isParams: real-world examples with uncovered branches", () => {
@@ -302,8 +272,63 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
           features: [false, false, true],
         }),
       ).toBe(true);
+    });
+  });
 
-      return true;
+  // ===================================================================
+  // Circular reference detection
+  // ===================================================================
+
+  describe("Circular reference detection", () => {
+    it("isParams rejects objects with self-referencing circular references", () => {
+      const obj: Record<string, unknown> = { a: "value" };
+
+      obj.self = obj;
+
+      expect(isParams(obj)).toBe(false);
+    });
+
+    it("isParams rejects circular references through arrays", () => {
+      const arr: unknown[] = [1, 2];
+      const obj: Record<string, unknown> = { items: arr };
+
+      arr.push(obj);
+
+      expect(isParams(obj)).toBe(false);
+    });
+  });
+
+  // ===================================================================
+  // Class instance rejection (custom prototype)
+  // ===================================================================
+
+  describe("Class instance rejection (custom prototype)", () => {
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParams rejects class instances as nested values", (instance) => {
+      expect(isParams({ field: instance })).toBe(false);
+    });
+
+    test.prop(
+      [
+        fc.oneof(
+          fc.constant(0).map(() => new Date()),
+          fc.constant(0).map(() => new Map()),
+          fc.constant(0).map(() => new Set()),
+          fc.constant(0).map(() => /regex/),
+        ),
+      ],
+      { numRuns: 5000 },
+    )("isParams rejects class instances at top level", (instance) => {
+      expect(isParams(instance)).toBe(false);
     });
   });
 
@@ -321,8 +346,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       const params = { invalid: invalidArray };
 
       expect(isParams(params)).toBe(false);
-
-      return true;
     });
 
     test.prop(
@@ -337,8 +360,6 @@ describe("Params Edge Cases (Uncovered Branches)", () => {
       (invalidNested) => {
         // Line 73: isParams(value) should return false
         expect(isParams(invalidNested)).toBe(false);
-
-        return true;
       },
     );
   });

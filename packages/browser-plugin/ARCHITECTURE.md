@@ -498,4 +498,5 @@ The hash fragment (`#section`) is always preserved when navigating to the same p
 
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor)
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents

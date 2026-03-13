@@ -588,6 +588,8 @@ router.dispose()  ───────────┘      ▼
 
 **Fire-and-forget safety:** `navigate()` internally attaches `.catch()` to suppress expected errors (`SAME_STATES`, `TRANSITION_CANCELLED`, `ROUTER_NOT_STARTED`, `ROUTE_NOT_FOUND`), so calling `router.navigate(...)` without `await` is safe.
 
+**Atomicity:** Transitions are atomic — either the full pipeline completes (all guards pass, state updates) or nothing changes. There is no intermediate "left but not arrived" state: if `canDeactivate` passes but `canActivate` fails, the router remains on the original route. Per-route leave/enter logic therefore belongs in `onTransitionSuccess`, not inside the pipeline. See [Navigation Lifecycle — Transition Atomicity](https://github.com/greydragon888/real-router/wiki/navigation-lifecycle#transition-atomicity).
+
 ## Route Definition
 
 ### Route Configuration
@@ -978,3 +980,4 @@ All limits have configurable bounds (`LIMIT_BOUNDS`) and can be set via `options
 - [path-matcher ARCHITECTURE.md](../path-matcher/ARCHITECTURE.md) — URL matching engine
 - [search-params ARCHITECTURE.md](../search-params/ARCHITECTURE.md) — Query string handling
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants

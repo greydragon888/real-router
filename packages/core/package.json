@@ -48,11 +48,13 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run functional/",
+    "test:properties": "vitest run --config vitest.config.properties.mts",
     "test:coverage": "vitest run functional/ --coverage",
+    "test:stress": "vitest run --config vitest.config.stress.mts",
+    "test:mutation": "stryker run",
     "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "test:mutation": "stryker run",
     "lint:package": "publint",
     "lint:types": "attw --pack ."
   },

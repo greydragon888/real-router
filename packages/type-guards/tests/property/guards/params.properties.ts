@@ -17,8 +17,6 @@ describe("Params Type Guards Properties", () => {
       "always returns true for simple valid Params",
       (params) => {
         expect(isParams(params)).toBe(true);
-
-        return true;
       },
     );
 
@@ -26,8 +24,6 @@ describe("Params Type Guards Properties", () => {
       "always returns true for Params with arrays",
       (params) => {
         expect(isParams(params)).toBe(true);
-
-        return true;
       },
     );
 
@@ -35,15 +31,11 @@ describe("Params Type Guards Properties", () => {
       "always returns true for nested Params",
       (params) => {
         expect(isParams(params)).toBe(true);
-
-        return true;
       },
     );
 
     it("returns true for empty object", () => {
       expect(isParams({})).toBe(true);
-
-      return true;
     });
 
     test.prop([invalidParamsArbitrary], { numRuns: 10_000 })(
@@ -51,8 +43,6 @@ describe("Params Type Guards Properties", () => {
       (params) => {
         // Invalid params should be rejected
         expect(isParams(params)).toBe(false);
-
-        return true;
       },
     );
 
@@ -60,8 +50,6 @@ describe("Params Type Guards Properties", () => {
       "returns false for primitives and non-objects",
       (value) => {
         expect(isParams(value)).toBe(false);
-
-        return true;
       },
     );
 
@@ -73,8 +61,6 @@ describe("Params Type Guards Properties", () => {
 
         expect(result1).toBe(result2);
         expect(result1).toBe(true);
-
-        return true;
       },
     );
 
@@ -83,8 +69,6 @@ describe("Params Type Guards Properties", () => {
     })("returns false for Params arrays", (paramsArray) => {
       // Arrays are not Params
       expect(isParams(paramsArray)).toBe(false);
-
-      return true;
     });
   });
 
@@ -93,8 +77,6 @@ describe("Params Type Guards Properties", () => {
       "always returns true for simple valid Params",
       (params) => {
         expect(isParamsStrict(params)).toBe(true);
-
-        return true;
       },
     );
 
@@ -102,23 +84,17 @@ describe("Params Type Guards Properties", () => {
       "always returns true for Params with arrays",
       (params) => {
         expect(isParamsStrict(params)).toBe(true);
-
-        return true;
       },
     );
 
     it("returns true for empty object", () => {
       expect(isParamsStrict({})).toBe(true);
-
-      return true;
     });
 
     test.prop([invalidParamsArbitrary], { numRuns: 10_000 })(
       "returns false for invalid Params",
       (params) => {
         expect(isParamsStrict(params)).toBe(false);
-
-        return true;
       },
     );
 
@@ -126,8 +102,6 @@ describe("Params Type Guards Properties", () => {
       "returns false for primitives",
       (value) => {
         expect(isParamsStrict(value)).toBe(false);
-
-        return true;
       },
     );
 
@@ -139,8 +113,6 @@ describe("Params Type Guards Properties", () => {
 
         expect(result1).toBe(result2);
         expect(result1).toBe(true);
-
-        return true;
       },
     );
   });
@@ -152,8 +124,6 @@ describe("Params Type Guards Properties", () => {
         if (isParamsStrict(params)) {
           expect(isParams(params)).toBe(true);
         }
-
-        return true;
       },
     );
 
@@ -163,8 +133,6 @@ describe("Params Type Guards Properties", () => {
         if (!isParams(value)) {
           expect(isParamsStrict(value)).toBe(false);
         }
-
-        return true;
       },
     );
 
@@ -176,8 +144,30 @@ describe("Params Type Guards Properties", () => {
 
         // For valid Params results should match
         expect(resultParams).toBe(resultParamsStrict);
+      },
+    );
 
-        return true;
+    // ===================================================================
+    // INV 84: isParams accepts nested objects that isParamsStrict rejects
+    // ===================================================================
+    test.prop(
+      [
+        paramsNestedArbitrary.filter((params) =>
+          Object.values(params).some(
+            (v) =>
+              v !== null &&
+              v !== undefined &&
+              typeof v === "object" &&
+              !Array.isArray(v),
+          ),
+        ),
+      ],
+      { numRuns: 3000 },
+    )(
+      "isParams accepts nested objects that isParamsStrict rejects",
+      (params) => {
+        expect(isParams(params)).toBe(true);
+        expect(isParamsStrict(params)).toBe(false);
       },
     );
   });
@@ -188,8 +178,6 @@ describe("Params Type Guards Properties", () => {
       expect(isParams(undefined)).toBe(false);
       expect(isParamsStrict(null)).toBe(false);
       expect(isParamsStrict(undefined)).toBe(false);
-
-      return true;
     });
 
     test.prop(
@@ -205,8 +193,6 @@ describe("Params Type Guards Properties", () => {
       // See params.ts:14-16
       expect(isParams(params)).toBe(true);
       expect(isParamsStrict(params)).toBe(true);
-
-      return true;
     });
 
     test.prop(
@@ -222,8 +208,6 @@ describe("Params Type Guards Properties", () => {
       // See params.ts:14-16
       expect(isParams(params)).toBe(true);
       expect(isParamsStrict(params)).toBe(true);
-
-      return true;
     });
 
     it("Params with numbers (including edge cases)", () => {
@@ -234,8 +218,6 @@ describe("Params Type Guards Properties", () => {
       expect(isParams({ a: Number.NaN })).toBe(false);
       expect(isParams({ a: Infinity })).toBe(false);
       expect(isParams({ a: -Infinity })).toBe(false);
-
-      return true;
     });
 
     test.prop(
@@ -244,16 +226,12 @@ describe("Params Type Guards Properties", () => {
     )("handles large number of keys", (params) => {
       expect(isParams(params)).toBe(true);
       expect(isParamsStrict(params)).toBe(true);
-
-      return true;
     });
 
     it("handles special keys", () => {
       expect(isParams({ __proto__: "value" })).toBe(true);
       expect(isParams({ constructor: "value" })).toBe(true);
       expect(isParams({ toString: "value" })).toBe(true);
-
-      return true;
     });
   });
 });

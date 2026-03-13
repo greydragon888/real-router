@@ -35,7 +35,8 @@
     "build": "tsup",
     "type-check": "tsc --noEmit",
     "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:properties": "vitest --config vitest.config.properties.mts --run"
   },
   "sideEffects": false,
   "dependencies": {
@@ -43,6 +44,6 @@
     "type-guards": "workspace:^"
   },
   "devDependencies": {
-    "jsdom": "27.4.0"
+    "jsdom": "28.1.0"
   }
 }

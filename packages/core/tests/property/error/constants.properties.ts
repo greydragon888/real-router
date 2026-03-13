@@ -9,8 +9,6 @@ describe("RouterError Constants Properties", () => {
       expect(typeof errorCodes).toBe("object");
       expect(errorCodes).not.toBeNull();
       expect(Array.isArray(errorCodes)).toBe(false);
-
-      return true;
     });
 
     it("errorCodes contains all required codes", () => {
@@ -25,6 +23,7 @@ describe("RouterError Constants Properties", () => {
         "TRANSITION_ERR",
         "TRANSITION_CANCELLED",
         "ROUTER_DISPOSED",
+        "PLUGIN_CONFLICT",
       ];
 
       for (const code of requiredCodes) {
@@ -32,10 +31,7 @@ describe("RouterError Constants Properties", () => {
         expect(typeof errorCodes[code as keyof typeof errorCodes]).toBe(
           "string",
         );
-        expect(errorCodes[code as keyof typeof errorCodes]).toBe(true);
       }
-
-      return true;
     });
 
     it("all errorCodes values are unique", () => {
@@ -43,8 +39,6 @@ describe("RouterError Constants Properties", () => {
       const uniqueValues = new Set(values);
 
       expect(uniqueValues.size).toBe(values.length);
-
-      return true;
     });
 
     it("all errorCodes keys are unique", () => {
@@ -52,8 +46,6 @@ describe("RouterError Constants Properties", () => {
       const uniqueKeys = new Set(keys);
 
       expect(uniqueKeys.size).toBe(keys.length);
-
-      return true;
     });
   });
 
@@ -66,8 +58,6 @@ describe("RouterError Constants Properties", () => {
         expect(value.length).toBeGreaterThan(0);
         expect(value.trim().length).toBeGreaterThan(0);
       }
-
-      return true;
     });
 
     it("all errorCodes keys are non-empty strings", () => {
@@ -78,8 +68,6 @@ describe("RouterError Constants Properties", () => {
         expect(key.length).toBeGreaterThan(0);
         expect(key.trim().length).toBeGreaterThan(0);
       }
-
-      return true;
     });
 
     it("errorCodes values have no leading or trailing whitespace", () => {
@@ -88,8 +76,6 @@ describe("RouterError Constants Properties", () => {
       for (const value of values) {
         expect(value).toBe(value.trim());
       }
-
-      return true;
     });
 
     it("errorCodes keys contain no whitespace", () => {
@@ -98,8 +84,6 @@ describe("RouterError Constants Properties", () => {
       for (const key of keys) {
         expect(key).not.toMatch(/\s/);
       }
-
-      return true;
     });
   });
 
@@ -115,8 +99,6 @@ describe("RouterError Constants Properties", () => {
         // Should not start or end with underscore
         expect(key).not.toMatch(/(?:^_)|(?:_$)/);
       }
-
-      return true;
     });
 
     it("errorCodes values are in SNAKE_CASE or SCREAMING_SNAKE_CASE", () => {
@@ -130,16 +112,12 @@ describe("RouterError Constants Properties", () => {
         // Should not start or end with underscore
         expect(value).not.toMatch(/(?:^_)|(?:_$)/);
       }
-
-      return true;
     });
   });
 
   describe("errorCodes mutability", () => {
     it("errorCodes object is frozen", () => {
       expect(Object.isFrozen(errorCodes)).toBe(true);
-
-      return true;
     });
 
     test.prop([fc.string({ minLength: 1, maxLength: 50 })], { numRuns: 1000 })(
@@ -157,8 +135,6 @@ describe("RouterError Constants Properties", () => {
         const after = Object.keys(errorCodes).length;
 
         expect(after).toBe(before);
-
-        return true;
       },
     );
 
@@ -177,8 +153,6 @@ describe("RouterError Constants Properties", () => {
       const currentValue = errorCodes[existingKey as keyof typeof errorCodes];
 
       expect(currentValue).toBe(originalValue);
-
-      return true;
     });
 
     test.prop([fc.constantFrom(...Object.keys(errorCodes))], {
@@ -196,20 +170,16 @@ describe("RouterError Constants Properties", () => {
 
       expect(after).toBe(before);
       expect(errorCodes).toHaveProperty(existingKey);
-
-      return true;
     });
   });
 
   describe("errorCodes backward compatibility", () => {
     it("errorCodes contains exact number of codes", () => {
       // If this number changes, it may break backward compatibility
-      const expectedCount = 10;
+      const expectedCount = 11;
       const actualCount = Object.keys(errorCodes).length;
 
       expect(actualCount).toBe(expectedCount);
-
-      return true;
     });
 
     it("errorCodes has expected values", () => {
@@ -225,13 +195,12 @@ describe("RouterError Constants Properties", () => {
         TRANSITION_ERR: "TRANSITION_ERR",
         TRANSITION_CANCELLED: "CANCELLED",
         ROUTER_DISPOSED: "DISPOSED",
+        PLUGIN_CONFLICT: "PLUGIN_CONFLICT",
       };
 
       for (const [key, expectedValue] of Object.entries(expectedMapping)) {
         expect(errorCodes[key as keyof typeof errorCodes]).toBe(expectedValue);
       }
-
-      return true;
     });
   });
 });

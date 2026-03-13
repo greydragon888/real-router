@@ -1,20 +1,20 @@
 // Main entry point — React 19.2+
 
 // Components
-export { Link } from "./components/Link";
-
 export { RouteView } from "./components/modern/RouteView";
 
-// Hooks
-export { useRouteNode } from "./hooks/useRouteNode";
+export { Link } from "./components/Link";
 
-export { useRoute } from "./hooks/useRoute";
+// Hooks
+export { useRouter } from "./hooks/useRouter";
 
 export { useNavigator } from "./hooks/useNavigator";
 
-export { useRouter } from "./hooks/useRouter";
-
 export { useRouteUtils } from "./hooks/useRouteUtils";
+
+export { useRoute } from "./hooks/useRoute";
+
+export { useRouteNode } from "./hooks/useRouteNode";
 
 export { useRouterTransition } from "./hooks/useRouterTransition";
 

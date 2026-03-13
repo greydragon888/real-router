@@ -12,7 +12,7 @@
   "globalEnv": ["BENCH_ROUTER", "BENCH_NO_VALIDATE", "BENCH_SECTIONS"],
   "tasks": {
     "build": {
-      "dependsOn": ["^build", "test"],
+      "dependsOn": ["^build", "test", "test:properties", "test:stress"],
       "outputs": ["dist/**"],
       "inputs": [
         "src/**/*.{ts,tsx}",
@@ -21,6 +21,26 @@
         "package.json"
       ],
       "env": ["NODE_ENV"],
+      "cache": true
+    },
+    "test:stress": {
+      "dependsOn": ["^build", "test:properties", "test", "lint", "type-check"],
+      "outputs": [],
+      "inputs": [
+        "tests/stress/**/*.{ts,tsx}",
+        "vitest.config.stress.*",
+        "!**/node_modules/**"
+      ],
+      "cache": true
+    },
+    "test:properties": {
+      "dependsOn": ["^build", "test", "lint", "type-check"],
+      "outputs": [],
+      "inputs": [
+        "tests/property/**/*.{ts,tsx}",
+        "vitest.config.properties.*",
+        "!**/node_modules/**"
+      ],
       "cache": true
     },
     "test": {

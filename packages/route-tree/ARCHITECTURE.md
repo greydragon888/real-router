@@ -490,6 +490,7 @@ Compute `staticPath`, `paramTypeMap` lazily (on first access) instead of eagerly
 
 ## See Also
 
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [path-matcher ARCHITECTURE.md](../path-matcher/ARCHITECTURE.md) — Segment Trie URL matching (zero deps)
 - [search-params ARCHITECTURE.md](../search-params/ARCHITECTURE.md) — Query string parsing/building (zero deps)
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture

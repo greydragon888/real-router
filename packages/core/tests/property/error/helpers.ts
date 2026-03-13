@@ -63,12 +63,29 @@ export const pathArbitrary = fc.oneof(
 /**
  * State generator for redirect
  */
-export const stateArbitrary = fc.record({
-  name: fc.string({ minLength: 1, maxLength: 50 }),
-  path: fc.string({ minLength: 1, maxLength: 100 }),
-  params: fc.dictionary(fc.string(), fc.anything()),
-  meta: fc.option(fc.dictionary(fc.string(), fc.anything())),
-}) as fc.Arbitrary<State>;
+const jsonPrimitive = fc.oneof(
+  fc.string(),
+  fc.integer(),
+  fc.boolean(),
+  fc.constant(null),
+  fc.double({ noNaN: true, noDefaultInfinity: true }),
+);
+
+export const stateArbitrary = fc
+  .record({
+    name: fc.string({ minLength: 1, maxLength: 50 }),
+    path: fc.string({ minLength: 1, maxLength: 100 }),
+    params: fc.dictionary(fc.string(), jsonPrimitive),
+    meta: fc.option(fc.dictionary(fc.string(), jsonPrimitive)),
+  })
+  .map(
+    (s) =>
+      ({
+        ...s,
+        params: { ...s.params },
+        meta: s.meta ? { ...s.meta } : s.meta,
+      }) as unknown as State,
+  );
 
 /**
  * Redirect generator (optional State)

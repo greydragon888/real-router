@@ -56,6 +56,17 @@ export default mergeConfig(
 
       // Use threads pool for better performance with async tests
       pool: "threads",
+
+      /**
+       * Disable automatic mock cleanup per iteration
+       *
+       * @fast-check/vitest 0.3.0 fires beforeEach/afterEach per property iteration.
+       * With restoreMocks/mockReset enabled, vi.spyOn() spies are destroyed after
+       * every iteration — creating/destroying 65k+ spies causes severe slowdowns.
+       * Property tests manage their own mock lifecycle via beforeAll/afterAll.
+       */
+      restoreMocks: false,
+      mockReset: false,
     },
   }),
 );

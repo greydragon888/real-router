@@ -31,8 +31,6 @@ describe("State Edge Cases (Uncovered Branches)", () => {
 
       // Ensures isParamsStrict check is properly tested
       expect(isStateStrict(state)).toBe(false);
-
-      return true;
     });
 
     test.prop(
@@ -56,8 +54,6 @@ describe("State Edge Cases (Uncovered Branches)", () => {
         };
 
         expect(isStateStrict(state)).toBe(false);
-
-        return true;
       },
     );
   });

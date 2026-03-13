@@ -28,8 +28,6 @@ describe("RouterError Circular References Properties", () => {
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(err.redirect?.name).toBe("test");
       expect(err.redirect?.path).toBe("/test");
-
-      return true;
     });
 
     it("deepFreezeState handles nested circular reference", () => {
@@ -55,8 +53,6 @@ describe("RouterError Circular References Properties", () => {
         (err.redirect?.params.nested as Record<string, unknown> | undefined)
           ?.value,
       ).toBe("test");
-
-      return true;
     });
 
     it("deepFreezeState handles circular reference through array", () => {
@@ -79,8 +75,6 @@ describe("RouterError Circular References Properties", () => {
 
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(err.redirect?.params.array).toHaveLength(4);
-
-      return true;
     });
   });
 
@@ -107,8 +101,6 @@ describe("RouterError Circular References Properties", () => {
         (err.redirect?.meta as { params: { foo: string } } | undefined)?.params
           .foo,
       ).toBe("bar");
-
-      return true;
     });
   });
 
@@ -140,8 +132,6 @@ describe("RouterError Circular References Properties", () => {
       expect(
         (err.redirect?.params.obj2 as Record<string, unknown> | undefined)?.id,
       ).toBe(2);
-
-      return true;
     });
 
     it("deepFreezeState handles deep circular references", () => {
@@ -174,8 +164,6 @@ describe("RouterError Circular References Properties", () => {
             ?.child as Record<string, unknown> | undefined
         )?.value,
       ).toBe(2);
-
-      return true;
     });
   });
 
@@ -211,8 +199,6 @@ describe("RouterError Circular References Properties", () => {
         // Value should not change
         expect(frozenState.params.foo).toBe("bar");
       }
-
-      return true;
     });
   });
 
@@ -244,8 +230,6 @@ describe("RouterError Circular References Properties", () => {
           expect(frozenState.name).toBe(state.name);
           expect(frozenState.path).toBe(state.path);
         }
-
-        return true;
       },
     );
   });
@@ -266,8 +250,6 @@ describe("RouterError Circular References Properties", () => {
       const err = new RouterError("ERR", { redirect: state });
 
       expect(Object.isFrozen(err.redirect)).toBe(true);
-
-      return true;
     });
 
     it("deepFreezeState handles arrays with circular references", () => {
@@ -286,8 +268,6 @@ describe("RouterError Circular References Properties", () => {
 
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(Array.isArray(err.redirect?.params.arr)).toBe(true);
-
-      return true;
     });
 
     it("deepFreezeState handles null in State", () => {
@@ -303,8 +283,6 @@ describe("RouterError Circular References Properties", () => {
       expect(Object.isFrozen(err.redirect)).toBe(true);
       expect(err.redirect?.params.nullValue).toBeNull();
       expect(err.redirect?.meta).toBeUndefined();
-
-      return true;
     });
   });
 });

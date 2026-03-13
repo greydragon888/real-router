@@ -3,7 +3,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { validateRouteName, validateState } from "type-guards";
+import { isRouteName, validateRouteName, validateState } from "type-guards";
 
 import { stateMinimalArbitrary } from "../helpers";
 
@@ -103,6 +103,26 @@ describe("Validators - Property-Based Tests", () => {
         expect(() => {
           validateRouteName(" ", methodName);
         }).toThrowError(`[router.${methodName}]`);
+      },
+    );
+
+    // ===================================================================
+    // INV 82: validateRouteName ↔ isRouteName bidirectional equivalence
+    // ===================================================================
+    test.prop([fc.anything()], { numRuns: 5000 })(
+      "validateRouteName(x) succeeds if and only if isRouteName(x) is true",
+      (value) => {
+        const guardResult = isRouteName(value);
+        let validatorSucceeded: boolean;
+
+        try {
+          validateRouteName(value, "test");
+          validatorSucceeded = true;
+        } catch {
+          validatorSucceeded = false;
+        }
+
+        expect(validatorSucceeded).toBe(guardResult);
       },
     );
   });

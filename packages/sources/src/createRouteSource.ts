@@ -4,6 +4,7 @@ import type { Router } from "@real-router/core";
 class RouteSource implements RouterSource<RouteSnapshot> {
   #routerUnsubscribe: (() => void) | null = null;
   #currentSnapshot: RouteSnapshot;
+  #destroyed = false;
 
   readonly #listeners = new Set<() => void>();
   readonly #router: Router;
@@ -22,6 +23,10 @@ class RouteSource implements RouterSource<RouteSnapshot> {
   }
 
   subscribe(listener: () => void): () => void {
+    if (this.#destroyed) {
+      return () => {};
+    }
+
     if (this.#listeners.size === 0) {
       // Connect to router on first subscription
       this.#routerUnsubscribe = this.#router.subscribe((next) => {
@@ -52,6 +57,12 @@ class RouteSource implements RouterSource<RouteSnapshot> {
   }
 
   destroy(): void {
+    if (this.#destroyed) {
+      return;
+    }
+
+    this.#destroyed = true;
+
     if (this.#routerUnsubscribe) {
       this.#routerUnsubscribe();
       this.#routerUnsubscribe = null;

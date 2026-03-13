@@ -57,8 +57,6 @@ describe("RouterError Serialization Properties", () => {
       expect(json).toHaveProperty("message");
       expect(json.code).toBe(code);
       expect(json.message).toBe(options.message ?? code);
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary, constructorOptionsArbitrary], {
@@ -87,8 +85,6 @@ describe("RouterError Serialization Properties", () => {
           expect(json).toHaveProperty("redirect");
           expect(json.redirect).toStrictEqual(options.redirect);
         }
-
-        return true;
       },
     );
 
@@ -102,8 +98,6 @@ describe("RouterError Serialization Properties", () => {
       const json = err.toJSON();
 
       expect(json).not.toHaveProperty("stack");
-
-      return true;
     });
   });
 
@@ -128,8 +122,6 @@ describe("RouterError Serialization Properties", () => {
             expect(json[key]).toBe(value);
           }
         }
-
-        return true;
       },
     );
 
@@ -156,8 +148,6 @@ describe("RouterError Serialization Properties", () => {
             expect(json[key]).toBe(value);
           }
         }
-
-        return true;
       },
     );
   });
@@ -179,8 +169,6 @@ describe("RouterError Serialization Properties", () => {
         expect(json1).toStrictEqual(json2);
         // Verify these are different objects (not same reference)
         expect(json1).not.toBe(json2);
-
-        return true;
       },
     );
 
@@ -194,8 +182,6 @@ describe("RouterError Serialization Properties", () => {
       const json2 = err2.toJSON();
 
       expect(json1).toStrictEqual(json2);
-
-      return true;
     });
   });
 
@@ -253,8 +239,6 @@ describe("RouterError Serialization Properties", () => {
 
       // stack should not be in JSON
       expect(parsed).not.toHaveProperty("stack");
-
-      return true;
     });
   });
 
@@ -272,8 +256,6 @@ describe("RouterError Serialization Properties", () => {
       // Should not be instance of RouterError or Error
       expect(json).not.toBeInstanceOf(Error);
       expect(json).not.toBeInstanceOf(RouterError);
-
-      return true;
     });
 
     test.prop(
@@ -289,8 +271,6 @@ describe("RouterError Serialization Properties", () => {
       for (const value of Object.values(json)) {
         expect(typeof value).not.toBe("function");
       }
-
-      return true;
     });
 
     test.prop([errorCodeArbitrary], { numRuns: 5000 })(
@@ -301,8 +281,6 @@ describe("RouterError Serialization Properties", () => {
 
         // JSON object should have Object.prototype, not Error.prototype
         expect(Object.getPrototypeOf(json)).toBe(Object.prototype);
-
-        return true;
       },
     );
   });

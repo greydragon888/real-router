@@ -40,8 +40,6 @@ describe("Logger Configuration Properties", () => {
         expect(config1.level).toBe(config2.level);
         expect(config1.callback).toBe(config2.callback);
         expect(config1.callbackIgnoresLevel).toBe(config2.callbackIgnoresLevel);
-
-        return true;
       },
     );
   });
@@ -71,8 +69,6 @@ describe("Logger Configuration Properties", () => {
         expect(config.level).toBe(level2);
         expect(config.callback).toBe(callback);
         expect(config.callbackIgnoresLevel).toBe(true);
-
-        return true;
       },
     );
 
@@ -95,8 +91,6 @@ describe("Logger Configuration Properties", () => {
         // Check that callback changed while level preserved
         expect(config.level).toBe(level);
         expect(config.callback).toBe(callback2);
-
-        return true;
       },
     );
   });
@@ -113,8 +107,6 @@ describe("Logger Configuration Properties", () => {
 
         // Check that level is valid
         expect(LOG_LEVEL_CONFIGS).toContain(config.level);
-
-        return true;
       },
     );
 
@@ -127,8 +119,6 @@ describe("Logger Configuration Properties", () => {
 
         // Check that callbackIgnoresLevel is always boolean
         expect(typeof config.callbackIgnoresLevel).toBe("boolean");
-
-        return true;
       },
     );
 
@@ -146,8 +136,6 @@ describe("Logger Configuration Properties", () => {
         expect(config1).not.toBe(config2);
         // But content is the same
         expect(config1).toStrictEqual(config2);
-
-        return true;
       },
     );
   });
@@ -172,8 +160,6 @@ describe("Logger Configuration Properties", () => {
         expect(config.callback).toBeUndefined();
         // level should be preserved
         expect(config.level).toBe(level);
-
-        return true;
       },
     );
   });
@@ -205,8 +191,6 @@ describe("Logger Configuration Properties", () => {
       expect(() => {
         logger.configure({ level: invalidLevel as LogLevelConfig });
       }).toThrowError(/Invalid log level/);
-
-      return true;
     });
   });
 
@@ -231,8 +215,6 @@ describe("Logger Configuration Properties", () => {
       logger.configure({ level: level3 });
 
       expect(logger.getConfig().level).toBe(level3);
-
-      return true;
     });
   });
 
@@ -258,8 +240,6 @@ describe("Logger Configuration Properties", () => {
         logger.configure({ callback });
 
         expect(logger.getConfig().callbackIgnoresLevel).toBe(initialFlag);
-
-        return true;
       },
     );
   });

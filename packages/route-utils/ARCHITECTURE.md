@@ -149,10 +149,10 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 
 ## Dependencies
 
-| Dependency           | Type    | Purpose                                                 |
-| -------------------- | ------- | ------------------------------------------------------- |
-| `@real-router/types` | runtime | `State` type for segment tester overloads               |
-| `mitata`             | dev     | Benchmark engine                                        |
+| Dependency           | Type    | Purpose                                   |
+| -------------------- | ------- | ----------------------------------------- |
+| `@real-router/types` | runtime | `State` type for segment tester overloads |
+| `mitata`             | dev     | Benchmark engine                          |
 
 `RouteTreeNode` interface is defined locally — no runtime dependency on the internal `route-tree` package. TypeScript structural typing ensures compatibility when passing the real `RouteTree` object.
 
@@ -181,3 +181,7 @@ const cache = new WeakMap<RouteTreeNode, RouteUtils>();
 - Segment testers use factory pattern to avoid code duplication across three functions
 - `eslint-disable sonarjs/function-return-type` on the curried tester — intentional union return type
 - Benchmarks use mitata engine with `boxplot` + `summary` grouping and `.gc("inner")` for GC isolation
+
+## See Also
+
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants

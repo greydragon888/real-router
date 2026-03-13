@@ -1,5 +1,5 @@
 import { fc, test } from "@fast-check/vitest";
-import { describe, beforeEach, afterEach, expect } from "vitest";
+import { describe, beforeAll, beforeEach, afterAll, expect } from "vitest";
 
 import { logger } from "@real-router/logger";
 
@@ -18,13 +18,14 @@ import {
 const noop = () => {};
 
 describe("Logger Callback Properties", () => {
-  beforeEach(() => {
-    // Mock console methods
+  beforeAll(() => {
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "warn").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
+  });
 
-    // Reset logger to default state
+  beforeEach(() => {
+    vi.clearAllMocks();
     logger.configure({
       level: "all",
       callback: undefined,
@@ -32,10 +33,8 @@ describe("Logger Callback Properties", () => {
     });
   });
 
-  afterEach(() => {
-    vi.clearAllMocks();
+  afterAll(() => {
     vi.restoreAllMocks();
-    // Reset logger state
     logger.configure({
       level: "all",
       callback: undefined,
@@ -69,8 +68,6 @@ describe("Logger Callback Properties", () => {
           message,
           ...args,
         );
-
-        return true;
       },
     );
   });
@@ -109,8 +106,6 @@ describe("Logger Callback Properties", () => {
         } else {
           expect(callback).not.toHaveBeenCalled();
         }
-
-        return true;
       },
     );
   });
@@ -141,8 +136,6 @@ describe("Logger Callback Properties", () => {
         // Callback should be called regardless of level
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith(messageLevel, context, message);
-
-        return true;
       },
     );
 
@@ -157,6 +150,7 @@ describe("Logger Callback Properties", () => {
     )(
       "callback receives messages even with level=none",
       (messageLevel, context, message, getCallback) => {
+        vi.clearAllMocks();
         const callback = getCallback();
 
         logger.configure({
@@ -173,8 +167,6 @@ describe("Logger Callback Properties", () => {
         // But callback should be called
         expect(callback).toHaveBeenCalledTimes(1);
         expect(callback).toHaveBeenCalledWith(messageLevel, context, message);
-
-        return true;
       },
     );
   });
@@ -235,8 +227,6 @@ describe("Logger Callback Properties", () => {
             expect.any(Error),
           );
         }
-
-        return true;
       },
     );
   });
@@ -278,8 +268,6 @@ describe("Logger Callback Properties", () => {
 
         // Call counts should be the same
         expect(consoleCallCount).toBe(callbackCallCount);
-
-        return true;
       },
     );
   });
@@ -325,8 +313,6 @@ describe("Logger Callback Properties", () => {
 
         // Result should be the same
         expect(callCount1).toBe(callCount2);
-
-        return true;
       },
     );
   });
@@ -366,8 +352,6 @@ describe("Logger Callback Properties", () => {
 
         // Now callback should be called
         expect(callback).toHaveBeenCalledTimes(1);
-
-        return true;
       },
     );
   });

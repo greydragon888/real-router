@@ -11,8 +11,6 @@ describe("Primitive Type Guards Properties", () => {
       "always returns true for strings",
       (value) => {
         expect(isString(value)).toBe(true);
-
-        return true;
       },
     );
 
@@ -20,8 +18,6 @@ describe("Primitive Type Guards Properties", () => {
       numRuns: 10_000,
     })("always returns false for non-strings", (value) => {
       expect(isString(value)).toBe(false);
-
-      return true;
     });
 
     test.prop([fc.string(), fc.string()], { numRuns: 2000 })(
@@ -33,8 +29,6 @@ describe("Primitive Type Guards Properties", () => {
         if (value1 === value2) {
           expect(result1).toBe(result2);
         }
-
-        return true;
       },
     );
   });
@@ -44,8 +38,6 @@ describe("Primitive Type Guards Properties", () => {
       "always returns true for boolean",
       (value) => {
         expect(isBoolean(value)).toBe(true);
-
-        return true;
       },
     );
 
@@ -54,15 +46,11 @@ describe("Primitive Type Guards Properties", () => {
       { numRuns: 10_000 },
     )("always returns false for non-boolean", (value) => {
       expect(isBoolean(value)).toBe(false);
-
-      return true;
     });
 
     it("correctly distinguishes true and false", () => {
       expect(isBoolean(true)).toBe(true);
       expect(isBoolean(false)).toBe(true);
-
-      return true;
     });
   });
 
@@ -81,8 +69,6 @@ describe("Primitive Type Guards Properties", () => {
       for (const key of keys) {
         expect(isObjKey(key, obj)).toBe(true);
       }
-
-      return true;
     });
 
     test.prop(
@@ -104,8 +90,6 @@ describe("Primitive Type Guards Properties", () => {
       const expectedResult = nonExistingKey in obj;
 
       expect(isObjKey(nonExistingKey, obj)).toBe(expectedResult);
-
-      return true;
     });
 
     test.prop([fc.string(), fc.dictionary(fc.string(), fc.anything())], {
@@ -115,8 +99,6 @@ describe("Primitive Type Guards Properties", () => {
       const result2 = isObjKey(key, obj);
 
       expect(result1).toBe(result2);
-
-      return true;
     });
 
     it("correctly works with Symbol keys", () => {
@@ -124,8 +106,6 @@ describe("Primitive Type Guards Properties", () => {
       const obj = { [sym]: 42 };
 
       expect(isObjKey(sym as unknown as string, obj)).toBe(true);
-
-      return true;
     });
   });
 
@@ -134,8 +114,6 @@ describe("Primitive Type Guards Properties", () => {
       "always returns true for valid primitives",
       (value) => {
         expect(isPrimitiveValue(value)).toBe(true);
-
-        return true;
       },
     );
 
@@ -143,8 +121,6 @@ describe("Primitive Type Guards Properties", () => {
       "always returns false for NaN, Infinity, -Infinity",
       (value) => {
         expect(isPrimitiveValue(value)).toBe(false);
-
-        return true;
       },
     );
 
@@ -160,23 +136,17 @@ describe("Primitive Type Guards Properties", () => {
       { numRuns: 10_000 },
     )("returns false for invalid types", (value) => {
       expect(isPrimitiveValue(value)).toBe(false);
-
-      return true;
     });
 
     it("correctly handles 0 and -0", () => {
       expect(isPrimitiveValue(0)).toBe(true);
       expect(isPrimitiveValue(-0)).toBe(true);
-
-      return true;
     });
 
     test.prop([fc.integer()], { numRuns: 10_000 })(
       "always returns true for integers",
       (value) => {
         expect(isPrimitiveValue(value)).toBe(true);
-
-        return true;
       },
     );
 
@@ -189,8 +159,6 @@ describe("Primitive Type Guards Properties", () => {
         } else {
           expect(isPrimitiveValue(value)).toBe(true);
         }
-
-        return true;
       },
     );
 
@@ -199,8 +167,6 @@ describe("Primitive Type Guards Properties", () => {
       expect(isPrimitiveValue("test")).toBe(true);
       expect(isPrimitiveValue(123)).toBe(true);
       expect(isPrimitiveValue(123)).toBe(true);
-
-      return true;
     });
   });
 
@@ -211,8 +177,6 @@ describe("Primitive Type Guards Properties", () => {
         if (isString(value)) {
           expect(isPrimitiveValue(value)).toBe(true);
         }
-
-        return true;
       },
     );
 
@@ -222,8 +186,6 @@ describe("Primitive Type Guards Properties", () => {
         if (isBoolean(value)) {
           expect(isPrimitiveValue(value)).toBe(true);
         }
-
-        return true;
       },
     );
 
@@ -232,8 +194,6 @@ describe("Primitive Type Guards Properties", () => {
       (value) => {
         // Integers are always valid primitives
         expect(isPrimitiveValue(value)).toBe(true);
-
-        return true;
       },
     );
 
@@ -247,8 +207,6 @@ describe("Primitive Type Guards Properties", () => {
 
         // Maximum 1 primitive type can be true
         expect(primitiveTypes).toBeLessThanOrEqual(1);
-
-        return true;
       },
     );
   });

@@ -373,3 +373,4 @@ On teardown, `api.setRootPath(originalRootPath)` restores the original value.
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture of the monorepo
 - [core/ARCHITECTURE.md](../core/ARCHITECTURE.md) — Core architecture (Plugin API, addInterceptor, setRootPath)
 - [browser-plugin/ARCHITECTURE.md](../browser-plugin/ARCHITECTURE.md) — Example of a plugin using addInterceptor
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants

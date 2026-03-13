@@ -327,6 +327,7 @@ createRouter(routes, {
 
 ## See Also
 
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants
 - [fsm ARCHITECTURE.md](../fsm/ARCHITECTURE.md) — FSM engine (drives event emission)
 - [core CLAUDE.md](../core/CLAUDE.md) — Core package architecture
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) — System-level architecture
