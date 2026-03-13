@@ -72,25 +72,73 @@ ignore:
 
 # Flags for organizing coverage by package
 flags:
-  core:
+  browser-env:
     paths:
-      - packages/core/src/
-    carryforward: false
-  react:
-    paths:
-      - packages/react/src/
+      - packages/browser-env/src/
     carryforward: false
   browser-plugin:
     paths:
       - packages/browser-plugin/src/
     carryforward: false
-  helpers:
+  core:
     paths:
-      - packages/helpers/src/
+      - packages/core/src/
+    carryforward: false
+  event-emitter:
+    paths:
+      - packages/event-emitter/src/
+    carryforward: false
+  fsm:
+    paths:
+      - packages/fsm/src/
+    carryforward: false
+  hash-plugin:
+    paths:
+      - packages/hash-plugin/src/
+    carryforward: false
+  logger:
+    paths:
+      - packages/logger/src/
+    carryforward: false
+  logger-plugin:
+    paths:
+      - packages/logger-plugin/src/
+    carryforward: false
+  path-matcher:
+    paths:
+      - packages/path-matcher/src/
+    carryforward: false
+  persistent-params-plugin:
+    paths:
+      - packages/persistent-params-plugin/src/
+    carryforward: false
+  react:
+    paths:
+      - packages/react/src/
     carryforward: false
   route-tree:
     paths:
       - packages/route-tree/src/
+    carryforward: false
+  route-utils:
+    paths:
+      - packages/route-utils/src/
+    carryforward: false
+  rx:
+    paths:
+      - packages/rx/src/
+    carryforward: false
+  search-params:
+    paths:
+      - packages/search-params/src/
+    carryforward: false
+  sources:
+    paths:
+      - packages/sources/src/
+    carryforward: false
+  type-guards:
+    paths:
+      - packages/type-guards/src/
     carryforward: false
 
 # GitHub Checks Integration

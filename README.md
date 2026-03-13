@@ -1,7 +1,29 @@
 # Real-Router
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+<div align="center">
+
+  <!-- Community -->
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
+[![Engineered with Claude Code](https://img.shields.io/badge/Engineered%20with-Claude%20Code-5865F2?style=flat-square&logo=anthropic&logoColor=white)](https://claude.com/claude-code)
+
+  <!-- Code Quality Tools -->
+
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
+[![Built with tsup](https://img.shields.io/badge/built%20with-tsup-blue?style=flat-square)](https://tsup.egoist.dev)
+[![ESLint](https://img.shields.io/badge/eslint-9.39-4B32C3?style=flat-square&logo=eslint)](https://eslint.org/)
+[![Turborepo](https://img.shields.io/badge/built%20with-Turborepo-EF4444?style=flat-square&logo=turborepo&logoColor=white)](https://turbo.build/repo)
+
+  <!-- Quality & Testing -->
+
+[![Enterprise Grade Testing](https://img.shields.io/badge/testing-enterprise%20grade-brightgreen?style=flat-square)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master)
+[![Coverage Status](https://codecov.io/gh/greydragon888/real-router/branch/master/graph/badge.svg)](https://codecov.io/gh/greydragon888/real-router)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
+[![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
+[![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)
+
+</div>
 
 > A simple, powerful, view-agnostic, modular and extensible router for JavaScript applications.
 

@@ -114,16 +114,6 @@ jobs:
         if: needs.check.outputs.should_run == 'true'
         run: pnpm lint:dedupe
 
-      - name: Fix coverage paths for SonarCloud
-        if: needs.check.outputs.should_run == 'true'
-        run: |
-          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
-          # SonarCloud needs project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
-          for lcov in packages/*/coverage/lcov.info; do
-            pkg_dir=$(echo "$lcov" | sed 's|/coverage/lcov.info||')
-            sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
-          done
-
       - name: Upload coverage artifacts
         if: needs.check.outputs.should_run == 'true'
         uses: actions/upload-artifact@v7
@@ -160,17 +150,8 @@ jobs:
         uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: >-
-            packages/core/coverage/lcov.info,
-            packages/react/coverage/lcov.info,
-            packages/browser-plugin/coverage/lcov.info,
-            packages/logger-plugin/coverage/lcov.info,
-            packages/logger/coverage/lcov.info,
-            packages/persistent-params-plugin/coverage/lcov.info,
-            packages/helpers/coverage/lcov.info,
-            packages/type-guards/coverage/lcov.info,
-            packages/route-tree/coverage/lcov.info,
-            packages/search-params/coverage/lcov.info
+          files: packages/browser-env/coverage/lcov.info,packages/browser-plugin/coverage/lcov.info,packages/core/coverage/lcov.info,packages/event-emitter/coverage/lcov.info,packages/fsm/coverage/lcov.info,packages/hash-plugin/coverage/lcov.info,packages/logger/coverage/lcov.info,packages/logger-plugin/coverage/lcov.info,packages/path-matcher/coverage/lcov.info,packages/persistent-params-plugin/coverage/lcov.info,packages/react/coverage/lcov.info,packages/route-tree/coverage/lcov.info,packages/route-utils/coverage/lcov.info,packages/rx/coverage/lcov.info,packages/search-params/coverage/lcov.info,packages/sources/coverage/lcov.info,packages/type-guards/coverage/lcov.info
+          disable_search: true
           fail_ci_if_error: true
 
   sonarcloud:
@@ -189,6 +170,15 @@ jobs:
         with:
           name: coverage-reports
           path: packages
+
+      - name: Fix coverage paths for SonarCloud
+        run: |
+          # vitest generates lcov.info with package-relative paths (SF:src/plugin.ts)
+          # SonarCloud needs project-root-relative paths (SF:packages/browser-plugin/src/plugin.ts)
+          for lcov in packages/*/coverage/lcov.info; do
+            pkg_dir=$(echo "$lcov" | sed 's|/coverage/lcov.info||')
+            sed -i "s|^SF:|SF:${pkg_dir}/|" "$lcov"
+          done
 
       - name: Cache SonarCloud packages
         uses: actions/cache@v5
