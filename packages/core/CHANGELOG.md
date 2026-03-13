@@ -1,5 +1,24 @@
 # @real-router/core
 
+## 0.36.0
+
+### Minor Changes
+
+- [#303](https://github.com/greydragon888/real-router/pull/303) [`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c) Thanks [@greydragon888](https://github.com/greydragon888)! - Move standalone API getters to `@real-router/core/api` subpath export ([#297](https://github.com/greydragon888/real-router/issues/297))
+
+  **Breaking Change:** `getPluginApi`, `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `cloneRouter` and types `PluginApi`, `RoutesApi`, `DependenciesApi`, `LifecycleApi` are no longer exported from `@real-router/core`.
+
+  **Migration:**
+
+  ```diff
+  - import { createRouter, getPluginApi } from "@real-router/core";
+  - import type { Router, PluginApi } from "@real-router/core";
+  + import { createRouter } from "@real-router/core";
+  + import { getPluginApi } from "@real-router/core/api";
+  + import type { Router } from "@real-router/core";
+  + import type { PluginApi } from "@real-router/core/api";
+  ```
+
 ## 0.35.2
 
 ### Patch Changes

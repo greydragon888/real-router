@@ -7,6 +7,76 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-13]
 
+### @real-router/core@0.36.0
+
+### Minor Changes
+
+- [#303](https://github.com/greydragon888/real-router/pull/303) [`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c) Thanks [@greydragon888](https://github.com/greydragon888)! - Move standalone API getters to `@real-router/core/api` subpath export ([#297](https://github.com/greydragon888/real-router/issues/297))
+
+  **Breaking Change:** `getPluginApi`, `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `cloneRouter` and types `PluginApi`, `RoutesApi`, `DependenciesApi`, `LifecycleApi` are no longer exported from `@real-router/core`.
+
+  **Migration:**
+
+  ```diff
+  - import { createRouter, getPluginApi } from "@real-router/core";
+  - import type { Router, PluginApi } from "@real-router/core";
+  + import { createRouter } from "@real-router/core";
+  + import { getPluginApi } from "@real-router/core/api";
+  + import type { Router } from "@real-router/core";
+  + import type { PluginApi } from "@real-router/core/api";
+  ```
+
+### @real-router/browser-plugin@0.10.1
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+### @real-router/hash-plugin@0.2.1
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+### @real-router/logger-plugin@0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+### @real-router/persistent-params-plugin@0.1.40
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+### @real-router/react@0.12.1
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+  - @real-router/sources@0.2.3
+
+### @real-router/rx@0.1.28
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+### @real-router/sources@0.2.3
+
+### Patch Changes
+
+- Updated dependencies [[`966bed6`](https://github.com/greydragon888/real-router/commit/966bed67e5f7fcc9c419a2d8e30e9c097fe8061c)]:
+  - @real-router/core@0.36.0
+
+
 ### @real-router/sources@0.2.2
 
 ### Patch Changes
