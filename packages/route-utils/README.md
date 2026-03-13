@@ -16,7 +16,8 @@ pnpm add @real-router/route-utils
 ## Quick Start
 
 ```typescript
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import { getRouteUtils, startsWithSegment } from "@real-router/route-utils";
 
 const router = createRouter([

@@ -152,7 +152,7 @@ router.usePlugin(
   }),
 );
 
-import { getLifecycleApi } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
 lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
