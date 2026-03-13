@@ -21,8 +21,6 @@ export { useRouterTransition } from "./hooks/useRouterTransition";
 // Context
 export { RouterProvider } from "./RouterProvider";
 
-export { RouterContext, RouteContext, NavigatorContext } from "./context";
-
 // Types
 export type { LinkProps } from "./types";
 

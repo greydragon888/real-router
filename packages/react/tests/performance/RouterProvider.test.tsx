@@ -3,12 +3,9 @@ import { memo, use } from "react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { withProfiler } from "vitest-react-profiler";
 
-import {
-  RouterProvider,
-  RouterContext,
-  RouteContext,
-} from "@real-router/react";
+import { RouterProvider } from "@real-router/react";
 
+import { RouteContext, RouterContext } from "../../src/context";
 import { createTestRouterWithADefaultRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
