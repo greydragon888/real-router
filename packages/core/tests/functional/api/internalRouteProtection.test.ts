@@ -1,10 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getLifecycleApi, getRoutesApi } from "@real-router/core";
+import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 
-import type { LifecycleApi, Router, RoutesApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { LifecycleApi, RoutesApi } from "@real-router/core/api";
 
 const INTERNAL_NAME = "@@router/UNKNOWN_ROUTE";
 const INTERNAL_CHILD = "@@custom/system-route";

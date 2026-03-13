@@ -1,7 +1,7 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect } from "vitest";
 
-import { getLifecycleApi } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,

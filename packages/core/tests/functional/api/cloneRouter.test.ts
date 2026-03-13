@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import {
   cloneRouter,
-  createRouter,
   getDependenciesApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 

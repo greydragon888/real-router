@@ -1,7 +1,7 @@
 import { test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,

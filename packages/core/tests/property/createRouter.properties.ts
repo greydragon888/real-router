@@ -1,11 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import {
-  createRouter,
-  getDependenciesApi,
-  getRoutesApi,
-} from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   arbSegmentName,

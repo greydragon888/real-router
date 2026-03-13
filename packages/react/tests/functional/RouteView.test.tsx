@@ -1,5 +1,6 @@
 import { browserPluginFactory } from "@real-router/browser-plugin";
-import { createRouter, getRoutesApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, act } from "@testing-library/react";
 import { useEffect, useRef } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";

@@ -7,12 +7,8 @@ import {
   expectTypeOf,
 } from "vitest";
 
-import {
-  createRouter,
-  errorCodes,
-  getDependenciesApi,
-  getPluginApi,
-} from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
+import { getDependenciesApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 

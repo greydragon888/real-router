@@ -1,4 +1,5 @@
-import { createRouter, errorCodes, getLifecycleApi } from "@real-router/core";
+import { createRouter, errorCodes } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import {
   describe,
   beforeAll,

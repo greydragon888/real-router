@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, getPluginApi, getRoutesApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import {
   createDeepRouteTree,

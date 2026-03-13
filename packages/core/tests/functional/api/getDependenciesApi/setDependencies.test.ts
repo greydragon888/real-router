@@ -1,12 +1,12 @@
 import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
-import { getDependenciesApi } from "@real-router/core";
-
 import { createDependenciesTestRouter } from "./setup";
+import { getDependenciesApi } from "../../../../src/api";
 
 import type { TestDependencies } from "./setup";
-import type { DependenciesApi, Router } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { DependenciesApi } from "@real-router/types";
 
 let router: Router<TestDependencies>;
 let deps: DependenciesApi<TestDependencies>;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPluginApi, getRoutesApi } from "@real-router/core";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createFixtureRouter, createStartedRouter } from "./helpers";
 

@@ -1,6 +1,6 @@
 // packages/persistent-params-plugin/src/factory.ts
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import { PersistentParamsPlugin } from "./plugin";
 import { validateConfig } from "./validation";

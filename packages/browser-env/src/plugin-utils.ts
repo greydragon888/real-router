@@ -4,10 +4,10 @@ import type { Browser } from "./types";
 import type {
   NavigationOptions,
   Params,
-  PluginApi,
   Router,
   State,
 } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 export function createStartInterceptor(
   api: PluginApi,

@@ -1,15 +1,12 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import {
-  getLifecycleApi,
-  events,
-  errorCodes,
-  getPluginApi,
-} from "@real-router/core";
+import { events, errorCodes } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, LifecycleApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
 
 let router: Router;
 let lifecycle: LifecycleApi;

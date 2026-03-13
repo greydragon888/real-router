@@ -1,17 +1,18 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
+import { createRouter } from "@real-router/core";
 import {
-  createRouter,
   cloneRouter,
   getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 
-import type { Router, DependenciesApi, RoutesApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { DependenciesApi, RoutesApi } from "@real-router/core/api";
 import type { EventName } from "@real-router/types";
 
 describe("core/noValidate option", () => {

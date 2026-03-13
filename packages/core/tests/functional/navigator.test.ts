@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import { cloneRouter } from "@real-router/core";
+import { cloneRouter } from "@real-router/core/api";
 
 import { getNavigator } from "../../src/getNavigator";
 import { createTestRouter } from "../helpers";

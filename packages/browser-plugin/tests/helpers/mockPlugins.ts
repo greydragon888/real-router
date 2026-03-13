@@ -1,7 +1,7 @@
 // Mock plugin factories for integration testing
 // These synthetic plugins allow testing various edge cases without external dependencies
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import type { Params, PluginFactory, State } from "@real-router/core";
 

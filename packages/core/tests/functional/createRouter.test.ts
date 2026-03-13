@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, getPluginApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 describe("createRouter", () => {
   it("should not throw", () => {

@@ -1,6 +1,6 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.1-high-load-sequential.bench.ts
 
-import { getRoutesApi } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 import { bench } from "mitata";
 
 import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";

@@ -13,11 +13,11 @@ import type { BrowserPluginOptions } from "./types";
 import type {
   NavigationOptions,
   Params,
-  PluginApi,
   Router,
   State,
   Plugin,
 } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 import type { Browser, SharedFactoryState } from "browser-env";
 
 export class BrowserPlugin {

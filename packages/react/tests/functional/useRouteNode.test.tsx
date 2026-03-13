@@ -1,4 +1,4 @@
-import { getRoutesApi } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 import { renderHook, act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 

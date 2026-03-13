@@ -1,7 +1,8 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { errorCodes, getLifecycleApi, RouterError } from "@real-router/core";
+import { errorCodes, RouterError } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import { createFixtureRouter, arbNavigableRoute, NUM_RUNS } from "./helpers";
 

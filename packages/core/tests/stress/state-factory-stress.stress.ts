@@ -1,6 +1,6 @@
 import { describe, afterEach, it, expect } from "vitest";
 
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 
 import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
 

@@ -1,4 +1,5 @@
-import { createRouter, getLifecycleApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
@@ -10,7 +11,8 @@ import {
   RxObservable,
 } from "../../src";
 
-import type { Router, LifecycleApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { LifecycleApi } from "@real-router/core/api";
 
 describe("@real-router/rx - Integration Tests", () => {
   let router: Router;

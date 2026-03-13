@@ -1,4 +1,4 @@
-import { getPluginApi } from "@real-router/core";
+import { getPluginApi } from "@real-router/core/api";
 import {
   createSafeBrowser,
   normalizeBase,

@@ -1,7 +1,8 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { errorCodes, getPluginApi, getRoutesApi } from "@real-router/core";
+import { errorCodes } from "@real-router/core";
 
+import { getPluginApi, getRoutesApi } from "../../../../src/api";
 import { createTestRouter } from "../../../helpers";
 
 import type {
@@ -9,8 +10,8 @@ import type {
   GuardFnFactory,
   Params,
   RouterError,
-  RoutesApi,
 } from "@real-router/core";
+import type { RoutesApi } from "@real-router/types";
 
 let router: Router;
 let routesApi: RoutesApi;

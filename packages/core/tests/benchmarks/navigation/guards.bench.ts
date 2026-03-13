@@ -7,7 +7,8 @@
 
 import { bench, boxplot, do_not_optimize, summary } from "mitata";
 
-import { createRouter, getLifecycleApi } from "../../../src";
+import { createRouter } from "../../../src";
+import { getLifecycleApi } from "../../../src/api";
 
 import type { Route } from "../../../src";
 

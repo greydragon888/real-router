@@ -3,7 +3,8 @@ import { RouterError } from "@real-router/core";
 import { getRouteFromEvent } from "./popstate-utils";
 
 import type { Browser, SharedFactoryState } from "./types";
-import type { PluginApi, Params, Plugin, Router } from "@real-router/core";
+import type { Params, Plugin, Router } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 export interface PopstateHandlerDeps {
   router: Router;

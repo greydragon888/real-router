@@ -1,10 +1,11 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getRoutesApi } from "@real-router/core";
+import { getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
-import type { Router, RoutesApi } from "@real-router/core";
+import type { Router } from "@real-router/core";
+import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;

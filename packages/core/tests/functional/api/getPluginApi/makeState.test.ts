@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { getPluginApi, getRoutesApi } from "../../../../src";
+import { getPluginApi, getRoutesApi } from "../../../../src/api";
 import { createTestRouter } from "../../../helpers";
 
-import type { RoutesApi } from "../../../../src";
+import type { RoutesApi } from "../../../../src/api";
 import type { Router } from "@real-router/types";
 
 let router: Router;

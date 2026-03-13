@@ -2,14 +2,14 @@
 
 import { fc } from "@fast-check/vitest";
 
-import type { Browser } from "../../src/types";
+import type { Browser } from "../../src";
 import type {
   NavigationOptions,
   Params,
-  PluginApi,
   Router,
   State,
 } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 export const NUM_RUNS = {
   fast: 100,

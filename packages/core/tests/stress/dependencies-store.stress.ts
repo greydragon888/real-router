@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 
-import { createRouter, getDependenciesApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getDependenciesApi } from "@real-router/core/api";
 
 import { createFlatRoutes, formatBytes, MB, takeHeapSnapshot } from "./helpers";
 

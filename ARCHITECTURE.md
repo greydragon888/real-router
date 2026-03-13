@@ -285,7 +285,7 @@ router.dispose();
 **Guards** (`GuardFn`) return `boolean | Promise<boolean>` and receive an optional `AbortSignal`:
 
 ```typescript
-import { getLifecycleApi } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
 lifecycle.addActivateGuard("admin", () => (toState, fromState, signal) => {
@@ -453,7 +453,7 @@ Full paths:
 ## SSR Support
 
 ```typescript
-import { cloneRouter } from "@real-router/core";
+import { cloneRouter } from "@real-router/core/api";
 
 // Server: clone router per request
 const serverRouter = cloneRouter(router, { request: req });

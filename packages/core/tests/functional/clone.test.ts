@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 
+import { errorCodes } from "@real-router/core";
 import {
   cloneRouter,
-  errorCodes,
   getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../helpers";
 

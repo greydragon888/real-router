@@ -5,10 +5,9 @@ import {
   constants,
   events,
   errorCodes,
-  getLifecycleApi,
-  getPluginApi,
   UNKNOWN_ROUTE,
 } from "@real-router/core";
+import { getLifecycleApi, getPluginApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 

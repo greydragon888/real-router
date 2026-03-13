@@ -1,7 +1,8 @@
 import { isStateStrict as isState } from "type-guards";
 
 import type { Browser } from "./types";
-import type { PluginApi, State, Params } from "@real-router/core";
+import type { State, Params } from "@real-router/core";
+import type { PluginApi } from "@real-router/core/api";
 
 /**
  * Extracts route name and params from a popstate event.

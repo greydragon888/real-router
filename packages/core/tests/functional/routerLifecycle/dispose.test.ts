@@ -1,18 +1,18 @@
 import { describe, beforeEach, it, expect, vi } from "vitest";
 
+import { errorCodes, events } from "@real-router/core";
 import {
   cloneRouter,
-  errorCodes,
-  events,
   getDependenciesApi,
   getLifecycleApi,
   getPluginApi,
   getRoutesApi,
-} from "@real-router/core";
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 
-import type { Router, PluginFactory, RoutesApi } from "@real-router/core";
+import type { Router, PluginFactory } from "@real-router/core";
+import type { RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;

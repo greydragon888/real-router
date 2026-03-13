@@ -1,4 +1,5 @@
-import { createRouter, getLifecycleApi } from "@real-router/core";
+import { createRouter } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 import { act } from "@testing-library/react";
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 import { profileHook } from "vitest-react-profiler";
