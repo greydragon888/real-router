@@ -74,6 +74,27 @@ COOLDOWN=${COOLDOWN:-60}
 MAX_COOLDOWN_WAIT=${MAX_COOLDOWN_WAIT:-300}
 ORIGINAL_USER="${SUDO_USER:-$USER}"
 
+# =============================================================================
+# Router Configuration — toggle which routers to benchmark
+# =============================================================================
+ENABLE_ROUTER5=false
+ENABLE_ROUTER6=true
+ENABLE_REAL_ROUTER=true
+ENABLE_NOVALIDATE=false
+# =============================================================================
+
+# Count enabled routers for step display
+TOTAL_ROUTERS=0
+[[ "$ENABLE_ROUTER5" == true ]] && ((TOTAL_ROUTERS++))
+[[ "$ENABLE_ROUTER6" == true ]] && ((TOTAL_ROUTERS++))
+[[ "$ENABLE_REAL_ROUTER" == true ]] && ((TOTAL_ROUTERS++))
+[[ "$ENABLE_NOVALIDATE" == true ]] && ((TOTAL_ROUTERS++))
+
+if [[ "$TOTAL_ROUTERS" -lt 2 ]]; then
+    echo "Error: At least 2 routers must be enabled for comparison."
+    exit 1
+fi
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -338,16 +359,16 @@ echo -e "${CYAN}Mode: per-section isolated runs (all routers per section)${NC}"
 SHORT_COOLDOWN=${SHORT_COOLDOWN:-20}
 echo -e "${CYAN}Short cooldown between routers: ${SHORT_COOLDOWN}s${NC}"
 
-# Initialize result files (empty them)
+# Initialize result files (only for enabled routers)
 RESULT_FILE_ROUTER5="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
 RESULT_FILE_ROUTER6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
 RESULT_FILE_REAL_ROUTER="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
 RESULT_FILE_REAL_ROUTER_NOVALIDATE="${RESULTS_DIR}/${TIMESTAMP}_real-router-novalidate.txt"
 
-: > "$RESULT_FILE_ROUTER5"
-: > "$RESULT_FILE_ROUTER6"
-: > "$RESULT_FILE_REAL_ROUTER"
-: > "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+[[ "$ENABLE_ROUTER5" == true ]] && : > "$RESULT_FILE_ROUTER5"
+[[ "$ENABLE_ROUTER6" == true ]] && : > "$RESULT_FILE_ROUTER6"
+[[ "$ENABLE_REAL_ROUTER" == true ]] && : > "$RESULT_FILE_REAL_ROUTER"
+[[ "$ENABLE_NOVALIDATE" == true ]] && : > "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 
 # Run each section for all routers before moving to the next section
 # This ensures fair comparison within each section (similar thermal conditions)
@@ -357,36 +378,50 @@ for section in "${RUN_SECTIONS[@]}"; do
     echo -e "${CYAN}║  Section $section                             ║${NC}"
     echo -e "${CYAN}╚════════════════════════════════════════╝${NC}"
 
+    STEP=0
+
     # --- router5 ---
-    echo -e "${BLUE}  [1/4] router5 (section $section)...${NC}"
-    sync && sudo purge || true
-    BENCH_ROUTER=router5 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER5"
-    echo -e "${GREEN}  ✓ router5 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
-    sleep "$SHORT_COOLDOWN"
+    if [[ "$ENABLE_ROUTER5" == true ]]; then
+        ((STEP++))
+        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] router5 (section $section)...${NC}"
+        sync && sudo purge || true
+        BENCH_ROUTER=router5 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER5"
+        echo -e "${GREEN}  ✓ router5 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+        sleep "$SHORT_COOLDOWN"
+    fi
 
     # --- router6 ---
-    echo -e "${BLUE}  [2/4] router6 (section $section)...${NC}"
-    sync && sudo purge || true
-    BENCH_ROUTER=router6 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER6"
-    echo -e "${GREEN}  ✓ router6 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
-    sleep "$SHORT_COOLDOWN"
+    if [[ "$ENABLE_ROUTER6" == true ]]; then
+        ((STEP++))
+        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] router6 (section $section)...${NC}"
+        sync && sudo purge || true
+        BENCH_ROUTER=router6 BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_ROUTER6"
+        echo -e "${GREEN}  ✓ router6 done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+        sleep "$SHORT_COOLDOWN"
+    fi
 
     # --- real-router ---
-    echo -e "${BLUE}  [3/4] real-router (section $section)...${NC}"
-    sync && sudo purge || true
-    BENCH_ROUTER=real-router BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER"
-    echo -e "${GREEN}  ✓ real-router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
-    sleep "$SHORT_COOLDOWN"
+    if [[ "$ENABLE_REAL_ROUTER" == true ]]; then
+        ((STEP++))
+        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] real-router (section $section)...${NC}"
+        sync && sudo purge || true
+        BENCH_ROUTER=real-router BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER"
+        echo -e "${GREEN}  ✓ real-router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+        sleep "$SHORT_COOLDOWN"
+    fi
 
     # --- real-router (noValidate) ---
-    echo -e "${BLUE}  [4/4] real-router noValidate (section $section)...${NC}"
-    sync && sudo purge || true
-    BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-        nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
-    echo -e "${GREEN}  ✓ real-router (noValidate) done${NC}"
+    if [[ "$ENABLE_NOVALIDATE" == true ]]; then
+        ((STEP++))
+        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] real-router noValidate (section $section)...${NC}"
+        sync && sudo purge || true
+        BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+        echo -e "${GREEN}  ✓ real-router (noValidate) done${NC}"
+    fi
 
     # Thermal cooldown between sections (not after the last one)
     # Note: ${RUN_SECTIONS[-1]} syntax requires bash 4.0+, but macOS ships with bash 3.2
@@ -425,8 +460,8 @@ echo -e "${GREEN}=== Benchmark Complete ===${NC}"
 echo "Results saved to: $RESULTS_DIR"
 echo ""
 echo "Files:"
-echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
-echo "  router6: $RESULT_FILE_ROUTER6"
-echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
-echo "  real-router (noValidate): $RESULT_FILE_REAL_ROUTER_NOVALIDATE"
+[[ "$ENABLE_ROUTER5" == true ]] && echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
+[[ "$ENABLE_ROUTER6" == true ]] && echo "  router6: $RESULT_FILE_ROUTER6"
+[[ "$ENABLE_REAL_ROUTER" == true ]] && echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
+[[ "$ENABLE_NOVALIDATE" == true ]] && echo "  real-router (noValidate): $RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 echo "  comparison: ${RESULTS_DIR}/${TIMESTAMP}_comparison.txt"
