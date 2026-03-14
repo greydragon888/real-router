@@ -12,7 +12,6 @@ import type {
   RouteTreeState,
   SimpleState,
   State,
-  StateMetaInput,
   Unsubscribe,
 } from "@real-router/types";
 import type { RouteTree } from "route-tree";
@@ -24,7 +23,7 @@ export interface RouterInternals<
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
+    meta?: Record<string, Record<string, "url" | "query">>,
     forceId?: number,
   ) => State<P, MP>;
 

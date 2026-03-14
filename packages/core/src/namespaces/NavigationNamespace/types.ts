@@ -6,7 +6,6 @@ import type {
   Options,
   Params,
   State,
-  TransitionPhase,
 } from "@real-router/types";
 
 /**
@@ -92,16 +91,4 @@ export interface NavigationDependencies {
 
   /** Clear canDeactivate guard for a route */
   clearCanDeactivate: (name: string) => void;
-}
-
-export interface TransitionOutput {
-  state: State;
-  meta: {
-    phase: TransitionPhase;
-    segments: {
-      deactivated: string[];
-      activated: string[];
-      intersection: string;
-    };
-  };
 }

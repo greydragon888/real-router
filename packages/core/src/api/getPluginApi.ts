@@ -24,7 +24,15 @@ export function getPluginApi<
         validateMakeStateArgs(name, params, path, forceId);
       }
 
-      return ctx.makeState(name, params, path, meta, forceId);
+      return ctx.makeState(
+        name,
+        params,
+        path,
+        meta?.params as
+          | Record<string, Record<string, "url" | "query">>
+          | undefined,
+        forceId,
+      );
     },
     buildState: (routeName, routeParams) => {
       if (!ctx.noValidate) {
@@ -90,9 +98,7 @@ export function getPluginApi<
         routeInfo.name,
         routeInfo.params,
         ctx.buildPath(routeInfo.name, routeInfo.params),
-        {
-          params: routeInfo.meta,
-        },
+        routeInfo.meta,
       );
     },
     getOptions: ctx.getOptions,

@@ -271,9 +271,7 @@ export class RoutesNamespace<
       });
     }
 
-    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
-      params: meta as MP,
-    });
+    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, meta);
   }
 
   /**
@@ -435,6 +433,14 @@ export class RoutesNamespace<
       !defaultParams ||
       paramsMatchExcluding(defaultParams, activeParams, params)
     );
+  }
+
+  getMetaForState(
+    name: string,
+  ): Record<string, Record<string, "url" | "query">> | undefined {
+    return this.#store.matcher.hasRoute(name)
+      ? this.#store.matcher.getMetaByName(name)
+      : undefined;
   }
 
   getUrlParams(name: string): string[] {

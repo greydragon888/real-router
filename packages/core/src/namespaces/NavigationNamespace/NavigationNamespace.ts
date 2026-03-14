@@ -1,6 +1,5 @@
 import { logger } from "@real-router/logger";
 
-import { buildSuccessState } from "./transition/buildSuccessState";
 import {
   handleGuardError,
   routeTransitionError,
@@ -12,6 +11,7 @@ import {
   validateNavigationOptions,
 } from "./validators";
 import { errorCodes, constants } from "../../constants";
+import { freezeStateInPlace } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
@@ -499,27 +499,31 @@ export class NavigationNamespace {
       }
     }
 
-    const stateWithTransition = buildSuccessState(
-      toState,
-      {
-        phase: "activating",
-        segments: {
-          deactivated: toDeactivate,
-          activated: toActivate,
-          intersection,
-        },
+    const transitionMeta = {
+      phase: "activating" as const,
+      reason: "success" as const,
+      segments: {
+        deactivated: toDeactivate,
+        activated: toActivate,
+        intersection,
       },
-      fromState,
-      opts,
-    );
+      ...(fromState?.name !== undefined && { from: fromState.name }),
+      ...(opts.reload !== undefined && { reload: opts.reload }),
+      ...(opts.redirected !== undefined && { redirected: opts.redirected }),
+    };
 
-    deps.setState(stateWithTransition);
+    (toState as { transition: typeof transitionMeta }).transition =
+      transitionMeta;
+
+    const finalState = freezeStateInPlace(toState);
+
+    deps.setState(finalState);
 
     const transitionOpts = opts.signal === undefined ? opts : stripSignal(opts);
 
-    deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
+    deps.sendTransitionDone(finalState, fromState, transitionOpts);
 
-    return stateWithTransition;
+    return finalState;
   }
 
   #cleanupController(controller: AbortController): void {

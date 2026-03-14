@@ -7,7 +7,7 @@ import { EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
-import type { Params, State, StateMetaInput } from "@real-router/types";
+import type { Params, State } from "@real-router/types";
 import type { RouteTreeStateMeta } from "route-tree";
 
 /**
@@ -145,12 +145,12 @@ export class StateNamespace {
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
+    meta?: RouteTreeStateMeta,
     forceId?: number,
     skipFreeze?: boolean,
   ): State<P, MP> {
     const madeMeta = meta
-      ? { id: forceId ?? ++this.#stateId, params: meta.params }
+      ? { id: forceId ?? ++this.#stateId, params: meta as unknown as MP }
       : undefined;
 
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration

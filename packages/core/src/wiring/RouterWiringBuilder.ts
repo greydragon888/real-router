@@ -118,22 +118,15 @@ export class RouterWiringBuilder<
         }
 
         const { name, params } = ctx.forwardState(routeName, routeParams);
-        const route = this.routes.buildStateResolved(name, params);
+        const meta = this.routes.getMetaForState(name);
 
-        if (!route) {
+        if (meta === undefined) {
           return;
         }
 
         const path = ctx.buildPath(name, params);
 
-        return this.state.makeState(
-          name,
-          params,
-          path,
-          { params: route.meta },
-          undefined,
-          true,
-        );
+        return this.state.makeState(name, params, path, meta, undefined, true);
       },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
