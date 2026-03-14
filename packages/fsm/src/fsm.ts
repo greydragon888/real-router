@@ -78,6 +78,15 @@ export class FSM<
     return this.#currentTransitions[event] !== undefined;
   }
 
+  /**
+   * Directly sets FSM state without triggering actions or listeners.
+   * Use for hot-path optimizations where the caller handles side effects.
+   */
+  forceState(state: TStates): void {
+    this.#state = state;
+    this.#currentTransitions = this.#transitions[state];
+  }
+
   getState(): TStates {
     return this.#state;
   }

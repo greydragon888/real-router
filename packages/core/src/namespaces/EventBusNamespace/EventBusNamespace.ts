@@ -25,7 +25,6 @@ export class EventBusNamespace {
   #currentToState: State | undefined;
   #pendingToState: State | undefined;
   #pendingFromState: State | undefined;
-  #pendingOpts: NavigationOptions | undefined;
   #pendingError: unknown;
 
   constructor(options: EventBusOptions) {
@@ -94,8 +93,9 @@ export class EventBusNamespace {
 
   sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
-    this.#pendingFromState = fromState;
-    this.#fsm.send(routerEvents.NAVIGATE);
+    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
+    this.#fsm.forceState(routerStates.TRANSITIONING);
+    this.emitTransitionStart(toState, fromState);
   }
 
   sendComplete(
@@ -103,10 +103,9 @@ export class EventBusNamespace {
     fromState?: State,
     opts: NavigationOptions = {},
   ): void {
-    this.#currentToState = state;
-    this.#pendingFromState = fromState;
-    this.#pendingOpts = opts;
-    this.#fsm.send(routerEvents.COMPLETE);
+    // Bypass FSM dispatch — forceState + direct emit
+    this.#fsm.forceState(routerStates.READY);
+    this.emitTransitionSuccess(state, fromState, opts);
 
     if (this.#currentToState === state) {
       this.#currentToState = undefined;
@@ -238,18 +237,8 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    fsm.on(routerStates.READY, routerEvents.NAVIGATE, () => {
-      this.emitTransitionStart(this.#currentToState!, this.#pendingFromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- set by sendNavigate before send()
-    });
-
-    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, () => {
-      this.emitTransitionSuccess(
-        this.#currentToState!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- set by sendComplete before send()
-        this.#pendingFromState,
-        this.#pendingOpts,
-      );
-    });
-
+    // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
+    // use fsm.forceState() + direct emit for zero-allocation hot path.
     fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, () => {
       this.emitTransitionCancel(this.#pendingToState!, this.#pendingFromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- set by sendCancel before send()
     });
