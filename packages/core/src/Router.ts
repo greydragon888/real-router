@@ -587,7 +587,11 @@ export class Router<
       opts,
     );
 
-    Router.#suppressUnhandledRejection(promiseState);
+    if (this.#navigation.lastSyncResolved) {
+      this.#navigation.lastSyncResolved = false;
+    } else {
+      Router.#suppressUnhandledRejection(promiseState);
+    }
 
     return promiseState;
   }
@@ -608,7 +612,11 @@ export class Router<
     // 3. Execute navigation with parsed arguments
     const promiseState = this.#navigation.navigateToDefault(opts);
 
-    Router.#suppressUnhandledRejection(promiseState);
+    if (this.#navigation.lastSyncResolved) {
+      this.#navigation.lastSyncResolved = false;
+    } else {
+      Router.#suppressUnhandledRejection(promiseState);
+    }
 
     return promiseState;
   }

@@ -157,6 +157,18 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
    * Used when maxEventDepth === 0 (depth protection disabled).
    */
   #emitFast(set: Set<AnyCallback>, eventName: string, args: unknown[]): void {
+    if (set.size === 1) {
+      const [cb] = set;
+
+      try {
+        this.#callListener(cb, args);
+      } catch (error) {
+        this.#onListenerError?.(eventName, error);
+      }
+
+      return;
+    }
+
     const listeners = [...set];
 
     for (const cb of listeners) {
@@ -226,7 +238,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     try {
       depthMap.set(eventName, depth + 1);
 
-      const listeners = [...set];
+      const listeners = set.size === 1 ? set : [...set];
 
       for (const cb of listeners) {
         try {

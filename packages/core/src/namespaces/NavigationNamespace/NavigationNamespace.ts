@@ -24,6 +24,13 @@ import type {
   TransitionMeta,
 } from "@real-router/types";
 
+type MutableTransitionMeta = {
+  -readonly [K in keyof TransitionMeta]: TransitionMeta[K];
+};
+type MutableState = Omit<State, "transition"> & {
+  transition: MutableTransitionMeta;
+};
+
 const FROZEN_ACTIVATED: string[] = [constants.UNKNOWN_ROUTE];
 
 Object.freeze(FROZEN_ACTIVATED);
@@ -57,6 +64,7 @@ function stripSignal({
  * overhead for the common case (no guards or sync guards).
  */
 export class NavigationNamespace {
+  lastSyncResolved = false;
   #deps!: NavigationDependencies;
   #currentController: AbortController | null = null;
   #navigationId = 0;
@@ -99,6 +107,7 @@ export class NavigationNamespace {
     params: Params,
     opts: NavigationOptions,
   ): Promise<State> {
+    this.lastSyncResolved = false;
     const deps = this.#deps;
     let toState: State | undefined;
     let fromState: State | undefined;
@@ -262,6 +271,8 @@ export class NavigationNamespace {
 
         this.#cleanupController(controller);
       }
+
+      this.lastSyncResolved = true;
 
       return Promise.resolve(
         this.#completeNavigation(
@@ -499,21 +510,29 @@ export class NavigationNamespace {
       }
     }
 
-    const transitionMeta = {
-      phase: "activating" as const,
-      reason: "success" as const,
+    const mutableState = toState as MutableState;
+
+    mutableState.transition = {
+      phase: "activating",
+      reason: "success",
       segments: {
         deactivated: toDeactivate,
         activated: toActivate,
         intersection,
       },
-      ...(fromState?.name !== undefined && { from: fromState.name }),
-      ...(opts.reload !== undefined && { reload: opts.reload }),
-      ...(opts.redirected !== undefined && { redirected: opts.redirected }),
     };
 
-    (toState as { transition: typeof transitionMeta }).transition =
-      transitionMeta;
+    if (fromState?.name !== undefined) {
+      mutableState.transition.from = fromState.name;
+    }
+
+    if (opts.reload !== undefined) {
+      mutableState.transition.reload = opts.reload;
+    }
+
+    if (opts.redirected !== undefined) {
+      mutableState.transition.redirected = opts.redirected;
+    }
 
     const finalState = freezeStateInPlace(toState);
 

@@ -509,6 +509,21 @@ describe("EventEmitter", () => {
       expect(cb).toHaveBeenCalledWith("save", { id: 1 }, true);
     });
 
+    it("should snapshot multiple listeners when depth tracking is on", () => {
+      const emitter = createEmitter({
+        limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
+      });
+      const cb1 = vi.fn();
+      const cb2 = vi.fn();
+
+      emitter.on("click", cb1);
+      emitter.on("click", cb2);
+      emitter.emit("click", 1, 2);
+
+      expect(cb1).toHaveBeenCalledWith(1, 2);
+      expect(cb2).toHaveBeenCalledWith(1, 2);
+    });
+
     it("should call listener with 4+ args when depth tracking is on", () => {
       const emitter = createEmitter({
         limits: { maxListeners: 0, warnListeners: 0, maxEventDepth: 5 },
