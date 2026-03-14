@@ -3,6 +3,7 @@
 import { getTypeDescription, validateState } from "type-guards";
 
 import { areParamValuesEqual, getUrlParamsFromMeta } from "./helpers";
+import { EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
@@ -149,11 +150,7 @@ export class StateNamespace {
     skipFreeze?: boolean,
   ): State<P, MP> {
     const madeMeta = meta
-      ? {
-          ...meta,
-          id: forceId ?? ++this.#stateId,
-          params: meta.params,
-        }
+      ? { id: forceId ?? ++this.#stateId, params: meta.params }
       : undefined;
 
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
@@ -165,10 +162,10 @@ export class StateNamespace {
 
     if (hasDefaultParams) {
       mergedParams = { ...defaultParamsConfig[name], ...params } as P;
-    } else if (params) {
-      mergedParams = { ...params };
+    } else if (!params || params === EMPTY_PARAMS) {
+      mergedParams = EMPTY_PARAMS as P;
     } else {
-      mergedParams = {} as P;
+      mergedParams = { ...params };
     }
 
     const state: State<P, MP> = {

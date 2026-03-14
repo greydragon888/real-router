@@ -173,94 +173,93 @@ export class NavigationNamespace {
       if (hasGuards) {
         controller = new AbortController();
         this.#currentController = controller;
-      }
 
-      const signal = controller?.signal;
-      const isCurrentNav = () => this.#navigationId === myId && deps.isActive();
+        const signal = controller.signal;
+        const isCurrentNav = () =>
+          this.#navigationId === myId && deps.isActive();
 
-      if (shouldDeactivate) {
-        const asyncResult = runGuardPhase(
-          canDeactivateFunctions,
-          toDeactivate,
-          errorCodes.CANNOT_DEACTIVATE,
-          toState,
-          fromState,
-          signal,
-          isCurrentNav,
-        );
-
-        if (asyncResult) {
-          return this.#continueAsyncNavigation(
-            asyncResult,
-            {
-              deactivate: toDeactivate.slice(asyncResult.remainingIndex),
-              activate: shouldActivate ? toActivate : [],
-            },
-            {
-              deactivate: canDeactivateFunctions,
-              activate: canActivateFunctions,
-            },
-            {
-              toState,
-              fromState,
-              opts,
-              toDeactivate,
-              toActivate,
-              intersection,
-            },
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasGuards guarantees controller
-            controller!,
-            myId,
+        if (shouldDeactivate) {
+          const asyncResult = runGuardPhase(
+            canDeactivateFunctions,
+            toDeactivate,
+            errorCodes.CANNOT_DEACTIVATE,
+            toState,
+            fromState,
+            signal,
+            isCurrentNav,
           );
+
+          if (asyncResult) {
+            return this.#continueAsyncNavigation(
+              asyncResult,
+              {
+                deactivate: toDeactivate.slice(asyncResult.remainingIndex),
+                activate: shouldActivate ? toActivate : [],
+              },
+              {
+                deactivate: canDeactivateFunctions,
+                activate: canActivateFunctions,
+              },
+              {
+                toState,
+                fromState,
+                opts,
+                toDeactivate,
+                toActivate,
+                intersection,
+              },
+
+              controller,
+              myId,
+            );
+          }
         }
-      }
 
-      if (!isCurrentNav()) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-      }
+        if (this.#navigationId !== myId || !deps.isActive()) {
+          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        }
 
-      if (shouldActivate) {
-        const asyncResult = runGuardPhase(
-          canActivateFunctions,
-          toActivate,
-          errorCodes.CANNOT_ACTIVATE,
-          toState,
-          fromState,
-          signal,
-          isCurrentNav,
-        );
-
-        if (asyncResult) {
-          return this.#continueAsyncNavigation(
-            asyncResult,
-            {
-              deactivate: [],
-              activate: toActivate.slice(asyncResult.remainingIndex),
-            },
-            {
-              deactivate: canDeactivateFunctions,
-              activate: canActivateFunctions,
-            },
-            {
-              toState,
-              fromState,
-              opts,
-              toDeactivate,
-              toActivate,
-              intersection,
-            },
-            // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- hasGuards guarantees controller
-            controller!,
-            myId,
+        if (shouldActivate) {
+          const asyncResult = runGuardPhase(
+            canActivateFunctions,
+            toActivate,
+            errorCodes.CANNOT_ACTIVATE,
+            toState,
+            fromState,
+            signal,
+            isCurrentNav,
           );
+
+          if (asyncResult) {
+            return this.#continueAsyncNavigation(
+              asyncResult,
+              {
+                deactivate: [],
+                activate: toActivate.slice(asyncResult.remainingIndex),
+              },
+              {
+                deactivate: canDeactivateFunctions,
+                activate: canActivateFunctions,
+              },
+              {
+                toState,
+                fromState,
+                opts,
+                toDeactivate,
+                toActivate,
+                intersection,
+              },
+
+              controller,
+              myId,
+            );
+          }
         }
-      }
 
-      if (!isCurrentNav()) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-      }
+        if (this.#navigationId !== myId || !deps.isActive()) {
+          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        }
 
-      if (controller) {
         this.#cleanupController(controller);
       }
 

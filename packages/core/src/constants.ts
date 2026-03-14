@@ -99,6 +99,8 @@ export const DEFAULT_LIMITS = {
   maxLifecycleHandlers: 200,
 } as const;
 
+export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
+
 /**
  * Bounds for each limit - defines min and max allowed values.
  * Used for runtime validation in setLimit/withLimits.

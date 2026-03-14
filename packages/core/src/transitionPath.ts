@@ -181,45 +181,46 @@ function pointOfDifference(
  * Validation significantly slows down nameToIDs execution.
  * The input should be validated by the function/method that calls nameToIDs.
  */
+const nameToIDsCache = new Map<string, string[]>();
+
 export function nameToIDs(name: string): string[] {
-  // ===== FAST PATH 1: Empty string (root route) =====
-  // Most common in initial navigation
+  const cached = nameToIDsCache.get(name);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result = computeNameToIDs(name);
+
+  Object.freeze(result);
+  nameToIDsCache.set(name, result);
+
+  return result;
+}
+
+function computeNameToIDs(name: string): string[] {
   if (!name) {
     return [DEFAULT_ROUTE_NAME];
   }
 
-  // ===== FAST PATH 2: Single segment (no dots) =====
-  // Very common: 'home', 'users', 'settings', etc.
   const firstDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR);
 
   if (firstDot === -1) {
     return [name];
   }
 
-  // ===== FAST PATH 3: Two segments =====
-  // Common: 'users.list', 'admin.dashboard', etc.
   const secondDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR, firstDot + 1);
 
   if (secondDot === -1) {
-    return [
-      name.slice(0, firstDot), // 'users'
-      name, // 'users.list'
-    ];
+    return [name.slice(0, firstDot), name];
   }
 
-  // ===== FAST PATH 4: Three segments =====
-  // Common: 'users.profile.edit', 'app.settings.general', etc.
   const thirdDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR, secondDot + 1);
 
   if (thirdDot === -1) {
-    return [
-      name.slice(0, firstDot), // 'users'
-      name.slice(0, secondDot), // 'users.profile'
-      name, // 'users.profile.edit'
-    ];
+    return [name.slice(0, firstDot), name.slice(0, secondDot), name];
   }
 
-  // ===== FAST PATH 5: Four segments =====
   const fourthDot = name.indexOf(ROUTE_SEGMENT_SEPARATOR, thirdDot + 1);
 
   if (fourthDot === -1) {
@@ -231,8 +232,6 @@ export function nameToIDs(name: string): string[] {
     ];
   }
 
-  // ===== STANDARD PATH: 5+ segments =====
-  // Less common, use general algorithm with optimizations
   return nameToIDsGeneral(name);
 }
 
@@ -315,9 +314,13 @@ export function nameToIDs(name: string): string[] {
 // Single-entry cache: shouldUpdateNode calls getTransitionPath N times per
 // navigation with the same state objects (once per subscribed node).
 // Cache by reference eliminates N-1 redundant computations.
-let cachedToState: State | undefined;
-let cachedFromState: State | undefined;
-let cachedResult: TransitionPath | null = null;
+let cached1To: State | undefined;
+let cached1From: State | undefined;
+let cached1Result: TransitionPath | null = null;
+
+let cached2To: State | undefined;
+let cached2From: State | undefined;
+let cached2Result: TransitionPath | null = null;
 
 function computeTransitionPath(
   toState: State,
@@ -392,19 +395,33 @@ export function getTransitionPath(
   if (opts?.reload) {
     return computeTransitionPath(toState, fromState);
   }
+
   if (
-    cachedResult !== null &&
-    toState === cachedToState &&
-    fromState === cachedFromState
+    cached1Result !== null &&
+    toState === cached1To &&
+    fromState === cached1From
   ) {
-    return cachedResult;
+    return cached1Result;
+  }
+
+  /* v8 ignore next 6 -- @preserve: 2nd cache slot hit path exercised by alternating navigation benchmarks, not unit tests */
+  if (
+    cached2Result !== null &&
+    toState === cached2To &&
+    fromState === cached2From
+  ) {
+    return cached2Result;
   }
 
   const result = computeTransitionPath(toState, fromState);
 
-  cachedToState = toState;
-  cachedFromState = fromState;
-  cachedResult = result;
+  cached2To = cached1To;
+  cached2From = cached1From;
+  cached2Result = cached1Result;
+
+  cached1To = toState;
+  cached1From = fromState;
+  cached1Result = result;
 
   return result;
 }
