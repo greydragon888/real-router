@@ -475,6 +475,18 @@ Uses turbo v2.8.12+.
 
 **v2.8.11 migration:** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
 
+### Concurrency Limit
+
+`turbo.json`:
+
+```json
+{
+  "concurrency": "4"
+}
+```
+
+**Why:** Without a limit, turbo runs all 34 tasks in parallel on uncached runs. Property-based tests (fast-check) are memory-intensive — running 5+ property test suites + builds simultaneously causes OOM kills (exit code 137). With cache, most tasks are hits and memory stays low. The limit prevents OOM on cold runs (cleared cache, new CI runner, fresh clone).
+
 ### Environment Variables
 
 `turbo.json`:
