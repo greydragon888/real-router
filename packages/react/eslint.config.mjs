@@ -409,6 +409,7 @@ export default tsEslint.config(
       "react-hooks/purity": "off",
       "react-hooks/set-state-in-render": "off",
       "react-hooks/error-boundaries": "off",
+      "@eslint-react/no-use-context": "off",
     },
   },
 
@@ -467,7 +468,6 @@ export default tsEslint.config(
       "react-hooks/globals": "off",
       "react-hooks/immutability": "off",
       "react-hooks/refs": "off",
-      "@eslint-react/no-use-context": "off",
     },
   },
 

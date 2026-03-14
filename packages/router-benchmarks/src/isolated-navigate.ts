@@ -6,7 +6,7 @@
  *       BENCH_ROUTER=router6 npx tsx src/isolated-navigate.ts
  */
 
-import { measure, do_not_optimize } from "mitata";
+import { measure } from "mitata";
 
 import { createRouter, createSimpleRouter, ROUTER_NAME } from "./helpers";
 
@@ -84,10 +84,10 @@ async function main(): Promise<void> {
     const routes = ["home", "about"];
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Simple navigate (alternating)", () => {
-      do_not_optimize(router.navigate(routes[index++ % 2]));
+      void router.navigate(routes[index++ % 2]);
     });
   }
 
@@ -96,10 +96,10 @@ async function main(): Promise<void> {
   {
     const router = createSimpleRouter();
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate same route (SAME_STATES)", () => {
-      do_not_optimize(router.navigate("home"));
+      void router.navigate("home");
     });
   }
 
@@ -110,10 +110,10 @@ async function main(): Promise<void> {
     const ids = ["123", "456"];
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate with params (alternating)", () => {
-      do_not_optimize(router.navigate("user", { id: ids[index++ % 2] }));
+      void router.navigate("user", { id: ids[index++ % 2] });
     });
   }
 
@@ -135,12 +135,12 @@ async function main(): Promise<void> {
     ] as const;
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate nested (alternating)", () => {
       const t = targets[index++ % 2];
 
-      do_not_optimize(router.navigate(t.name, t.params));
+      void router.navigate(t.name, t.params);
     });
   }
 
@@ -151,10 +151,10 @@ async function main(): Promise<void> {
     const searchTerms = [{ search: "foo" }, { search: "bar" }];
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate with query params", () => {
-      do_not_optimize(router.navigate("about", searchTerms[index++ % 2]));
+      void router.navigate("about", searchTerms[index++ % 2]);
     });
   }
 
@@ -175,12 +175,12 @@ async function main(): Promise<void> {
     ] as const;
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate multi-param (alternating)", () => {
       const t = targets[index++ % 2];
 
-      do_not_optimize(router.navigate(t.name, t.params));
+      void router.navigate(t.name, t.params);
     });
   }
 
@@ -189,10 +189,10 @@ async function main(): Promise<void> {
   {
     const router = createSimpleRouter();
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate with reload", () => {
-      do_not_optimize(router.navigate("home", {}, { reload: true }));
+      void router.navigate("home", {}, { reload: true });
     });
   }
 
@@ -203,10 +203,10 @@ async function main(): Promise<void> {
     const routes = ["home", "about"];
     let index = 0;
 
-    router.start("/about");
+    void router.start("/about");
 
     await isolatedMeasure("Navigate to default (alternating)", () => {
-      do_not_optimize(router.navigate(routes[index++ % 2]));
+      void router.navigate(routes[index++ % 2]);
     });
   }
 
@@ -217,10 +217,10 @@ async function main(): Promise<void> {
     const chain = ["home", "about", "users", "home"];
     let index = 0;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Sequential chain (4 routes)", () => {
-      do_not_optimize(router.navigate(chain[index++ % 4]));
+      void router.navigate(chain[index++ % 4]);
     });
   }
 
@@ -232,13 +232,13 @@ async function main(): Promise<void> {
     const router = createSimpleRouter();
     let toAbout = true;
 
-    router.start("/");
+    void router.start("/");
 
     await isolatedMeasure("Navigate one direction", () => {
       if (toAbout) {
-        do_not_optimize(router.navigate("about"));
+        void router.navigate("about");
       } else {
-        do_not_optimize(router.navigate("home"));
+        void router.navigate("home");
       }
 
       toAbout = !toAbout;
