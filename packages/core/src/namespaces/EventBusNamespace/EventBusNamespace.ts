@@ -98,17 +98,27 @@ export class EventBusNamespace {
     fromState?: State,
     opts: NavigationOptions = {},
   ): void {
+    const prev = this.#currentToState;
+
     this.#fsm.send(routerEvents.COMPLETE, {
       state,
       fromState,
       opts,
     });
-    this.#currentToState = undefined;
+
+    if (this.#currentToState === prev) {
+      this.#currentToState = undefined;
+    }
   }
 
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
+    const prev = this.#currentToState;
+
     this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
-    this.#currentToState = undefined;
+
+    if (this.#currentToState === prev) {
+      this.#currentToState = undefined;
+    }
   }
 
   sendFailSafe(toState?: State, fromState?: State, error?: unknown): void {
@@ -120,8 +130,13 @@ export class EventBusNamespace {
   }
 
   sendCancel(toState: State, fromState?: State): void {
+    const prev = this.#currentToState;
+
     this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
-    this.#currentToState = undefined;
+
+    if (this.#currentToState === prev) {
+      this.#currentToState = undefined;
+    }
   }
 
   canBeginTransition(): boolean {
