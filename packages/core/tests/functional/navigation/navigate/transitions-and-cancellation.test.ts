@@ -39,17 +39,24 @@ describe("router.navigate() - transitions and cancellation", () => {
       },
     }));
 
+    // With sync navigate (no async guards), first navigate completes synchronously.
+    // Subsequent navigates to the same route get SAME_STATES (already there).
     const promises = Array.from({ length: 5 })
       .fill(null)
       .map(() =>
         router.navigate("users").catch((error: unknown) => {
-          expect((error as Record<string, unknown>)?.code).toStrictEqual(
-            errorCodes.TRANSITION_CANCELLED,
-          );
+          const code = (error as Record<string, unknown>)?.code;
+
+          expect(
+            code === errorCodes.TRANSITION_CANCELLED ||
+              code === errorCodes.SAME_STATES,
+          ).toBe(true);
         }),
       );
 
-    await router.navigate("users");
+    await router.navigate("users").catch(() => {
+      // SAME_STATES is expected
+    });
 
     await Promise.all(promises);
   });

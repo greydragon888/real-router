@@ -357,7 +357,6 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
     it("11. Listener on external signal removed after navigation completes (success path)", async () => {
       const controller = new AbortController();
 
-      // Track listener count via addEventListener spy
       const addEventListenerSpy = vi.spyOn(
         controller.signal,
         "addEventListener",
@@ -371,11 +370,10 @@ describe("router.navigate() - AbortController / AbortSignal integration", () => 
 
       expect(state.name).toBe("users");
 
-      // After successful navigation, the internal controller is aborted in finally,
-      // which removes the listener via { signal: controller.signal } option.
-      // The external signal should still be usable (not aborted).
+      // Sync navigate (no async guards) completes synchronously —
+      // external signal is never linked (nothing to cancel mid-navigation).
       expect(controller.signal.aborted).toBe(false);
-      expect(addEventListenerSpy).toHaveBeenCalledTimes(1);
+      expect(addEventListenerSpy).toHaveBeenCalledTimes(0);
     });
 
     it("12. External signal remains usable after navigation completes", async () => {

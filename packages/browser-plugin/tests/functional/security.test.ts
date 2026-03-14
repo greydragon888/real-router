@@ -154,8 +154,7 @@ describe("Browser Plugin — Security", () => {
       // Object prototype should not be polluted
       expect(({} as any).polluted).toBeUndefined();
 
-      // Router should handle the navigation (async, not awaited)
-      expect(router.getState()?.name).toBe("index");
+      expect(router.getState()?.name).toBe("home");
     });
 
     it("handles popstate with deeply nested malicious objects", async () => {
@@ -182,9 +181,8 @@ describe("Browser Plugin — Security", () => {
         );
       }).not.toThrowError();
 
-      // Router should still be in a valid state (no crash)
       expect(router.getState()).toBeDefined();
-      expect(router.getState()?.name).toBe("index");
+      expect(router.getState()?.name).toBe("home");
     });
   });
 
