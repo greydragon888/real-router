@@ -110,10 +110,7 @@ export class RouterWiringBuilder<
       setState: (state) => {
         this.state.set(state);
       },
-      buildStateWithSegments: <P extends Params = Params>(
-        routeName: string,
-        routeParams: P,
-      ) => {
+      buildNavigateState: (routeName, routeParams) => {
         const ctx = getInternals(this.router);
 
         if (!ctx.noValidate) {
@@ -121,15 +118,15 @@ export class RouterWiringBuilder<
         }
 
         const { name, params } = ctx.forwardState(routeName, routeParams);
+        const route = this.routes.buildStateResolved(name, params);
 
-        return this.routes.buildStateWithSegmentsResolved(name, params);
-      },
-      makeState: (name, params, path, meta) =>
-        this.state.makeState(name, params, path, meta),
-      buildPath: (route, params) => {
-        const ctx = getInternals(this.router);
+        if (!route) {
+          return;
+        }
 
-        return ctx.buildPath(route, params);
+        const path = ctx.buildPath(name, params);
+
+        return this.state.makeState(name, params, path, { params: route.meta });
       },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),

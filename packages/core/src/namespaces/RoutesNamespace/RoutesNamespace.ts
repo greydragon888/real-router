@@ -14,7 +14,7 @@ import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
 import type { RoutesDependencies } from "./types";
-import type { BuildStateResultWithSegments, Route } from "../../types";
+import type { Route } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
@@ -357,30 +357,6 @@ export class RoutesNamespace<
       { segments, params: resolvedParams, meta },
       resolvedName,
     );
-  }
-
-  buildStateWithSegmentsResolved<P extends Params = Params>(
-    resolvedName: string,
-    resolvedParams: P,
-  ): BuildStateResultWithSegments<P> | undefined {
-    const segments = this.#store.matcher.getSegmentsByName(resolvedName);
-
-    if (!segments) {
-      return undefined;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const meta = this.#store.matcher.getMetaByName(resolvedName)!;
-    const state = createRouteState<P>(
-      {
-        segments: segments as readonly RouteTree[],
-        params: resolvedParams,
-        meta,
-      },
-      resolvedName,
-    );
-
-    return { state, segments: segments as readonly RouteTree[] };
   }
 
   // =========================================================================

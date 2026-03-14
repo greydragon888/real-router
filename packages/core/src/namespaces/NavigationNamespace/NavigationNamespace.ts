@@ -110,24 +110,15 @@ export class NavigationNamespace {
         throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
       }
 
-      const result = deps.buildStateWithSegments(name, params);
+      toState = deps.buildNavigateState(name, params);
 
-      if (!result) {
+      if (!toState) {
         const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
 
         deps.emitTransitionError(undefined, deps.getState(), err);
 
         throw err;
       }
-
-      const { state: route } = result;
-
-      toState = deps.makeState(
-        route.name,
-        route.params,
-        deps.buildPath(route.name, route.params),
-        { params: route.meta },
-      );
 
       fromState = deps.getState();
       opts = forceReplaceFromUnknown(opts, fromState);

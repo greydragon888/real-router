@@ -1,13 +1,11 @@
 // packages/core/src/namespaces/NavigationNamespace/types.ts
 
-import type { BuildStateResultWithSegments } from "../../types";
 import type {
   GuardFn,
   NavigationOptions,
   Options,
   Params,
   State,
-  StateMetaInput,
   TransitionPhase,
 } from "@real-router/types";
 
@@ -30,22 +28,11 @@ export interface NavigationDependencies {
   /** Set router state */
   setState: (state: State) => void;
 
-  /** Build state with segments from route name and params */
-  buildStateWithSegments: <P extends Params = Params>(
+  /** Build complete navigate state: forwardState + route check + buildPath + makeState in one step */
+  buildNavigateState: (
     routeName: string,
-    routeParams: P,
-  ) => BuildStateResultWithSegments<P> | undefined;
-
-  /** Make state object with path and meta */
-  makeState: <P extends Params = Params, MP extends Params = Params>(
-    name: string,
-    params?: P,
-    path?: string,
-    meta?: StateMetaInput<MP>,
-  ) => State<P, MP>;
-
-  /** Build path from route name and params */
-  buildPath: (route: string, params?: Params) => string;
+    routeParams: Params,
+  ) => State | undefined;
 
   /** Check if states are equal */
   areStatesEqual: (
