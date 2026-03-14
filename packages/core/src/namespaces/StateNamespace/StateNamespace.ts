@@ -146,6 +146,7 @@ export class StateNamespace {
     path?: string,
     meta?: StateMetaInput<MP>,
     forceId?: number,
+    skipFreeze?: boolean,
   ): State<P, MP> {
     const madeMeta = meta
       ? {
@@ -177,7 +178,7 @@ export class StateNamespace {
       meta: madeMeta,
     };
 
-    return freezeStateInPlace(state);
+    return skipFreeze ? state : freezeStateInPlace(state);
   }
 
   // =========================================================================

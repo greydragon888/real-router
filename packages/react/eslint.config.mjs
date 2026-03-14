@@ -467,6 +467,7 @@ export default tsEslint.config(
       "react-hooks/globals": "off",
       "react-hooks/immutability": "off",
       "react-hooks/refs": "off",
+      "@eslint-react/no-use-context": "off",
     },
   },
 

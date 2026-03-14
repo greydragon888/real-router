@@ -1,3 +1,5 @@
+import { freezeStateInPlace } from "../../../helpers";
+
 import type { TransitionOutput } from "../types";
 import type {
   NavigationOptions,
@@ -20,13 +22,8 @@ export function buildSuccessState(
     ...(opts.redirected !== undefined && { redirected: opts.redirected }),
   };
 
-  Object.freeze(transitionMeta.segments.deactivated);
-  Object.freeze(transitionMeta.segments.activated);
-  Object.freeze(transitionMeta.segments);
-  Object.freeze(transitionMeta);
-
-  return {
+  return freezeStateInPlace({
     ...finalState,
     transition: transitionMeta,
-  };
+  });
 }

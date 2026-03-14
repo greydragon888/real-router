@@ -126,7 +126,14 @@ export class RouterWiringBuilder<
 
         const path = ctx.buildPath(name, params);
 
-        return this.state.makeState(name, params, path, { params: route.meta });
+        return this.state.makeState(
+          name,
+          params,
+          path,
+          { params: route.meta },
+          undefined,
+          true,
+        );
       },
       areStatesEqual: (state1, state2, ignoreQueryParams) =>
         this.state.areStatesEqual(state1, state2, ignoreQueryParams),
