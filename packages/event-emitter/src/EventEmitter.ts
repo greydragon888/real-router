@@ -113,10 +113,16 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
    * Uses snapshot iteration — listeners added/removed during emit don't affect
    * the current invocation. Per-listener errors are caught and reported via
    * the onListenerError callback. RecursionDepthError is re-thrown.
+   *
+   * Uses explicit params instead of rest params to avoid V8 array materialization.
+   * Extra undefined args are harmless — JS functions ignore extra arguments.
    */
-  emit<E extends keyof TEventMap & string>(
-    eventName: E,
-    ...args: TEventMap[E]
+  emit(
+    eventName: keyof TEventMap & string,
+    a?: unknown,
+    b?: unknown,
+    c?: unknown,
+    d?: unknown,
   ): void {
     const set = this.#callbacks.get(eventName);
 
@@ -124,13 +130,16 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
       return;
     }
 
+    // arguments.length is O(1) in V8 strict mode — no deopt
+    const argc = arguments.length - 1;
+
     if (this.#limits.maxEventDepth === 0) {
-      this.#emitFast(set, eventName, args);
+      this.#emitFast(set, eventName, argc, a, b, c, d);
 
       return;
     }
 
-    this.#emitWithDepthTracking(set, eventName, args);
+    this.#emitWithDepthTracking(set, eventName, argc, a, b, c, d);
   }
 
   /**
@@ -156,12 +165,20 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
    * Fast emit path — no depth tracking, no try/finally overhead.
    * Used when maxEventDepth === 0 (depth protection disabled).
    */
-  #emitFast(set: Set<AnyCallback>, eventName: string, args: unknown[]): void {
+  #emitFast(
+    set: Set<AnyCallback>,
+    eventName: string,
+    argc: number,
+    a: unknown,
+    b: unknown,
+    c: unknown,
+    d: unknown,
+  ): void {
     if (set.size === 1) {
       const [cb] = set;
 
       try {
-        this.#callListener(cb, args);
+        this.#callListener(cb, argc, a, b, c, d);
       } catch (error) {
         this.#onListenerError?.(eventName, error);
       }
@@ -173,7 +190,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
     for (const cb of listeners) {
       try {
-        this.#callListener(cb, args);
+        this.#callListener(cb, argc, a, b, c, d);
       } catch (error) {
         this.#onListenerError?.(eventName, error);
       }
@@ -181,37 +198,45 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   }
 
   /**
-   * Calls a listener with the provided arguments, dispatching by argument count.
-   * Optimized for 0-3 args with direct calls; falls back to apply for larger counts.
+   * Calls a listener with the correct number of arguments.
+   * Dispatches by argc to preserve exact call semantics.
    */
-  #callListener(cb: AnyCallback, args: unknown[]): void {
-    switch (args.length) {
+  #callListener(
+    cb: AnyCallback,
+    argc: number,
+    a: unknown,
+    b: unknown,
+    c: unknown,
+    d: unknown,
+  ): void {
+    switch (argc) {
       case 0: {
         (cb as () => void)();
 
         break;
       }
       case 1: {
-        (cb as (a: unknown) => void)(args[0]);
+        (cb as (a: unknown) => void)(a);
 
         break;
       }
       case 2: {
-        (cb as (a: unknown, b: unknown) => void)(args[0], args[1]);
+        (cb as (a: unknown, b: unknown) => void)(a, b);
 
         break;
       }
       case 3: {
-        (cb as (a: unknown, b: unknown, c: unknown) => void)(
-          args[0],
-          args[1],
-          args[2],
-        );
+        (cb as (a: unknown, b: unknown, c: unknown) => void)(a, b, c);
 
         break;
       }
       default: {
-        Function.prototype.apply.call(cb, undefined, args);
+        (cb as (a: unknown, b: unknown, c: unknown, d: unknown) => void)(
+          a,
+          b,
+          c,
+          d,
+        );
       }
     }
   }
@@ -223,7 +248,11 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
   #emitWithDepthTracking(
     set: Set<AnyCallback>,
     eventName: string,
-    args: unknown[],
+    argc: number,
+    a: unknown,
+    b: unknown,
+    c: unknown,
+    d: unknown,
   ): void {
     this.#depthMap ??= new Map();
     const depthMap = this.#depthMap;
@@ -242,7 +271,7 @@ export class EventEmitter<TEventMap extends Record<string, unknown[]>> {
 
       for (const cb of listeners) {
         try {
-          this.#callListener(cb, args);
+          this.#callListener(cb, argc, a, b, c, d);
         } catch (error) {
           if (error instanceof RecursionDepthError) {
             throw error;

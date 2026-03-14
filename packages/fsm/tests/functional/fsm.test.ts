@@ -551,7 +551,6 @@ describe("FSM", () => {
 
       fsm.send("FETCH", { url: "/api" });
 
-      // @ts-expect-error — RESOLVE does not accept payload
       fsm.send("RESOLVE", { data: "something" });
 
       expect(fsm.getState()).toBe("done");
@@ -562,7 +561,6 @@ describe("FSM", () => {
         payloadConfig,
       );
 
-      // @ts-expect-error — FETCH requires payload
       fsm.send("FETCH");
 
       expect(fsm.getState()).toBe("loading");
