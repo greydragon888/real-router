@@ -42,6 +42,11 @@ export class RouteLifecycleNamespace<
   >();
   readonly #canDeactivateFunctions = new Map<string, GuardFn>();
   readonly #canActivateFunctions = new Map<string, GuardFn>();
+  // Cached tuple — Maps never change reference, so this is stable
+  readonly #functionsTuple: [Map<string, GuardFn>, Map<string, GuardFn>] = [
+    this.#canDeactivateFunctions,
+    this.#canActivateFunctions,
+  ];
 
   readonly #registering = new Set<string>();
   readonly #definitionActivateGuardNames = new Set<string>();
@@ -249,7 +254,7 @@ export class RouteLifecycleNamespace<
    * @returns Tuple of [canDeactivateFunctions, canActivateFunctions] as Maps
    */
   getFunctions(): [Map<string, GuardFn>, Map<string, GuardFn>] {
-    return [this.#canDeactivateFunctions, this.#canActivateFunctions];
+    return this.#functionsTuple;
   }
 
   canNavigateTo(

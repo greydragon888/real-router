@@ -25,6 +25,9 @@ interface TransitionPath {
 const ROUTE_SEGMENT_SEPARATOR = ".";
 const EMPTY_INTERSECTION = "";
 const DEFAULT_ROUTE_NAME = "";
+const FROZEN_EMPTY_ARRAY: string[] = [];
+
+Object.freeze(FROZEN_EMPTY_ARRAY);
 
 /**
  * Builds a reversed copy of a string array.
@@ -332,7 +335,7 @@ function computeTransitionPath(
     return {
       intersection: EMPTY_INTERSECTION,
       toActivate: nameToIDs(toState.name),
-      toDeactivate: [],
+      toDeactivate: FROZEN_EMPTY_ARRAY,
     };
   }
 
@@ -368,14 +371,23 @@ function computeTransitionPath(
 
   // Optimization: Build deactivation list in reverse order directly
   // instead of slice(i).toReversed() which creates 2 arrays
-  const toDeactivate: string[] = [];
+  let toDeactivate: string[];
 
-  for (let j = fromStateIds.length - 1; j >= i; j--) {
-    toDeactivate.push(fromStateIds[j]);
+  if (i >= fromStateIds.length) {
+    toDeactivate = FROZEN_EMPTY_ARRAY;
+  } else if (i === 0 && fromStateIds.length === 1) {
+    // Single-segment route: reversed = original, reuse cached frozen array
+    toDeactivate = fromStateIds;
+  } else {
+    toDeactivate = [];
+
+    for (let j = fromStateIds.length - 1; j >= i; j--) {
+      toDeactivate.push(fromStateIds[j]);
+    }
   }
 
-  // Build activation list (forward order for proper initialization)
-  const toActivate = toStateIds.slice(i);
+  // Build activation list — reuse cached frozen array when using full list
+  const toActivate = i === 0 ? toStateIds : toStateIds.slice(i);
 
   // Determine intersection point (common ancestor)
   const intersection = i > 0 ? fromStateIds[i - 1] : EMPTY_INTERSECTION;
@@ -390,9 +402,9 @@ function computeTransitionPath(
 export function getTransitionPath(
   toState: State,
   fromState?: State,
-  opts?: { reload?: boolean },
+  reload?: boolean,
 ): TransitionPath {
-  if (opts?.reload) {
+  if (reload) {
     return computeTransitionPath(toState, fromState);
   }
 
