@@ -35,7 +35,6 @@ async function isolatedMeasure(
   const stats = await measure(
     function* () {
       yield {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function -- mitata measure() API requires setup fn at key [0]
         [0]() {},
         bench() {
           fn();

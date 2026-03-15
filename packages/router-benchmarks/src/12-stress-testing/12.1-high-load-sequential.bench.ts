@@ -1,9 +1,14 @@
 // packages/router-benchmarks/modules/12-stress-testing/12.1-high-load-sequential.bench.ts
 
-import { getRoutesApi } from "@real-router/core/api";
 import { bench } from "mitata";
 
-import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
+import {
+  createSimpleRouter,
+  createNestedRouter,
+  IS_ROUTER5,
+  IS_REAL_ROUTER,
+  getRoutesApi,
+} from "../helpers";
 
 // 12.1.1 Thousand sequential navigations between two routes
 {
@@ -112,33 +117,25 @@ import { createSimpleRouter, createNestedRouter, IS_ROUTER5 } from "../helpers";
 }
 
 // 12.1.8 Five thousand navigations to random routes
-if (IS_ROUTER5) {
+{
   const router = createSimpleRouter();
   const routes = Array.from({ length: 20 }, (_, i) => `route${i}`);
 
-  // Add 20 routes
-  for (const route of routes) {
-    // @ts-expect-error - use method from router5
-    router.add({ name: route, path: `/${route}` });
-  }
+  // Add 20 routes — API differs per router
+  if (IS_REAL_ROUTER) {
+    const routesApi = getRoutesApi!(router);
 
-  router.start("/");
-
-  bench("12.1.8 Five thousand navigations to random routes", () => {
-    for (let i = 0; i < 5000; i++) {
-      const randomRoute = routes[Math.floor(Math.random() * routes.length)];
-
-      router.navigate(randomRoute);
+    for (const route of routes) {
+      routesApi.add({ name: route, path: `/${route}` });
     }
-  }).gc("inner");
-} else {
-  const router = createSimpleRouter();
-  const routesApi = getRoutesApi(router);
-  const routes = Array.from({ length: 20 }, (_, i) => `route${i}`);
+  } else {
+    for (const route of routes) {
+      // router5: .add(), router6: .addRoute()
+      const addFn = IS_ROUTER5 ? "add" : "addRoute";
 
-  // Add 20 routes
-  for (const route of routes) {
-    routesApi.add({ name: route, path: `/${route}` });
+      // @ts-expect-error - router5/router6 method
+      router[addFn]({ name: route, path: `/${route}` });
+    }
   }
 
   router.start("/");

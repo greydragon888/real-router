@@ -9,7 +9,9 @@ import type {
   DefaultDependencies,
 } from "@real-router/core";
 
-/* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
+// API module for real-router (loaded from same source tree as createRouter)
+let realRouterApiModule: any = null;
+
 const routerModule = (() => {
   switch (ROUTER_NAME) {
     case "router5": {
@@ -19,21 +21,25 @@ const routerModule = (() => {
       return require("router6");
     }
     default: {
-      // IMPORTANT: Load compiled dist, not TypeScript source.
-      // tsx resolves workspace packages to src/*.ts, causing unfair benchmark comparison.
-      // Use absolute path to bypass Node 24 strict exports enforcement.
+      // Load from source so createRouter and API functions share the same
+      // internals WeakMap. The CJS dist bundles index.js and api.js separately,
+      // each with their own WeakMap — getPluginApi/getRoutesApi would fail.
       const path = require("node:path");
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- dynamic require returns `any`
-      const distPath: string = path.resolve(
+      const sourcePath: string = path.resolve(
         __dirname,
-        "../../node_modules/@real-router/core/dist/cjs/index.js",
+        "../../node_modules/@real-router/core/src/index.ts",
+      );
+      const sourceApiPath: string = path.resolve(
+        __dirname,
+        "../../node_modules/@real-router/core/src/api/index.ts",
       );
 
-      return require(distPath);
+      realRouterApiModule = require(sourceApiPath);
+
+      return require(sourcePath);
     }
   }
 })();
-/* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
 type CreateRouterFn = <Dependencies extends DefaultDependencies = object>(
   routes?: Route<Dependencies>[],
@@ -41,7 +47,6 @@ type CreateRouterFn = <Dependencies extends DefaultDependencies = object>(
   dependencies?: Dependencies,
 ) => Router<Dependencies>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 const originalCreateRouter: CreateRouterFn = routerModule.createRouter;
 
 /**
@@ -63,6 +68,22 @@ export const createRouter: CreateRouterFn = <
 };
 
 export type { Route, Router } from "@real-router/core";
+
+type PluginApiFn = (
+  router: Router,
+) => ReturnType<typeof import("@real-router/core/api").getPluginApi>;
+
+type RoutesApiFn = (
+  router: Router,
+) => ReturnType<typeof import("@real-router/core/api").getRoutesApi>;
+
+/** Get the PluginApi for a real-router instance. Returns null for router5/router6. */
+export const getPluginApi: PluginApiFn | null =
+  realRouterApiModule?.getPluginApi ?? null;
+
+/** Get the RoutesApi for a real-router instance. Returns null for router5/router6. */
+export const getRoutesApi: RoutesApiFn | null =
+  realRouterApiModule?.getRoutesApi ?? null;
 
 console.error(
   `Using router: ${ROUTER_NAME}${BENCH_NO_VALIDATE ? " (noValidate: true)" : ""}`,

@@ -2,7 +2,7 @@
 
 import { bench, do_not_optimize } from "mitata";
 
-import { createRouter } from "../helpers";
+import { createRouter, IS_REAL_ROUTER, getPluginApi } from "../helpers";
 
 import type { Route } from "../helpers";
 
@@ -16,46 +16,90 @@ const routes: Route[] = [
   { name: "about", path: "/about" },
 ];
 
+/**
+ * Unified matchPath — router5/router6 have it on the instance,
+ * real-router exposes it via getPluginApi().
+ */
+function createMatchPath(
+  router: ReturnType<typeof createRouter>,
+): (path: string) => unknown {
+  if (IS_REAL_ROUTER) {
+    const api = getPluginApi!(router);
+
+    return (path: string) => api.matchPath(path);
+  }
+
+  // router5/router6: direct method
+  return (path: string) =>
+    (router as unknown as { matchPath: (p: string) => unknown }).matchPath(
+      path,
+    );
+}
+
+/**
+ * Unified setRootPath — router5/router6 have it on the instance,
+ * real-router exposes it via getPluginApi().
+ */
+function createSetRootPath(
+  router: ReturnType<typeof createRouter>,
+): (path: string) => void {
+  if (IS_REAL_ROUTER) {
+    const api = getPluginApi!(router);
+
+    return (path: string) => api.setRootPath(path);
+  }
+
+  // router5/router6: direct method
+  return (path: string) =>
+    (router as unknown as { setRootPath: (p: string) => void }).setRootPath(
+      path,
+    );
+}
+
 // 7.3.1 Setting root path
 {
   const router = createRouter(routes);
+  const setRootPath = createSetRootPath(router);
   const paths = ["/app", "/application"];
   let index = 0;
 
   bench("7.3.1 Setting root path", () => {
-    router.setRootPath(paths[index++ % 2]);
+    setRootPath(paths[index++ % 2]);
   }).gc("inner");
 }
 
 // 7.3.2 Setting root path with nesting
 {
   const router = createRouter(routes);
+  const setRootPath = createSetRootPath(router);
   const paths = ["/app/v1/api", "/app/v2/api"];
   let index = 0;
 
   bench("7.3.2 Setting root path with nesting", () => {
-    router.setRootPath(paths[index++ % 2]);
+    setRootPath(paths[index++ % 2]);
   }).gc("inner");
 }
 
 // 7.3.3 Changing root path
 {
   const router = createRouter(routes);
+  const setRootPath = createSetRootPath(router);
   const paths = ["/app", "/new-app"];
   let index = 0;
 
-  router.setRootPath("/initial");
+  setRootPath("/initial");
 
   bench("7.3.3 Changing root path", () => {
-    router.setRootPath(paths[index++ % 2]);
+    setRootPath(paths[index++ % 2]);
   }).gc("inner");
 }
 
 // 7.3.4 Building paths after setRootPath
 {
   const router = createRouter(routes);
+  const setRootPath = createSetRootPath(router);
 
-  router.setRootPath("/app");
+  setRootPath("/app");
 
   bench(`7.3.4 Building paths after setRootPath (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
@@ -67,12 +111,14 @@ const routes: Route[] = [
 // 7.3.5 Matching paths after setRootPath
 {
   const router = createRouter(routes);
+  const setRootPath = createSetRootPath(router);
+  const matchPath = createMatchPath(router);
 
-  router.setRootPath("/app");
+  setRootPath("/app");
 
   bench(`7.3.5 Matching paths after setRootPath (×${BATCH})`, () => {
     for (let i = 0; i < BATCH; i++) {
-      do_not_optimize(router.matchPath("/app/about"));
+      do_not_optimize(matchPath("/app/about"));
     }
   }).gc("inner");
 }

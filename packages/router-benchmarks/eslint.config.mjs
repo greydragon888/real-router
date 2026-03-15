@@ -20,53 +20,54 @@ export default tsEslint.config(
   },
 
   // ============================================
-  // BENCHMARK FILES CONFIGURATION
+  // ALL BENCHMARK SOURCE FILES
   // ============================================
+  // All files in this package are benchmark infrastructure.
+  // The root config's section 14 (`**/router-benchmarks/src/**/*.ts`)
+  // does NOT match when running lint from within the package,
+  // so the local config must be self-sufficient.
   {
-    files: ["src/**/*.bench.ts"],
+    files: ["src/**/*.ts"],
     rules: {
-      // Benchmarks often define functions inline for performance testing
-      "unicorn/consistent-function-scoping": "off",
+      // --- Dynamic require() in router-adapter.ts ---
+      "@typescript-eslint/no-require-imports": "off",
+      "import-x/no-commonjs": "off",
 
-      // Benchmark tests may use variables without explicit void for clarity
-      "sonarjs/void-use": "off",
-
-      // Benchmarks test edge cases with unused collections
-      "sonarjs/no-unused-collection": "off",
-
-      // Allow dead stores in benchmarks (assignments for side effects)
-      "sonarjs/no-dead-store": "off",
-
-      // Allow pseudo-random for performance testing scenarios
-      "sonarjs/pseudo-random": "off",
-
-      // Duplicate strings are common in benchmark names/descriptions
-      "sonarjs/no-duplicate-string": "off",
-
-      // Promise rules - benchmarks may intentionally not return/catch promises
-      "promise/always-return": "off",
-      "promise/no-callback-in-promise": "off",
-      "promise/catch-or-return": "off",
-
-      // TypeScript - benchmarks may have unsafe operations for testing
-      "@typescript-eslint/no-unsafe-member-access": "off",
+      // --- any types for dynamically loaded router modules ---
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
       "@typescript-eslint/no-unsafe-return": "off",
+
+      // --- Benchmark-specific patterns ---
+      // Inline functions in bench blocks
+      "unicorn/consistent-function-scoping": "off",
+      // void router.navigate(...) fire-and-forget
+      "sonarjs/void-use": "off",
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      // Floating promises from router.navigate() / router.start()
       "@typescript-eslint/no-floating-promises": "off",
       "@typescript-eslint/no-misused-promises": "off",
       "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/no-confusing-void-expression": "off",
-
-      // Allow unused vars in benchmarks (testing different scenarios)
+      // Promise chains in bench runners
+      "promise/always-return": "off",
+      "promise/no-callback-in-promise": "off",
+      "promise/catch-or-return": "off",
+      // Benchmark test data and side-effect assignments
+      "sonarjs/no-unused-collection": "off",
+      "sonarjs/no-dead-store": "off",
+      "sonarjs/pseudo-random": "off",
+      // Duplicate strings in benchmark names/descriptions
+      "sonarjs/no-duplicate-string": "off",
+      // Unused vars from test setup
       "@typescript-eslint/no-unused-vars": "off",
       "sonarjs/no-unused-vars": "off",
-
-      // Explicit function return types not needed in benchmarks
+      // Return types not needed in benchmark helpers
       "@typescript-eslint/explicit-function-return-type": "off",
-
-      // Mixed return types in guards/middleware factories are intentional
       "sonarjs/function-return-type": "off",
+      // Empty function for mitata measure() API setup fixture
+      "@typescript-eslint/no-empty-function": "off",
     },
   },
 );
