@@ -80,12 +80,12 @@ describe("S3. Eager subscription leak detection", () => {
     expect(delta).toBeLessThan(MB);
   });
 
-  it("S3.3: 100 TransitionSource without destroy accumulates heap; heap recovers after destroy", async () => {
+  it("S3.3: 200 TransitionSource without destroy accumulates heap; heap recovers after destroy", async () => {
     const heapBeforeCreate = takeHeapSnapshot();
 
     const sources = createManySources(
       () => createTransitionSource(router),
-      100,
+      200,
     );
 
     const routes = ["users.list", "about", "admin.dashboard", "home"];

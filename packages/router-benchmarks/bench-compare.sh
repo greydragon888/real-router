@@ -320,10 +320,10 @@ echo -e "${YELLOW}[Step 4] Preparing...${NC}"
 mkdir -p "$RESULTS_DIR"
 cd "$SCRIPT_DIR"
 
-# Build real-router
-echo "Building @real-router/core..."
-pnpm --filter @real-router/core build >/dev/null 2>&1
-echo -e "${GREEN}@real-router/core built successfully${NC}"
+# Build real-router and all its dependencies (fsm, event-emitter, etc.)
+echo "Building @real-router/core and dependencies..."
+pnpm --filter @real-router/core... build >/dev/null 2>&1
+echo -e "${GREEN}@real-router/core and dependencies built successfully${NC}"
 
 # -----------------------------------------------------------------------------
 # Step 5: Run benchmarks (per-section isolated runs)

@@ -150,7 +150,12 @@ function checkMeasurement(name, routerName, rmeData, diff, type = "rrVsR6") {
 function getRmeWarning(benchmarkName, rmeValue) {
   if (rmeValue > 0.1) {
     const rmePercent = (rmeValue * 100).toFixed(1);
-    return `${YELLOW}⚠️ High RME (${rmePercent}%) for "${benchmarkName}" - comparison unreliable${RESET}`;
+
+    if (rmePercent > 100) {
+      return `${RED}⚠️ High RME (${rmePercent}%)`;
+    }
+
+    return `${YELLOW}⚠️ High RME (${rmePercent}%)`;
   }
   return null;
 }
