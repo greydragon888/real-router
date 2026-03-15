@@ -8,6 +8,16 @@ import type {
   State,
 } from "@real-router/types";
 
+export interface NavigationContext {
+  toState: State;
+  fromState: State | undefined;
+  opts: NavigationOptions;
+  toDeactivate: string[];
+  toActivate: string[];
+  intersection: string;
+  canDeactivateFunctions: Map<string, GuardFn>;
+}
+
 /**
  * Dependencies injected into NavigationNamespace.
  *

@@ -7,36 +7,25 @@ import {
   CACHED_SAME_STATES_ERROR,
   CACHED_SAME_STATES_REJECTION,
 } from "./constants";
-import {
-  handleGuardError,
-  routeTransitionError,
-} from "./transition/errorHandling";
-import { resolveRemainingGuards, runGuardPhase } from "./transition/guardPhase";
+import { completeTransition } from "./transition/completeTransition";
+import { routeTransitionError } from "./transition/errorHandling";
+import { executeGuardPipeline } from "./transition/guardPhase";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
   validateNavigationOptions,
 } from "./validators";
 import { errorCodes, constants } from "../../constants";
-import { freezeStateInPlace } from "../../helpers";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
-import type { NavigationDependencies } from "./types";
+import type { NavigationContext, NavigationDependencies } from "./types";
 import type {
-  GuardFn,
   NavigationOptions,
   Params,
   State,
   TransitionMeta,
 } from "@real-router/types";
-
-type MutableTransitionMeta = {
-  -readonly [K in keyof TransitionMeta]: TransitionMeta[K];
-};
-type MutableState = Omit<State, "transition"> & {
-  transition: MutableTransitionMeta;
-};
 
 const FROZEN_ACTIVATED: string[] = [constants.UNKNOWN_ROUTE];
 
@@ -54,11 +43,18 @@ function forceReplaceFromUnknown(
     : opts;
 }
 
-function stripSignal({
-  signal: _,
-  ...rest
-}: NavigationOptions): NavigationOptions {
-  return rest;
+function isSameNavigation(
+  fromState: State | undefined,
+  opts: NavigationOptions,
+  toState: State,
+  areStatesEqual: (a: State, b: State, ignoreQuery: boolean) => boolean,
+): boolean {
+  return (
+    !!fromState &&
+    !opts.reload &&
+    !opts.force &&
+    areStatesEqual(fromState, toState, false)
+  );
 }
 
 /**
@@ -109,7 +105,6 @@ export class NavigationNamespace {
   // Instance methods
   // =========================================================================
 
-  // eslint-disable-next-line sonarjs/cognitive-complexity -- inherent to optimistic sync/async branching
   navigate(
     name: string,
     params: Params,
@@ -148,12 +143,7 @@ export class NavigationNamespace {
       fromState = deps.getState();
       opts = forceReplaceFromUnknown(opts, fromState);
 
-      if (
-        fromState &&
-        !opts.reload &&
-        !opts.force &&
-        deps.areStatesEqual(fromState, toState, false)
-      ) {
+      if (isSameNavigation(fromState, opts, toState, deps.areStatesEqual)) {
         deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
         this.lastSyncRejected = true;
 
@@ -202,85 +192,37 @@ export class NavigationNamespace {
         const isCurrentNav = () =>
           this.#navigationId === myId && deps.isActive();
 
-        if (shouldDeactivate) {
-          const asyncResult = runGuardPhase(
-            canDeactivateFunctions,
-            toDeactivate,
-            errorCodes.CANNOT_DEACTIVATE,
-            toState,
-            fromState,
-            signal,
-            isCurrentNav,
+        const guardCompletion = executeGuardPipeline(
+          canDeactivateFunctions,
+          canActivateFunctions,
+          toDeactivate,
+          toActivate,
+          !!shouldDeactivate,
+          shouldActivate,
+          toState,
+          fromState,
+          signal,
+          isCurrentNav,
+        );
+
+        if (guardCompletion !== undefined) {
+          return this.#finishAsyncNavigation(
+            guardCompletion,
+            {
+              toState,
+              fromState,
+              opts,
+              toDeactivate,
+              toActivate,
+              intersection,
+              canDeactivateFunctions,
+            },
+            controller,
+            myId,
           );
-
-          if (asyncResult) {
-            return this.#continueAsyncNavigation(
-              asyncResult,
-              {
-                deactivate: toDeactivate.slice(asyncResult.remainingIndex),
-                activate: shouldActivate ? toActivate : [],
-              },
-              {
-                deactivate: canDeactivateFunctions,
-                activate: canActivateFunctions,
-              },
-              {
-                toState,
-                fromState,
-                opts,
-                toDeactivate,
-                toActivate,
-                intersection,
-              },
-
-              controller,
-              myId,
-            );
-          }
         }
 
-        if (this.#navigationId !== myId || !deps.isActive()) {
-          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-        }
-
-        if (shouldActivate) {
-          const asyncResult = runGuardPhase(
-            canActivateFunctions,
-            toActivate,
-            errorCodes.CANNOT_ACTIVATE,
-            toState,
-            fromState,
-            signal,
-            isCurrentNav,
-          );
-
-          if (asyncResult) {
-            return this.#continueAsyncNavigation(
-              asyncResult,
-              {
-                deactivate: [],
-                activate: toActivate.slice(asyncResult.remainingIndex),
-              },
-              {
-                deactivate: canDeactivateFunctions,
-                activate: canActivateFunctions,
-              },
-              {
-                toState,
-                fromState,
-                opts,
-                toDeactivate,
-                toActivate,
-                intersection,
-              },
-
-              controller,
-              myId,
-            );
-          }
-        }
-
-        if (this.#navigationId !== myId || !deps.isActive()) {
+        if (!isCurrentNav()) {
           throw new RouterError(errorCodes.TRANSITION_CANCELLED);
         }
 
@@ -290,7 +232,7 @@ export class NavigationNamespace {
       this.lastSyncResolved = true;
 
       return Promise.resolve(
-        this.#completeNavigation(
+        completeTransition(deps, {
           toState,
           fromState,
           opts,
@@ -298,16 +240,16 @@ export class NavigationNamespace {
           toActivate,
           intersection,
           canDeactivateFunctions,
-        ),
+        }),
       );
     } catch (error) {
-      if (controller) {
-        this.#cleanupController(controller);
-      }
-
-      if (transitionStarted && toState) {
-        routeTransitionError(deps, error, toState, fromState);
-      }
+      this.#handleNavigateError(
+        error,
+        controller,
+        transitionStarted,
+        toState,
+        fromState,
+      );
 
       return Promise.reject(error as Error);
     }
@@ -387,21 +329,9 @@ export class NavigationNamespace {
     this.#currentController = null;
   }
 
-  async #continueAsyncNavigation(
-    pending: { result: Promise<boolean>; errorCode: string; segment: string },
-    remaining: { deactivate: string[]; activate: string[] },
-    guards: {
-      deactivate: Map<string, GuardFn>;
-      activate: Map<string, GuardFn>;
-    },
-    nav: {
-      toState: State;
-      fromState: State | undefined;
-      opts: NavigationOptions;
-      toDeactivate: string[];
-      toActivate: string[];
-      intersection: string;
-    },
+  async #finishAsyncNavigation(
+    guardCompletion: Promise<void>,
+    nav: NavigationContext,
     controller: AbortController,
     myId: number,
   ): Promise<State> {
@@ -412,7 +342,6 @@ export class NavigationNamespace {
       deps.isActive();
 
     try {
-      // Link external signal to internal controller (deferred from sync path)
       if (nav.opts.signal) {
         if (nav.opts.signal.aborted) {
           throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
@@ -429,61 +358,13 @@ export class NavigationNamespace {
         );
       }
 
-      let result: boolean;
-
-      try {
-        result = await pending.result;
-      } catch (error: unknown) {
-        handleGuardError(error, pending.errorCode, pending.segment);
-
-        return undefined as never; // unreachable — handleGuardError returns never
-      }
-
-      if (!result) {
-        throw new RouterError(pending.errorCode, { segment: pending.segment });
-      }
-
-      if (remaining.deactivate.length > 0) {
-        await resolveRemainingGuards(
-          guards.deactivate,
-          remaining.deactivate,
-          errorCodes.CANNOT_DEACTIVATE,
-          nav.toState,
-          nav.fromState,
-          controller.signal,
-          isActive,
-        );
-      }
+      await guardCompletion;
 
       if (!isActive()) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED);
       }
 
-      if (remaining.activate.length > 0) {
-        await resolveRemainingGuards(
-          guards.activate,
-          remaining.activate,
-          errorCodes.CANNOT_ACTIVATE,
-          nav.toState,
-          nav.fromState,
-          controller.signal,
-          isActive,
-        );
-      }
-
-      if (!isActive()) {
-        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
-      }
-
-      return this.#completeNavigation(
-        nav.toState,
-        nav.fromState,
-        nav.opts,
-        nav.toDeactivate,
-        nav.toActivate,
-        nav.intersection,
-        guards.deactivate,
-      );
+      return completeTransition(deps, nav);
     } catch (error) {
       routeTransitionError(deps, error, nav.toState, nav.fromState);
 
@@ -493,71 +374,20 @@ export class NavigationNamespace {
     }
   }
 
-  #completeNavigation(
-    toState: State,
+  #handleNavigateError(
+    error: unknown,
+    controller: AbortController | null,
+    transitionStarted: boolean,
+    toState: State | undefined,
     fromState: State | undefined,
-    opts: NavigationOptions,
-    toDeactivate: string[],
-    toActivate: string[],
-    intersection: string,
-    canDeactivateFunctions: Map<string, GuardFn>,
-  ): State {
-    const deps = this.#deps;
-
-    if (
-      toState.name !== constants.UNKNOWN_ROUTE &&
-      !deps.hasRoute(toState.name)
-    ) {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: toState.name,
-      });
-
-      deps.sendTransitionFail(toState, fromState, err);
-
-      throw err;
+  ): void {
+    if (controller) {
+      this.#cleanupController(controller);
     }
 
-    if (fromState) {
-      for (const name of toDeactivate) {
-        if (!toActivate.includes(name) && canDeactivateFunctions.has(name)) {
-          deps.clearCanDeactivate(name);
-        }
-      }
+    if (transitionStarted && toState) {
+      routeTransitionError(this.#deps, error, toState, fromState);
     }
-
-    const mutableState = toState as MutableState;
-
-    mutableState.transition = {
-      phase: "activating",
-      reason: "success",
-      segments: {
-        deactivated: toDeactivate,
-        activated: toActivate,
-        intersection,
-      },
-    };
-
-    if (fromState?.name !== undefined) {
-      mutableState.transition.from = fromState.name;
-    }
-
-    if (opts.reload !== undefined) {
-      mutableState.transition.reload = opts.reload;
-    }
-
-    if (opts.redirected !== undefined) {
-      mutableState.transition.redirected = opts.redirected;
-    }
-
-    const finalState = freezeStateInPlace(toState);
-
-    deps.setState(finalState);
-
-    const transitionOpts = opts.signal === undefined ? opts : stripSignal(opts);
-
-    deps.sendTransitionDone(finalState, fromState, transitionOpts);
-
-    return finalState;
   }
 
   #cleanupController(controller: AbortController): void {

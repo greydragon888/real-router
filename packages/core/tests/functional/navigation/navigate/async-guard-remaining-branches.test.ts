@@ -74,7 +74,7 @@ describe("resolveRemainingGuards branches", () => {
     expect(pendingSyncGuard).toHaveBeenCalledTimes(1);
   });
 
-  it("should cancel when navigation superseded during remaining guard iteration", async () => {
+  it("should cancel when navigation superseded during remaining guard iteration (sync path)", async () => {
     vi.useFakeTimers();
 
     try {
@@ -108,6 +108,86 @@ describe("resolveRemainingGuards branches", () => {
 
       expect(ordersActivateGuard).toHaveBeenCalledTimes(1);
       expect(pendingActivateGuard).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("should cancel when navigation superseded after async guard resolves in same phase", async () => {
+    vi.useFakeTimers();
+
+    try {
+      await router.navigate("users.view", { id: 123 });
+
+      lifecycle.addDeactivateGuard(
+        "users.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 10),
+          ),
+      );
+      lifecycle.addDeactivateGuard("users", () => () => true);
+
+      const p1 = router.navigate("orders.pending");
+
+      void router.navigate("home");
+
+      await vi.runAllTimersAsync();
+
+      await expect(p1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("should complete when async deactivate resolves with no activate phase", async () => {
+    await router.navigate("users.view", { id: 123 });
+
+    lifecycle.addDeactivateGuard(
+      "users.view",
+      () => () => Promise.resolve(true),
+    );
+
+    const state = await router.navigate("users");
+
+    expect(state.name).toBe("users");
+  });
+
+  it("should cancel between async deactivate and activate phases", async () => {
+    vi.useFakeTimers();
+
+    try {
+      await router.navigate("users");
+
+      lifecycle.addDeactivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 10),
+          ),
+      );
+
+      const activateGuard = vi.fn().mockReturnValue(true);
+
+      lifecycle.addActivateGuard("orders", () => activateGuard);
+
+      const p1 = router.navigate("orders.pending");
+
+      void router.navigate("home");
+
+      await vi.runAllTimersAsync();
+
+      await expect(p1).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      expect(activateGuard).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
