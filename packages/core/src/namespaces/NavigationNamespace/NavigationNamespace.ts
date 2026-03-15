@@ -1,6 +1,13 @@
 import { logger } from "@real-router/logger";
 
 import {
+  CACHED_NOT_STARTED_REJECTION,
+  CACHED_ROUTE_NOT_FOUND_ERROR,
+  CACHED_ROUTE_NOT_FOUND_REJECTION,
+  CACHED_SAME_STATES_ERROR,
+  CACHED_SAME_STATES_REJECTION,
+} from "./constants";
+import {
   handleGuardError,
   routeTransitionError,
 } from "./transition/errorHandling";
@@ -65,6 +72,7 @@ function stripSignal({
  */
 export class NavigationNamespace {
   lastSyncResolved = false;
+  lastSyncRejected = false;
   #deps!: NavigationDependencies;
   #currentController: AbortController | null = null;
   #navigationId = 0;
@@ -109,24 +117,32 @@ export class NavigationNamespace {
   ): Promise<State> {
     this.lastSyncResolved = false;
     const deps = this.#deps;
+
+    // Fast-path sync rejections: cached error + cached Promise.reject
+    // No allocations, no throw/catch overhead, facade skips .catch() suppression
+    if (!deps.canNavigate()) {
+      this.lastSyncRejected = true;
+
+      return CACHED_NOT_STARTED_REJECTION;
+    }
+
     let toState: State | undefined;
     let fromState: State | undefined;
     let transitionStarted = false;
     let controller: AbortController | null = null;
 
     try {
-      if (!deps.canNavigate()) {
-        throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
-      }
-
       toState = deps.buildNavigateState(name, params);
 
       if (!toState) {
-        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
+        deps.emitTransitionError(
+          undefined,
+          deps.getState(),
+          CACHED_ROUTE_NOT_FOUND_ERROR,
+        );
+        this.lastSyncRejected = true;
 
-        deps.emitTransitionError(undefined, deps.getState(), err);
-
-        throw err;
+        return CACHED_ROUTE_NOT_FOUND_REJECTION;
       }
 
       fromState = deps.getState();
@@ -138,11 +154,10 @@ export class NavigationNamespace {
         !opts.force &&
         deps.areStatesEqual(fromState, toState, false)
       ) {
-        const err = new RouterError(errorCodes.SAME_STATES);
+        deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
+        this.lastSyncRejected = true;
 
-        deps.emitTransitionError(toState, fromState, err);
-
-        throw err;
+        return CACHED_SAME_STATES_REJECTION;
       }
 
       this.#abortPreviousNavigation();
@@ -170,7 +185,7 @@ export class NavigationNamespace {
       const { toDeactivate, toActivate, intersection } = getTransitionPath(
         toState,
         fromState,
-        opts.reload === undefined ? undefined : { reload: opts.reload },
+        opts.reload,
       );
 
       const shouldDeactivate =

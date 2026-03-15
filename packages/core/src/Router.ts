@@ -589,6 +589,9 @@ export class Router<
 
     if (this.#navigation.lastSyncResolved) {
       this.#navigation.lastSyncResolved = false;
+    } else if (this.#navigation.lastSyncRejected) {
+      // Cached rejection — already pre-suppressed at module load, skip .catch()
+      this.#navigation.lastSyncRejected = false;
     } else {
       Router.#suppressUnhandledRejection(promiseState);
     }
@@ -614,6 +617,8 @@ export class Router<
 
     if (this.#navigation.lastSyncResolved) {
       this.#navigation.lastSyncResolved = false;
+    } else if (this.#navigation.lastSyncRejected) {
+      this.#navigation.lastSyncRejected = false;
     } else {
       Router.#suppressUnhandledRejection(promiseState);
     }
