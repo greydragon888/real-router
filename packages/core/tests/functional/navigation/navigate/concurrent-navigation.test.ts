@@ -702,7 +702,7 @@ describe("router.navigate() - concurrent navigation", () => {
 
       // Deactivate "users.view" async → triggers #continueAsyncNavigation
       // Remaining activate: ["orders", "orders.view"] — both async
-      // Two iterations of drainGuardPhase while loop
+      // Two async guards resolved by resolveRemainingGuards loop
       lifecycle.addDeactivateGuard(
         "users.view",
         () => () =>

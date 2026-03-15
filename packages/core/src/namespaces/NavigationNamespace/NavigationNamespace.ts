@@ -11,7 +11,7 @@ import {
   handleGuardError,
   routeTransitionError,
 } from "./transition/errorHandling";
-import { drainGuardPhase, runGuardPhase } from "./transition/guardPhase";
+import { resolveRemainingGuards, runGuardPhase } from "./transition/guardPhase";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
@@ -444,7 +444,7 @@ export class NavigationNamespace {
       }
 
       if (remaining.deactivate.length > 0) {
-        await drainGuardPhase(
+        await resolveRemainingGuards(
           guards.deactivate,
           remaining.deactivate,
           errorCodes.CANNOT_DEACTIVATE,
@@ -460,7 +460,7 @@ export class NavigationNamespace {
       }
 
       if (remaining.activate.length > 0) {
-        await drainGuardPhase(
+        await resolveRemainingGuards(
           guards.activate,
           remaining.activate,
           errorCodes.CANNOT_ACTIVATE,

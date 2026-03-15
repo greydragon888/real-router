@@ -51,7 +51,27 @@ export function runGuardPhase(
   return undefined;
 }
 
-export async function drainGuardPhase(
+async function resolveAsyncGuard(
+  promise: Promise<boolean>,
+  errorCode: string,
+  segment: string,
+): Promise<void> {
+  let result: boolean;
+
+  try {
+    result = await promise;
+  } catch (error: unknown) {
+    handleGuardError(error, errorCode, segment);
+
+    return; // unreachable — handleGuardError returns never
+  }
+
+  if (!result) {
+    throw new RouterError(errorCode, { segment });
+  }
+}
+
+export async function resolveRemainingGuards(
   guards: Map<string, GuardFn>,
   segments: string[],
   errorCode: string,
@@ -60,46 +80,32 @@ export async function drainGuardPhase(
   signal: AbortSignal,
   isActive: () => boolean,
 ): Promise<void> {
-  let remaining = segments;
-  let detected = runGuardPhase(
-    guards,
-    remaining,
-    errorCode,
-    toState,
-    fromState,
-    signal,
-    isActive,
-  );
+  for (const segment of segments) {
+    if (!isActive()) {
+      throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+    }
 
-  while (detected) {
-    let val: boolean;
+    const guardFn = guards.get(segment);
+
+    if (!guardFn) {
+      continue;
+    }
+
+    let guardResult: boolean | Promise<boolean> = false;
 
     try {
-      val = await detected.result;
+      guardResult = guardFn(toState, fromState, signal);
     } catch (error: unknown) {
-      handleGuardError(error, detected.errorCode, detected.segment);
-
-      return; // unreachable — handleGuardError returns never
+      handleGuardError(error, errorCode, segment);
     }
 
-    if (!val) {
-      throw new RouterError(detected.errorCode, { segment: detected.segment });
+    if (guardResult instanceof Promise) {
+      await resolveAsyncGuard(guardResult, errorCode, segment);
+      continue;
     }
 
-    remaining = remaining.slice(detected.remainingIndex);
-
-    if (remaining.length === 0) {
-      break;
+    if (!guardResult) {
+      throw new RouterError(errorCode, { segment });
     }
-
-    detected = runGuardPhase(
-      guards,
-      remaining,
-      errorCode,
-      toState,
-      fromState,
-      signal,
-      isActive,
-    );
   }
 }
