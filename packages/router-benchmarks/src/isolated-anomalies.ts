@@ -8,7 +8,13 @@
 
 import { measure, do_not_optimize } from "mitata";
 
-import { createRouter, createSimpleRouter, ROUTER_NAME } from "./helpers";
+import {
+  createRouter,
+  createSimpleRouter,
+  ROUTER_NAME,
+  IS_REAL_ROUTER,
+  getPluginApi,
+} from "./helpers";
 
 import type { Route } from "./helpers";
 
@@ -24,6 +30,24 @@ const routes: Route[] = [
     children: [{ name: "profile", path: "/:id/profile" }],
   },
 ];
+
+// ─── Router API ─────────────────────────────────────────────────────────────
+
+function getMatchPath(
+  router: ReturnType<typeof createRouter>,
+): (path: string) => unknown {
+  if (IS_REAL_ROUTER) {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- getPluginApi is non-null when IS_REAL_ROUTER
+    const api = getPluginApi!(router);
+
+    return (path: string) => api.matchPath(path);
+  }
+
+  return (path: string) =>
+    (router as unknown as { matchPath: (p: string) => unknown }).matchPath(
+      path,
+    );
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -157,19 +181,20 @@ async function main(): Promise<void> {
   console.log("\n── 7.2.1 matchPath simple ──");
   {
     const router = createRouter(routes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.1 matchPath simple (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/about"));
+          do_not_optimize(matchPath("/about"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.1 matchPath simple (×1)", () => {
-      do_not_optimize(router.matchPath("/about"));
+      do_not_optimize(matchPath("/about"));
     });
   }
 
@@ -177,19 +202,20 @@ async function main(): Promise<void> {
   console.log("\n── 7.2.4 matchPath nested ──");
   {
     const router = createRouter(routes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.4 matchPath nested (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/users/123/profile"));
+          do_not_optimize(matchPath("/users/123/profile"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.4 matchPath nested (×1)", () => {
-      do_not_optimize(router.matchPath("/users/123/profile"));
+      do_not_optimize(matchPath("/users/123/profile"));
     });
   }
 
@@ -197,19 +223,20 @@ async function main(): Promise<void> {
   console.log("\n── 7.2.2 matchPath with parameters ──");
   {
     const router = createRouter(routes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.2 matchPath with params (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/users/123"));
+          do_not_optimize(matchPath("/users/123"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.2 matchPath with params (×1)", () => {
-      do_not_optimize(router.matchPath("/users/123"));
+      do_not_optimize(matchPath("/users/123"));
     });
   }
 
@@ -217,19 +244,20 @@ async function main(): Promise<void> {
   console.log("\n── 7.2.3 matchPath with query parameters ──");
   {
     const router = createRouter(routes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.3 matchPath with query params (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/about?search=test&page=1"));
+          do_not_optimize(matchPath("/about?search=test&page=1"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.3 matchPath with query params (×1)", () => {
-      do_not_optimize(router.matchPath("/about?search=test&page=1"));
+      do_not_optimize(matchPath("/about?search=test&page=1"));
     });
   }
 
@@ -239,19 +267,20 @@ async function main(): Promise<void> {
     const router = createRouter(routes, {
       urlParamsEncoding: "uriComponent",
     });
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.5 matchPath with param decoding (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/users/test%40example.com"));
+          do_not_optimize(matchPath("/users/test%40example.com"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.5 matchPath with param decoding (×1)", () => {
-      do_not_optimize(router.matchPath("/users/test%40example.com"));
+      do_not_optimize(matchPath("/users/test%40example.com"));
     });
   }
 
@@ -261,19 +290,20 @@ async function main(): Promise<void> {
     const router = createRouter(routes, {
       trailingSlash: "always",
     });
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.2.9 matchPath with trailing slash (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/about/"));
+          do_not_optimize(matchPath("/about/"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.2.9 matchPath with trailing slash (×1)", () => {
-      do_not_optimize(router.matchPath("/about/"));
+      do_not_optimize(matchPath("/about/"));
     });
   }
 
@@ -286,19 +316,20 @@ async function main(): Promise<void> {
       { name: "article", path: "/articles/:id?/:slug?" },
     ];
     const router = createRouter(optionalRoutes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.4.8 matchPath duplicate query params (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/?tag=1&tag=2&tag=3"));
+          do_not_optimize(matchPath("/?tag=1&tag=2&tag=3"));
         }
       },
       { gc: true },
     );
 
     await isolatedMeasure("7.4.8 matchPath duplicate query params (×1)", () => {
-      do_not_optimize(router.matchPath("/?tag=1&tag=2&tag=3"));
+      do_not_optimize(matchPath("/?tag=1&tag=2&tag=3"));
     });
   }
 
@@ -311,12 +342,13 @@ async function main(): Promise<void> {
       { name: "article", path: "/articles/:id?/:slug?" },
     ];
     const router = createRouter(optionalRoutes);
+    const matchPath = getMatchPath(router);
 
     await isolatedMeasure(
       "7.4.12 matchPath without optional params (×50)",
       () => {
         for (let i = 0; i < 50; i++) {
-          do_not_optimize(router.matchPath("/articles"));
+          do_not_optimize(matchPath("/articles"));
         }
       },
       { gc: true },
@@ -325,7 +357,7 @@ async function main(): Promise<void> {
     await isolatedMeasure(
       "7.4.12 matchPath without optional params (×1)",
       () => {
-        do_not_optimize(router.matchPath("/articles"));
+        do_not_optimize(matchPath("/articles"));
       },
     );
   }

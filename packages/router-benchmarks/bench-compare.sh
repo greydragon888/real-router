@@ -76,9 +76,11 @@ ORIGINAL_USER="${SUDO_USER:-$USER}"
 
 # =============================================================================
 # Router Configuration — toggle which routers to benchmark
+# Quick switch: change BASELINE to "router5" or "router6"
 # =============================================================================
-ENABLE_ROUTER5=false
-ENABLE_ROUTER6=true
+BASELINE=router5
+ENABLE_ROUTER5=$([[ "$BASELINE" == "router5" ]] && echo true || echo false)
+ENABLE_ROUTER6=$([[ "$BASELINE" == "router6" ]] && echo true || echo false)
 ENABLE_REAL_ROUTER=true
 ENABLE_NOVALIDATE=false
 # =============================================================================

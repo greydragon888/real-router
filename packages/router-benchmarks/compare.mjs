@@ -10,13 +10,13 @@ const BENCH_JSON_DIR = join(__dirname, ".bench");
 
 // Anomaly thresholds
 const ANOMALY_THRESHOLDS = {
-  // rr slower than r6 by this % is anomalous (they should be similar)
+  // rr slower than baseline by this % is anomalous
   rrVsR6Slowdown: 20,
   // noValidate slower than rr by this % is anomalous (should be faster or equal)
   nvVsRrSlowdown: 5,
-  // RME threshold for unstable measurements
-  rmeUnstable: 0.3,
-  rmeSuspicious: 0.5,
+  // RME threshold for unstable measurements (values are in percent, e.g., 5 = 5%)
+  rmeUnstable: 5,
+  rmeSuspicious: 10,
 };
 
 // Output capture for saving to file
@@ -145,18 +145,18 @@ function checkMeasurement(name, routerName, rmeData, diff, type = "rrVsR6") {
 }
 
 /**
- * Get RME warning if RME is high (> 10%)
+ * Get RME warning if RME is high (> 10%).
+ * rmeValue is already in percent (e.g., 0.5 means 0.5%, 10.0 means 10%).
  */
 function getRmeWarning(benchmarkName, rmeValue) {
-  if (rmeValue > 0.1) {
-    const rmePercent = (rmeValue * 100).toFixed(1);
-
-    if (rmePercent > 100) {
-      return `${RED}⚠️ High RME (${rmePercent}%)`;
-    }
-
-    return `${YELLOW}⚠️ High RME (${rmePercent}%)`;
+  if (rmeValue > 10) {
+    return `${RED}⚠️ High RME (${rmeValue.toFixed(1)}%)`;
   }
+
+  if (rmeValue > 5) {
+    return `${YELLOW}⚠️ High RME (${rmeValue.toFixed(1)}%)`;
+  }
+
   return null;
 }
 
@@ -1286,11 +1286,12 @@ function getLatestBenchmarkSet() {
         type: "pair",
       };
     }
-    // Duo: router6 and real-router only (no router5)
-    if (set["router6"] && set["real-router"]) {
+    // Duo: baseline router and real-router only
+    if (set[BASELINE_ROUTER] && set["real-router"]) {
       return {
-        baseline: set["router6"],
+        baseline: set[BASELINE_ROUTER],
         current: set["real-router"],
+        baselineLabel: BASELINE_ROUTER,
         type: "duo",
       };
     }
@@ -1336,7 +1337,12 @@ if (args.length === 0) {
   } else if (set.type === "triplet") {
     compareThreeBenchmarks(set.router5, set.router6, set.realRouter);
   } else if (set.type === "duo") {
-    compareTwoBenchmarks(set.baseline, set.current, "router6", "real-router");
+    compareTwoBenchmarks(
+      set.baseline,
+      set.current,
+      set.baselineLabel,
+      "real-router",
+    );
   } else {
     compareTwoBenchmarks(set.baseline, set.current);
   }
