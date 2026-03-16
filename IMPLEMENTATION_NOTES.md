@@ -808,13 +808,15 @@ Added `packages/router-benchmarks` workspace to `knip.json` with `entry: ["src/*
 
 **`canSend(event): boolean`** — O(1) check if event is valid in current state. Uses cached `#currentTransitions`.
 
-**`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Key format `${from}\0${event}` prevents collisions. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
+**`on(from, event, action): Unsubscribe`** — typed action for a specific `(from, event)` pair. Lazy `#actions` Map (`null` until first `on()`). Uses nested `Map<TStates, Map<TEvents, action>>` for O(1) lookup without string concatenation. Actions fire before `onTransition` listeners. Overwrite semantics (second `on()` for same pair replaces first).
+
+**`forceState(state)`** — direct state update without dispatching actions or notifying listeners. Used by router's navigate hot path to bypass `send()` overhead.
 
 **Null-slot listener pattern:** Unsubscribed listeners are set to `null` instead of spliced, preventing array reallocation. New listeners reuse null slots.
 
 **Listener count fast-path:** `#listenerCount` tracks active listeners. When zero, `send()` skips `TransitionInfo` object creation and listener iteration entirely.
 
-**Type-safe payloads via `TPayloadMap`:** A fourth generic parameter maps event names to payload types. Events not in the map accept no payload. Uses conditional rest parameters for zero-overhead at runtime.
+**Type-safe payloads via `TPayloadMap`:** A fourth generic parameter maps event names to payload types. Events not in the map accept no payload. Uses optional `payload?` parameter (not rest params — V8 always allocates an array for rest params even when empty).
 
 ### Reentrancy
 
@@ -1224,16 +1226,18 @@ After each navigation, `state.transition` contains `TransitionMeta` with:
 
 #### FSM-Driven Event Flow
 
-All router events are consequences of FSM transitions via `fsm.on(from, event, action)`:
+Router events originate from FSM state changes. The navigate hot path uses `forceState()` for direct state updates + manual emit (bypassing `send()` dispatch overhead):
 
 ```
-navigate() → routerFSM.send("NAVIGATE") → emitTransitionStart()
-           → [transition pipeline]
-           → routerFSM.send("COMPLETE") → emitTransitionSuccess()
+navigate() → fsm.forceState(TRANSITIONING) + emitTransitionStart()
+           → [guard pipeline — optimistic sync execution]
+           → fsm.forceState(READY) + emitTransitionSuccess()
 
 stop()    → routerFSM.send("CANCEL")  → emitTransitionCancel()  (if transitioning)
           → routerFSM.send("STOP")    → emitRouterStop()
 ```
+
+Non-navigate transitions (start, stop, dispose) still use `send()` with FSM actions via `fsm.on()`.
 
 **Key change vs master:** `invokeEventListeners` lambdas replaced by typed FSM actions. No manual flag management (`#started`, `#active`, `#navigating` booleans removed).
 

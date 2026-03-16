@@ -45,18 +45,20 @@ Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is
 | Metric             | Improvement                              |
 | ------------------ | ---------------------------------------- |
 | Navigation         | 2–3x faster                              |
-| URL building       | 20–30x faster                            |
-| Memory allocations | 3x fewer                                 |
+| URL building       | 7–16x faster                             |
+| URL matching       | 3–5x faster                              |
+| Memory allocations | 3–5x fewer                               |
 | Scaling            | O(1) vs O(n) — up to 12x at 1000+ routes |
 
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
-| Metric             | Improvement                           |
-| ------------------ | ------------------------------------- |
-| Navigation         | 2x faster                             |
-| URL building       | 5–10x faster                          |
-| Memory allocations | 1.5x fewer                            |
-| Scaling            | Both O(1) — stable at any route count |
+| Metric             | Improvement                        |
+| ------------------ |------------------------------------|
+| Navigation         | ~2x faster                         |
+| URL building       | 3–7x faster                        |
+| URL matching       | ~2x faster                         |
+| Memory allocations | 5–6x fewer                         |
+| Scaling            | Both O(1) — up to 5x on deep trees |
 
 ### Reliability
 
