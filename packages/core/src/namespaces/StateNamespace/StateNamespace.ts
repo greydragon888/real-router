@@ -86,7 +86,7 @@ export class StateNamespace {
   get<P extends Params = Params, MP extends Params = Params>():
     | State<P, MP>
     | undefined {
-    return this.#frozenState as State<P, MP> | undefined;
+    return this.#frozenState as State<P, MP> | undefined; // NOSONAR -- generic narrowing needed for public API
   }
 
   /**
@@ -109,10 +109,8 @@ export class StateNamespace {
   /**
    * Returns the previous router state (before the last navigation).
    */
-  getPrevious<P extends Params = Params, MP extends Params = Params>():
-    | State<P, MP>
-    | undefined {
-    return this.#previousState as State<P, MP> | undefined;
+  getPrevious(): State | undefined {
+    return this.#previousState;
   }
 
   reset(): void {
@@ -200,7 +198,7 @@ export class StateNamespace {
     }
 
     if (ignoreQueryParams) {
-      const stateMeta = (state1.meta?.params ?? state2.meta?.params) as
+      const stateMeta = (state1.meta?.params ?? state2.meta?.params) as  // NOSONAR -- narrowing from Params to RouteTreeStateMeta
         | RouteTreeStateMeta
         | undefined;
 

@@ -284,11 +284,8 @@ function getTargetParams<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
 ): Set<string> {
   if (existsInTree) {
-    const toSegments = getSegmentsByName(tree, targetRoute);
-
-    // toSegments won't be null since we checked existsInTree
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    return getRequiredParams(toSegments!);
+    /* v8 ignore next -- @preserve: ?? fallback unreachable — existsInTree guarantees non-null */
+    return getRequiredParams(getSegmentsByName(tree, targetRoute) ?? []);
   }
 
   // Target is in batch
