@@ -111,7 +111,7 @@ describe("RouterProvider - Integration Tests", () => {
 
       expect(() => {
         render(<ComponentWithoutProvider />);
-      }).toThrowError("useRouter must be used within a RouterProvider");
+      }).toThrow("useRouter must be used within a RouterProvider");
 
       consoleSpy.mockRestore();
     });

@@ -551,7 +551,7 @@ describe("navigateToDefault", () => {
       // Options are deep-frozen, so mutation throws TypeError
       expect(() => {
         defaultParams.mutable = "changed";
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Verify the router still has original values
       expect(getPluginApi(router).getOptions().defaultParams).toStrictEqual({
@@ -656,7 +656,7 @@ describe("navigateToDefault", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigateToDefault(invalidArg);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -910,25 +910,25 @@ describe("navigateToDefault", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigateToDefault("invalid");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigateToDefault("invalid");
-      }).toThrowError(/Invalid options/);
+      }).toThrow(/Invalid options/);
     });
 
     it("should throw TypeError for invalid options type (number)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigateToDefault(123);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid option field types", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigateToDefault({ replace: "true" });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should accept valid NavigationOptions", () => {
@@ -936,13 +936,13 @@ describe("navigateToDefault", () => {
         router
           .navigateToDefault({ replace: true, reload: false })
           .catch(() => {});
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
         router.navigateToDefault({}).catch(() => {});
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should include method name in error message", () => {
@@ -951,8 +951,8 @@ describe("navigateToDefault", () => {
         void router.navigateToDefault({ reload: "yes" });
       };
 
-      expect(action).toThrowError(TypeError);
-      expect(action).toThrowError(/\[router\.navigateToDefault\]/);
+      expect(action).toThrow(TypeError);
+      expect(action).toThrow(/\[router\.navigateToDefault\]/);
     });
   });
 });

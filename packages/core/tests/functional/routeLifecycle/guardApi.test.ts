@@ -102,7 +102,7 @@ describe("core/route-lifecycle/guard-api", () => {
 
       expect(() => {
         getLifecycleApi(noValidateRouter).removeActivateGuard("admin");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -125,7 +125,7 @@ describe("core/route-lifecycle/guard-api", () => {
 
       expect(() => {
         getLifecycleApi(noValidateRouter).removeDeactivateGuard("admin");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 

@@ -190,7 +190,7 @@ describe("Logger Configuration Properties", () => {
       // Check that error is thrown
       expect(() => {
         logger.configure({ level: invalidLevel as LogLevelConfig });
-      }).toThrowError(/Invalid log level/);
+      }).toThrow(/Invalid log level/);
     });
   });
 

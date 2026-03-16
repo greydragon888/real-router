@@ -161,7 +161,7 @@ describe("EventEmitter Property-Based Tests", () => {
           unsub();
           unsub();
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         emitter.emit(eventName, data);
 
@@ -180,7 +180,7 @@ describe("EventEmitter Property-Based Tests", () => {
         expect(() => {
           emitter.off(eventName, listener.fn);
           emitter.off(eventName, listener.fn);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         emitter.emit(eventName, data);
 
@@ -344,7 +344,7 @@ describe("EventEmitter Property-Based Tests", () => {
 
         expect(() => {
           emitter.emit(eventName, data);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         expect(emitter.listenerCount(eventName)).toBe(0);
       },
@@ -389,7 +389,7 @@ describe("EventEmitter Property-Based Tests", () => {
 
         expect(() => {
           emitter.on(eventName, listener.fn);
-        }).toThrowError("Duplicate listener");
+        }).toThrow("Duplicate listener");
       },
     );
 
@@ -405,7 +405,7 @@ describe("EventEmitter Property-Based Tests", () => {
 
         expect(() => {
           emitter.on(eventB, listener.fn);
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });
@@ -471,7 +471,7 @@ describe("EventEmitter Property-Based Tests", () => {
 
         expect(() => {
           emitter.on(eventName, listeners[maxListeners].fn);
-        }).toThrowError("Listener limit");
+        }).toThrow("Listener limit");
       },
     );
   });
@@ -484,7 +484,7 @@ describe("EventEmitter Property-Based Tests", () => {
       (value, eventName) => {
         expect(() => {
           EventEmitter.validateCallback(value, eventName);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });

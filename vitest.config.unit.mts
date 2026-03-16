@@ -79,7 +79,7 @@ export default mergeConfig(
       /**
        * Reporter configuration
        */
-      reporters: ["dot"],
+      reporters: process.env.CI ? ["dot", "github-actions"] : ["dot"],
 
       /**
        * Test filtering
@@ -101,6 +101,30 @@ export default mergeConfig(
         "coverage",
         "**/tests/property/**/*.properties.{ts,tsx}",
         "**/tests/benchmarks/**/*.bench.{ts,tsx}",
+      ],
+
+      /**
+       * Test tags
+       * @see https://vitest.dev/guide/filtering#test-tags
+       */
+      tags: [
+        {
+          name: "slow",
+          description: "Тесты >5с (navigation stress, concurrent guards)",
+          timeout: 60_000,
+        },
+        {
+          name: "performance",
+          description: "Тесты производительности navigate(), matchPath()",
+          timeout: 60_000,
+        },
+        {
+          name: "flaky",
+          description: "Нестабильные тесты в CI",
+          retry: process.env.CI ? 3 : 0,
+          timeout: 30_000,
+          priority: 1,
+        },
       ],
 
       /**

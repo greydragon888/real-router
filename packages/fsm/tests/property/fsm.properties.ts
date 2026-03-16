@@ -421,7 +421,7 @@ describe("FSM Edge Case Properties", () => {
       throw new Error("boom");
     });
 
-    expect(() => fsm.send(gen.knownEvent)).toThrowError("boom");
+    expect(() => fsm.send(gen.knownEvent)).toThrow("boom");
     expect(fsm.getState()).toBe(gen.knownTo);
   });
 

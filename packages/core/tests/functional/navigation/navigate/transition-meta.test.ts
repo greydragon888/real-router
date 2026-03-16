@@ -132,7 +132,7 @@ describe("router.navigate() - TransitionMeta on state.transition", () => {
 
   describe("blocked navigation", () => {
     it("should not update state when guard blocks navigation", async () => {
-      await expect(router.navigate("admin-protected")).rejects.toThrowError();
+      await expect(router.navigate("admin-protected")).rejects.toThrow();
 
       expect(router.getState()?.name).toBe("home");
     });

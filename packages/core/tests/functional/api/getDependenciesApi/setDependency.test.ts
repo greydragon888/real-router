@@ -53,17 +53,17 @@ describe("core/dependencies/setDependency", () => {
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       deps.set(null, undefined);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       deps.set(123, undefined);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     expect(() => {
       // @ts-expect-error: testing invalid key with undefined
       deps.set({}, undefined);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   it("should allow conditional setup with undefined", () => {
@@ -81,29 +81,29 @@ describe("core/dependencies/setDependency", () => {
     expect(() => {
       // @ts-expect-error: testing number key
       deps.set(123, "value");
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing number key
       deps.set(123, "value");
-    }).toThrowError("dependency name must be a string, got number");
+    }).toThrow("dependency name must be a string, got number");
   });
 
   it("should throw TypeError for null key", () => {
     expect(() => {
       // @ts-expect-error: testing null key
       deps.set(null, "value");
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing null key
       deps.set(null, "value");
-    }).toThrowError("dependency name must be a string, got object");
+    }).toThrow("dependency name must be a string, got object");
   });
 
   it("should throw TypeError for object key", () => {
     expect(() => {
       // @ts-expect-error: testing object key
       deps.set({}, "value");
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   // 🟡 IMPORTANT: Warning on overwrite

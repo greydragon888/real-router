@@ -41,22 +41,22 @@ describe("core/dependencies/setDependencies", () => {
     expect(() => {
       // @ts-expect-error: testing null
       deps.setAll(null);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing null
       deps.setAll(null);
-    }).toThrowError("expected plain object, received null");
+    }).toThrow("expected plain object, received null");
   });
 
   it("should reject arrays with TypeError", () => {
     expect(() => {
       // @ts-expect-error: testing array
       deps.setAll([]);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing array
       deps.setAll(["dep1", "dep2"]);
-    }).toThrowError(/expected plain object.*array/i);
+    }).toThrow(/expected plain object.*array/i);
   });
 
   it("should reject class instances with TypeError", () => {
@@ -68,22 +68,22 @@ describe("core/dependencies/setDependencies", () => {
     expect(() => {
       // @ts-expect-error: testing class instance
       deps.setAll(instance);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing class instance
       deps.setAll(instance);
-    }).toThrowError(/expected plain object.*myclass/i);
+    }).toThrow(/expected plain object.*myclass/i);
   });
 
   it("should reject Date objects with TypeError", () => {
     expect(() => {
       // @ts-expect-error: testing Date
       deps.setAll(new Date());
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing Date
       deps.setAll(new Date());
-    }).toThrowError(/expected plain object.*date/i);
+    }).toThrow(/expected plain object.*date/i);
   });
 
   // 🔴 CRITICAL: Getters prohibition
@@ -99,11 +99,11 @@ describe("core/dependencies/setDependencies", () => {
     expect(() => {
       // @ts-expect-error: testing getter
       deps.setAll(withGetter);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       // @ts-expect-error: testing getter
       deps.setAll(withGetter);
-    }).toThrowError(/getters not allowed.*computed/i);
+    }).toThrow(/getters not allowed.*computed/i);
   });
 
   it("should not invoke getters during validation", () => {
@@ -121,7 +121,7 @@ describe("core/dependencies/setDependencies", () => {
     expect(() => {
       // @ts-expect-error: testing getter
       deps.setAll(malicious);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // Getter should not have been invoked
     expect(getterCalled).toBe(false);
@@ -141,7 +141,7 @@ describe("core/dependencies/setDependencies", () => {
 
     expect(() => {
       deps.setAll(withGetter);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // State should remain unchanged
     expect(deps.get("foo")).toBe(1);
@@ -209,7 +209,7 @@ describe("core/dependencies/setDependencies", () => {
 
     // Symbol key should be ignored
     // @ts-expect-error: testing symbol access
-    expect(() => deps.get(symbolKey)).toThrowError();
+    expect(() => deps.get(symbolKey)).toThrow();
   });
 
   // 🟢 DESIRABLE: Empty object

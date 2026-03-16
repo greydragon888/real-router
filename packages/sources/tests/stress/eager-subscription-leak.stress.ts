@@ -9,6 +9,7 @@ import {
 import {
   createStressRouter,
   takeHeapSnapshot,
+  forceGC,
   createManySources,
   MB,
 } from "./helpers";
@@ -51,6 +52,10 @@ describe("S3. Eager subscription leak detection", () => {
 
     sources.length = 0;
 
+    // Extra GC passes: one pass inside takeHeapSnapshot is not always enough
+    // for V8 to fully reclaim generational heap across 200 destroyed sources
+    forceGC();
+    forceGC();
     const heapAfterDestroy = takeHeapSnapshot();
 
     expect(heapAfterDestroy).toBeLessThan(heapWithLiveSources);
@@ -104,6 +109,9 @@ describe("S3. Eager subscription leak detection", () => {
 
     sources.length = 0;
 
+    // Extra GC passes: same fix as S3.1
+    forceGC();
+    forceGC();
     const heapAfterDestroy = takeHeapSnapshot();
 
     expect(heapAfterDestroy).toBeLessThan(heapWithLiveSources);

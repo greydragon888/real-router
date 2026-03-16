@@ -22,8 +22,8 @@ describe("getDependenciesApi", () => {
 
   describe("invalid router", () => {
     it("should throw TypeError for non-router object", () => {
-      expect(() => getDependenciesApi({} as Router)).toThrowError(TypeError);
-      expect(() => getDependenciesApi({} as Router)).toThrowError(
+      expect(() => getDependenciesApi({} as Router)).toThrow(TypeError);
+      expect(() => getDependenciesApi({} as Router)).toThrow(
         "not found in internals registry",
       );
     });
@@ -35,7 +35,7 @@ describe("getDependenciesApi", () => {
     });
 
     it("should throw ReferenceError for missing dependency", () => {
-      expect(() => deps.get("bar")).toThrowError(ReferenceError);
+      expect(() => deps.get("bar")).toThrow(ReferenceError);
     });
   });
 
@@ -65,7 +65,7 @@ describe("getDependenciesApi", () => {
       expect(() => {
         // @ts-expect-error: testing invalid key type
         deps.set(123, "value");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -81,7 +81,7 @@ describe("getDependenciesApi", () => {
       expect(() => {
         // @ts-expect-error: testing invalid input
         deps.setAll([]);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -118,16 +118,16 @@ describe("getDependenciesApi", () => {
 
       expect(() => {
         depsAfterDispose.set("bar", "x");
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
       expect(() => {
         depsAfterDispose.setAll({ foo: 2 });
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
       expect(() => {
         depsAfterDispose.remove("foo");
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
       expect(() => {
         depsAfterDispose.reset();
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
     it("should still allow read-only methods after dispose", () => {

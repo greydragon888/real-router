@@ -183,7 +183,7 @@ describe("router.navigate() - edge cases params", () => {
             { id: Number.NaN as unknown as number },
             {},
           ),
-        ).rejects.toThrowError(TypeError);
+        ).rejects.toThrow(TypeError);
       });
 
       it("should reject Infinity in params (not serializable)", async () => {
@@ -194,7 +194,7 @@ describe("router.navigate() - edge cases params", () => {
             { id: Infinity as unknown as number },
             {},
           ),
-        ).rejects.toThrowError(TypeError);
+        ).rejects.toThrow(TypeError);
       });
 
       it("should reject -Infinity in params (not serializable)", async () => {
@@ -204,7 +204,7 @@ describe("router.navigate() - edge cases params", () => {
             { id: -Infinity as unknown as number },
             {},
           ),
-        ).rejects.toThrowError(TypeError);
+        ).rejects.toThrow(TypeError);
       });
 
       it("should handle -0 in params (finite, converts to '0')", async () => {

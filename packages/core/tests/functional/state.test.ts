@@ -282,7 +282,7 @@ describe("core/stateBuilder", () => {
 
       expect(() =>
         getPluginApi(testRouter).forwardState("cycle-a", {}),
-      ).toThrowError(/Circular forwardTo/);
+      ).toThrow(/Circular forwardTo/);
 
       testRouter.stop();
     });
@@ -338,9 +338,9 @@ describe("core/stateBuilder", () => {
         forwardTo: () => "nonexistent",
       });
 
-      expect(() =>
-        getPluginApi(router).forwardState("bad-fn", {}),
-      ).toThrowError(/does not exist/);
+      expect(() => getPluginApi(router).forwardState("bad-fn", {})).toThrow(
+        /does not exist/,
+      );
     });
 
     it("should bubble errors from forwardTo callback naturally", () => {
@@ -352,9 +352,9 @@ describe("core/stateBuilder", () => {
         },
       });
 
-      expect(() =>
-        getPluginApi(router).forwardState("error-fn", {}),
-      ).toThrowError("Custom callback error");
+      expect(() => getPluginApi(router).forwardState("error-fn", {})).toThrow(
+        "Custom callback error",
+      );
     });
 
     it("should throw TypeError for non-string return from callback", () => {
@@ -364,9 +364,9 @@ describe("core/stateBuilder", () => {
         forwardTo: (() => 123) as any,
       });
 
-      expect(() =>
-        getPluginApi(router).forwardState("bad-return", {}),
-      ).toThrowError(TypeError);
+      expect(() => getPluginApi(router).forwardState("bad-return", {})).toThrow(
+        TypeError,
+      );
     });
 
     it("should throw when exceeding max depth (100 hops)", () => {
@@ -389,7 +389,7 @@ describe("core/stateBuilder", () => {
 
       routesApi.add(routes);
 
-      expect(() => getPluginApi(router).forwardState("hop-0", {})).toThrowError(
+      expect(() => getPluginApi(router).forwardState("hop-0", {})).toThrow(
         /exceeds maximum depth/,
       );
     });
@@ -449,9 +449,9 @@ describe("core/stateBuilder", () => {
         forwardTo: () => "self-fn",
       });
 
-      expect(() =>
-        getPluginApi(router).forwardState("self-fn", {}),
-      ).toThrowError(/Circular forwardTo/);
+      expect(() => getPluginApi(router).forwardState("self-fn", {})).toThrow(
+        /Circular forwardTo/,
+      );
     });
 
     it("should throw for empty string returned from callback", () => {
@@ -463,7 +463,7 @@ describe("core/stateBuilder", () => {
 
       expect(() =>
         getPluginApi(router).forwardState("empty-return", {}),
-      ).toThrowError(/does not exist/);
+      ).toThrow(/does not exist/);
     });
 
     it("should not affect pure static forward chains", () => {

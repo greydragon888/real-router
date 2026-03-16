@@ -318,7 +318,7 @@ describe("destroy", () => {
         for (let i = 0; i < destroyCount; i++) {
           source.destroy();
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.stop();
     },
@@ -377,7 +377,7 @@ describe("destroy", () => {
 
       expect(() => {
         unsubscribe();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.stop();
     },

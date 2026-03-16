@@ -136,12 +136,12 @@ describe("router.navigate() - error context", () => {
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
         new RouterError(errorCodes.TRANSITION_ERR, { code: 500 } as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
         new RouterError(errorCodes.TRANSITION_ERR, { code: 500 } as any);
-      }).toThrowError(/Cannot set reserved property "code"/);
+      }).toThrow(/Cannot set reserved property "code"/);
     });
 
     // Test 2: Constructor should throw for "segment" if passed as custom field
@@ -160,7 +160,7 @@ describe("router.navigate() - error context", () => {
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
         new RouterError(errorCodes.TRANSITION_ERR, badOptions as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     // Test 3: setAdditionalFields already throws for reserved properties (consistency check)
@@ -169,21 +169,21 @@ describe("router.navigate() - error context", () => {
 
       expect(() => {
         err.setAdditionalFields({ code: "OVERWRITE" });
-      }).toThrowError(/Cannot set reserved property "code"/);
+      }).toThrow(/Cannot set reserved property "code"/);
 
       expect(() => {
         err.setAdditionalFields({ segment: "overwrite" });
-      }).toThrowError(/Cannot set reserved property "segment"/);
+      }).toThrow(/Cannot set reserved property "segment"/);
 
       expect(() => {
         err.setAdditionalFields({ path: "/overwrite" });
-      }).toThrowError(/Cannot set reserved property "path"/);
+      }).toThrow(/Cannot set reserved property "path"/);
 
       expect(() => {
         err.setAdditionalFields({
           redirect: { name: "x", params: {}, path: "/" },
         });
-      }).toThrowError(/Cannot set reserved property "redirect"/);
+      }).toThrow(/Cannot set reserved property "redirect"/);
     });
 
     // Test 4: Non-reserved custom properties should work in constructor
@@ -219,7 +219,7 @@ describe("router.navigate() - error context", () => {
       expect(() => {
         // eslint-disable-next-line sonarjs/constructor-for-side-effects, sonarjs/no-unthrown-error
         new RouterError(errorCodes.CANNOT_ACTIVATE, { code: 500 } as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 });

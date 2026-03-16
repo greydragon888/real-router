@@ -29,58 +29,54 @@ describe("typeGuards", () => {
     });
 
     it("should throw TypeError for non-object config (null)", () => {
-      expect(() => isLoggerConfig(null)).toThrowError(TypeError);
-      expect(() => isLoggerConfig(null)).toThrowError(
+      expect(() => isLoggerConfig(null)).toThrow(TypeError);
+      expect(() => isLoggerConfig(null)).toThrow(
         "Logger config must be an object",
       );
     });
 
     it("should throw TypeError for non-object config (primitive)", () => {
-      expect(() => isLoggerConfig("string")).toThrowError(TypeError);
-      expect(() => isLoggerConfig(123)).toThrowError(TypeError);
-      expect(() => isLoggerConfig(true)).toThrowError(TypeError);
-      expect(() => isLoggerConfig(undefined)).toThrowError(TypeError);
+      expect(() => isLoggerConfig("string")).toThrow(TypeError);
+      expect(() => isLoggerConfig(123)).toThrow(TypeError);
+      expect(() => isLoggerConfig(true)).toThrow(TypeError);
+      expect(() => isLoggerConfig(undefined)).toThrow(TypeError);
     });
 
     it("should throw TypeError for unknown property", () => {
-      expect(() => isLoggerConfig({ unknown: "value" })).toThrowError(
-        TypeError,
-      );
-      expect(() => isLoggerConfig({ unknown: "value" })).toThrowError(
+      expect(() => isLoggerConfig({ unknown: "value" })).toThrow(TypeError);
+      expect(() => isLoggerConfig({ unknown: "value" })).toThrow(
         'Unknown logger config property: "unknown"',
       );
     });
 
     it("should throw TypeError for invalid level - number", () => {
-      expect(() => isLoggerConfig({ level: 123 })).toThrowError(TypeError);
-      expect(() => isLoggerConfig({ level: 123 })).toThrowError(
+      expect(() => isLoggerConfig({ level: 123 })).toThrow(TypeError);
+      expect(() => isLoggerConfig({ level: 123 })).toThrow(
         "Invalid logger level",
       );
     });
 
     it("should throw TypeError for invalid level - string not in set (line 60)", () => {
-      expect(() => isLoggerConfig({ level: "invalid" })).toThrowError(
-        TypeError,
-      );
-      expect(() => isLoggerConfig({ level: "invalid" })).toThrowError(
+      expect(() => isLoggerConfig({ level: "invalid" })).toThrow(TypeError);
+      expect(() => isLoggerConfig({ level: "invalid" })).toThrow(
         "Invalid logger level",
       );
     });
 
     it("should throw TypeError for invalid level - object (formatValue branch line 36)", () => {
-      expect(() => isLoggerConfig({ level: { nested: true } })).toThrowError(
+      expect(() => isLoggerConfig({ level: { nested: true } })).toThrow(
         TypeError,
       );
-      expect(() => isLoggerConfig({ level: { nested: true } })).toThrowError(
+      expect(() => isLoggerConfig({ level: { nested: true } })).toThrow(
         'Invalid logger level: {"nested":true}',
       );
     });
 
     it("should throw TypeError for callback that is not a function", () => {
-      expect(() => isLoggerConfig({ callback: "not-a-function" })).toThrowError(
+      expect(() => isLoggerConfig({ callback: "not-a-function" })).toThrow(
         TypeError,
       );
-      expect(() => isLoggerConfig({ callback: "not-a-function" })).toThrowError(
+      expect(() => isLoggerConfig({ callback: "not-a-function" })).toThrow(
         "Logger callback must be a function",
       );
     });
@@ -98,10 +94,8 @@ describe("typeGuards", () => {
       // Using Symbol which is neither string nor object
       const symbolLevel = Symbol("test");
 
-      expect(() => isLoggerConfig({ level: symbolLevel })).toThrowError(
-        TypeError,
-      );
-      expect(() => isLoggerConfig({ level: symbolLevel })).toThrowError(
+      expect(() => isLoggerConfig({ level: symbolLevel })).toThrow(TypeError);
+      expect(() => isLoggerConfig({ level: symbolLevel })).toThrow(
         "Invalid logger level: Symbol(test)",
       );
     });

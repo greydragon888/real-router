@@ -23,8 +23,8 @@ describe("getLifecycleApi", () => {
 
   describe("invalid router", () => {
     it("should throw TypeError for non-router object", () => {
-      expect(() => getLifecycleApi({} as Router)).toThrowError(TypeError);
-      expect(() => getLifecycleApi({} as Router)).toThrowError(
+      expect(() => getLifecycleApi({} as Router)).toThrow(TypeError);
+      expect(() => getLifecycleApi({} as Router)).toThrow(
         "not found in internals registry",
       );
     });
@@ -34,19 +34,19 @@ describe("getLifecycleApi", () => {
     it("should register a factory guard without throwing", () => {
       expect(() => {
         lifecycle.addActivateGuard("home", () => () => true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should register a boolean true guard without throwing", () => {
       expect(() => {
         lifecycle.addActivateGuard("home", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should register a boolean false guard without throwing", () => {
       expect(() => {
         lifecycle.addActivateGuard("home", false);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should register guard that blocks navigation (returns void)", () => {
@@ -59,14 +59,14 @@ describe("getLifecycleApi", () => {
       expect(() => {
         // @ts-expect-error: testing null route name
         lifecycle.addActivateGuard(null, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid handler", () => {
       expect(() => {
         // @ts-expect-error: testing null handler
         lifecycle.addActivateGuard("home", null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw ROUTER_DISPOSED after dispose", () => {
@@ -77,7 +77,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.addActivateGuard("home", true);
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
     it("should skip validation in noValidate mode", () => {
@@ -86,7 +86,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         noValidateLifecycle.addActivateGuard("route/name", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       noValidateRouter.stop();
     });
@@ -96,19 +96,19 @@ describe("getLifecycleApi", () => {
     it("should register a factory guard without throwing", () => {
       expect(() => {
         lifecycle.addDeactivateGuard("home", () => () => true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should register a boolean true guard without throwing", () => {
       expect(() => {
         lifecycle.addDeactivateGuard("home", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should register a boolean false guard without throwing", () => {
       expect(() => {
         lifecycle.addDeactivateGuard("home", false);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should not affect activate guards when registering deactivate guard (returns void)", () => {
@@ -121,14 +121,14 @@ describe("getLifecycleApi", () => {
       expect(() => {
         // @ts-expect-error: testing null route name
         lifecycle.addDeactivateGuard(null, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid handler", () => {
       expect(() => {
         // @ts-expect-error: testing null handler
         lifecycle.addDeactivateGuard("home", null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw ROUTER_DISPOSED after dispose", () => {
@@ -139,7 +139,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.addDeactivateGuard("home", true);
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
     it("should skip validation in noValidate mode", () => {
@@ -148,7 +148,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         noValidateLifecycle.addDeactivateGuard("route/name", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       noValidateRouter.stop();
     });
@@ -160,7 +160,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         lifecycle.removeActivateGuard("home");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should make route navigable after clearing blocking guard (returns void)", () => {
@@ -174,7 +174,7 @@ describe("getLifecycleApi", () => {
       expect(() => {
         // @ts-expect-error: testing null route name
         lifecycle.removeActivateGuard(null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw ROUTER_DISPOSED after dispose", () => {
@@ -185,7 +185,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.removeActivateGuard("home");
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
     it("should skip validation in noValidate mode", () => {
@@ -194,7 +194,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         noValidateLifecycle.removeActivateGuard("route/name");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       noValidateRouter.stop();
     });
@@ -206,7 +206,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         lifecycle.removeDeactivateGuard("home");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should not affect activate guards after clearing deactivate guard (returns void)", () => {
@@ -220,7 +220,7 @@ describe("getLifecycleApi", () => {
       expect(() => {
         // @ts-expect-error: testing null route name
         lifecycle.removeDeactivateGuard(null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw ROUTER_DISPOSED after dispose", () => {
@@ -231,7 +231,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         freshLifecycle.removeDeactivateGuard("home");
-      }).toThrowError(errorCodes.ROUTER_DISPOSED);
+      }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
     it("should skip validation in noValidate mode", () => {
@@ -240,7 +240,7 @@ describe("getLifecycleApi", () => {
 
       expect(() => {
         noValidateLifecycle.removeDeactivateGuard("route/name");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       noValidateRouter.stop();
     });

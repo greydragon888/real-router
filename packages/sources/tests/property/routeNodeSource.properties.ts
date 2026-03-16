@@ -401,7 +401,7 @@ describe("destroy", () => {
 
       expect(() => {
         source.destroy();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.stop();
     },
@@ -422,7 +422,7 @@ describe("destroy", () => {
       expect(listener).not.toHaveBeenCalled();
       expect(() => {
         unsub();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.stop();
     },

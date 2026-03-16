@@ -141,15 +141,15 @@ describe("core/dependencies (integration)", () => {
 
       expect(() => {
         deps.get("nonexistent" as "foo");
-      }).toThrowError(ReferenceError);
+      }).toThrow(ReferenceError);
 
       expect(() => {
         deps.set(123 as any, "value");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         deps.setAll([] as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 });

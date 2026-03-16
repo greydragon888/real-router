@@ -566,31 +566,31 @@ describe("Persistent params plugin", () => {
       it("should throw on null params", () => {
         expect(() => {
           persistentParamsPlugin(null as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on number params", () => {
         expect(() => {
           persistentParamsPlugin(42 as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on string params", () => {
         expect(() => {
           persistentParamsPlugin("mode" as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on Date object", () => {
         expect(() => {
           persistentParamsPlugin(new Date() as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on Map object", () => {
         expect(() => {
           persistentParamsPlugin(new Map() as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
     });
 
@@ -598,25 +598,25 @@ describe("Persistent params plugin", () => {
       it("should throw on array with non-string items", () => {
         expect(() => {
           persistentParamsPlugin([123, "mode"] as unknown as string[]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on array with empty strings", () => {
         expect(() => {
           persistentParamsPlugin(["mode", ""]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on array with keys containing special characters", () => {
         expect(() => {
           persistentParamsPlugin(["valid", "param=bad"]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on array with keys containing whitespace", () => {
         expect(() => {
           persistentParamsPlugin(["param name"]);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
     });
 
@@ -624,19 +624,19 @@ describe("Persistent params plugin", () => {
       it("should throw on object with empty string key", () => {
         expect(() => {
           persistentParamsPlugin({ "": "value" });
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on object with keys containing special characters", () => {
         expect(() => {
           persistentParamsPlugin({ "bad=key": "value" });
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
 
       it("should throw on object with keys containing question mark", () => {
         expect(() => {
           persistentParamsPlugin({ "bad?key": "value" });
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
     });
 
@@ -646,7 +646,7 @@ describe("Persistent params plugin", () => {
           persistentParamsPlugin({
             mode: { nested: "value" },
           } as unknown as Record<string, string>);
-        }).toThrowError(/Invalid params configuration/);
+        }).toThrow(/Invalid params configuration/);
       });
     });
 
@@ -654,13 +654,13 @@ describe("Persistent params plugin", () => {
       it("should accept empty array", () => {
         expect(() => {
           router.usePlugin(persistentParamsPlugin([]));
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should accept empty object", () => {
         expect(() => {
           router.usePlugin(persistentParamsPlugin({}));
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
   });
@@ -678,7 +678,7 @@ describe("Persistent params plugin", () => {
             id: "1",
             mode: { nested: "object" } as unknown as string,
           }),
-        ).rejects.toThrowError(/must be a primitive value/);
+        ).rejects.toThrow(/must be a primitive value/);
       });
 
       it("should reject arrays as parameter values", async () => {
@@ -687,7 +687,7 @@ describe("Persistent params plugin", () => {
             id: "1",
             mode: [1, 2, 3] as unknown as string,
           }),
-        ).rejects.toThrowError(/must be a primitive value/);
+        ).rejects.toThrow(/must be a primitive value/);
       });
 
       it("should reject functions as parameter values", async () => {
@@ -698,7 +698,7 @@ describe("Persistent params plugin", () => {
             id: "1",
             mode: (() => "dev") as unknown as string,
           }),
-        ).rejects.toThrowError(/Invalid routeParams/);
+        ).rejects.toThrow(/Invalid routeParams/);
       });
 
       it("should reject null as parameter value", async () => {
@@ -707,7 +707,7 @@ describe("Persistent params plugin", () => {
             id: "1",
             mode: null as unknown as string,
           }),
-        ).rejects.toThrowError(/cannot be null/);
+        ).rejects.toThrow(/cannot be null/);
       });
     });
   });
@@ -739,7 +739,7 @@ describe("Persistent params plugin", () => {
             id: "1",
             constructor: { prototype: { polluted: true } },
           } as unknown as Record<string, string>),
-        ).rejects.toThrowError();
+        ).rejects.toThrow();
       });
 
       it("should only process own properties", async () => {
@@ -752,7 +752,7 @@ describe("Persistent params plugin", () => {
         params.mode = "dev";
         params.id = "1";
 
-        await expect(router.navigate("route1", params)).rejects.toThrowError(
+        await expect(router.navigate("route1", params)).rejects.toThrow(
           /Invalid routeParams/,
         );
       });
@@ -764,7 +764,7 @@ describe("Persistent params plugin", () => {
       it("should initialize plugin without errors", () => {
         expect(() => {
           router.usePlugin(persistentParamsPlugin(["mode"]));
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should allow initialization on different routers", async () => {
@@ -774,7 +774,7 @@ describe("Persistent params plugin", () => {
 
         expect(() => {
           router2.usePlugin(persistentParamsPlugin(["mode"]));
-        }).not.toThrowError();
+        }).not.toThrow();
 
         router2.stop();
       });
@@ -846,7 +846,7 @@ describe("Persistent params plugin", () => {
 
         expect(() => {
           router.usePlugin(persistentParamsPlugin(["theme"]));
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
   });
@@ -912,9 +912,9 @@ describe("Persistent params plugin", () => {
         },
       };
 
-      await expect(
-        router.navigate("route1", maliciousParams),
-      ).rejects.toThrowError(/Generic error during iteration/);
+      await expect(router.navigate("route1", maliciousParams)).rejects.toThrow(
+        /Generic error during iteration/,
+      );
     });
 
     it("should propagate non-Error thrown values from params getters", async () => {
@@ -932,9 +932,9 @@ describe("Persistent params plugin", () => {
         },
       };
 
-      await expect(
-        router.navigate("route1", maliciousParams),
-      ).rejects.toThrowError(/String error thrown/);
+      await expect(router.navigate("route1", maliciousParams)).rejects.toThrow(
+        /String error thrown/,
+      );
     });
   });
 

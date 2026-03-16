@@ -141,16 +141,14 @@ describe("areStatesEqual", () => {
       // Using 'as never' to test runtime behavior with null values
       expect(() =>
         router.areStatesEqual(null as never, null as never),
-      ).not.toThrowError();
-      expect(() =>
-        router.areStatesEqual(undefined, undefined),
-      ).not.toThrowError();
+      ).not.toThrow();
+      expect(() => router.areStatesEqual(undefined, undefined)).not.toThrow();
       expect(() =>
         router.areStatesEqual(validState, null as never),
-      ).not.toThrowError();
+      ).not.toThrow();
       expect(() =>
         router.areStatesEqual(null as never, validState),
-      ).not.toThrowError();
+      ).not.toThrow();
     });
 
     it("throws TypeError for invalid state1", () => {
@@ -158,10 +156,10 @@ describe("areStatesEqual", () => {
 
       expect(() =>
         router.areStatesEqual("invalid" as never, validState),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         router.areStatesEqual({ name: "x" } as never, validState),
-      ).toThrowError(/Invalid state/);
+      ).toThrow(/Invalid state/);
     });
 
     it("throws TypeError for invalid state2", () => {
@@ -169,20 +167,20 @@ describe("areStatesEqual", () => {
 
       expect(() =>
         router.areStatesEqual(validState, "invalid" as never),
-      ).toThrowError(TypeError);
-      expect(() =>
-        router.areStatesEqual(validState, 123 as never),
-      ).toThrowError(/Invalid state/);
+      ).toThrow(TypeError);
+      expect(() => router.areStatesEqual(validState, 123 as never)).toThrow(
+        /Invalid state/,
+      );
     });
 
     it("throws TypeError for invalid ignoreQueryParams", () => {
       const s1 = getPluginApi(router).makeState("home", {}, "/home");
       const s2 = getPluginApi(router).makeState("home", {}, "/home");
 
-      expect(() => router.areStatesEqual(s1, s2, "true" as never)).toThrowError(
+      expect(() => router.areStatesEqual(s1, s2, "true" as never)).toThrow(
         TypeError,
       );
-      expect(() => router.areStatesEqual(s1, s2, 1 as never)).toThrowError(
+      expect(() => router.areStatesEqual(s1, s2, 1 as never)).toThrow(
         /Invalid ignoreQueryParams/,
       );
     });

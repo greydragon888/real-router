@@ -75,11 +75,11 @@ describe("navigateToNotFound Properties", () => {
 
     expect(() => {
       router.navigateToNotFound("/unknown");
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
 
     expect(() => {
       router.navigateToNotFound("/unknown");
-    }).toThrowError(
+    }).toThrow(
       expect.objectContaining({ code: errorCodes.ROUTER_NOT_STARTED }),
     );
   });

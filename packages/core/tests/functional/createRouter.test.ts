@@ -5,7 +5,7 @@ import { getPluginApi } from "@real-router/core/api";
 
 describe("createRouter", () => {
   it("should not throw", () => {
-    expect(() => createRouter()).not.toThrowError();
+    expect(() => createRouter()).not.toThrow();
   });
 
   describe("with routes", () => {
@@ -40,7 +40,7 @@ describe("createRouter", () => {
       const router = createRouter([]);
 
       expect(router).toBeDefined();
-      expect(() => router.buildPath("unknown")).toThrowError();
+      expect(() => router.buildPath("unknown")).toThrow();
     });
 
     it("should throw if route names are duplicated", () => {
@@ -49,7 +49,7 @@ describe("createRouter", () => {
           { name: "home", path: "/home" },
           { name: "home", path: "/duplicate" },
         ]),
-      ).toThrowError();
+      ).toThrow();
     });
 
     it("should throw if routes share the same path but have different names", () => {
@@ -58,13 +58,13 @@ describe("createRouter", () => {
           { name: "home", path: "/home" },
           { name: "dashboard", path: "/home" },
         ]),
-      ).toThrowError();
+      ).toThrow();
     });
 
     it("should throw when building a path for an unknown route", () => {
       const router = createRouter([{ name: "home", path: "/home" }]);
 
-      expect(() => router.buildPath("not-found")).toThrowError();
+      expect(() => router.buildPath("not-found")).toThrow();
     });
   });
 
@@ -83,31 +83,31 @@ describe("createRouter", () => {
       // Should not throw - valid logger config
       expect(() =>
         createRouter([], { logger: { level: "error-only", callback } }),
-      ).not.toThrowError();
+      ).not.toThrow();
     });
 
     it("should configure logger with level only", () => {
       expect(() =>
         createRouter([], { logger: { level: "warn-error" } }),
-      ).not.toThrowError();
+      ).not.toThrow();
     });
 
     it("should configure logger with callback only", () => {
       expect(() =>
         createRouter([], { logger: { callback: () => {} } }),
-      ).not.toThrowError();
+      ).not.toThrow();
     });
 
     it("should throw TypeError for invalid logger config", () => {
       expect(() =>
         createRouter([], { logger: { invalid: true } as any }),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
     });
 
     it("should throw for invalid logger level", () => {
       expect(() =>
         createRouter([], { logger: { level: "invalid" as any } }),
-      ).toThrowError("Invalid logger level");
+      ).toThrow("Invalid logger level");
     });
 
     it("should not have logger in options after configuration", () => {

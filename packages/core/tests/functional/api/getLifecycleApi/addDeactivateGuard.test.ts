@@ -103,34 +103,34 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(() => {
         lifecycle.addDeactivateGuard("route1", true);
         lifecycle.addDeactivateGuard("route2", false);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should throw TypeError for invalid handler types", () => {
       expect(() => {
         // @ts-expect-error: testing null
         lifecycle.addDeactivateGuard("route1", null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing undefined
         lifecycle.addDeactivateGuard("route2", undefined);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing number
         lifecycle.addDeactivateGuard("route3", 123);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing string
         lifecycle.addDeactivateGuard("route4", "true");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing object
         lifecycle.addDeactivateGuard("route5", {});
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing NaN
         lifecycle.addDeactivateGuard("route6", Number.NaN);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError if factory returns non-function", () => {
@@ -138,57 +138,57 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
         lifecycle.addDeactivateGuard("route1", () => null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning undefined
       expect(() => {
         // @ts-expect-error: testing factory returning undefined
         lifecycle.addDeactivateGuard("route2", () => undefined);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning number
       expect(() => {
         // @ts-expect-error: testing factory returning number
         lifecycle.addDeactivateGuard("route3", () => 42);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning object
       expect(() => {
         // @ts-expect-error: testing factory returning object
         lifecycle.addDeactivateGuard("route4", () => ({}));
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid route names", () => {
       // Whitespace-only (empty string is valid root node)
       expect(() => {
         lifecycle.addDeactivateGuard("   ", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Route name with spaces
       expect(() => {
         lifecycle.addDeactivateGuard("route name", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Route name starting with number
       expect(() => {
         lifecycle.addDeactivateGuard("1route", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Route name with special characters
       expect(() => {
         lifecycle.addDeactivateGuard("route#name", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Route name ending with dot
       expect(() => {
         lifecycle.addDeactivateGuard("route.", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Consecutive dots
       expect(() => {
         lifecycle.addDeactivateGuard("route..name", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should handle very long route names correctly", () => {
@@ -196,19 +196,19 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
 
       expect(() => {
         lifecycle.addDeactivateGuard(longButValidName, true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       const tooLongName = "a".repeat(10_001);
 
       expect(() => {
         lifecycle.addDeactivateGuard(tooLongName, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should allow system routes with @@ prefix", () => {
       expect(() => {
         lifecycle.addDeactivateGuard("@@notFound", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // System routes can be registered - verified by no throw above
     });
@@ -219,24 +219,24 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning non-function
         lifecycle.addDeactivateGuard("problematic", () => null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
         lifecycle.addDeactivateGuard("problematic", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should rollback if factory returns non-function", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning object
         lifecycle.addDeactivateGuard("test", () => ({}));
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
         lifecycle.addDeactivateGuard("test", false);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should maintain consistency after failed registration", async () => {
@@ -246,7 +246,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing invalid handler
         lifecycle.addDeactivateGuard("index", "not-a-function");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Valid guard should still work
       await router.navigate("admin");
@@ -259,7 +259,7 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       // Failed route can be re-registered (was rolled back)
       expect(() => {
         lifecycle.addDeactivateGuard("index", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 

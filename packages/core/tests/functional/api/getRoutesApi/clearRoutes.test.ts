@@ -98,7 +98,7 @@ describe("core/routes/clearRoutes", () => {
       // Second clear should not throw
       expect(() => {
         routesApi.clear();
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -407,7 +407,7 @@ describe("core/routes/clearRoutes", () => {
       const result = router.navigate("home");
 
       expect(result).toBeInstanceOf(Promise);
-      await expect(result).rejects.toThrowError();
+      await expect(result).rejects.toThrow();
     });
 
     it("should transition to new route after clearRoutes + addRoute", async () => {

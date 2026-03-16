@@ -336,9 +336,9 @@ describe("routeUtils property-based tests", () => {
     test.prop([arbRouteName, arbSegment], { numRuns: NUM_RUNS.standard })(
       "valid characters: segments matching SAFE_SEGMENT_PATTERN are accepted",
       (name, segment) => {
-        expect(() => startsWithSegment(name, segment)).not.toThrowError();
-        expect(() => endsWithSegment(name, segment)).not.toThrowError();
-        expect(() => includesSegment(name, segment)).not.toThrowError();
+        expect(() => startsWithSegment(name, segment)).not.toThrow();
+        expect(() => endsWithSegment(name, segment)).not.toThrow();
+        expect(() => includesSegment(name, segment)).not.toThrow();
       },
     );
 
@@ -347,9 +347,9 @@ describe("routeUtils property-based tests", () => {
     })(
       "invalid characters: segments with forbidden characters throw TypeError",
       (name, segment) => {
-        expect(() => startsWithSegment(name, segment)).toThrowError(TypeError);
-        expect(() => endsWithSegment(name, segment)).toThrowError(TypeError);
-        expect(() => includesSegment(name, segment)).toThrowError(TypeError);
+        expect(() => startsWithSegment(name, segment)).toThrow(TypeError);
+        expect(() => endsWithSegment(name, segment)).toThrow(TypeError);
+        expect(() => includesSegment(name, segment)).toThrow(TypeError);
       },
     );
   });
@@ -362,9 +362,9 @@ describe("routeUtils property-based tests", () => {
     test.prop([arbRouteName, arbOversizedSegment], {
       numRuns: NUM_RUNS.standard,
     })("oversized segments throw RangeError", (name, segment) => {
-      expect(() => startsWithSegment(name, segment)).toThrowError(RangeError);
-      expect(() => endsWithSegment(name, segment)).toThrowError(RangeError);
-      expect(() => includesSegment(name, segment)).toThrowError(RangeError);
+      expect(() => startsWithSegment(name, segment)).toThrow(RangeError);
+      expect(() => endsWithSegment(name, segment)).toThrow(RangeError);
+      expect(() => includesSegment(name, segment)).toThrow(RangeError);
     });
   });
 });

@@ -125,7 +125,7 @@ describe("addInterceptor('buildPath')", () => {
         disposedApi.addInterceptor("buildPath", (next, route, params) =>
           next(route, params),
         );
-      }).toThrowError(RouterError);
+      }).toThrow(RouterError);
     });
   });
 });

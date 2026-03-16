@@ -238,7 +238,7 @@ describe("router.navigateToNotFound()", () => {
     it("should throw ROUTER_NOT_STARTED when router is not active", () => {
       router = createTestRouter();
 
-      expect(() => router.navigateToNotFound()).toThrowError();
+      expect(() => router.navigateToNotFound()).toThrow();
 
       try {
         router.navigateToNotFound();
@@ -255,7 +255,7 @@ describe("router.navigateToNotFound()", () => {
 
       router.dispose();
 
-      expect(() => router.navigateToNotFound()).toThrowError();
+      expect(() => router.navigateToNotFound()).toThrow();
     });
   });
 

@@ -55,13 +55,13 @@ describe("core/dependencies/resetDependencies", () => {
     // Second reset - should not throw
     expect(() => {
       deps.reset();
-    }).not.toThrowError();
+    }).not.toThrow();
     expect(deps.getAll()).toStrictEqual({});
 
     // Third reset - still safe
     expect(() => {
       deps.reset();
-    }).not.toThrowError();
+    }).not.toThrow();
     expect(deps.getAll()).toStrictEqual({});
   });
 
@@ -71,7 +71,7 @@ describe("core/dependencies/resetDependencies", () => {
     // Should not throw even if container is already empty
     expect(() => {
       deps.reset();
-    }).not.toThrowError();
+    }).not.toThrow();
 
     expect(deps.getAll()).toStrictEqual({});
   });
@@ -84,11 +84,11 @@ describe("core/dependencies/resetDependencies", () => {
     // All previous dependencies should throw when accessed
     expect(() => {
       deps.get("foo");
-    }).toThrowError(ReferenceError);
+    }).toThrow(ReferenceError);
 
     expect(() => {
       deps.get("bar");
-    }).toThrowError(ReferenceError);
+    }).toThrow(ReferenceError);
   });
 
   it("should handle special keys correctly", () => {

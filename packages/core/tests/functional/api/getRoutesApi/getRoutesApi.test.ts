@@ -208,7 +208,7 @@ describe("getRoutesApi()", () => {
 
       expect(() => {
         freshApi.add({ name: "x", path: "/x" });
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("remove should throw RouterError", () => {
@@ -219,7 +219,7 @@ describe("getRoutesApi()", () => {
 
       expect(() => {
         freshApi.remove("home");
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("update should throw RouterError", () => {
@@ -230,7 +230,7 @@ describe("getRoutesApi()", () => {
 
       expect(() => {
         freshApi.update("home", {});
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("clear should throw RouterError", () => {
@@ -241,7 +241,7 @@ describe("getRoutesApi()", () => {
 
       expect(() => {
         freshApi.clear();
-      }).toThrowError();
+      }).toThrow();
     });
   });
 });

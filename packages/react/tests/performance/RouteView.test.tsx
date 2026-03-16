@@ -8,7 +8,7 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 import type { Router } from "@real-router/core";
 import type { FC } from "react";
 
-describe("RouteView - Performance Tests", () => {
+describe("RouteView - Performance Tests", { tags: ["performance"] }, () => {
   let router: Router;
 
   beforeEach(() => {

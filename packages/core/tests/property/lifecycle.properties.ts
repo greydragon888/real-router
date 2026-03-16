@@ -83,7 +83,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
 
       await router.start(path);
 
-      await expect(router.start(path)).rejects.toThrowError(
+      await expect(router.start(path)).rejects.toThrow(
         expect.objectContaining({ code: errorCodes.ROUTER_ALREADY_STARTED }),
       );
 
@@ -108,8 +108,8 @@ describe("start / stop / dispose Lifecycle Properties", () => {
     ] as const;
 
     for (const method of blockedMethods) {
-      expect(method).toThrowError(RouterError);
-      expect(method).toThrowError(
+      expect(method).toThrow(RouterError);
+      expect(method).toThrow(
         expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
       );
     }
@@ -122,7 +122,7 @@ describe("start / stop / dispose Lifecycle Properties", () => {
 
     expect(() => {
       router.dispose();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("dispose works from any state (idle, ready)", () => {
@@ -130,6 +130,6 @@ describe("start / stop / dispose Lifecycle Properties", () => {
 
     expect(() => {
       idleRouter.dispose();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 });

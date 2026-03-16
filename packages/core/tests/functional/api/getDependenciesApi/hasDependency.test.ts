@@ -55,19 +55,19 @@ describe("core/dependencies/hasDependency", () => {
     expect(() => {
       // @ts-expect-error: testing number parameter
       deps.has(123);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // null should throw
     expect(() => {
       // @ts-expect-error: testing null parameter
       deps.has(null);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // undefined should throw
     expect(() => {
       // @ts-expect-error: testing undefined parameter
       deps.has(undefined);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   it("should be case-sensitive for dependency names", () => {

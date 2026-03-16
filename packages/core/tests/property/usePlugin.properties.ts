@@ -86,7 +86,7 @@ describe("usePlugin Properties", () => {
 
     expect(() => {
       unsubscribe();
-    }).not.toThrowError();
+    }).not.toThrow();
 
     router.stop();
   });
@@ -150,13 +150,11 @@ describe("usePlugin Properties", () => {
 
     expect(() => {
       router.usePlugin(createSpyPlugin().factory);
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
 
     expect(() => {
       router.usePlugin(createSpyPlugin().factory);
-    }).toThrowError(
-      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
-    );
+    }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
   });
 
   it("plugins receive events in registration order", async () => {
@@ -234,12 +232,10 @@ describe("usePlugin Properties", () => {
 
     expect(() => {
       pluginApi.extendRouter({ navigate: () => "conflict" });
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
 
     expect(() => {
       pluginApi.extendRouter({ navigate: () => "conflict" });
-    }).toThrowError(
-      expect.objectContaining({ code: errorCodes.PLUGIN_CONFLICT }),
-    );
+    }).toThrow(expect.objectContaining({ code: errorCodes.PLUGIN_CONFLICT }));
   });
 });

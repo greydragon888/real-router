@@ -179,7 +179,7 @@ describe("Browser Plugin — Security", () => {
         globalThis.dispatchEvent(
           new PopStateEvent("popstate", { state: maliciousState }),
         );
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(router.getState()).toBeDefined();
       expect(router.getState()?.name).toBe("home");
@@ -335,11 +335,11 @@ describe("Browser Plugin — Security", () => {
       // Circular references are not serializable and should be caught early.
       await expect(
         router.navigate("users.view", circularParams),
-      ).rejects.toThrowError(TypeError);
+      ).rejects.toThrow(TypeError);
 
       await expect(
         router.navigate("users.view", circularParams),
-      ).rejects.toThrowError("Invalid routeParams");
+      ).rejects.toThrow("Invalid routeParams");
     });
 
     it("handles params with function values", async () => {

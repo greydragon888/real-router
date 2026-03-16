@@ -70,12 +70,12 @@ describe("S13: Dependencies store churn", () => {
     for (let i = 0; i < 100; i++) {
       expect(() => {
         deps.set(`dep${i}`, i);
-      }).not.toThrowError();
+      }).not.toThrow();
     }
 
     expect(() => {
       deps.set("dep100", 100);
-    }).toThrowError();
+    }).toThrow();
 
     for (let i = 0; i < 50; i++) {
       deps.remove(`dep${i}`);
@@ -84,7 +84,7 @@ describe("S13: Dependencies store churn", () => {
     for (let i = 0; i < 50; i++) {
       expect(() => {
         deps.set(`newdep${i}`, i);
-      }).not.toThrowError();
+      }).not.toThrow();
     }
 
     expect(deps.has("dep50")).toBe(true);

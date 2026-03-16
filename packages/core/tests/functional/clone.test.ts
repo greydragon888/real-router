@@ -298,8 +298,8 @@ describe("cloneRouter()", () => {
     it("should throw TypeError for invalid dependencies (array)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, [] as never)).toThrowError(TypeError);
-      expect(() => cloneRouter(router, [] as never)).toThrowError(
+      expect(() => cloneRouter(router, [] as never)).toThrow(TypeError);
+      expect(() => cloneRouter(router, [] as never)).toThrow(
         /Invalid dependencies/,
       );
     });
@@ -307,8 +307,8 @@ describe("cloneRouter()", () => {
     it("should throw TypeError for invalid dependencies (null)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, null as never)).toThrowError(TypeError);
-      expect(() => cloneRouter(router, null as never)).toThrowError(
+      expect(() => cloneRouter(router, null as never)).toThrow(TypeError);
+      expect(() => cloneRouter(router, null as never)).toThrow(
         /Invalid dependencies/,
       );
     });
@@ -316,10 +316,8 @@ describe("cloneRouter()", () => {
     it("should throw TypeError for invalid dependencies (primitive)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, "string" as never)).toThrowError(
-        TypeError,
-      );
-      expect(() => cloneRouter(router, 123 as never)).toThrowError(
+      expect(() => cloneRouter(router, "string" as never)).toThrow(TypeError);
+      expect(() => cloneRouter(router, 123 as never)).toThrow(
         /Invalid dependencies/,
       );
     });
@@ -335,10 +333,10 @@ describe("cloneRouter()", () => {
         enumerable: true,
       });
 
-      expect(() => cloneRouter(router, depsWithGetter as never)).toThrowError(
+      expect(() => cloneRouter(router, depsWithGetter as never)).toThrow(
         TypeError,
       );
-      expect(() => cloneRouter(router, depsWithGetter as never)).toThrowError(
+      expect(() => cloneRouter(router, depsWithGetter as never)).toThrow(
         /Getters not allowed/,
       );
     });

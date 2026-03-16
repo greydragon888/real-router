@@ -328,7 +328,8 @@ describe("timing - module initialization", () => {
       // Mock dynamic import of perf_hooks
       const mockPerfHooksNow = vi.fn(() => 456.789);
 
-      vi.doMock("perf_hooks", () => ({
+      // eslint-disable-next-line vitest/prefer-import-in-mock -- partial mock is not assignable to full Performance type
+      vi.doMock("node:perf_hooks", () => ({
         performance: {
           now: mockPerfHooksNow,
         },
@@ -352,7 +353,8 @@ describe("timing - module initialization", () => {
       vi.stubGlobal("performance", undefined);
 
       // Mock failed import of perf_hooks
-      vi.doMock("perf_hooks", () => {
+      // eslint-disable-next-line vitest/prefer-import-in-mock -- partial mock is not assignable to full Performance type
+      vi.doMock("node:perf_hooks", () => {
         throw new Error("Module not found");
       });
 
@@ -389,7 +391,8 @@ describe("timing - module initialization", () => {
         resolvePerfHooks = resolve;
       });
 
-      vi.doMock("perf_hooks", () => perfHooksPromise);
+      // eslint-disable-next-line vitest/prefer-import-in-mock -- partial mock is not assignable to full Performance type
+      vi.doMock("node:perf_hooks", () => perfHooksPromise);
 
       const { now } = await import("../../../src/internal/timing.js");
 

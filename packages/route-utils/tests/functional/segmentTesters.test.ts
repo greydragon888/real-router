@@ -50,17 +50,15 @@ describe("segmentTesters", () => {
       it("should throw validation errors in curried form", () => {
         const tester = startsWithSegment("a.b.c");
 
-        expect(() => tester("invalid!char")).toThrowError(TypeError);
-        expect(() => tester("a".repeat(10_001))).toThrowError(RangeError);
+        expect(() => tester("invalid!char")).toThrow(TypeError);
+        expect(() => tester("a".repeat(10_001))).toThrow(RangeError);
       });
 
       it("should throw TypeError for non-string in curried form (line 94)", () => {
         const tester = startsWithSegment("a.b.c");
 
-        expect(() => tester(123 as any)).toThrowError(TypeError);
-        expect(() => tester(123 as any)).toThrowError(
-          /Segment must be a string/,
-        );
+        expect(() => tester(123 as any)).toThrow(TypeError);
+        expect(() => tester(123 as any)).toThrow(/Segment must be a string/);
       });
     });
 
@@ -102,30 +100,20 @@ describe("segmentTesters", () => {
 
     describe("validation", () => {
       it("should throw TypeError for invalid characters", () => {
-        expect(() => startsWithSegment("route", "seg!ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", "seg@ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", "seg ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", "seg/ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", "seg:ment")).toThrowError(
-          TypeError,
-        );
+        expect(() => startsWithSegment("route", "seg!ment")).toThrow(TypeError);
+        expect(() => startsWithSegment("route", "seg@ment")).toThrow(TypeError);
+        expect(() => startsWithSegment("route", "seg ment")).toThrow(TypeError);
+        expect(() => startsWithSegment("route", "seg/ment")).toThrow(TypeError);
+        expect(() => startsWithSegment("route", "seg:ment")).toThrow(TypeError);
       });
 
       it("should throw RangeError for segment exceeding max length", () => {
         const longSegment = "a".repeat(10_001);
 
-        expect(() => startsWithSegment("route", longSegment)).toThrowError(
+        expect(() => startsWithSegment("route", longSegment)).toThrow(
           RangeError,
         );
-        expect(() => startsWithSegment("route", longSegment)).toThrowError(
+        expect(() => startsWithSegment("route", longSegment)).toThrow(
           /exceeds maximum length/,
         );
       });
@@ -134,62 +122,50 @@ describe("segmentTesters", () => {
         const maxSegment = "a".repeat(10_000);
 
         // Should not throw
-        expect(() => startsWithSegment("route", maxSegment)).not.toThrowError();
+        expect(() => startsWithSegment("route", maxSegment)).not.toThrow();
       });
 
       it("should throw TypeError for non-string segment", () => {
-        expect(() => startsWithSegment("route", 123 as any)).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", {} as any)).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", [] as any)).toThrowError(
-          TypeError,
-        );
+        expect(() => startsWithSegment("route", 123 as any)).toThrow(TypeError);
+        expect(() => startsWithSegment("route", {} as any)).toThrow(TypeError);
+        expect(() => startsWithSegment("route", [] as any)).toThrow(TypeError);
       });
 
       it("should provide clear error messages", () => {
-        expect(() => startsWithSegment("route", "invalid!")).toThrowError(
+        expect(() => startsWithSegment("route", "invalid!")).toThrow(
           /invalid characters/,
         );
-        expect(() =>
-          startsWithSegment("route", "a".repeat(10_001)),
-        ).toThrowError(/maximum length/);
-        expect(() => startsWithSegment("route", 123 as any)).toThrowError(
+        expect(() => startsWithSegment("route", "a".repeat(10_001))).toThrow(
+          /maximum length/,
+        );
+        expect(() => startsWithSegment("route", 123 as any)).toThrow(
           /must be a string/,
         );
       });
 
       it("should reject unicode characters", () => {
         // Cyrillic
-        expect(() => startsWithSegment("route", "тест")).toThrowError(
-          TypeError,
-        );
-        expect(() => startsWithSegment("route", "тест")).toThrowError(
+        expect(() => startsWithSegment("route", "тест")).toThrow(TypeError);
+        expect(() => startsWithSegment("route", "тест")).toThrow(
           /invalid characters/,
         );
 
         // Chinese
-        expect(() => startsWithSegment("route", "测试")).toThrowError(
-          TypeError,
-        );
+        expect(() => startsWithSegment("route", "测试")).toThrow(TypeError);
 
         // Emoji
-        expect(() => startsWithSegment("route", "🚀")).toThrowError(TypeError);
+        expect(() => startsWithSegment("route", "🚀")).toThrow(TypeError);
 
         // Mixed
-        expect(() => startsWithSegment("route", "test测试")).toThrowError(
-          TypeError,
-        );
+        expect(() => startsWithSegment("route", "test测试")).toThrow(TypeError);
       });
 
       it("should reject unicode in curried form", () => {
         const tester = startsWithSegment("route");
 
-        expect(() => tester("тест")).toThrowError(TypeError);
-        expect(() => tester("测试")).toThrowError(TypeError);
-        expect(() => tester("🚀")).toThrowError(TypeError);
+        expect(() => tester("тест")).toThrow(TypeError);
+        expect(() => tester("测试")).toThrow(TypeError);
+        expect(() => tester("🚀")).toThrow(TypeError);
       });
     });
   });
@@ -239,10 +215,8 @@ describe("segmentTesters", () => {
 
     describe("validation", () => {
       it("should throw on invalid segments", () => {
-        expect(() => endsWithSegment("route", "seg!ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => endsWithSegment("route", "a".repeat(10_001))).toThrowError(
+        expect(() => endsWithSegment("route", "seg!ment")).toThrow(TypeError);
+        expect(() => endsWithSegment("route", "a".repeat(10_001))).toThrow(
           RangeError,
         );
       });
@@ -302,10 +276,8 @@ describe("segmentTesters", () => {
 
     describe("validation", () => {
       it("should throw on invalid segments", () => {
-        expect(() => includesSegment("route", "seg!ment")).toThrowError(
-          TypeError,
-        );
-        expect(() => includesSegment("route", "a".repeat(10_001))).toThrowError(
+        expect(() => includesSegment("route", "seg!ment")).toThrow(TypeError);
+        expect(() => includesSegment("route", "a".repeat(10_001))).toThrow(
           RangeError,
         );
       });
@@ -339,26 +311,18 @@ describe("segmentTesters", () => {
       invalidChars.forEach((char) => {
         const segment = `seg${char}ment`;
 
-        expect(() => startsWithSegment("route", segment)).toThrowError(
-          TypeError,
-        );
-        expect(() => endsWithSegment("route", segment)).toThrowError(TypeError);
-        expect(() => includesSegment("route", segment)).toThrowError(TypeError);
+        expect(() => startsWithSegment("route", segment)).toThrow(TypeError);
+        expect(() => endsWithSegment("route", segment)).toThrow(TypeError);
+        expect(() => includesSegment("route", segment)).toThrow(TypeError);
       });
     });
 
     it("should handle max length consistently", () => {
       const longSegment = "a".repeat(10_001);
 
-      expect(() => startsWithSegment("route", longSegment)).toThrowError(
-        RangeError,
-      );
-      expect(() => endsWithSegment("route", longSegment)).toThrowError(
-        RangeError,
-      );
-      expect(() => includesSegment("route", longSegment)).toThrowError(
-        RangeError,
-      );
+      expect(() => startsWithSegment("route", longSegment)).toThrow(RangeError);
+      expect(() => endsWithSegment("route", longSegment)).toThrow(RangeError);
+      expect(() => includesSegment("route", longSegment)).toThrow(RangeError);
     });
   });
 
@@ -432,13 +396,13 @@ describe("segmentTesters", () => {
       const route = `${largeSegment}.b.c`;
 
       // Should work without issues
-      expect(() => startsWithSegment(route, largeSegment)).not.toThrowError();
+      expect(() => startsWithSegment(route, largeSegment)).not.toThrow();
       expect(startsWithSegment(route, largeSegment)).toBe(true);
 
       // Also test with curried form
       const tester = startsWithSegment(route);
 
-      expect(() => tester(largeSegment)).not.toThrowError();
+      expect(() => tester(largeSegment)).not.toThrow();
       expect(tester(largeSegment)).toBe(true);
     });
 
@@ -458,11 +422,9 @@ describe("segmentTesters", () => {
       const unicodeSegments = ["тест", "测试", "🚀", "café"];
 
       unicodeSegments.forEach((segment) => {
-        expect(() => startsWithSegment("route", segment)).toThrowError(
-          TypeError,
-        );
-        expect(() => endsWithSegment("route", segment)).toThrowError(TypeError);
-        expect(() => includesSegment("route", segment)).toThrowError(TypeError);
+        expect(() => startsWithSegment("route", segment)).toThrow(TypeError);
+        expect(() => endsWithSegment("route", segment)).toThrow(TypeError);
+        expect(() => includesSegment("route", segment)).toThrow(TypeError);
       });
     });
 
@@ -471,9 +433,9 @@ describe("segmentTesters", () => {
       const endsTester = endsWithSegment("route");
       const includesTester = includesSegment("route");
 
-      expect(() => startsTester("тест")).toThrowError(TypeError);
-      expect(() => endsTester("测试")).toThrowError(TypeError);
-      expect(() => includesTester("🚀")).toThrowError(TypeError);
+      expect(() => startsTester("тест")).toThrow(TypeError);
+      expect(() => endsTester("测试")).toThrow(TypeError);
+      expect(() => includesTester("🚀")).toThrow(TypeError);
     });
 
     it("should accept only ASCII alphanumeric and safe characters", () => {
@@ -487,9 +449,9 @@ describe("segmentTesters", () => {
       ];
 
       validSegments.forEach((segment) => {
-        expect(() => startsWithSegment("route", segment)).not.toThrowError();
-        expect(() => endsWithSegment("route", segment)).not.toThrowError();
-        expect(() => includesSegment("route", segment)).not.toThrowError();
+        expect(() => startsWithSegment("route", segment)).not.toThrow();
+        expect(() => endsWithSegment("route", segment)).not.toThrow();
+        expect(() => includesSegment("route", segment)).not.toThrow();
       });
     });
   });

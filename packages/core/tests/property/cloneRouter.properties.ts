@@ -61,13 +61,11 @@ describe("cloneRouter Properties", () => {
 
     expect(() => {
       cloneRouter(router);
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
 
     expect(() => {
       cloneRouter(router);
-    }).toThrowError(
-      expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }),
-    );
+    }).toThrow(expect.objectContaining({ code: errorCodes.ROUTER_DISPOSED }));
   });
 
   it("cloned router can start and navigate independently", async () => {

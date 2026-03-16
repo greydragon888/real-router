@@ -87,7 +87,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
     it("should allow empty string as valid route name (root node)", async () => {
       expect(() => {
         lifecycle.addActivateGuard("", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify guard is active by testing navigation behavior
       // Empty string guard affects all routes (root level)
@@ -103,22 +103,22 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing null
         lifecycle.addActivateGuard(null, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing null
         lifecycle.addActivateGuard(null, true);
-      }).toThrowError(/Route name must be a string/);
+      }).toThrow(/Route name must be a string/);
     });
 
     it("should throw TypeError for undefined route name", async () => {
       expect(() => {
         // @ts-expect-error: testing undefined
         lifecycle.addActivateGuard(undefined, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing undefined
         lifecycle.addActivateGuard(undefined, true);
-      }).toThrowError(/Route name must be a string/);
+      }).toThrow(/Route name must be a string/);
     });
 
     it("should throw TypeError for non-string route name types", async () => {
@@ -126,91 +126,85 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing number
         lifecycle.addActivateGuard(123, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing number
         lifecycle.addActivateGuard(123, true);
-      }).toThrowError(/Route name must be a string/);
+      }).toThrow(/Route name must be a string/);
 
       // Object
       expect(() => {
         // @ts-expect-error: testing object
         lifecycle.addActivateGuard({}, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Array
       expect(() => {
         // @ts-expect-error: testing array
         lifecycle.addActivateGuard(["route"], true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Symbol
       expect(() => {
         // @ts-expect-error: testing symbol
         lifecycle.addActivateGuard(Symbol("route"), true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid handler types", async () => {
       expect(() => {
         // @ts-expect-error: testing null
         lifecycle.addActivateGuard("route1", null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing undefined
         lifecycle.addActivateGuard("route2", undefined);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing number
         lifecycle.addActivateGuard("route3", 123);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing string
         lifecycle.addActivateGuard("route4", "true");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing object
         lifecycle.addActivateGuard("route5", {});
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing NaN
         lifecycle.addActivateGuard("route6", Number.NaN);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should include descriptive error message for invalid handler", async () => {
       expect(() => {
         // @ts-expect-error: testing null
         lifecycle.addActivateGuard("route", null);
-      }).toThrowError(
-        /Handler must be a boolean or factory function.*got null/,
-      );
+      }).toThrow(/Handler must be a boolean or factory function.*got null/);
 
       expect(() => {
         // @ts-expect-error: testing number
         lifecycle.addActivateGuard("route", 123);
-      }).toThrowError(
-        /Handler must be a boolean or factory function.*got number/,
-      );
+      }).toThrow(/Handler must be a boolean or factory function.*got number/);
 
       expect(() => {
         // @ts-expect-error: testing string
         lifecycle.addActivateGuard("route", "true");
-      }).toThrowError(
-        /Handler must be a boolean or factory function.*got string/,
-      );
+      }).toThrow(/Handler must be a boolean or factory function.*got string/);
     });
 
     it("should include descriptive error message when factory returns non-function", async () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
         lifecycle.addActivateGuard("route", () => null);
-      }).toThrowError(/Factory must return a function.*got null/);
+      }).toThrow(/Factory must return a function.*got null/);
 
       expect(() => {
         // @ts-expect-error: testing factory returning string
         lifecycle.addActivateGuard("route", () => "not a function");
-      }).toThrowError(/Factory must return a function.*got string/);
+      }).toThrow(/Factory must return a function.*got string/);
     });
 
     it("should throw TypeError if factory returns non-function", async () => {
@@ -218,52 +212,52 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
         lifecycle.addActivateGuard("route1", () => null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning undefined
       expect(() => {
         // @ts-expect-error: testing factory returning undefined
         lifecycle.addActivateGuard("route2", () => undefined);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning object
       expect(() => {
         // @ts-expect-error: testing factory returning object
         lifecycle.addActivateGuard("route3", () => ({}));
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Factory returning number
       expect(() => {
         // @ts-expect-error: testing factory returning number
         lifecycle.addActivateGuard("route4", () => 42);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid route names", async () => {
       // Only whitespace (empty string is valid root node)
       expect(() => {
         lifecycle.addActivateGuard("   ", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Invalid characters
       expect(() => {
         lifecycle.addActivateGuard("route/name", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Leading dot
       expect(() => {
         lifecycle.addActivateGuard(".route", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Trailing dot
       expect(() => {
         lifecycle.addActivateGuard("route.", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Consecutive dots
       expect(() => {
         lifecycle.addActivateGuard("route..name", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should handle very long route names correctly", async () => {
@@ -271,19 +265,19 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       expect(() => {
         lifecycle.addActivateGuard(longButValidName, true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       const tooLongName = "a".repeat(10_001);
 
       expect(() => {
         lifecycle.addActivateGuard(tooLongName, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should allow system routes with @@ prefix", async () => {
       expect(() => {
         lifecycle.addActivateGuard("@@router/UNKNOWN_ROUTE", false);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // System routes can be registered - verified by no throw above
       // Actual guard execution depends on route tree containing such routes
@@ -294,7 +288,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // The guard simply won't be called during navigation
       expect(() => {
         lifecycle.addActivateGuard("nonexistent.route.path", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Registration succeeds (no throw), guard won't affect navigation
       // since route doesn't exist in tree
@@ -349,12 +343,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       expect(() => {
         lifecycle.addActivateGuard("problematic", factoryThatThrows);
-      }).toThrowError("Factory initialization failed");
+      }).toThrow("Factory initialization failed");
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
         lifecycle.addActivateGuard("problematic", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify new guard works
       let err: any;
@@ -373,12 +367,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
         lifecycle.addActivateGuard("invalid", () => null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Verify rollback: can successfully re-register the same route
       expect(() => {
         lifecycle.addActivateGuard("invalid", false);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should maintain consistency after failed registration", async () => {
@@ -393,7 +387,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Try to register failing guard
       expect(() => {
         lifecycle.addActivateGuard("items", factoryThatThrows);
-      }).toThrowError();
+      }).toThrow();
 
       // Verify valid guards still work correctly
       try {
@@ -410,7 +404,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify failed guard can be re-registered (was rolled back)
       expect(() => {
         lifecycle.addActivateGuard("items", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -423,14 +417,14 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
           return () => true;
         });
-      }).toThrowError(Error);
+      }).toThrow(Error);
       expect(() => {
         lifecycle.addActivateGuard("selfModify2", (r) => {
           getLifecycleApi(r).addActivateGuard("selfModify2", false);
 
           return () => true;
         });
-      }).toThrowError(
+      }).toThrow(
         /Cannot modify route "selfModify2" during its own registration/,
       );
     });
@@ -472,7 +466,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
           return () => true;
         });
-      }).toThrowError();
+      }).toThrow();
 
       // Verify existing guard still works
       try {
@@ -484,7 +478,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Verify problematic guard was rolled back (can be re-registered)
       expect(() => {
         lifecycle.addActivateGuard("index", true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should cleanup registering set even if factory throws", async () => {
@@ -493,12 +487,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         lifecycle.addActivateGuard("throwingRoute", () => {
           throw new Error("Factory error");
         });
-      }).toThrowError("Factory error");
+      }).toThrow("Factory error");
 
       // Second attempt - should not claim route is being registered
       expect(() => {
         lifecycle.addActivateGuard("throwingRoute", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Guard was successfully registered on second attempt
       // (registration state was cleaned up after first failure)
@@ -558,11 +552,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing String object
         lifecycle.addActivateGuard(stringObj, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing String object
         lifecycle.addActivateGuard(stringObj, true);
-      }).toThrowError(/Route name must be a string/);
+      }).toThrow(/Route name must be a string/);
     });
 
     it("should reject object with toString method", async () => {
@@ -575,45 +569,45 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing object with toString
         lifecycle.addActivateGuard(objWithToString, true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should reject route names with null bytes (security)", async () => {
       // Null bytes are invalid - security concern (null byte injection)
       expect(() => {
         lifecycle.addActivateGuard("route\0hidden", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         lifecycle.addActivateGuard("route\0hidden", true);
-      }).toThrowError(/Invalid route name/);
+      }).toThrow(/Invalid route name/);
     });
 
     it("should reject Unicode and emoji in route names (ASCII only)", async () => {
       // Validator only allows ASCII alphanumeric, underscore, hyphen
       expect(() => {
         lifecycle.addActivateGuard("route🚀", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         lifecycle.addActivateGuard("маршрут", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         lifecycle.addActivateGuard("路由", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should reject zero-width characters (homoglyph attack protection)", async () => {
       // Zero-width space (U+200B) - rejected for security
       expect(() => {
         lifecycle.addActivateGuard("admin\u200B", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Zero-width non-joiner (U+200C)
       expect(() => {
         lifecycle.addActivateGuard("admin\u200C", true);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should handle prototype pollution keys safely (Map protection)", async () => {
@@ -621,15 +615,15 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // Registration should succeed without errors
       expect(() => {
         lifecycle.addActivateGuard("__proto__", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         lifecycle.addActivateGuard("constructor", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         lifecycle.addActivateGuard("hasOwnProperty", true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // All registered correctly - can overwrite them without "no handler" warning
       // (overwrite triggers warning only if handler exists, so no error = was registered)
@@ -655,11 +649,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing Boolean object
         lifecycle.addActivateGuard("route", boolObj);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing Boolean object
         lifecycle.addActivateGuard("route", boolObj);
-      }).toThrowError(/Handler must be a boolean or factory function/);
+      }).toThrow(/Handler must be a boolean or factory function/);
     });
 
     it("should reject async function used directly as handler (not as factory)", async () => {
@@ -669,11 +663,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing async as direct handler
         lifecycle.addActivateGuard("route", asyncHandler);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing async as direct handler
         lifecycle.addActivateGuard("route", asyncHandler);
-      }).toThrowError(/Factory must return a function.*got Promise/);
+      }).toThrow(/Factory must return a function.*got Promise/);
     });
 
     it("should reject generator function as factory", async () => {
@@ -685,11 +679,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing generator
         lifecycle.addActivateGuard("route", generatorFactory);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error: testing generator
         lifecycle.addActivateGuard("route", generatorFactory);
-      }).toThrowError(/Factory must return a function/);
+      }).toThrow(/Factory must return a function/);
     });
 
     it("should accept Proxy function (transparent to typeof)", async () => {
@@ -703,7 +697,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       expect(() => {
         lifecycle.addActivateGuard("proxyRoute", proxyFactory);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify guard works via navigation
       try {
@@ -720,7 +714,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       expect(() => {
         lifecycle.addActivateGuard("boundRoute", factory);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify bound function's `this.allowed` (true) works via navigation
       try {
@@ -736,7 +730,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
 
       expect(() => {
         lifecycle.addActivateGuard("asyncActivation", factory);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Async guards are supported - registration succeeds
     });

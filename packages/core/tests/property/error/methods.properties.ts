@@ -108,11 +108,11 @@ describe("RouterError Methods Properties", () => {
 
         expect(() => {
           err.setErrorInstance(null as unknown as Error);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
 
         expect(() => {
           err.setErrorInstance(undefined as unknown as Error);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
 

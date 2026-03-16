@@ -68,13 +68,13 @@ describe("core/route-lifecycle/removeGuard", () => {
   it("should not throw when removing non-existent activate guard", () => {
     expect(() => {
       lifecycle.removeActivateGuard("nonexistent");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("should not throw when removing non-existent deactivate guard", () => {
     expect(() => {
       lifecycle.removeDeactivateGuard("nonexistent");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("should handle re-adding guard after removal", async () => {
@@ -179,6 +179,6 @@ describe("core/route-lifecycle/removeGuard", () => {
 
     expect(() => {
       lifecycle.removeActivateGuard("admin");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 });

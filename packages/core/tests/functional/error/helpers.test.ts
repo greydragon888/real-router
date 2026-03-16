@@ -38,7 +38,7 @@ describe("deepFreezeState", () => {
       // Verify immutability
       expect(() => {
         frozen.name = "changed";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should freeze state with meta", () => {
@@ -155,7 +155,7 @@ describe("deepFreezeState", () => {
       state.params.self = state.params;
 
       // structuredClone handles circular references properly
-      expect(() => deepFreezeState(state)).not.toThrowError();
+      expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
 
@@ -180,7 +180,7 @@ describe("deepFreezeState", () => {
       (a.b as Params).ref = a;
 
       // structuredClone handles circular references properly
-      expect(() => deepFreezeState(state)).not.toThrowError();
+      expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
       const frozenA = frozen.params.a as Params;
@@ -207,7 +207,7 @@ describe("deepFreezeState", () => {
       items[0].self = items[0];
 
       // structuredClone handles circular references properly
-      expect(() => deepFreezeState(state)).not.toThrowError();
+      expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
       const frozenItems = frozen.params.items as Params[];
@@ -236,7 +236,7 @@ describe("deepFreezeState", () => {
       obj1.selfRef = obj1;
 
       // structuredClone handles circular references properly
-      expect(() => deepFreezeState(state)).not.toThrowError();
+      expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
       const frozenObj1 = frozen.params.obj1 as Params;
@@ -267,26 +267,26 @@ describe("deepFreezeState", () => {
     it("should throw TypeError for invalid state structure", () => {
       expect(() => {
         deepFreezeState({ invalid: "structure" } as unknown as State);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         deepFreezeState({ invalid: "structure" } as unknown as State);
-      }).toThrowError(/Expected valid State object/);
+      }).toThrow(/Expected valid State object/);
     });
 
     it("should throw TypeError for primitive values", () => {
       // Truthy primitives should fail isState check
       expect(() => {
         deepFreezeState(42 as unknown as State);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         deepFreezeState("not an object" as unknown as State);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         deepFreezeState(true as unknown as State);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should handle state with empty params", () => {
@@ -398,7 +398,7 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         frozen.name = "modified";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent modification of frozen params", () => {
@@ -412,7 +412,7 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         frozen.params.id = "456";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent modification of nested frozen objects", () => {
@@ -426,7 +426,7 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         (frozen.params.nested as { value: string }).value = "modified";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent adding new properties to frozen objects", () => {
@@ -440,7 +440,7 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         frozen.params.newProp = "added";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent modification of frozen arrays", () => {
@@ -454,11 +454,11 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         (frozen.params.items as number[]).push(4);
-      }).toThrowError();
+      }).toThrow();
 
       expect(() => {
         (frozen.params.items as number[])[0] = 999;
-      }).toThrowError();
+      }).toThrow();
     });
   });
 
@@ -480,7 +480,7 @@ describe("deepFreezeState", () => {
 
       expect(() => {
         frozen.meta!.params.source = "modified";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should handle circular reference in meta", () => {
@@ -497,7 +497,7 @@ describe("deepFreezeState", () => {
       // Create circular reference in meta.params
       (state.meta!.params as Record<string, unknown>).ref = state.meta;
 
-      expect(() => deepFreezeState(state)).not.toThrowError();
+      expect(() => deepFreezeState(state)).not.toThrow();
 
       const frozen = deepFreezeState(state);
 
@@ -542,7 +542,7 @@ describe("freezeStateInPlace", () => {
       // Verify immutability
       expect(() => {
         frozen.name = "changed";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should freeze state with meta in place", () => {
@@ -755,7 +755,7 @@ describe("freezeStateInPlace", () => {
 
       expect(() => {
         frozen.name = "modified";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent modification of frozen params", () => {
@@ -769,7 +769,7 @@ describe("freezeStateInPlace", () => {
 
       expect(() => {
         frozen.params.id = "456";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent adding new properties to frozen objects", () => {
@@ -783,7 +783,7 @@ describe("freezeStateInPlace", () => {
 
       expect(() => {
         frozen.params.newProp = "added";
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should prevent modification of frozen arrays", () => {
@@ -797,11 +797,11 @@ describe("freezeStateInPlace", () => {
 
       expect(() => {
         (frozen.params.items as number[]).push(4);
-      }).toThrowError();
+      }).toThrow();
 
       expect(() => {
         (frozen.params.items as number[])[0] = 999;
-      }).toThrowError();
+      }).toThrow();
     });
   });
 });

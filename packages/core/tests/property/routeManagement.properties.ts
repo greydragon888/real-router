@@ -70,7 +70,7 @@ describe("Route Management (getRoutesApi) Properties", () => {
         { name: "cycA", path: "/cyc-a", forwardTo: "cycB" },
         { name: "cycB", path: "/cyc-b", forwardTo: "cycA" },
       ]);
-    }).toThrowError();
+    }).toThrow();
   });
 
   it("replace atomicity: old routes gone, new routes present", () => {
@@ -97,7 +97,7 @@ describe("Route Management (getRoutesApi) Properties", () => {
         { name: "dupX", path: "/dup-x" },
         { name: "dupX", path: "/dup-x2" },
       ]);
-    }).toThrowError();
+    }).toThrow();
   });
 
   test.prop([arbSegmentName], { numRuns: NUM_RUNS.fast })(

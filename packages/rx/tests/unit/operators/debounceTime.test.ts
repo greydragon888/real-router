@@ -347,7 +347,7 @@ describe("debounceTime()", () => {
     it("should throw RangeError on negative duration", () => {
       expect(() => {
         debounceTime(-100);
-      }).toThrowError(
+      }).toThrow(
         new RangeError(
           "debounceTime: duration must be a non-negative finite number, got -100",
         ),
@@ -357,7 +357,7 @@ describe("debounceTime()", () => {
     it("should throw RangeError on NaN duration", () => {
       expect(() => {
         debounceTime(Number.NaN);
-      }).toThrowError(
+      }).toThrow(
         new RangeError(
           "debounceTime: duration must be a non-negative finite number, got NaN",
         ),
@@ -367,7 +367,7 @@ describe("debounceTime()", () => {
     it("should throw RangeError on Infinity duration", () => {
       expect(() => {
         debounceTime(Number.POSITIVE_INFINITY);
-      }).toThrowError(
+      }).toThrow(
         new RangeError(
           "debounceTime: duration must be a non-negative finite number, got Infinity",
         ),
@@ -377,13 +377,13 @@ describe("debounceTime()", () => {
     it("should accept zero duration", () => {
       expect(() => {
         debounceTime(0);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept positive finite duration", () => {
       expect(() => {
         debounceTime(100);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 });

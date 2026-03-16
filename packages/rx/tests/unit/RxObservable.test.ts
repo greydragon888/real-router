@@ -199,7 +199,7 @@ describe("RxObservable", () => {
 
       expect(() => {
         observable.subscribe({});
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -235,7 +235,7 @@ describe("RxObservable", () => {
             throw new Error("error handler error");
           },
         });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("catches errors in complete handler silently", () => {
@@ -249,7 +249,7 @@ describe("RxObservable", () => {
             throw new Error("complete error");
           },
         });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("catches errors in teardown silently", () => {
@@ -263,7 +263,7 @@ describe("RxObservable", () => {
 
       expect(() => {
         subscription.unsubscribe();
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("reports unhandled error via console.error when no error handler", () => {
@@ -643,7 +643,7 @@ describe("RxObservable", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       emitError!(new Error("test error"));
 
-      await expect(iteratorPromise).rejects.toThrowError("test error");
+      await expect(iteratorPromise).rejects.toThrow("test error");
     });
 
     it("throws on observable error with value", async () => {
@@ -670,7 +670,7 @@ describe("RxObservable", () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       emitError!(new Error("error after value"));
 
-      await expect(iteratorPromise).rejects.toThrowError("error after value");
+      await expect(iteratorPromise).rejects.toThrow("error after value");
     });
 
     it("handles error while iterator is actively waiting in Promise", async () => {
@@ -690,7 +690,7 @@ describe("RxObservable", () => {
         for await (const _value of observable) {
           // Iterator will wait here, then error will be emitted
         }
-      }).rejects.toThrowError("error while waiting");
+      }).rejects.toThrow("error while waiting");
     });
 
     it("handles complete while iterator is actively waiting in Promise", async () => {
@@ -726,7 +726,7 @@ describe("RxObservable", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      await expect(iterator.next()).rejects.toThrowError("delayed error");
+      await expect(iterator.next()).rejects.toThrow("delayed error");
     });
   });
 });

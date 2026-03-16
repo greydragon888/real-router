@@ -191,24 +191,20 @@ describe("search-params", () => {
     });
 
     it("throws TypeError for object elements in arrays", () => {
-      expect(() => build({ items: [{ nested: "value" }] })).toThrowError(
-        TypeError,
-      );
-      expect(() => build({ items: [{ nested: "value" }] })).toThrowError(
+      expect(() => build({ items: [{ nested: "value" }] })).toThrow(TypeError);
+      expect(() => build({ items: [{ nested: "value" }] })).toThrow(
         "[search-params] Array element must be a string, number, or boolean — received object",
       );
     });
 
     it("throws TypeError for null elements in arrays", () => {
-      expect(() => build({ items: [null] })).toThrowError(TypeError);
-      expect(() => build({ items: [null] })).toThrowError("received null");
+      expect(() => build({ items: [null] })).toThrow(TypeError);
+      expect(() => build({ items: [null] })).toThrow("received null");
     });
 
     it("throws TypeError for undefined elements in arrays", () => {
-      expect(() => build({ items: [undefined] })).toThrowError(TypeError);
-      expect(() => build({ items: [undefined] })).toThrowError(
-        "received undefined",
-      );
+      expect(() => build({ items: [undefined] })).toThrow(TypeError);
+      expect(() => build({ items: [undefined] })).toThrow("received undefined");
     });
 
     it("handles null with default format", () => {

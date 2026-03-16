@@ -147,9 +147,7 @@ describe("navigate() → transition.segments Properties", () => {
   it("same route navigation → SAME_STATES error", async () => {
     const router = await createStartedRouter("/users/abc");
 
-    await expect(
-      router.navigate("users.view", { id: "abc" }),
-    ).rejects.toThrowError(
+    await expect(router.navigate("users.view", { id: "abc" })).rejects.toThrow(
       expect.objectContaining({ code: errorCodes.SAME_STATES }),
     );
 
@@ -159,7 +157,7 @@ describe("navigate() → transition.segments Properties", () => {
   it("navigate to unknown route → ROUTE_NOT_FOUND error", async () => {
     const router = await createStartedRouter("/users/abc");
 
-    await expect(router.navigate("nonexistent")).rejects.toThrowError(
+    await expect(router.navigate("nonexistent")).rejects.toThrow(
       expect.objectContaining({ code: errorCodes.ROUTE_NOT_FOUND }),
     );
 
@@ -187,7 +185,7 @@ describe("navigate() → transition.segments Properties", () => {
 
     await vi.runAllTimersAsync();
 
-    await expect(p1).rejects.toThrowError(RouterError);
+    await expect(p1).rejects.toThrow(RouterError);
 
     try {
       await p1;

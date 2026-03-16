@@ -16,19 +16,19 @@ describe("core/limits (integration via public API)", () => {
     it("should accept valid custom limit without error", () => {
       expect(() => {
         createRouter([], { limits: { maxPlugins: 10 } });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept 0 (unlimited) without error", () => {
       expect(() => {
         createRouter([], { limits: { maxPlugins: 0 } });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept empty limits object without error", () => {
       expect(() => {
         createRouter([], { limits: {} });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept all valid limit keys", () => {
@@ -42,7 +42,7 @@ describe("core/limits (integration via public API)", () => {
             maxLifecycleHandlers: 100,
           },
         });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -51,61 +51,61 @@ describe("core/limits (integration via public API)", () => {
     it("should throw TypeError for non-integer maxPlugins (string)", () => {
       expect(() => {
         createRouter([], { limits: { maxPlugins: "50" as any } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         createRouter([], { limits: { maxPlugins: "50" as any } });
-      }).toThrowError("must be an integer");
+      }).toThrow("must be an integer");
     });
 
     it("should throw TypeError for non-integer maxPlugins (float)", () => {
       expect(() => {
         createRouter([], { limits: { maxPlugins: 1.5 } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         createRouter([], { limits: { maxPlugins: 1.5 } });
-      }).toThrowError("must be an integer");
+      }).toThrow("must be an integer");
     });
 
     it("should throw RangeError for negative maxPlugins", () => {
       expect(() => {
         createRouter([], { limits: { maxPlugins: -1 } });
-      }).toThrowError(RangeError);
+      }).toThrow(RangeError);
       expect(() => {
         createRouter([], { limits: { maxPlugins: -1 } });
-      }).toThrowError("must be between 0 and");
+      }).toThrow("must be between 0 and");
     });
 
     it("should throw TypeError for unknown limit key", () => {
       expect(() => {
         createRouter([], { limits: { unknownLimit: 50 } as any });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         createRouter([], { limits: { unknownLimit: 50 } as any });
-      }).toThrowError("unknown limit");
+      }).toThrow("unknown limit");
     });
 
     it("should throw TypeError when limits is null", () => {
       expect(() => {
         createRouter([], { limits: null as any });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         createRouter([], { limits: null as any });
-      }).toThrowError("expected plain object");
+      }).toThrow("expected plain object");
     });
 
     it("should throw TypeError when limits is array", () => {
       expect(() => {
         createRouter([], { limits: [] as any });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         createRouter([], { limits: [] as any });
-      }).toThrowError("expected plain object");
+      }).toThrow("expected plain object");
     });
 
     it("should throw TypeError when limits is primitive", () => {
       expect(() => {
         createRouter([], { limits: 123 as any });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -118,12 +118,12 @@ describe("core/limits (integration via public API)", () => {
       expect(() => {
         router.usePlugin(() => ({}));
         router.usePlugin(() => ({}));
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 3rd plugin should throw
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should enforce custom maxDependencies limit", () => {
@@ -136,12 +136,12 @@ describe("core/limits (integration via public API)", () => {
       // Set 1 dependency - should succeed
       expect(() => {
         deps.set("dep1", 1);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 2nd dependency should throw
       expect(() => {
         deps.set("dep2", 2);
-      }).toThrowError("Dependency limit exceeded");
+      }).toThrow("Dependency limit exceeded");
     });
 
     it("should enforce custom maxListeners limit", () => {
@@ -150,12 +150,12 @@ describe("core/limits (integration via public API)", () => {
       // Add 1 listener - should succeed
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 2nd listener should throw
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
-      }).toThrowError("Listener limit");
+      }).toThrow("Listener limit");
     });
   });
 
@@ -169,7 +169,7 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 10; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow unlimited dependencies when maxDependencies = 0", () => {
@@ -189,12 +189,12 @@ describe("core/limits (integration via public API)", () => {
 
       expect(() => {
         deps.setAll(manyDeps);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Also test set to cover #checkDependencyCount early return
       expect(() => {
         deps.set("extraDep", 999);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow unlimited listeners when maxListeners = 0", () => {
@@ -205,7 +205,7 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 10; i++) {
           getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow unlimited event depth when maxEventDepth = 0", async () => {
@@ -237,7 +237,7 @@ describe("core/limits (integration via public API)", () => {
           getLifecycleApi(router).addActivateGuard(`route${i}`, true);
           getLifecycleApi(router).addDeactivateGuard(`route${i}`, true);
         }
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -251,12 +251,12 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 50; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 51st plugin should throw
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should enforce default maxDependencies limit (100)", () => {
@@ -273,13 +273,13 @@ describe("core/limits (integration via public API)", () => {
 
       expect(() => {
         deps.setAll(deps99);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Adding 2 more via setAll should throw (would be 101 total)
       // This tests validateDependencyLimit throw path
       expect(() => {
         deps.setAll({ dep99: 99, dep100: 100 });
-      }).toThrowError("Dependency limit exceeded");
+      }).toThrow("Dependency limit exceeded");
     });
 
     it("should enforce default maxListeners limit (10000)", () => {
@@ -290,12 +290,12 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 10_000; i++) {
           getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 10001st listener should throw
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
-      }).toThrowError("Listener limit");
+      }).toThrow("Listener limit");
     });
 
     it("should work without explicit limits option", () => {
@@ -304,19 +304,19 @@ describe("core/limits (integration via public API)", () => {
       // No limits option - should use defaults
       expect(() => {
         router = createRouter([]);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify default limits are enforced by registering plugins
       expect(() => {
         for (let i = 0; i < 50; i++) {
           router!.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 51st should throw (default limit)
       expect(() => {
         router!.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
   });
 
@@ -395,12 +395,12 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 199; i++) {
           getLifecycleApi(router).addActivateGuard(`route${i}`, true);
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 200th handler should throw
       expect(() => {
         getLifecycleApi(router).addActivateGuard("route199", true);
-      }).toThrowError(/limit exceeded.*200/i);
+      }).toThrow(/limit exceeded.*200/i);
     });
 
     it("should log warning at warn threshold (20% of maxLifecycleHandlers)", async () => {
@@ -473,11 +473,11 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 5; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should handle limit of 1 (minimum non-zero)", () => {
@@ -486,12 +486,12 @@ describe("core/limits (integration via public API)", () => {
       // 1 plugin should succeed
       expect(() => {
         router.usePlugin(() => ({}));
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 2nd should throw
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should handle very large custom limits", () => {
@@ -502,7 +502,7 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 100; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should preserve limits in cloned router", () => {
@@ -515,11 +515,11 @@ describe("core/limits (integration via public API)", () => {
         cloned.usePlugin(() => ({}));
         cloned.usePlugin(() => ({}));
         cloned.usePlugin(() => ({}));
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         cloned.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should handle all limits set to 0 (unlimited everything)", () => {
@@ -537,7 +537,7 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 20; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should skip undefined limit values in config", () => {
@@ -548,7 +548,7 @@ describe("core/limits (integration via public API)", () => {
             maxPlugins: undefined,
           } as any,
         });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // maxPlugins should use default (50) when undefined
       const router = createRouter([], {
@@ -562,12 +562,12 @@ describe("core/limits (integration via public API)", () => {
         for (let i = 0; i < 50; i++) {
           router.usePlugin(() => ({}));
         }
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // 51st should throw (default limit)
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError("Plugin limit exceeded");
+      }).toThrow("Plugin limit exceeded");
     });
 
     it("should accept limits: undefined (skip validation)", () => {
@@ -576,7 +576,7 @@ describe("core/limits (integration via public API)", () => {
         createRouter([], {
           limits: undefined,
         } as any);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept logger option without error", () => {
@@ -585,7 +585,7 @@ describe("core/limits (integration via public API)", () => {
         createRouter([], {
           logger: { level: "all" },
         } as any);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 });

@@ -87,7 +87,7 @@ describe("router.navigate() - base cases", () => {
       () =>
         // @ts-expect-error - Testing extra arguments are ignored
         void router.navigate("index", {}, {}, extraFn, 123),
-    ).not.toThrowError();
+    ).not.toThrow();
   });
 
   it("should be able to call navigate with 3 args without callback", async () => {

@@ -281,7 +281,7 @@ describe("Operator Properties", () => {
       (duration) => {
         expect(() => {
           debounceTime(duration);
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
 
@@ -298,7 +298,7 @@ describe("Operator Properties", () => {
     )("negative, NaN, or infinite duration throws RangeError", (duration) => {
       expect(() => {
         debounceTime(duration);
-      }).toThrowError(RangeError);
+      }).toThrow(RangeError);
     });
   });
 });

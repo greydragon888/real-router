@@ -21,7 +21,7 @@ describe("createOptionsValidator Properties", () => {
 
         expect(() => {
           validate(cleaned);
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });
@@ -32,7 +32,7 @@ describe("createOptionsValidator Properties", () => {
       (opts) => {
         expect(() => {
           validate(opts as never);
-        }).toThrowError(Error);
+        }).toThrow(Error);
       },
     );
   });
@@ -41,7 +41,7 @@ describe("createOptionsValidator Properties", () => {
     test("undefined options do not throw", () => {
       expect(() => {
         validate(undefined);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -63,7 +63,7 @@ describe("createOptionsValidator Properties", () => {
 
         expect(() => {
           validate(cleaned);
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });

@@ -10,7 +10,7 @@ describe("Route Guards - Property-Based Tests", () => {
     test.prop([fc.string()])(
       "accepts any string input without throwing",
       (name) => {
-        expect(() => isRouteName(name)).not.toThrowError();
+        expect(() => isRouteName(name)).not.toThrow();
       },
     );
 

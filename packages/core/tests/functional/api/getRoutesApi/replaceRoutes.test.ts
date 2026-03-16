@@ -250,7 +250,7 @@ describe("core/routes/replaceRoutes", () => {
       });
 
       // Guard blocks navigation before replace
-      await expect(router.navigate("protected")).rejects.toThrowError();
+      await expect(router.navigate("protected")).rejects.toThrow();
 
       // Replace: re-add same route path but without guard
       routesApi.replace([
@@ -274,7 +274,7 @@ describe("core/routes/replaceRoutes", () => {
       ]);
 
       // Guard is registered for new route
-      await expect(router.navigate("new-protected")).rejects.toThrowError();
+      await expect(router.navigate("new-protected")).rejects.toThrow();
     });
 
     it("should preserve external guards (addActivateGuard) on replace", async () => {
@@ -282,7 +282,7 @@ describe("core/routes/replaceRoutes", () => {
       lifecycle.addActivateGuard("ext-guarded", () => () => false); // external guard
 
       // External guard blocks navigation
-      await expect(router.navigate("ext-guarded")).rejects.toThrowError();
+      await expect(router.navigate("ext-guarded")).rejects.toThrow();
 
       // Replace: re-add the route
       routesApi.replace([
@@ -291,7 +291,7 @@ describe("core/routes/replaceRoutes", () => {
       ]);
 
       // External guard is STILL preserved — navigation still blocked
-      await expect(router.navigate("ext-guarded")).rejects.toThrowError();
+      await expect(router.navigate("ext-guarded")).rejects.toThrow();
     });
 
     it("should preserve external guard for removed route (usable after re-add)", async () => {
@@ -308,7 +308,7 @@ describe("core/routes/replaceRoutes", () => {
       routesApi.add({ name: "removed-route", path: "/removed" });
 
       // External guard is still in place
-      await expect(router.navigate("removed-route")).rejects.toThrowError();
+      await expect(router.navigate("removed-route")).rejects.toThrow();
     });
 
     it("should treat routesApi.update({ canActivate }) as definition guard (cleared on replace)", async () => {
@@ -316,7 +316,7 @@ describe("core/routes/replaceRoutes", () => {
       routesApi.update("updated", { canActivate: () => () => false }); // definition guard via update
 
       // Update-registered guard blocks navigation
-      await expect(router.navigate("updated")).rejects.toThrowError();
+      await expect(router.navigate("updated")).rejects.toThrow();
 
       // Replace with same route but no guard
       routesApi.replace([
@@ -340,7 +340,7 @@ describe("core/routes/replaceRoutes", () => {
       await router.navigate("sticky-def");
 
       // Definition deactivate guard blocks leaving
-      await expect(router.navigate("home")).rejects.toThrowError();
+      await expect(router.navigate("home")).rejects.toThrow();
 
       // Replace without deactivate guard (state revalidation keeps us on sticky-def)
       routesApi.replace([
@@ -377,7 +377,7 @@ describe("core/routes/replaceRoutes", () => {
       expect(router.getState()?.name).toBe("cross-type");
 
       // External canDeactivate is preserved — cannot leave the route
-      await expect(router.navigate("home")).rejects.toThrowError();
+      await expect(router.navigate("home")).rejects.toThrow();
     });
 
     it("should preserve external canDeactivate guards on replace", async () => {
@@ -393,7 +393,7 @@ describe("core/routes/replaceRoutes", () => {
       ]);
 
       // External deactivate guard preserved — cannot leave sticky
-      await expect(router.navigate("home")).rejects.toThrowError();
+      await expect(router.navigate("home")).rejects.toThrow();
     });
 
     it("should overwrite external guard with definition guard on replace (definition wins)", async () => {
@@ -419,7 +419,7 @@ describe("core/routes/replaceRoutes", () => {
       await router.navigate("home");
 
       // Definition guard now blocks navigation
-      await expect(router.navigate("contested")).rejects.toThrowError();
+      await expect(router.navigate("contested")).rejects.toThrow();
     });
 
     it("should have no stale entries after removeActivateGuard + replace", async () => {
@@ -506,7 +506,7 @@ describe("core/routes/replaceRoutes", () => {
       // No state exists — should not throw
       expect(() => {
         api.replace([{ name: "new", path: "/new" }]);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(getPluginApi(unstartedRouter).matchPath("/new")?.name).toBe("new");
     });
@@ -535,7 +535,7 @@ describe("core/routes/replaceRoutes", () => {
           { name: "home", path: "/home" }, // valid
           { name: "invalid route name!", path: "/invalid" }, // invalid — has spaces
         ]);
-      }).toThrowError();
+      }).toThrow();
 
       // Tree unchanged — home still exists
       expect(routesApi.has("home")).toBe(beforeHas);
@@ -552,7 +552,7 @@ describe("core/routes/replaceRoutes", () => {
       routesApi.add({ name: "ext-guarded", path: "/ext-guarded" });
 
       // External guard is still in place (replace preserves external guards, clear does not)
-      await expect(router.navigate("ext-guarded")).rejects.toThrowError();
+      await expect(router.navigate("ext-guarded")).rejects.toThrow();
     });
 
     it("should block entire batch if duplicate route name is in new array", () => {
@@ -563,7 +563,7 @@ describe("core/routes/replaceRoutes", () => {
           { name: "new-a", path: "/new-a" },
           { name: "new-a", path: "/new-a-dup" }, // duplicate name in batch
         ]);
-      }).toThrowError();
+      }).toThrow();
 
       // Original tree intact
       expect(routesApi.has("home")).toBe(hadHome);
@@ -581,7 +581,7 @@ describe("core/routes/replaceRoutes", () => {
 
       expect(() => {
         api.replace([{ name: "fresh-route", path: "/fresh-route" }]);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(api.has("fresh-route")).toBe(true);
     });
@@ -592,7 +592,7 @@ describe("core/routes/replaceRoutes", () => {
 
       expect(() => {
         routesApi.replace([{ name: "after-stop", path: "/after-stop" }]);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(routesApi.has("after-stop")).toBe(true);
     });
@@ -602,7 +602,7 @@ describe("core/routes/replaceRoutes", () => {
 
       expect(() => {
         routesApi.replace([{ name: "after-dispose", path: "/after-dispose" }]);
-      }).toThrowError();
+      }).toThrow();
     });
   });
 
@@ -686,7 +686,7 @@ describe("core/routes/replaceRoutes", () => {
       ]);
 
       // External guard is preserved even with noValidate
-      await expect(nvRouter.navigate("guarded")).rejects.toThrowError();
+      await expect(nvRouter.navigate("guarded")).rejects.toThrow();
 
       nvRouter.stop();
     });
@@ -719,7 +719,7 @@ describe("core/routes/replaceRoutes", () => {
       routesApi.replace([{ name: "new-home", path: "/new-home" }]);
 
       // Navigation to removed route fails
-      await expect(router.navigate("home")).rejects.toThrowError();
+      await expect(router.navigate("home")).rejects.toThrow();
     });
 
     it("should build paths correctly for new routes after replace", () => {

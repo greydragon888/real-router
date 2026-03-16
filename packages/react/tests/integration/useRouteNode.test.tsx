@@ -61,7 +61,7 @@ describe("useRouteNode - Integration Tests", () => {
 
       expect(() => {
         renderHook(() => useRouteNode("users"));
-      }).toThrowError("useRouter must be used within a RouterProvider");
+      }).toThrow("useRouter must be used within a RouterProvider");
 
       consoleSpy.mockRestore();
     });

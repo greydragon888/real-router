@@ -201,7 +201,7 @@ describe("Logger Callback Properties", () => {
         // Logging should not throw error
         expect(() => {
           logger[messageLevel](context, message);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Console should be called (main logging works)
         if (messageLevel === "error") {

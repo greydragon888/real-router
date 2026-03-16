@@ -78,20 +78,16 @@ describe("core/routes/routePath/buildPath", () => {
     it("should throw TypeError for non-string rootPath", () => {
       expect(() => {
         getPluginApi(router).setRootPath(123 as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         getPluginApi(router).setRootPath(123 as unknown as string);
-      }).toThrowError(
-        "[router.setRootPath] rootPath must be a string, got number",
-      );
+      }).toThrow("[router.setRootPath] rootPath must be a string, got number");
     });
 
     it("should throw TypeError for null rootPath", () => {
       expect(() => {
         getPluginApi(router).setRootPath(null as unknown as string);
-      }).toThrowError(
-        "[router.setRootPath] rootPath must be a string, got null",
-      );
+      }).toThrow("[router.setRootPath] rootPath must be a string, got null");
     });
   });
 
@@ -226,40 +222,40 @@ describe("core/routes/routePath/buildPath", () => {
   describe("buildPath error handling", () => {
     describe("invalid route parameter", () => {
       it("should throw TypeError when route is undefined", () => {
-        expect(() =>
-          router.buildPath(undefined as unknown as string),
-        ).toThrowError(TypeError);
+        expect(() => router.buildPath(undefined as unknown as string)).toThrow(
+          TypeError,
+        );
       });
 
       it("should throw TypeError when route is null", () => {
-        expect(() => router.buildPath(null as unknown as string)).toThrowError(
+        expect(() => router.buildPath(null as unknown as string)).toThrow(
           TypeError,
         );
       });
 
       it("should throw TypeError when route is not a string", () => {
-        expect(() => router.buildPath(123 as unknown as string)).toThrowError(
+        expect(() => router.buildPath(123 as unknown as string)).toThrow(
           TypeError,
         );
-        expect(() => router.buildPath({} as unknown as string)).toThrowError(
+        expect(() => router.buildPath({} as unknown as string)).toThrow(
           TypeError,
         );
       });
 
       it("should throw when route is empty string", () => {
-        expect(() => router.buildPath("")).toThrowError();
+        expect(() => router.buildPath("")).toThrow();
       });
     });
 
     describe("route not found", () => {
       it("should throw when route does not exist", () => {
-        expect(() => router.buildPath("nonexistent")).toThrowError(
+        expect(() => router.buildPath("nonexistent")).toThrow(
           /nonexistent.*is not defined/,
         );
       });
 
       it("should throw when nested route does not exist", () => {
-        expect(() => router.buildPath("home.nonexistent")).toThrowError(
+        expect(() => router.buildPath("home.nonexistent")).toThrow(
           /home\.nonexistent.*is not defined/,
         );
       });
@@ -272,7 +268,7 @@ describe("core/routes/routePath/buildPath", () => {
           path: String.raw`/user/:id<\d+>`,
         });
 
-        expect(() => router.buildPath("user", { id: "abc" })).toThrowError(
+        expect(() => router.buildPath("user", { id: "abc" })).toThrow(
           /does not match constraint/,
         );
       });
@@ -299,7 +295,7 @@ describe("core/routes/routePath/buildPath", () => {
           },
         });
 
-        expect(() => router.buildPath("user", { id: "42" })).toThrowError(
+        expect(() => router.buildPath("user", { id: "42" })).toThrow(
           "Custom encoder error",
         );
       });
@@ -447,7 +443,7 @@ describe("core/routes/routePath/buildPath", () => {
           encodeParams: () => ({ id: "not-a-number" }),
         });
 
-        expect(() => router.buildPath("user", { id: "42" })).toThrowError(
+        expect(() => router.buildPath("user", { id: "42" })).toThrow(
           /does not match constraint/,
         );
       });
@@ -601,19 +597,19 @@ describe("core/routes/routePath/buildPath", () => {
         it("should reject Cyrillic route names (ASCII only)", () => {
           expect(() => {
             routesApi.add({ name: "пользователи", path: "/users" });
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
 
         it("should reject emoji route names", () => {
           expect(() => {
             routesApi.add({ name: "🚀", path: "/launch" });
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
 
         it("should reject route names with unicode characters", () => {
           expect(() => {
             routesApi.add({ name: "café", path: "/cafe" });
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
 
         it("should accept route names with underscores and hyphens", () => {

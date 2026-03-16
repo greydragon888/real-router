@@ -30,7 +30,7 @@ export default mergeConfig(
       /**
        * Reporter configuration
        */
-      reporters: ["default"],
+      reporters: process.env.CI ? ["default", "github-actions"] : ["default"],
 
       /**
        * Test filtering - only property-based tests

@@ -30,7 +30,7 @@ describe("core/internal-route-protection", () => {
     it("should throw when adding a route with @@ prefix", () => {
       expect(() => {
         routesApi.add({ name: INTERNAL_NAME, path: "/system" });
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     it("should throw when adding routes with @@ prefix in children", () => {
@@ -40,19 +40,19 @@ describe("core/internal-route-protection", () => {
           path: "/parent",
           children: [{ name: INTERNAL_CHILD, path: "/child" }],
         });
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     it("should throw when removing a route with @@ prefix", () => {
       expect(() => {
         routesApi.remove(INTERNAL_NAME);
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     it("should throw when updating a route with @@ prefix", () => {
       expect(() => {
         routesApi.update(INTERNAL_NAME, { defaultParams: { a: "1" } });
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     it("should throw when replacing routes with @@ prefix", () => {
@@ -61,7 +61,7 @@ describe("core/internal-route-protection", () => {
           { name: "home", path: "/home" },
           { name: INTERNAL_NAME, path: "/system" },
         ]);
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     it("should throw when replacing routes with @@ prefix in children", () => {
@@ -73,35 +73,35 @@ describe("core/internal-route-protection", () => {
             children: [{ name: INTERNAL_CHILD, path: "/child" }],
           },
         ]);
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
   });
 
   describe("allowed operations on @@ prefix routes", () => {
     it("should allow read operations (has, get, getConfig)", () => {
-      expect(() => routesApi.has(INTERNAL_NAME)).not.toThrowError();
-      expect(() => routesApi.get(INTERNAL_NAME)).not.toThrowError();
-      expect(() => routesApi.getConfig(INTERNAL_NAME)).not.toThrowError();
+      expect(() => routesApi.has(INTERNAL_NAME)).not.toThrow();
+      expect(() => routesApi.get(INTERNAL_NAME)).not.toThrow();
+      expect(() => routesApi.getConfig(INTERNAL_NAME)).not.toThrow();
     });
 
     it("should allow adding guards for @@ prefix routes", () => {
       expect(() => {
         lifecycle.addActivateGuard(INTERNAL_NAME, () => () => true);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         lifecycle.addDeactivateGuard(INTERNAL_NAME, () => () => true);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow removing guards for @@ prefix routes", () => {
       expect(() => {
         lifecycle.removeActivateGuard(INTERNAL_NAME);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(() => {
         lifecycle.removeDeactivateGuard(INTERNAL_NAME);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -122,7 +122,7 @@ describe("core/internal-route-protection", () => {
     it("should allow adding @@ route when noValidate is true", () => {
       expect(() => {
         noValidateRoutes.add({ name: INTERNAL_NAME, path: "/system" });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -130,25 +130,25 @@ describe("core/internal-route-protection", () => {
     it("should include addRoute in error message", () => {
       expect(() => {
         routesApi.add({ name: INTERNAL_NAME, path: "/x" });
-      }).toThrowError("[router.addRoute]");
+      }).toThrow("[router.addRoute]");
     });
 
     it("should include removeRoute in error message", () => {
       expect(() => {
         routesApi.remove(INTERNAL_NAME);
-      }).toThrowError("[router.removeRoute]");
+      }).toThrow("[router.removeRoute]");
     });
 
     it("should include updateRoute in error message", () => {
       expect(() => {
         routesApi.update(INTERNAL_NAME, {});
-      }).toThrowError("[router.updateRoute]");
+      }).toThrow("[router.updateRoute]");
     });
 
     it("should include replaceRoutes in error message", () => {
       expect(() => {
         routesApi.replace([{ name: INTERNAL_NAME, path: "/x" }]);
-      }).toThrowError("[router.replaceRoutes]");
+      }).toThrow("[router.replaceRoutes]");
     });
   });
 });

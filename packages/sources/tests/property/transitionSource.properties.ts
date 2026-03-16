@@ -407,7 +407,7 @@ describe("createTransitionSource — destroy", () => {
       for (let i = 0; i < destroyCount; i++) {
         expect(() => {
           source.destroy();
-        }).not.toThrowError();
+        }).not.toThrow();
       }
 
       router.stop();
@@ -475,7 +475,7 @@ describe("createTransitionSource — destroy", () => {
 
       expect(() => {
         unsub();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.stop();
     },

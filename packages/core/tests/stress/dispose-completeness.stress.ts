@@ -114,7 +114,7 @@ describe("S4. Router dispose completeness", () => {
 
       expect(() => {
         router.dispose();
-      }).not.toThrowError();
+      }).not.toThrow();
     }
 
     const after = takeHeapSnapshot();

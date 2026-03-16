@@ -26,54 +26,54 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, "invalid");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, "invalid");
-      }).toThrowError(/Invalid options/);
+      }).toThrow(/Invalid options/);
     });
 
     it("should throw TypeError for invalid options type (number)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, 123);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid options type (array)", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, []);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid option field types", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, { replace: "true" });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         // @ts-expect-error -- testing runtime validation
         void router.navigate("users", {}, { reload: 1 });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should accept valid NavigationOptions", () => {
       expect(() => {
         void router.navigate("users", {}, { replace: true, reload: false });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept empty options object", () => {
       expect(() => {
         void router.navigate("users", {}, {});
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept undefined options (short form)", () => {
       expect(() => {
         void router.navigate("users", {});
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should include method name in error message", () => {
@@ -82,8 +82,8 @@ describe("router.navigate() - edge cases input validation", () => {
         void router.navigate("users", {}, { replace: "invalid" });
       };
 
-      expect(action).toThrowError(TypeError);
-      expect(action).toThrowError(/\[router\.navigate\]/);
+      expect(action).toThrow(TypeError);
+      expect(action).toThrow(/\[router\.navigate\]/);
     });
   });
 
@@ -92,7 +92,7 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
         void router.navigate(123);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);
@@ -102,7 +102,7 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
         void router.navigate(null);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);
@@ -112,7 +112,7 @@ describe("router.navigate() - edge cases input validation", () => {
       expect(() => {
         // @ts-expect-error -- testing runtime behavior with invalid type
         void router.navigate(undefined);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Router should still be operational
       expect(router.isActive()).toBe(true);

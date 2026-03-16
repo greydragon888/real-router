@@ -135,7 +135,7 @@ describe("Logger", () => {
     it("should throw error for invalid log level", () => {
       expect(() => {
         logger.configure({ level: "invalid" as LogLevelConfig });
-      }).toThrowError(
+      }).toThrow(
         'Invalid log level: "invalid". Valid levels are: all, warn-error, error-only, none',
       );
     });
@@ -143,7 +143,7 @@ describe("Logger", () => {
     it("should throw error with correct message format for invalid level", () => {
       expect(() => {
         logger.configure({ level: "debug" as LogLevelConfig });
-      }).toThrowError(/Invalid log level:.*Valid levels are:/);
+      }).toThrow(/Invalid log level:.*Valid levels are:/);
     });
 
     it("should verify default callbackIgnoresLevel is false in internal config", () => {
@@ -405,7 +405,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.error("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should log callback errors to console.error", () => {
@@ -445,7 +445,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.error("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       globalThis.console = originalConsole;
     });
@@ -458,7 +458,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.warn("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       console.warn = originalWarn;
     });
@@ -471,7 +471,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.log("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       console.log = originalLog;
     });
@@ -486,7 +486,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.error("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       globalThis.console = originalConsole;
     });
@@ -501,7 +501,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.log("Router", "Test");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       console.error = originalError;
     });
@@ -721,7 +721,7 @@ describe("Logger", () => {
 
       expect(() => {
         logger.error("Test", "message");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should dynamically switch callbackIgnoresLevel behavior", () => {

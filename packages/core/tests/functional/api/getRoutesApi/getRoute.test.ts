@@ -274,45 +274,45 @@ describe("core/routes/routeTree/getRoute", () => {
     });
 
     it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() => routesApi.get(".gr-users")).toThrowError(TypeError);
+      expect(() => routesApi.get(".gr-users")).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid name (trailing dot)", () => {
-      expect(() => routesApi.get("gr-users.")).toThrowError(TypeError);
+      expect(() => routesApi.get("gr-users.")).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid name (consecutive dots)", () => {
-      expect(() => routesApi.get("gr-users..profile")).toThrowError(TypeError);
+      expect(() => routesApi.get("gr-users..profile")).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (number)", () => {
-      expect(() => routesApi.get(123 as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(123 as never)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (null)", () => {
-      expect(() => routesApi.get(null as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(null as never)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (undefined)", () => {
-      expect(() => routesApi.get(undefined as never)).toThrowError(TypeError);
+      expect(() => routesApi.get(undefined as never)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (object)", () => {
-      expect(() => routesApi.get({} as never)).toThrowError(TypeError);
+      expect(() => routesApi.get({} as never)).toThrow(TypeError);
     });
 
     it("should throw TypeError for whitespace-only string", () => {
-      expect(() => routesApi.get("   ")).toThrowError(TypeError);
+      expect(() => routesApi.get("   ")).toThrow(TypeError);
     });
 
     it("should throw TypeError for segment starting with number", () => {
-      expect(() => routesApi.get("123users")).toThrowError(TypeError);
+      expect(() => routesApi.get("123users")).toThrow(TypeError);
     });
 
     it("should throw TypeError for name exceeding max length", () => {
       const longName = "a".repeat(10_001);
 
-      expect(() => routesApi.get(longName)).toThrowError(TypeError);
+      expect(() => routesApi.get(longName)).toThrow(TypeError);
     });
   });
 
@@ -340,16 +340,16 @@ describe("core/routes/routeTree/getRoute", () => {
   describe("edge cases", () => {
     describe("input validation edge cases", () => {
       it("should throw TypeError for Unicode characters in name", () => {
-        expect(() => routesApi.get("маршрут")).toThrowError(TypeError);
-        expect(() => routesApi.get("route-αβγ")).toThrowError(TypeError);
-        expect(() => routesApi.get("路由")).toThrowError(TypeError);
+        expect(() => routesApi.get("маршрут")).toThrow(TypeError);
+        expect(() => routesApi.get("route-αβγ")).toThrow(TypeError);
+        expect(() => routesApi.get("路由")).toThrow(TypeError);
       });
 
       it("should work with boundary length name (10,000 characters)", () => {
         const boundaryName = "a".repeat(10_000);
 
         // Should not throw - validates successfully
-        expect(() => routesApi.get(boundaryName)).not.toThrowError();
+        expect(() => routesApi.get(boundaryName)).not.toThrow();
 
         // Returns undefined since route doesn't exist
         expect(routesApi.get(boundaryName)).toBeUndefined();
@@ -360,7 +360,7 @@ describe("core/routes/routeTree/getRoute", () => {
           toString: () => "validroute",
         };
 
-        expect(() => routesApi.get(objWithToString as never)).toThrowError(
+        expect(() => routesApi.get(objWithToString as never)).toThrow(
           TypeError,
         );
       });
@@ -376,26 +376,24 @@ describe("core/routes/routeTree/getRoute", () => {
           {},
         );
 
-        expect(() => routesApi.get(proxyObj as never)).toThrowError(TypeError);
+        expect(() => routesApi.get(proxyObj as never)).toThrow(TypeError);
       });
 
       it("should throw TypeError for String object (boxed string)", () => {
         // eslint-disable-next-line sonarjs/no-primitive-wrappers, unicorn/new-for-builtins -- Testing boxed string edge case
         const boxedString = new String("validroute");
 
-        expect(() => routesApi.get(boxedString as never)).toThrowError(
-          TypeError,
-        );
+        expect(() => routesApi.get(boxedString as never)).toThrow(TypeError);
       });
 
       it("should block adding routes with @@ prefix", () => {
         expect(() => {
           routesApi.add({ name: "@@system", path: "/system" });
-        }).toThrowError(/reserved "@@" prefix/);
+        }).toThrow(/reserved "@@" prefix/);
       });
 
       it("should allow reading @@ prefix routes via get", () => {
-        expect(() => routesApi.get("@@system")).not.toThrowError();
+        expect(() => routesApi.get("@@system")).not.toThrow();
         expect(routesApi.get("@@system")).toBeUndefined();
       });
     });

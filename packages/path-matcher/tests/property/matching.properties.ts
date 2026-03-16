@@ -187,7 +187,7 @@ describe("Matching Properties", () => {
       (id: string) => {
         expect(() => {
           matcher.buildPath("users.profile", { id });
-        }).toThrowError();
+        }).toThrow();
       },
     );
   });

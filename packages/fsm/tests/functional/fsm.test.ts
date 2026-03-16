@@ -249,7 +249,7 @@ describe("FSM", () => {
         throw error;
       });
 
-      expect(() => fsm.send("TIMER")).toThrowError(error);
+      expect(() => fsm.send("TIMER")).toThrow(error);
       expect(fsm.getState()).toBe("yellow");
     });
 

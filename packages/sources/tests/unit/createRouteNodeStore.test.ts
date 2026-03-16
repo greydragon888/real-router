@@ -187,7 +187,7 @@ describe("createRouteNodeSources", () => {
 
     expect(() => {
       source.destroy();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("post-destroy: getSnapshot still returns last snapshot", async () => {
@@ -217,7 +217,7 @@ describe("createRouteNodeSources", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("lazy: does not subscribe to router until first listener", () => {

@@ -741,7 +741,7 @@ describe("SegmentMatcher", () => {
     it("should throw for unknown route", () => {
       const matcher = createStaticMatcher();
 
-      expect(() => matcher.buildPath("unknown")).toThrowError(
+      expect(() => matcher.buildPath("unknown")).toThrow(
         "[SegmentMatcher.buildPath] 'unknown' is not defined",
       );
     });
@@ -937,7 +937,7 @@ describe("SegmentMatcher", () => {
 
       expect(() => {
         matcher.setRootPath("/app");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should affect buildPath output", () => {
@@ -1453,7 +1453,7 @@ describe("SegmentMatcher", () => {
     it("should throw for missing required param", () => {
       const matcher = createParamBuildMatcher();
 
-      expect(() => matcher.buildPath("users.profile")).toThrowError(
+      expect(() => matcher.buildPath("users.profile")).toThrow(
         "[SegmentMatcher.buildPath] Missing required param 'id'",
       );
     });
@@ -1463,15 +1463,15 @@ describe("SegmentMatcher", () => {
 
       expect(() =>
         matcher.buildPath("users.profile", { id: undefined }),
-      ).toThrowError("[SegmentMatcher.buildPath] Missing required param 'id'");
+      ).toThrow("[SegmentMatcher.buildPath] Missing required param 'id'");
     });
 
     it("should throw for explicitly null param", () => {
       const matcher = createParamBuildMatcher();
 
-      expect(() =>
-        matcher.buildPath("users.profile", { id: null }),
-      ).toThrowError("[SegmentMatcher.buildPath] Missing required param 'id'");
+      expect(() => matcher.buildPath("users.profile", { id: null })).toThrow(
+        "[SegmentMatcher.buildPath] Missing required param 'id'",
+      );
     });
 
     it("should prepend rootPath to param path", () => {
@@ -1714,14 +1714,14 @@ describe("SegmentMatcher", () => {
       );
 
       // Invalid
-      expect(() =>
-        matcher.buildPath("users.profile", { id: "abc" }),
-      ).toThrowError(/does not match constraint/);
+      expect(() => matcher.buildPath("users.profile", { id: "abc" })).toThrow(
+        /does not match constraint/,
+      );
 
       // Object value — serialized via JSON.stringify before constraint check
       expect(() =>
         matcher.buildPath("users.profile", { id: { foo: 1 } }),
-      ).toThrowError(/does not match constraint/);
+      ).toThrow(/does not match constraint/);
     });
 
     it("should skip constraint validation for undefined optional param", () => {

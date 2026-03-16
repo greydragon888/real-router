@@ -191,7 +191,7 @@ describe("core/routes/addRoute", () => {
         path: "/parent-test-1",
         children: [{ name: 123 as unknown as string, path: "/invalid" }],
       });
-    }).toThrowError("[router.addRoute] Route name must be a string");
+    }).toThrow("[router.addRoute] Route name must be a string");
   });
 
   it("should throw when route name is empty string", async () => {
@@ -200,7 +200,7 @@ describe("core/routes/addRoute", () => {
         name: "",
         path: "/empty-name",
       });
-    }).toThrowError(/Route name cannot be empty/i);
+    }).toThrow(/Route name cannot be empty/i);
   });
 
   it("should validate deeply nested children", async () => {
@@ -216,17 +216,17 @@ describe("core/routes/addRoute", () => {
           },
         ],
       });
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   it("should throw if route is not an object", async () => {
     expect(() => {
       routesApi.add(null as unknown as []);
-    }).toThrowError("[router.addRoute] Route must be an object, got null");
+    }).toThrow("[router.addRoute] Route must be an object, got null");
 
     expect(() => {
       routesApi.add("string-route" as unknown as []);
-    }).toThrowError("[router.addRoute] Route must be an object, got string");
+    }).toThrow("[router.addRoute] Route must be an object, got string");
   });
 
   it("should throw if children is not an array", async () => {
@@ -236,7 +236,7 @@ describe("core/routes/addRoute", () => {
         path: "/parent-test-2",
         children: "not-an-array" as unknown as [],
       });
-    }).toThrowError(
+    }).toThrow(
       '[router.addRoute] Route "parent-test-2" children must be an array',
     );
   });
@@ -261,7 +261,7 @@ describe("core/routes/addRoute", () => {
 
     expect(() => {
       routesApi.add({ name: "dup-test", path: "/other" });
-    }).toThrowError('[router.addRoute] Route "dup-test" already exists');
+    }).toThrow('[router.addRoute] Route "dup-test" already exists');
   });
 
   it("should throw on duplicate name within same batch (cross-batch detection)", async () => {
@@ -270,7 +270,7 @@ describe("core/routes/addRoute", () => {
         { name: "batch-dup", path: "/batch-dup-1" },
         { name: "batch-dup", path: "/batch-dup-2" },
       ]);
-    }).toThrowError('[router.addRoute] Duplicate route "batch-dup" in batch');
+    }).toThrow('[router.addRoute] Duplicate route "batch-dup" in batch');
   });
 
   it("should throw on duplicate before modifying config (atomicity)", async () => {
@@ -285,7 +285,7 @@ describe("core/routes/addRoute", () => {
         },
         { name: "first-dup", path: "/first-dup" },
       ]);
-    }).toThrowError('[router.addRoute] Route "first-dup" already exists');
+    }).toThrow('[router.addRoute] Route "first-dup" already exists');
 
     // new-before-dup should NOT be registered (atomicity preserved)
     expect(routesApi.has("new-before-dup")).toBe(false);
@@ -303,9 +303,7 @@ describe("core/routes/addRoute", () => {
         { name: "child", path: "/other" },
         { parent: "dup-parent" },
       );
-    }).toThrowError(
-      '[router.addRoute] Route "dup-parent.child" already exists',
-    );
+    }).toThrow('[router.addRoute] Route "dup-parent.child" already exists');
   });
 
   it("should reject batch on path conflict (pre-validation atomicity)", async () => {
@@ -324,9 +322,7 @@ describe("core/routes/addRoute", () => {
         },
         { name: "conflict-route", path: "/path-conflict" },
       ]);
-    }).toThrowError(
-      '[router.addRoute] Path "/path-conflict" is already defined',
-    );
+    }).toThrow('[router.addRoute] Path "/path-conflict" is already defined');
 
     // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
     expect(routesApi.has("pre-validation-test")).toBe(false);
@@ -338,7 +334,7 @@ describe("core/routes/addRoute", () => {
         { name: "batch-path-a", path: "/same-path" },
         { name: "batch-path-b", path: "/same-path" },
       ]);
-    }).toThrowError('[router.addRoute] Path "/same-path" is already defined');
+    }).toThrow('[router.addRoute] Path "/same-path" is already defined');
   });
 
   describe("children handlers registration", () => {
@@ -552,9 +548,7 @@ describe("core/routes/addRoute", () => {
           { name: "orphan", path: "/orphan" },
           { parent: "nonexistent" },
         );
-      }).toThrowError(
-        '[router.addRoute] Parent route "nonexistent" does not exist',
-      );
+      }).toThrow('[router.addRoute] Parent route "nonexistent" does not exist');
     });
 
     it("should add multiple routes with same { parent } in batch", () => {
@@ -615,14 +609,14 @@ describe("core/routes/addRoute", () => {
     it("should validate { parent } option value", () => {
       expect(() => {
         routesApi.add({ name: "child", path: "/child" }, { parent: "" as any });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.add(
           { name: "child", path: "/child" },
           { parent: 123 as any },
         );
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -630,13 +624,13 @@ describe("core/routes/addRoute", () => {
     it("should throw TypeError when route name contains dots", () => {
       expect(() => {
         routesApi.add({ name: "users.profile", path: "/:id" });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should include helpful error message for dot-notation", () => {
       expect(() => {
         routesApi.add({ name: "users.profile", path: "/:id" });
-      }).toThrowError(
+      }).toThrow(
         '[router.addRoute] Route name "users.profile" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
       );
     });
@@ -644,11 +638,11 @@ describe("core/routes/addRoute", () => {
     it("should reject multi-level dot-notation", () => {
       expect(() => {
         routesApi.add({ name: "a.b.c", path: "/c" });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.add({ name: "a.b.c", path: "/c" });
-      }).toThrowError(/cannot contain dots/);
+      }).toThrow(/cannot contain dots/);
     });
   });
 
@@ -661,7 +655,7 @@ describe("core/routes/addRoute", () => {
 
           decodeParams: "not a function" as any,
         });
-      }).toThrowError(/decodeparams must be a function/i);
+      }).toThrow(/decodeparams must be a function/i);
     });
 
     it("should throw when encodeParams is not a function", async () => {
@@ -672,7 +666,7 @@ describe("core/routes/addRoute", () => {
 
           encodeParams: { wrong: "type" } as any,
         });
-      }).toThrowError(/encodeparams must be a function/i);
+      }).toThrow(/encodeparams must be a function/i);
     });
 
     it("should throw when decodeParams is null", async () => {
@@ -683,7 +677,7 @@ describe("core/routes/addRoute", () => {
 
           decodeParams: null as any,
         });
-      }).toThrowError(/decodeparams must be a function/i);
+      }).toThrow(/decodeparams must be a function/i);
     });
 
     it("should accept valid function for decodeParams", async () => {
@@ -693,7 +687,7 @@ describe("core/routes/addRoute", () => {
           path: "/valid-decoder/:id",
           decodeParams: (params) => ({ ...params, decoded: true }),
         });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should accept valid function for encodeParams", async () => {
@@ -703,7 +697,7 @@ describe("core/routes/addRoute", () => {
           path: "/valid-encoder/:id",
           encodeParams: (params) => ({ ...params, encoded: true }),
         });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should validate encodeParams/decodeParams in children", async () => {
@@ -720,7 +714,7 @@ describe("core/routes/addRoute", () => {
             },
           ],
         });
-      }).toThrowError(/decodeparams must be a function/i);
+      }).toThrow(/decodeparams must be a function/i);
     });
 
     it("should throw when decodeParams is an async function", async () => {
@@ -730,7 +724,7 @@ describe("core/routes/addRoute", () => {
           path: "/async-decoder/:id",
           decodeParams: (async (params: Params) => params) as any,
         });
-      }).toThrowError(/decodeparams cannot be async/i);
+      }).toThrow(/decodeparams cannot be async/i);
     });
 
     it("should throw when encodeParams is an async function", async () => {
@@ -740,7 +734,7 @@ describe("core/routes/addRoute", () => {
           path: "/async-encoder/:id",
           encodeParams: (async (params: Params) => params) as any,
         });
-      }).toThrowError(/encodeparams cannot be async/i);
+      }).toThrow(/encodeparams cannot be async/i);
     });
   });
 
@@ -808,7 +802,7 @@ describe("core/routes/addRoute", () => {
       // Should not throw when adding frozen route
       expect(() => {
         routesApi.add(frozenRoute);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Route should work correctly
       expect(getPluginApi(router).matchPath("/frozen")).toBeDefined();
@@ -859,7 +853,7 @@ describe("core/routes/addRoute", () => {
           { name: "A", path: "/a", forwardTo: "B" },
           { name: "B", path: "/b", forwardTo: "A" },
         ]);
-      }).toThrowError(/Circular forwardTo: A → B → A/);
+      }).toThrow(/Circular forwardTo: A → B → A/);
     });
 
     it("should detect circular forwardTo (A → B → C → B)", async () => {
@@ -869,13 +863,13 @@ describe("core/routes/addRoute", () => {
           { name: "B", path: "/b", forwardTo: "C" },
           { name: "C", path: "/c", forwardTo: "B" },
         ]);
-      }).toThrowError(/Circular forwardTo: B → C → B/);
+      }).toThrow(/Circular forwardTo: B → C → B/);
     });
 
     it("should detect self-referencing forwardTo (A → A)", async () => {
       expect(() => {
         routesApi.add({ name: "A", path: "/a", forwardTo: "A" });
-      }).toThrowError(/Circular forwardTo: A → A/);
+      }).toThrow(/Circular forwardTo: A → A/);
     });
 
     it("should allow forwardTo if target exists in same batch", async () => {
@@ -989,7 +983,7 @@ describe("core/routes/addRoute", () => {
 
       expect(() => {
         routesApi.add(routes);
-      }).toThrowError(/forwardTo chain exceeds maximum depth/);
+      }).toThrow(/forwardTo chain exceeds maximum depth/);
     });
 
     it("should handle forwardTo with nested routes", async () => {
@@ -1047,9 +1041,7 @@ describe("core/routes/addRoute", () => {
           { name: "noparams", path: "/noparams", forwardTo: "withparams" },
           { name: "withparams", path: "/withparams/:id" },
         ]);
-      }).toThrowError(
-        /forwardTo target.*requires params.*not available in source/,
-      );
+      }).toThrow(/forwardTo target.*requires params.*not available in source/);
     });
 
     it("should allow adding forwards dynamically via updateRoute()", async () => {
@@ -1116,7 +1108,7 @@ describe("core/routes/addRoute", () => {
       // Should not throw when adding empty array
       expect(() => {
         routesApi.add([]);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow addRoute on stopped router", async () => {
@@ -1125,7 +1117,7 @@ describe("core/routes/addRoute", () => {
       // Should not throw
       expect(() => {
         routesApi.add({ name: "after-stop", path: "/after-stop" });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Route should be registered
       await router.start("/home");
@@ -1336,7 +1328,7 @@ describe("core/routes/addRoute", () => {
             path: "/redirect",
             forwardTo: "nonexistent-target",
           });
-        }).toThrowError(/forwardto target .* does not exist/i);
+        }).toThrow(/forwardto target .* does not exist/i);
       });
 
       it("should throw if forwardTo target does not exist in batch", async () => {
@@ -1345,7 +1337,7 @@ describe("core/routes/addRoute", () => {
             { name: "a", path: "/a", forwardTo: "ghost" },
             { name: "b", path: "/b" },
           ]);
-        }).toThrowError(/forwardto target .* does not exist/i);
+        }).toThrow(/forwardto target .* does not exist/i);
       });
     });
 
@@ -1357,7 +1349,7 @@ describe("core/routes/addRoute", () => {
             path: "/bad-guard",
             canActivate: "not a function" as any,
           });
-        }).toThrowError(/canactivate must be a function/i);
+        }).toThrow(/canactivate must be a function/i);
       });
 
       it("should throw if canActivate is null", async () => {
@@ -1367,7 +1359,7 @@ describe("core/routes/addRoute", () => {
             path: "/null-guard",
             canActivate: null as any,
           });
-        }).toThrowError(/canactivate must be a function/i);
+        }).toThrow(/canactivate must be a function/i);
       });
 
       it("should throw if canActivate is an object", async () => {
@@ -1377,7 +1369,7 @@ describe("core/routes/addRoute", () => {
             path: "/object-guard",
             canActivate: { handler: () => true } as any,
           });
-        }).toThrowError(/canactivate must be a function/i);
+        }).toThrow(/canactivate must be a function/i);
       });
     });
 
@@ -1389,7 +1381,7 @@ describe("core/routes/addRoute", () => {
             path: "/bad-deactivate-guard",
             canDeactivate: "not a function" as any,
           });
-        }).toThrowError(/candeactivate must be a function/i);
+        }).toThrow(/candeactivate must be a function/i);
       });
 
       it("should throw if canDeactivate is null", async () => {
@@ -1399,7 +1391,7 @@ describe("core/routes/addRoute", () => {
             path: "/null-deactivate-guard",
             canDeactivate: null as any,
           });
-        }).toThrowError(/candeactivate must be a function/i);
+        }).toThrow(/candeactivate must be a function/i);
       });
 
       it("should throw if canDeactivate is an object", async () => {
@@ -1409,7 +1401,7 @@ describe("core/routes/addRoute", () => {
             path: "/object-deactivate-guard",
             canDeactivate: { handler: () => true } as any,
           });
-        }).toThrowError(/candeactivate must be a function/i);
+        }).toThrow(/candeactivate must be a function/i);
       });
     });
 
@@ -1421,7 +1413,7 @@ describe("core/routes/addRoute", () => {
             path: "/bad-defaults",
             defaultParams: "not an object" as any,
           });
-        }).toThrowError(/defaultparams must be an object/i);
+        }).toThrow(/defaultparams must be an object/i);
       });
 
       it("should throw if defaultParams is null", async () => {
@@ -1431,7 +1423,7 @@ describe("core/routes/addRoute", () => {
             path: "/null-defaults",
             defaultParams: null as any,
           });
-        }).toThrowError(/defaultparams must be an object/i);
+        }).toThrow(/defaultparams must be an object/i);
       });
 
       it("should throw if defaultParams is an array", async () => {
@@ -1441,7 +1433,7 @@ describe("core/routes/addRoute", () => {
             path: "/array-defaults",
             defaultParams: ["a", "b"] as any,
           });
-        }).toThrowError(/defaultparams must be an object/i);
+        }).toThrow(/defaultparams must be an object/i);
       });
     });
 
@@ -1452,7 +1444,7 @@ describe("core/routes/addRoute", () => {
             name: "bad-path",
             path: 123 as unknown as string,
           });
-        }).toThrowError(/path must be a string/i);
+        }).toThrow(/path must be a string/i);
       });
 
       it("should throw if path is null", async () => {
@@ -1461,7 +1453,7 @@ describe("core/routes/addRoute", () => {
             name: "null-path",
             path: null as unknown as string,
           });
-        }).toThrowError(/path must be a string/i);
+        }).toThrow(/path must be a string/i);
       });
     });
 
@@ -1473,7 +1465,7 @@ describe("core/routes/addRoute", () => {
             path: "/self",
             forwardTo: "self-ref",
           });
-        }).toThrowError(/circular forwardto/i);
+        }).toThrow(/circular forwardto/i);
       });
     });
 
@@ -1484,7 +1476,7 @@ describe("core/routes/addRoute", () => {
             { name: "cycle-a", path: "/cycle-a", forwardTo: "cycle-b" },
             { name: "cycle-b", path: "/cycle-b", forwardTo: "cycle-a" },
           ]);
-        }).toThrowError(/Circular forwardTo/);
+        }).toThrow(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
         expect(routesApi.has("cycle-a")).toBe(false);
@@ -1506,7 +1498,7 @@ describe("core/routes/addRoute", () => {
               forwardTo: "cycle-with-guard-a",
             },
           ]);
-        }).toThrowError(/Circular forwardTo/);
+        }).toThrow(/Circular forwardTo/);
 
         // Routes should NOT be registered (atomicity)
         expect(routesApi.has("cycle-with-guard-a")).toBe(false);
@@ -1519,25 +1511,25 @@ describe("core/routes/addRoute", () => {
     it("should throw on path with spaces", async () => {
       expect(() => {
         routesApi.add({ name: "spacey", path: "/with space" });
-      }).toThrowError(/whitespace not allowed/);
+      }).toThrow(/whitespace not allowed/);
     });
 
     it("should throw on path with tabs", async () => {
       expect(() => {
         routesApi.add({ name: "tabby", path: "/with\ttab" });
-      }).toThrowError(/whitespace not allowed/);
+      }).toThrow(/whitespace not allowed/);
     });
 
     it("should throw on path with newlines", async () => {
       expect(() => {
         routesApi.add({ name: "newline", path: "/with\nnewline" });
-      }).toThrowError(/whitespace not allowed/);
+      }).toThrow(/whitespace not allowed/);
     });
 
     it("should allow path without whitespace", async () => {
       expect(() => {
         routesApi.add({ name: "clean", path: "/clean-path" });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -1552,7 +1544,7 @@ describe("core/routes/addRoute", () => {
 
       expect(() => {
         routesApi.add(routeWithGetter as Route);
-      }).toThrowError(/must not have getters or setters/);
+      }).toThrow(/must not have getters or setters/);
     });
 
     it("should throw on route with setter", async () => {
@@ -1569,7 +1561,7 @@ describe("core/routes/addRoute", () => {
 
       expect(() => {
         routesApi.add(routeWithSetter as Route);
-      }).toThrowError(/must not have getters or setters/);
+      }).toThrow(/must not have getters or setters/);
     });
 
     it("should throw on class instance route", async () => {
@@ -1580,7 +1572,7 @@ describe("core/routes/addRoute", () => {
 
       expect(() => {
         routesApi.add(new RouteClass() as Route);
-      }).toThrowError(/must be a plain object/);
+      }).toThrow(/must be a plain object/);
     });
 
     it("should allow Object.create(null) route", async () => {
@@ -1591,13 +1583,13 @@ describe("core/routes/addRoute", () => {
 
       expect(() => {
         routesApi.add(nullProtoRoute);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow plain object route", async () => {
       expect(() => {
         routesApi.add({ name: "plain", path: "/plain" });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -1706,7 +1698,7 @@ describe("core/routes/addRoute", () => {
           path: "/async-forward",
           forwardTo: (async () => "target") as any,
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.add({
@@ -1714,7 +1706,7 @@ describe("core/routes/addRoute", () => {
           path: "/async-forward",
           forwardTo: (async () => "target") as any,
         });
-      }).toThrowError(/cannot be async/);
+      }).toThrow(/cannot be async/);
     });
 
     it("should reject async forwardTo callback (transpiled async with __awaiter)", async () => {
@@ -1731,7 +1723,7 @@ describe("core/routes/addRoute", () => {
           path: "/transpiled-async-forward",
           forwardTo: transpiledAsync,
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.add({
@@ -1739,7 +1731,7 @@ describe("core/routes/addRoute", () => {
           path: "/transpiled-async-forward",
           forwardTo: transpiledAsync,
         });
-      }).toThrowError(/cannot be async/);
+      }).toThrow(/cannot be async/);
     });
   });
 

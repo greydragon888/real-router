@@ -56,13 +56,13 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     it("should throw on invalid params structure", async () => {
       expect(() => {
         router.isActiveRoute("home", "invalid-params" as unknown as Params);
-      }).toThrowError("[router.isActiveRoute] Invalid params structure");
+      }).toThrow("[router.isActiveRoute] Invalid params structure");
     });
 
     it("should throw when params contain a function", async () => {
       expect(() => {
         router.isActiveRoute("home", { fn: () => {} } as unknown as Params);
-      }).toThrowError("[router.isActiveRoute] Invalid params structure");
+      }).toThrow("[router.isActiveRoute] Invalid params structure");
     });
 
     it("should throw when params contain circular reference", async () => {
@@ -72,19 +72,19 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
       expect(() => {
         router.isActiveRoute("home", circular as unknown as Params);
-      }).toThrowError("[router.isActiveRoute] Invalid params structure");
+      }).toThrow("[router.isActiveRoute] Invalid params structure");
     });
 
     it("should throw when params contain class instance", async () => {
       expect(() => {
         router.isActiveRoute("home", { date: new Date() } as unknown as Params);
-      }).toThrowError("[router.isActiveRoute] Invalid params structure");
+      }).toThrow("[router.isActiveRoute] Invalid params structure");
     });
 
     it("should throw on invalid route name", async () => {
       expect(() => {
         router.isActiveRoute(null as unknown as string);
-      }).toThrowError("Route name must be a string");
+      }).toThrow("Route name must be a string");
     });
 
     describe("hierarchy (strictEquality=false)", () => {
@@ -376,39 +376,39 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // Truthy non-boolean values throw TypeError
         expect(() => {
           router.isActiveRoute("users", {}, 1 as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got number",
         );
 
         expect(() => {
           router.isActiveRoute("users", {}, "true" as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got string",
         );
 
         // IMPORTANT: "false" string would be truthy in JS - validation prevents this bug
         expect(() => {
           router.isActiveRoute("users", {}, "false" as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got string",
         );
 
         // Falsy non-boolean values also throw TypeError
         expect(() => {
           router.isActiveRoute("users", {}, 0 as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got number",
         );
 
         expect(() => {
           router.isActiveRoute("users", {}, "" as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got string",
         );
 
         expect(() => {
           router.isActiveRoute("users", {}, null as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] strictEquality must be a boolean, got object",
         );
       });
@@ -418,7 +418,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
 
         expect(() => {
           router.isActiveRoute("users", {}, false, 1 as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] ignoreQueryParams must be a boolean, got number",
         );
 
@@ -429,13 +429,13 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
             false,
             "true" as unknown as boolean,
           );
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] ignoreQueryParams must be a boolean, got string",
         );
 
         expect(() => {
           router.isActiveRoute("users", {}, false, null as unknown as boolean);
-        }).toThrowError(
+        }).toThrow(
           "[router.isActiveRoute] ignoreQueryParams must be a boolean, got object",
         );
       });
@@ -468,7 +468,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // (isSerializable checks Object.getPrototypeOf(value) === Object.prototype)
         expect(() => {
           router.isActiveRoute("users.view", params);
-        }).toThrowError("[router.isActiveRoute] Invalid params structure");
+        }).toThrow("[router.isActiveRoute] Invalid params structure");
       });
 
       it("should reject Object.create() params even with own properties", async () => {
@@ -483,7 +483,7 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
         // Objects with custom prototype are always rejected regardless of properties
         expect(() => {
           router.isActiveRoute("users.view", params);
-        }).toThrowError("[router.isActiveRoute] Invalid params structure");
+        }).toThrow("[router.isActiveRoute] Invalid params structure");
       });
 
       it("should ignore non-enumerable properties", async () => {

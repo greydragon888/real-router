@@ -90,7 +90,7 @@ describe("useNavigator hook", () => {
   });
 
   it("should throw error if used outside RouterProvider", () => {
-    expect(() => renderHook(() => useNavigator())).toThrowError(
+    expect(() => renderHook(() => useNavigator())).toThrow(
       "useNavigator must be used within a RouterProvider",
     );
   });

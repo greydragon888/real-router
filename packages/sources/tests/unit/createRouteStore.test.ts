@@ -142,7 +142,7 @@ describe("createRouteSources", () => {
 
     expect(() => {
       source.destroy();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("post-destroy: getSnapshot still returns last snapshot", async () => {
@@ -172,6 +172,6 @@ describe("createRouteSources", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 });

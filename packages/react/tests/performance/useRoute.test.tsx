@@ -9,7 +9,7 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 import type { Router } from "@real-router/core";
 import type { ReactNode } from "react";
 
-describe("useRoute - Performance Tests", () => {
+describe("useRoute - Performance Tests", { tags: ["performance"] }, () => {
   let router: Router;
 
   const wrapper = ({ children }: { children: ReactNode }) => (

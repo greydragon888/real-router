@@ -75,7 +75,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-from", { forwardTo: "nonexistent" });
-      }).toThrowError(
+      }).toThrow(
         '[real-router] updateRoute: forwardTo target "nonexistent" does not exist',
       );
     });
@@ -85,7 +85,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-self", { forwardTo: "ur-self" });
-      }).toThrowError(/Circular forwardTo/);
+      }).toThrow(/Circular forwardTo/);
     });
 
     it("should throw if target requires unavailable params", () => {
@@ -94,7 +94,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-static", { forwardTo: "ur-param" });
-      }).toThrowError(
+      }).toThrow(
         '[real-router] forwardTo target "ur-param" requires params [id] that are not available in source route "ur-static"',
       );
     });
@@ -105,7 +105,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-old", { forwardTo: "ur-new" });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify forward works via behavior
       expect(
@@ -136,7 +136,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Should throw error AND NOT corrupt forwardMap
         expect(() => {
           routesApi.update("ur-c", { forwardTo: "ur-a" });
-        }).toThrowError(/Circular forwardTo/);
+        }).toThrow(/Circular forwardTo/);
 
         // forwardMap should remain clean (without ur-c) - verify via behavior
         expect(getPluginApi(router).forwardState("ur-a", {}).name).toBe("ur-c"); // ur-a → ur-b → ur-c
@@ -156,7 +156,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() => {
           routesApi.update("ur-w", { forwardTo: "ur-x" });
-        }).toThrowError(/Circular forwardTo/);
+        }).toThrow(/Circular forwardTo/);
 
         // forwardMap should remain without ur-w → ur-x - verify via behavior
         expect(getPluginApi(router).forwardState("ur-w", {}).name).toBe("ur-w"); // ur-w stays (no forward)
@@ -173,7 +173,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Attempt to create cycle
         expect(() => {
           routesApi.update("ur-r", { forwardTo: "ur-p" });
-        }).toThrowError();
+        }).toThrow();
 
         // matchPath should work correctly with existing redirects
         const state = getPluginApi(router).matchPath("/ur-p");
@@ -205,7 +205,7 @@ describe("core/routes/routeTree/updateRoute", () => {
           routesApi.update("ur-chain-99", {
             forwardTo: "ur-chain-100",
           });
-        }).toThrowError(/exceeds maximum depth/);
+        }).toThrow(/exceeds maximum depth/);
       });
     });
   });
@@ -618,11 +618,11 @@ describe("core/routes/routeTree/updateRoute", () => {
     it("should throw ReferenceError for non-existent route", () => {
       expect(() => {
         routesApi.update("nonexistent", { defaultParams: { x: 1 } });
-      }).toThrowError(ReferenceError);
+      }).toThrow(ReferenceError);
 
       expect(() => {
         routesApi.update("nonexistent", { defaultParams: { x: 1 } });
-      }).toThrowError(
+      }).toThrow(
         '[real-router] updateRoute: route "nonexistent" does not exist',
       );
     });
@@ -631,13 +631,13 @@ describe("core/routes/routeTree/updateRoute", () => {
       // Empty string represents the root node, which is not a named route
       expect(() => {
         routesApi.update("", { defaultParams: { x: 1 } });
-      }).toThrowError(ReferenceError);
+      }).toThrow(ReferenceError);
     });
 
     it("should throw TypeError for invalid name (leading dot)", () => {
       expect(() => {
         routesApi.update(".invalid", { defaultParams: { x: 1 } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string name", () => {
@@ -646,38 +646,38 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update(123 as unknown as string, {
           defaultParams: { x: 1 },
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Object
       expect(() => {
         routesApi.update({} as unknown as string, {
           defaultParams: { x: 1 },
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Null
       expect(() => {
         routesApi.update(null as unknown as string, {
           defaultParams: { x: 1 },
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Undefined
       expect(() => {
         routesApi.update(undefined as unknown as string, {
           defaultParams: { x: 1 },
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for whitespace-only name", () => {
       expect(() => {
         routesApi.update("   ", { defaultParams: { x: 1 } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.update("\t\n", { defaultParams: { x: 1 } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for name exceeding 10000 characters", () => {
@@ -685,11 +685,11 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update(longName, { defaultParams: { x: 1 } });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.update(longName, { defaultParams: { x: 1 } });
-      }).toThrowError(/exceeds maximum length/);
+      }).toThrow(/exceeds maximum length/);
     });
 
     it("should throw TypeError for null updates", () => {
@@ -697,11 +697,11 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-null-test", null as unknown as object);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         routesApi.update("ur-null-test", null as unknown as object);
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: updates must be an object, got null",
       );
     });
@@ -711,13 +711,13 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-prim-test", "string" as unknown as object);
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: updates must be an object, got string",
       );
 
       expect(() => {
         routesApi.update("ur-prim-test", 123 as unknown as object);
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: updates must be an object, got number",
       );
     });
@@ -727,7 +727,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
       expect(() => {
         routesApi.update("ur-arr-test", [] as unknown as object);
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: updates must be an object, got array",
       );
     });
@@ -740,7 +740,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dp-test", {
           defaultParams: "string" as unknown as Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: defaultParams must be an object or null, got string",
       );
 
@@ -749,7 +749,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dp-test", {
           defaultParams: 123 as unknown as Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: defaultParams must be an object or null, got number",
       );
 
@@ -758,7 +758,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dp-test", {
           defaultParams: [] as unknown as Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: defaultParams must be an object or null, got array",
       );
 
@@ -767,7 +767,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dp-test", {
           defaultParams: (() => ({})) as unknown as Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: defaultParams must be an object or null, got function",
       );
     });
@@ -780,7 +780,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dec-test", {
           decodeParams: "string" as unknown as (params: Params) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: decodeParams must be a function or null, got string",
       );
 
@@ -789,7 +789,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dec-test", {
           decodeParams: {} as unknown as (params: Params) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: decodeParams must be a function or null, got object",
       );
 
@@ -798,7 +798,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-dec-test", {
           decodeParams: 42 as unknown as (params: Params) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: decodeParams must be a function or null, got number",
       );
     });
@@ -811,7 +811,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-enc-test", {
           encodeParams: "string" as unknown as (params: Params) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: encodeParams must be a function or null, got string",
       );
 
@@ -820,7 +820,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-enc-test", {
           encodeParams: [] as unknown as (params: Params) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: encodeParams must be a function or null, got object",
       );
     });
@@ -835,7 +835,7 @@ describe("core/routes/routeTree/updateRoute", () => {
             params: Params,
           ) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: decodeParams cannot be an async function",
       );
     });
@@ -850,7 +850,7 @@ describe("core/routes/routeTree/updateRoute", () => {
             params: Params,
           ) => Params,
         });
-      }).toThrowError(
+      }).toThrow(
         "[real-router] updateRoute: encodeParams cannot be an async function",
       );
     });
@@ -863,36 +863,36 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-valid-test", {
           defaultParams: { page: 1, sort: "name" },
         });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // null is valid for defaultParams (remove)
       expect(() => {
         routesApi.update("ur-valid-test", { defaultParams: null });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Valid function for decodeParams
       expect(() => {
         routesApi.update("ur-valid-test", {
           decodeParams: (params) => params,
         });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // null is valid for decodeParams (remove)
       expect(() => {
         routesApi.update("ur-valid-test", { decodeParams: null });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Valid function for encodeParams
       expect(() => {
         routesApi.update("ur-valid-test", {
           encodeParams: (params) => params,
         });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // null is valid for encodeParams (remove)
       expect(() => {
         routesApi.update("ur-valid-test", { encodeParams: null });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should update route and return void", () => {
@@ -973,7 +973,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         routesApi.update("ur-solo.missing", {
           defaultParams: { x: 1 },
         });
-      }).toThrowError(
+      }).toThrow(
         '[real-router] updateRoute: route "ur-solo.missing" does not exist',
       );
     });
@@ -1075,7 +1075,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Should not throw
         expect(() => {
           routesApi.update("ur-empty", {});
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // No defaults should be applied
         expect(getPluginApi(router).makeState("ur-empty").params).toStrictEqual(
@@ -1112,7 +1112,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() => {
           routesApi.update("ur-frozen", frozenUpdates);
-        }).not.toThrowError();
+        }).not.toThrow();
         expect(
           getPluginApi(router).makeState("ur-frozen").params,
         ).toStrictEqual({
@@ -1166,7 +1166,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Should not throw on assignment
         expect(() => {
           routesApi.update("ur-circular", { defaultParams: circular });
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Verify behavior - page should be accessible
         const state = getPluginApi(router).makeState("ur-circular");
@@ -1249,7 +1249,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() => {
           routesApi.update("ur-fwd-empty", { forwardTo: "" });
-        }).toThrowError();
+        }).toThrow();
       });
 
       it("should reject forwardTo to self (direct cycle)", () => {
@@ -1257,7 +1257,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() => {
           routesApi.update("ur-self", { forwardTo: "ur-self" });
-        }).toThrowError(/Circular forwardTo/);
+        }).toThrow(/Circular forwardTo/);
       });
 
       it("should reject forwardTo with invalid type (not string or null)", () => {
@@ -1270,11 +1270,11 @@ describe("core/routes/routeTree/updateRoute", () => {
           routesApi.update("ur-invalid-fwd", {
             forwardTo: 123 as any,
           });
-        }).toThrowError(/forwardTo must be a string, function, or null/);
+        }).toThrow(/forwardTo must be a string, function, or null/);
 
         expect(() => {
           routesApi.update("ur-invalid-fwd", { forwardTo: {} as any });
-        }).toThrowError(/forwardTo must be a string, function, or null/);
+        }).toThrow(/forwardTo must be a string, function, or null/);
       });
     });
 
@@ -1288,7 +1288,7 @@ describe("core/routes/routeTree/updateRoute", () => {
             forwardTo: "ur-atom-tgt",
             defaultParams: "invalid" as unknown as Params,
           });
-        }).toThrowError(/defaultParams must be an object/);
+        }).toThrow(/defaultParams must be an object/);
 
         // forwardTo should NOT be applied due to validation-first approach
         // Verify by checking forwardState returns same route (no forward)
@@ -1307,7 +1307,7 @@ describe("core/routes/routeTree/updateRoute", () => {
             forwardTo: "nonexistent",
             defaultParams: { page: 1 },
           });
-        }).toThrowError(/forwardTo target.*does not exist/);
+        }).toThrow(/forwardTo target.*does not exist/);
 
         // Both should NOT be applied
         // No forward configured - forwardState returns same route
@@ -1397,7 +1397,7 @@ describe("core/routes/routeTree/updateRoute", () => {
         // Exception propagates to caller
         expect(() => {
           routesApi.update("ur-throwing", throwingUpdates);
-        }).toThrowError("Getter explosion!");
+        }).toThrow("Getter explosion!");
 
         // Config remains unchanged - exception happens during destructuring,
         // before any mutations
@@ -1424,7 +1424,7 @@ describe("core/routes/routeTree/updateRoute", () => {
 
         expect(() => {
           routesApi.update("ur-proxy", updates);
-        }).not.toThrowError();
+        }).not.toThrow();
         expect(getPluginApi(router).makeState("ur-proxy").params).toStrictEqual(
           {
             page: 1,

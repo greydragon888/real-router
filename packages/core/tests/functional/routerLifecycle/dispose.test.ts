@@ -34,7 +34,7 @@ describe("dispose", () => {
     it("dispose() on never-started router works (IDLE → DISPOSED)", () => {
       expect(() => {
         router.dispose();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(router.isActive()).toBe(false);
     });
@@ -55,7 +55,7 @@ describe("dispose", () => {
 
       expect(() => {
         router.dispose();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(router.isActive()).toBe(false);
     });
@@ -234,7 +234,7 @@ describe("dispose", () => {
 
       expect(() => {
         router.dispose();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(goodTeardown).toHaveBeenCalledTimes(1);
     });
@@ -268,7 +268,7 @@ describe("dispose", () => {
     it("stop() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         router.stop();
-      }).toThrowError();
+      }).toThrow();
 
       try {
         router.stop();
@@ -280,7 +280,7 @@ describe("dispose", () => {
     it("usePlugin() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         router.usePlugin(() => ({}));
-      }).toThrowError();
+      }).toThrow();
 
       try {
         router.usePlugin(() => ({}));
@@ -295,7 +295,7 @@ describe("dispose", () => {
           events.TRANSITION_SUCCESS,
           vi.fn(),
         );
-      }).toThrowError();
+      }).toThrow();
 
       try {
         getPluginApi(router).addEventListener(
@@ -310,7 +310,7 @@ describe("dispose", () => {
     it("addRoute() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         routesApi.add({ name: "newRoute", path: "/new" });
-      }).toThrowError();
+      }).toThrow();
 
       try {
         routesApi.add({ name: "newRoute", path: "/new" });
@@ -322,7 +322,7 @@ describe("dispose", () => {
     it("subscribe() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         router.subscribe(vi.fn());
-      }).toThrowError();
+      }).toThrow();
 
       try {
         router.subscribe(vi.fn());
@@ -344,7 +344,7 @@ describe("dispose", () => {
     it("addActivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         getLifecycleApi(router).addActivateGuard("home", true);
-      }).toThrowError();
+      }).toThrow();
 
       try {
         getLifecycleApi(router).addActivateGuard("home", true);
@@ -356,7 +356,7 @@ describe("dispose", () => {
     it("addDeactivateGuard() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         getLifecycleApi(router).addDeactivateGuard("home", true);
-      }).toThrowError();
+      }).toThrow();
 
       try {
         getLifecycleApi(router).addDeactivateGuard("home", true);
@@ -371,7 +371,7 @@ describe("dispose", () => {
 
       expect(() => {
         deps.set("key", "value");
-      }).toThrowError();
+      }).toThrow();
 
       try {
         deps.set("key", "value");
@@ -383,7 +383,7 @@ describe("dispose", () => {
     it("cloneRouter() throws ROUTER_DISPOSED after dispose()", () => {
       expect(() => {
         cloneRouter(router);
-      }).toThrowError();
+      }).toThrow();
 
       try {
         cloneRouter(router);

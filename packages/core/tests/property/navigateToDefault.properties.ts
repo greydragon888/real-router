@@ -31,7 +31,7 @@ describe("navigateToDefault Properties", () => {
 
     await router.start("/");
 
-    await expect(router.navigateToDefault()).rejects.toThrowError();
+    await expect(router.navigateToDefault()).rejects.toThrow();
 
     router.stop();
   });

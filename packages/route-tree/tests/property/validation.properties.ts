@@ -123,7 +123,7 @@ describe("Route Name Validation", () => {
       (name: string) => {
         expect(() => {
           validateRoute({ name, path: "" }, "add");
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });
@@ -134,7 +134,7 @@ describe("Route Name Validation", () => {
       (name: string) => {
         expect(() => {
           validateRoute({ name, path: "" }, "add");
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });
@@ -145,7 +145,7 @@ describe("Route Name Validation", () => {
       (name: string) => {
         expect(() => {
           validateRoute({ name, path: "" }, "add");
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });
@@ -156,7 +156,7 @@ describe("Route Name Validation", () => {
       (name: unknown) => {
         expect(() => {
           validateRoute({ name, path: "" }, "add");
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });
@@ -173,7 +173,7 @@ describe("Route Path Validation", () => {
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
   });
@@ -184,7 +184,7 @@ describe("Route Path Validation", () => {
       (path: unknown) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });
@@ -195,7 +195,7 @@ describe("Route Path Validation", () => {
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });
@@ -206,7 +206,7 @@ describe("Route Path Validation", () => {
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add");
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });
@@ -222,7 +222,7 @@ describe("Route Path Validation", () => {
       (path: string) => {
         expect(() => {
           validateRoutePath(path, "test", "add", parentWithUrlParams);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       },
     );
   });

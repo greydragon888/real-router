@@ -122,18 +122,18 @@ describe("getPluginApi().buildNavigationState()", () => {
 
   describe("argument validation", () => {
     it("should throw TypeError for non-string routeName", () => {
-      expect(() =>
-        api.buildNavigationState(123 as unknown as string),
-      ).toThrowError(TypeError);
+      expect(() => api.buildNavigationState(123 as unknown as string)).toThrow(
+        TypeError,
+      );
     });
 
     it("should throw TypeError for null routeName", () => {
-      expect(() =>
-        api.buildNavigationState(null as unknown as string),
-      ).toThrowError(TypeError);
-      expect(() =>
-        api.buildNavigationState(null as unknown as string),
-      ).toThrowError(/Invalid routeName/);
+      expect(() => api.buildNavigationState(null as unknown as string)).toThrow(
+        TypeError,
+      );
+      expect(() => api.buildNavigationState(null as unknown as string)).toThrow(
+        /Invalid routeName/,
+      );
     });
 
     it("should return undefined for empty string routeName", () => {
@@ -145,25 +145,25 @@ describe("getPluginApi().buildNavigationState()", () => {
     it("should throw TypeError for invalid routeParams (string)", () => {
       expect(() =>
         api.buildNavigationState("home", "invalid" as never),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         api.buildNavigationState("home", "invalid" as never),
-      ).toThrowError(/Invalid routeParams/);
+      ).toThrow(/Invalid routeParams/);
     });
 
     it("should throw TypeError for invalid routeParams (function)", () => {
       expect(() =>
         api.buildNavigationState("home", (() => {}) as never),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         api.buildNavigationState("home", (() => {}) as never),
-      ).toThrowError(/Invalid routeParams/);
+      ).toThrow(/Invalid routeParams/);
     });
 
     it("should include 'buildNavigationState' in error message", () => {
-      expect(() =>
-        api.buildNavigationState(123 as unknown as string),
-      ).toThrowError(/buildNavigationState/);
+      expect(() => api.buildNavigationState(123 as unknown as string)).toThrow(
+        /buildNavigationState/,
+      );
     });
   });
 

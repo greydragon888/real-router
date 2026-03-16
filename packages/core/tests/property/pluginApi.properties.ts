@@ -213,7 +213,7 @@ describe("pluginApi.addInterceptor Properties", () => {
       pluginApi.addInterceptor("buildPath", (next, route, params) =>
         next(route, params),
       );
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
   });
 });
 
@@ -239,9 +239,7 @@ describe("pluginApi.extendRouter Properties", () => {
 
     expect(() => {
       pluginApi.extendRouter({ buildPath: () => "/fake" });
-    }).toThrowError(
-      expect.objectContaining({ code: errorCodes.PLUGIN_CONFLICT }),
-    );
+    }).toThrow(expect.objectContaining({ code: errorCodes.PLUGIN_CONFLICT }));
   });
 
   it("cleanup removes extensions", () => {
@@ -275,7 +273,7 @@ describe("pluginApi.extendRouter Properties", () => {
 
     expect(() => {
       remove();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("extendRouter on disposed router throws", async () => {
@@ -286,7 +284,7 @@ describe("pluginApi.extendRouter Properties", () => {
 
     expect(() => {
       pluginApi.extendRouter({ foo: "bar" });
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
   });
 });
 

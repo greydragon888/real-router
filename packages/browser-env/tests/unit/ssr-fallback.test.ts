@@ -49,7 +49,7 @@ describe("createHistoryFallbackBrowser", () => {
 
     expect(() => {
       browser.pushState({ name: "a", params: {}, path: "/a" }, "/a");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("replaceState is no-op", () => {
@@ -57,7 +57,7 @@ describe("createHistoryFallbackBrowser", () => {
 
     expect(() => {
       browser.replaceState({ name: "a", params: {}, path: "/a" }, "/a");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("addPopstateListener returns cleanup function", () => {
@@ -67,7 +67,7 @@ describe("createHistoryFallbackBrowser", () => {
     expect(typeof cleanup).toBe("function");
     expect(() => {
       cleanup();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("getHash returns empty string", () => {

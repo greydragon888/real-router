@@ -142,7 +142,7 @@ describe("getPluginApi()", () => {
 
     expect(() => {
       disposedApi.addEventListener(events.TRANSITION_SUCCESS, () => {});
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
   });
 
   it("should throw ROUTER_DISPOSED for setRootPath after dispose", () => {
@@ -152,10 +152,10 @@ describe("getPluginApi()", () => {
 
     expect(() => {
       disposedApi.setRootPath("/app");
-    }).toThrowError(RouterError);
+    }).toThrow(RouterError);
   });
 
   it("should throw TypeError for invalid router instance", () => {
-    expect(() => getPluginApi({} as Router)).toThrowError(TypeError);
+    expect(() => getPluginApi({} as Router)).toThrow(TypeError);
   });
 });

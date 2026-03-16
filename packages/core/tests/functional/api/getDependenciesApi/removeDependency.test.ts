@@ -27,7 +27,7 @@ describe("core/dependencies/removeDependency", () => {
     expect(deps.has("foo")).toBe(false);
     expect(() => {
       deps.get("foo");
-    }).toThrowError(ReferenceError);
+    }).toThrow(ReferenceError);
   });
 
   it("should warn when removing non-existent dependency", () => {
@@ -87,19 +87,19 @@ describe("core/dependencies/removeDependency", () => {
     expect(() => {
       // @ts-expect-error: testing number parameter
       deps.remove(123);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // null parameter should throw
     expect(() => {
       // @ts-expect-error: testing null parameter
       deps.remove(null);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
 
     // undefined parameter should throw
     expect(() => {
       // @ts-expect-error: testing undefined parameter
       deps.remove(undefined);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   it("should handle empty string as valid key", () => {
@@ -165,7 +165,7 @@ describe("core/dependencies/removeDependency", () => {
       cleanupDeps.forEach((dep) => {
         deps.remove(dep as "foo");
       });
-    }).not.toThrowError();
+    }).not.toThrow();
 
     // Should have warned for non-existent dependencies
     expect(warnSpy).toHaveBeenCalledTimes(2); // dep2 and dep3

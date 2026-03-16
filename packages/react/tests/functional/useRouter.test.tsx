@@ -34,6 +34,6 @@ describe("useRouter hook", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouter())).toThrowError();
+    expect(() => renderHook(() => useRouter())).toThrow();
   });
 });

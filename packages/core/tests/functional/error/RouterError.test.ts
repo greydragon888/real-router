@@ -421,25 +421,21 @@ describe("RouterError", () => {
         expect(() => {
           // @ts-expect-error - intentionally passing null
           err.setErrorInstance(null);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           // @ts-expect-error - intentionally passing null
           err.setErrorInstance(null);
-        }).toThrowError(
-          "[RouterError.setErrorInstance] err parameter is required",
-        );
+        }).toThrow("[RouterError.setErrorInstance] err parameter is required");
 
         // Test with undefined
         expect(() => {
           // @ts-expect-error - intentionally passing undefined
           err.setErrorInstance(undefined);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           // @ts-expect-error - intentionally passing undefined
           err.setErrorInstance(undefined);
-        }).toThrowError(
-          "[RouterError.setErrorInstance] err parameter is required",
-        );
+        }).toThrow("[RouterError.setErrorInstance] err parameter is required");
       });
 
       it("should handle Error without stack", () => {
@@ -539,7 +535,7 @@ describe("RouterError", () => {
           err.setAdditionalFields({
             code: "Should not work",
           });
-        }).toThrowError();
+        }).toThrow();
 
         // code should remain unchanged
         expect(err.code).toBe("ERR");

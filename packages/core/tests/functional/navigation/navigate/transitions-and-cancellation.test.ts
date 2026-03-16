@@ -67,7 +67,7 @@ describe("router.navigate() - transitions and cancellation", () => {
     expect(router.getState()?.name).toBe("users");
     expect(() => {
       router.stop();
-    }).not.toThrowError();
+    }).not.toThrow();
 
     // Restart for afterEach cleanup
     await router.start("/home");

@@ -351,7 +351,7 @@ describe("createTransitionSource", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("destroy is idempotent", () => {
@@ -361,6 +361,6 @@ describe("createTransitionSource", () => {
 
     expect(() => {
       source.destroy();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 });

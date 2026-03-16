@@ -11,7 +11,7 @@ import { createTestRouterWithADefaultRouter } from "../helpers";
 import type { Router } from "@real-router/core";
 import type { ComponentProps, ReactNode } from "react";
 
-describe("Link - Performance Tests", () => {
+describe("Link - Performance Tests", { tags: ["performance"] }, () => {
   let router: Router;
   const user = userEvent.setup();
 

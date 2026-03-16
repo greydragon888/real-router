@@ -185,7 +185,7 @@ describe("createActiveRouteSources", () => {
 
     expect(() => {
       source.destroy();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("previousRoute is undefined on first navigation: isPrevRelated is falsy", async () => {
@@ -237,6 +237,6 @@ describe("createActiveRouteSources", () => {
     expect(listener).not.toHaveBeenCalled();
     expect(() => {
       unsubscribe();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 });

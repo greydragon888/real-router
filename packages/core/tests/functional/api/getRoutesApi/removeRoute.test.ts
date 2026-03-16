@@ -52,7 +52,7 @@ describe("core/routes/removeRoute", () => {
       routesApi.remove("removable");
 
       // buildPath should throw for non-existent route
-      expect(() => router.buildPath("removable")).toThrowError(/not defined/);
+      expect(() => router.buildPath("removable")).toThrow(/not defined/);
     });
 
     it("should allow re-adding route with same name after removal", async () => {
@@ -62,7 +62,7 @@ describe("core/routes/removeRoute", () => {
       // Should not throw - route was fully removed
       expect(() => {
         routesApi.add({ name: "reusable", path: "/new-path" });
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(getPluginApi(router).matchPath("/new-path")?.name).toBe(
         "reusable",
@@ -121,7 +121,7 @@ describe("core/routes/removeRoute", () => {
       // Route doesn't exist - remove should not throw
       expect(() => {
         routesApi.remove("nonexistent");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Router should still function normally
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
@@ -160,7 +160,7 @@ describe("core/routes/removeRoute", () => {
       // Child doesn't exist - should not throw
       expect(() => {
         routesApi.remove("wrapper.nonexistent");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Parent and existing child should remain
       expect(getPluginApi(router).matchPath("/wrapper")?.name).toBe("wrapper");
@@ -274,7 +274,7 @@ describe("core/routes/removeRoute", () => {
 
       expect(() => {
         routesApi.remove("simple");
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should not emit warning when clearing non-existent lifecycle handlers", async () => {
@@ -283,7 +283,7 @@ describe("core/routes/removeRoute", () => {
       // The silent parameter should suppress warnings
       expect(() => {
         routesApi.remove("nohandlers");
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Route should be removed
       expect(routesApi.has("nohandlers")).toBe(false);
@@ -1083,10 +1083,10 @@ describe("core/routes/removeRoute", () => {
 
       expect(() => {
         routesApi.remove(longName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         routesApi.remove(longName);
-      }).toThrowError(/exceeds maximum length/);
+      }).toThrow(/exceeds maximum length/);
     });
 
     // 12.6: Exact boundary (10000 characters)
@@ -1099,7 +1099,7 @@ describe("core/routes/removeRoute", () => {
       // Should not throw - exactly 10000 is valid
       expect(() => {
         routesApi.remove(exactLimit);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Route doesn't exist, so graceful handling
       expect(warnSpy).toHaveBeenCalledWith(
@@ -1114,26 +1114,26 @@ describe("core/routes/removeRoute", () => {
     it("should throw TypeError for Cyrillic characters in name", async () => {
       expect(() => {
         routesApi.remove("маршрут");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for emoji in name", async () => {
       expect(() => {
         routesApi.remove("route_🚀");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for CJK characters in name", async () => {
       expect(() => {
         routesApi.remove("route.日本語");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     // 12.8: System routes (@@prefix) — blocked by internal route protection
     it("should throw when trying to remove @@ prefix route", () => {
       expect(() => {
         routesApi.remove("@@real-router/UNKNOWN");
-      }).toThrowError(/reserved "@@" prefix/);
+      }).toThrow(/reserved "@@" prefix/);
     });
 
     // 12.9: Deep nesting (10+ levels)
@@ -1350,25 +1350,25 @@ describe("core/routes/removeRoute", () => {
     it("should throw TypeError for null name", async () => {
       expect(() => {
         routesApi.remove(null as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for undefined name", async () => {
       expect(() => {
         routesApi.remove(undefined as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for number name", async () => {
       expect(() => {
         routesApi.remove(123 as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for object name", async () => {
       expect(() => {
         routesApi.remove({} as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for Proxy with overridden toString (12.14)", async () => {
@@ -1392,7 +1392,7 @@ describe("core/routes/removeRoute", () => {
       // typeof Proxy === "object", so it should be rejected BEFORE any coercion
       expect(() => {
         routesApi.remove(maliciousProxy as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Original route should remain untouched
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
@@ -1406,7 +1406,7 @@ describe("core/routes/removeRoute", () => {
       // typeof stringWrapper === "object", not "string"
       expect(() => {
         routesApi.remove(stringWrapper as unknown as string);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       // Original route should remain untouched
       expect(getPluginApi(router).matchPath("/")).toBeDefined();
@@ -1415,31 +1415,31 @@ describe("core/routes/removeRoute", () => {
     it("should throw TypeError for whitespace-only name", async () => {
       expect(() => {
         routesApi.remove("   ");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for name with leading dot", async () => {
       expect(() => {
         routesApi.remove(".invalid");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for name with trailing dot", async () => {
       expect(() => {
         routesApi.remove("invalid.");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for name starting with number", async () => {
       expect(() => {
         routesApi.remove("123invalid");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for name with consecutive dots", async () => {
       expect(() => {
         routesApi.remove("invalid..name");
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 });

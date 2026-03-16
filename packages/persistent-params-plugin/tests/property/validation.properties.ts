@@ -84,7 +84,7 @@ describe("validation: validateParamKey partition property", () => {
     (key) => {
       expect(() => {
         validateParamKey(key);
-      }).not.toThrowError();
+      }).not.toThrow();
     },
   );
 
@@ -93,7 +93,7 @@ describe("validation: validateParamKey partition property", () => {
     (key) => {
       expect(() => {
         validateParamKey(key);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     },
   );
 });
@@ -108,7 +108,7 @@ describe("validation: validateParamValue partition property", () => {
   })("primitive values and undefined pass validation", (key, value) => {
     expect(() => {
       validateParamValue(key, value);
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   test.prop([fc.string({ maxLength: 10 }), arbInvalidValue], {
@@ -116,6 +116,6 @@ describe("validation: validateParamValue partition property", () => {
   })("non-primitive values throw TypeError", (key, value) => {
     expect(() => {
       validateParamValue(key, value);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 });

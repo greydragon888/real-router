@@ -35,80 +35,70 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(123);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(123);
-          }).toThrowError(
-            "[router.shouldUpdateNode] nodeName must be a string",
-          );
+          }).toThrow("[router.shouldUpdateNode] nodeName must be a string");
         });
 
         it("should throw TypeError when nodeName is null", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(null);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(null);
-          }).toThrowError(
-            "[router.shouldUpdateNode] nodeName must be a string",
-          );
+          }).toThrow("[router.shouldUpdateNode] nodeName must be a string");
         });
 
         it("should throw TypeError when nodeName is undefined", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(undefined);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(undefined);
-          }).toThrowError(
-            "[router.shouldUpdateNode] nodeName must be a string",
-          );
+          }).toThrow("[router.shouldUpdateNode] nodeName must be a string");
         });
 
         it("should throw TypeError when nodeName is an object", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode({});
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode({ name: "test" });
-          }).toThrowError(
-            "[router.shouldUpdateNode] nodeName must be a string",
-          );
+          }).toThrow("[router.shouldUpdateNode] nodeName must be a string");
         });
 
         it("should throw TypeError when nodeName is an array", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode([]);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             router.shouldUpdateNode(["a", "b"]);
-          }).toThrowError(
-            "[router.shouldUpdateNode] nodeName must be a string",
-          );
+          }).toThrow("[router.shouldUpdateNode] nodeName must be a string");
         });
 
         it("should accept empty string as valid nodeName (root node)", () => {
           expect(() => {
             router.shouldUpdateNode("");
-          }).not.toThrowError();
+          }).not.toThrow();
         });
 
         it("should accept regular string as valid nodeName", () => {
           expect(() => {
             router.shouldUpdateNode("home");
-          }).not.toThrowError();
+          }).not.toThrow();
           expect(() => {
             router.shouldUpdateNode("users.list");
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -119,11 +109,11 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(null);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(null);
-          }).toThrowError(
+          }).toThrow(
             "[router.shouldUpdateNode] toState must be valid State object",
           );
         });
@@ -134,11 +124,11 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(undefined);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(undefined);
-          }).toThrowError(
+          }).toThrow(
             "[router.shouldUpdateNode] toState must be valid State object",
           );
         });
@@ -149,11 +139,11 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(123);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate(123);
-          }).toThrowError(
+          }).toThrow(
             "[router.shouldUpdateNode] toState must be valid State object",
           );
         });
@@ -164,11 +154,11 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate("state");
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate("state");
-          }).toThrowError(
+          }).toThrow(
             "[router.shouldUpdateNode] toState must be valid State object",
           );
         });
@@ -179,11 +169,11 @@ describe("core/routes", () => {
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate({});
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             // @ts-expect-error - testing runtime validation
             predicate({ path: "/test" });
-          }).toThrowError(
+          }).toThrow(
             "[router.shouldUpdateNode] toState must be valid State object",
           );
         });
@@ -198,7 +188,7 @@ describe("core/routes", () => {
 
           expect(() => {
             predicate(validState);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
 
         it("should accept complete State object", () => {
@@ -211,7 +201,7 @@ describe("core/routes", () => {
 
           expect(() => {
             predicate(currentState);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -226,7 +216,7 @@ describe("core/routes", () => {
 
           expect(() => {
             predicate(toState, undefined);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
 
         it("should accept valid fromState", () => {
@@ -244,7 +234,7 @@ describe("core/routes", () => {
 
           expect(() => {
             predicate(toState, fromState);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -293,7 +283,7 @@ describe("core/routes", () => {
         expect(() => {
           predicate(state1);
           predicate(state2);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 

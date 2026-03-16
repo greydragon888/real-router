@@ -27,7 +27,7 @@ describe("State Validators - Property-Based Tests", () => {
         (state, method) => {
           expect(() => {
             validateState(state, method);
-          }).not.toThrowError();
+          }).not.toThrow();
         },
       );
 
@@ -36,7 +36,7 @@ describe("State Validators - Property-Based Tests", () => {
         (state, method) => {
           expect(() => {
             validateState(state, method);
-          }).not.toThrowError();
+          }).not.toThrow();
         },
       );
 
@@ -45,7 +45,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("does not throw exception for valid HistoryState", (state, method) => {
         expect(() => {
           validateState(state, method);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 
@@ -55,7 +55,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("throws TypeError for invalid State objects", (state, method) => {
         expect(() => {
           validateState(state, method);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       });
 
       test.prop([arbitraryInvalidTypes, methodNameArbitrary], {
@@ -63,7 +63,7 @@ describe("State Validators - Property-Based Tests", () => {
       })("throws TypeError for primitives and non-objects", (value, method) => {
         expect(() => {
           validateState(value, method);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
       });
 
       test.prop([methodNameArbitrary], { numRuns: 1000 })(
@@ -71,7 +71,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState(null, method);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         },
       );
 
@@ -80,7 +80,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState(undefined, method);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         },
       );
     });
@@ -238,7 +238,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({}, method);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         },
       );
 
@@ -247,7 +247,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home" }, method);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         },
       );
 
@@ -256,7 +256,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home", params: {} }, method);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         },
       );
 
@@ -265,7 +265,7 @@ describe("State Validators - Property-Based Tests", () => {
         (method) => {
           expect(() => {
             validateState({ name: "home", params: {}, path: "/" }, method);
-          }).not.toThrowError();
+          }).not.toThrow();
         },
       );
 
@@ -283,7 +283,7 @@ describe("State Validators - Property-Based Tests", () => {
               },
               method,
             );
-          }).not.toThrowError();
+          }).not.toThrow();
         },
       );
     });
@@ -297,7 +297,7 @@ describe("State Validators - Property-Based Tests", () => {
           // First validation
           expect(() => {
             validateState(state, method);
-          }).not.toThrowError();
+          }).not.toThrow();
 
           // Mutate state
           state.name = "mutated";
@@ -306,7 +306,7 @@ describe("State Validators - Property-Based Tests", () => {
           // Second validation should pass (mutated state is still valid)
           expect(() => {
             validateState(state, method);
-          }).not.toThrowError();
+          }).not.toThrow();
         },
       );
     });

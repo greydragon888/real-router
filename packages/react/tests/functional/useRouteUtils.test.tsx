@@ -89,7 +89,7 @@ describe("useRouteUtils hook", () => {
   });
 
   it("should throw error if used outside RouterProvider", () => {
-    expect(() => renderHook(() => useRouteUtils())).toThrowError(
+    expect(() => renderHook(() => useRouteUtils())).toThrow(
       "useRouter must be used within a RouterProvider",
     );
   });

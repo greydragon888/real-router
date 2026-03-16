@@ -46,7 +46,7 @@ describe("getPluginApi().extendRouter()", () => {
 
     expect(() => {
       unsub();
-    }).not.toThrowError();
+    }).not.toThrow();
 
     expect("foo" in router).toBe(false);
   });
@@ -90,7 +90,7 @@ describe("getPluginApi().extendRouter()", () => {
 
     expect(() => {
       api2.extendRouter({ foo: 2 });
-    }).not.toThrowError();
+    }).not.toThrow();
 
     expect((router as Record<string, unknown>).foo).toBe(2);
   });
@@ -133,7 +133,7 @@ describe("getPluginApi().extendRouter()", () => {
       const unsub = api.extendRouter({});
 
       unsub();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("unsubscribe after dispose does not throw (idx -1 branch)", () => {
@@ -143,7 +143,7 @@ describe("getPluginApi().extendRouter()", () => {
 
     expect(() => {
       unsub();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("extension values: functions, primitives, objects — all work", () => {

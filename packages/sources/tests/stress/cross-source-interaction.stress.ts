@@ -332,7 +332,7 @@ describe("S5: Cross-source interaction", () => {
 
     expect(() => {
       router.stop();
-    }).not.toThrowError();
+    }).not.toThrow();
 
     routeSources.forEach((s) => {
       const snap = s.getSnapshot();

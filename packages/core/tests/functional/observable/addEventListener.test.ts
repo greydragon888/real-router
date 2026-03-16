@@ -121,10 +121,10 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         getPluginApi(router).addEventListener(events.TRANSITION_START, cb);
-      }).toThrowError("Duplicate listener");
+      }).toThrow("Duplicate listener");
       expect(() => {
         getPluginApi(router).addEventListener(events.TRANSITION_START, cb);
-      }).toThrowError(events.TRANSITION_START);
+      }).toThrow(events.TRANSITION_START);
     });
 
     it("should allow same callback for different events", async () => {
@@ -134,7 +134,7 @@ describe("core/observable/addEventListener", () => {
         getPluginApi(router).addEventListener(events.TRANSITION_START, cb);
         getPluginApi(router).addEventListener(events.TRANSITION_SUCCESS, cb);
         getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       // Verify all registered by triggering events
       await router.start("/");
@@ -154,7 +154,7 @@ describe("core/observable/addEventListener", () => {
         getPluginApi(router).addEventListener(events.ROUTER_START, cb1);
         getPluginApi(router).addEventListener(events.ROUTER_START, cb2);
         getPluginApi(router).addEventListener(events.ROUTER_START, cb3);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       await router.start("/home");
 
@@ -172,7 +172,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-      }).toThrowError("Duplicate listener");
+      }).toThrow("Duplicate listener");
     });
 
     it("should detect duplicates with class methods", () => {
@@ -192,7 +192,7 @@ describe("core/observable/addEventListener", () => {
           events.ROUTER_START,
           handler.method,
         );
-      }).toThrowError("Duplicate listener");
+      }).toThrow("Duplicate listener");
     });
 
     it("should allow re-registration after unsubscribe", async () => {
@@ -207,7 +207,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       await router.start("/home");
 
@@ -283,10 +283,10 @@ describe("core/observable/addEventListener", () => {
     it("should throw TypeError when callback is not a function", () => {
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, null as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, null as any);
-      }).toThrowError("Expected callback to be a function");
+      }).toThrow("Expected callback to be a function");
     });
 
     it("should throw TypeError for non-function types", () => {
@@ -295,25 +295,25 @@ describe("core/observable/addEventListener", () => {
           events.ROUTER_START,
           "string" as any,
         );
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, 123 as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, {} as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, [] as any);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw Error for invalid event name", () => {
       expect(() => {
         getPluginApi(router).addEventListener("INVALID_EVENT" as any, () => {});
-      }).toThrowError("Invalid event name");
+      }).toThrow("Invalid event name");
     });
 
     it("should validate both parameters", () => {
@@ -322,7 +322,7 @@ describe("core/observable/addEventListener", () => {
           "INVALID_EVENT" as any,
           "not-function" as any,
         );
-      }).toThrowError(); // Should throw for invalid event name first
+      }).toThrow(); // Should throw for invalid event name first
     });
   });
 
@@ -431,7 +431,7 @@ describe("core/observable/addEventListener", () => {
         unsub();
         unsub();
         unsub();
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should work with multiple listeners", async () => {
@@ -530,7 +530,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, emptyFn);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       router.start("/home").catch(() => {});
     });
@@ -540,7 +540,7 @@ describe("core/observable/addEventListener", () => {
 
       expect(() => {
         getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-      }).not.toThrowError();
+      }).not.toThrow();
 
       await router.start("/home");
 

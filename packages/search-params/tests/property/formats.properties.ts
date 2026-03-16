@@ -169,7 +169,7 @@ describe("array element validation", () => {
     (key: string, values: (string | number | boolean)[]) => {
       expect(() => {
         build({ [key]: values });
-      }).not.toThrowError();
+      }).not.toThrow();
     },
   );
 
@@ -178,7 +178,7 @@ describe("array element validation", () => {
     (key: string, value: unknown) => {
       expect(() => {
         build({ [key]: [value] });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     },
   );
 });

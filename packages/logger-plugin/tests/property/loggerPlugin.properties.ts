@@ -161,7 +161,7 @@ describe("no-throw: plugin never breaks navigation", () => {
 
       await expect(router.start("/")).resolves.toBeDefined();
 
-      expect(() => router.stop()).not.toThrowError();
+      expect(() => router.stop()).not.toThrow();
     },
   );
 });

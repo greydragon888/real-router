@@ -90,19 +90,19 @@ describe("forwardState", () => {
     it("throws TypeError for non-string routeName", () => {
       expect(() =>
         getPluginApi(router).forwardState(123 as unknown as string, {}),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).forwardState(null as unknown as string, {}),
-      ).toThrowError(/Invalid routeName/);
+      ).toThrow(/Invalid routeName/);
     });
 
     it("throws TypeError for invalid routeParams", () => {
       expect(() =>
         getPluginApi(router).forwardState("home", "invalid" as never),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).forwardState("home", (() => {}) as never),
-      ).toThrowError(/Invalid routeParams/);
+      ).toThrow(/Invalid routeParams/);
     });
   });
 });

@@ -300,7 +300,7 @@ describe("@real-router/logger-plugin", () => {
 
       router.usePlugin(loggerPluginFactory());
 
-      expect(() => router.start("/")).not.toThrowError();
+      expect(() => router.start("/")).not.toThrow();
 
       globalThis.console = originalConsole;
     });
@@ -506,7 +506,7 @@ describe("@real-router/logger-plugin", () => {
         await router.navigate(i % 2 ? "users" : "admin");
       }
 
-      expect(() => router.getState()).not.toThrowError();
+      expect(() => router.getState()).not.toThrow();
     });
   });
 

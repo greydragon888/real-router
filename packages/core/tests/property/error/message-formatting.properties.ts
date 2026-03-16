@@ -273,7 +273,7 @@ describe("RouterError Message Formatting Properties", () => {
       (code) => {
         const err = new RouterError(code);
 
-        expect(() => JSON.stringify(err)).not.toThrowError();
+        expect(() => JSON.stringify(err)).not.toThrow();
 
         const json = structuredClone(err);
 
@@ -286,9 +286,7 @@ describe("RouterError Message Formatting Properties", () => {
     test.prop([errorCodeArbitrary, fc.string({ minLength: 0, maxLength: 0 })], {
       numRuns: 1000,
     })("empty message does not cause errors", (code, emptyMsg) => {
-      expect(
-        () => new RouterError(code, { message: emptyMsg }),
-      ).not.toThrowError();
+      expect(() => new RouterError(code, { message: emptyMsg })).not.toThrow();
 
       const err = new RouterError(code, { message: emptyMsg });
 

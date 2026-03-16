@@ -173,10 +173,10 @@ describe("Browser Plugin — Lifecycle", () => {
     });
 
     it("validates option types throw on invalid types", () => {
-      expect(() => browserPluginFactory({ base: 123 as any })).toThrowError();
+      expect(() => browserPluginFactory({ base: 123 as any })).toThrow();
       expect(() =>
         browserPluginFactory({ forceDeactivate: "true" as any }),
-      ).toThrowError();
+      ).toThrow();
     });
 
     it("does not warn for correct option types", async () => {
@@ -197,7 +197,7 @@ describe("Browser Plugin — Lifecycle", () => {
     });
 
     it("throws Error with message for invalid base type", () => {
-      expect(() => browserPluginFactory({ base: 123 as any })).toThrowError(
+      expect(() => browserPluginFactory({ base: 123 as any })).toThrow(
         /base.*string.*number/,
       );
     });
@@ -205,7 +205,7 @@ describe("Browser Plugin — Lifecycle", () => {
     it("throws Error with message for invalid forceDeactivate type", () => {
       expect(() =>
         browserPluginFactory({ forceDeactivate: "true" as any }),
-      ).toThrowError(/forceDeactivate.*boolean.*string/);
+      ).toThrow(/forceDeactivate.*boolean.*string/);
     });
   });
 
@@ -411,13 +411,13 @@ describe("Browser Plugin — Lifecycle", () => {
     it("throws if buildState returns undefined", async () => {
       expect(() => {
         router.replaceHistoryState("definitely.nonexistent.route");
-      }).toThrowError("[real-router] Cannot replace state");
+      }).toThrow("[real-router] Cannot replace state");
     });
   });
 
   describe("Validation Edge Cases", () => {
     it("skips validation when opts is undefined (no throw)", () => {
-      expect(() => browserPluginFactory()).not.toThrowError();
+      expect(() => browserPluginFactory()).not.toThrow();
 
       router.usePlugin(browserPluginFactory());
     });
@@ -425,7 +425,7 @@ describe("Browser Plugin — Lifecycle", () => {
     it("ignores unknown option keys (no throw on unknown key)", () => {
       expect(() =>
         browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),
-      ).not.toThrowError();
+      ).not.toThrow();
 
       router.usePlugin(
         browserPluginFactory({ unknownOption: "value" } as any, mockedBrowser),

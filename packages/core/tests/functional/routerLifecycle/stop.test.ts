@@ -60,7 +60,7 @@ describe("stop", () => {
 
       expect(() => {
         router.stop();
-      }).not.toThrowError();
+      }).not.toThrow();
 
       expect(router.isActive()).toBe(false);
       expect(router.getState()).toBeUndefined();
@@ -97,12 +97,12 @@ describe("stop", () => {
 
       expect(() => {
         router.stop();
-      }).not.toThrowError();
+      }).not.toThrow();
       expect(router.isActive()).toBe(false);
 
       expect(() => {
         router.stop();
-      }).not.toThrowError();
+      }).not.toThrow();
       expect(router.isActive()).toBe(false);
     });
 

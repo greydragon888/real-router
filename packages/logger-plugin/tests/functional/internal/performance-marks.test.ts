@@ -105,7 +105,7 @@ describe("performance-marks utilities", () => {
 
         expect(() => {
           tracker.measure("test", "missing-start", "missing-end");
-        }).not.toThrowError();
+        }).not.toThrow();
 
         expect(warnSpy).toHaveBeenCalledWith(
           `[${TEST_CONTEXT}] Failed to create performance measure: test`,
@@ -185,7 +185,7 @@ describe("performance-marks utilities", () => {
 
           tracker.mark("test");
           tracker.measure("test", "start", "end");
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 
@@ -220,7 +220,7 @@ describe("performance-marks utilities", () => {
 
         expect(() => {
           tracker.measure("test", "nonexistent", "end");
-        }).not.toThrowError();
+        }).not.toThrow();
 
         expect(warnSpy).toHaveBeenCalled();
       });

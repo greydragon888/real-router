@@ -12,7 +12,7 @@ describe("validateConstraints", () => {
 
     expect(() => {
       validateConstraints({ id: "123" }, patterns, String.raw`/users/:id<\d+>`);
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("throws error for non-matching constraint", () => {
@@ -22,7 +22,7 @@ describe("validateConstraints", () => {
 
     expect(() => {
       validateConstraints({ id: "abc" }, patterns, String.raw`/users/:id<\d+>`);
-    }).toThrowError(
+    }).toThrow(
       String.raw`[validateConstraints] Parameter 'id' of '/users/:id<\d+>' has invalid format: got 'abc', expected to match '\d+'`,
     );
   });
@@ -39,7 +39,7 @@ describe("validateConstraints", () => {
         patterns,
         String.raw`/:id<\d+>/:slug<[a-z-]+>`,
       );
-    }).not.toThrowError();
+    }).not.toThrow();
 
     expect(() => {
       validateConstraints(
@@ -47,7 +47,7 @@ describe("validateConstraints", () => {
         patterns,
         String.raw`/:id<\d+>/:slug<[a-z-]+>`,
       );
-    }).toThrowError(String.raw`expected to match '\d+'`);
+    }).toThrow(String.raw`expected to match '\d+'`);
   });
 
   it("handles empty constraint pattern map", () => {
@@ -55,7 +55,7 @@ describe("validateConstraints", () => {
 
     expect(() => {
       validateConstraints({ id: "anything" }, patterns, "/users/:id");
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("shows default pattern for empty constraint", () => {
@@ -65,6 +65,6 @@ describe("validateConstraints", () => {
 
     expect(() => {
       validateConstraints({ id: "/" }, patterns, "/users/:id");
-    }).toThrowError("expected to match '[^/]+'");
+    }).toThrow("expected to match '[^/]+'");
   });
 });

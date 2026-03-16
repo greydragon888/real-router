@@ -6,13 +6,13 @@ describe("validateOptions", () => {
   it("should accept undefined options", () => {
     expect(() => {
       validateOptions();
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("should accept empty options object", () => {
     expect(() => {
       validateOptions({});
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("should accept all valid options", () => {
@@ -24,28 +24,28 @@ describe("validateOptions", () => {
         showParamsDiff: false,
         usePerformanceMarks: true,
       });
-    }).not.toThrowError();
+    }).not.toThrow();
   });
 
   it("should throw TypeError for non-object options", () => {
     expect(() => {
       validateOptions("string" as never);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       validateOptions(42 as never);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       validateOptions(true as never);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
   });
 
   it("should throw TypeError for null options", () => {
     expect(() => {
       validateOptions(null as never);
-    }).toThrowError(TypeError);
+    }).toThrow(TypeError);
     expect(() => {
       validateOptions(null as never);
-    }).toThrowError("Options must be an object");
+    }).toThrow("Options must be an object");
   });
 
   describe("level", () => {
@@ -54,23 +54,23 @@ describe("validateOptions", () => {
       (level) => {
         expect(() => {
           validateOptions({ level });
-        }).not.toThrowError();
+        }).not.toThrow();
       },
     );
 
     it("should throw TypeError for invalid level", () => {
       expect(() => {
         validateOptions({ level: "verbose" as never });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateOptions({ level: "verbose" as never });
-      }).toThrowError('Invalid level: "verbose"');
+      }).toThrow('Invalid level: "verbose"');
     });
 
     it("should list valid levels in error message", () => {
       expect(() => {
         validateOptions({ level: "bad" as never });
-      }).toThrowError("Expected: all, transitions, errors, none");
+      }).toThrow("Expected: all, transitions, errors, none");
     });
   });
 
@@ -78,22 +78,22 @@ describe("validateOptions", () => {
     it("should accept valid non-empty string", () => {
       expect(() => {
         validateOptions({ context: "my-router" });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should throw TypeError for empty string", () => {
       expect(() => {
         validateOptions({ context: "" });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateOptions({ context: "" });
-      }).toThrowError('"context" must be a non-empty string');
+      }).toThrow('"context" must be a non-empty string');
     });
 
     it("should throw TypeError for non-string", () => {
       expect(() => {
         validateOptions({ context: 42 as never });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
   });
 
@@ -101,40 +101,40 @@ describe("validateOptions", () => {
     it("should throw TypeError for non-boolean showTiming", () => {
       expect(() => {
         validateOptions({ showTiming: "yes" as never });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateOptions({ showTiming: "yes" as never });
-      }).toThrowError('"showTiming" must be a boolean');
+      }).toThrow('"showTiming" must be a boolean');
     });
 
     it("should throw TypeError for non-boolean showParamsDiff", () => {
       expect(() => {
         validateOptions({ showParamsDiff: "yes" as never });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateOptions({ showParamsDiff: "yes" as never });
-      }).toThrowError('"showParamsDiff" must be a boolean');
+      }).toThrow('"showParamsDiff" must be a boolean');
     });
 
     it("should throw TypeError for non-boolean usePerformanceMarks", () => {
       expect(() => {
         validateOptions({ usePerformanceMarks: "yes" as never });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateOptions({ usePerformanceMarks: "yes" as never });
-      }).toThrowError('"usePerformanceMarks" must be a boolean');
+      }).toThrow('"usePerformanceMarks" must be a boolean');
     });
 
     it("should accept boolean values", () => {
       expect(() => {
         validateOptions({ showTiming: false });
-      }).not.toThrowError();
+      }).not.toThrow();
       expect(() => {
         validateOptions({ showParamsDiff: true });
-      }).not.toThrowError();
+      }).not.toThrow();
       expect(() => {
         validateOptions({ usePerformanceMarks: false });
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -142,7 +142,7 @@ describe("validateOptions", () => {
     it("should include [@real-router/logger-plugin] prefix in error messages", () => {
       expect(() => {
         validateOptions(null as never);
-      }).toThrowError("[@real-router/logger-plugin]");
+      }).toThrow("[@real-router/logger-plugin]");
     });
   });
 });

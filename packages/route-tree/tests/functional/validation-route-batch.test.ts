@@ -14,31 +14,31 @@ describe("validateRoute", () => {
     it("should throw TypeError for null", () => {
       expect(() => {
         validateRoute(null, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(null, methodName);
-      }).toThrowError("[router.add] Route must be an object, got null");
+      }).toThrow("[router.add] Route must be an object, got null");
     });
 
     it("should throw TypeError for undefined", () => {
       expect(() => {
         validateRoute(undefined, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(undefined, methodName);
-      }).toThrowError("[router.add] Route must be an object, got undefined");
+      }).toThrow("[router.add] Route must be an object, got undefined");
     });
 
     it("should throw TypeError for primitives", () => {
       expect(() => {
         validateRoute("string", methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(123, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(true, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("should throw TypeError for class instances", () => {
@@ -49,10 +49,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(new RouteClass(), methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(new RouteClass(), methodName);
-      }).toThrowError(/must be a plain object/);
+      }).toThrow(/must be a plain object/);
     });
 
     it("should throw TypeError for route with getter", () => {
@@ -65,10 +65,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(routeWithGetter, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(routeWithGetter, methodName);
-      }).toThrowError(/must not have getters or setters/);
+      }).toThrow(/must not have getters or setters/);
     });
 
     it("should throw TypeError for route with setter", () => {
@@ -85,10 +85,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(routeWithSetter, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute(routeWithSetter, methodName);
-      }).toThrowError(/must not have getters or setters/);
+      }).toThrow(/must not have getters or setters/);
     });
 
     it("should allow Object.create(null) route", () => {
@@ -102,13 +102,13 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute(nullProtoRoute, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should allow plain object route", () => {
       expect(() => {
         validateRoute({ name: "plain", path: "/plain" }, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -116,25 +116,25 @@ describe("validateRoute", () => {
     it("should throw for missing name", () => {
       expect(() => {
         validateRoute({ path: "/test" }, methodName);
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should throw for empty name", () => {
       expect(() => {
         validateRoute({ name: "", path: "/test" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: "", path: "/test" }, methodName);
-      }).toThrowError("[router.add] Route name cannot be empty");
+      }).toThrow("[router.add] Route name cannot be empty");
     });
 
     it("should throw for whitespace-only name", () => {
       expect(() => {
         validateRoute({ name: "   ", path: "/test" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: "   ", path: "/test" }, methodName);
-      }).toThrowError("[router.add] Route name cannot contain only whitespace");
+      }).toThrow("[router.add] Route name cannot contain only whitespace");
     });
 
     it("should throw for name exceeding maximum length", () => {
@@ -142,10 +142,10 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute({ name: longName, path: "/test" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: longName, path: "/test" }, methodName);
-      }).toThrowError(/exceeds maximum length of 10000 characters/);
+      }).toThrow(/exceeds maximum length of 10000 characters/);
     });
 
     it("should accept system routes with @@ prefix", () => {
@@ -154,28 +154,28 @@ describe("validateRoute", () => {
           { name: "@@real-router/UNKNOWN", path: "/unknown" },
           methodName,
         );
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should throw for invalid route name pattern (non-ASCII)", () => {
       expect(() => {
         validateRoute({ name: "café", path: "/cafe" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: "café", path: "/cafe" }, methodName);
-      }).toThrowError(/Invalid route name/);
+      }).toThrow(/Invalid route name/);
     });
 
     it("should throw for missing path", () => {
       expect(() => {
         validateRoute({ name: "test" }, methodName);
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should accept valid route", () => {
       expect(() => {
         validateRoute({ name: "test", path: "/test" }, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -187,7 +187,7 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute({ name: "users", path: "/u" }, methodName, rootNode);
-      }).toThrowError('[router.add] Route "users" already exists');
+      }).toThrow('[router.add] Route "users" already exists');
     });
 
     it("should throw when nested route name exists", () => {
@@ -206,7 +206,7 @@ describe("validateRoute", () => {
           rootNode,
           "users",
         );
-      }).toThrowError('[router.add] Route "users.profile" already exists');
+      }).toThrow('[router.add] Route "users.profile" already exists');
     });
 
     it("should throw when path exists in tree", () => {
@@ -216,7 +216,7 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute({ name: "people", path: "/users" }, methodName, rootNode);
-      }).toThrowError('[router.add] Path "/users" is already defined');
+      }).toThrow('[router.add] Path "/users" is already defined');
     });
 
     it("should not throw when route does not exist", () => {
@@ -230,7 +230,7 @@ describe("validateRoute", () => {
           methodName,
           rootNode,
         );
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should throw when path exists at nested level", () => {
@@ -249,7 +249,7 @@ describe("validateRoute", () => {
           rootNode,
           "users",
         );
-      }).toThrowError('[router.add] Path "/profile" is already defined');
+      }).toThrow('[router.add] Path "/profile" is already defined');
     });
 
     it("should not throw when parent does not exist for path check", () => {
@@ -266,7 +266,7 @@ describe("validateRoute", () => {
           rootNode,
           "nonexistent",
         );
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -282,7 +282,7 @@ describe("validateRoute", () => {
           "",
           seenNames,
         );
-      }).toThrowError('[router.add] Duplicate route "users" in batch');
+      }).toThrow('[router.add] Duplicate route "users" in batch');
     });
 
     it("should add name to seenNames set", () => {
@@ -313,7 +313,7 @@ describe("validateRoute", () => {
           undefined,
           seenPaths,
         );
-      }).toThrowError('[router.add] Path "/users" is already defined');
+      }).toThrow('[router.add] Path "/users" is already defined');
     });
 
     it("should add path to seenPaths map", () => {
@@ -363,7 +363,7 @@ describe("validateRoute", () => {
           { name: "test", path: "/test", children: "invalid" },
           methodName,
         );
-      }).toThrowError(
+      }).toThrow(
         '[router.add] Route "test" children must be an array, got string',
       );
     });
@@ -377,7 +377,7 @@ describe("validateRoute", () => {
           { name: "test", path: "/test", children: new CustomClass() },
           methodName,
         );
-      }).toThrowError(
+      }).toThrow(
         '[router.add] Route "test" children must be an array, got CustomClass',
       );
     });
@@ -388,7 +388,7 @@ describe("validateRoute", () => {
           { name: "test", path: "/test", children: {} },
           methodName,
         );
-      }).toThrowError(
+      }).toThrow(
         '[router.add] Route "test" children must be an array, got object',
       );
     });
@@ -403,7 +403,7 @@ describe("validateRoute", () => {
           },
           methodName,
         );
-      }).toThrowError();
+      }).toThrow();
     });
 
     it("should accept valid nested routes", () => {
@@ -422,7 +422,7 @@ describe("validateRoute", () => {
           },
           methodName,
         );
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should detect duplicate names in nested children", () => {
@@ -443,7 +443,7 @@ describe("validateRoute", () => {
           "",
           seenNames,
         );
-      }).toThrowError('[router.add] Duplicate route "parent.child" in batch');
+      }).toThrow('[router.add] Duplicate route "parent.child" in batch');
     });
 
     it("should detect duplicate paths in nested children", () => {
@@ -465,7 +465,7 @@ describe("validateRoute", () => {
           undefined,
           seenPaths,
         );
-      }).toThrowError('[router.add] Path "/same" is already defined');
+      }).toThrow('[router.add] Path "/same" is already defined');
     });
   });
 
@@ -503,25 +503,25 @@ describe("validateRoute", () => {
     it("should throw TypeError when route name contains dots", () => {
       expect(() => {
         validateRoute({ name: "users.profile", path: "/profile" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: "users.profile", path: "/profile" }, methodName);
-      }).toThrowError(/cannot contain dots/);
+      }).toThrow(/cannot contain dots/);
     });
 
     it("should throw TypeError for multi-level dot-notation", () => {
       expect(() => {
         validateRoute({ name: "a.b.c", path: "/path" }, methodName);
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
       expect(() => {
         validateRoute({ name: "a.b.c", path: "/path" }, methodName);
-      }).toThrowError(/cannot contain dots/);
+      }).toThrow(/cannot contain dots/);
     });
 
     it("should accept simple route names without dots", () => {
       expect(() => {
         validateRoute({ name: "users", path: "/users" }, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -532,7 +532,7 @@ describe("validateRoute", () => {
 
       expect(() => {
         validateRoute({ name: exactLengthName, path: "/test" }, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 
@@ -547,9 +547,7 @@ describe("validateRoute", () => {
           },
           methodName,
         );
-      }).toThrowError(
-        '[router.add] Route "test" encodeParams must be a function',
-      );
+      }).toThrow('[router.add] Route "test" encodeParams must be a function');
     });
 
     it("should throw when decodeParams is not a function", () => {
@@ -562,9 +560,7 @@ describe("validateRoute", () => {
           },
           methodName,
         );
-      }).toThrowError(
-        '[router.add] Route "test" decodeParams must be a function',
-      );
+      }).toThrow('[router.add] Route "test" decodeParams must be a function');
     });
 
     it("should accept valid encode/decode functions", () => {
@@ -578,7 +574,7 @@ describe("validateRoute", () => {
           },
           methodName,
         );
-      }).not.toThrowError();
+      }).not.toThrow();
     });
   });
 });

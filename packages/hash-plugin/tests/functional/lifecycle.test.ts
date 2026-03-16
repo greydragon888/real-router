@@ -59,11 +59,11 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     it("throws for invalid option type", () => {
       expect(() =>
         hashPluginFactory({ base: 123 as unknown as string }),
-      ).toThrowError();
+      ).toThrow();
     });
 
     it("does not throw when opts is undefined", () => {
-      expect(() => hashPluginFactory()).not.toThrowError();
+      expect(() => hashPluginFactory()).not.toThrow();
     });
 
     it("creates working browser when none provided", async () => {
@@ -230,7 +230,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
     it("throws if route does not exist", () => {
       expect(() => {
         router.replaceHistoryState("definitely.nonexistent.route");
-      }).toThrowError("[real-router] Cannot replace state");
+      }).toThrow("[real-router] Cannot replace state");
     });
 
     it("uses hash URL format in replaceHistoryState", () => {
@@ -316,7 +316,7 @@ describe("Hash Plugin — Lifecycle & Configuration", async () => {
       router.usePlugin(hashPluginFactory({}, mockedBrowser));
       await router.start();
 
-      expect(() => router.stop()).not.toThrowError();
+      expect(() => router.stop()).not.toThrow();
     });
 
     it("teardown removes extensions and listener", async () => {

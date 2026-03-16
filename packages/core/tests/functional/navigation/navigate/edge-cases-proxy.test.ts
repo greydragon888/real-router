@@ -33,7 +33,7 @@ describe("router.navigate() - edge cases proxy", () => {
         // This documents current behavior - exceptions are NOT caught
         expect(() => {
           void router.navigate("users", {}, evilOpts);
-        }).toThrowError("Evil getter!");
+        }).toThrow("Evil getter!");
       });
 
       it("should handle opts with non-throwing getters", async () => {

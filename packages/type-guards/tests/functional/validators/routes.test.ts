@@ -22,10 +22,10 @@ describe("Route Validators", () => {
         nonStringValues.forEach(({ value, type }) => {
           expect(() => {
             validateRouteName(value, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             validateRouteName(value, methodName);
-          }).toThrowError(
+          }).toThrow(
             `[router.${methodName}] Route name must be a string, got ${type}`,
           );
         });
@@ -34,7 +34,7 @@ describe("Route Validators", () => {
       it("should not throw for valid string values", () => {
         expect(() => {
           validateRouteName("validRoute", methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 
@@ -42,7 +42,7 @@ describe("Route Validators", () => {
       it("should accept empty string (root node)", () => {
         expect(() => {
           validateRouteName("", methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should throw for strings with only whitespace", () => {
@@ -59,7 +59,7 @@ describe("Route Validators", () => {
         whitespaceStrings.forEach((str) => {
           expect(() => {
             validateRouteName(str, methodName);
-          }).toThrowError(
+          }).toThrow(
             `[router.${methodName}] Route name cannot contain only whitespace`,
           );
         });
@@ -72,7 +72,7 @@ describe("Route Validators", () => {
 
         expect(() => {
           validateRouteName(maxLengthRoute, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should throw for routes exceeding MAX_ROUTE_NAME_LENGTH", () => {
@@ -80,10 +80,10 @@ describe("Route Validators", () => {
 
         expect(() => {
           validateRouteName(tooLongRoute, methodName);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           validateRouteName(tooLongRoute, methodName);
-        }).toThrowError(
+        }).toThrow(
           `[router.${methodName}] Route name exceeds maximum length of 10000 characters. This is a technical safety limit.`,
         );
       });
@@ -105,17 +105,17 @@ describe("Route Validators", () => {
         systemRoutes.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
       it("should not treat @ as system route", () => {
         expect(() => {
           validateRouteName("@notSystem", methodName);
-        }).toThrowError();
+        }).toThrow();
         expect(() => {
           validateRouteName("@", methodName);
-        }).toThrowError();
+        }).toThrow();
       });
     });
 
@@ -126,7 +126,7 @@ describe("Route Validators", () => {
         routesStartingWithDot.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         });
       });
 
@@ -136,7 +136,7 @@ describe("Route Validators", () => {
         routesEndingWithDot.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         });
       });
 
@@ -151,7 +151,7 @@ describe("Route Validators", () => {
         routesWithConsecutiveDots.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
         });
       });
 
@@ -166,7 +166,7 @@ describe("Route Validators", () => {
         validDottedRoutes.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -187,7 +187,7 @@ describe("Route Validators", () => {
         validSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -203,7 +203,7 @@ describe("Route Validators", () => {
         validSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -223,7 +223,7 @@ describe("Route Validators", () => {
         validSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -233,10 +233,10 @@ describe("Route Validators", () => {
         invalidSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
       });
 
@@ -246,10 +246,10 @@ describe("Route Validators", () => {
         invalidSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
       });
 
@@ -273,10 +273,10 @@ describe("Route Validators", () => {
         invalidSegments.forEach((segment) => {
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             validateRouteName(segment, methodName);
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
       });
     });
@@ -294,10 +294,10 @@ describe("Route Validators", () => {
         invalidRoutes.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(TypeError);
+          }).toThrow(TypeError);
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
       });
 
@@ -314,7 +314,7 @@ describe("Route Validators", () => {
         validRoutes.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -326,21 +326,21 @@ describe("Route Validators", () => {
 
         expect(() => {
           validateRouteName(almostMaxRoute, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Route with exactly 10000 characters
         const exactMaxRoute = "a".repeat(10_000);
 
         expect(() => {
           validateRouteName(exactMaxRoute, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Route with 10001 characters (just over limit)
         const overMaxRoute = "a".repeat(10_001);
 
         expect(() => {
           validateRouteName(overMaxRoute, methodName);
-        }).toThrowError("exceeds maximum length");
+        }).toThrow("exceeds maximum length");
       });
 
       it("should handle single character routes", () => {
@@ -349,7 +349,7 @@ describe("Route Validators", () => {
         validSingleChars.forEach((char) => {
           expect(() => {
             validateRouteName(char, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
 
         const invalidSingleChars = ["1", "-", "@", " ", "."];
@@ -357,14 +357,14 @@ describe("Route Validators", () => {
         invalidSingleChars.forEach((char) => {
           expect(() => {
             validateRouteName(char, methodName);
-          }).toThrowError();
+          }).toThrow();
         });
       });
 
       it("should accept empty string as special root node case", () => {
         expect(() => {
           validateRouteName("", methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Empty string should be treated as string after validation
         const value: unknown = "";
@@ -388,7 +388,7 @@ describe("Route Validators", () => {
         unicodeRoutes.forEach((route) => {
           expect(() => {
             validateRouteName(route, methodName);
-          }).toThrowError(/Invalid route name/);
+          }).toThrow(/Invalid route name/);
         });
       });
 
@@ -397,19 +397,17 @@ describe("Route Validators", () => {
 
         expect(() => {
           validateRouteName(123, customMethodName);
-        }).toThrowError(
-          `[router.${customMethodName}] Route name must be a string`,
-        );
+        }).toThrow(`[router.${customMethodName}] Route name must be a string`);
 
         expect(() => {
           validateRouteName("   ", customMethodName);
-        }).toThrowError(
+        }).toThrow(
           `[router.${customMethodName}] Route name cannot contain only whitespace`,
         );
 
         expect(() => {
           validateRouteName("123invalid", customMethodName);
-        }).toThrowError(`[router.${customMethodName}] Invalid route name`);
+        }).toThrow(`[router.${customMethodName}] Invalid route name`);
       });
     });
   });

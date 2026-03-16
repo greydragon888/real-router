@@ -55,15 +55,15 @@ describe("core/options", () => {
       // Mutations should throw in strict mode (Vitest runs in strict mode)
       expect(() => {
         opts.allowNotFound = !opts.allowNotFound;
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         opts.trailingSlash = "always";
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         opts.defaultRoute = "mutated";
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     // 🔴 CRITICAL: Nested objects are also frozen
@@ -82,11 +82,11 @@ describe("core/options", () => {
       // Mutations to nested objects should throw
       expect(() => {
         opts.queryParams!.arrayFormat = "comma";
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       expect(() => {
         (opts.defaultParams as Record<string, unknown>).id = "456";
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
 
       customRouter.stop();
     });
@@ -237,18 +237,18 @@ describe("core/options", () => {
     // 🔴 CRITICAL: Type validation
     describe("type validation", () => {
       it("should throw TypeError for wrong primitive type - string", () => {
-        expect(() =>
-          createRouter([], { trailingSlash: true as any }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createRouter([], { defaultRoute: 123 as any }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { trailingSlash: true as any })).toThrow(
+          TypeError,
+        );
+        expect(() => createRouter([], { defaultRoute: 123 as any })).toThrow(
+          TypeError,
+        );
       });
 
       it("should throw TypeError for null value", () => {
-        expect(() =>
-          createRouter([], { defaultRoute: null as any }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { defaultRoute: null as any })).toThrow(
+          TypeError,
+        );
       });
     });
 
@@ -257,32 +257,28 @@ describe("core/options", () => {
       it("should throw TypeError for invalid trailingSlash value", () => {
         expect(() =>
           createRouter([], { trailingSlash: "INVALID" as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { trailingSlash: "INVALID" as any }),
-        ).toThrowError(
-          'expected one of "strict", "never", "always", "preserve"',
-        );
+        ).toThrow('expected one of "strict", "never", "always", "preserve"');
       });
 
       it("should throw TypeError for invalid queryParamsMode value", () => {
         expect(() =>
           createRouter([], { queryParamsMode: "INVALID" as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParamsMode: "INVALID" as any }),
-        ).toThrowError('expected one of "default", "strict", "loose"');
+        ).toThrow('expected one of "default", "strict", "loose"');
       });
 
       it("should throw TypeError for invalid urlParamsEncoding value", () => {
         expect(() =>
           createRouter([], { urlParamsEncoding: "INVALID" as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { urlParamsEncoding: "INVALID" as any }),
-        ).toThrowError(
-          'expected one of "default", "uri", "uriComponent", "none"',
-        );
+        ).toThrow('expected one of "default", "uri", "uriComponent", "none"');
       });
 
       it("should accept all valid trailingSlash values", () => {
@@ -294,7 +290,7 @@ describe("core/options", () => {
         ] as const) {
           expect(() =>
             createRouter([], { trailingSlash: value }),
-          ).not.toThrowError();
+          ).not.toThrow();
         }
       });
 
@@ -302,7 +298,7 @@ describe("core/options", () => {
         for (const value of ["default", "strict", "loose"] as const) {
           expect(() =>
             createRouter([], { queryParamsMode: value }),
-          ).not.toThrowError();
+          ).not.toThrow();
         }
       });
 
@@ -315,48 +311,48 @@ describe("core/options", () => {
         ] as const) {
           expect(() =>
             createRouter([], { urlParamsEncoding: value }),
-          ).not.toThrowError();
+          ).not.toThrow();
         }
       });
 
       it("should include invalid value in error message", () => {
         expect(() =>
           createRouter([], { trailingSlash: "typo-value" as any }),
-        ).toThrowError('got "typo-value"');
+        ).toThrow('got "typo-value"');
       });
     });
 
     // 🔴 CRITICAL: Object validation
     describe("object validation", () => {
       it("should reject array for object options", () => {
-        expect(() => createRouter([], { queryParams: [] as any })).toThrowError(
+        expect(() => createRouter([], { queryParams: [] as any })).toThrow(
           TypeError,
         );
-        expect(() => createRouter([], { queryParams: [] as any })).toThrowError(
+        expect(() => createRouter([], { queryParams: [] as any })).toThrow(
           "expected plain object",
         );
 
-        expect(() =>
-          createRouter([], { defaultParams: [] as any }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { defaultParams: [] as any })).toThrow(
+          TypeError,
+        );
       });
 
       it("should reject Date instance for object options", () => {
         expect(() =>
           createRouter([], { queryParams: new Date() as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { defaultParams: new Date() as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
       });
 
       it("should reject null for object options", () => {
-        expect(() =>
-          createRouter([], { queryParams: null as any }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createRouter([], { defaultParams: null as any }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { queryParams: null as any })).toThrow(
+          TypeError,
+        );
+        expect(() => createRouter([], { defaultParams: null as any })).toThrow(
+          TypeError,
+        );
       });
 
       it("should reject class instances for object options", () => {
@@ -367,34 +363,32 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: instance as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { defaultParams: instance as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
       });
 
       it("should reject Object.create(null) for object options", () => {
         const nullProto = Object.create(null);
 
-        expect(() => createRouter([], { queryParams: nullProto })).toThrowError(
+        expect(() => createRouter([], { queryParams: nullProto })).toThrow(
           TypeError,
         );
-        expect(() =>
-          createRouter([], { defaultParams: nullProto }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { defaultParams: nullProto })).toThrow(
+          TypeError,
+        );
       });
 
       it("should accept plain objects for object options", () => {
-        expect(() => createRouter([], { queryParams: {} })).not.toThrowError();
+        expect(() => createRouter([], { queryParams: {} })).not.toThrow();
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "brackets" } }),
-        ).not.toThrowError();
-        expect(() =>
-          createRouter([], { defaultParams: {} }),
-        ).not.toThrowError();
+        ).not.toThrow();
+        expect(() => createRouter([], { defaultParams: {} })).not.toThrow();
         expect(() =>
           createRouter([], { defaultParams: { id: "123" } }),
-        ).not.toThrowError();
+        ).not.toThrow();
       });
 
       it("should reject objects with getters", () => {
@@ -404,12 +398,12 @@ describe("core/options", () => {
           },
         };
 
-        expect(() =>
-          createRouter([], { defaultParams: withGetter }),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createRouter([], { defaultParams: withGetter }),
-        ).toThrowError('Getters not allowed in "defaultParams": "id"');
+        expect(() => createRouter([], { defaultParams: withGetter })).toThrow(
+          TypeError,
+        );
+        expect(() => createRouter([], { defaultParams: withGetter })).toThrow(
+          'Getters not allowed in "defaultParams": "id"',
+        );
       });
 
       it("should reject objects with getters in queryParams", () => {
@@ -421,10 +415,10 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).toThrowError("Getters not allowed");
+        ).toThrow("Getters not allowed");
       });
 
       it("should accept objects with regular properties alongside rejected getters", () => {
@@ -435,10 +429,10 @@ describe("core/options", () => {
           },
         };
 
-        expect(() => createRouter([], { defaultParams: mixed })).toThrowError(
+        expect(() => createRouter([], { defaultParams: mixed })).toThrow(
           TypeError,
         );
-        expect(() => createRouter([], { defaultParams: mixed })).toThrowError(
+        expect(() => createRouter([], { defaultParams: mixed })).toThrow(
           'Getters not allowed in "defaultParams": "dangerousProp"',
         );
       });
@@ -447,38 +441,38 @@ describe("core/options", () => {
       it("should reject unknown keys in queryParams", () => {
         expect(() =>
           createRouter([], { queryParams: { unknownKey: "value" } as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParams: { unknownKey: "value" } as any }),
-        ).toThrowError('Unknown queryParams key: "unknownKey"');
+        ).toThrow('Unknown queryParams key: "unknownKey"');
       });
 
       // 🔴 CRITICAL: queryParams value validation
       it("should reject invalid arrayFormat value", () => {
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).toThrowError('expected one of "none", "brackets", "index", "comma"');
+        ).toThrow('expected one of "none", "brackets", "index", "comma"');
       });
 
       it("should reject invalid booleanFormat value", () => {
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).toThrowError('expected one of "none", "string", "empty-true"');
+        ).toThrow('expected one of "none", "string", "empty-true"');
       });
 
       it("should reject invalid nullFormat value", () => {
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrowError('expected one of "default", "hidden"');
+        ).toThrow('expected one of "default", "hidden"');
       });
 
       it("should accept all valid queryParams combinations", () => {
@@ -490,7 +484,7 @@ describe("core/options", () => {
               nullFormat: "default",
             },
           }),
-        ).not.toThrowError();
+        ).not.toThrow();
 
         expect(() =>
           createRouter([], {
@@ -500,7 +494,7 @@ describe("core/options", () => {
               nullFormat: "hidden",
             },
           }),
-        ).not.toThrowError();
+        ).not.toThrow();
 
         expect(() =>
           createRouter([], {
@@ -509,23 +503,23 @@ describe("core/options", () => {
               booleanFormat: "empty-true",
             },
           }),
-        ).not.toThrowError();
+        ).not.toThrow();
 
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "comma" } }),
-        ).not.toThrowError();
+        ).not.toThrow();
       });
     });
 
     // 🔴 CRITICAL: Non-existent option
     describe("non-existent options", () => {
       it("should throw TypeError for unknown option name", () => {
-        expect(() =>
-          createRouter([], { unknownOption: true } as any),
-        ).toThrowError(TypeError);
-        expect(() =>
-          createRouter([], { unknownOption: true } as any),
-        ).toThrowError('Unknown option: "unknownOption"');
+        expect(() => createRouter([], { unknownOption: true } as any)).toThrow(
+          TypeError,
+        );
+        expect(() => createRouter([], { unknownOption: true } as any)).toThrow(
+          'Unknown option: "unknownOption"',
+        );
       });
 
       it("should reject prototype pollution keys", () => {
@@ -542,7 +536,7 @@ describe("core/options", () => {
         ];
 
         for (const key of dangerousKeys) {
-          expect(() => createRouter([], { [key]: {} } as any)).toThrowError();
+          expect(() => createRouter([], { [key]: {} } as any)).toThrow();
         }
       });
     });
@@ -580,16 +574,16 @@ describe("core/options", () => {
         // typeof check happens before any coercion
         expect(() =>
           createRouter([], { defaultRoute: evilValue as any }),
-        ).toThrowError(TypeError);
+        ).toThrow(TypeError);
         expect(() =>
           createRouter([], { defaultRoute: evilValue as any }),
-        ).toThrowError("expected string, got object");
+        ).toThrow("expected string, got object");
       });
 
       it("should reject number for string option", () => {
-        expect(() =>
-          createRouter([], { trailingSlash: 1 as any }),
-        ).toThrowError(TypeError);
+        expect(() => createRouter([], { trailingSlash: 1 as any })).toThrow(
+          TypeError,
+        );
       });
 
       it("should accept frozen object for defaultParams", () => {
@@ -614,17 +608,17 @@ describe("core/options", () => {
 
   describe("options.ts edge cases (lines 31, 73, 79)", () => {
     it("should throw TypeError for unknown option in createRouter (line 73)", () => {
-      expect(() =>
-        createRouter([], { unknownOption: "value" } as any),
-      ).toThrowError(TypeError);
-      expect(() =>
-        createRouter([], { unknownOption: "value" } as any),
-      ).toThrowError('Unknown option: "unknownOption"');
+      expect(() => createRouter([], { unknownOption: "value" } as any)).toThrow(
+        TypeError,
+      );
+      expect(() => createRouter([], { unknownOption: "value" } as any)).toThrow(
+        'Unknown option: "unknownOption"',
+      );
     });
 
     it("should throw TypeError for array as options in createRouter (line 194)", () => {
-      expect(() => createRouter([], [] as any)).toThrowError(TypeError);
-      expect(() => createRouter([], [] as any)).toThrowError(
+      expect(() => createRouter([], [] as any)).toThrow(TypeError);
+      expect(() => createRouter([], [] as any)).toThrow(
         "Invalid options: expected plain object, got array",
       );
     });
@@ -634,10 +628,10 @@ describe("core/options", () => {
         allowNotFound = true;
       }
 
-      expect(() => createRouter([], new CustomOptions() as any)).toThrowError(
+      expect(() => createRouter([], new CustomOptions() as any)).toThrow(
         TypeError,
       );
-      expect(() => createRouter([], new CustomOptions() as any)).toThrowError(
+      expect(() => createRouter([], new CustomOptions() as any)).toThrow(
         "Invalid options: expected plain object, got CustomOptions",
       );
     });
@@ -652,7 +646,7 @@ describe("core/options", () => {
           // @ts-expect-error: testing undefined value for conditional config
           { trailingSlash: undefined, allowNotFound: true },
         ),
-      ).not.toThrowError();
+      ).not.toThrow();
     });
   });
 
@@ -754,7 +748,7 @@ describe("core/options", () => {
         createTestRouter({
           trailingSlash: (() => "never") as never,
         });
-      }).toThrowError(TypeError);
+      }).toThrow(TypeError);
     });
 
     it("navigateToDefault resolves callback defaultRoute via getDependency", async () => {

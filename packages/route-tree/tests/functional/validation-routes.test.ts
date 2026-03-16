@@ -18,13 +18,13 @@ describe("validateRoutePath", () => {
       it("should accept empty string (root/grouping)", () => {
         expect(() => {
           validateRoutePath("", routeName, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should accept root path", () => {
         expect(() => {
           validateRoutePath("/", routeName, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should accept static paths", () => {
@@ -40,7 +40,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -56,7 +56,7 @@ describe("validateRoutePath", () => {
         segments.forEach((segment) => {
           expect(() => {
             validateRoutePath(segment, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -73,7 +73,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -83,7 +83,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -93,7 +93,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -108,7 +108,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -125,7 +125,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -139,7 +139,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -156,7 +156,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
 
@@ -165,7 +165,7 @@ describe("validateRoutePath", () => {
 
         expect(() => {
           validateRoutePath("~/absolute", routeName, methodName, parentNode);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 
@@ -181,7 +181,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -206,14 +206,14 @@ describe("validateRoutePath", () => {
         invalidValues.forEach((value) => {
           expect(() => {
             validateRoutePath(value, routeName, methodName);
-          }).toThrowError(/Route path must be a string/);
+          }).toThrow(/Route path must be a string/);
         });
       });
 
       it("should include correct type in error message for arrays", () => {
         expect(() => {
           validateRoutePath([], routeName, methodName);
-        }).toThrowError(/Route path must be a string, got array/);
+        }).toThrow(/Route path must be a string, got array/);
       });
     });
 
@@ -221,25 +221,25 @@ describe("validateRoutePath", () => {
       it("should throw for paths with spaces", () => {
         expect(() => {
           validateRoutePath("/with space", routeName, methodName);
-        }).toThrowError(/whitespace not allowed/);
+        }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with tabs", () => {
         expect(() => {
           validateRoutePath("/with\ttab", routeName, methodName);
-        }).toThrowError(/whitespace not allowed/);
+        }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with newlines", () => {
         expect(() => {
           validateRoutePath("/with\nnewline", routeName, methodName);
-        }).toThrowError(/whitespace not allowed/);
+        }).toThrow(/whitespace not allowed/);
       });
 
       it("should throw for paths with carriage return", () => {
         expect(() => {
           validateRoutePath("/with\rcarriage", routeName, methodName);
-        }).toThrowError(/whitespace not allowed/);
+        }).toThrow(/whitespace not allowed/);
       });
 
       it("should include path in whitespace error message", () => {
@@ -247,7 +247,7 @@ describe("validateRoutePath", () => {
 
         expect(() => {
           validateRoutePath(pathWithSpace, routeName, methodName);
-        }).toThrowError(`whitespace not allowed in "${pathWithSpace}"`);
+        }).toThrow(`whitespace not allowed in "${pathWithSpace}"`);
       });
     });
 
@@ -258,7 +258,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).toThrowError(/double slashes not allowed/);
+          }).toThrow(/double slashes not allowed/);
         });
       });
 
@@ -273,7 +273,7 @@ describe("validateRoutePath", () => {
         paths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName);
-          }).toThrowError(/invalid path format/);
+          }).toThrow(/invalid path format/);
         });
       });
     });
@@ -292,7 +292,7 @@ describe("validateRoutePath", () => {
             methodName,
             parentWithParams,
           );
-        }).toThrowError(
+        }).toThrow(
           /Absolute path .* cannot be used under parent route with URL parameters/,
         );
       });
@@ -308,9 +308,7 @@ describe("validateRoutePath", () => {
         absolutePaths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName, parentWithParams);
-          }).toThrowError(
-            /cannot be used under parent route with URL parameters/,
-          );
+          }).toThrow(/cannot be used under parent route with URL parameters/);
         });
       });
 
@@ -326,7 +324,7 @@ describe("validateRoutePath", () => {
         relativePaths.forEach((path) => {
           expect(() => {
             validateRoutePath(path, routeName, methodName, parentWithParams);
-          }).not.toThrowError();
+          }).not.toThrow();
         });
       });
     });
@@ -338,7 +336,7 @@ describe("validateRoutePath", () => {
 
       expect(() => {
         validateRoutePath(longPath, routeName, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should handle paths with many segments", () => {
@@ -346,7 +344,7 @@ describe("validateRoutePath", () => {
 
       expect(() => {
         validateRoutePath(deepPath, routeName, methodName);
-      }).not.toThrowError();
+      }).not.toThrow();
     });
 
     it("should handle paths with unicode characters", () => {
@@ -355,7 +353,7 @@ describe("validateRoutePath", () => {
       unicodePaths.forEach((path) => {
         expect(() => {
           validateRoutePath(path, routeName, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
 
@@ -372,7 +370,7 @@ describe("validateRoutePath", () => {
       specialPaths.forEach((path) => {
         expect(() => {
           validateRoutePath(path, routeName, methodName);
-        }).not.toThrowError();
+        }).not.toThrow();
       });
     });
   });
@@ -383,7 +381,7 @@ describe("validateRoutePath", () => {
 
       expect(() => {
         validateRoutePath("//", testRouteName, methodName);
-      }).toThrowError(new RegExp(testRouteName));
+      }).toThrow(new RegExp(testRouteName));
     });
 
     it("should include method name in error message", () => {
@@ -391,7 +389,7 @@ describe("validateRoutePath", () => {
 
       expect(() => {
         validateRoutePath("//", routeName, testMethodName);
-      }).toThrowError(new RegExp(testMethodName));
+      }).toThrow(new RegExp(testMethodName));
     });
 
     it("should include the invalid path in error message", () => {
@@ -399,7 +397,7 @@ describe("validateRoutePath", () => {
 
       expect(() => {
         validateRoutePath(invalidPath, routeName, methodName);
-      }).toThrowError(
+      }).toThrow(
         new RegExp(
           invalidPath.replaceAll(/[$()*+.?[\\\]^{|}]/g, String.raw`\$&`),
         ),
@@ -409,15 +407,15 @@ describe("validateRoutePath", () => {
     it("should provide helpful error message for type errors", () => {
       expect(() => {
         validateRoutePath(123, routeName, methodName);
-      }).toThrowError(/Route path must be a string, got number/);
+      }).toThrow(/Route path must be a string, got number/);
 
       expect(() => {
         validateRoutePath(null, routeName, methodName);
-      }).toThrowError(/Route path must be a string, got null/);
+      }).toThrow(/Route path must be a string, got null/);
 
       expect(() => {
         validateRoutePath(undefined, routeName, methodName);
-      }).toThrowError(/Route path must be a string, got undefined/);
+      }).toThrow(/Route path must be a string, got undefined/);
     });
   });
 });

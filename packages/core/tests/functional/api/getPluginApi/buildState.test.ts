@@ -34,19 +34,19 @@ describe("buildState", () => {
     it("throws TypeError for non-string routeName", () => {
       expect(() =>
         getPluginApi(router).buildState(123 as unknown as string, {}),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).buildState(null as unknown as string, {}),
-      ).toThrowError(/Invalid routeName/);
+      ).toThrow(/Invalid routeName/);
     });
 
     it("throws TypeError for invalid routeParams", () => {
       expect(() =>
         getPluginApi(router).buildState("home", "invalid" as never),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).buildState("home", (() => {}) as never),
-      ).toThrowError(/Invalid routeParams/);
+      ).toThrow(/Invalid routeParams/);
     });
   });
 });

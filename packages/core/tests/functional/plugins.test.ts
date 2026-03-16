@@ -183,7 +183,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(validPlugin1, failingPlugin, validPlugin2);
-        }).toThrowError("Factory initialization failed");
+        }).toThrow("Factory initialization failed");
 
         // No plugins should be registered - verify by starting router
         await router.start("/home");
@@ -201,10 +201,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(validPlugin, invalidPlugin);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(validPlugin, invalidPlugin);
-        }).toThrowError("Unknown property");
+        }).toThrow("Unknown property");
 
         // Rollback should leave state unchanged - verify by starting router
         await router.start("/home");
@@ -226,7 +226,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(plugin1, plugin2, plugin3, plugin4);
-        }).toThrowError("Error in plugin3");
+        }).toThrow("Error in plugin3");
 
         // All-or-nothing: no plugins registered - verify by starting router
         await router.start("/home");
@@ -244,7 +244,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(plugin1, plugin2);
-        }).toThrowError("Plugin2 fails");
+        }).toThrow("Plugin2 fails");
 
         // Teardown of successfully initialized plugin should be called
         expect(teardown1).toHaveBeenCalled();
@@ -272,7 +272,7 @@ describe("core/plugins", () => {
         // The catch block at line 147-153 should catch this
         expect(() => {
           router.usePlugin(pluginWithFailingTeardown, failingPlugin);
-        }).toThrowError("Initialization failed");
+        }).toThrow("Initialization failed");
 
         // teardown should have been called during rollback
         expect(teardownThatThrows).toHaveBeenCalled();
@@ -300,7 +300,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(factory);
-        }).toThrowError("Plugin factory already registered");
+        }).toThrow("Plugin factory already registered");
 
         // Original plugin should remain registered - verify by starting router
         await router.start("/home");
@@ -317,7 +317,7 @@ describe("core/plugins", () => {
         // Different factory references with different handler instances
         expect(() => {
           router.usePlugin(tracker1.factory, tracker2.factory);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Both plugins should be registered - verify by starting router
         await router.start("/home");
@@ -489,10 +489,10 @@ describe("core/plugins", () => {
       it("should throw TypeError for non-function parameter", () => {
         expect(() => {
           router.usePlugin(null as any);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(null as any);
-        }).toThrowError("Expected plugin factory function");
+        }).toThrow("Expected plugin factory function");
       });
 
       it("should throw TypeError when factory returns non-object", () => {
@@ -500,10 +500,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(invalidFactory);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(invalidFactory);
-        }).toThrowError("must return an object");
+        }).toThrow("must return an object");
       });
 
       it("should throw TypeError when factory returns null", () => {
@@ -511,10 +511,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(nullFactory);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(nullFactory);
-        }).toThrowError("must return an object");
+        }).toThrow("must return an object");
       });
 
       it("should throw TypeError when factory returns undefined", () => {
@@ -522,10 +522,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(undefinedFactory);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(undefinedFactory);
-        }).toThrowError("must return an object");
+        }).toThrow("must return an object");
       });
 
       it("should throw TypeError when factory returns array", () => {
@@ -533,20 +533,18 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(arrayFactory);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(arrayFactory);
-        }).toThrowError("must return an object");
+        }).toThrow("must return an object");
       });
 
       it("should validate all types: null, undefined, number, string, object", () => {
-        expect(() => router.usePlugin(null as any)).toThrowError(TypeError);
-        expect(() => router.usePlugin(undefined as any)).toThrowError(
-          TypeError,
-        );
-        expect(() => router.usePlugin(123 as any)).toThrowError(TypeError);
-        expect(() => router.usePlugin("str" as any)).toThrowError(TypeError);
-        expect(() => router.usePlugin({} as any)).toThrowError(TypeError);
+        expect(() => router.usePlugin(null as any)).toThrow(TypeError);
+        expect(() => router.usePlugin(undefined as any)).toThrow(TypeError);
+        expect(() => router.usePlugin(123 as any)).toThrow(TypeError);
+        expect(() => router.usePlugin("str" as any)).toThrow(TypeError);
+        expect(() => router.usePlugin({} as any)).toThrow(TypeError);
       });
 
       it("should throw when plugin contains unknown properties", () => {
@@ -558,10 +556,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(factory);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(factory);
-        }).toThrowError("Unknown property");
+        }).toThrow("Unknown property");
       });
 
       it("should throw TypeError when factory returns Promise (async factory)", () => {
@@ -570,10 +568,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(asyncFactory as any);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(asyncFactory as any);
-        }).toThrowError("Async plugin factories are not supported");
+        }).toThrow("Async plugin factories are not supported");
       });
 
       it("should throw TypeError for Promise-like objects (thenable)", () => {
@@ -586,12 +584,10 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(thenableFactory as any);
-        }).toThrowError(TypeError);
+        }).toThrow(TypeError);
         expect(() => {
           router.usePlugin(thenableFactory as any);
-        }).toThrowError(
-          "Factory returned a Promise instead of a plugin object",
-        );
+        }).toThrow("Factory returned a Promise instead of a plugin object");
       });
 
       it("should allow all valid plugin methods", async () => {
@@ -599,7 +595,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(tracker.factory);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Verify plugin is registered by checking it responds to events
         router.stop();
@@ -627,7 +623,7 @@ describe("core/plugins", () => {
         // Unsubscribe should not throw even if teardown2 throws
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // All teardowns should be called
         expect(teardown1).toHaveBeenCalled();
@@ -659,12 +655,12 @@ describe("core/plugins", () => {
         // Second call should be safe no-op
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Third call should also be safe no-op
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Teardown should only be called once (idempotent unsubscribe)
         expect(teardown).toHaveBeenCalledTimes(1);
@@ -686,12 +682,12 @@ describe("core/plugins", () => {
         // Second call should be safe no-op
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Third call should also be safe no-op
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Teardowns should only be called once (idempotent unsubscribe)
         expect(teardown1).toHaveBeenCalledTimes(1);
@@ -726,7 +722,7 @@ describe("core/plugins", () => {
         // Attempt to modify plugin (should be frozen)
         expect(() => {
           (plugin as any).newProperty = "test";
-        }).toThrowError(); // Will throw in strict mode
+        }).toThrow(); // Will throw in strict mode
       });
     });
 
@@ -740,7 +736,7 @@ describe("core/plugins", () => {
         // Should not throw - property is in whitelist but skipped during subscription
         expect(() => {
           router.usePlugin(factory);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Logger format: logger.warn(context, message)
         expect(warnSpy).toHaveBeenCalledWith(
@@ -907,7 +903,7 @@ describe("core/plugins", () => {
         // Should not throw
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Should log the error
         // Logger format: logger.error(context, message, error)
@@ -931,7 +927,7 @@ describe("core/plugins", () => {
         // Unsubscribe should be safe no-op
         expect(() => {
           unsub();
-        }).not.toThrowError();
+        }).not.toThrow();
       });
 
       it("should return function for empty batch", () => {
@@ -958,7 +954,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(factory);
-        }).not.toThrowError();
+        }).not.toThrow();
 
         // Verify plugin was registered - should not throw on restart
         router.stop();

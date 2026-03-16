@@ -170,7 +170,7 @@ describe("useRouteNode", () => {
   });
 
   it("should throw error if router instance was not passed to provider", () => {
-    expect(() => renderHook(() => useRouteNode(""))).toThrowError();
+    expect(() => renderHook(() => useRouteNode(""))).toThrow();
   });
 
   describe("shouldUpdateNode behavior", () => {

@@ -79,28 +79,28 @@ describe("makeState", () => {
     it("throws TypeError for non-string name", () => {
       expect(() =>
         getPluginApi(router).makeState(123 as unknown as string, {}),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).makeState(null as unknown as string, {}),
-      ).toThrowError(/Invalid name/);
+      ).toThrow(/Invalid name/);
     });
 
     it("throws TypeError for invalid params", () => {
       expect(() =>
         getPluginApi(router).makeState("home", "invalid" as never),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).makeState("home", (() => {}) as never),
-      ).toThrowError(/Invalid params/);
+      ).toThrow(/Invalid params/);
     });
 
     it("throws TypeError for non-string path", () => {
       expect(() =>
         getPluginApi(router).makeState("home", {}, 123 as unknown as string),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).makeState("home", {}, {} as unknown as string),
-      ).toThrowError(/Invalid path/);
+      ).toThrow(/Invalid path/);
     });
 
     it("throws TypeError for non-number forceId", () => {
@@ -112,7 +112,7 @@ describe("makeState", () => {
           { params: {} },
           "999" as unknown as number,
         ),
-      ).toThrowError(TypeError);
+      ).toThrow(TypeError);
       expect(() =>
         getPluginApi(router).makeState(
           "home",
@@ -121,7 +121,7 @@ describe("makeState", () => {
           { params: {} },
           {} as unknown as number,
         ),
-      ).toThrowError(/Invalid forceId/);
+      ).toThrow(/Invalid forceId/);
     });
   });
 });
