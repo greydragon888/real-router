@@ -25,13 +25,14 @@ import type { RouteTreeNode } from "../../src/types";
 describe("routeUtils property-based tests", () => {
   describe("startsWithSegment consistency with single-segment names", () => {
     test.prop([arbRouteName], { numRuns: NUM_RUNS.standard })(
-      "startsWithSegment(name, lastSegment) is true iff name has no dot",
+      "startsWithSegment(name, lastSegment) is true iff name has no dot or first segment equals last segment",
       (name) => {
+        const firstSeg = getFirstSegment(name);
         const lastSeg = getLastSegment(name);
-        const hasNoDot = !name.includes(".");
+        const expected = !name.includes(".") || firstSeg === lastSeg;
         const result = startsWithSegment(name, lastSeg);
 
-        expect(result).toStrictEqual(hasNoDot);
+        expect(result).toStrictEqual(expected);
       },
     );
   });
