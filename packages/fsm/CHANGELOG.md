@@ -1,5 +1,15 @@
 # @real-router/fsm
 
+## 0.2.1
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize FSM for navigate hot path ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  Replace `...args` rest parameter with optional `payload?` in `send()` to eliminate V8 array allocation.
+  Add `forceState()` method for direct state transitions bypassing dispatch overhead.
+  Use nested Map for transition lookups instead of template literal key concatenation.
+
 ## 0.2.0
 
 ### Minor Changes

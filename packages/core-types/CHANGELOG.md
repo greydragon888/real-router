@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.23.1
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `NavigationContext` interface ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  New internal interface shared across NavigationNamespace, guard pipeline, and transition completion modules.
+
 ## 0.23.0
 
 ### Minor Changes
