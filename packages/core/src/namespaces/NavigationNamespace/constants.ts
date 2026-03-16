@@ -50,6 +50,6 @@ export const CACHED_SAME_STATES_REJECTION: Promise<State> = Promise.reject(
 // Subsequent .catch() / await by user code still works correctly:
 // a rejected promise stays rejected forever, each .catch() creates
 // its own derived promise and fires its handler.
-CACHED_NOT_STARTED_REJECTION.catch(() => {});
-CACHED_ROUTE_NOT_FOUND_REJECTION.catch(() => {});
-CACHED_SAME_STATES_REJECTION.catch(() => {});
+CACHED_NOT_STARTED_REJECTION.catch(() => {}); // NOSONAR -- intentional suppression, not a promise chain
+CACHED_ROUTE_NOT_FOUND_REJECTION.catch(() => {}); // NOSONAR
+CACHED_SAME_STATES_REJECTION.catch(() => {}); // NOSONAR

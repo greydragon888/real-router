@@ -24,7 +24,7 @@ async function resolveAsyncGuard(
   }
 }
 
-async function resolveRemainingGuards(
+async function resolveRemainingGuards( // NOSONAR -- params kept flat to avoid object allocation on hot path
   guards: Map<string, GuardFn>,
   segments: string[],
   errorCode: string,
@@ -69,7 +69,7 @@ async function resolveRemainingGuards(
   }
 }
 
-async function finishAsyncPipeline(
+async function finishAsyncPipeline( // NOSONAR
   deactivateCompletion: Promise<void>,
   activateGuards: Map<string, GuardFn>,
   toActivate: string[],
@@ -106,7 +106,7 @@ async function finishAsyncPipeline(
   }
 }
 
-export function executeGuardPipeline(
+export function executeGuardPipeline( // NOSONAR
   deactivateGuards: Map<string, GuardFn>,
   activateGuards: Map<string, GuardFn>,
   toDeactivate: string[],

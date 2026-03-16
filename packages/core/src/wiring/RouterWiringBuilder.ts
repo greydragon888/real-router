@@ -152,7 +152,7 @@ export class RouterWiringBuilder<
       },
       cancelNavigation: () => {
         this.eventBus.sendCancel(
-          this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
+          this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- NOSONAR guaranteed set before TRANSITIONING
           this.state.get(),
         );
       },
