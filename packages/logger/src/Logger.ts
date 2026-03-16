@@ -43,7 +43,7 @@ interface InternalLoggerConfig {
  */
 class Logger {
   /** Internal configuration storage using private field */
-  #config: InternalLoggerConfig = {
+  readonly #config: InternalLoggerConfig = {
     level: "all",
     callbackIgnoresLevel: false,
   };

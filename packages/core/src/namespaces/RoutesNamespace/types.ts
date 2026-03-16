@@ -7,7 +7,6 @@ import type {
   Params,
   SimpleState,
   State,
-  StateMetaInput,
 } from "@real-router/types";
 
 /**
@@ -36,7 +35,7 @@ export interface RoutesDependencies<
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
+    meta?: Record<string, Record<string, "url" | "query">>,
   ) => State<P, MP>;
 
   /** Get current router state */

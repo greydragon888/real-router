@@ -10,13 +10,13 @@ const BENCH_JSON_DIR = join(__dirname, ".bench");
 
 // Anomaly thresholds
 const ANOMALY_THRESHOLDS = {
-  // rr slower than r6 by this % is anomalous (they should be similar)
+  // rr slower than baseline by this % is anomalous
   rrVsR6Slowdown: 20,
   // noValidate slower than rr by this % is anomalous (should be faster or equal)
   nvVsRrSlowdown: 5,
-  // RME threshold for unstable measurements
-  rmeUnstable: 0.3,
-  rmeSuspicious: 0.5,
+  // RME threshold for unstable measurements (values are in percent, e.g., 5 = 5%)
+  rmeUnstable: 5,
+  rmeSuspicious: 10,
 };
 
 // Output capture for saving to file
@@ -145,13 +145,18 @@ function checkMeasurement(name, routerName, rmeData, diff, type = "rrVsR6") {
 }
 
 /**
- * Get RME warning if RME is high (> 10%)
+ * Get RME warning if RME is high (> 10%).
+ * rmeValue is already in percent (e.g., 0.5 means 0.5%, 10.0 means 10%).
  */
 function getRmeWarning(benchmarkName, rmeValue) {
-  if (rmeValue > 0.1) {
-    const rmePercent = (rmeValue * 100).toFixed(1);
-    return `${YELLOW}⚠️ High RME (${rmePercent}%) for "${benchmarkName}" - comparison unreliable${RESET}`;
+  if (rmeValue > 10) {
+    return `${RED}⚠️ High RME (${rmeValue.toFixed(1)}%)`;
   }
+
+  if (rmeValue > 5) {
+    return `${YELLOW}⚠️ High RME (${rmeValue.toFixed(1)}%)`;
+  }
+
   return null;
 }
 
@@ -440,23 +445,28 @@ function formatCategorySummary(categoryStats, type = "time") {
 /**
  * Compare two benchmark results (legacy mode)
  */
-function compareTwoBenchmarks(baselineFile, currentFile) {
+function compareTwoBenchmarks(
+  baselineFile,
+  currentFile,
+  baselineLabel = "router5",
+  currentLabel = "real-router",
+) {
   log(`${BOLD}${BLUE}=== Benchmark Comparison ===${RESET}\n`);
-  log(`${GRAY}router5 (baseline): ${baselineFile}${RESET}`);
-  log(`${GRAY}real-router (current): ${currentFile}${RESET}\n`);
+  log(`${GRAY}${baselineLabel} (baseline): ${baselineFile}${RESET}`);
+  log(`${GRAY}${currentLabel} (current): ${currentFile}${RESET}\n`);
 
   const baselineResults = parseBenchmarkFile(join(RESULTS_DIR, baselineFile));
   const currentResults = parseBenchmarkFile(join(RESULTS_DIR, currentFile));
 
   // Load RME data from JSON files
   const rmeData = loadRmeData();
-  const baselineRmeMap = rmeData.get("router5") || new Map();
-  const currentRmeMap = rmeData.get("real-router") || new Map();
+  const baselineRmeMap = rmeData.get(baselineLabel) || new Map();
+  const currentRmeMap = rmeData.get(currentLabel) || new Map();
 
   log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
   log("─".repeat(120));
   log(
-    `${"Benchmark".padEnd(70)} ${"router5".padStart(15)} ${"real-router".padStart(15)} ${"Diff".padStart(15)}`,
+    `${"Benchmark".padEnd(70)} ${baselineLabel.padStart(15)} ${currentLabel.padStart(15)} ${"Diff".padStart(15)}`,
   );
   log("─".repeat(120));
 
@@ -538,10 +548,10 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
   log(`\n${BOLD}Summary:${RESET}`);
   log(`  Total benchmarks: ${count}`);
   log(
-    `  real-router faster: ${GREEN}${currentFaster}${RESET} (${((currentFaster / count) * 100).toFixed(1)}%)`,
+    `  ${currentLabel} faster: ${GREEN}${currentFaster}${RESET} (${((currentFaster / count) * 100).toFixed(1)}%)`,
   );
   log(
-    `  router5 faster: ${RED}${baselineFaster}${RESET} (${((baselineFaster / count) * 100).toFixed(1)}%)`,
+    `  ${baselineLabel} faster: ${RED}${baselineFaster}${RESET} (${((baselineFaster / count) * 100).toFixed(1)}%)`,
   );
 
   formatCategorySummary(categoryStats, "time");
@@ -550,7 +560,7 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
   log(`\n${BOLD}${CYAN}Memory Allocation Comparison${RESET}`);
   log("─".repeat(120));
   log(
-    `${"Benchmark".padEnd(70)} ${"router5".padStart(15)} ${"real-router".padStart(15)} ${"Diff".padStart(15)}`,
+    `${"Benchmark".padEnd(70)} ${baselineLabel.padStart(15)} ${currentLabel.padStart(15)} ${"Diff".padStart(15)}`,
   );
   log("─".repeat(120));
 
@@ -629,10 +639,10 @@ function compareTwoBenchmarks(baselineFile, currentFile) {
     log(`\n${BOLD}Memory Summary:${RESET}`);
     log(`  Total benchmarks: ${memCount}`);
     log(
-      `  real-router uses less: ${GREEN}${currentLessMem}${RESET} (${((currentLessMem / memCount) * 100).toFixed(1)}%)`,
+      `  ${currentLabel} uses less: ${GREEN}${currentLessMem}${RESET} (${((currentLessMem / memCount) * 100).toFixed(1)}%)`,
     );
     log(
-      `  router5 uses less: ${RED}${baselineLessMem}${RESET} (${((baselineLessMem / memCount) * 100).toFixed(1)}%)`,
+      `  ${baselineLabel} uses less: ${RED}${baselineLessMem}${RESET} (${((baselineLessMem / memCount) * 100).toFixed(1)}%)`,
     );
 
     formatCategorySummary(memCategoryStats, "memory");
@@ -1276,6 +1286,15 @@ function getLatestBenchmarkSet() {
         type: "pair",
       };
     }
+    // Duo: baseline router and real-router only
+    if (set[BASELINE_ROUTER] && set["real-router"]) {
+      return {
+        baseline: set[BASELINE_ROUTER],
+        current: set["real-router"],
+        baselineLabel: BASELINE_ROUTER,
+        type: "duo",
+      };
+    }
   }
 
   return null;
@@ -1317,6 +1336,13 @@ if (args.length === 0) {
     );
   } else if (set.type === "triplet") {
     compareThreeBenchmarks(set.router5, set.router6, set.realRouter);
+  } else if (set.type === "duo") {
+    compareTwoBenchmarks(
+      set.baseline,
+      set.current,
+      set.baselineLabel,
+      "real-router",
+    );
   } else {
     compareTwoBenchmarks(set.baseline, set.current);
   }

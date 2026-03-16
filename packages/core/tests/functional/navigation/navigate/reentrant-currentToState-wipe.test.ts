@@ -236,29 +236,22 @@ describe("Issue #308: reentrant navigate wipes #currentToState", () => {
   // Control: sync reentrant navigate (no wipe)
   // =========================================================================
 
-  describe("sync guard reentrant (completes after microtask)", () => {
-    it("should eventually complete despite wipe when inner navigate has sync guard", async () => {
+  describe("sync guard reentrant (completes synchronously)", () => {
+    it("should complete inner navigate synchronously within outer navigate", async () => {
       lifecycle.addActivateGuard("orders", () => () => true);
-
-      let innerPromise: Promise<State> | undefined;
 
       router.usePlugin(() => ({
         onTransitionSuccess: (toState: State) => {
           if (toState.name === "settings") {
-            innerPromise = router.navigate("orders");
+            void router.navigate("orders");
           }
         },
       }));
 
       await router.navigate("settings");
 
-      // With current async navigate(), even sync guards go through `await transition()`.
-      // The inner navigate is pending in microtask queue — same wipe happens, but
-      // the window is short: inner navigate completes on next microtask.
-      expect(router.getState()?.name).toBe("settings");
-
-      await innerPromise;
-
+      // With optimistic sync navigate, both navigations complete synchronously.
+      // Inner navigate from onTransitionSuccess completes within the outer call.
       expect(router.getState()?.name).toBe("orders");
     });
   });

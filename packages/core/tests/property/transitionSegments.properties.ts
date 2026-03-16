@@ -2,6 +2,7 @@ import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it, vi } from "vitest";
 
 import { errorCodes, UNKNOWN_ROUTE, RouterError } from "@real-router/core";
+import { getLifecycleApi } from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -166,10 +167,25 @@ describe("navigate() → transition.segments Properties", () => {
   });
 
   it("cancellation: concurrent navigate cancels first", async () => {
+    vi.useFakeTimers();
+
     const router = await createStartedRouter("/users/abc");
+
+    // Async guard keeps "home" navigation pending so concurrent navigate can cancel it
+    getLifecycleApi(router).addActivateGuard(
+      "home",
+      () => () =>
+        new Promise<boolean>((resolve) =>
+          setTimeout(() => {
+            resolve(true);
+          }, 50),
+        ),
+    );
 
     const p1 = router.navigate("home");
     const p2 = router.navigate("admin.settings");
+
+    await vi.runAllTimersAsync();
 
     await expect(p1).rejects.toThrowError(RouterError);
 
@@ -184,6 +200,7 @@ describe("navigate() → transition.segments Properties", () => {
     expect(router.getState()!.name).toBe("admin.settings");
 
     router.stop();
+    vi.useRealTimers();
   });
 
   it("reload: true bypasses SAME_STATES", async () => {

@@ -19,6 +19,13 @@ export default [
     limit: "25 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/core/api (ESM)",
+    path: "packages/core/dist/esm/api.mjs",
+    limit: "25 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
 
   // ── UI Bindings ───────────────────────────────────────────────────
   {
@@ -37,7 +44,7 @@ export default [
   {
     name: "@real-router/sources (ESM)",
     path: "packages/sources/dist/esm/index.mjs",
-    limit: "1.5 kB",
+    limit: "1 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },

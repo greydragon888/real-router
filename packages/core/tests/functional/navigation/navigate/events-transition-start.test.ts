@@ -134,16 +134,16 @@ describe("router.navigate() - events transition start", () => {
         onCancel,
       );
 
-      // Set up async plugin that only delays specific route
-      router.usePlugin(() => ({
-        onTransitionSuccess: (toState) => {
-          if (toState.name === "users.view") {
-            void new Promise((resolve) => {
-              setTimeout(resolve, 50);
-            });
-          }
-        },
-      }));
+      // Async guard keeps "users.view" navigation pending so concurrent navigate can cancel it
+      getLifecycleApi(router).addActivateGuard(
+        "users.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
 
       const firstNav = router.navigate("users.view", { id: 456 });
 

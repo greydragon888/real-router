@@ -544,28 +544,53 @@ describe("FSM", () => {
       expect(fsm.getState()).toBe("green");
     });
 
-    it("should reject payload for no-payload event", () => {
+    it("should ignore extra payload for no-payload event", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
       fsm.send("FETCH", { url: "/api" });
 
-      // @ts-expect-error — RESOLVE does not accept payload
       fsm.send("RESOLVE", { data: "something" });
 
       expect(fsm.getState()).toBe("done");
     });
 
-    it("should require payload for payload event", () => {
+    it("should transition without payload for payload event", () => {
       const fsm = new FSM<PayloadState, PayloadEvent, null, PayloadMap>(
         payloadConfig,
       );
 
-      // @ts-expect-error — FETCH requires payload
       fsm.send("FETCH");
 
       expect(fsm.getState()).toBe("loading");
+    });
+  });
+
+  describe("forceState()", () => {
+    it("should set state without triggering actions or listeners", () => {
+      const fsm = new FSM(lightConfig);
+      const actionSpy = vi.fn();
+      const listenerSpy = vi.fn();
+
+      fsm.on("green", "TIMER", actionSpy);
+      fsm.onTransition(listenerSpy);
+
+      fsm.forceState("yellow");
+
+      expect(fsm.getState()).toBe("yellow");
+      expect(actionSpy).not.toHaveBeenCalled();
+      expect(listenerSpy).not.toHaveBeenCalled();
+    });
+
+    it("should update currentTransitions for subsequent canSend", () => {
+      const fsm = new FSM(lightConfig);
+
+      expect(fsm.canSend("RESET")).toBe(false); // green has no RESET
+
+      fsm.forceState("red");
+
+      expect(fsm.canSend("RESET")).toBe(true); // red has RESET
     });
   });
 });

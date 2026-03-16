@@ -1,6 +1,40 @@
 // packages/core/src/namespaces/NavigationNamespace/transition/errorHandling.ts
 
+import { errorCodes } from "../../../constants";
 import { RouterError } from "../../../RouterError";
+
+import type { NavigationDependencies } from "../types";
+import type { State } from "@real-router/types";
+
+export function routeTransitionError(
+  deps: NavigationDependencies,
+  error: unknown,
+  toState: State,
+  fromState: State | undefined,
+): void {
+  const routerError = error as RouterError;
+
+  if (
+    routerError.code === errorCodes.TRANSITION_CANCELLED ||
+    routerError.code === errorCodes.ROUTE_NOT_FOUND
+  ) {
+    return;
+  }
+
+  deps.sendTransitionFail(toState, fromState, routerError);
+}
+
+export function handleGuardError(
+  error: unknown,
+  errorCode: string,
+  segment: string,
+): never {
+  if (error instanceof DOMException && error.name === "AbortError") {
+    throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+  }
+
+  rethrowAsRouterError(error, errorCode, segment);
+}
 
 /**
  * Error metadata structure for transition errors.

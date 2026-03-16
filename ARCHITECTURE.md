@@ -190,45 +190,39 @@ FSM events trigger observable emissions via `fsm.on(from, event, action)`:
 
 ### Navigation Pipeline
 
-All navigation methods return `Promise<State>` (async/await):
+All navigation methods return `Promise<State>`. Uses **optimistic sync execution** — guards run synchronously until one returns a Promise, then switches to async path.
 
 ```
 const state = await router.navigate(name, params, options)
                      │
                      ▼
              ┌───────────────┐
-             │ Build target  │  RoutesNamespace.buildState()
-             │    state      │  + forwardState() resolution
+             │ Build target  │  buildNavigateState()
+             │    state      │  (forwardState + buildPath + makeState)
              └───────┬───────┘
                      │
                      ▼
              ┌───────────────┐
-             │AbortController│  Internal controller created per navigation
-             │    setup      │  External opts.signal linked if provided
+             │  Guard        │  executeGuardPipeline()
+             │  pipeline     │  Deactivation → Activation
+             │               │  Returns: undefined | Promise<void>
              └───────┬───────┘
                      │
-                     ▼
+              ┌──────┴──────┐
+              │             │
+         ALL SYNC      ASYNC DETECTED
+              │             │
+              ▼             ▼
+        ┌──────────┐  ┌──────────────┐
+        │ Complete  │  │ Setup        │  AbortController (deferred)
+        │ inline    │  │ + await      │  Link external signal
+        │ (no await)│  │ guards       │
+        └─────┬────┘  └──────┬───────┘
+              │              │
+              ▼              ▼
              ┌───────────────┐
-             │  Deactivation │  canDeactivate guards (signal as 3rd param)
-             │    guards     │  (innermost → outermost)
-             └───────┬───────┘
-                     │
-                     ▼
-             ┌───────────────┐
-             │  Activation   │  canActivate guards (signal as 3rd param)
-             │    guards     │  (outermost → innermost)
-             └───────┬───────┘
-                     │
-                     ▼
-             ┌───────────────┐
-             │  setState()   │  Freeze & store state
-             │  + FSM send   │  COMPLETE → emitTransitionSuccess
-             └───────┬───────┘
-                     │
-                     ▼
-             ┌───────────────┐
-             │   Plugins     │  onTransitionSuccess()
-             │               │
+             │completeTransi-│  setState + freeze
+             │tion()         │  FSM → READY + emitTransitionSuccess
              └───────┬───────┘
                      │
                      ▼
@@ -236,11 +230,11 @@ const state = await router.navigate(name, params, options)
                (or rejects with RouterError)
 ```
 
-On error at any step: FSM sends `FAIL` → `emitTransitionError()`, Promise rejects with `RouterError`.
+On error at any step: `emitTransitionError()`, Promise rejects with `RouterError`.
 
 **`navigateToNotFound()`** bypasses this pipeline entirely — sets state directly and emits only `TRANSITION_SUCCESS` (no guards, no AbortController, no `TRANSITION_START`). Always uses `replace: true`. Navigating away from UNKNOWN_ROUTE auto-forces `replace: true` to prevent history pollution.
 
-**Cancellation sources:** `signal.aborted` (external AbortController), concurrent navigation (aborts previous controller), `stop()`, `dispose()`. All checked via `isCancelled = () => signal.aborted || !deps.isActive()`.
+**Cancellation sources:** external AbortController (`opts.signal`), concurrent navigation (aborts previous controller), `stop()`, `dispose()`. AbortController is created only on async path (when a guard returns a Promise).
 
 ### Navigation API
 

@@ -23,6 +23,9 @@ export class EventBusNamespace {
   readonly #emitter: EventEmitter<RouterEventMap>;
 
   #currentToState: State | undefined;
+  #pendingToState: State | undefined;
+  #pendingFromState: State | undefined;
+  #pendingError: unknown;
 
   constructor(options: EventBusOptions) {
     this.#fsm = options.routerFSM;
@@ -90,7 +93,9 @@ export class EventBusNamespace {
 
   sendNavigate(toState: State, fromState?: State): void {
     this.#currentToState = toState;
-    this.#fsm.send(routerEvents.NAVIGATE, { toState, fromState });
+    // Bypass FSM dispatch — forceState + direct emit (no action lookup, no rest params)
+    this.#fsm.forceState(routerStates.TRANSITIONING);
+    this.emitTransitionStart(toState, fromState);
   }
 
   sendComplete(
@@ -98,15 +103,11 @@ export class EventBusNamespace {
     fromState?: State,
     opts: NavigationOptions = {},
   ): void {
-    const prev = this.#currentToState;
+    // Bypass FSM dispatch — forceState + direct emit
+    this.#fsm.forceState(routerStates.READY);
+    this.emitTransitionSuccess(state, fromState, opts);
 
-    this.#fsm.send(routerEvents.COMPLETE, {
-      state,
-      fromState,
-      opts,
-    });
-
-    if (this.#currentToState === prev) {
+    if (this.#currentToState === state) {
       this.#currentToState = undefined;
     }
   }
@@ -114,7 +115,10 @@ export class EventBusNamespace {
   sendFail(toState?: State, fromState?: State, error?: unknown): void {
     const prev = this.#currentToState;
 
-    this.#fsm.send(routerEvents.FAIL, { toState, fromState, error });
+    this.#pendingToState = toState;
+    this.#pendingFromState = fromState;
+    this.#pendingError = error;
+    this.#fsm.send(routerEvents.FAIL);
 
     if (this.#currentToState === prev) {
       this.#currentToState = undefined;
@@ -132,7 +136,9 @@ export class EventBusNamespace {
   sendCancel(toState: State, fromState?: State): void {
     const prev = this.#currentToState;
 
-    this.#fsm.send(routerEvents.CANCEL, { toState, fromState });
+    this.#pendingToState = toState;
+    this.#pendingFromState = fromState;
+    this.#fsm.send(routerEvents.CANCEL);
 
     if (this.#currentToState === prev) {
       this.#currentToState = undefined;
@@ -212,6 +218,14 @@ export class EventBusNamespace {
     this.sendCancel(this.#currentToState!, fromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- guaranteed set before TRANSITIONING
   }
 
+  #emitPendingError(): void {
+    this.emitTransitionError(
+      this.#pendingToState,
+      this.#pendingFromState,
+      this.#pendingError as RouterError | undefined,
+    );
+  }
+
   #setupFSMActions(): void {
     const fsm = this.#fsm;
 
@@ -223,40 +237,22 @@ export class EventBusNamespace {
       this.emitRouterStop();
     });
 
-    fsm.on(routerStates.READY, routerEvents.NAVIGATE, (params) => {
-      this.emitTransitionStart(params.toState, params.fromState);
+    // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
+    // use fsm.forceState() + direct emit for zero-allocation hot path.
+    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, () => {
+      this.emitTransitionCancel(this.#pendingToState!, this.#pendingFromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- set by sendCancel before send()
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.COMPLETE, (params) => {
-      this.emitTransitionSuccess(params.state, params.fromState, params.opts);
+    fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {
+      this.#emitPendingError();
     });
 
-    fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, (params) => {
-      this.emitTransitionCancel(params.toState, params.fromState);
+    fsm.on(routerStates.READY, routerEvents.FAIL, () => {
+      this.#emitPendingError();
     });
 
-    fsm.on(routerStates.STARTING, routerEvents.FAIL, (params) => {
-      this.emitTransitionError(
-        params.toState,
-        params.fromState,
-        params.error as RouterError | undefined,
-      );
-    });
-
-    fsm.on(routerStates.READY, routerEvents.FAIL, (params) => {
-      this.emitTransitionError(
-        params.toState,
-        params.fromState,
-        params.error as RouterError | undefined,
-      );
-    });
-
-    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, (params) => {
-      this.emitTransitionError(
-        params.toState,
-        params.fromState,
-        params.error as RouterError | undefined,
-      );
+    fsm.on(routerStates.TRANSITIONING, routerEvents.FAIL, () => {
+      this.#emitPendingError();
     });
   }
 }

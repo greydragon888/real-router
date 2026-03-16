@@ -10,11 +10,12 @@ import { logger } from "@real-router/logger";
 import { EventEmitter } from "event-emitter";
 import { validateRouteName } from "type-guards";
 
-import { errorCodes } from "./constants";
+import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
 import { createLimits } from "./helpers";
 import {
   createInterceptable,
+  createInterceptable2,
   getInternals,
   registerInternals,
 } from "./internals";
@@ -57,6 +58,8 @@ import type {
   Unsubscribe,
 } from "@real-router/types";
 import type { CreateMatcherOptions } from "route-tree";
+
+const EMPTY_OPTS: Readonly<NavigationOptions> = Object.freeze({});
 
 /**
  * Router class with integrated namespace architecture.
@@ -212,11 +215,12 @@ export class Router<
     registerInternals(this, {
       makeState: (name, params, path, meta, forceId) =>
         this.#state.makeState(name, params, path, meta, forceId),
-      forwardState: createInterceptable(
+      forwardState: createInterceptable2(
         "forwardState",
-        (name, params) => this.#routes.forwardState(name, params),
+        (name: string, params: Params) =>
+          this.#routes.forwardState(name, params),
         interceptorsMap,
-      ),
+      ) as unknown as RouterInternals["forwardState"],
       buildStateResolved: (name, params) =>
         this.#routes.buildStateResolved(name, params),
       matchPath: (path, matchOptions) =>
@@ -224,12 +228,16 @@ export class Router<
       getOptions: () => this.#options.get(),
       addEventListener: (eventName, cb) =>
         this.#eventBus.addEventListener(eventName, cb),
-      buildPath: createInterceptable(
+      buildPath: createInterceptable2(
         "buildPath",
         (route: string, params?: Params) =>
-          this.#routes.buildPath(route, params ?? {}, this.#options.get()),
+          this.#routes.buildPath(
+            route,
+            params ?? EMPTY_PARAMS,
+            this.#options.get(),
+          ),
         interceptorsMap,
-      ),
+      ) as unknown as RouterInternals["buildPath"],
       start: createInterceptable(
         "start",
         (path: string) => {
@@ -566,7 +574,7 @@ export class Router<
     }
 
     // 2. Validate parsed options
-    const opts = options ?? {};
+    const opts = options ?? EMPTY_OPTS;
 
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigate");
@@ -575,11 +583,18 @@ export class Router<
     // 3. Execute navigation with parsed arguments
     const promiseState = this.#navigation.navigate(
       routeName,
-      routeParams ?? {},
+      routeParams ?? EMPTY_PARAMS,
       opts,
     );
 
-    Router.#suppressUnhandledRejection(promiseState);
+    if (this.#navigation.lastSyncResolved) {
+      this.#navigation.lastSyncResolved = false;
+    } else if (this.#navigation.lastSyncRejected) {
+      // Cached rejection — already pre-suppressed at module load, skip .catch()
+      this.#navigation.lastSyncRejected = false;
+    } else {
+      Router.#suppressUnhandledRejection(promiseState);
+    }
 
     return promiseState;
   }
@@ -591,7 +606,7 @@ export class Router<
     }
 
     // 2. Validate parsed options
-    const opts = options ?? {};
+    const opts = options ?? EMPTY_OPTS;
 
     if (!this.#noValidate) {
       NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
@@ -600,7 +615,13 @@ export class Router<
     // 3. Execute navigation with parsed arguments
     const promiseState = this.#navigation.navigateToDefault(opts);
 
-    Router.#suppressUnhandledRejection(promiseState);
+    if (this.#navigation.lastSyncResolved) {
+      this.#navigation.lastSyncResolved = false;
+    } else if (this.#navigation.lastSyncRejected) {
+      this.#navigation.lastSyncRejected = false;
+    } else {
+      Router.#suppressUnhandledRejection(promiseState);
+    }
 
     return promiseState;
   }

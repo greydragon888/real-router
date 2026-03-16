@@ -100,17 +100,20 @@ describe("core/observable", () => {
 
         const cb = vi.fn();
 
-        router.usePlugin(() => ({
-          onTransitionSuccess: (toState) => {
-            if (toState.name === "users") {
-              void new Promise((resolve) => setTimeout(resolve, 50));
-            }
-          },
-        }));
+        // Async guard keeps "users" navigation pending so concurrent navigate can cancel it
+        getLifecycleApi(router).addActivateGuard(
+          "users",
+          () => () =>
+            new Promise<boolean>((resolve) =>
+              setTimeout(() => {
+                resolve(true);
+              }, 50),
+            ),
+        );
 
         getPluginApi(router).addEventListener(events.TRANSITION_CANCEL, cb);
 
-        // First navigation - will be cancelled by concurrent second navigation
+        // First navigation - async guard keeps it pending
         const first = router.navigate("users");
 
         // Second navigation - aborts first navigation's controller
@@ -127,7 +130,7 @@ describe("core/observable", () => {
 
         expect(secondResult.name).toBe("orders");
 
-        // R3: concurrent navigation sends CANCEL to RouterFSM,
+        // Concurrent navigation sends CANCEL to RouterFSM,
         // which emits TRANSITION_CANCEL for the cancelled first navigation
         expect(cb).toHaveBeenCalledTimes(1);
 

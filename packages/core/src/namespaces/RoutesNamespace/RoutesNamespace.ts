@@ -14,7 +14,7 @@ import { getTransitionPath } from "../../transitionPath";
 
 import type { RoutesStore } from "./routesStore";
 import type { RoutesDependencies } from "./types";
-import type { BuildStateResultWithSegments, Route } from "../../types";
+import type { Route } from "../../types";
 import type { RouteLifecycleNamespace } from "../RouteLifecycleNamespace";
 import type {
   DefaultDependencies,
@@ -65,6 +65,11 @@ export function createRouteState<P extends RouteParams = RouteParams>(
   };
 }
 
+interface CachedBuildPathOpts {
+  readonly trailingSlash?: "always" | "never" | undefined;
+  readonly queryParamsMode?: "default" | "strict" | "loose" | undefined;
+}
+
 /**
  * Independent namespace for managing routes.
  *
@@ -75,6 +80,7 @@ export class RoutesNamespace<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 > {
   readonly #store: RoutesStore<Dependencies>;
+  #cachedBuildPathOpts: CachedBuildPathOpts | undefined;
 
   get #deps(): RoutesDependencies<Dependencies> {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -210,13 +216,11 @@ export class RoutesNamespace<
         ? this.#store.config.encoders[route]({ ...paramsWithDefault })
         : paramsWithDefault;
 
-    const ts = options?.trailingSlash;
-    const trailingSlash = ts === "never" || ts === "always" ? ts : undefined;
-
-    return this.#store.matcher.buildPath(route, encodedParams, {
-      trailingSlash,
-      queryParamsMode: options?.queryParamsMode,
-    });
+    return this.#store.matcher.buildPath(
+      route,
+      encodedParams,
+      this.#getBuildPathOptions(options),
+    );
   }
 
   /**
@@ -267,9 +271,7 @@ export class RoutesNamespace<
       });
     }
 
-    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, {
-      params: meta as MP,
-    });
+    return this.#deps.makeState<P, MP>(routeName, routeParams, builtPath, meta);
   }
 
   /**
@@ -359,30 +361,6 @@ export class RoutesNamespace<
     );
   }
 
-  buildStateWithSegmentsResolved<P extends Params = Params>(
-    resolvedName: string,
-    resolvedParams: P,
-  ): BuildStateResultWithSegments<P> | undefined {
-    const segments = this.#store.matcher.getSegmentsByName(resolvedName);
-
-    if (!segments) {
-      return undefined;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const meta = this.#store.matcher.getMetaByName(resolvedName)!;
-    const state = createRouteState<P>(
-      {
-        segments: segments as readonly RouteTree[],
-        params: resolvedParams,
-        meta,
-      },
-      resolvedName,
-    );
-
-    return { state, segments: segments as readonly RouteTree[] };
-  }
-
   // =========================================================================
   // Query operations
   // =========================================================================
@@ -457,6 +435,14 @@ export class RoutesNamespace<
     );
   }
 
+  getMetaForState(
+    name: string,
+  ): Record<string, Record<string, "url" | "query">> | undefined {
+    return this.#store.matcher.hasRoute(name)
+      ? this.#store.matcher.getMetaByName(name)
+      : undefined;
+  }
+
   getUrlParams(name: string): string[] {
     const segments = this.#store.matcher.getSegmentsByName(name);
 
@@ -483,6 +469,21 @@ export class RoutesNamespace<
     }
 
     return params;
+  }
+
+  #getBuildPathOptions(options?: Options): CachedBuildPathOpts {
+    if (this.#cachedBuildPathOpts) {
+      return this.#cachedBuildPathOpts;
+    }
+
+    const ts = options?.trailingSlash;
+
+    this.#cachedBuildPathOpts = Object.freeze({
+      trailingSlash: ts === "never" || ts === "always" ? ts : undefined,
+      queryParamsMode: options?.queryParamsMode,
+    });
+
+    return this.#cachedBuildPathOpts;
   }
 
   #resolveDynamicForward(

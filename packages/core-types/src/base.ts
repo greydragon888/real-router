@@ -16,11 +16,11 @@ export type TransitionPhase = "deactivating" | "activating";
 export type TransitionReason = "success" | "blocked" | "cancelled" | "error";
 
 export interface TransitionMeta {
-  readonly reload?: boolean;
-  readonly redirected?: boolean;
   phase: TransitionPhase;
-  from?: string;
   reason: TransitionReason;
+  reload?: boolean;
+  redirected?: boolean;
+  from?: string;
   blocker?: string;
   segments: {
     deactivated: string[];

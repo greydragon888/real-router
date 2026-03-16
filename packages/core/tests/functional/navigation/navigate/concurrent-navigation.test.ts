@@ -549,4 +549,255 @@ describe("router.navigate() - concurrent navigation", () => {
   // relied on spying on buildStateWithSegments facade method, which is now bypassed
   // by dependency injection. The optimization (single buildState call) is still
   // in place but cannot be verified via facade spy.
+
+  describe("optimistic sync navigate edge cases", () => {
+    it("should cancel when router.stop() called from deactivation guard before activation phase", async () => {
+      await router.navigate("users");
+
+      lifecycle.addDeactivateGuard("users", () => () => {
+        router.stop();
+
+        return true;
+      });
+
+      await expect(router.navigate("orders")).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await router.start("/home");
+    });
+
+    it("should cancel when opts.signal already aborted at async continuation entry", async () => {
+      vi.useFakeTimers();
+
+      const controller = new AbortController();
+
+      // TRANSITION_START listener aborts the external signal
+      const unsub = getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        () => {
+          controller.abort();
+        },
+      );
+
+      // Async guard triggers #continueAsyncNavigation where signal check happens
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+
+      await expect(
+        router.navigate("users", {}, { signal: controller.signal }),
+      ).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      unsub();
+      await vi.runAllTimersAsync();
+
+      // Router must be usable after signal-aborted async entry
+      const state = await router.navigate("orders");
+
+      expect(state.name).toBe("orders");
+
+      vi.useRealTimers();
+    });
+
+    it("should cancel when router stopped after async activation guards complete", async () => {
+      vi.useFakeTimers();
+
+      await router.navigate("users.view", { id: 123 });
+
+      // Deactivation async guard triggers #continueAsyncNavigation
+      lifecycle.addDeactivateGuard(
+        "users.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+
+      // Last activation guard stops router after resolving
+      lifecycle.addActivateGuard(
+        "orders.view",
+        () => () =>
+          new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              router.stop();
+              resolve(true);
+            }, 50);
+          }),
+      );
+
+      const result = router.navigate("orders.view", { id: 456 });
+
+      await vi.runAllTimersAsync();
+
+      await expect(result).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      await router.start("/home");
+      vi.useRealTimers();
+    });
+
+    it("should reject when async guard in drain loop returns false", async () => {
+      vi.useFakeTimers();
+
+      await router.navigate("users.view", { id: 123 });
+
+      // Deactivate "users.view" async → triggers #continueAsyncNavigation
+      // Remaining activate: ["orders", "orders.view"]
+      // "orders" async(true) → drain iteration 1, "orders.view" async(false) → drain rejects
+      lifecycle.addDeactivateGuard(
+        "users.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+      lifecycle.addActivateGuard(
+        "orders",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+      lifecycle.addActivateGuard(
+        "orders.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(false);
+            }, 50),
+          ),
+      );
+
+      const result = router.navigate("orders.view", { id: 456 });
+
+      await vi.runAllTimersAsync();
+
+      await expect(result).rejects.toMatchObject({
+        code: errorCodes.CANNOT_ACTIVATE,
+      });
+
+      vi.useRealTimers();
+    });
+
+    it("should handle multiple async guards in drain loop sequence", async () => {
+      vi.useFakeTimers();
+
+      await router.navigate("users.view", { id: 123 });
+
+      // Deactivate "users.view" async → triggers #continueAsyncNavigation
+      // Remaining activate: ["orders", "orders.view"] — both async
+      // Two async guards resolved by resolveRemainingGuards loop
+      lifecycle.addDeactivateGuard(
+        "users.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+      lifecycle.addActivateGuard(
+        "orders",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+      lifecycle.addActivateGuard(
+        "orders.view",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 50),
+          ),
+      );
+
+      const result = router.navigate("orders.view", { id: 456 });
+
+      await vi.runAllTimersAsync();
+
+      const state = await result;
+
+      expect(state.name).toBe("orders.view");
+
+      vi.useRealTimers();
+    });
+
+    it("should cancel when TRANSITION_START listener triggers async reentrant navigate on no-guard route", async () => {
+      vi.useFakeTimers();
+
+      lifecycle.addActivateGuard(
+        "users",
+        () => () =>
+          new Promise<boolean>((resolve) =>
+            setTimeout(() => {
+              resolve(true);
+            }, 100),
+          ),
+      );
+
+      // TRANSITION_START listener redirects to "users" (with async guard)
+      const unsub = getPluginApi(router).addEventListener(
+        events.TRANSITION_START,
+        (toState: State) => {
+          if (toState.name === "orders") {
+            void router.navigate("users");
+          }
+        },
+      );
+
+      // "orders" has NO guards — navigation ID detects superseded navigation
+      const result = router.navigate("orders");
+
+      await vi.runAllTimersAsync();
+
+      await expect(result).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      expect(router.getState()?.name).toBe("users");
+
+      unsub();
+      vi.useRealTimers();
+    });
+
+    it("should cancel when sync guard triggers reentrant navigate to different route", async () => {
+      await router.navigate("users");
+
+      lifecycle.addDeactivateGuard("users", () => (toState) => {
+        if (toState.name === "orders") {
+          void router.navigate("settings");
+        }
+
+        return true;
+      });
+
+      const result = router.navigate("orders");
+
+      await expect(result).rejects.toMatchObject({
+        code: errorCodes.TRANSITION_CANCELLED,
+      });
+
+      expect(router.getState()?.name).toBe("settings");
+    });
+  });
 });

@@ -784,7 +784,18 @@ describe("@real-router/logger-plugin", () => {
       it("should create perf marks on cancelled transition", async () => {
         lifecycle.addActivateGuard(
           "users",
-          () => () => new Promise<boolean>(() => {}),
+          () => (_to, _from, signal) =>
+            new Promise<boolean>((_resolve, reject) => {
+              signal?.addEventListener(
+                "abort",
+                () => {
+                  reject(signal.reason);
+                },
+                {
+                  once: true,
+                },
+              );
+            }),
         );
         router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
         await router.start("/");

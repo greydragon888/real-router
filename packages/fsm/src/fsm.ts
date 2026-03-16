@@ -19,7 +19,8 @@ export class FSM<
   #state: TStates;
   #currentTransitions: Partial<Record<TEvents, TStates>>;
   #listenerCount = 0;
-  #actions: Map<string, (payload: unknown) => void> | null = null;
+  #actions: Map<TStates, Map<TEvents, (payload: unknown) => void>> | null =
+    null;
   readonly #context: TContext;
   readonly #transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
   readonly #listeners: (TransitionListener<
@@ -35,12 +36,7 @@ export class FSM<
     this.#currentTransitions = config.transitions[config.initial];
   }
 
-  send<E extends TEvents>(
-    event: E,
-    ...args: E extends keyof TPayloadMap
-      ? [payload: TPayloadMap[E]]
-      : [payload?: never]
-  ): TStates {
+  send(event: TEvents, payload?: TPayloadMap[TEvents]): TStates {
     const nextState = this.#currentTransitions[event];
 
     if (nextState === undefined) {
@@ -53,10 +49,10 @@ export class FSM<
     this.#currentTransitions = this.#transitions[nextState];
 
     if (this.#actions !== null) {
-      const action = this.#actions.get(`${from}\0${event}`);
+      const action = this.#actions.get(from)?.get(event);
 
       if (action !== undefined) {
-        action(args[0]);
+        action(payload);
       }
     }
 
@@ -65,7 +61,7 @@ export class FSM<
         from,
         to: nextState,
         event,
-        payload: args[0] as TPayloadMap[TEvents] | undefined,
+        payload: payload,
       };
 
       for (const listener of this.#listeners) {
@@ -80,6 +76,15 @@ export class FSM<
 
   canSend(event: TEvents): boolean {
     return this.#currentTransitions[event] !== undefined;
+  }
+
+  /**
+   * Directly sets FSM state without triggering actions or listeners.
+   * Use for hot-path optimizations where the caller handles side effects.
+   */
+  forceState(state: TStates): void {
+    this.#state = state;
+    this.#currentTransitions = this.#transitions[state];
   }
 
   getState(): TStates {
@@ -98,12 +103,18 @@ export class FSM<
       : () => void,
   ): () => void {
     this.#actions ??= new Map();
-    const key = `${from}\0${event}`;
 
-    this.#actions.set(key, action as (payload: unknown) => void);
+    let stateActions = this.#actions.get(from);
+
+    if (!stateActions) {
+      stateActions = new Map();
+      this.#actions.set(from, stateActions);
+    }
+
+    stateActions.set(event, action as (payload: unknown) => void);
 
     return () => {
-      this.#actions?.delete(key);
+      this.#actions?.get(from)?.delete(event);
     };
   }
 

@@ -3,7 +3,6 @@
 import { FSM } from "@real-router/fsm";
 
 import type { FSMConfig } from "@real-router/fsm";
-import type { NavigationOptions, State } from "@real-router/types";
 
 /**
  * Router FSM states.
@@ -54,26 +53,8 @@ export type RouterEvent = (typeof routerEvents)[keyof typeof routerEvents];
  *
  * Events without entries have no payload.
  */
-export interface RouterPayloads {
-  NAVIGATE: {
-    toState: State;
-    fromState: State | undefined;
-  };
-  COMPLETE: {
-    state: State;
-    fromState: State | undefined;
-    opts: NavigationOptions;
-  };
-  FAIL: {
-    toState?: State | undefined;
-    fromState?: State | undefined;
-    error?: unknown;
-  };
-  CANCEL: {
-    toState: State;
-    fromState: State | undefined;
-  };
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- payloads stored in EventBusNamespace fields (N8+N9 optimization)
+export interface RouterPayloads {}
 
 /**
  * Router FSM configuration.

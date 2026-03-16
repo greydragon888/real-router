@@ -84,9 +84,9 @@ emitter.off("data", handler);
 
 ---
 
-### `emitter.emit(eventName, ...args)`
+### `emitter.emit(eventName, a?, b?, c?, d?)`
 
-Emits an event, calling all registered listeners. Arguments are type-checked against `TEventMap`.
+Emits an event, calling all registered listeners (up to 4 arguments).
 
 ```typescript
 emitter.emit("start");
@@ -120,8 +120,10 @@ Static method. Asserts that `cb` is a function, throws `TypeError` otherwise.
 
 ## Performance
 
+- **Zero-alloc emit** — explicit params `(a?, b?, c?, d?)` instead of rest params to avoid V8 array materialization
+- **Single-listener fast path** — skips `[...set]` snapshot when only one listener registered
 - **Dual-path emit** — fast path without depth tracking when `maxEventDepth === 0`
-- **Switch by args.length** — direct calls for 0-3 args, avoids `Function.prototype.apply`
+- **Switch by argc** — direct calls for 0-4 args, no `Function.prototype.apply`
 - **Lazy depth map** — `null` until first emit with depth tracking enabled
 - **Set-based listeners** — O(1) add, remove, and duplicate detection
 

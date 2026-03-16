@@ -1,8 +1,15 @@
-// packages/core/src/namespaces/NavigationNamespace/NavigationNamespace.ts
-
 import { logger } from "@real-router/logger";
 
-import { transition } from "./transition";
+import {
+  CACHED_NOT_STARTED_REJECTION,
+  CACHED_ROUTE_NOT_FOUND_ERROR,
+  CACHED_ROUTE_NOT_FOUND_REJECTION,
+  CACHED_SAME_STATES_ERROR,
+  CACHED_SAME_STATES_REJECTION,
+} from "./constants";
+import { completeTransition } from "./transition/completeTransition";
+import { routeTransitionError } from "./transition/errorHandling";
+import { executeGuardPipeline } from "./transition/guardPhase";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
@@ -10,9 +17,9 @@ import {
 } from "./validators";
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
-import { nameToIDs } from "../../transitionPath";
+import { getTransitionPath, nameToIDs } from "../../transitionPath";
 
-import type { NavigationDependencies, TransitionOutput } from "./types";
+import type { NavigationContext, NavigationDependencies } from "./types";
 import type {
   NavigationOptions,
   Params,
@@ -36,65 +43,35 @@ function forceReplaceFromUnknown(
     : opts;
 }
 
-function stripSignal({
-  signal: _,
-  ...rest
-}: NavigationOptions): NavigationOptions {
-  return rest;
-}
-
-function routeTransitionError(
-  deps: NavigationDependencies,
-  error: unknown,
-  toState: State,
-  fromState: State | undefined,
-): void {
-  const routerError = error as RouterError;
-
-  if (
-    routerError.code === errorCodes.TRANSITION_CANCELLED ||
-    routerError.code === errorCodes.ROUTE_NOT_FOUND
-  ) {
-    return;
-  }
-
-  deps.sendTransitionFail(toState, fromState, routerError);
-}
-
-function buildSuccessState(
-  finalState: State,
-  transitionOutput: TransitionOutput["meta"],
+function isSameNavigation(
   fromState: State | undefined,
   opts: NavigationOptions,
-): State {
-  const transitionMeta: TransitionMeta = {
-    phase: transitionOutput.phase,
-    ...(fromState?.name !== undefined && { from: fromState.name }),
-    reason: "success",
-    segments: transitionOutput.segments,
-    ...(opts.reload !== undefined && { reload: opts.reload }),
-    ...(opts.redirected !== undefined && { redirected: opts.redirected }),
-  };
-
-  Object.freeze(transitionMeta.segments.deactivated);
-  Object.freeze(transitionMeta.segments.activated);
-  Object.freeze(transitionMeta.segments);
-  Object.freeze(transitionMeta);
-
-  return {
-    ...finalState,
-    transition: transitionMeta,
-  };
+  toState: State,
+  areStatesEqual: (a: State, b: State, ignoreQuery: boolean) => boolean,
+): boolean {
+  return (
+    !!fromState &&
+    !opts.reload &&
+    !opts.force &&
+    areStatesEqual(fromState, toState, false)
+  );
 }
 
 /**
  * Independent namespace for managing navigation.
  *
  * Handles navigate(), navigateToDefault(), navigateToNotFound(), and transition state.
+ *
+ * Performance: navigate() uses optimistic sync execution — guards run synchronously
+ * until one returns a Promise, then switches to async. This eliminates Promise/AbortController
+ * overhead for the common case (no guards or sync guards).
  */
 export class NavigationNamespace {
+  lastSyncResolved = false;
+  lastSyncRejected = false;
   #deps!: NavigationDependencies;
   #currentController: AbortController | null = null;
+  #navigationId = 0;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -128,154 +105,176 @@ export class NavigationNamespace {
   // Instance methods
   // =========================================================================
 
-  /**
-   * Navigates to a route by name.
-   * Arguments should be pre-parsed and validated by facade.
-   */
-  async navigate(
+  navigate(
     name: string,
     params: Params,
     opts: NavigationOptions,
   ): Promise<State> {
-    if (!this.#deps.canNavigate()) {
-      throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
-    }
-
+    this.lastSyncResolved = false;
     const deps = this.#deps;
 
-    const result = deps.buildStateWithSegments(name, params);
+    // Fast-path sync rejections: cached error + cached Promise.reject
+    // No allocations, no throw/catch overhead, facade skips .catch() suppression
+    if (!deps.canNavigate()) {
+      this.lastSyncRejected = true;
 
-    if (!result) {
-      const err = new RouterError(errorCodes.ROUTE_NOT_FOUND);
-
-      deps.emitTransitionError(undefined, deps.getState(), err);
-
-      throw err;
+      return CACHED_NOT_STARTED_REJECTION;
     }
 
-    const { state: route } = result;
+    let toState: State | undefined;
+    let fromState: State | undefined;
+    let transitionStarted = false;
+    let controller: AbortController | null = null;
 
-    const toState = deps.makeState(
-      route.name,
-      route.params,
-      deps.buildPath(route.name, route.params),
-      {
-        params: route.meta,
-      },
-    );
+    try {
+      toState = deps.buildNavigateState(name, params);
 
-    const fromState = deps.getState();
+      if (!toState) {
+        deps.emitTransitionError(
+          undefined,
+          deps.getState(),
+          CACHED_ROUTE_NOT_FOUND_ERROR,
+        );
+        this.lastSyncRejected = true;
 
-    opts = forceReplaceFromUnknown(opts, fromState);
+        return CACHED_ROUTE_NOT_FOUND_REJECTION;
+      }
 
-    if (
-      fromState &&
-      !opts.reload &&
-      !opts.force &&
-      deps.areStatesEqual(fromState, toState, false)
-    ) {
-      const err = new RouterError(errorCodes.SAME_STATES);
+      fromState = deps.getState();
+      opts = forceReplaceFromUnknown(opts, fromState);
 
-      deps.emitTransitionError(toState, fromState, err);
+      if (isSameNavigation(fromState, opts, toState, deps.areStatesEqual)) {
+        deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
+        this.lastSyncRejected = true;
 
-      throw err;
-    }
+        return CACHED_SAME_STATES_REJECTION;
+      }
 
-    this.#abortPreviousNavigation();
+      this.#abortPreviousNavigation();
 
-    const controller = new AbortController();
-
-    this.#currentController = controller;
-
-    if (opts.signal) {
-      if (opts.signal.aborted) {
-        this.#currentController = null;
-
+      if (opts.signal?.aborted) {
         throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
           reason: opts.signal.reason,
         });
       }
 
-      opts.signal.addEventListener(
-        "abort",
-        () => {
-          controller.abort(opts.signal?.reason);
-        },
-        { once: true, signal: controller.signal },
-      );
-    }
+      const myId = ++this.#navigationId;
 
-    deps.startTransition(toState, fromState);
+      deps.startTransition(toState, fromState);
+      transitionStarted = true;
 
-    try {
-      const { state: finalState, meta: transitionOutput } = await transition(
-        deps,
+      // Reentrant navigate from TRANSITION_START listener superseded this navigation
+      if (this.#navigationId !== myId) {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+      }
+
+      const [canDeactivateFunctions, canActivateFunctions] =
+        deps.getLifecycleFunctions();
+      const isUnknownRoute = toState.name === constants.UNKNOWN_ROUTE;
+
+      const { toDeactivate, toActivate, intersection } = getTransitionPath(
         toState,
         fromState,
-        opts,
-        controller.signal,
+        opts.reload,
       );
 
-      if (
-        finalState.name === constants.UNKNOWN_ROUTE ||
-        deps.hasRoute(finalState.name)
-      ) {
-        const stateWithTransition = buildSuccessState(
-          finalState,
-          transitionOutput,
+      const shouldDeactivate =
+        fromState && !opts.forceDeactivate && toDeactivate.length > 0;
+      const shouldActivate = !isUnknownRoute && toActivate.length > 0;
+      const hasGuards =
+        canDeactivateFunctions.size > 0 || canActivateFunctions.size > 0;
+
+      if (hasGuards) {
+        controller = new AbortController();
+        this.#currentController = controller;
+
+        const signal = controller.signal;
+        const isCurrentNav = () =>
+          this.#navigationId === myId && deps.isActive();
+
+        const guardCompletion = executeGuardPipeline(
+          canDeactivateFunctions,
+          canActivateFunctions,
+          toDeactivate,
+          toActivate,
+          !!shouldDeactivate,
+          shouldActivate,
+          toState,
           fromState,
-          opts,
+          signal,
+          isCurrentNav,
         );
 
-        deps.setState(stateWithTransition);
+        if (guardCompletion !== undefined) {
+          return this.#finishAsyncNavigation(
+            guardCompletion,
+            {
+              toState,
+              fromState,
+              opts,
+              toDeactivate,
+              toActivate,
+              intersection,
+              canDeactivateFunctions,
+            },
+            controller,
+            myId,
+          );
+        }
 
-        const transitionOpts =
-          opts.signal === undefined ? opts : stripSignal(opts);
+        if (!isCurrentNav()) {
+          throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+        }
 
-        deps.sendTransitionDone(stateWithTransition, fromState, transitionOpts);
-
-        return stateWithTransition;
-      } else {
-        const err = new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-          routeName: finalState.name,
-        });
-
-        deps.sendTransitionFail(finalState, fromState, err);
-
-        throw err;
+        this.#cleanupController(controller);
       }
+
+      this.lastSyncResolved = true;
+
+      return Promise.resolve(
+        completeTransition(deps, {
+          toState,
+          fromState,
+          opts,
+          toDeactivate,
+          toActivate,
+          intersection,
+          canDeactivateFunctions,
+        }),
+      );
     } catch (error) {
-      routeTransitionError(deps, error, toState, fromState);
+      this.#handleNavigateError(
+        error,
+        controller,
+        transitionStarted,
+        toState,
+        fromState,
+      );
 
-      throw error;
-    } finally {
-      controller.abort();
-      if (this.#currentController === controller) {
-        this.#currentController = null;
-      }
+      return Promise.reject(error as Error);
     }
   }
 
-  /**
-   * Navigates to the default route if configured.
-   * Arguments should be pre-parsed and validated by facade.
-   */
-  async navigateToDefault(opts: NavigationOptions): Promise<State> {
+  navigateToDefault(opts: NavigationOptions): Promise<State> {
     const deps = this.#deps;
     const options = deps.getOptions();
 
     if (!options.defaultRoute) {
-      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: "defaultRoute not configured",
-      });
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute not configured",
+        }),
+      );
     }
 
     const { route, params } = deps.resolveDefault();
 
     if (!route) {
-      throw new RouterError(errorCodes.ROUTE_NOT_FOUND, {
-        routeName: "defaultRoute resolved to empty",
-      });
+      return Promise.reject(
+        new RouterError(errorCodes.ROUTE_NOT_FOUND, {
+          routeName: "defaultRoute resolved to empty",
+        }),
+      );
     }
 
     return this.navigate(route, params, opts);
@@ -328,6 +327,75 @@ export class NavigationNamespace {
       new RouterError(errorCodes.TRANSITION_CANCELLED),
     );
     this.#currentController = null;
+  }
+
+  async #finishAsyncNavigation(
+    guardCompletion: Promise<void>,
+    nav: NavigationContext,
+    controller: AbortController,
+    myId: number,
+  ): Promise<State> {
+    const deps = this.#deps;
+    const isActive = () =>
+      this.#navigationId === myId &&
+      !controller.signal.aborted &&
+      deps.isActive();
+
+    try {
+      if (nav.opts.signal) {
+        if (nav.opts.signal.aborted) {
+          throw new RouterError(errorCodes.TRANSITION_CANCELLED, {
+            reason: nav.opts.signal.reason,
+          });
+        }
+
+        nav.opts.signal.addEventListener(
+          "abort",
+          () => {
+            controller.abort(nav.opts.signal?.reason);
+          },
+          { once: true, signal: controller.signal },
+        );
+      }
+
+      await guardCompletion;
+
+      if (!isActive()) {
+        throw new RouterError(errorCodes.TRANSITION_CANCELLED);
+      }
+
+      return completeTransition(deps, nav);
+    } catch (error) {
+      routeTransitionError(deps, error, nav.toState, nav.fromState);
+
+      throw error;
+    } finally {
+      this.#cleanupController(controller);
+    }
+  }
+
+  #handleNavigateError(
+    error: unknown,
+    controller: AbortController | null,
+    transitionStarted: boolean,
+    toState: State | undefined,
+    fromState: State | undefined,
+  ): void {
+    if (controller) {
+      this.#cleanupController(controller);
+    }
+
+    if (transitionStarted && toState) {
+      routeTransitionError(this.#deps, error, toState, fromState);
+    }
+  }
+
+  #cleanupController(controller: AbortController): void {
+    controller.abort();
+
+    if (this.#currentController === controller) {
+      this.#currentController = null;
+    }
   }
 
   #abortPreviousNavigation(): void {

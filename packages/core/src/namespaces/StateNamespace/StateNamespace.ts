@@ -3,10 +3,11 @@
 import { getTypeDescription, validateState } from "type-guards";
 
 import { areParamValuesEqual, getUrlParamsFromMeta } from "./helpers";
+import { EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
 
 import type { StateNamespaceDependencies } from "./types";
-import type { Params, State, StateMetaInput } from "@real-router/types";
+import type { Params, State } from "@real-router/types";
 import type { RouteTreeStateMeta } from "route-tree";
 
 /**
@@ -85,7 +86,7 @@ export class StateNamespace {
   get<P extends Params = Params, MP extends Params = Params>():
     | State<P, MP>
     | undefined {
-    return this.#frozenState as State<P, MP> | undefined;
+    return this.#frozenState as State<P, MP> | undefined; // NOSONAR -- generic narrowing needed for public API
   }
 
   /**
@@ -108,10 +109,8 @@ export class StateNamespace {
   /**
    * Returns the previous router state (before the last navigation).
    */
-  getPrevious<P extends Params = Params, MP extends Params = Params>():
-    | State<P, MP>
-    | undefined {
-    return this.#previousState as State<P, MP> | undefined;
+  getPrevious(): State | undefined {
+    return this.#previousState;
   }
 
   reset(): void {
@@ -144,15 +143,12 @@ export class StateNamespace {
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
+    meta?: RouteTreeStateMeta,
     forceId?: number,
+    skipFreeze?: boolean,
   ): State<P, MP> {
     const madeMeta = meta
-      ? {
-          ...meta,
-          id: forceId ?? ++this.#stateId,
-          params: meta.params,
-        }
+      ? { id: forceId ?? ++this.#stateId, params: meta as unknown as MP }
       : undefined;
 
     // Optimization: O(1) lookup instead of O(depth) ancestor iteration
@@ -164,10 +160,10 @@ export class StateNamespace {
 
     if (hasDefaultParams) {
       mergedParams = { ...defaultParamsConfig[name], ...params } as P;
-    } else if (params) {
-      mergedParams = { ...params };
+    } else if (!params || params === EMPTY_PARAMS) {
+      mergedParams = EMPTY_PARAMS as P;
     } else {
-      mergedParams = {} as P;
+      mergedParams = { ...params };
     }
 
     const state: State<P, MP> = {
@@ -177,7 +173,7 @@ export class StateNamespace {
       meta: madeMeta,
     };
 
-    return freezeStateInPlace(state);
+    return skipFreeze ? state : freezeStateInPlace(state);
   }
 
   // =========================================================================
@@ -202,7 +198,7 @@ export class StateNamespace {
     }
 
     if (ignoreQueryParams) {
-      const stateMeta = (state1.meta?.params ?? state2.meta?.params) as
+      const stateMeta = (state1.meta?.params ?? state2.meta?.params) as  // NOSONAR -- narrowing from Params to RouteTreeStateMeta
         | RouteTreeStateMeta
         | undefined;
 

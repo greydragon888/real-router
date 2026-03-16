@@ -12,7 +12,6 @@ import type {
   RouteTreeState,
   SimpleState,
   State,
-  StateMetaInput,
   Unsubscribe,
 } from "@real-router/types";
 import type { RouteTree } from "route-tree";
@@ -24,7 +23,7 @@ export interface RouterInternals<
     name: string,
     params?: P,
     path?: string,
-    meta?: StateMetaInput<MP>,
+    meta?: Record<string, Record<string, "url" | "query">>,
     forceId?: number,
   ) => State<P, MP>;
 
@@ -152,3 +151,23 @@ export function createInterceptable<T extends (...args: any[]) => any>(
     return executeInterceptorChain(chain, original, args);
   }) as T;
 }
+
+export function createInterceptable2<A, B, R>(
+  name: string,
+  original: (a: A, b: B) => R,
+  interceptors: Map<
+    string,
+    ((next: (...args: any[]) => any, ...args: any[]) => any)[]
+  >,
+): (a: A, b: B) => R {
+  return (a: A, b: B) => {
+    const chain = interceptors.get(name);
+
+    if (!chain || chain.length === 0) {
+      return original(a, b);
+    }
+
+    return executeInterceptorChain(chain, original, [a, b]);
+  };
+}
+/* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

@@ -57,9 +57,9 @@ class EventEmitter<TEventMap extends Record<string, unknown[]>> {
     eventName: E,
     cb: (...args: TEventMap[E]) => void,
   ): void;
-  emit<E extends keyof TEventMap & string>(
-    eventName: E,
-    ...args: TEventMap[E]
+  emit(
+    eventName: keyof TEventMap & string,
+    a?: unknown, b?: unknown, c?: unknown, d?: unknown,
   ): void;
   clearAll(): void;
   listenerCount(eventName: keyof TEventMap & string): number;
@@ -149,7 +149,9 @@ off(eventName, cb) {
 ### emit() — Dual-Path Dispatch
 
 ```
-emit(eventName, ...args)
+emit(eventName, a?, b?, c?, d?)
+    │
+    ├── argc = arguments.length - 1   // O(1) in V8 strict mode
     │
     ▼
 ┌───────────────┐
@@ -165,16 +167,26 @@ emit(eventName, ...args)
 └───────────────────────────────────────┘
 ```
 
+**Why explicit params instead of `...args`?** V8 always materializes an array for rest parameters, even when empty. With `(a?, b?, c?, d?)`, V8 passes `undefined` — zero allocation. This eliminates one array allocation per `emit()` call (~5ns saved).
+
 #### Fast Path (#emitFast)
 
 No depth tracking, no try/finally overhead:
 
 ```typescript
-#emitFast(set, eventName, args) {
+#emitFast(set, eventName, argc, a, b, c, d) {
+  // Single-listener fast path — no snapshot needed
+  if (set.size === 1) {
+    const [cb] = set;
+    try { this.#callListener(cb, argc, a, b, c, d); }
+    catch (error) { this.#onListenerError?.(eventName, error); }
+    return;
+  }
+
   const listeners = [...set];                    // snapshot — freeze iteration order
   for (const cb of listeners) {
     try {
-      this.#callListener(cb, args);
+      this.#callListener(cb, argc, a, b, c, d);
     } catch (error) {
       this.#onListenerError?.(eventName, error); // swallow, continue
     }
@@ -184,57 +196,29 @@ No depth tracking, no try/finally overhead:
 
 #### Depth-Tracked Path (#emitWithDepthTracking)
 
-```typescript
-#emitWithDepthTracking(set, eventName, args) {
-  this.#depthMap ??= new Map();                  // lazy init
-  const depth = this.#depthMap.get(eventName) ?? 0;
-
-  if (depth >= this.#limits.maxEventDepth) {
-    throw new RecursionDepthError(/*...*/);
-  }
-
-  try {
-    this.#depthMap.set(eventName, depth + 1);
-    const listeners = [...set];                  // snapshot
-    for (const cb of listeners) {
-      try {
-        this.#callListener(cb, args);
-      } catch (error) {
-        if (error instanceof RecursionDepthError) throw error; // re-throw
-        this.#onListenerError?.(eventName, error);             // swallow others
-      }
-    }
-  } finally {
-    this.#depthMap.set(eventName, depth);        // always decrement
-  }
-}
-```
+Same as fast path but with recursion depth check and try/finally. Also uses single-listener fast path (`set.size === 1` skips `[...set]` snapshot).
 
 ### #callListener() — Argument Dispatch
 
 ```typescript
-switch (args.length) {
-  case 0:
-    cb();
-  case 1:
-    cb(args[0]);
-  case 2:
-    cb(args[0], args[1]);
-  case 3:
-    cb(args[0], args[1], args[2]);
-  default:
-    Function.prototype.apply.call(cb, undefined, args);
+switch (argc) {
+  case 0: cb(); break;
+  case 1: cb(a); break;
+  case 2: cb(a, b); break;
+  case 3: cb(a, b, c); break;
+  default: cb(a, b, c, d);
 }
 ```
 
-Direct calls for 0-3 args — monomorphic call sites, V8 optimizes well. Fallback to `apply` for 4+ args (rare in router: max 3 args for `$$success`).
+Direct calls for 0-4 args by `argc` count — monomorphic call sites, V8 optimizes well. No `Function.prototype.apply` fallback needed (router uses max 3 args for `$$success`).
 
 ## Snapshot Iteration
 
-`emit()` creates a snapshot `[...set]` before iterating:
+`emit()` creates a snapshot `[...set]` before iterating (when `set.size > 1`):
 
 - Listener **added** during emit → NOT called in current emit
 - Listener **removed** during emit → STILL called (already in snapshot)
+- **Single listener** → no snapshot, direct call from `set` (optimization: avoids array allocation)
 
 Standard pattern in event systems (DOM, Node.js EventEmitter).
 
@@ -319,11 +303,12 @@ createRouter(routes, {
 
 ### Memory
 
-| Allocation          | Size          | When                           |
-| ------------------- | ------------- | ------------------------------ |
-| Snapshot `[...set]` | ~8 B/listener | Every emit with listeners      |
-| `#depthMap`         | ~400 B        | First emit with depth tracking |
-| Closure per `on()`  | ~200 B        | Once per subscription          |
+| Allocation          | Size          | When                                  |
+| ------------------- | ------------- | ------------------------------------- |
+| Snapshot `[...set]` | ~8 B/listener | Every emit with 2+ listeners          |
+| `#depthMap`         | ~400 B        | First emit with depth tracking        |
+| Closure per `on()`  | ~200 B        | Once per subscription                 |
+| `emit()` args       | **0 B**       | Explicit params, no V8 rest-param array |
 
 ## See Also
 
