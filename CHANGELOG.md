@@ -5,6 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-16]
+
+### @real-router/core@0.36.2
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize navigate() — 6x speedup, 5x fewer allocations ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  Optimistic sync execution eliminates async overhead when no guards are registered.
+  Systematic allocation reduction across the navigate pipeline: merged state construction,
+  single-pass freeze chain, cached error paths, segment array reuse, FSM dispatch bypass.
+  Guard pipeline refactored from three-function coroutine to flat loop with zero sync-path regression.
+
+- Updated dependencies [[`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836), [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836)]:
+  - @real-router/fsm@0.2.1
+  - @real-router/types@0.23.1
+
+### @real-router/fsm@0.2.1
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize FSM for navigate hot path ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  Replace `...args` rest parameter with optional `payload?` in `send()` to eliminate V8 array allocation.
+  Add `forceState()` method for direct state transitions bypassing dispatch overhead.
+  Use nested Map for transition lookups instead of template literal key concatenation.
+
+### @real-router/types@0.23.1
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `NavigationContext` interface ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  New internal interface shared across NavigationNamespace, guard pipeline, and transition completion modules.
+
 ## [2026-03-14]
 
 ### @real-router/core@0.36.1

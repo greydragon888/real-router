@@ -1,5 +1,20 @@
 # @real-router/core
 
+## 0.36.2
+
+### Patch Changes
+
+- [#316](https://github.com/greydragon888/real-router/pull/316) [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836) Thanks [@greydragon888](https://github.com/greydragon888)! - Optimize navigate() — 6x speedup, 5x fewer allocations ([#307](https://github.com/greydragon888/real-router/issues/307))
+
+  Optimistic sync execution eliminates async overhead when no guards are registered.
+  Systematic allocation reduction across the navigate pipeline: merged state construction,
+  single-pass freeze chain, cached error paths, segment array reuse, FSM dispatch bypass.
+  Guard pipeline refactored from three-function coroutine to flat loop with zero sync-path regression.
+
+- Updated dependencies [[`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836), [`88397c6`](https://github.com/greydragon888/real-router/commit/88397c66270a0612636df759b7e56a55a0b51836)]:
+  - @real-router/fsm@0.2.1
+  - @real-router/types@0.23.1
+
 ## 0.36.1
 
 ### Patch Changes
