@@ -240,7 +240,14 @@ export class EventBusNamespace {
     // NAVIGATE and COMPLETE actions bypassed — sendNavigate/sendComplete
     // use fsm.forceState() + direct emit for zero-allocation hot path.
     fsm.on(routerStates.TRANSITIONING, routerEvents.CANCEL, () => {
-      this.emitTransitionCancel(this.#pendingToState!, this.#pendingFromState); // eslint-disable-line @typescript-eslint/no-non-null-assertion -- NOSONAR set by sendCancel before send()
+      const toState = this.#pendingToState;
+
+      /* v8 ignore next -- @preserve: #pendingToState guaranteed set by sendCancel before send() */
+      if (toState === undefined) {
+        return;
+      }
+
+      this.emitTransitionCancel(toState, this.#pendingFromState);
     });
 
     fsm.on(routerStates.STARTING, routerEvents.FAIL, () => {

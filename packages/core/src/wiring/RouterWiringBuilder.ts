@@ -151,10 +151,14 @@ export class RouterWiringBuilder<
         this.eventBus.sendNavigate(toState, fromState);
       },
       cancelNavigation: () => {
-        this.eventBus.sendCancel(
-          this.eventBus.getCurrentToState()!, // eslint-disable-line @typescript-eslint/no-non-null-assertion -- NOSONAR guaranteed set before TRANSITIONING
-          this.state.get(),
-        );
+        const toState = this.eventBus.getCurrentToState();
+
+        /* v8 ignore next -- @preserve: getCurrentToState() guaranteed set before TRANSITIONING */
+        if (toState === undefined) {
+          return;
+        }
+
+        this.eventBus.sendCancel(toState, this.state.get());
       },
       sendTransitionDone: (state, fromState, opts) => {
         this.eventBus.sendComplete(state, fromState, opts);
