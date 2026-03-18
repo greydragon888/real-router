@@ -10,6 +10,9 @@
     "*": {
       "api": [
         "./dist/cjs/api.d.ts"
+      ],
+      "utils": [
+        "./dist/cjs/utils.d.ts"
       ]
     }
   },
@@ -31,6 +34,15 @@
       },
       "import": "./dist/esm/api.mjs",
       "require": "./dist/cjs/api.js"
+    },
+    "./utils": {
+      "development": "./src/utils/index.ts",
+      "types": {
+        "import": "./dist/esm/utils.d.mts",
+        "require": "./dist/cjs/utils.d.ts"
+      },
+      "import": "./dist/esm/utils.mjs",
+      "require": "./dist/cjs/utils.js"
     }
   },
   "files": [
