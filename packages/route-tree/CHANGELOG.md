@@ -1,5 +1,11 @@
 # route-tree
 
+## 0.3.4
+
+### Patch Changes
+
+- Rewrite README — internal package style with Purpose, Consumers, Key Design Decisions, Path Patterns, Matching Algorithm (#320)
+
 ## 0.3.3
 
 ### Patch Changes

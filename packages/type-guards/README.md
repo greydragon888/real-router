@@ -1,205 +1,58 @@
 # type-guards
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+> Runtime type validation utilities for Real-Router core types.
 
-> Runtime type validation utilities for Real-Router ecosystem.
+**Internal package** — consumed by `@real-router/core`, `browser-env`, `browser-plugin`, `hash-plugin`, `persistent-params-plugin`. Not published to npm.
 
-**⚠️ Internal Use Only:** This package is designed for use within the Real-Router monorepo. External users should use `@real-router/core` package directly.
+## Purpose
 
-Provides centralized type guards and validators for all Real-Router core types with TypeScript type narrowing support.
+Centralized type guards and validators for all Real-Router types. Provides both boolean-returning guards (for branching) and assertion validators (for fail-fast).
 
-## Features
+## Public API
 
-- **Runtime type safety**: Validate types at runtime with TypeScript type narrowing
-- **Strict & flexible modes**: Different validation levels for different use cases
-- **Comprehensive coverage**: Guards for State, Params, NavigationOptions, and more
-- **Well-tested**: 60+ test cases covering edge cases
+### Type Guards
 
-## API
+| Guard | Returns | Used by |
+|-------|---------|---------|
+| `isState(value)` | `value is State` | Quick field presence check |
+| `isStateStrict(value)` | `value is State` | Deep validation (types, meta). Browser plugins, serialization |
+| `isParams(value)` | `value is Params` | Flexible — allows nested objects. Core |
+| `isParamsStrict(value)` | `value is Params` | Strict — primitives and arrays only. Rejects `NaN`, `Infinity`, nested objects. URL serialization |
+| `isNavigationOptions(value)` | `value is NavigationOptions` | Core |
+| `isRouteName(value)` | `value is string` | Route validation |
+| `isString(value)` | `value is string` | Primitive |
+| `isBoolean(value)` | `value is boolean` | Primitive |
+| `isPrimitiveValue(value)` | `value is string \| number \| boolean` | Persistent params |
+| `isObjKey(key, obj)` | `key is keyof typeof obj` | Key narrowing |
 
-### Type Guards (is*)
+### Validators (assertion)
 
-Type guards return `boolean` and narrow TypeScript types.
-
-#### Primitive Guards
-
-```typescript
-isString(value: unknown): value is string
-isBoolean(value: unknown): value is boolean
-isObjKey(key: string, obj: object): key is keyof typeof obj
-isPrimitiveValue(value: unknown): value is string | number | boolean
-```
-
-#### Params Guards
-
-```typescript
-isParams(value: unknown): value is Params
-isParamsStrict(value: unknown): value is Params
-```
-
-#### State Guards
-
-```typescript
-isState(value: unknown): value is State
-isStateStrict(value: unknown): value is State
-```
-
-#### Navigation Guards
-
-```typescript
-isNavigationOptions(value: unknown): value is NavigationOptions
-isRouteName(value: unknown): value is string
-```
-
-### Validators (validate*)
-
-Validators throw errors for invalid input, providing assertion-style validation.
-
-```typescript
-validateRouteName(name: unknown, methodName: string): asserts name is string
-validateState(value: unknown): asserts value is State
-```
+| Validator | Throws | Description |
+|-----------|--------|-------------|
+| `validateRouteName(name, methodName)` | `TypeError` | Asserts valid route name |
+| `validateState(value)` | `TypeError` | Asserts valid State |
 
 ### Utilities
 
-```typescript
-getTypeDescription(value: unknown): string  // Human-readable type description
-```
+`getTypeDescription(value)` — human-readable type description for error messages.
 
-## Usage in Router Packages
+## Route Name Rules
 
-### Validating State
-
-```typescript
-import { isState, isStateStrict } from "type-guards";
-
-// Quick presence check
-if (isState(value)) {
-  console.log(value.name, value.path);
-}
-
-// Deep validation with type checking
-if (isStateStrict(value)) {
-  // Validates params types, meta structure
-  processState(value);
-}
-```
-
-### Validating Params
-
-```typescript
-import { isParams, isParamsStrict } from "type-guards";
-
-// Flexible validation - allows nested objects (@real-router/core)
-if (isParams(routeParams)) {
-  router.setState(routeParams);
-}
-
-// Strict validation - only primitives and arrays (browser plugin)
-if (isParamsStrict(urlParams)) {
-  window.history.pushState(urlParams, "", path);
-}
-```
-
-### Route Validation (Assertion Functions)
-
-```typescript
-import { validateRouteName } from "type-guards";
-
-function addRoute(name: unknown, path: string) {
-  // Throws TypeError if invalid, narrows type if valid
-  validateRouteName(name, "addRoute");
-
-  // TypeScript now knows name is a string
-  routes[name] = path;
-}
-```
-
-## Validation Strategies
-
-### `isParams` vs `isParamsStrict`
-
-- **`isParams`**: Used in @real-router/core
-
-  - Allows: primitives, arrays, nested objects
-  - Use case: Internal state management
-
-- **`isParamsStrict`**: Used in browser plugin
-  - Allows: primitives, arrays of primitives only
-  - Use case: URL serialization (no nested objects)
-  - Rejects: `NaN`, `Infinity`, nested objects
-
-### `isState` vs `isStateStrict`
-
-- **`isState`**: Quick field presence check
-
-  - Validates: `name`, `params`, `path` exist
-  - Fast, minimal overhead
-
-- **`isStateStrict`**: Deep type validation
-  - Validates: field types, meta structure
-  - Use case: Browser plugin, state serialization
-
-## Edge Cases
-
-The guards handle various edge cases:
-
-```typescript
-// Rejects NaN and Infinity
-isPrimitiveValue(NaN); // false
-isPrimitiveValue(Infinity); // false
-
-// Handles null/undefined
-isParamsStrict({ query: null, filter: undefined }); // true
-
-// Inherited properties are not validated
-const proto = { inherited: "value" };
-const params = Object.create(proto);
-params.own = "test";
-isParamsStrict(params); // true - validates only own properties
-
-// Handles frozen objects
-const frozen = Object.freeze({ id: "123" });
-isParams(frozen); // true
-```
-
-## Route Name Validation Rules
-
-`isRouteName` validates (returns `true`/`false`):
-
-- String type
-- Empty string is valid (represents root node)
-- Segments: `[a-zA-Z_][a-zA-Z0-9_-]*`
-- Dots (.) for hierarchy
+- Segments: `[a-zA-Z_][a-zA-Z0-9_-]*`, separated by dots
+- Empty string valid (root node)
+- `@@` prefix valid (system routes)
 - No consecutive, leading, or trailing dots
-- System routes (@@prefix) bypass validation
 
-```typescript
-isRouteName("users.profile"); // true
-isRouteName("admin_panel"); // true
-isRouteName("api-v2"); // true
-isRouteName(""); // true (root node)
-isRouteName("@@real-router/UNKNOWN"); // true (system route)
+## Key Design Decisions
 
-isRouteName(".users"); // false (leading dot)
-isRouteName("users..profile"); // false (consecutive dots)
-isRouteName("123user"); // false (starts with number)
-isRouteName("users profile"); // false (contains space)
-```
+- **`isParams` vs `isParamsStrict`** — two validation levels because core allows nested objects internally, but URL serialization in browser plugins requires flat primitives
+- **`isState` vs `isStateStrict`** — quick presence check vs deep type validation. `isStateStrict` is used by browser plugins to validate `history.state` which can be corrupted by external code
+- **Assertion validators** throw `TypeError` with method name context for debuggable error messages
 
-`validateRouteName` performs the same checks but throws `TypeError` on failure:
+## Dependencies
 
-```typescript
-validateRouteName("users.profile", "navigate"); // OK
-validateRouteName(".users", "navigate"); // throws TypeError
-```
-
-## Related Packages
-
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — core router implementation
-- [core-types](.) — TypeScript type definitions (internal)
+- `@real-router/types` — `State`, `Params`, `NavigationOptions` type definitions
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE)

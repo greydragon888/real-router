@@ -1,28 +1,18 @@
 # event-emitter
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+> Typed event emitter with listener limits, recursion protection, and per-listener error isolation.
 
-> Generic typed event emitter with listener limits, recursion depth protection, and per-listener error isolation.
+**Internal package** — consumed by `@real-router/core`. Not published to npm.
 
-**⚠️ Internal Use Only:** This package is designed for use within the Real-Router monorepo. External users should use `@real-router/core` package directly.
+## Purpose
 
-## Overview
+Lightweight, type-safe event emitter powering the router's internal event system (`EventBusNamespace`). Designed for high-frequency emit paths with zero-allocation optimizations.
 
-`event-emitter` provides a lightweight, type-safe event emitter:
+## Consumer
 
-- **Type-safe events** — generic `TEventMap` ensures correct argument types per event
-- **Listener limits** — configurable `maxListeners` with warning threshold
-- **Recursion depth protection** — prevents infinite emit loops
-- **Per-listener error isolation** — one failing listener doesn't break others
-- **Snapshot iteration** — listeners added/removed during emit don't affect the current invocation
-- **Duplicate detection** — throws on duplicate listener registration
+- `@real-router/core` — router event bus (transition events, lifecycle events)
 
-## API
-
-### `new EventEmitter<TEventMap>(options?)`
-
-Creates a typed event emitter.
+## Public API
 
 ```typescript
 import { EventEmitter } from "event-emitter";
@@ -34,113 +24,54 @@ type Events = {
 };
 
 const emitter = new EventEmitter<Events>({
-  onListenerError: (eventName, error) => {
-    console.error(`Error in ${eventName} listener:`, error);
-  },
+  onListenerError: (eventName, error) => { /* isolated */ },
 });
+
+const unsub = emitter.on("data", (payload) => { /* typed */ });
+emitter.emit("data", "hello");
+unsub();
+
+emitter.listenerCount("data"); // 0
+emitter.clearAll();
 ```
 
-**Options:**
+| Method | Description |
+|--------|-------------|
+| `on(event, callback)` | Add listener, returns unsubscribe. Throws on duplicate |
+| `off(event, callback)` | Remove listener by reference |
+| `emit(event, a?, b?, c?, d?)` | Emit event, up to 4 args |
+| `clearAll()` | Remove all listeners, reset depth tracking |
+| `listenerCount(event)` | Number of listeners for event |
+| `setLimits(limits)` | Replace limits config |
+
+### Options
 
 ```typescript
 interface EventEmitterOptions {
-  limits?: EventEmitterLimits;
+  limits?: {
+    maxListeners: number;   // 0 = unlimited
+    warnListeners: number;  // 0 = no warning
+    maxEventDepth: number;  // 0 = no depth tracking
+  };
   onListenerError?: (eventName: string, error: unknown) => void;
   onListenerWarn?: (eventName: string, count: number) => void;
 }
-
-interface EventEmitterLimits {
-  maxListeners: number;   // 0 = unlimited
-  warnListeners: number;  // 0 = no warning
-  maxEventDepth: number;  // 0 = no depth tracking
-}
 ```
 
----
-
-### `emitter.on(eventName, callback)`
-
-Adds a listener and returns an unsubscribe function. Throws on duplicate listeners or when `maxListeners` is reached.
-
-```typescript
-const unsubscribe = emitter.on("data", (payload) => {
-  console.log(payload); // type: string
-});
-
-unsubscribe(); // remove listener
-```
-
----
-
-### `emitter.off(eventName, callback)`
-
-Removes a listener by reference.
-
-```typescript
-const handler = (payload: string) => console.log(payload);
-emitter.on("data", handler);
-emitter.off("data", handler);
-```
-
----
-
-### `emitter.emit(eventName, a?, b?, c?, d?)`
-
-Emits an event, calling all registered listeners (up to 4 arguments).
-
-```typescript
-emitter.emit("start");
-emitter.emit("data", "hello");
-emitter.emit("error", new Error("fail"), "context");
-```
-
----
-
-### `emitter.clearAll()`
-
-Removes all listeners for all events and resets depth tracking.
-
----
-
-### `emitter.listenerCount(eventName)`
-
-Returns the number of listeners for the given event.
-
----
-
-### `emitter.setLimits(limits)`
-
-Replaces current limits configuration.
-
----
-
-### `EventEmitter.validateCallback(cb, eventName)`
-
-Static method. Asserts that `cb` is a function, throws `TypeError` otherwise.
-
-## Performance
+## Key Design Decisions
 
 - **Zero-alloc emit** — explicit params `(a?, b?, c?, d?)` instead of rest params to avoid V8 array materialization
-- **Single-listener fast path** — skips `[...set]` snapshot when only one listener registered
+- **Single-listener fast path** — skips `[...set]` snapshot when only one listener
 - **Dual-path emit** — fast path without depth tracking when `maxEventDepth === 0`
 - **Switch by argc** — direct calls for 0-4 args, no `Function.prototype.apply`
-- **Lazy depth map** — `null` until first emit with depth tracking enabled
-- **Set-based listeners** — O(1) add, remove, and duplicate detection
+- **Null-slot listener array** — reuses slots from unsubscribed listeners
+- **Snapshot iteration** — listeners added/removed during emit don't affect current invocation
+- **Per-listener error isolation** — one failing listener doesn't break others
 
-## Type Exports
+## Dependencies
 
-```typescript
-import type {
-  EventEmitterLimits,
-  EventEmitterOptions,
-  Unsubscribe,
-} from "event-emitter";
-```
-
-## Related Packages
-
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — core router (uses event-emitter internally via EventBusNamespace)
+None (zero dependencies).
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE)

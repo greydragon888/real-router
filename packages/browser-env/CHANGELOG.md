@@ -1,5 +1,11 @@
 # browser-env
 
+## 0.1.3
+
+### Patch Changes
+
+- Rewrite README and create ARCHITECTURE.md — Browser abstraction, SSR fallback, popstate handling, plugin utilities (#320)
+
 ## 0.1.2
 
 ### Patch Changes
