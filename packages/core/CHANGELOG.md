@@ -1,5 +1,22 @@
 # @real-router/core
 
+## 0.38.0
+
+### Minor Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/core/utils` subpath with `serializeState()` ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  New subpath export `@real-router/core/utils` with XSS-safe JSON serialization for embedding data in HTML `<script>` tags during SSR.
+
+  ```typescript
+  import { serializeState } from "@real-router/core/utils";
+
+  const json = serializeState(data);
+  const html = `<script>window.__STATE__=${json}</script>`;
+  ```
+
+  Escapes `<`, `>`, and `&` to Unicode equivalents to prevent `</script>` injection.
+
 ## 0.37.0
 
 ### Minor Changes

@@ -1,5 +1,16 @@
 # @real-router/browser-plugin
 
+## 0.10.3
+
+### Patch Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `GuardFnFactory` signature in README example ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  Guard factory receives `(router, getDep)`, not `()`. Updated deactivate guard example to show correct signature.
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
 ## 0.10.2
 
 ### Patch Changes

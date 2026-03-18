@@ -7,6 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2026-03-18]
 
+### @real-router/core@0.38.0
+
+### Minor Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/core/utils` subpath with `serializeState()` ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  New subpath export `@real-router/core/utils` with XSS-safe JSON serialization for embedding data in HTML `<script>` tags during SSR.
+
+  ```typescript
+  import { serializeState } from "@real-router/core/utils";
+
+  const json = serializeState(data);
+  const html = `<script>window.__STATE__=${json}</script>`;
+  ```
+
+  Escapes `<`, `>`, and `&` to Unicode equivalents to prevent `</script>` injection.
+
+### @real-router/ssr-data-plugin@1.0.0
+
+### Minor Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `@real-router/ssr-data-plugin` — SSR per-route data loading ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  New plugin that intercepts `start()` to load per-route data before server rendering. Data is stored in a `WeakMap<State, unknown>` and accessible via `router.getRouteData()`.
+
+  ```typescript
+  import { ssrDataPluginFactory } from "@real-router/ssr-data-plugin";
+
+  router.usePlugin(
+    ssrDataPluginFactory({
+      "users.profile": async (params) => fetchUser(params.id),
+    }),
+  );
+
+  const state = await router.start(url);
+  const data = router.getRouteData();
+  ```
+
+  SSR-only by design — does not intercept `navigate()`.
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/browser-plugin@0.10.3
+
+### Patch Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `GuardFnFactory` signature in README example ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  Guard factory receives `(router, getDep)`, not `()`. Updated deactivate guard example to show correct signature.
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/hash-plugin@0.2.3
+
+### Patch Changes
+
+- [#323](https://github.com/greydragon888/real-router/pull/323) [`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888) Thanks [@greydragon888](https://github.com/greydragon888)! - Fix `GuardFnFactory` signature in README example ([#298](https://github.com/greydragon888/real-router/issues/298))
+
+  Guard factory receives `(router, getDep)`, not `()`. Updated deactivate guard example to show correct signature.
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/logger-plugin@0.3.3
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/persistent-params-plugin@0.1.42
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/react@0.12.4
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+  - @real-router/sources@0.2.5
+
+### @real-router/rx@0.1.30
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+### @real-router/sources@0.2.5
+
+### Patch Changes
+
+- Updated dependencies [[`0993a4f`](https://github.com/greydragon888/real-router/commit/0993a4f4dd6075e1ad979bd1230e7112bf9ee888)]:
+  - @real-router/core@0.38.0
+
+
 ### @real-router/core@0.37.0
 
 ### Minor Changes
