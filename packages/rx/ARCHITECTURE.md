@@ -51,122 +51,9 @@ graph LR
 | **events$()**    | `getPluginApi`, all 6 event constants       | Subscribe to all lifecycle events |
 | **observable()** | `state$()`                                  | TC39 Observable interop wrapper   |
 
-## Public API
+## Core Design
 
-### RxObservable — Main Class
-
-```typescript
-class RxObservable<T> {
-  constructor(subscribeFn: SubscribeFn<T>);
-
-  subscribe(
-    observerOrNext: Observer<T> | ((value: T) => void),
-    options?: ObservableOptions,
-  ): Subscription;
-
-  pipe(): this;
-  pipe<A>(op1: Operator<T, A>): RxObservable<A>;
-  // ... overloads up to 9 operators
-  pipe<A, B, C, D, E, F, G, H, I>(
-    op1: Operator<T, A>,
-    op2: Operator<A, B>,
-    op3: Operator<B, C>,
-    op4: Operator<C, D>,
-    op5: Operator<D, E>,
-    op6: Operator<E, F>,
-    op7: Operator<F, G>,
-    op8: Operator<G, H>,
-    op9: Operator<H, I>,
-  ): RxObservable<I>;
-
-  [Symbol.observable](): this;
-  ["@@observable"](): this;
-  [Symbol.asyncIterator](): AsyncIterableIterator<T>;
-}
-```
-
-### Stream Factories
-
-```typescript
-function state$(
-  router: Router,
-  options?: { replay?: boolean },
-): RxObservable<SubscribeState>;
-function events$(router: Router): RxObservable<RouterEvent>;
-function observable(router: Router): RxObservable<SubscribeState>;
-```
-
-### Operators
-
-```typescript
-function map<T, R>(project: (value: T) => R): Operator<T, R>;
-function filter<T, S extends T>(
-  predicate: (value: T) => value is S,
-): Operator<T, S>;
-function filter<T>(predicate: (value: T) => boolean): Operator<T, T>;
-function distinctUntilChanged<T>(
-  comparator?: (a: T, b: T) => boolean,
-): Operator<T, T>;
-function debounceTime<T>(duration: number): Operator<T, T>;
-function takeUntil<T>(notifier: RxObservable<unknown>): Operator<T, T>;
-```
-
-### Types
-
-```typescript
-interface Observer<T> {
-  next?: (value: T) => void;
-  error?: (err: unknown) => void;
-  complete?: () => void;
-}
-
-interface Subscription {
-  unsubscribe: () => void;
-  readonly closed: boolean;
-}
-
-interface ObservableOptions {
-  signal?: AbortSignal;
-  replay?: boolean;
-}
-
-type SubscribeFn<T> = (observer: Observer<T>) => void | (() => void);
-type Operator<T, R> = (source: RxObservable<T>) => RxObservable<R>;
-type UnaryFunction<T, R> = (source: T) => R;
-
-// Re-exported from @real-router/core
-type SubscribeState = { route: State; previousRoute: State | undefined };
-
-type RouterEvent =
-  | { type: "ROUTER_START" }
-  | { type: "ROUTER_STOP" }
-  | { type: "TRANSITION_START"; toState: State; fromState: State | undefined }
-  | {
-      type: "TRANSITION_SUCCESS";
-      toState: State;
-      fromState: State | undefined;
-      options: NavigationOptions;
-    }
-  | {
-      type: "TRANSITION_ERROR";
-      toState: State | undefined;
-      fromState: State | undefined;
-      error: RouterError;
-    }
-  | { type: "TRANSITION_CANCEL"; toState: State; fromState: State | undefined };
-```
-
-## Core Data Structures
-
-### Internal State
-
-```typescript
-class RxObservable<T> {
-  #subscribeFn: SubscribeFn<T>; // The subscribe function (set once in constructor)
-}
-```
-
-Minimal state — all subscription state (`closed`, `teardown`, `abortHandler`) lives in `subscribe()` closures, not on the instance. Each subscription is fully independent.
+`RxObservable<T>` holds a single private field `#subscribeFn`. All subscription state (`closed`, `teardown`, `abortHandler`) lives in `subscribe()` closures, not on the instance. Each subscription is fully independent.
 
 ## Core Algorithms
 
@@ -397,6 +284,18 @@ Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxOb
 | Per operator in `pipe()` | ~200 B | New `RxObservable` + closure     |
 | `events$()` teardown     | ~100 B | Array of 6 unsubscribe functions |
 | `debounceTime` state     | ~50 B  | Timer ID + pending value         |
+
+## Stress Test Coverage
+
+8 stress tests in `tests/stress/` validate behavior under extreme conditions:
+
+| Category | Tests | What they verify |
+|----------|-------|-----------------|
+| Subscription | subscription-storm, concurrent-pipelines | Rapid subscribe/unsubscribe churn, parallel pipeline isolation |
+| Operators | operator-chain-depth, debounce-timer-churn, takeuntil-lifecycle | Deep pipe chains, timer cleanup, takeUntil race conditions |
+| Error handling | error-cascade | Error propagation through operator chains under load |
+| Backpressure | async-iterator-backpressure | Async iterator under slow consumer / fast producer |
+| Fan-out | events-listener-fanout | Many subscribers on single events$ stream |
 
 ## See Also
 

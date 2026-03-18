@@ -48,30 +48,6 @@ graph LR
 | **@real-router/core** | `PluginFactory` type             | Plugin factory return type     |
 | **@real-router/core** | `State`, `RouterError`, `Params` | Lifecycle hook parameter types |
 
-## Public API
-
-### loggerPluginFactory — Main Factory
-
-```typescript
-function loggerPluginFactory(
-  options?: Partial<LoggerPluginConfig>,
-): PluginFactory;
-```
-
-### Types
-
-```typescript
-type LogLevel = "all" | "transitions" | "errors" | "none";
-
-interface LoggerPluginConfig {
-  usePerformanceMarks?: boolean; // Performance API marks/measures (default: false)
-  level?: LogLevel; // Log level filter (default: "all")
-  showTiming?: boolean; // Transition timing in ms/μs (default: true)
-  showParamsDiff?: boolean; // Params diff for same-route nav (default: true)
-  context?: string; // Console prefix (default: "logger-plugin")
-}
-```
-
 ## Core Data Structures
 
 ### Default Configuration (internal)
