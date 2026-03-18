@@ -453,6 +453,8 @@ Uses knip v5.85+ with **configuration hints** enabled (built-in since v5.84.0) �
 
 `ignore` array is intentionally empty — knip excludes `dist/`, `coverage/`, and `*.d.ts` by default.
 
+`ignoreWorkspaces: ["examples/*"]` — examples have different dependency structures (Express, Vite, Playwright) that would trigger false positives in knip analysis.
+
 ### syncpack Configuration
 
 Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
@@ -622,6 +624,8 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
 
+**Allowed packages:** Express 5 transitive dependencies (`unpipe`, `toidentifier`, `escape-html`, `ee-first`, `depd`, `cookie-signature`) are allowlisted via `allow-packages` — they have low OpenSSF Scorecard (< 3) but are well-established Express ecosystem utilities. Used only in `examples/ssr-react` (private).
+
 ## ESLint React Plugin Migration
 
 ### eslint-plugin-react → @eslint-react/eslint-plugin
@@ -789,6 +793,16 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 ### Workspace Cleanup
 
 `pnpm-workspace.yaml`: removed `tools/*` glob and `minimumReleaseAgeExclude` entries for legacy `router6`/`router6-types` packages.
+
+### Examples Workspace
+
+`pnpm-workspace.yaml` includes `examples/*` as a workspace glob. Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.
+
+**Turbo exclusion:** Examples use `build:app` instead of `build` in their scripts to avoid triggering turbo's `build` pipeline. `turbo run build` only matches packages with a `build` script — examples are excluded.
+
+**knip exclusion:** `ignoreWorkspaces: ["examples/*"]` prevents false positives from example-specific dependencies.
+
+**syncpack exclusion:** `syncpack.config.mjs` `source` only covers `packages/*/package.json` — examples are automatically excluded from version consistency checks.
 
 ### knip: Router Benchmarks Entry
 
