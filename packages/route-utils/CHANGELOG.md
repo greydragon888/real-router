@@ -1,5 +1,16 @@
 # @real-router/route-utils
 
+## 0.1.5
+
+### Patch Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Rewrite README ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  Added badges, RouteUtils and Segment Testers tables, fixed curried `startsWithSegment` example, performance complexity table.
+
+- Updated dependencies [[`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2)]:
+  - @real-router/types@0.24.0
+
 ## 0.1.4
 
 ### Patch Changes

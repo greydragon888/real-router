@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.24.0
+
+### Minor Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Move `getRouteConfig` type from `RoutesApi` to `PluginApi` interface ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  **Breaking Change:** `getRouteConfig` method signature removed from `RoutesApi` interface and added to `PluginApi` interface. Consumers typing against these interfaces must update accordingly.
+
 ## 0.23.1
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @real-router/rx
 
+## 0.1.29
+
+### Patch Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Rewrite README and trim ARCHITECTURE.md ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  README: added badges, streams and operators tables, pipe example in Quick Start. ARCHITECTURE: removed 103-line Public API section (TypeScript signatures now in README).
+
+- Updated dependencies [[`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2), [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2)]:
+  - @real-router/core@0.37.0
+
 ## 0.1.28
 
 ### Patch Changes
