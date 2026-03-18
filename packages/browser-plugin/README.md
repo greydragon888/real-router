@@ -1,21 +1,19 @@
 # @real-router/browser-plugin
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/browser-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/browser-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/browser-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/browser-plugin)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/browser-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/browser-plugin&treeshake=[*])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Browser History API integration for Real-Router. Synchronizes router state with browser URL and handles back/forward navigation.
+> Browser History API integration for [Real-Router](https://github.com/greydragon888/real-router). Synchronizes router state with browser URL and handles back/forward navigation.
 
 ## Installation
 
 ```bash
 npm install @real-router/browser-plugin
-# or
-pnpm add @real-router/browser-plugin
-# or
-yarn add @real-router/browser-plugin
-# or
-bun add @real-router/browser-plugin
 ```
+
+**Peer dependency:** `@real-router/core`
 
 ## Quick Start
 
@@ -25,165 +23,112 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 const router = createRouter([
   { name: "home", path: "/" },
-  { name: "products", path: "/products/:id" },
-  { name: "cart", path: "/cart" },
+  { name: "users", path: "/users/:id" },
 ]);
 
-// Basic usage
 router.usePlugin(browserPluginFactory());
-
-// With options
-router.usePlugin(
-  browserPluginFactory({
-    base: "/app",
-  }),
-);
-
-await router.start();
+await router.start(); // path inferred from browser location
 ```
 
----
-
-## Configuration
+## Options
 
 ```typescript
-router.usePlugin(
-  browserPluginFactory({
-    base: "/app",
-    forceDeactivate: true,
-  }),
-);
-
-router.navigate("products", { id: "123" });
-// URL: http://example.com/app/products/123
+router.usePlugin(browserPluginFactory({
+  base: "/app",           // Base path prefix for all routes
+  forceDeactivate: true,  // Bypass canDeactivate guards on back/forward
+}));
 ```
 
-| Option            | Type      | Default | Description                                           |
-| ----------------- | --------- | ------- | ----------------------------------------------------- |
-| `base`            | `string`  | `""`    | Base path for all routes (e.g., `"/app"`)             |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `base` | `string` | `""` | Base path for all routes (e.g., `"/app"` → URLs start with `/app/...`) |
+| `forceDeactivate` | `boolean` | `true` | Bypass `canDeactivate` guards on browser back/forward |
 
-> **Looking for hash routing?** Use [`@real-router/hash-plugin`](https://www.npmjs.com/package/@real-router/hash-plugin) instead.
+> **Hash routing?** Use [`@real-router/hash-plugin`](https://www.npmjs.com/package/@real-router/hash-plugin) instead.
 
-See [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-configuration-options) for detailed option descriptions and examples.
+## Router Extensions
 
----
+The plugin extends the router instance with three methods via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
 
-## Added Router Methods
-
-The plugin extends the router instance with browser-specific methods (via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/core#extendrouter)):
-
-#### `router.buildUrl(name: string, params?: Params): string`
-
-Build full URL with base path.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-Returns: `string` — full URL\
-[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `buildUrl(name, params?)` | `string` | Build full URL with base path |
+| `matchUrl(url)` | `State \| undefined` | Parse URL to router state |
+| `replaceHistoryState(name, params?, title?)` | `void` | Update browser URL without triggering navigation |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
 // => "/app/users/123" (with base "/app")
-```
 
-#### `router.matchUrl(url: string): State | undefined`
+router.matchUrl("/app/users/123");
+// => { name: "users", params: { id: "123" }, path: "/users/123" }
 
-Parse URL to router state.\
-`url: string` — URL to parse\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
-
-```typescript
-router.navigate("page1");
-router.navigate("page2");
-router.navigate("page3");
-
-// User clicks back twice rapidly
-// Plugin ensures router ends at page1
-// URL and router state remain synchronized
-```
-
-#### `router.replaceHistoryState(name: string, params?: Params, title?: string): void`
-
-Update browser URL without triggering navigation.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`title?: string` — page title\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
-
-```typescript
+// Update URL silently (no transition, no guards)
 router.replaceHistoryState("users", { id: "456" });
 ```
 
----
-
-## Usage Examples
-
-### With Base Path
+### `buildUrl` vs `buildPath`
 
 ```typescript
-router.usePlugin(
-  browserPluginFactory({
-    base: "/app",
-  }),
-);
-
-router.navigate("users", { id: "123" });
-// URL: /app/users/123
+router.buildPath("users", { id: 1 }); // "/users/1"       — core, no base
+router.buildUrl("users", { id: 1 });  // "/app/users/1"   — plugin, with base
 ```
 
-### Form Protection
+### `replaceHistoryState` vs `navigate({ replace: true })`
 
 ```typescript
-router.usePlugin(
-  browserPluginFactory({
-    forceDeactivate: false,
-  }),
-);
+router.replaceHistoryState(name, params);            // URL only, no transition
+router.navigate(name, params, { replace: true });    // Full transition + URL update
+```
+
+## Form Protection
+
+Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
+
+```typescript
+router.usePlugin(browserPluginFactory({ forceDeactivate: false }));
 
 import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
 lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
-  return !hasUnsavedChanges(); // false blocks navigation
+  return !hasUnsavedChanges(); // false blocks back/forward
 });
 ```
 
----
-
 ## SSR Support
 
-The plugin is SSR-safe with automatic fallback:
+The plugin is SSR-safe — automatically detects the environment and falls back to no-ops:
 
 ```typescript
 // Server-side — no errors, methods return safe defaults
 router.usePlugin(browserPluginFactory());
-router.buildUrl("home"); // Works
-router.matchUrl("/path"); // Returns undefined
+router.buildUrl("home");     // returns path without base
+router.matchUrl("/path");    // returns undefined
 ```
-
----
 
 ## Documentation
 
-Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki/browser-plugin):
+Full documentation: [Wiki — browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin)
 
 - [Configuration Options](https://github.com/greydragon888/real-router/wiki/browser-plugin#3-configuration-options)
 - [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/browser-plugin#4-lifecycle-hooks)
-- [Router Methods](https://github.com/greydragon888/real-router/wiki/browser-plugin#5-router-interaction)
 - [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/browser-plugin#8-behavior)
 - [Migration from router5](https://github.com/greydragon888/real-router/wiki/browser-plugin#11-migration-from-router5)
 
----
-
 ## Related Packages
 
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
-- [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) — Hash-based routing (`#/path`)
-- [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
-- [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) — Debug logging
+| Package | Description |
+|---------|-------------|
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required peer dependency) |
+| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) | Hash-based routing (`#/path`) |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration |
+| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) | Development logging |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

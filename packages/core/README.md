@@ -1,244 +1,220 @@
 # @real-router/core
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/core&treeshake=[{createRouter}]&badge=detailed)](https://bundlejs.com/?q=@real-router/core&treeshake=[{createRouter}])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Core router implementation for Real-Router.
+> Simple, powerful, view-agnostic, modular and extensible router for JavaScript applications.
+
+This is the core package of the [Real-Router](https://github.com/greydragon888/real-router) monorepo. It provides the router implementation, lifecycle management, navigation pipeline, and tree-shakeable standalone API modules.
 
 ## Installation
 
 ```bash
 npm install @real-router/core
-# or
-pnpm add @real-router/core
-# or
-yarn add @real-router/core
-# or
-bun add @real-router/core
 ```
 
 ## Quick Start
 
 ```typescript
 import { createRouter } from "@real-router/core";
+import { browserPluginFactory } from "@real-router/browser-plugin";
 
 const routes = [
   { name: "home", path: "/" },
-  {
-    name: "users",
-    path: "/users",
-    children: [{ name: "profile", path: "/:id" }],
-  },
+  { name: "users", path: "/users", children: [
+    { name: "profile", path: "/:id" },
+  ]},
 ];
 
 const router = createRouter(routes);
+router.usePlugin(browserPluginFactory());
 
 await router.start("/");
 await router.navigate("users.profile", { id: "123" });
 ```
 
----
-
 ## Router API
-
-The Router class provides core lifecycle, navigation, state, and subscription methods.
-Domain-specific operations (routes, dependencies, guards, plugin infrastructure, cloning) are available through [standalone API functions](#standalone-api) for tree-shaking.
-
-### `createRouter(routes?, options?, dependencies?)`
-
-Creates a new router instance. [Wiki](https://github.com/greydragon888/real-router/wiki/createRouter)
-
-```typescript
-const router = createRouter(routes, options, dependencies);
-```
-
----
 
 ### Lifecycle
 
-#### `router.start(path): Promise<State>`
-
-Starts the router with an initial path. [Wiki](https://github.com/greydragon888/real-router/wiki/start)
-
-#### `router.stop(): this`
-
-Stops the router. Cancels any in-progress transition. [Wiki](https://github.com/greydragon888/real-router/wiki/stop)
-
-#### `router.dispose(): void`
-
-Permanently terminates the router. Cannot be restarted. [Wiki](https://github.com/greydragon888/real-router/wiki/dispose)
-
-#### `router.isActive(): boolean`
-
-Returns whether the router is active. [Wiki](https://github.com/greydragon888/real-router/wiki/isActive)
-
----
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `start(path)` | `Promise<State>` | Start the router with an initial path |
+| `stop()` | `this` | Stop the router, cancel in-progress transition |
+| `dispose()` | `void` | Permanently terminate (cannot restart) |
+| `isActive()` | `boolean` | Whether the router is started |
 
 ### Navigation
 
-#### `router.navigate(name, params?, options?): Promise<State>`
-
-Navigates to a route by name. Supports AbortController cancellation. Fire-and-forget safe. [Wiki](https://github.com/greydragon888/real-router/wiki/navigate)
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
+| `navigateToDefault(options?)` | `Promise<State>` | Navigate to the default route |
+| `navigateToNotFound(path?)` | `State` | Synchronously set UNKNOWN_ROUTE state |
+| `canNavigateTo(name, params?)` | `boolean` | Check if guards allow navigation |
 
 ```typescript
 await router.navigate("users.profile", { id: "123" });
-await router.navigate("users", {}, { replace: true });
+await router.navigate("dashboard", {}, { replace: true });
+
+// Cancellable navigation
+const controller = new AbortController();
+router.navigate("users", {}, { signal: controller.signal });
+controller.abort();
 ```
-
-#### `router.navigateToDefault(options?): Promise<State>`
-
-Navigates to the default route. [Wiki](https://github.com/greydragon888/real-router/wiki/navigateToDefault)
-
-#### `router.navigateToNotFound(path?): State`
-
-Synchronously sets the router to UNKNOWN_ROUTE state. Bypasses the transition pipeline. [Wiki](https://github.com/greydragon888/real-router/wiki/navigateToNotFound)
-
-#### `router.canNavigateTo(name, params?): boolean`
-
-Checks if navigation would be allowed by guards. [Wiki](https://github.com/greydragon888/real-router/wiki/canNavigateTo)
-
----
 
 ### State
 
-#### `router.getState(): State | undefined`
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getState()` | `State \| undefined` | Current router state (deeply frozen) |
+| `getPreviousState()` | `State \| undefined` | Previous router state |
+| `areStatesEqual(s1, s2, ignoreQP?)` | `boolean` | Compare two states |
+| `isActiveRoute(name, params?, strict?, ignoreQP?)` | `boolean` | Check if route is active |
+| `buildPath(name, params?)` | `string` | Build URL path from route name |
 
-Returns the current router state. [Wiki](https://github.com/greydragon888/real-router/wiki/getState)
+### Events & Plugins
 
-#### `router.getPreviousState(): State | undefined`
-
-Returns the previous router state. [Wiki](https://github.com/greydragon888/real-router/wiki/getPreviousState)
-
-#### `router.areStatesEqual(state1, state2, ignoreQueryParams?): boolean`
-
-Compare two states for equality. [Wiki](https://github.com/greydragon888/real-router/wiki/areStatesEqual)
-
-#### `router.shouldUpdateNode(nodeName): (toState, fromState?) => boolean`
-
-Create a predicate to check if a route node should update. [Wiki](https://github.com/greydragon888/real-router/wiki/shouldUpdateNode)
-
----
-
-### Path Operations
-
-#### `router.buildPath(name, params?): string`
-
-Build URL path from route name. [Wiki](https://github.com/greydragon888/real-router/wiki/buildPath)
-
-#### `router.isActiveRoute(name, params?, strictEquality?, ignoreQueryParams?): boolean`
-
-Check if route is currently active. [Wiki](https://github.com/greydragon888/real-router/wiki/isActiveRoute)
-
----
-
-### Events
-
-#### `router.subscribe(listener): Unsubscribe`
-
-Subscribes to successful transitions. [Wiki](https://github.com/greydragon888/real-router/wiki/subscribe)
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `subscribe(listener)` | `Unsubscribe` | Listen to successful transitions |
+| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories |
 
 ```typescript
 const unsub = router.subscribe(({ route, previousRoute }) => {
-  console.log(previousRoute?.name, "→", route.name);
+  console.log(previousRoute?.name, "->", route.name);
 });
 ```
 
----
-
-### Plugins
-
-#### `router.usePlugin(...plugins): Unsubscribe`
-
-Registers one or more plugins. [Wiki](https://github.com/greydragon888/real-router/wiki/usePlugin)
-
-```typescript
-import { browserPluginFactory } from "@real-router/browser-plugin";
-
-router.usePlugin(browserPluginFactory());
-```
-
----
-
 ## Standalone API
 
-Tree-shakeable functions for domain-specific operations.
+Tree-shakeable functions imported from `@real-router/core/api`. Only imported functions are bundled.
 
-### `getRoutesApi(router)` — Route Management
+```typescript
+import {
+  getRoutesApi,
+  getDependenciesApi,
+  getLifecycleApi,
+  getPluginApi,
+  cloneRouter,
+} from "@real-router/core/api";
+```
 
-Add, remove, replace, and query routes at runtime. [Wiki](https://github.com/greydragon888/real-router/wiki/getRoutesApi)
+| Function | Purpose | Key methods |
+|----------|---------|-------------|
+| `getRoutesApi(router)` | Dynamic route CRUD | `add`, `remove`, `update`, `replace`, `has`, `get` |
+| `getDependenciesApi(router)` | Dependency injection | `get`, `set`, `setAll`, `remove`, `has` |
+| `getLifecycleApi(router)` | Guard registration | `addActivateGuard`, `addDeactivateGuard`, `remove*` |
+| `getPluginApi(router)` | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `getRouteConfig` |
+| `cloneRouter(router, deps?)` | SSR cloning | Shares route definitions, independent state |
 
-**Methods:** `add`, `remove`, `replace`, `update`, `clear`, `has`, `get`, `getConfig`
+### `getNavigator(router)` (main entry)
 
-### `getDependenciesApi(router)` — Dependencies
+Frozen read-only subset of router methods for view layers. Pre-bound, safe to destructure. Imported from `@real-router/core`, not `/api`.
 
-Dependency injection container. [Wiki](https://github.com/greydragon888/real-router/wiki/getDependenciesApi)
+```typescript
+import { getNavigator } from "@real-router/core";
+```
 
-**Methods:** `get`, `getAll`, `set`, `setAll`, `remove`, `reset`, `has`
+```typescript
+// Dynamic route management
+const routes = getRoutesApi(router);
+routes.add({ name: "settings", path: "/settings" });
+routes.replace(newRoutes); // atomic HMR-safe replacement
 
-### `getLifecycleApi(router)` — Guards
+// Dependency injection for guards and plugins
+const deps = getDependenciesApi(router);
+deps.set("authService", authService);
 
-Route activation/deactivation guards. [Wiki](https://github.com/greydragon888/real-router/wiki/getLifecycleApi)
+// Global lifecycle guards
+const lifecycle = getLifecycleApi(router);
+lifecycle.addActivateGuard("admin", (router, getDep) => (toState) => {
+  return getDep("authService").isAuthenticated();
+});
 
-**Methods:** `addActivateGuard`, `addDeactivateGuard`, `removeActivateGuard`, `removeDeactivateGuard`
+// SSR — clone with request-scoped deps
+const requestRouter = cloneRouter(router, { store: requestStore });
+await requestRouter.start(req.url);
+```
 
-### `getPluginApi(router)` — Plugin Infrastructure
+## Route Configuration
 
-Low-level API for plugin authors. State building, path matching, event system, method interception, router extension. [Wiki](https://github.com/greydragon888/real-router/wiki/getPluginApi)
+```typescript
+import type { Route } from "@real-router/core";
 
-**Methods:** `makeState`, `buildState`, `buildNavigationState`, `forwardState`, `matchPath`, `setRootPath`, `getRootPath`, `addEventListener`, `getOptions`, `getTree`, `addInterceptor`, `extendRouter`
-
-### `getNavigator(router)` — Navigator
-
-Frozen subset of router methods for view layers. Pre-bound, safe to destructure. [Wiki](https://github.com/greydragon888/real-router/wiki/getNavigator)
-
-### `cloneRouter(router, deps?)` — SSR Cloning
-
-Clone router for server-side rendering. [Wiki](https://github.com/greydragon888/real-router/wiki/cloneRouter)
-
----
-
-## Configuration
-
-See [RouterOptions](https://github.com/greydragon888/real-router/wiki/RouterOptions) for all available options.
-
----
+const routes: Route[] = [
+  {
+    name: "admin",
+    path: "/admin",
+    canActivate: (router, getDep) => (toState, fromState, signal) => {
+      return getDep("authService").isAdmin();
+    },
+    children: [
+      { name: "dashboard", path: "/dashboard", defaultParams: { tab: "overview" } },
+    ],
+  },
+  {
+    name: "legacy",
+    path: "/old-path",
+    forwardTo: "home", // URL alias — guards on source are NOT executed
+  },
+  {
+    name: "product",
+    path: "/product/:id",
+    encodeParams: ({ id }) => ({ id: String(id) }),
+    decodeParams: ({ id }) => ({ id: Number(id) }),
+  },
+];
+```
 
 ## Error Handling
 
-Navigation errors are instances of `RouterError`. See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for details.
+Navigation errors are instances of `RouterError` with typed error codes:
 
----
+```typescript
+import { RouterError, errorCodes } from "@real-router/core";
 
-## Observable Support
+try {
+  await router.navigate("admin");
+} catch (err) {
+  if (err instanceof RouterError) {
+    // err.code: ROUTE_NOT_FOUND | CANNOT_ACTIVATE | CANNOT_DEACTIVATE
+    //           | TRANSITION_CANCELLED | SAME_STATES | DISPOSED | ...
+  }
+}
+```
 
-> Observable API has been moved to `@real-router/rx` package for zero bundle cost.
-> See [@real-router/rx](../rx/README.md) for reactive stream APIs.
-
----
+See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for the full reference.
 
 ## Documentation
 
-Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki):
+Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [Creating a Router](https://github.com/greydragon888/real-router/wiki/createRouter)
-- [Navigation](https://github.com/greydragon888/real-router/wiki/navigate)
-- [State](https://github.com/greydragon888/real-router/wiki/getState)
-- [Guards](https://github.com/greydragon888/real-router/wiki/getLifecycleApi)
-- [Plugins](https://github.com/greydragon888/real-router/wiki/usePlugin)
-- [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes)
+- [Core Concepts](https://github.com/greydragon888/real-router/wiki/core-concepts) — overview and mental model
+- [Defining Routes](https://github.com/greydragon888/real-router/wiki/Route) — nesting, path syntax, guards
+- [Navigation Lifecycle](https://github.com/greydragon888/real-router/wiki/navigation-lifecycle) — transitions, guards, hooks
+- [RouterOptions](https://github.com/greydragon888/real-router/wiki/RouterOptions) — `defaultRoute`, `trailingSlash`, `allowNotFound`, and more
+- [Plugin Architecture](https://github.com/greydragon888/real-router/wiki/plugin-architecture) — interception, extension, events
 - [Migration from router5](https://github.com/greydragon888/real-router/wiki/migration-guide)
-
----
 
 ## Related Packages
 
-- [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
-- [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) — Browser history
-- [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) — Hash-based routing
-- [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) — Debug logging
-- [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) — Persistent params
-- [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils) — Route tree queries and segment testing utilities
+| Package | Description |
+|---------|-------------|
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration (`RouterProvider`, hooks, `Link`, `RouteView`) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API and URL synchronization |
+| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) | Hash-based routing |
+| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx) | Observable API (`state$`, `events$`, TC39 Observable) |
+| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) | Development logging |
+| [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries and segment testing |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

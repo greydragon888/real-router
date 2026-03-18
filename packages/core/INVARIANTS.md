@@ -176,8 +176,8 @@ These invariants cover the FSM-driven lifecycle of the router. Each state transi
 | 7   | update then get            | After `update(name, { forwardTo: "x" })`, `get(name).forwardTo === "x"`. Updates are reflected immediately in `get()`.             |
 | 8   | clear then has             | After `clear()`, `has(name) === false` for every previously registered route. `clear()` removes all routes.                        |
 | 9   | add with parent            | `add(child, { parent: "users" })` makes the child accessible as `"users.child"`. The dot-notation name is derived from the parent. |
-| 10  | getConfig returns fields   | After `add({ name, path, myField })`, `getConfig(name).myField` returns the custom field. Route config metadata is preserved.      |
-| 11  | getConfig unknown          | `getConfig("nonexistent")` returns `undefined` for routes not in the tree.                                                         |
+| 10  | getRouteConfig returns fields   | After `add({ name, path, myField })`, `getPluginApi(router).getRouteConfig(name).myField` returns the custom field. Route config metadata is preserved. |
+| 11  | getRouteConfig unknown          | `getPluginApi(router).getRouteConfig("nonexistent")` returns `undefined` for routes not in the tree.                                                    |
 | 12  | update canActivate guard   | After `update(name, { canActivate: () => () => false })`, `canNavigateTo(name) === false`. Definition guards block navigation.     |
 | 13  | update canActivate null    | After `update(name, { canActivate: null })`, any previously set definition guard is removed and navigation is allowed again.       |
 | 14  | replace during navigation  | `replace()` called during an active navigation returns silently without modifying routes. It is a silent no-op.                    |
