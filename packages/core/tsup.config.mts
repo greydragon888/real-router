@@ -7,6 +7,7 @@ export default createIsomorphicConfig({
     entry: {
       index: "src/index.ts",
       api: "src/api/index.ts",
+      utils: "src/utils/index.ts",
     },
   },
 });

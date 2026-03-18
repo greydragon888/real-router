@@ -26,6 +26,9 @@ api/ (standalone functions — tree-shakeable)
     ├── getLifecycleApi(router)   — guard management
     ├── getPluginApi(router)      — plugin management
     └── cloneRouter(router, deps) — SSR cloning
+
+utils/ (SSR helpers — separate subpath export)
+    └── serializeState(data)      — XSS-safe JSON for embedding in HTML <script> tags
 ```
 
 **RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITIONING (+ NAVIGATE self-loop) → IDLE | DISPOSED`
@@ -112,7 +115,7 @@ api.addInterceptor("forwardState", (next, routeName, routeParams) => {
 api.addInterceptor("start", (next, path) => next(path ?? browser.getLocation()));
 ```
 
-**`InterceptableMethodMap`** defines interceptable methods: `start`, `buildPath`, `forwardState`.
+**`InterceptableMethodMap`** defines interceptable methods: `start`, `buildPath`, `forwardState`. Consumers: `browser-plugin` (start), `persistent-params-plugin` (buildPath, forwardState), `ssr-data-plugin` (start).
 
 Multiple interceptors per method execute in LIFO (reverse registration) order — the last-registered interceptor wraps the first, forming an onion-layer chain. Each receives `next` (original or previously-wrapped function) plus the method's arguments. Returns unsubscribe function.
 
@@ -332,17 +335,24 @@ All guards use `GuardFn` (`boolean | Promise<boolean>`) — **no State return**.
 
 Both route config (`canActivate`/`canDeactivate`) and `addActivateGuard`/`addDeactivateGuard` accept `GuardFnFactory` which returns `GuardFn`.
 
+**`GuardFnFactory` signature: `(router, getDependency) => GuardFn`** — same as `PluginFactory`.
+
 ```typescript
 import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
 
 // WRONG - GuardFn can only return boolean
-lifecycle.addActivateGuard("admin", () => (toState, fromState) => {
+lifecycle.addActivateGuard("admin", (router, getDep) => (toState, fromState) => {
   return router.makeState("login"); // TypeError! GuardFn returns boolean only
 });
 
-// CORRECT - return boolean
+// CORRECT - return boolean, use getDependency for DI
+lifecycle.addActivateGuard("admin", (router, getDep) => (toState) => {
+  return getDep("isAuthenticated") === true; // false blocks navigation
+});
+
+// CORRECT - ignore factory params if not needed
 lifecycle.addActivateGuard("admin", () => (toState) => {
   return isAuthenticated(); // false blocks navigation
 });

@@ -42,12 +42,15 @@ core/
 │   │   ├── RouterWiringBuilder.ts   — Builder: namespace cross-references
 │   │   └── wireRouter.ts           — Director: correct wiring order
 │   │
-│   └── api/
-│       ├── getRoutesApi.ts          — Route CRUD (add/remove/update/replace/clear)
-│       ├── getDependenciesApi.ts    — Dependency CRUD
-│       ├── getLifecycleApi.ts       — Guard management
-│       ├── getPluginApi.ts          — Plugin management
-│       └── cloneRouter.ts           — SSR cloning
+│   ├── api/
+│   │   ├── getRoutesApi.ts          — Route CRUD (add/remove/update/replace/clear)
+│   │   ├── getDependenciesApi.ts    — Dependency CRUD
+│   │   ├── getLifecycleApi.ts       — Guard management
+│   │   ├── getPluginApi.ts          — Plugin management
+│   │   └── cloneRouter.ts           — SSR cloning
+│   │
+│   └── utils/
+│       └── serializeState.ts        — XSS-safe JSON serialization for SSR
 ```
 
 ## Dependencies
@@ -430,14 +433,14 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 25 stress tests in `tests/stress/` validate behavior under extreme conditions:
 
-| Category | Tests | What they verify |
-|----------|-------|-----------------|
-| Memory & leaks | navigation-memory, plugin-lifecycle-memory, event-listener-memory, dispose-completeness | Heap stable across thousands of navigations; dispose releases all resources |
-| Concurrent navigation | fire-and-forget, abort-signal-stress, combined-stress | Fire-and-forget storm, AbortController churn, mixed concurrent operations |
-| Guards under load | guards-stress, guard-removal-stress, error-path-storm | Guard execution under load, removal mid-execution, 1000+ error cycles |
-| Route CRUD | route-crud-stress, replace-atomicity-stress, route-tree-scaling | Add/remove/replace under load, atomic replace, 1000+ route trees |
-| Lifecycle | stop-start-cycles, fsm-transitions-stress | Rapid start/stop cycles, FSM transition correctness under churn |
-| Edge cases | forward-to-chains, navigate-to-not-found, navigate-to-default, hot-path-utilities | Deep forwarding chains, unknown route handling, utility function stress |
+| Category              | Tests                                                                                   | What they verify                                                            |
+| --------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Memory & leaks        | navigation-memory, plugin-lifecycle-memory, event-listener-memory, dispose-completeness | Heap stable across thousands of navigations; dispose releases all resources |
+| Concurrent navigation | fire-and-forget, abort-signal-stress, combined-stress                                   | Fire-and-forget storm, AbortController churn, mixed concurrent operations   |
+| Guards under load     | guards-stress, guard-removal-stress, error-path-storm                                   | Guard execution under load, removal mid-execution, 1000+ error cycles       |
+| Route CRUD            | route-crud-stress, replace-atomicity-stress, route-tree-scaling                         | Add/remove/replace under load, atomic replace, 1000+ route trees            |
+| Lifecycle             | stop-start-cycles, fsm-transitions-stress                                               | Rapid start/stop cycles, FSM transition correctness under churn             |
+| Edge cases            | forward-to-chains, navigate-to-not-found, navigate-to-default, hot-path-utilities       | Deep forwarding chains, unknown route handling, utility function stress     |
 
 ## See Also
 

@@ -1,6 +1,3 @@
 packages:
-  - 'packages/*'
-
-# TODO: remove after 2026-03-14 (24h quarantine for danger@13.0.7)
-minimumReleaseAgeExclude:
-  - danger@13.0.7
+  - "packages/*"
+  - "examples/*"

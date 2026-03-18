@@ -28,7 +28,7 @@
       }
     }
   },
-  "ignoreWorkspaces": [],
+  "ignoreWorkspaces": ["examples/*"],
   "ignore": [],
   "ignoreDependencies": [
     "@real-router/browser-plugin",

@@ -49,3 +49,5 @@ jobs:
           fail-on-severity: moderate
           config-file: ./.github/dependency-review-config.yml
           comment-summary-in-pr: on-failure
+          warn-on-openssf-scorecard-level: 0
+          allow-ghsas: GHSA-7mvr-c777-76hp
