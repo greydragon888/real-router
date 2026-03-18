@@ -1,0 +1,74 @@
+{
+  "name": "@real-router/preact",
+  "version": "0.0.1",
+  "type": "commonjs",
+  "description": "Preact integration for Real-Router",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "homepage": "https://github.com/greydragon888/real-router",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "bugs": {
+    "url": "https://github.com/greydragon888/real-router/issues"
+  },
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts,.tsx src/ tests/ --fix --max-warnings 0",
+    "lint:package": "publint",
+    "lint:types": "attw --pack ."
+  },
+  "keywords": [
+    "router",
+    "html5",
+    "history",
+    "tree",
+    "preact",
+    "hooks",
+    "components",
+    "functional",
+    "real-router"
+  ],
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^",
+    "@real-router/route-utils": "workspace:^",
+    "@real-router/sources": "workspace:^"
+  },
+  "devDependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@testing-library/dom": "10.4.1",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/preact": "3.2.4",
+    "@testing-library/user-event": "14.6.1",
+    "preact": "10.25.4"
+  },
+  "peerDependencies": {
+    "preact": ">=10.0.0"
+  }
+}
