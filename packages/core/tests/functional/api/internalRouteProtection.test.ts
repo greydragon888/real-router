@@ -1,6 +1,10 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
-import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import { createTestRouter } from "../../helpers";
 
@@ -78,10 +82,12 @@ describe("core/internal-route-protection", () => {
   });
 
   describe("allowed operations on @@ prefix routes", () => {
-    it("should allow read operations (has, get, getConfig)", () => {
+    it("should allow read operations (has, get, getRouteConfig)", () => {
       expect(() => routesApi.has(INTERNAL_NAME)).not.toThrow();
       expect(() => routesApi.get(INTERNAL_NAME)).not.toThrow();
-      expect(() => routesApi.getConfig(INTERNAL_NAME)).not.toThrow();
+      expect(() =>
+        getPluginApi(router).getRouteConfig(INTERNAL_NAME),
+      ).not.toThrow();
     });
 
     it("should allow adding guards for @@ prefix routes", () => {

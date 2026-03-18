@@ -1,20 +1,22 @@
 import { describe, beforeEach, afterEach, it, expect } from "vitest";
 
 import { createRouter } from "@real-router/core";
-import { cloneRouter, getRoutesApi } from "@real-router/core/api";
+import { cloneRouter, getPluginApi, getRoutesApi } from "@real-router/core/api";
 
 import { createTestRouter } from "../../../helpers";
 
 import type { Router } from "@real-router/core";
-import type { RoutesApi } from "@real-router/core/api";
+import type { PluginApi, RoutesApi } from "@real-router/core/api";
 
 let router: Router;
 let routesApi: RoutesApi;
+let pluginApi: PluginApi;
 
 describe("core/routes/routeTree/getRouteConfig", () => {
   beforeEach(async () => {
     router = createTestRouter();
     routesApi = getRoutesApi(router);
+    pluginApi = getPluginApi(router);
     await router.start("/home");
   });
 
@@ -31,20 +33,20 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         abortRequest: [{ url: "api/**" }],
       } as never);
 
-      expect(routesApi.getConfig("gc-home")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-home")).toStrictEqual({
         title: "Home",
         abortRequest: [{ url: "api/**" }],
       });
     });
 
     it("should return undefined for non-existent route", () => {
-      expect(routesApi.getConfig("nonexistent")).toBeUndefined();
+      expect(pluginApi.getRouteConfig("nonexistent")).toBeUndefined();
     });
 
     it("should return undefined for route with only standard fields", () => {
       routesApi.add({ name: "gc-basic", path: "/gc-basic" });
 
-      expect(routesApi.getConfig("gc-basic")).toBeUndefined();
+      expect(pluginApi.getRouteConfig("gc-basic")).toBeUndefined();
     });
   });
 
@@ -58,7 +60,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         ],
       } as never);
 
-      expect(routesApi.getConfig("gc-users.profile")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-users.profile")).toStrictEqual({
         title: "Profile",
       });
     });
@@ -72,7 +74,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         customField: "value",
       } as never);
 
-      expect(routesApi.getConfig("gc-dynamic")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-dynamic")).toStrictEqual({
         customField: "value",
       });
     });
@@ -84,13 +86,13 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Remove Me",
       } as never);
 
-      expect(routesApi.getConfig("gc-remove")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-remove")).toStrictEqual({
         title: "Remove Me",
       });
 
       routesApi.remove("gc-remove");
 
-      expect(routesApi.getConfig("gc-remove")).toBeUndefined();
+      expect(pluginApi.getRouteConfig("gc-remove")).toBeUndefined();
     });
 
     it("should return undefined after clearRoutes()", () => {
@@ -100,13 +102,13 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Clear Me",
       } as never);
 
-      expect(routesApi.getConfig("gc-clear")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-clear")).toStrictEqual({
         title: "Clear Me",
       });
 
       routesApi.clear();
 
-      expect(routesApi.getConfig("gc-clear")).toBeUndefined();
+      expect(pluginApi.getRouteConfig("gc-clear")).toBeUndefined();
     });
 
     it("should preserve custom fields in cloned router", () => {
@@ -117,9 +119,9 @@ describe("core/routes/routeTree/getRouteConfig", () => {
       } as never);
 
       const clone = cloneRouter(router);
-      const cloneRoutesApi = getRoutesApi(clone);
+      const clonePluginApi = getPluginApi(clone);
 
-      expect(cloneRoutesApi.getConfig("gc-clonable")).toStrictEqual({
+      expect(clonePluginApi.getRouteConfig("gc-clonable")).toStrictEqual({
         title: "Clonable",
       });
     });
@@ -133,7 +135,7 @@ describe("core/routes/routeTree/getRouteConfig", () => {
 
       routesApi.update("gc-update", { defaultParams: { lang: "en" } });
 
-      expect(routesApi.getConfig("gc-update")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-update")).toStrictEqual({
         title: "Update Me",
       });
     });
@@ -146,11 +148,11 @@ describe("core/routes/routeTree/getRouteConfig", () => {
       const middlewareRouter = createRouter([
         { name: "gc-mw-home", path: "/", title: "Home" } as never,
       ]);
-      const middlewareRoutesApi = getRoutesApi(middlewareRouter);
+      const middlewarePluginApi = getPluginApi(middlewareRouter);
 
       middlewareRouter.usePlugin(() => ({
         onTransitionSuccess: (toState) => {
-          capturedConfig.push(middlewareRoutesApi.getConfig(toState.name));
+          capturedConfig.push(middlewarePluginApi.getRouteConfig(toState.name));
         },
       }));
 
@@ -170,16 +172,17 @@ describe("core/routes/routeTree/getRouteConfig", () => {
         title: "Dispose Me",
       } as never);
 
-      expect(routesApi.getConfig("gc-dispose")).toStrictEqual({
+      expect(pluginApi.getRouteConfig("gc-dispose")).toStrictEqual({
         title: "Dispose Me",
       });
 
       router.dispose();
 
-      expect(routesApi.getConfig("gc-dispose")).toBeUndefined();
+      expect(pluginApi.getRouteConfig("gc-dispose")).toBeUndefined();
 
       router = createTestRouter();
       routesApi = getRoutesApi(router);
+      pluginApi = getPluginApi(router);
       router.stop();
     });
   });
@@ -194,9 +197,9 @@ describe("core/routes/routeTree/getRouteConfig", () => {
           abortRequest: [{ url: "api/**" }],
         } as never,
       ]);
-      const freshRoutesApi = getRoutesApi(freshRouter);
+      const freshPluginApi = getPluginApi(freshRouter);
 
-      expect(freshRoutesApi.getConfig("gc-init-home")).toStrictEqual({
+      expect(freshPluginApi.getRouteConfig("gc-init-home")).toStrictEqual({
         title: "Home",
         abortRequest: [{ url: "api/**" }],
       });

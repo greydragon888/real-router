@@ -2,104 +2,149 @@
 
 <div align="center">
 
-  <!-- Community -->
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+[![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square&logo=npm)](https://www.npmjs.com/package/@real-router/core)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](http://makeapullrequest.com)
 [![Engineered with Claude Code](https://img.shields.io/badge/Engineered%20with-Claude%20Code-5865F2?style=flat-square&logo=anthropic&logoColor=white)](https://claude.com/claude-code)
 
-  <!-- Code Quality Tools -->
-
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Built with tsup](https://img.shields.io/badge/built%20with-tsup-blue?style=flat-square)](https://tsup.egoist.dev)
-[![ESLint](https://img.shields.io/badge/eslint-9.39-4B32C3?style=flat-square&logo=eslint)](https://eslint.org/)
-[![Turborepo](https://img.shields.io/badge/built%20with-Turborepo-EF4444?style=flat-square&logo=turborepo&logoColor=white)](https://turbo.build/repo)
-
-  <!-- Quality & Testing -->
-
-[![Enterprise Grade Testing](https://img.shields.io/badge/testing-enterprise%20grade-brightgreen?style=flat-square)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master)
-[![Coverage Status](https://codecov.io/gh/greydragon888/real-router/branch/master/graph/badge.svg)](https://codecov.io/gh/greydragon888/real-router)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
-[![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
-[![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)
-
 </div>
 
-> A simple, powerful, view-agnostic, modular and extensible router for JavaScript applications.
+<p align="center">
+  <b>Data-first router for JavaScript — URLs map to state, not components.</b>
+</p>
 
-> **Warning**
-> This project is pre-1.0. The core API and plugin interfaces are considered stable and are unlikely to change.
-> Minor versions may include new features but aim to preserve backward compatibility.
-> A 1.0 release will follow once the full API surface has been validated in production use.
+<p align="center">
+  <a href="https://github.com/greydragon888/real-router/wiki">Wiki</a> ·
+  <a href="https://github.com/greydragon888/real-router/wiki/recipes">Recipes</a> ·
+  <a href="https://github.com/greydragon888/real-router/issues/296">Roadmap</a> ·
+  <a href="https://github.com/greydragon888/real-router/releases">Changelog</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="https://github.com/greydragon888/real-router/issues">Issues</a>
+</p>
 
-Real-Router is an **independent routing solution** inspired by the declarative routing philosophy of [router5](https://github.com/router5/router5), built from scratch with modern JavaScript, TypeScript-first design, and performance optimizations.
+---
+
+Every router you know maps URLs to **components**. Real-Router maps URLs to **data**.
+
+```
+React Router:     URL  →  <Component />     (router decides what to render)
+Vue Router:       URL  →  component: View   (router decides what to render)
+Real-Router:      URL  →  { name, params }  (you decide what to do)
+```
+
+This is not a minor API difference — it's a fundamentally different architecture.\
+The router becomes a **data provider**: it tells you *where* the user is, and you decide what to do with that information — render a page, load data, set a title, track analytics, or ignore it entirely.
+
+> Built from scratch with TypeScript-first design. Independent project inspired by [router5](https://github.com/router5/router5)'s declarative philosophy, not a fork.
+
+> **Pre-1.0**: Core API and plugin interfaces are stable. Minor versions preserve backward compatibility. See [Roadmap](https://github.com/greydragon888/real-router/issues/296) for the path to 1.0 and [Quality & Testing](#quality--testing) for reliability guarantees.
 
 ## Why Real-Router?
 
-### Performance-First Design
+### One-Way Data Flow
 
-Real-Router uses a custom **Segment Trie** matcher — a trie where each edge is an entire URL segment, natively reflecting the hierarchy of named routes.
+Routing state arrives as external data — components don't manage it. No `useParams()` + `useEffect()` + `fetch()` chains. 
+The router tells you *where* the user is; plugins handle data loading, titles, analytics outside the component tree. Components just render.
+
+### Config = Full Specification
+
+Route config is the **single source of truth** for the entire application — not just routing. 
+Guards control access, custom fields drive data loading, titles, and any other concern through generic plugins:
+
+```typescript
+const routes = [
+  { 
+    name: "users", 
+    path: "/users",
+    canActivate: authGuard,                          // access control (guard)
+    title: "Users",                                  // custom field → title plugin
+    loadData: (p, api) => api.getUsers(p),           // custom field → data plugin
+    children: [
+      { 
+        name: "profile", 
+        path: "/:id" 
+      }
+    ],
+  },
+];
+
+// Generic plugin — reads custom fields, no hardcoded route names
+const dataPlugin: PluginFactory = (router, getDep) => {
+  const { getRouteConfig } = getPluginApi(router);
+  return {
+    onTransitionSuccess: (toState) => {
+      const route = getRouteConfig(toState.name);
+      
+      route?.loadData?.(toState.params, getDep("api"));
+    },
+  };
+};
+```
+
+Adding a new page = one config entry. No plugin code changes. See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for full examples.
+
+### Runtime Route Management
+
+Full CRUD for routes at runtime — add, remove, update, replace, clear.\
+No other router offers `update()` for modifying guards, redirects, or defaults of individual routes without remove+add.\
+`replace()` is atomic with state revalidation — designed for HMR and dynamic feature flags.
+
+### Minimal Runtime Footprint
+
+Platform-agnostic core — no DOM, no React, no History API in the routing layer. 
+All platform concerns live in plugins. 
+Result: **minimal allocations per navigation**, optimized independently from the external API. 
+See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plugin patterns: data lifecycle, analytics, scroll restoration.
+
+### Performance
+
+Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static routes.
+
+<details>
+<summary><b>Benchmarks vs router5 and router6</b></summary>
 
 **vs [router5](https://github.com/router5/router5):**
 
 | Metric             | Improvement                              |
 | ------------------ | ---------------------------------------- |
-| Navigation         | 2–3x faster                              |
-| URL building       | 7–16x faster                             |
-| URL matching       | 3–5x faster                              |
-| Memory allocations | 3–5x fewer                               |
+| Navigation         | 2-3x faster                              |
+| URL building       | 7-16x faster                             |
+| URL matching       | 3-5x faster                              |
+| Memory allocations | 3-5x fewer                               |
 | Scaling            | O(1) vs O(n) — up to 12x at 1000+ routes |
 
 **vs [router6](https://github.com/nicolo-ribaudo/router6):**
 
 | Metric             | Improvement                        |
-| ------------------ |------------------------------------|
+| ------------------ | ---------------------------------- |
 | Navigation         | ~2x faster                         |
-| URL building       | 3–7x faster                        |
+| URL building       | 3-7x faster                        |
 | URL matching       | ~2x faster                         |
-| Memory allocations | 5–6x fewer                         |
+| Memory allocations | 5-6x fewer                         |
 | Scaling            | Both O(1) — up to 5x on deep trees |
 
-### Reliability
+</details>
 
-Verified by 99 stress tests covering 100% of the public API:
+### Key Features
 
-- **Zero memory leaks**: Heap stable across thousands of navigations, route mutations, and plugin cycles (50+ heap snapshots)
-- **Clean disposal**: `dispose()` fully releases all resources; GC collects >50% of disposed routers immediately
-- **Concurrent-safe**: Fire-and-forget navigations, guard removal during execution, and route CRUD under load — no race conditions
-- **Robust error handling**: All error paths validated under storm conditions (1,000+ error cycles)
+- **Framework-agnostic** — React, Vue, Angular, or vanilla JS
+- **Universal** — client-side and server-side rendering
+- **Named nested routes** — dot-notation hierarchy (`users.profile`)
+- **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
+- **AbortController** — cancel navigations via standard `AbortSignal`
+- **Dynamic route management** — add, remove, update, replace routes at runtime
+- **Dependency injection** — type-safe DI container for guards and plugins
+- **Plugin architecture** — intercept and extend router behavior
+- **Observable state** — RxJS and TC39 Observable compatible
+- **Immutable state** — deeply frozen, predictable state management
 
-### Modern Architecture
-
-- **TypeScript-first**: Complete type safety with full generics support
-- **Immutable state**: Predictable state management
-- **Mandatory validation**: Descriptive error messages during development
-- **Modern builds**: ESM and CommonJS with tree-shaking support
-
-## Key Features
-
-- **Framework-agnostic**: Works with React, Vue, Angular, or vanilla JS
-- **Universal**: Client-side and server-side rendering
-- **Nested routes**: Full support for hierarchical route structures
-- **Lifecycle guards**: `addActivateGuard` / `addDeactivateGuard` for navigation control
-- **AbortController support**: Cancel navigations via standard `AbortSignal` API
-- **HMR support**: Atomic route replacement via `replace()` with state preservation
-- **Observable state**: Compatible with RxJS and other observable libraries
-- **Plugin architecture**: Modular functionality
-
-## Installation
+## Quick Start
 
 ```bash
 npm install @real-router/core
-# or
-pnpm add @real-router/core
-# or
-yarn add @real-router/core
-# or
-bun add @real-router/core
 ```
-
-## Quick Start
 
 ```typescript
 import { createRouter } from "@real-router/core";
@@ -115,152 +160,148 @@ const routes = [
 ];
 
 const router = createRouter(routes);
-
 router.usePlugin(browserPluginFactory());
 
 await router.start();
-
-// Navigate programmatically
 await router.navigate("users.profile", { id: "123" });
 ```
 
 ### With React
 
 ```tsx
-import { RouterProvider, useRouteNode, Link } from "@real-router/react";
+import { RouterProvider, RouteView, Link } from "@real-router/react";
 
 function App() {
-  const { route } = useRouteNode(""); // root — re-renders on any route change
-
   return (
-    <div>
+    <RouterProvider router={router}>
       <nav>
         <Link routeName="home">Home</Link>
         <Link routeName="users">Users</Link>
       </nav>
-      <p>Current route: {route?.name}</p>
-    </div>
+      <RouteView nodeName="">
+        <RouteView.Match routeName="home">
+          <HomePage />
+        </RouteView.Match>
+        <RouteView.Match routeName="users">
+          <UsersPage />
+        </RouteView.Match>
+        <RouteView.NotFound>
+          <NotFoundPage />
+        </RouteView.NotFound>
+      </RouteView>
+    </RouterProvider>
   );
 }
-
-createRoot(document.getElementById("root")).render(
-  <RouterProvider router={router}>
-    <App />
-  </RouterProvider>,
-);
 ```
 
-### With Observables
-
-```typescript
-import { from } from "rxjs";
-import { observable } from "@real-router/rx";
-
-from(observable(router)).subscribe(({ route, previousRoute }) => {
-  console.log("Navigation:", previousRoute?.name, "→", route.name);
-});
-```
+`RouteView` with `keepAlive` requires React 19.2+ (React Activity API). For React 18+, use `@real-router/react/legacy` — all hooks and `Link`, no `RouteView`.
 
 ## Packages
 
-This is a **monorepo** containing multiple packages. Install only what you need:
-
 ### Core
 
-| Package                            | Description                |
-| ---------------------------------- | -------------------------- |
-| [@real-router/core](packages/core) | Core router implementation |
+| Package                                     | Version                                                                                                                           | Description                                                                                                        |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| [`@real-router/core`](packages/core)        | [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)   | Router implementation                                                                                              |
+| `@real-router/core/api`                     |                                                                                                                                   | Tree-shakeable modular API: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter` |
+| [`@real-router/types`](packages/core-types) | [![npm](https://img.shields.io/npm/v/@real-router/types.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/types) | Shared TypeScript type definitions                                                                                 |
 
 ### Framework Integration
 
-| Package                              | Description                                                                      |
-| ------------------------------------ | -------------------------------------------------------------------------------- |
-| [@real-router/react](packages/react) | React 19.2+ integration (Provider, hooks, components). React 18+ via `./legacy`. |
+| Package                                | Version                                                                                                                           | Description                                                                          |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| [`@real-router/react`](packages/react) | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react) | React 19.2+ (`RouterProvider`, hooks, `Link`, `RouteView`). React 18+ via `./legacy` |
 
 ### Plugins
 
-| Package                                                                    | Description                                  |
-| -------------------------------------------------------------------------- | -------------------------------------------- |
-| [@real-router/browser-plugin](packages/browser-plugin)                     | Browser History API and URL synchronization  |
-| [@real-router/hash-plugin](packages/hash-plugin)                           | Hash-based routing (`#/path`)                |
-| [@real-router/logger-plugin](packages/logger-plugin)                       | Development logging with transition tracking |
-| [@real-router/persistent-params-plugin](packages/persistent-params-plugin) | Parameter persistence across navigations     |
-
-### Subscription Layer
-
-| Package                                  | Description                                   |
-| ---------------------------------------- | --------------------------------------------- |
-| [@real-router/sources](packages/sources) | Reactive subscription sources for UI bindings |
+| Package                                                                      | Version                                                                                                                                                                 | Description                                  |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| [`@real-router/browser-plugin`](packages/browser-plugin)                     | [![npm](https://img.shields.io/npm/v/@real-router/browser-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization  |
+| [`@real-router/hash-plugin`](packages/hash-plugin)                           | [![npm](https://img.shields.io/npm/v/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing (`#/path`)                |
+| [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking |
+| [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations     |
 
 ### Utilities
 
-| Package                                          | Description                                          |
-| ------------------------------------------------ | ---------------------------------------------------- |
-| [@real-router/fsm](packages/fsm)                 | Finite state machine engine                          |
-| [@real-router/logger](packages/logger)           | Structured logging utility                           |
-| [@real-router/rx](packages/rx)                   | Reactive Observable API (state$, events$, operators) |
-| [@real-router/route-utils](packages/route-utils) | Route tree queries and segment testing utilities     |
+| Package                                            | Version                                                                                                                                       | Description                                                                  |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`@real-router/sources`](packages/sources)         | [![npm](https://img.shields.io/npm/v/@real-router/sources.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/sources)         | Reactive subscription sources for UI bindings (`useSyncExternalStore`-ready) |
+| [`@real-router/rx`](packages/rx)                   | [![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)                   | Observable API: `state$`, `events$`, operators, TC39 Observable              |
+| [`@real-router/route-utils`](packages/route-utils) | [![npm](https://img.shields.io/npm/v/@real-router/route-utils.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries: `getRouteUtils`, segment testers, `areRoutesRelated`     |
+| [`@real-router/logger`](packages/logger)           | [![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)           | Structured logging utility                                                   |
 
 ## Documentation
 
-Full documentation is available in the repository wiki.
+Full documentation is available in the [Wiki](https://github.com/greydragon888/real-router/wiki).
 
 ### Getting Started
 
-- **Introduction** — Overview and core concepts
-- **Defining Routes** — Route configuration and nesting
-- **Path Syntax** — URL patterns and parameters
-
-### Core Concepts
-
-- **Navigation** — Programmatic navigation API
-- **State** — Router state management
-- **Plugins** — Extending router functionality
+- [Core Concepts](https://github.com/greydragon888/real-router/wiki/core-concepts) — overview and mental model
+- [Defining Routes](https://github.com/greydragon888/real-router/wiki/Route) — route configuration, nesting, path syntax
+- [Navigation Lifecycle](https://github.com/greydragon888/real-router/wiki/navigation-lifecycle) — transitions, guards, hooks
 
 ### API Reference
 
-- **createRouter** — Router factory function
-- **Router Methods** — Complete API reference
-- **React Hooks** — useRouter, useRoute, useRouteNode
+- [createRouter](https://github.com/greydragon888/real-router/wiki/createRouter) · [navigate](https://github.com/greydragon888/real-router/wiki/navigate) · [start](https://github.com/greydragon888/real-router/wiki/start) · [stop](https://github.com/greydragon888/real-router/wiki/stop) · [buildPath](https://github.com/greydragon888/real-router/wiki/buildPath) · [isActiveRoute](https://github.com/greydragon888/real-router/wiki/isActiveRoute)
+- [Guards](https://github.com/greydragon888/real-router/wiki/guards) · [State](https://github.com/greydragon888/real-router/wiki/State) · [NavigationOptions](https://github.com/greydragon888/real-router/wiki/NavigationOptions) · [RouterOptions](https://github.com/greydragon888/real-router/wiki/RouterOptions) · [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError)
+- [Plugin Architecture](https://github.com/greydragon888/real-router/wiki/plugin-architecture) · [getRoutesApi](https://github.com/greydragon888/real-router/wiki/addRoute) · [getDependenciesApi](https://github.com/greydragon888/real-router/wiki/getDependency) · [getLifecycleApi](https://github.com/greydragon888/real-router/wiki/addActivateGuard) · [cloneRouter](https://github.com/greydragon888/real-router/wiki/clone)
+
+### React
+
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator)
+
+### Plugins
+
+- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ## Relationship to Router5
 
-Real-Router is an **independent project** inspired by router5's declarative routing philosophy. While it shares similar concepts (named routes, hierarchical routing, lifecycle guards), Real-Router is:
+Real-Router is an **independent project** — not a fork. Built from scratch with different algorithms (Segment Trie vs linear scan), modern TypeScript API, and independent roadmap. Inspired by router5's declarative routing philosophy (named routes, hierarchical routing, lifecycle guards).
 
-- **Not a fork**: Built from scratch with different implementation
-- **Different API**: Modern TypeScript-first API design
-- **Performance-focused**: Optimized algorithms and data structures
-- **Independent development**: Separate roadmap and features
+## Quality & Testing
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
+[![Mutation testing badge](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master)
+[![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
+[![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)
+
+Real-Router treats testing as a first-class engineering concern, not an afterthought.
+
+- **100% code coverage** — enforced in CI across all packages, no exceptions
+- **Static analysis** — SonarCloud quality gate on every PR: zero bugs, zero vulnerabilities, zero code smells
+- **Property-based testing** — [fast-check](https://fast-check.dev/) generates thousands of random inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations)
+- **Stress testing** — 99 dedicated stress tests: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, 50+ heap snapshots confirming zero memory leaks
+- **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
 
 ## Development
 
-This is a pnpm monorepo using Turbo for task orchestration.
+This is a pnpm monorepo with [Turborepo](https://turbo.build/repo) for task orchestration.
 
 ```bash
-# Install dependencies
-pnpm install
-
-# Build all packages
-pnpm build
-
-# Run tests
-pnpm test
-
-# Type checking
-pnpm type-check
-
-# Linting
-pnpm lint
+pnpm install          # Install all dependencies
+pnpm build            # Build all packages
+pnpm test -- --run    # Run tests once
+pnpm type-check       # TypeScript type checking
+pnpm lint             # ESLint
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, coding standards, and PR guidelines.
 
 ## Contributing
 
-Contributions are welcome! Please read the contributing guidelines before submitting a pull request.
+Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTING.md) before submitting a pull request.
+
+- [Good first issues](https://github.com/greydragon888/real-router/labels/good%20first%20issue) — great starting points for new contributors
+- [Help wanted](https://github.com/greydragon888/real-router/labels/help%20wanted) — issues where community input is needed
+
+## Changelog
+
+The [changelog](https://github.com/greydragon888/real-router/releases) is regularly updated to reflect what's changed in each new release.
+
+## Security
+
+For details on supported versions and reporting security vulnerabilities, please refer to the [security policy](SECURITY.md).
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
-
----
-
-**Inspired by the routing philosophy of [router5](https://github.com/router5/router5)**
+[MIT](LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

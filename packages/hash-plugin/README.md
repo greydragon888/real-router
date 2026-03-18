@@ -1,21 +1,23 @@
 # @real-router/hash-plugin
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/hash-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/hash-plugin&treeshake=[*])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Hash-based routing plugin for Real-Router. Uses URL hash fragment for navigation — no server configuration needed.
+> Hash-based routing plugin for [Real-Router](https://github.com/greydragon888/real-router). Uses URL hash fragment (`#/path`) for navigation — no server configuration needed.
+
+Works on static hosting (GitHub Pages, S3, Netlify) without redirect rules. Tradeoff: URLs include `#` (`example.com/#!/users` vs `example.com/users`).
+
+> **Looking for clean URLs?** Use [`@real-router/browser-plugin`](https://www.npmjs.com/package/@real-router/browser-plugin) (History API).
 
 ## Installation
 
 ```bash
 npm install @real-router/hash-plugin
-# or
-pnpm add @real-router/hash-plugin
-# or
-yarn add @real-router/hash-plugin
-# or
-bun add @real-router/hash-plugin
 ```
+
+**Peer dependency:** `@real-router/core`
 
 ## Quick Start
 
@@ -25,186 +27,100 @@ import { hashPluginFactory } from "@real-router/hash-plugin";
 
 const router = createRouter([
   { name: "home", path: "/" },
-  { name: "products", path: "/products/:id" },
-  { name: "cart", path: "/cart" },
+  { name: "users", path: "/users/:id" },
 ]);
 
-// Basic usage
 router.usePlugin(hashPluginFactory());
-
-// With options
-router.usePlugin(
-  hashPluginFactory({
-    hashPrefix: "!",
-  }),
-);
-
-await router.start();
+await router.start(); // reads hash from browser location
 ```
 
----
+## Options
 
-## Configuration
-
-```typescript
-router.usePlugin(
-  hashPluginFactory({
-    hashPrefix: "!",
-    forceDeactivate: true,
-  }),
-);
-
-router.navigate("products", { id: "123" });
-// URL: http://example.com/#!/products/123
-```
-
-| Option            | Type      | Default | Description                                           |
-| ----------------- | --------- | ------- | ----------------------------------------------------- |
-| `hashPrefix`      | `string`  | `""`    | Prefix after `#` (e.g., `"!"` → `#!/path`)            |
-| `base`            | `string`  | `""`    | Base path before hash (e.g., `"/app"` → `/app#/path`) |
-| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on browser back/forward |
-
-> **Looking for History API routing?** Use [`@real-router/browser-plugin`](https://www.npmjs.com/package/@real-router/browser-plugin) instead.
-
-See [Wiki](https://github.com/greydragon888/real-router/wiki/hash-plugin) for detailed option descriptions and examples.
-
----
-
-## Added Router Methods
-
-The plugin extends the router instance with browser-specific methods (via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/extendRouter)):
-
-#### `router.buildUrl(name: string, params?: Params): string`
-
-Build full URL with hash prefix.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-Returns: `string` — full URL\
-[Wiki](https://github.com/greydragon888/real-router/wiki/hash-plugin#5-router-interaction)
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `hashPrefix` | `string` | `""` | Prefix after `#` (e.g., `"!"` → `#!/path`) |
+| `base` | `string` | `""` | Base path before hash (e.g., `"/app"` → `/app#/path`) |
+| `forceDeactivate` | `boolean` | `true` | Bypass `canDeactivate` guards on back/forward |
 
 ```typescript
-router.buildUrl("users", { id: "123" });
-// => "#!/users/123" (with hashPrefix "!")
-```
-
-#### `router.matchUrl(url: string): State | undefined`
-
-Parse URL to router state.\
-`url: string` — URL to parse\
-Returns: `State | undefined`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/hash-plugin#5-router-interaction)
-
-```typescript
-const state = router.matchUrl("https://example.com/#!/users/123");
-// => { name: "users", params: { id: "123" }, ... }
-```
-
-#### `router.replaceHistoryState(name: string, params?: Params, title?: string): void`
-
-Update browser URL without triggering navigation.\
-`name: string` — route name\
-`params?: Params` — route parameters\
-`title?: string` — page title\
-Returns: `void`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/hash-plugin#5-router-interaction)
-
-```typescript
-router.replaceHistoryState("users", { id: "456" });
-```
-
----
-
-## Usage Examples
-
-### Hashbang Routing
-
-```typescript
-router.usePlugin(
-  hashPluginFactory({
-    hashPrefix: "!",
-  }),
-);
-
-router.navigate("users", { id: "123" });
-// URL: #!/users/123
-```
-
-### With Base Path
-
-```typescript
-router.usePlugin(
-  hashPluginFactory({
-    hashPrefix: "!",
-    base: "/app",
-  }),
-);
+router.usePlugin(hashPluginFactory({ hashPrefix: "!", base: "/app" }));
 
 router.navigate("users", { id: "123" });
 // URL: /app#!/users/123
 ```
 
-### Form Protection
+## Router Extensions
+
+The plugin extends the router instance with three methods via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `buildUrl(name, params?)` | `string` | Build full URL with hash and prefix |
+| `matchUrl(url)` | `State \| undefined` | Parse hash URL to router state |
+| `replaceHistoryState(name, params?, title?)` | `void` | Update browser URL without navigation |
 
 ```typescript
-router.usePlugin(
-  hashPluginFactory({
-    forceDeactivate: false,
-  }),
-);
+router.buildUrl("users", { id: "123" });
+// => "#!/users/123" (with hashPrefix "!")
+
+router.matchUrl("https://example.com/#!/users/123");
+// => { name: "users", params: { id: "123" }, path: "/users/123" }
+
+// Update URL silently (no transition, no guards)
+router.replaceHistoryState("users", { id: "456" });
+```
+
+### `buildUrl` vs `buildPath`
+
+```typescript
+router.buildPath("users", { id: 1 }); // "/users/1"       — core, no hash
+router.buildUrl("users", { id: 1 });  // "#!/users/1"     — plugin, with hash prefix
+```
+
+## Form Protection
+
+Set `forceDeactivate: false` to respect `canDeactivate` guards on back/forward:
+
+```typescript
+router.usePlugin(hashPluginFactory({ forceDeactivate: false }));
 
 import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
 lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
-  return !hasUnsavedChanges(); // false blocks navigation
+  return !hasUnsavedChanges(); // false blocks back/forward
 });
 ```
 
----
-
 ## SSR Support
 
-The plugin is SSR-safe with automatic fallback:
+SSR-safe — automatically detects the environment and falls back to no-ops:
 
 ```typescript
-// Server-side — no errors, methods return safe defaults
 router.usePlugin(hashPluginFactory());
-router.buildUrl("home"); // Works
-router.matchUrl("/path"); // Returns undefined
+router.buildUrl("home");     // returns hash path
+router.matchUrl("/path");    // returns undefined
 ```
-
----
-
-## Why Hash Routing?
-
-Hash-based routing stores the entire route in the URL hash fragment (`#/path`). This means:
-
-- **No server configuration** — the server always serves the same `index.html` regardless of the URL
-- **Works on static hosting** — GitHub Pages, S3, Netlify (without redirect rules)
-- **Legacy browser support** — works everywhere that supports `hashchange` events
-
-The tradeoff is less clean URLs (`example.com/#!/users` vs `example.com/users`).
-
----
 
 ## Documentation
 
-Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki/hash-plugin):
+Full documentation: [Wiki — hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin)
 
 - [Configuration Options](https://github.com/greydragon888/real-router/wiki/hash-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/hash-plugin#4-lifecycle-hooks)
-- [Router Methods](https://github.com/greydragon888/real-router/wiki/hash-plugin#5-router-interaction)
 - [Behavior & Edge Cases](https://github.com/greydragon888/real-router/wiki/hash-plugin#8-behavior)
-
----
 
 ## Related Packages
 
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
-- [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) — History API routing
-- [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
-- [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) — Debug logging
+| Package | Description |
+|---------|-------------|
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | History API routing (clean URLs) |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

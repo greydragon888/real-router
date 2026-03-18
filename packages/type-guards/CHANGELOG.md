@@ -1,5 +1,11 @@
 # type-guards
 
+## 0.3.6
+
+### Patch Changes
+
+- Rewrite README and create ARCHITECTURE.md — guards vs validators, strictness levels, consumer mapping (#320)
+
 ## 0.3.5
 
 ### Patch Changes

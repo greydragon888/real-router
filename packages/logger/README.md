@@ -1,20 +1,18 @@
 # @real-router/logger
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/logger.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/logger&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/logger&treeshake=[*])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Isomorphic logger for Real-Router with level filtering and custom callbacks. Works in browsers, Node.js, and any JavaScript runtime.
+> Isomorphic structured logger for the [Real-Router](https://github.com/greydragon888/real-router) ecosystem. Level filtering, custom callbacks, works in any JavaScript runtime.
+
+Zero dependencies. Used internally by `@real-router/core` and plugins.
 
 ## Installation
 
 ```bash
 npm install @real-router/logger
-# or
-pnpm add @real-router/logger
-# or
-yarn add @real-router/logger
-# or
-bun add @real-router/logger
 ```
 
 ## Quick Start
@@ -22,57 +20,33 @@ bun add @real-router/logger
 ```typescript
 import { logger } from "@real-router/logger";
 
-// Basic logging
 logger.log("App", "Application started");
 logger.warn("Auth", "Token expires in 5 minutes");
 logger.error("API", "Request failed", error);
 
-// Configure log level
 logger.configure({ level: "error-only" });
 ```
 
----
-
 ## API
 
-### `logger.log(context: string, message: string, ...args: unknown[]): void`
+| Method | Description |
+|--------|-------------|
+| `logger.log(context, message, ...args)` | Informational message |
+| `logger.warn(context, message, ...args)` | Warning message |
+| `logger.error(context, message, ...args)` | Error message |
+| `logger.configure(config)` | Update logger configuration |
+| `logger.getConfig()` | Return current configuration |
 
-Logs an informational message.\
-`context: string` — source identifier (e.g., "Router", "Auth")\
-`message: string` — log message\
-`...args: unknown[]` — additional data to log
+## Log Levels
 
-```typescript
-logger.log("Router", "Navigation started");
-logger.log("API", "Response received", { status: 200, data });
-```
+| Level | log | warn | error |
+|-------|:---:|:----:|:-----:|
+| `"all"` | Yes | Yes | Yes |
+| `"warn-error"` | — | Yes | Yes |
+| `"error-only"` | — | — | Yes |
+| `"none"` | — | — | — |
 
-### `logger.warn(context: string, message: string, ...args: unknown[]): void`
-
-Logs a warning message.\
-`context: string` — source identifier\
-`message: string` — warning message\
-`...args: unknown[]` — additional data to log
-
-```typescript
-logger.warn("Router", "Deprecated route used", { route: "old-users" });
-```
-
-### `logger.error(context: string, message: string, ...args: unknown[]): void`
-
-Logs an error message.\
-`context: string` — source identifier\
-`message: string` — error message\
-`...args: unknown[]` — additional data to log
-
-```typescript
-logger.error("Router", "Navigation failed", error);
-```
-
-### `logger.configure(config: Partial<LoggerConfig>): void`
-
-Updates logger configuration.\
-`config: Partial<LoggerConfig>` — configuration options
+## Configuration
 
 ```typescript
 logger.configure({
@@ -80,66 +54,22 @@ logger.configure({
   callback: (level, context, message, ...args) => {
     Sentry.captureMessage(`[${context}] ${message}`);
   },
+  callbackIgnoresLevel: false, // default: false
 });
 ```
 
-### `logger.getConfig(): LoggerConfig`
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `level` | `LogLevelConfig` | `"all"` | Which messages to show in console |
+| `callback` | `LogCallback` | — | Custom handler for log messages |
+| `callbackIgnoresLevel` | `boolean` | `false` | When `true`, callback receives all messages regardless of level |
 
-Returns current logger configuration.
+### `callbackIgnoresLevel`
 
-```typescript
-const config = logger.getConfig();
-console.log(config.level); // "all"
-```
-
----
-
-## Types
+Decouples console output from callback — useful for error tracking, metrics, or external logging:
 
 ```typescript
-import type {
-  LogLevel,
-  LogLevelConfig,
-  LogCallback,
-  LoggerConfig,
-} from "@real-router/logger";
-
-type LogLevel = "log" | "warn" | "error";
-type LogLevelConfig = "all" | "warn-error" | "error-only" | "none";
-
-type LogCallback = (
-  level: LogLevel,
-  context: string,
-  message: string,
-  ...args: unknown[]
-) => void;
-
-interface LoggerConfig {
-  level: LogLevelConfig;
-  callback?: LogCallback;
-  callbackIgnoresLevel?: boolean;
-}
-```
-
----
-
-## Log Levels
-
-| Level          | Description                          |
-| -------------- | ------------------------------------ |
-| `"all"`        | Show all messages (log, warn, error) |
-| `"warn-error"` | Show warnings and errors only        |
-| `"error-only"` | Show errors only                     |
-| `"none"`       | Disable console output               |
-
-```typescript
-// Development: show everything
-logger.configure({ level: "all" });
-
-// Production: errors only
-logger.configure({ level: "error-only" });
-
-// Silent mode with callback
+// Console: silent. Callback: everything.
 logger.configure({
   level: "none",
   callbackIgnoresLevel: true,
@@ -149,16 +79,11 @@ logger.configure({
 });
 ```
 
----
+## Use Cases
 
-## Usage Examples
-
-### Error Tracking Integration
+### Error Tracking (Sentry)
 
 ```typescript
-import { logger } from "@real-router/logger";
-import * as Sentry from "@sentry/browser";
-
 logger.configure({
   level: "warn-error",
   callback: (level, context, message, ...args) => {
@@ -184,69 +109,28 @@ logger.configure({
 });
 ```
 
-### Debug Library Integration
+## Types
 
 ```typescript
-import debug from "debug";
-
-logger.configure({
-  level: "none",
-  callbackIgnoresLevel: true,
-  callback: (level, context, message, ...args) => {
-    debug(`app:${context}:${level}`)(message, ...args);
-  },
-});
+import type {
+  LogLevel,          // "log" | "warn" | "error"
+  LogLevelConfig,    // "all" | "warn-error" | "error-only" | "none"
+  LogCallback,       // (level, context, message, ...args) => void
+  LoggerConfig,      // { level, callback?, callbackIgnoresLevel? }
+} from "@real-router/logger";
 ```
-
-### Metrics Collection
-
-```typescript
-const metrics = { log: 0, warn: 0, error: 0 };
-
-logger.configure({
-  level: "error-only", // Console shows errors only
-  callbackIgnoresLevel: true, // Callback gets everything
-  callback: (level) => {
-    metrics[level]++;
-  },
-});
-```
-
----
-
-## Callback Behavior
-
-The `callbackIgnoresLevel` option controls callback invocation:
-
-| Setting           | Behavior                                           |
-| ----------------- | -------------------------------------------------- |
-| `false` (default) | Callback respects level filter                     |
-| `true`            | Callback receives all messages regardless of level |
-
-This enables scenarios like:
-
-- Disabling console but keeping error tracking
-- Collecting metrics for all logs while showing only errors
-- Using alternative logging libraries
-
----
-
-## Context Convention
-
-Recommended context naming:
-
-- `"Router"` — General router messages
-- `"Router.Module"` — Module-specific (e.g., `"Router.Navigation"`)
-- `"router.method"` — Method-specific (e.g., `"router.usePlugin"`)
-- `"App"` — Application-level messages
-- `"Auth"`, `"API"`, etc. — Feature-specific contexts
-
----
 
 ## Related Packages
 
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
+| Package | Description |
+|---------|-------------|
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (uses logger internally) |
+| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) | Transition logging plugin (uses logger internally) |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

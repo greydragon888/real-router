@@ -1,21 +1,27 @@
 # @real-router/logger-plugin
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/logger-plugin&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/logger-plugin&treeshake=[*])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Console logging plugin for Real-Router. Provides transition timing, parameter diff tracking, Performance API integration, and log grouping.
+> Development logging plugin for [Real-Router](https://github.com/greydragon888/real-router). Transition timing, parameter diffs, Performance API marks, and log grouping.
+
+```
+[logger-plugin] Router started
+▼ Router transition
+  [logger-plugin] Transition: home → users.profile {from: {...}, to: {...}}
+  [logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
+  [logger-plugin] Transition success (1.23ms) {to: {...}, from: {...}}
+```
 
 ## Installation
 
 ```bash
 npm install @real-router/logger-plugin
-# or
-pnpm add @real-router/logger-plugin
-# or
-yarn add @real-router/logger-plugin
-# or
-bun add @real-router/logger-plugin
 ```
+
+**Peer dependency:** `@real-router/core`
 
 ## Quick Start
 
@@ -24,159 +30,88 @@ import { createRouter } from "@real-router/core";
 import { loggerPluginFactory } from "@real-router/logger-plugin";
 
 const router = createRouter(routes);
-
-// Use with default settings
 router.usePlugin(loggerPluginFactory());
-
-router.start();
 ```
 
-**Console output:**
+## Options
 
-```
-[logger-plugin] Router started
-▼ Router transition
-  [logger-plugin] Transition: home → users {from: {...}, to: {...}}
-  [logger-plugin] Transition success (1.23ms) {to: {...}, from: {...}}
-```
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `level` | `"all" \| "transitions" \| "errors" \| "none"` | `"all"` | What to log |
+| `showTiming` | `boolean` | `true` | Transition execution time (adaptive ms/μs) |
+| `showParamsDiff` | `boolean` | `true` | Show param changes on same-route navigation |
+| `usePerformanceMarks` | `boolean` | `false` | Create Performance API marks for DevTools |
+| `context` | `string` | `"logger-plugin"` | Log prefix (useful for multiple routers) |
 
----
+### Log Levels
 
-## API
+| Level | Lifecycle (start/stop) | Transitions | Warnings (cancel) | Errors |
+|-------|:-----:|:-----------:|:-------:|:------:|
+| `"all"` | Yes | Yes | Yes | Yes |
+| `"transitions"` | — | Yes | Yes | Yes |
+| `"errors"` | — | — | — | Yes |
+| `"none"` | — | — | — | — |
 
-### `loggerPluginFactory(options?)`
-
-Factory for creating a plugin instance with optional configuration.
+### Usage Examples
 
 ```typescript
-import { loggerPluginFactory } from "@real-router/logger-plugin";
+// Multiple routers — distinguish by context
+router.usePlugin(loggerPluginFactory({ context: "main-router" }));
 
-// Default configuration
-router.usePlugin(loggerPluginFactory());
+// Performance profiling
+router.usePlugin(loggerPluginFactory({ usePerformanceMarks: true }));
 
-// With custom options
-router.usePlugin(
-  loggerPluginFactory({
-    level: "errors",
-    showTiming: false,
-  }),
-);
+// Errors only (staging/production)
+router.usePlugin(loggerPluginFactory({ level: "errors" }));
 ```
-
----
-
-## Configuration
-
-| Option                | Type       | Default           | Description                                          |
-| --------------------- | ---------- | ----------------- | ---------------------------------------------------- |
-| `level`               | `LogLevel` | `"all"`           | `"all"` \| `"transitions"` \| `"errors"` \| `"none"` |
-| `showTiming`          | `boolean`  | `true`            | Show transition execution time (μs/ms)               |
-| `showParamsDiff`      | `boolean`  | `true`            | Show param changes within same route                 |
-| `usePerformanceMarks` | `boolean`  | `false`           | Create Performance API marks for DevTools            |
-| `context`             | `string`   | `"logger-plugin"` | Log prefix for multiple routers                      |
-
-### Configuration Examples
-
-```typescript
-// With custom context for multiple routers
-router.usePlugin(
-  loggerPluginFactory({
-    context: "main-router",
-  }),
-);
-
-// Performance profiling enabled
-router.usePlugin(
-  loggerPluginFactory({
-    usePerformanceMarks: true,
-    showTiming: true,
-  }),
-);
-
-// Errors only (for production-like environments)
-router.usePlugin(
-  loggerPluginFactory({
-    level: "errors",
-    showTiming: false,
-  }),
-);
-
-// Minimal output
-router.usePlugin(
-  loggerPluginFactory({
-    level: "transitions",
-    showParamsDiff: false,
-    showTiming: false,
-  }),
-);
-```
-
-See [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin#3-configuration-options) for detailed descriptions.
-
----
 
 ## Features
 
-### Timing Display
+### Adaptive Timing
 
 ```
-[logger-plugin] Transition success (15ms)      // normal
-[logger-plugin] Transition success (27.29μs)   // fast (<0.1ms)
+[logger-plugin] Transition success (15ms)       // normal
+[logger-plugin] Transition success (27.29μs)    // fast (<0.1ms)
 ```
 
 ### Parameter Diff
 
-When navigating within the same route:
+Logs added, changed, and removed params when navigating within the same route:
 
 ```
-▼ Router transition
-  [logger-plugin] Transition: users.view → users.view {from: {...}, to: {...}}
-  [logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
-  [logger-plugin] Transition success (2.15ms) {to: {...}, from: {...}}
+[logger-plugin]   Changed: { id: "123" → "456" }, Added: {"sort":"name"}
 ```
 
 ### Performance API
 
 With `usePerformanceMarks: true`, creates marks visible in DevTools Performance tab:
 
-- `router:transition-start:{from}→{to}`
-- `router:transition-end:{from}→{to}`
-- `router:transition:{from}→{to}` (measure)
-
-See [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin#10-performance-marks-and-measures) for full list.
-
----
-
-## SSR Support
-
-For high-precision timing in Node.js:
-
-```typescript
-import { performance } from "perf_hooks";
-
-if (typeof globalThis.performance === "undefined") {
-  globalThis.performance = performance;
-}
 ```
-
----
+router:transition-start:{from}→{to}
+router:transition-end:{from}→{to}
+router:transition:{from}→{to}              (measure)
+router:lifetime                             (measure: start → stop)
+```
 
 ## Documentation
 
-Full documentation on [Wiki](https://github.com/greydragon888/real-router/wiki/logger-plugin):
+Full documentation: [Wiki — logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin)
 
 - [Configuration Options](https://github.com/greydragon888/real-router/wiki/logger-plugin#3-configuration-options)
-- [Lifecycle Hooks](https://github.com/greydragon888/real-router/wiki/logger-plugin#4-lifecycle-hooks)
 - [Performance Marks](https://github.com/greydragon888/real-router/wiki/logger-plugin#10-performance-marks-and-measures)
 - [Migration from router5](https://github.com/greydragon888/real-router/wiki/logger-plugin#13-migration-from-router5)
 
----
-
 ## Related Packages
 
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
-- [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) — Browser history
+| Package | Description |
+|---------|-------------|
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

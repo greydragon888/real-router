@@ -1,104 +1,21 @@
 # @real-router/rx
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+[![npm](https://img.shields.io/npm/v/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)
+[![npm downloads](https://img.shields.io/npm/dm/@real-router/rx.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/rx)
+[![bundle size](https://deno.bundlejs.com/?q=@real-router/rx&treeshake=[*]&badge=detailed)](https://bundlejs.com/?q=@real-router/rx&treeshake=[*])
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
 
-Reactive Observable API for Real-Router. Zero-cost opt-in for reactive programming patterns.
+> Reactive Observable API for [Real-Router](https://github.com/greydragon888/real-router). State streams, event streams, built-in operators, TC39 Observable and RxJS interop. Zero-cost opt-in — only bundled when imported.
 
 ## Installation
 
 ```bash
 npm install @real-router/rx
-# or
-pnpm add @real-router/rx
-# or
-yarn add @real-router/rx
-# or
-bun add @real-router/rx
 ```
+
+**Peer dependency:** `@real-router/core`
 
 ## Quick Start
-
-```typescript
-import { createRouter } from "@real-router/core";
-import { state$ } from "@real-router/rx";
-
-const router = createRouter([
-  { name: "home", path: "/" },
-  { name: "users", path: "/users" },
-  { name: "users.profile", path: "/:id" },
-]);
-
-router.start();
-
-// Subscribe to state changes
-state$(router).subscribe(({ route, previousRoute }) => {
-  console.log("Navigation:", previousRoute?.name, "→", route.name);
-});
-```
-
----
-
-## API
-
-### Streams
-
-#### `state$(router, options?)`
-
-Creates a reactive stream of router state changes.\
-`router: Router` — router instance\
-`options.signal?: AbortSignal` — for automatic unsubscription\
-Returns: `RxObservable<{ route: State, previousRoute?: State }>`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#state$router-options)
-
-#### `events$(router)`
-
-Creates a reactive stream of all router events.\
-`router: Router` — router instance\
-Returns: `RxObservable<RouterEvent>`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#events$router)
-
-#### `observable(router)`
-
-Creates a TC39 Observable-compliant wrapper for RxJS interop.\
-`router: Router` — router instance\
-Returns: `RxObservable<SubscribeState>`\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#observablerouter)
-
----
-
-### Operators
-
-#### `map(project)`
-
-Transforms emitted values.\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#mapt-rproject-value-t--r)
-
-#### `filter(predicate)`
-
-Filters values based on a predicate.\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#filtertpredicate-value-t--boolean)
-
-#### `debounceTime(duration)`
-
-Delays emissions, emitting only the last value.\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#debouncetimetduration-number)
-
-#### `distinctUntilChanged(comparator?)`
-
-Filters consecutive duplicate values.\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#distinctuntilchangedtcomparator-prev-t-curr-t--boolean)
-
-#### `takeUntil(notifier)`
-
-Completes stream when notifier emits.\
-[Wiki](https://github.com/greydragon888/real-router/wiki/rx-package#takeuntiltnotifier-rxobservableany)
-
----
-
-## Usage Examples
-
-### Operator Pipeline
 
 ```typescript
 import { state$, map, filter, distinctUntilChanged } from "@real-router/rx";
@@ -114,12 +31,42 @@ state$(router)
   });
 ```
 
-### Event Filtering
+## Streams
+
+| Factory | Returns | Description |
+|---------|---------|-------------|
+| `state$(router, options?)` | `RxObservable<{ route, previousRoute }>` | Router state changes |
+| `events$(router)` | `RxObservable<RouterEvent>` | All router events (start, stop, transition, error, cancel) |
+| `observable(router)` | `RxObservable<SubscribeState>` | TC39 Observable-compliant wrapper for RxJS interop |
+
+`state$` accepts `{ signal: AbortSignal }` for automatic unsubscription.
+
+## Operators
+
+| Operator | Description |
+|----------|-------------|
+| `map(project)` | Transform emitted values |
+| `filter(predicate)` | Filter values by predicate |
+| `debounceTime(ms)` | Emit only the last value after a delay |
+| `distinctUntilChanged(cmp?)` | Skip consecutive duplicates |
+| `takeUntil(notifier)` | Complete when notifier emits |
+
+All operators are composable via `.pipe()`:
+
+```typescript
+state$(router).pipe(
+  filter(({ route }) => route.name.startsWith("admin")),
+  debounceTime(100),
+).subscribe(({ route }) => {
+  analytics.trackPage(route.name);
+});
+```
+
+## Event Filtering
 
 ```typescript
 import { events$, filter } from "@real-router/rx";
 
-// Track navigation errors
 events$(router)
   .pipe(filter((e) => e.type === "TRANSITION_ERROR"))
   .subscribe(({ error }) => {
@@ -127,7 +74,9 @@ events$(router)
   });
 ```
 
-### RxJS Interop
+## RxJS Interop
+
+`observable()` returns a TC39-compliant Observable — pass it to RxJS `from()`:
 
 ```typescript
 import { from } from "rxjs";
@@ -141,25 +90,27 @@ from(observable(router))
   });
 ```
 
----
-
 ## Documentation
 
-Full documentation available on the [Wiki](https://github.com/greydragon888/real-router/wiki/rx-package):
+Full documentation: [Wiki — rx](https://github.com/greydragon888/real-router/wiki/rx-package)
 
 - [API Reference](https://github.com/greydragon888/real-router/wiki/rx-package#api-reference)
 - [Operators](https://github.com/greydragon888/real-router/wiki/rx-package#operators)
 - [Async Iteration](https://github.com/greydragon888/real-router/wiki/rx-package#async-iteration)
 - [Migration Guide](https://github.com/greydragon888/real-router/wiki/rx-package#migration-guide)
 
----
-
 ## Related Packages
 
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
-- [@real-router/react](https://www.npmjs.com/package/@real-router/react) — React integration
-- [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) — Browser history
+| Package | Description |
+|---------|-------------|
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required peer dependency) |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources) | `useSyncExternalStore`-based alternative |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

@@ -9,11 +9,12 @@ src/
 ├── createRouteSource.ts       — Full route state source with lazy-connection pattern
 ├── createRouteNodeSource.ts   — Node-scoped source with lazy-connection pattern + shouldUpdateNode filter
 ├── createActiveRouteSource.ts — Boolean active-route source using areRoutesRelated filter
+├── createTransitionSource.ts  — Transition lifecycle source (isTransitioning, toRoute, fromRoute)
 ├── BaseSource.ts              — Internal Set-based listener management (not exported)
 ├── computeSnapshot.ts        — Same-reference snapshot optimization for route nodes
 ├── shouldUpdateCache.ts      — WeakMap<Router, Map<string, fn>> two-level cache
-├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, ActiveRouteSourceOptions
-└── index.ts                  — Public exports (3 factories + types)
+├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, RouterTransitionSnapshot, ActiveRouteSourceOptions
+└── index.ts                  — Public exports (4 factories + types)
 ```
 
 ## Two Source Patterns
@@ -128,11 +129,21 @@ On first access for a given router+nodeName combination, the predicate is create
 ## Code Conventions
 
 - 100% test coverage required
-- Tests cover only the public API (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`)
+- Tests cover only the public API (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`, `createTransitionSource`)
 - `v8 ignore @preserve` used for defensive guards that are unreachable via the public API
 - Benchmarks use the mitata engine, not vitest bench
 
 ---
+
+## Stress Test Coverage
+
+7 stress tests in `tests/stress/` validate behavior under extreme conditions:
+
+| Category | Tests | What they verify |
+|----------|-------|-----------------|
+| Memory & leaks | source-creation-memory, eager-subscription-leak, should-update-cache-growth | No leaks from source creation/destruction cycles, cache bounded |
+| Concurrent | reconnection-storm, destroy-during-notification | Rapid subscribe/unsubscribe churn, destroy safety during emit |
+| Integrity | listener-set-integrity, notification-pipeline, cross-source-interaction | Listener set consistency, notification ordering, multi-source isolation |
 
 ## See Also
 

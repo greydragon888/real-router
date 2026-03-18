@@ -163,7 +163,7 @@ If provided, it passes it through as-is.
 **Why not monkey-patching?**
 
 - `addInterceptor` is an official core API designed for plugins
-- Interceptors execute in FIFO order; multiple plugins can intercept the same method
+- Interceptors execute in LIFO order (last-registered wraps first); multiple plugins can intercept the same method
 - `#removeStartInterceptor` stores the unsubscribe function — called in `teardown`
 
 ## Router Augmentation
@@ -493,6 +493,17 @@ The hash fragment (`#section`) is always preserved when navigating to the same p
 | Last-write-wins for deferred events | `browser-env`  | Intermediate states are skipped without accumulation  |
 | `historyState` as a subset of State | `browser-env`  | Less data stored in `history.state`                   |
 | `createSafeBrowser()` called once   | `factory.ts`   | Environment check doesn't repeat                      |
+
+## Stress Test Coverage
+
+6 stress tests in `tests/stress/` validate behavior under extreme conditions:
+
+| Category | Tests | What they verify |
+|----------|-------|-----------------|
+| Popstate | popstate-storm, popstate-navigate-interleave | Rapid back/forward, popstate during navigation |
+| Guards | cannot-deactivate-storm | canDeactivate guard blocking under rapid back/forward |
+| State | corrupted-state-storm, history-state-accumulation | Corrupted history.state recovery, history entry growth |
+| Lifecycle | plugin-lifecycle-churn | Rapid plugin register/unregister cycles |
 
 ## Related Documents
 

@@ -66,6 +66,7 @@ class FSM<
     action: ActionFn<E>,
   ): () => void;
   onTransition(listener: (info: TransitionInfo) => void): () => void;
+  forceState(state: TStates): void;
 }
 ```
 
@@ -222,6 +223,22 @@ onTransition(listener) {
 | Lazy `#actions` (`null`)    | No Map allocation when `on()` not used                               |
 | Null-slot listener array    | Reuses slots from unsubscribed listeners                             |
 | Early exit on no-op         | Returns immediately if transition undefined                          |
+| `forceState()` bypass       | ~30ns saved per call — no actions, no listeners, no TransitionInfo   |
+
+## forceState() — Direct State Bypass
+
+`forceState(state)` updates `#state` and `#currentTransitions` directly — no actions fire, no listeners notified, no validation.
+
+```typescript
+forceState(state) {
+  this.#state = state;
+  this.#currentTransitions = this.#transitions[state];
+}
+```
+
+**Why it exists:** Router's navigate hot path uses `forceState()` for NAVIGATE and COMPLETE transitions to bypass `send()` overhead (~30ns saved per call). The router already handles event emission separately via `EventBusNamespace` — running it through FSM actions would be redundant.
+
+**Contract:** Caller is responsible for maintaining state consistency. No guards, no listeners, no reentrancy handling.
 
 ## Reentrancy
 

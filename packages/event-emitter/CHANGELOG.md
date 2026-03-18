@@ -1,5 +1,11 @@
 # event-emitter
 
+## 0.1.2
+
+### Patch Changes
+
+- Rewrite README — internal package style with Purpose, Consumers, API table, Key Design Decisions (#320)
+
 ## 0.1.1
 
 ### Patch Changes

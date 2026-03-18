@@ -1,23 +1,18 @@
 # @real-router/fsm
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
+> Synchronous finite state machine engine.
 
-Universal synchronous FSM engine for Real-Router. Zero dependencies, full TypeScript generics, O(1) transition lookup.
+**Internal package** — consumed by `@real-router/core`. Published to npm by historical accident — do not depend on it directly.
 
-## Installation
+## Purpose
 
-```bash
-npm install @real-router/fsm
-# or
-pnpm add @real-router/fsm
-# or
-yarn add @real-router/fsm
-# or
-bun add @real-router/fsm
-```
+Drives the router's lifecycle state machine (`STOPPED → STARTED → DISPOSED`). Synchronous, zero-dependency, O(1) transition lookup.
 
-## Quick Start
+## Consumer
+
+- `@real-router/core` — router lifecycle management
+
+## Public API
 
 ```typescript
 import { FSM } from "@real-router/fsm";
@@ -32,128 +27,47 @@ const fsm = new FSM({
   },
 });
 
-fsm.send("TIMER");     // "yellow"
-fsm.send("TIMER");     // "red"
-fsm.send("RESET");     // "green"
-fsm.getState();         // "green"
-fsm.getContext();        // { count: 0 }
+fsm.send("TIMER");      // "yellow"
+fsm.send("TIMER");      // "red"
+fsm.getState();          // "red"
+fsm.getContext();         // { count: 0 }
 ```
 
----
+| Method | Description |
+|--------|-------------|
+| `send(event, payload?)` | Trigger transition, return current state. No-op if no transition defined |
+| `getState()` | Current state |
+| `getContext()` | Context object (same reference as config) |
+| `onTransition(listener)` | Subscribe to transitions, returns unsubscribe |
+| `on(from, event, action)` | Register action for specific `(from, event)` pair |
+| `forceState(state)` | Direct state update — no actions, no listeners |
 
-## API
-
-### `new FSM(config: FSMConfig<TStates, TEvents, TContext>)`
-
-Creates a new FSM instance.\
-`config.initial: TStates` — initial state\
-`config.context: TContext` — shared context object\
-`config.transitions: Record<TStates, Partial<Record<TEvents, TStates>>>` — transition table
-
-### `fsm.send(event, payload?): TStates`
-
-Sends an event to trigger a transition. Returns the current state after processing.\
-If no transition exists for the event in the current state, returns the current state (no-op).\
-State is updated before listeners fire (reentrancy-safe).
+### Type-Safe Payloads
 
 ```typescript
-fsm.send("TIMER");  // transitions and returns new state
-fsm.send("RESET");  // no-op if no transition defined, returns current state
-```
-
-### `fsm.getState(): TStates`
-
-Returns the current state.
-
-### `fsm.getContext(): TContext`
-
-Returns the context object (same reference as provided in config).
-
-### `fsm.onTransition(listener): () => void`
-
-Subscribes a listener to state transitions. Returns an unsubscribe function.\
-Listener receives `TransitionInfo` with `from`, `to`, `event`, and `payload` fields.\
-Not called on no-op sends (when no transition exists).
-
-```typescript
-const unsub = fsm.onTransition((info) => {
-  console.log(`${info.from} -> ${info.to} via ${info.event}`);
-});
-
-fsm.send("TIMER");  // logs: "green -> yellow via TIMER"
-unsub();
-```
-
----
-
-## Type-Safe Payloads
-
-Use `TPayloadMap` to require payloads for specific events:
-
-```typescript
-import type { FSMConfig } from "@real-router/fsm";
-
-type State = "idle" | "loading" | "done";
-type Event = "FETCH" | "RESOLVE";
-
 interface PayloadMap {
   FETCH: { url: string };
 }
 
-const config: FSMConfig<State, Event, null> = {
-  initial: "idle",
-  context: null,
-  transitions: {
-    idle:    { FETCH: "loading" },
-    loading: { RESOLVE: "done" },
-    done:    {},
-  },
-};
-
 const fsm = new FSM<State, Event, null, PayloadMap>(config);
-
-fsm.send("FETCH", { url: "/api" });  // OK — payload required
-fsm.send("RESOLVE");                  // OK — no payload needed
-fsm.send("FETCH");                    // TypeScript error — missing payload
+fsm.send("FETCH", { url: "/api" }); // required
+fsm.send("RESOLVE");                 // no payload
+fsm.send("FETCH");                   // TS error
 ```
 
----
-
-## Types
-
-```typescript
-import type { FSMConfig, TransitionInfo } from "@real-router/fsm";
-
-interface FSMConfig<TStates, TEvents, TContext> {
-  initial: TStates;
-  context: TContext;
-  transitions: Record<TStates, Partial<Record<TEvents, TStates>>>;
-}
-
-interface TransitionInfo<TStates, TEvents, TPayloadMap> {
-  from: TStates;
-  to: TStates;
-  event: TEvents;
-  payload: TPayloadMap[TEvents] | undefined;
-}
-```
-
----
-
-## Design
+## Key Design Decisions
 
 - **Synchronous** — no async, no promises, no microtasks
-- **O(1) transitions** — cached current-state lookup, single property access per `send()`
-- **Zero-alloc hot path** — when no listeners are registered, `send()` allocates nothing
-- **Null-slot listener array** — `onTransition` reuses slots from unsubscribed listeners, preventing unbounded array growth
-- **Reentrancy-safe** — `send()` inside a listener sees the updated state; callers are responsible for preventing infinite recursion
+- **`#currentTransitions` cache** — avoids double lookup `transitions[state][event]`
+- **Zero-alloc hot path** — skips `TransitionInfo` allocation when no listeners
+- **Null-slot listener array** — reuses slots from unsubscribed listeners
+- **Reentrancy-safe** — state updated before listeners fire; callers responsible for preventing loops
+- **`forceState()`** — bypasses `send()` overhead (~30ns saved per call) for router's navigate hot path
 
----
+## Dependencies
 
-## Related Packages
-
-- [@real-router/core](https://www.npmjs.com/package/@real-router/core) — Core router
+None (zero dependencies).
 
 ## License
 
-MIT © [Oleg Ivanov](https://github.com/greydragon888)
+[MIT](../../LICENSE)

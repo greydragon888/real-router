@@ -225,7 +225,7 @@ describe("core/routes/replaceRoutes", () => {
       } as any);
 
       // Verify custom field is registered
-      const configBefore = routesApi.getConfig("with-custom");
+      const configBefore = getPluginApi(router).getRouteConfig("with-custom");
 
       expect(configBefore?.someCustomField).toBe("custom-value");
 
@@ -233,7 +233,9 @@ describe("core/routes/replaceRoutes", () => {
 
       // Old route with custom field is gone
       expect(routesApi.has("with-custom")).toBe(false);
-      expect(routesApi.getConfig("with-custom")).toBeUndefined();
+      expect(
+        getPluginApi(router).getRouteConfig("with-custom"),
+      ).toBeUndefined();
     });
   });
 

@@ -57,6 +57,7 @@ src/
 │   ├── useRouteNode.tsx        # Node-scoped subscription via useSyncExternalStore
 │   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
+│   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
@@ -85,7 +86,7 @@ RouterProvider
 
 | Context            | Value                                 | Changes                      | Consumers                    |
 | ------------------ | ------------------------------------- | ---------------------------- | ---------------------------- |
-| `RouterContext`    | `Router` instance                     | Never (same reference)       | `useRouter`, `useRouteUtils` |
+| `RouterContext`    | `Router` instance                     | Never (same reference)       | `useRouter`, `useRouteUtils`, `useRouterTransition` |
 | `NavigatorContext` | `Navigator`                           | Never (memoized from router) | `useNavigator`               |
 | `RouteContext`     | `{ navigator, route, previousRoute }` | Every navigation             | `useRoute`                   |
 
@@ -107,6 +108,7 @@ These three hooks use `useContext()` — works in both React 18 and 19. (`use()`
 
 ```
 useRouteNode(name)              — createRouteNodeSource(router, name)
+useRouterTransition()           — createTransitionSource(router)
 useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
 RouterProvider                  — createRouteSource(router)
 ```
@@ -166,33 +168,6 @@ router emits TRANSITION_SUCCESS
                     └──► Link active CSS updates (via internal useIsActiveRoute)
 ```
 
-## Type System
-
-```typescript
-interface RouteState<P extends Params = Params, MP extends Params = Params> {
-  route: State<P, MP> | undefined;
-  previousRoute?: State | undefined;
-}
-
-type RouteContext = { navigator: Navigator } & RouteState;
-
-interface LinkProps<
-  P extends Params = Params,
-> extends HTMLAttributes<HTMLAnchorElement> {
-  routeName: string;
-  routeParams?: P;
-  routeOptions?: NavigationOptions;
-  activeClassName?: string; // default: "active"
-  activeStrict?: boolean; // default: false
-  ignoreQueryParams?: boolean; // default: true
-  target?: string;
-  onClick?: MouseEventHandler<HTMLAnchorElement>;
-  onMouseOver?: MouseEventHandler<HTMLAnchorElement>;
-}
-```
-
-Single `LinkProps` definition in `types.ts`, extending `HTMLAttributes<HTMLAnchorElement>`. Exported publicly via both entry points.
-
 ## Testing Strategy
 
 ```
@@ -210,15 +185,18 @@ tests/
 
 **Coverage:** 100% required (enforced in vitest.config).
 
-## Pending Changes (RFC Roadmap)
+### Performance Tests
 
-| #   | RFC                                                        | Impact                                                                     | Status      |
-| --- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ----------- |
-| 1   | [react-18-19-split](/.claude/RFC-react-18-19-split.md)     | Infrastructure — dual entry points, `useContext` / `.Provider` syntax      | Implemented |
-| 2   | [link-optimization](/.claude/RFC-link-optimization.md)     | Remove BaseLink/ConnectedLink, simplify Link                               | Implemented |
-| 3   | [useRouterTransition](/.claude/RFC-useRouterTransition.md) | New hook for transition state                                              | Draft       |
-| 4   | [route-view](/.claude/RFC-route-view.md)                   | New RouteView component                                                    | Implemented |
-| 5   | [react-activity](/.claude/RFC-react-activity.md)           | `keepAlive` prop on `RouteView.Match` via React Activity (React 19.2 only) | Implemented |
+6 performance test suites in `tests/performance/` verify render budgets via `vitest-react-profiler`:
+
+| Component / Hook | What is verified |
+|------------------|-----------------|
+| **RouterProvider** | 1 mount per init; 1 re-render per navigation; memo'd children without context skip re-renders; RouterContext consumers skip re-renders (stable ref); RouteContext consumers re-render on navigation |
+| **Link** | 1 mount; memo skips parent re-renders; 100 links meet budget (100 mounts, 0 updates); active class toggles exactly 1 re-render; unrelated navigations skip re-render; `useStableValue` prevents re-render on identical inline objects |
+| **RouteView** | Sibling isolation (navigation doesn't re-render siblings); only matched child renders; keepAlive lazy activation (never-visited children have 0 renders); hidden keepAlive children don't re-render on sibling navigation; hide/show cycle meets ≤2 re-render budget |
+| **useRoute** | Re-renders on every navigation (no filtering); linear render count (N navigations = N re-renders); stable navigator ref across re-renders |
+| **useRouteNode** | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes |
+| **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders |
 
 ## See Also
 

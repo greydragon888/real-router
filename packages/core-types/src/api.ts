@@ -93,6 +93,8 @@ export interface PluginApi {
   ) => Unsubscribe;
 
   extendRouter: (extensions: Record<string, unknown>) => Unsubscribe;
+
+  getRouteConfig: (name: string) => Record<string, unknown> | undefined;
 }
 
 /**
@@ -117,8 +119,6 @@ export interface RoutesApi<
   has: (name: string) => boolean;
 
   get: (name: string) => Route<Dependencies> | undefined;
-
-  getConfig: (name: string) => Record<string, unknown> | undefined;
 }
 
 /**
