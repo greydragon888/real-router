@@ -27,7 +27,6 @@ describe("getRoutesApi()", () => {
     expect(typeof routesApi.clear).toBe("function");
     expect(typeof routesApi.has).toBe("function");
     expect(typeof routesApi.get).toBe("function");
-    expect(typeof routesApi.getConfig).toBe("function");
   });
 
   it("should return a new object on each call", () => {
@@ -52,18 +51,6 @@ describe("getRoutesApi()", () => {
     const route = routesApi.get("nonexistent");
 
     expect(route).toBeUndefined();
-  });
-
-  it("getConfig should return route config for an existing route", () => {
-    const config = routesApi.getConfig("home");
-
-    expect(config === undefined || typeof config === "object").toBe(true);
-  });
-
-  it("getConfig should return undefined for a non-existent route", () => {
-    const config = routesApi.getConfig("nonexistent");
-
-    expect(config).toBeUndefined();
   });
 
   it("add should add a route", () => {

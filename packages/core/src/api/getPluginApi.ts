@@ -122,6 +122,15 @@ export function getPluginApi<
         }
       };
     },
+    getRouteConfig: (name) => {
+      const store = ctx.routeGetStore();
+
+      if (!store.matcher.hasRoute(name)) {
+        return;
+      }
+
+      return store.routeCustomFields[name];
+    },
     extendRouter: (extensions: Record<string, unknown>) => {
       throwIfDisposed(ctx.isDisposed);
 

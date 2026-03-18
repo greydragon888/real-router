@@ -1,7 +1,11 @@
 import { fc, test } from "@fast-check/vitest";
 import { describe, expect, it } from "vitest";
 
-import { getLifecycleApi, getRoutesApi } from "@real-router/core/api";
+import {
+  getLifecycleApi,
+  getPluginApi,
+  getRoutesApi,
+} from "@real-router/core/api";
 
 import {
   createFixtureRouter,
@@ -138,7 +142,7 @@ describe("Route Management (getRoutesApi) Properties", () => {
     expect(routesApi.has("users.child")).toBe(true);
   });
 
-  it("getConfig returns custom fields for a route", () => {
+  it("getRouteConfig returns custom fields for a route", () => {
     const router = createFixtureRouter();
     const routesApi = getRoutesApi(router);
 
@@ -148,17 +152,16 @@ describe("Route Management (getRoutesApi) Properties", () => {
       myField: "value",
     } as never);
 
-    const config = routesApi.getConfig("custom");
+    const config = getPluginApi(router).getRouteConfig("custom");
 
     expect(config).toBeDefined();
     expect(config!.myField).toBe("value");
   });
 
-  it("getConfig returns undefined for unknown route", () => {
+  it("getRouteConfig returns undefined for unknown route", () => {
     const router = createFixtureRouter();
-    const routesApi = getRoutesApi(router);
 
-    expect(routesApi.getConfig("nonexistent")).toBeUndefined();
+    expect(getPluginApi(router).getRouteConfig("nonexistent")).toBeUndefined();
   });
 
   it("update with canActivate guard: guard blocks navigation", async () => {

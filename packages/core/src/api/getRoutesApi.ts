@@ -414,22 +414,6 @@ function getRoute<
   return enrichRoute(definition, name, store.config, factories);
 }
 
-/**
- * Gets the custom config fields for a route.
- */
-function getRouteConfig<
-  Dependencies extends DefaultDependencies = DefaultDependencies,
->(
-  store: RoutesStore<Dependencies>,
-  name: string,
-): Record<string, unknown> | undefined {
-  if (!store.matcher.hasRoute(name)) {
-    return undefined;
-  }
-
-  return store.routeCustomFields[name];
-}
-
 // ============================================================================
 // API factory
 // ============================================================================
@@ -608,10 +592,6 @@ export function getRoutesApi<
       }
 
       return getRoute(store, name);
-    },
-
-    getConfig: (name) => {
-      return getRouteConfig(store, name);
     },
 
     replace: (routes) => {
