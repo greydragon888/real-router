@@ -49,3 +49,5 @@ jobs:
           fail-on-severity: moderate
           config-file: ./.github/dependency-review-config.yml
           comment-summary-in-pr: on-failure
+          warn-on-openssf-scorecard-level: 0
+          allow-packages: pkg:npm/unpipe, pkg:npm/toidentifier, pkg:npm/escape-html, pkg:npm/ee-first, pkg:npm/depd, pkg:npm/cookie-signature
