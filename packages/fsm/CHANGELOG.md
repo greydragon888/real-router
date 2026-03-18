@@ -1,5 +1,13 @@
 # @real-router/fsm
 
+## 0.2.2
+
+### Patch Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Rewrite README and update ARCHITECTURE.md ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  README: rewritten as internal package style — Purpose, Consumers, Key Design Decisions. ARCHITECTURE: added `forceState()` documentation — architecturally significant method for router's navigate hot path.
+
 ## 0.2.1
 
 ### Patch Changes

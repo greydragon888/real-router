@@ -1,5 +1,16 @@
 # @real-router/logger-plugin
 
+## 0.3.2
+
+### Patch Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Rewrite README and trim ARCHITECTURE.md ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  README: added badges, console output preview, log levels matrix table. ARCHITECTURE: removed Public API section (now in README).
+
+- Updated dependencies [[`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2), [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2)]:
+  - @real-router/core@0.37.0
+
 ## 0.3.1
 
 ### Patch Changes

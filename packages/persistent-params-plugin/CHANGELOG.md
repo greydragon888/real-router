@@ -1,5 +1,16 @@
 # @real-router/persistent-params-plugin
 
+## 0.1.41
+
+### Patch Changes
+
+- [#321](https://github.com/greydragon888/real-router/pull/321) [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2) Thanks [@greydragon888](https://github.com/greydragon888)! - Rewrite README ([#320](https://github.com/greydragon888/real-router/issues/320))
+
+  Added badges, problem/solution example as hero, compact behavior section, UTM tracking and multilingual use cases.
+
+- Updated dependencies [[`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2), [`6d17481`](https://github.com/greydragon888/real-router/commit/6d17481a3240e041e4c5d5d12c2922744fd447d2)]:
+  - @real-router/core@0.37.0
+
 ## 0.1.40
 
 ### Patch Changes
