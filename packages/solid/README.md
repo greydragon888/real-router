@@ -1,0 +1,218 @@
+# @real-router/solid
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
+
+> Solid.js integration for [Real-Router](https://github.com/greydragon888/real-router) — hooks, components, and context providers.
+
+## Installation
+
+```bash
+npm install @real-router/solid @real-router/core @real-router/browser-plugin
+```
+
+**Peer dependency:** `solid-js` >= 1.7.0
+
+## Quick Start
+
+```tsx
+import { createRouter } from "@real-router/core";
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { RouterProvider, RouteView, Link } from "@real-router/solid";
+
+const router = createRouter([
+  { name: "home", path: "/" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
+]);
+
+router.usePlugin(browserPluginFactory());
+router.start();
+
+function App() {
+  return (
+    <RouterProvider router={router}>
+      <nav>
+        <Link routeName="home">Home</Link>
+        <Link routeName="users">Users</Link>
+      </nav>
+      <RouteView nodeName="">
+        <RouteView.Match segment="home">
+          <HomePage />
+        </RouteView.Match>
+        <RouteView.Match segment="users">
+          <UsersPage />
+        </RouteView.Match>
+        <RouteView.NotFound>
+          <NotFoundPage />
+        </RouteView.NotFound>
+      </RouteView>
+    </RouterProvider>
+  );
+}
+```
+
+## Hooks
+
+All hooks that subscribe to route state return `Accessor<T>` — call the accessor inside a reactive context to read the current value.
+
+| Hook                    | Returns                              | Reactive?                            |
+| ----------------------- | ------------------------------------ | ------------------------------------ |
+| `useRouter()`           | `Router`                             | Never                                |
+| `useNavigator()`        | `Navigator`                          | Never                                |
+| `useRoute()`            | `Accessor<RouteState>`               | Every navigation                     |
+| `useRouteNode(name)`    | `Accessor<RouteState>`               | Only when node activates/deactivates |
+| `useRouteUtils()`       | `RouteUtils`                         | Never                                |
+| `useRouterTransition()` | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
+
+```tsx
+// useRouteNode — updates only when "users.*" changes
+function UsersLayout() {
+  const routeState = useRouteNode("users");
+
+  return (
+    <Show when={routeState().route}>
+      {(route) => {
+        switch (route().name) {
+          case "users":
+            return <UsersList />;
+          case "users.profile":
+            return <UserProfile id={route().params.id} />;
+          default:
+            return null;
+        }
+      }}
+    </Show>
+  );
+}
+
+// useNavigator — stable reference, never reactive
+function BackButton() {
+  const navigator = useNavigator();
+  return <button onClick={() => navigator.navigate("home")}>Back</button>;
+}
+
+// useRouterTransition — progress bars, loading states
+function GlobalProgress() {
+  const transition = useRouterTransition();
+  return (
+    <Show when={transition().isTransitioning}>
+      <div class="progress-bar" />
+    </Show>
+  );
+}
+```
+
+## Components
+
+### `<Link>`
+
+Navigation link with automatic active state detection. Uses `classList` for active class toggling — only the DOM attribute updates, not the whole component.
+
+```tsx
+<Link
+  routeName="users.profile"
+  routeParams={{ id: "123" }}
+  activeClassName="active" // default: "active"
+  activeStrict={false} // default: false (ancestor match)
+  ignoreQueryParams={true} // default: true
+  routeOptions={{ replace: true }}
+>
+  View Profile
+</Link>
+```
+
+### `<RouteView>`
+
+Declarative route matching. Renders the first matching `<RouteView.Match>` child.
+
+```tsx
+<RouteView nodeName="">
+  <RouteView.Match segment="users">
+    <UsersPage />
+  </RouteView.Match>
+  <RouteView.Match segment="settings">
+    <SettingsPage />
+  </RouteView.Match>
+  <RouteView.NotFound>
+    <NotFoundPage />
+  </RouteView.NotFound>
+</RouteView>
+```
+
+`RouteView.Match` accepts an optional `exact` prop for strict segment matching:
+
+```tsx
+<RouteView.Match segment="users" exact>
+  {/* Only matches "users" exactly, not "users.profile" */}
+  <UsersIndex />
+</RouteView.Match>
+```
+
+> **Note:** `keepAlive` is not supported. Solid has no equivalent of React's `<Activity>` API. Components dispose completely when navigating away.
+
+## Solid-Specific Patterns
+
+### Accessors, Not Values
+
+Unlike the React and Preact adapters, hooks that subscribe to route state return `Accessor<T>`. Read the value by calling the accessor:
+
+```tsx
+// React/Preact
+const { route } = useRoute();
+
+// Solid
+const routeState = useRoute();
+const { route } = routeState(); // call it
+```
+
+Inside JSX, call the accessor directly in reactive positions:
+
+```tsx
+function CurrentRoute() {
+  const routeState = useRoute();
+  return <div>{routeState().route?.name}</div>;
+}
+```
+
+### Never Destructure Props
+
+Solid props are reactive getters. Destructuring them breaks the reactive graph:
+
+```tsx
+// WRONG — loses reactivity
+function MyLink({ routeName, routeParams }) {
+  return <Link routeName={routeName} routeParams={routeParams} />;
+}
+
+// CORRECT — pass props through
+function MyLink(props) {
+  return <Link routeName={props.routeName} routeParams={props.routeParams} />;
+}
+```
+
+## Documentation
+
+Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
+
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
+
+## Related Packages
+
+| Package                                                                                  | Description                          |
+| ---------------------------------------------------------------------------------------- | ------------------------------------ |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
+
+## License
+
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)
