@@ -23,9 +23,11 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 
 const routes = [
   { name: "home", path: "/" },
-  { name: "users", path: "/users", children: [
-    { name: "profile", path: "/:id" },
-  ]},
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
 ];
 
 const router = createRouter(routes);
@@ -39,21 +41,21 @@ await router.navigate("users.profile", { id: "123" });
 
 ### Lifecycle
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `start(path)` | `Promise<State>` | Start the router with an initial path |
-| `stop()` | `this` | Stop the router, cancel in-progress transition |
-| `dispose()` | `void` | Permanently terminate (cannot restart) |
-| `isActive()` | `boolean` | Whether the router is started |
+| Method        | Returns          | Description                                    |
+| ------------- | ---------------- | ---------------------------------------------- |
+| `start(path)` | `Promise<State>` | Start the router with an initial path          |
+| `stop()`      | `this`           | Stop the router, cancel in-progress transition |
+| `dispose()`   | `void`           | Permanently terminate (cannot restart)         |
+| `isActive()`  | `boolean`        | Whether the router is started                  |
 
 ### Navigation
 
-| Method | Returns | Description |
-|--------|---------|-------------|
+| Method                              | Returns          | Description                               |
+| ----------------------------------- | ---------------- | ----------------------------------------- |
 | `navigate(name, params?, options?)` | `Promise<State>` | Navigate to a route. Fire-and-forget safe |
-| `navigateToDefault(options?)` | `Promise<State>` | Navigate to the default route |
-| `navigateToNotFound(path?)` | `State` | Synchronously set UNKNOWN_ROUTE state |
-| `canNavigateTo(name, params?)` | `boolean` | Check if guards allow navigation |
+| `navigateToDefault(options?)`       | `Promise<State>` | Navigate to the default route             |
+| `navigateToNotFound(path?)`         | `State`          | Synchronously set UNKNOWN_ROUTE state     |
+| `canNavigateTo(name, params?)`      | `boolean`        | Check if guards allow navigation          |
 
 ```typescript
 await router.navigate("users.profile", { id: "123" });
@@ -67,20 +69,20 @@ controller.abort();
 
 ### State
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `getState()` | `State \| undefined` | Current router state (deeply frozen) |
-| `getPreviousState()` | `State \| undefined` | Previous router state |
-| `areStatesEqual(s1, s2, ignoreQP?)` | `boolean` | Compare two states |
-| `isActiveRoute(name, params?, strict?, ignoreQP?)` | `boolean` | Check if route is active |
-| `buildPath(name, params?)` | `string` | Build URL path from route name |
+| Method                                             | Returns              | Description                          |
+| -------------------------------------------------- | -------------------- | ------------------------------------ |
+| `getState()`                                       | `State \| undefined` | Current router state (deeply frozen) |
+| `getPreviousState()`                               | `State \| undefined` | Previous router state                |
+| `areStatesEqual(s1, s2, ignoreQP?)`                | `boolean`            | Compare two states                   |
+| `isActiveRoute(name, params?, strict?, ignoreQP?)` | `boolean`            | Check if route is active             |
+| `buildPath(name, params?)`                         | `string`             | Build URL path from route name       |
 
 ### Events & Plugins
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `subscribe(listener)` | `Unsubscribe` | Listen to successful transitions |
-| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories |
+| Method                  | Returns       | Description                      |
+| ----------------------- | ------------- | -------------------------------- |
+| `subscribe(listener)`   | `Unsubscribe` | Listen to successful transitions |
+| `usePlugin(...plugins)` | `Unsubscribe` | Register plugin factories        |
 
 ```typescript
 const unsub = router.subscribe(({ route, previousRoute }) => {
@@ -102,13 +104,28 @@ import {
 } from "@real-router/core/api";
 ```
 
-| Function | Purpose | Key methods |
-|----------|---------|-------------|
-| `getRoutesApi(router)` | Dynamic route CRUD | `add`, `remove`, `update`, `replace`, `has`, `get` |
-| `getDependenciesApi(router)` | Dependency injection | `get`, `set`, `setAll`, `remove`, `has` |
-| `getLifecycleApi(router)` | Guard registration | `addActivateGuard`, `addDeactivateGuard`, `remove*` |
-| `getPluginApi(router)` | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `getRouteConfig` |
-| `cloneRouter(router, deps?)` | SSR cloning | Shares route definitions, independent state |
+| Function                     | Purpose               | Key methods                                                                  |
+| ---------------------------- | --------------------- | ---------------------------------------------------------------------------- |
+| `getRoutesApi(router)`       | Dynamic route CRUD    | `add`, `remove`, `update`, `replace`, `has`, `get`                           |
+| `getDependenciesApi(router)` | Dependency injection  | `get`, `set`, `setAll`, `remove`, `has`                                      |
+| `getLifecycleApi(router)`    | Guard registration    | `addActivateGuard`, `addDeactivateGuard`, `remove*`                          |
+| `getPluginApi(router)`       | Plugin infrastructure | `makeState`, `matchPath`, `addInterceptor`, `extendRouter`, `getRouteConfig` |
+| `cloneRouter(router, deps?)` | SSR cloning           | Shares route definitions, independent state                                  |
+
+## Utilities
+
+SSR helpers imported from `@real-router/core/utils`.
+
+```typescript
+import { serializeState } from "@real-router/core/utils";
+
+const json = serializeState({ name: "home", path: "/" });
+const html = `<script>window.__STATE__=${json}</script>`;
+```
+
+| Function               | Purpose                                                           |
+| ---------------------- | ----------------------------------------------------------------- |
+| `serializeState(data)` | XSS-safe JSON serialization for embedding in HTML `<script>` tags |
 
 ### `getNavigator(router)` (main entry)
 
@@ -152,7 +169,11 @@ const routes: Route[] = [
       return getDep("authService").isAdmin();
     },
     children: [
-      { name: "dashboard", path: "/dashboard", defaultParams: { tab: "overview" } },
+      {
+        name: "dashboard",
+        path: "/dashboard",
+        defaultParams: { tab: "overview" },
+      },
     ],
   },
   {
@@ -201,15 +222,15 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package | Description |
-|---------|-------------|
-| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration (`RouterProvider`, hooks, `Link`, `RouteView`) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API and URL synchronization |
-| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin) | Hash-based routing |
-| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx) | Observable API (`state$`, `events$`, TC39 Observable) |
-| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin) | Development logging |
-| [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries and segment testing |
+| Package                                                                                                      | Description                                                      |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                                       | React integration (`RouterProvider`, hooks, `Link`, `RouteView`) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin)                     | Browser History API and URL synchronization                      |
+| [@real-router/hash-plugin](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing                                               |
+| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)                                             | Observable API (`state$`, `events$`, TC39 Observable)            |
+| [@real-router/logger-plugin](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging                                              |
+| [@real-router/persistent-params-plugin](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence                                            |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)                           | Route tree queries and segment testing                           |
 
 ## Contributing
 

@@ -35,7 +35,7 @@ Real-Router:      URL  →  { name, params }  (you decide what to do)
 ```
 
 This is not a minor API difference — it's a fundamentally different architecture.\
-The router becomes a **data provider**: it tells you *where* the user is, and you decide what to do with that information — render a page, load data, set a title, track analytics, or ignore it entirely.
+The router becomes a **data provider**: it tells you _where_ the user is, and you decide what to do with that information — render a page, load data, set a title, track analytics, or ignore it entirely.
 
 > Built from scratch with TypeScript-first design. Independent project inspired by [router5](https://github.com/router5/router5)'s declarative philosophy, not a fork.
 
@@ -45,27 +45,27 @@ The router becomes a **data provider**: it tells you *where* the user is, and yo
 
 ### One-Way Data Flow
 
-Routing state arrives as external data — components don't manage it. No `useParams()` + `useEffect()` + `fetch()` chains. 
-The router tells you *where* the user is; plugins handle data loading, titles, analytics outside the component tree. Components just render.
+Routing state arrives as external data — components don't manage it. No `useParams()` + `useEffect()` + `fetch()` chains.
+The router tells you _where_ the user is; plugins handle data loading, titles, analytics outside the component tree. Components just render.
 
 ### Config = Full Specification
 
-Route config is the **single source of truth** for the entire application — not just routing. 
+Route config is the **single source of truth** for the entire application — not just routing.
 Guards control access, custom fields drive data loading, titles, and any other concern through generic plugins:
 
 ```typescript
 const routes = [
-  { 
-    name: "users", 
+  {
+    name: "users",
     path: "/users",
-    canActivate: authGuard,                          // access control (guard)
-    title: "Users",                                  // custom field → title plugin
-    loadData: (p, api) => api.getUsers(p),           // custom field → data plugin
+    canActivate: authGuard, // access control (guard)
+    title: "Users", // custom field → title plugin
+    loadData: (p, api) => api.getUsers(p), // custom field → data plugin
     children: [
-      { 
-        name: "profile", 
-        path: "/:id" 
-      }
+      {
+        name: "profile",
+        path: "/:id",
+      },
     ],
   },
 ];
@@ -76,7 +76,7 @@ const dataPlugin: PluginFactory = (router, getDep) => {
   return {
     onTransitionSuccess: (toState) => {
       const route = getRouteConfig(toState.name);
-      
+
       route?.loadData?.(toState.params, getDep("api"));
     },
   };
@@ -93,9 +93,12 @@ No other router offers `update()` for modifying guards, redirects, or defaults o
 
 ### Minimal Runtime Footprint
 
-Platform-agnostic core — no DOM, no React, no History API in the routing layer. 
-All platform concerns live in plugins. 
-Result: **minimal allocations per navigation**, optimized independently from the external API. 
+Platform-agnostic core — no DOM, no React, no History API in the routing layer.
+All platform concerns live in plugins.
+
+This means SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up — no special SSR mode, no framework-specific adapters. Data loading plugs in via interceptors without touching the transition pipeline. See the [SSR example](examples/ssr-react).
+
+Result: **minimal allocations per navigation**, optimized independently from the external API.
 See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plugin patterns: data lifecycle, analytics, scroll restoration.
 
 ### Performance
@@ -130,7 +133,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 ### Key Features
 
 - **Framework-agnostic** — React, Vue, Angular, or vanilla JS
-- **Universal** — client-side and server-side rendering
+- **Universal** — client-side and server-side rendering ([SSR example](examples/ssr-react))
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
@@ -204,6 +207,7 @@ function App() {
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | [`@real-router/core`](packages/core)        | [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)   | Router implementation                                                                                              |
 | `@real-router/core/api`                     |                                                                                                                                   | Tree-shakeable modular API: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter` |
+| `@real-router/core/utils`                   |                                                                                                                                   | Utility functions: `serializeState` (XSS-safe JSON for SSR)                                                        |
 | [`@real-router/types`](packages/core-types) | [![npm](https://img.shields.io/npm/v/@real-router/types.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/types) | Shared TypeScript type definitions                                                                                 |
 
 ### Framework Integration
@@ -220,6 +224,7 @@ function App() {
 | [`@real-router/hash-plugin`](packages/hash-plugin)                           | [![npm](https://img.shields.io/npm/v/@real-router/hash-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/hash-plugin)                           | Hash-based routing (`#/path`)                |
 | [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking |
 | [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations     |
+| [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor   |
 
 ### Utilities
 
@@ -252,7 +257,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ### Plugins
 
-- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
+- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ## Relationship to Router5
 

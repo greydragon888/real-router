@@ -36,11 +36,11 @@ await router.start(); // reads hash from browser location
 
 ## Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `hashPrefix` | `string` | `""` | Prefix after `#` (e.g., `"!"` → `#!/path`) |
-| `base` | `string` | `""` | Base path before hash (e.g., `"/app"` → `/app#/path`) |
-| `forceDeactivate` | `boolean` | `true` | Bypass `canDeactivate` guards on back/forward |
+| Option            | Type      | Default | Description                                           |
+| ----------------- | --------- | ------- | ----------------------------------------------------- |
+| `hashPrefix`      | `string`  | `""`    | Prefix after `#` (e.g., `"!"` → `#!/path`)            |
+| `base`            | `string`  | `""`    | Base path before hash (e.g., `"/app"` → `/app#/path`) |
+| `forceDeactivate` | `boolean` | `true`  | Bypass `canDeactivate` guards on back/forward         |
 
 ```typescript
 router.usePlugin(hashPluginFactory({ hashPrefix: "!", base: "/app" }));
@@ -53,11 +53,11 @@ router.navigate("users", { id: "123" });
 
 The plugin extends the router instance with three methods via [`extendRouter()`](https://github.com/greydragon888/real-router/wiki/plugin-architecture):
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `buildUrl(name, params?)` | `string` | Build full URL with hash and prefix |
-| `matchUrl(url)` | `State \| undefined` | Parse hash URL to router state |
-| `replaceHistoryState(name, params?, title?)` | `void` | Update browser URL without navigation |
+| Method                                       | Returns              | Description                           |
+| -------------------------------------------- | -------------------- | ------------------------------------- |
+| `buildUrl(name, params?)`                    | `string`             | Build full URL with hash and prefix   |
+| `matchUrl(url)`                              | `State \| undefined` | Parse hash URL to router state        |
+| `replaceHistoryState(name, params?, title?)` | `void`               | Update browser URL without navigation |
 
 ```typescript
 router.buildUrl("users", { id: "123" });
@@ -74,7 +74,7 @@ router.replaceHistoryState("users", { id: "456" });
 
 ```typescript
 router.buildPath("users", { id: 1 }); // "/users/1"       — core, no hash
-router.buildUrl("users", { id: 1 });  // "#!/users/1"     — plugin, with hash prefix
+router.buildUrl("users", { id: 1 }); // "#!/users/1"     — plugin, with hash prefix
 ```
 
 ## Form Protection
@@ -87,9 +87,12 @@ router.usePlugin(hashPluginFactory({ forceDeactivate: false }));
 import { getLifecycleApi } from "@real-router/core/api";
 
 const lifecycle = getLifecycleApi(router);
-lifecycle.addDeactivateGuard("checkout", () => (toState, fromState) => {
-  return !hasUnsavedChanges(); // false blocks back/forward
-});
+lifecycle.addDeactivateGuard(
+  "checkout",
+  (router, getDep) => (toState, fromState) => {
+    return !hasUnsavedChanges(); // false blocks back/forward
+  },
+);
 ```
 
 ## SSR Support
@@ -98,8 +101,8 @@ SSR-safe — automatically detects the environment and falls back to no-ops:
 
 ```typescript
 router.usePlugin(hashPluginFactory());
-router.buildUrl("home");     // returns hash path
-router.matchUrl("/path");    // returns undefined
+router.buildUrl("home"); // returns hash path
+router.matchUrl("/path"); // returns undefined
 ```
 
 ## Documentation
@@ -111,11 +114,11 @@ Full documentation: [Wiki — hash-plugin](https://github.com/greydragon888/real
 
 ## Related Packages
 
-| Package | Description |
-|---------|-------------|
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required peer dependency) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | History API routing (clean URLs) |
-| [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration |
+| Package                                                                                  | Description                            |
+| ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required peer dependency) |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | History API routing (clean URLs)       |
+| [@real-router/react](https://www.npmjs.com/package/@real-router/react)                   | React integration                      |
 
 ## Contributing
 

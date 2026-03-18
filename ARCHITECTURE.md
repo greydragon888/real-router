@@ -7,6 +7,7 @@
 Real-Router is a **named, hierarchical, state-driven router** for JavaScript applications. Routes form a dot-notation tree (`users.profile.edit`), navigation is guarded by lifecycle functions, and the entire lifecycle is driven by a single finite state machine — no boolean flags, no ad-hoc state.
 
 Key technical choices:
+
 - **Segment Trie** for URL matching — O(segments) traversal, O(1) for static routes
 - **Facade + Namespaces** — thin Router class delegates to single-responsibility namespace modules
 - **Optimistic sync execution** — navigation runs synchronously unless a guard returns a Promise
@@ -27,6 +28,7 @@ real-router/
 │   ├── hash-plugin/               # Hash-based routing (#/path)
 │   ├── logger-plugin/             # Development logging with timing and param diffs
 │   ├── persistent-params-plugin/  # Parameter persistence across navigations
+│   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
@@ -38,7 +40,7 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
 
@@ -108,6 +110,9 @@ graph TD
 
     PPP -->|dep| CORE
     PPP -.->|bundles| TG
+
+    SDP["ssr-data-plugin"]
+    SDP -->|dep| CORE
 
     ROUTEUTILS -->|dep| TYPES
 ```
@@ -238,11 +243,11 @@ On error at any step: `emitTransitionError()`, Promise rejects with `RouterError
 
 Plugins intercept router methods via `addInterceptor()` on `PluginApi`:
 
-| Method         | Signature                                                 | Used by                  |
-| -------------- | --------------------------------------------------------- | ------------------------ |
-| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin           |
-| `buildPath`    | `(route: string, params?: Params) => string`              | persistent-params-plugin |
-| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin |
+| Method         | Signature                                                 | Used by                         |
+| -------------- | --------------------------------------------------------- | ------------------------------- |
+| `start`        | `(path?: string) => Promise<State>`                       | browser-plugin, ssr-data-plugin |
+| `buildPath`    | `(route: string, params?: Params) => string`              | persistent-params-plugin        |
+| `forwardState` | `(routeName: string, routeParams: Params) => SimpleState` | persistent-params-plugin        |
 
 Multiple interceptors per method execute in **LIFO** order (last-registered wraps first). Each receives `next` (original or previously-wrapped function) plus the method's arguments. Applied via `createInterceptable()` in `RouterInternals`.
 
@@ -303,12 +308,14 @@ These are deliberately designed constraints. Violating them will break the syste
 ```
 
 **ALLOWED:**
+
 - Consumer packages depend on `core` and `core-types`
 - Consumer packages bundle internal packages as needed (`type-guards`, `browser-env`)
 - Foundation packages depend on each other (`route-tree` → `path-matcher`, `search-params`)
 - `browser-env` is the **only** package that touches `window`, `history`, `addEventListener`
 
 **FORBIDDEN:**
+
 - Foundation packages must not depend on `core`
   - Exception: `browser-env` depends on `core` for `Router`, `PluginApi`, `RouterError` types
 - Consumer packages must not depend on each other's internals
@@ -341,6 +348,7 @@ pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsu
 ### Performance Hot Path
 
 The navigate path is heavily optimized:
+
 - **Optimistic sync execution** — no AbortController/Promise on the sync path
 - **FSM `forceState()`** — bypasses `send()` dispatch for NAVIGATE/COMPLETE transitions
 - **EventEmitter explicit params** — `emit(name, a?, b?, c?, d?)` avoids V8 rest-param array allocation
