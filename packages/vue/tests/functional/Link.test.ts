@@ -218,4 +218,62 @@ describe("Link component", () => {
       expect(wrapper.find("a").text()).toBe("Original Text");
     });
   });
+
+  describe("Default prop factories", () => {
+    it("should use default routeParams factory when prop is not provided", () => {
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+      });
+
+      const link = wrapper.find("a");
+
+      expect(link.exists()).toBe(true);
+      expect(link.attributes("href")).toBe("/test");
+    });
+
+    it("should use default routeOptions factory when prop is not provided", async () => {
+      vi.spyOn(router, "navigate");
+
+      const wrapper = mountLink(router, {
+        routeName: "one-more-test",
+      });
+
+      await wrapper.find("a").trigger("click");
+      await flushPromises();
+
+      expect(router.navigate).toHaveBeenCalledWith(
+        "one-more-test",
+        expect.any(Object),
+        expect.any(Object),
+      );
+    });
+
+    it("should render correctly without routeParams and routeOptions props", () => {
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router },
+              {
+                default: () =>
+                  h(
+                    Link,
+                    { routeName: "one-more-test" },
+                    {
+                      default: () => "Link Text",
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      const link = wrapper.find("a");
+
+      expect(link.exists()).toBe(true);
+      expect(link.text()).toBe("Link Text");
+      expect(link.attributes("href")).toBe("/test");
+    });
+  });
 });

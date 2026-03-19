@@ -647,4 +647,182 @@ describe("RouteView", () => {
       expect(wrapper.find("[data-testid='list']").exists()).toBe(false);
     });
   });
+
+  describe("NotFound with keepAlive", () => {
+    let notFoundRouter: Router;
+
+    beforeEach(() => {
+      notFoundRouter = createRouter(
+        [
+          { name: "test", path: "/" },
+          { name: "home", path: "/home" },
+          {
+            name: "users",
+            path: "/users",
+            children: [{ name: "list", path: "/list" }],
+          },
+        ],
+        {
+          defaultRoute: "test",
+          allowNotFound: true,
+        },
+      );
+      notFoundRouter.usePlugin(browserPluginFactory({}));
+    });
+
+    afterEach(() => {
+      notFoundRouter.stop();
+    });
+
+    it("should render NotFound in non-keepAlive mode when route is UNKNOWN_ROUTE", async () => {
+      await notFoundRouter.start("/non-existent-path");
+
+      const wrapper = mountRouteView(
+        notFoundRouter,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: false },
+          {
+            default: () => [
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+              h(RouteView.NotFound, null, {
+                default: () =>
+                  h("div", { "data-testid": "not-found" }, "Not Found"),
+              }),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='not-found']").exists()).toBe(true);
+    });
+
+    it("should render NotFound through KeepAlive wrapper when keepAlive is true and route is UNKNOWN_ROUTE", async () => {
+      await notFoundRouter.start("/non-existent-path");
+
+      const wrapper = mountRouteView(
+        notFoundRouter,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: true },
+          {
+            default: () => [
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+              h(RouteView.NotFound, null, {
+                default: () =>
+                  h("div", { "data-testid": "not-found" }, "Not Found"),
+              }),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='not-found']").exists()).toBe(true);
+    });
+  });
+
+  describe("Nested array children", () => {
+    it("should handle nested arrays in children via normalizeChildren", () => {
+      const matchVNode = h(Match, { segment: "users" });
+      const result: any[] = [];
+
+      collectElements([[matchVNode]], result);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(Match);
+    });
+
+    it("should handle deeply nested arrays", () => {
+      const matchVNode = h(Match, { segment: "users" });
+      const result: any[] = [];
+
+      collectElements([[[matchVNode]]], result);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(Match);
+    });
+  });
+
+  describe("Match without props", () => {
+    it("should handle Match with null props (no segment prop)", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () => [
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+              h(RouteView.Match, null as any, {
+                default: () =>
+                  h("div", { "data-testid": "fallback" }, "Fallback"),
+              }),
+            ],
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
+    });
+  });
+
+  describe("KeepAlive with empty NotFound content", () => {
+    let notFoundRouter: Router;
+
+    beforeEach(() => {
+      notFoundRouter = createRouter(
+        [
+          { name: "test", path: "/" },
+          { name: "home", path: "/home" },
+        ],
+        {
+          defaultRoute: "test",
+          allowNotFound: true,
+        },
+      );
+      notFoundRouter.usePlugin(browserPluginFactory({}));
+    });
+
+    afterEach(() => {
+      notFoundRouter.stop();
+    });
+
+    it("should handle NotFound with no slot content in keepAlive mode", async () => {
+      await notFoundRouter.start("/non-existent-path");
+
+      const wrapper = mountRouteView(
+        notFoundRouter,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: true },
+          {
+            default: () => h(RouteView.NotFound),
+          },
+        ),
+      );
+
+      expect(wrapper.html()).toBe("");
+    });
+  });
 });
