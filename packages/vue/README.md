@@ -1,0 +1,297 @@
+# @real-router/vue
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](../../LICENSE)
+
+> Vue 3 integration for [Real-Router](https://github.com/greydragon888/real-router) — composables, components, and context providers.
+
+## Installation
+
+```bash
+npm install @real-router/vue @real-router/core @real-router/browser-plugin
+```
+
+**Peer dependency:** `vue` >= 3.3.0
+
+## Quick Start
+
+```typescript
+import { createRouter } from "@real-router/core";
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { RouterProvider, RouteView, Link } from "@real-router/vue";
+import { defineComponent, h } from "vue";
+
+const router = createRouter([
+  { name: "home", path: "/" },
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
+]);
+
+router.usePlugin(browserPluginFactory());
+router.start();
+
+const App = defineComponent({
+  setup() {
+    return () =>
+      h(
+        RouterProvider,
+        { router },
+        {
+          default: () => [
+            h("nav", [
+              h(Link, { routeName: "home" }, { default: () => "Home" }),
+              h(Link, { routeName: "users" }, { default: () => "Users" }),
+            ]),
+            h(
+              RouteView,
+              { nodeName: "" },
+              {
+                default: () => [
+                  h(
+                    RouteView.Match,
+                    { segment: "home" },
+                    { default: () => h(HomePage) },
+                  ),
+                  h(
+                    RouteView.Match,
+                    { segment: "users" },
+                    { default: () => h(UsersPage) },
+                  ),
+                  h(RouteView.NotFound, null, {
+                    default: () => h(NotFoundPage),
+                  }),
+                ],
+              },
+            ),
+          ],
+        },
+      );
+  },
+});
+```
+
+Or with Vue SFC templates (the composables and components work in `.vue` files too):
+
+```vue
+<template>
+  <RouterProvider :router="router">
+    <nav>
+      <Link routeName="home">Home</Link>
+      <Link routeName="users">Users</Link>
+    </nav>
+    <RouteView nodeName="">
+      <RouteView.Match segment="home">
+        <HomePage />
+      </RouteView.Match>
+      <RouteView.Match segment="users">
+        <UsersPage />
+      </RouteView.Match>
+      <RouteView.NotFound>
+        <NotFoundPage />
+      </RouteView.NotFound>
+    </RouteView>
+  </RouterProvider>
+</template>
+```
+
+## Composables
+
+Route state composables return `ShallowRef` values. Read `.value` in script, or use them directly in templates where Vue auto-unwraps refs.
+
+| Composable              | Returns                                                       | Reactive?                                |
+| ----------------------- | ------------------------------------------------------------- | ---------------------------------------- |
+| `useRouter()`           | `Router`                                                      | Never                                    |
+| `useNavigator()`        | `Navigator`                                                   | Never (stable ref, safe to use directly) |
+| `useRoute()`            | `{ navigator, route: ShallowRef, previousRoute: ShallowRef }` | route/previousRoute on every navigation  |
+| `useRouteNode(name)`    | `{ navigator, route: ShallowRef, previousRoute: ShallowRef }` | Only when node activates/deactivates     |
+| `useRouteUtils()`       | `RouteUtils`                                                  | Never                                    |
+| `useRouterTransition()` | `ShallowRef<RouterTransitionSnapshot>`                        | On transition start/end                  |
+
+```typescript
+// useRouteNode — updates only when "users.*" changes
+const UsersLayout = defineComponent({
+  setup() {
+    const { route } = useRouteNode("users");
+
+    return () => {
+      if (!route.value) return null;
+
+      switch (route.value.name) {
+        case "users":
+          return h(UsersList);
+        case "users.profile":
+          return h(UserProfile, { id: route.value.params.id });
+        default:
+          return null;
+      }
+    };
+  },
+});
+
+// useNavigator — stable reference, never reactive
+const BackButton = defineComponent({
+  setup() {
+    const navigator = useNavigator();
+    return () =>
+      h("button", { onClick: () => navigator.navigate("home") }, "Back");
+  },
+});
+
+// useRouterTransition — progress bars, loading states
+const GlobalProgress = defineComponent({
+  setup() {
+    const transition = useRouterTransition();
+    return () =>
+      transition.value.isTransitioning
+        ? h("div", { class: "progress-bar" })
+        : null;
+  },
+});
+```
+
+## Components
+
+### `<Link>`
+
+Navigation link with automatic active state detection. Uses `computed()` for href and class — only the DOM attributes update when active state changes.
+
+```typescript
+h(
+  Link,
+  {
+    routeName: "users.profile",
+    routeParams: { id: "123" },
+    activeClassName: "active", // default: "active"
+    activeStrict: false, // default: false (ancestor match)
+    ignoreQueryParams: true, // default: true
+    routeOptions: { replace: true },
+  },
+  { default: () => "View Profile" },
+);
+```
+
+In a template:
+
+```vue
+<Link
+  routeName="users.profile"
+  :routeParams="{ id: '123' }"
+  activeClassName="active"
+  :activeStrict="false"
+  :ignoreQueryParams="true"
+  :routeOptions="{ replace: true }"
+>
+  View Profile
+</Link>
+```
+
+### `<RouteView>`
+
+Declarative route matching. Renders the first matching `<RouteView.Match>` child.
+
+```typescript
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      h(RouteView.Match, { segment: "users" }, { default: () => h(UsersPage) }),
+      h(
+        RouteView.Match,
+        { segment: "settings" },
+        { default: () => h(SettingsPage) },
+      ),
+      h(RouteView.NotFound, null, { default: () => h(NotFoundPage) }),
+    ],
+  },
+);
+```
+
+`RouteView.Match` accepts an optional `exact` prop for strict segment matching:
+
+```typescript
+h(
+  RouteView.Match,
+  { segment: "users", exact: true },
+  { default: () => h(UsersIndex) },
+);
+// Only matches "users" exactly, not "users.profile"
+```
+
+**`keepAlive` prop:** Vue's native `<KeepAlive>` preserves component state across navigations. Each segment gets a dedicated wrapper component so `<KeepAlive>` can track them independently.
+
+```typescript
+h(
+  RouteView,
+  { nodeName: "", keepAlive: true },
+  {
+    default: () => [
+      h(RouteView.Match, { segment: "users" }, { default: () => h(UsersPage) }),
+      // UsersPage stays alive when navigating to settings and back
+    ],
+  },
+);
+```
+
+## Vue-Specific Patterns
+
+### Refs, Not Plain Values
+
+Unlike the React and Preact adapters, `useRoute()` and `useRouteNode()` return `ShallowRef` values. Read `.value` in script:
+
+```typescript
+// React/Preact
+const { route } = useRoute();
+console.log(route?.name);
+
+// Vue
+const { route } = useRoute();
+console.log(route.value?.name); // .value in script
+
+// In template — Vue auto-unwraps
+// <div>{{ route?.name }}</div>
+```
+
+### Watching Route Changes
+
+Use Vue's `watch` to react to route changes in script:
+
+```typescript
+const { route } = useRouteNode("users");
+
+watch(route, (newRoute) => {
+  if (newRoute) {
+    document.title = `Users — ${newRoute.params.id ?? "list"}`;
+  }
+});
+```
+
+### No .vue SFC Required
+
+All components are plain `.ts` files using `defineComponent` + `h()`. You can use them in `.vue` SFC templates or in render functions — both work.
+
+## Documentation
+
+Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
+
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
+
+## Related Packages
+
+| Package                                                                                  | Description                          |
+| ---------------------------------------------------------------------------------------- | ------------------------------------ |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
+
+## Contributing
+
+See [contributing guidelines](../../CONTRIBUTING.md) for development setup and PR process.
+
+## License
+
+[MIT](../../LICENSE) © [Oleg Ivanov](https://github.com/greydragon888)

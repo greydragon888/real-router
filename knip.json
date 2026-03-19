@@ -25,6 +25,12 @@
       },
       "ignoreDependencies": ["@babel/preset-typescript", "babel-preset-solid"]
     },
+    "packages/vue": {
+      "project": ["src/**/*.ts"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      }
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {
