@@ -96,6 +96,20 @@ Or with Vue SFC templates (the composables and components work in `.vue` files t
 </template>
 ```
 
+## Plugin Installation (Alternative)
+
+Use `createRouterPlugin` for the standard `app.use()` pattern instead of `<RouterProvider>`:
+
+```typescript
+import { createApp } from "vue";
+import { createRouterPlugin } from "@real-router/vue";
+
+const app = createApp(App);
+app.use(createRouterPlugin(router));
+```
+
+All composables (`useRouter`, `useRoute`, etc.) and the `v-link` directive work identically — `app.provide()` resolves the same way as component-level `provide()`. `<RouterProvider>` remains available for advanced cases (multiple routers, scoped routing, testing).
+
 ## Composables
 
 Route state composables return `ShallowRef` values. Read `.value` in script, or use them directly in templates where Vue auto-unwraps refs.

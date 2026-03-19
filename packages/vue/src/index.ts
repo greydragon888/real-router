@@ -19,6 +19,9 @@ export { useRouteNode } from "./composables/useRouteNode";
 
 export { useRouterTransition } from "./composables/useRouterTransition";
 
+// Plugin
+export { createRouterPlugin } from "./createRouterPlugin";
+
 // Context
 export { RouterProvider } from "./RouterProvider";
 
