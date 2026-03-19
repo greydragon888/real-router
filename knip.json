@@ -31,6 +31,13 @@
         "config": ["vitest.config.mts"]
       }
     },
+    "packages/svelte": {
+      "project": ["src/**/*.{ts,svelte,svelte.ts}"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      },
+      "ignoreDependencies": ["@real-router/browser-plugin"]
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {
