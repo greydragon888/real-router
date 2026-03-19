@@ -145,6 +145,27 @@ Navigation link with automatic active state detection. Uses `$derived` for href 
 
 All other props are spread onto the `<a>` element.
 
+### `<Lazy>`
+
+Lazy-load route content with a fallback component while loading. Useful for code-splitting and dynamic imports.
+
+```svelte
+<RouteView nodeName="">
+  {#snippet dashboard()}
+    <Lazy loader={() => import('./Dashboard.svelte')} fallback={Spinner} />
+  {/snippet}
+</RouteView>
+```
+
+**Props:**
+
+| Prop       | Type                                    | Default     | Description                               |
+| ---------- | --------------------------------------- | ----------- | ----------------------------------------- |
+| `loader`   | `() => Promise<{ default: Component }>` | required    | Async function that imports the component |
+| `fallback` | `Component`                             | `undefined` | Component to render while loading         |
+
+The `loader` function should return a dynamic import promise. The `fallback` component is rendered while the import is pending. If an error occurs during loading, an error message is displayed.
+
 ### `<RouteView>`
 
 Declarative route matching. Renders the snippet whose name matches the active route segment.

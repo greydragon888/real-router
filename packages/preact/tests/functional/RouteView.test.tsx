@@ -471,4 +471,50 @@ describe("RouteView", () => {
       expect(screen.queryByTestId("list")).not.toBeInTheDocument();
     });
   });
+
+  describe("Suspense fallback", () => {
+    it("should wrap children in Suspense when fallback is provided", async () => {
+      const { lazy } = await import("preact/compat");
+
+      const LazyComponent = lazy(() =>
+        Promise.resolve({
+          default: () => <div data-testid="lazy-content">Lazy Content</div>,
+        }),
+      );
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match
+              segment="users"
+              fallback={<div data-testid="fallback">Loading...</div>}
+            >
+              <LazyComponent />
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    });
+
+    it("should not wrap children in Suspense when fallback is not provided", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="content">Content</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("content")).toBeInTheDocument();
+      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
+    });
+  });
 });

@@ -151,6 +151,22 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 </RouteView.Match>
 ```
 
+**Lazy loading with `fallback`:** Pass a `fallback` prop (`JSX.Element`) to wrap the matched content in Solid's `<Suspense>`. This lets you show a loading state while a `lazy()` component's chunk is fetching.
+
+```tsx
+import { lazy } from "solid-js";
+
+const LazyDashboard = lazy(() => import("./Dashboard"));
+
+<RouteView nodeName="">
+  <RouteView.Match segment="dashboard" fallback={<Spinner />}>
+    <LazyDashboard />
+  </RouteView.Match>
+</RouteView>;
+```
+
+Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
+
 > **Note:** `keepAlive` is not supported. Solid has no equivalent of React's `<Activity>` API. Components dispose completely when navigating away.
 
 ## Solid-Specific Patterns

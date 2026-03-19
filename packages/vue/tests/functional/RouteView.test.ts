@@ -825,4 +825,118 @@ describe("RouteView", () => {
       expect(wrapper.html()).toBe("");
     });
   });
+
+  describe("Suspense fallback", () => {
+    it("should render fallback when provided", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                {
+                  segment: "users",
+                  fallback: () =>
+                    h("div", { "data-testid": "fallback" }, "Loading..."),
+                },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+    });
+
+    it("should not render fallback when no fallback prop", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                { segment: "users" },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='fallback']").exists()).toBe(false);
+    });
+
+    it("should render fallback with keepAlive when provided", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: true },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                {
+                  segment: "users",
+                  fallback: () =>
+                    h("div", { "data-testid": "fallback" }, "Loading..."),
+                },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+    });
+
+    it("should render fallback as VNode when provided", async () => {
+      await router.start("/users/list");
+
+      const wrapper = mountRouteView(
+        router,
+        h(
+          RouteView,
+          { nodeName: "" },
+          {
+            default: () =>
+              h(
+                RouteView.Match,
+                {
+                  segment: "users",
+                  fallback: h(
+                    "div",
+                    { "data-testid": "fallback" },
+                    "Loading...",
+                  ),
+                },
+                {
+                  default: () => h("div", { "data-testid": "users" }, "Users"),
+                },
+              ),
+          },
+        ),
+      );
+
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(true);
+    });
+  });
 });

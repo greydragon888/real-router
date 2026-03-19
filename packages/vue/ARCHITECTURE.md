@@ -147,6 +147,8 @@ Link (defineComponent + h('a'))
 
 **`class` string concat for active state:** Vue's `class` binding accepts a string. The `finalClassName` computed concatenates `props.class` and `props.activeClassName` when `isActive.value` is true.
 
+**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in Vue's `<Suspense>` boundary with that fallback. Use this with `defineAsyncComponent` to code-split route components. Works with both `keepAlive` and non-`keepAlive` modes — the `<Suspense>` boundary is preserved inside the `<KeepAlive>` wrapper.
+
 **RouteView marker components:** `Match` and `NotFound` are real `defineComponent` instances with `render: null`. `RouteView` reads `slots.default?.()` to get VNodes, then `collectElements` walks them checking `vnode.type === Match` or `vnode.type === NotFound`. This is standard Vue VNode type checking.
 
 ```

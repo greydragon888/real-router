@@ -14,6 +14,8 @@ export interface MatchProps {
   readonly exact?: boolean;
   /** Preserve component state when deactivated (React Activity). Defaults to false. */
   readonly keepAlive?: boolean;
+  /** Fallback content to show while children are suspended. */
+  readonly fallback?: ReactNode;
   /** Content to render when matched. */
   readonly children: ReactNode;
 }

@@ -134,6 +134,29 @@ Declarative route matching. Renders the first matching `<RouteView.Match>` child
 
 > **Note:** Unlike the React adapter, `keepAlive` is not supported. Preact has no equivalent of React's `<Activity>` API. Components unmount completely when navigating away.
 
+#### `RouteView.Match` props
+
+| Prop       | Type                | Description                                                                 |
+| ---------- | ------------------- | --------------------------------------------------------------------------- |
+| `segment`  | `string`            | Route segment to match                                                      |
+| `fallback` | `ComponentChildren` | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
+
+#### Lazy loading with `fallback` (experimental)
+
+Preact's `lazy` and `Suspense` come from `preact/compat`. Support is experimental — test before shipping to production.
+
+```tsx
+import { lazy } from "preact/compat";
+
+const LazyDashboard = lazy(() => import("./Dashboard"));
+
+<RouteView nodeName="">
+  <RouteView.Match segment="dashboard" fallback={<Spinner />}>
+    <LazyDashboard />
+  </RouteView.Match>
+</RouteView>;
+```
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)

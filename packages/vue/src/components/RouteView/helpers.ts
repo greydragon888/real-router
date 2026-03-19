@@ -6,6 +6,8 @@ import { Match, NotFound } from "./components";
 
 import type { VNode } from "vue";
 
+type FallbackType = VNode | (() => VNode) | undefined;
+
 function isSegmentMatch(
   routeName: string,
   fullSegmentName: string,
@@ -56,9 +58,14 @@ export function buildRenderList(
   elements: VNode[],
   routeName: string,
   nodeName: string,
-): { rendered: VNode[]; activeMatchFound: boolean } {
+): {
+  rendered: VNode[];
+  activeMatchFound: boolean;
+  fallback?: FallbackType;
+} {
   let notFoundChildren: unknown = null;
   let activeMatchFound = false;
+  let fallback: FallbackType = undefined;
   const rendered: VNode[] = [];
 
   for (const child of elements) {
@@ -67,7 +74,11 @@ export function buildRenderList(
       continue;
     }
 
-    const props = child.props as { segment: string; exact?: boolean } | null;
+    const props = child.props as {
+      segment: string;
+      exact?: boolean;
+      fallback?: FallbackType;
+    } | null;
     const segment = props?.segment ?? "";
     const exact = props?.exact ?? false;
     const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
@@ -76,6 +87,7 @@ export function buildRenderList(
 
     if (isActive) {
       activeMatchFound = true;
+      fallback = props?.fallback;
       rendered.push(child);
     }
   }
@@ -94,5 +106,5 @@ export function buildRenderList(
     }
   }
 
-  return { rendered, activeMatchFound };
+  return { rendered, activeMatchFound, fallback };
 }

@@ -141,6 +141,8 @@ Link (no memo — Solid components run once)
 
 **`classList` for active state:** Solid's `classList` prop accepts `{ [className]: boolean }` and updates the DOM attribute directly without string concatenation.
 
+**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary (from `solid-js`) with that fallback. Use this with `lazy()` from `solid-js` to code-split route components.
+
 **RouteView marker objects:** `Match` and `NotFound` are not real JSX elements — they return plain objects with a `$$type` Symbol property. `RouteView` uses `children()` from `solid-js` to resolve the child accessor, then `collectElements` walks the result and checks `$$type` to identify markers. This avoids React-style element type checking (`element.type === Match`) which doesn't work in Solid.
 
 ```

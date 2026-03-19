@@ -235,6 +235,45 @@ h(
 );
 ```
 
+**Lazy loading with `fallback`:** Pass a `fallback` prop (`VNode | (() => VNode)`) to wrap the matched content in Vue's `<Suspense>`. This lets you show a loading state while a `defineAsyncComponent` chunk is fetching. Works with both `keepAlive` and non-`keepAlive` modes.
+
+```typescript
+import { defineAsyncComponent, h } from "vue";
+
+const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
+
+h(
+  RouteView,
+  { nodeName: "" },
+  {
+    default: () => [
+      h(
+        RouteView.Match,
+        { segment: "dashboard", fallback: h(Spinner) },
+        { default: () => h(LazyDashboard) },
+      ),
+    ],
+  },
+);
+```
+
+In a template:
+
+```vue
+<script setup>
+import { defineAsyncComponent } from "vue";
+const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
+</script>
+
+<RouteView nodeName="">
+  <RouteView.Match segment="dashboard" :fallback="SpinnerComponent">
+    <LazyDashboard />
+  </RouteView.Match>
+</RouteView>
+```
+
+Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
+
 ## Vue-Specific Patterns
 
 ### Refs, Not Plain Values

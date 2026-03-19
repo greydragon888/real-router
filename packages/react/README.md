@@ -17,10 +17,10 @@ npm install @real-router/react @real-router/core @real-router/browser-plugin
 
 ## Entry Points
 
-| Import Path | React Version | Includes |
-|-------------|---------------|----------|
-| `@real-router/react` | 19.2+ | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
-| `@real-router/react/legacy` | 18+ | All hooks and `Link`, no `RouteView` |
+| Import Path                 | React Version | Includes                                               |
+| --------------------------- | ------------- | ------------------------------------------------------ |
+| `@real-router/react`        | 19.2+         | Full API (hooks, `Link`, `RouteView` with `keepAlive`) |
+| `@real-router/react/legacy` | 18+           | All hooks and `Link`, no `RouteView`                   |
 
 Both share the same underlying code — `/legacy` excludes components that require React 19.2's `<Activity>` API.
 
@@ -33,9 +33,11 @@ import { RouterProvider, RouteView, Link } from "@real-router/react";
 
 const router = createRouter([
   { name: "home", path: "/" },
-  { name: "users", path: "/users", children: [
-    { name: "profile", path: "/:id" },
-  ]},
+  {
+    name: "users",
+    path: "/users",
+    children: [{ name: "profile", path: "/:id" }],
+  },
 ]);
 
 router.usePlugin(browserPluginFactory());
@@ -49,9 +51,15 @@ function App() {
         <Link routeName="users">Users</Link>
       </nav>
       <RouteView nodeName="">
-        <RouteView.Match routeName="home"><HomePage /></RouteView.Match>
-        <RouteView.Match routeName="users"><UsersPage /></RouteView.Match>
-        <RouteView.NotFound><NotFoundPage /></RouteView.NotFound>
+        <RouteView.Match routeName="home">
+          <HomePage />
+        </RouteView.Match>
+        <RouteView.Match routeName="users">
+          <UsersPage />
+        </RouteView.Match>
+        <RouteView.NotFound>
+          <NotFoundPage />
+        </RouteView.NotFound>
       </RouteView>
     </RouterProvider>
   );
@@ -60,14 +68,14 @@ function App() {
 
 ## Hooks
 
-| Hook | Returns | Re-renders |
-|------|---------|------------|
-| `useRouter()` | `Router` | Never |
-| `useNavigator()` | `Navigator` | Never (stable ref, safe to destructure) |
-| `useRoute()` | `{ router, route, previousRoute }` | Every navigation |
-| `useRouteNode(name)` | `{ router, route, previousRoute }` | Only when node activates/deactivates |
-| `useRouteUtils()` | `RouteUtils` | Never |
-| `useRouterTransition()` | `{ isTransitioning, toRoute, fromRoute }` | On transition start/end |
+| Hook                    | Returns                                   | Re-renders                              |
+| ----------------------- | ----------------------------------------- | --------------------------------------- |
+| `useRouter()`           | `Router`                                  | Never                                   |
+| `useNavigator()`        | `Navigator`                               | Never (stable ref, safe to destructure) |
+| `useRoute()`            | `{ router, route, previousRoute }`        | Every navigation                        |
+| `useRouteNode(name)`    | `{ router, route, previousRoute }`        | Only when node activates/deactivates    |
+| `useRouteUtils()`       | `RouteUtils`                              | Never                                   |
+| `useRouterTransition()` | `{ isTransitioning, toRoute, fromRoute }` | On transition start/end                 |
 
 ```tsx
 // useRouteNode — re-renders only when "users.*" changes
@@ -76,9 +84,12 @@ function UsersLayout() {
   if (!route) return null;
 
   switch (route.name) {
-    case "users":        return <UsersList />;
-    case "users.profile": return <UserProfile id={route.params.id} />;
-    default:             return null;
+    case "users":
+      return <UsersList />;
+    case "users.profile":
+      return <UserProfile id={route.params.id} />;
+    default:
+      return null;
   }
 }
 
@@ -106,9 +117,9 @@ Navigation link with automatic active state detection. Re-renders only when its 
 <Link
   routeName="users.profile"
   routeParams={{ id: "123" }}
-  activeClassName="active"     // default: "active"
-  activeStrict={false}         // default: false (ancestor match)
-  ignoreQueryParams={true}     // default: true
+  activeClassName="active" // default: "active"
+  activeStrict={false} // default: false (ancestor match)
+  ignoreQueryParams={true} // default: true
   routeOptions={{ replace: true }}
 >
   View Profile
@@ -133,6 +144,32 @@ Declarative route matching with optional `keepAlive` — preserves component sta
 </RouteView>
 ```
 
+#### `RouteView.Match` props
+
+| Prop        | Type        | Description                                                                 |
+| ----------- | ----------- | --------------------------------------------------------------------------- |
+| `segment`   | `string`    | Route segment to match                                                      |
+| `keepAlive` | `boolean`   | Preserve state via React `<Activity>` (React 19.2+)                         |
+| `fallback`  | `ReactNode` | Shown while children suspend. Wraps children in `<Suspense>` when provided. |
+
+#### Lazy loading with `fallback`
+
+Pass `fallback` to code-split a route component. `RouteView.Match` wraps children in `<Suspense>` automatically:
+
+```tsx
+import { lazy } from "react";
+
+const LazyDashboard = lazy(() => import("./Dashboard"));
+
+<RouteView nodeName="">
+  <RouteView.Match segment="dashboard" fallback={<Spinner />}>
+    <LazyDashboard />
+  </RouteView.Match>
+</RouteView>;
+```
+
+`fallback` and `keepAlive` work together — `<Activity>` wraps the whole match including the `<Suspense>` boundary.
+
 ## React 18 Migration
 
 One import path change — all hooks and `Link` work identically:
@@ -146,14 +183,14 @@ One import path change — all hooks and `Link` work identically:
 
 ## Migration from react-router5
 
-| API | react-router5 | @real-router/react |
-|-----|---------------|-------------------|
-| `RouterProvider`, `Link` | Yes | Yes |
-| `useRouter`, `useRoute`, `useRouteNode` | Yes | Yes |
-| `RouteView` with `keepAlive` | No | Yes (React 19.2+) |
-| `useNavigator`, `useRouteUtils`, `useRouterTransition` | No | Yes |
-| `withRouter`, `withRoute`, `routeNode` (HOCs) | Yes | No — use hooks |
-| `Router`, `Route`, `RouteNode` (render props) | Yes | No — use hooks |
+| API                                                    | react-router5 | @real-router/react |
+| ------------------------------------------------------ | ------------- | ------------------ |
+| `RouterProvider`, `Link`                               | Yes           | Yes                |
+| `useRouter`, `useRoute`, `useRouteNode`                | Yes           | Yes                |
+| `RouteView` with `keepAlive`                           | No            | Yes (React 19.2+)  |
+| `useNavigator`, `useRouteUtils`, `useRouterTransition` | No            | Yes                |
+| `withRouter`, `withRoute`, `routeNode` (HOCs)          | Yes           | No — use hooks     |
+| `Router`, `Route`, `RouteNode` (render props)          | Yes           | No — use hooks     |
 
 ## Documentation
 
@@ -164,12 +201,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
 ## Related Packages
 
-| Package | Description |
-|---------|-------------|
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required dependency) |
-| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration |
-| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources) | Subscription layer (used internally) |
-| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils) | Route tree queries (`useRouteUtils`) |
+| Package                                                                                  | Description                          |
+| ---------------------------------------------------------------------------------------- | ------------------------------------ |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)                     | Core router (required dependency)    |
+| [@real-router/browser-plugin](https://www.npmjs.com/package/@real-router/browser-plugin) | Browser History API integration      |
+| [@real-router/sources](https://www.npmjs.com/package/@real-router/sources)               | Subscription layer (used internally) |
+| [@real-router/route-utils](https://www.npmjs.com/package/@real-router/route-utils)       | Route tree queries (`useRouteUtils`) |
 
 ## Contributing
 

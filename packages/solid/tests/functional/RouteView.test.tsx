@@ -426,4 +426,42 @@ describe("RouteView", () => {
       });
     });
   });
+
+  describe("Suspense fallback", () => {
+    it("should render fallback when provided", async () => {
+      await router.start("/users/list");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match
+              segment="users"
+              fallback={<div data-testid="fallback">Loading...</div>}
+            >
+              <div data-testid="users">Users</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+    });
+
+    it("should not render fallback when no fallback prop", async () => {
+      await router.start("/users/list");
+
+      render(() => (
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="users">Users</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>
+      ));
+
+      expect(screen.getByTestId("users")).toBeInTheDocument();
+      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
+    });
+  });
 });

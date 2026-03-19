@@ -1,6 +1,6 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { startsWithSegment } from "@real-router/route-utils";
-import { Activity, Children, Fragment, isValidElement } from "react";
+import { Activity, Children, Fragment, Suspense, isValidElement } from "react";
 
 import { Match, NotFound } from "./components";
 
@@ -45,16 +45,24 @@ function renderMatchElement(
   fullSegmentName: string,
   keepAlive: boolean,
   mode: "visible" | "hidden",
+  fallback?: ReactNode,
 ): ReactElement {
+  const content =
+    fallback === undefined ? (
+      matchChildren
+    ) : (
+      <Suspense fallback={fallback}>{matchChildren}</Suspense>
+    );
+
   if (keepAlive) {
     return (
       <Activity mode={mode} key={fullSegmentName}>
-        {matchChildren}
+        {content}
       </Activity>
     );
   }
 
-  return <Fragment key={fullSegmentName}>{matchChildren}</Fragment>;
+  return <Fragment key={fullSegmentName}>{content}</Fragment>;
 }
 
 export function buildRenderList(
@@ -77,6 +85,7 @@ export function buildRenderList(
       segment,
       exact = false,
       keepAlive = false,
+      fallback,
     } = child.props as MatchProps;
     const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
     const isActive =
@@ -91,6 +100,7 @@ export function buildRenderList(
           fullSegmentName,
           keepAlive,
           "visible",
+          fallback,
         ),
       );
     } else if (keepAlive && hasBeenActivated.has(fullSegmentName)) {
@@ -100,6 +110,7 @@ export function buildRenderList(
           fullSegmentName,
           keepAlive,
           "hidden",
+          fallback,
         ),
       );
     }

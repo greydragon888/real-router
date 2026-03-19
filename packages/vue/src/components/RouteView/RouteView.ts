@@ -1,4 +1,11 @@
-import { Fragment, defineComponent, h, KeepAlive, markRaw } from "vue";
+import {
+  Fragment,
+  defineComponent,
+  h,
+  KeepAlive,
+  markRaw,
+  Suspense,
+} from "vue";
 
 import { Match, NotFound } from "./components";
 import { buildRenderList, collectElements } from "./helpers";
@@ -38,6 +45,27 @@ function getOrCreateWrapper(
   return wrapper;
 }
 
+function wrapWithSuspense(content: VNode, fallback: unknown): VNode {
+  if (fallback === undefined) {
+    return content;
+  }
+
+  const fallbackContent =
+    typeof fallback === "function" ? (fallback as () => VNode)() : fallback;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment
+  const suspenseComponent = Suspense as any;
+
+  return h(
+    suspenseComponent,
+    {},
+    {
+      default: () => content,
+      fallback: () => fallbackContent,
+    },
+  );
+}
+
 const RouteViewComponent = defineComponent({
   name: "RouteView",
   props: {
@@ -66,7 +94,7 @@ const RouteViewComponent = defineComponent({
 
       collectElements(slots.default?.(), elements);
 
-      const { rendered } = buildRenderList(
+      const { rendered, fallback } = buildRenderList(
         elements,
         route.name,
         props.nodeName,
@@ -86,7 +114,9 @@ const RouteViewComponent = defineComponent({
             return null;
           }
 
-          return h(Fragment, content);
+          const fragment = h(Fragment, content);
+
+          return wrapWithSuspense(fragment, fallback);
         }
 
         /* v8 ignore start */
@@ -102,10 +132,12 @@ const RouteViewComponent = defineComponent({
       const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
       const slotContent = getSlotContent(activeChild) ?? [];
 
-      return h(KeepAlive, null, {
+      const keepAliveContent = h(KeepAlive, null, {
         default: () =>
           h(WrapperComponent, { key: segment }, { default: () => slotContent }),
       });
+
+      return wrapWithSuspense(keepAliveContent, fallback);
     };
   },
 });

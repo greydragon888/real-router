@@ -3,6 +3,8 @@ export { default as RouteView } from "./components/RouteView.svelte";
 
 export { default as Link } from "./components/Link.svelte";
 
+export { default as Lazy } from "./components/Lazy.svelte";
+
 // Composables
 export { useRouter } from "./composables/useRouter.svelte";
 

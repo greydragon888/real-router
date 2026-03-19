@@ -1,5 +1,6 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { startsWithSegment } from "@real-router/route-utils";
+import { Suspense } from "solid-js";
 
 import { MATCH_MARKER, NOT_FOUND_MARKER } from "./components";
 
@@ -76,14 +77,22 @@ export function buildRenderList(
       continue;
     }
 
-    const { segment, exact } = child;
+    const { segment, exact, fallback } = child;
     const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
     const isActive =
       !activeMatchFound && isSegmentMatch(routeName, fullSegmentName, exact);
 
     if (isActive) {
       activeMatchFound = true;
-      rendered.push(child.children);
+      const matchContent = child.children;
+      const content =
+        fallback === undefined ? (
+          matchContent
+        ) : (
+          <Suspense fallback={fallback}>{matchContent}</Suspense>
+        );
+
+      rendered.push(content);
     }
   }
 

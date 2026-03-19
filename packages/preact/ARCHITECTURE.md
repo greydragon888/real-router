@@ -137,6 +137,8 @@ Link (memo + areLinkPropsEqual)
 
 **RouteView (no keepAlive):** Renders only the first matching `<RouteView.Match>`. On navigation, the previous match unmounts completely — no state preservation. `<RouteView.NotFound>` renders on `UNKNOWN_ROUTE`.
 
+**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary (from `preact/compat`) with that fallback. Use this with `lazy()` from `preact/compat` to code-split route components. **Note:** Suspense support in Preact is experimental — test thoroughly before shipping to production.
+
 ## Performance Optimizations
 
 | Optimization                 | Location               | Mechanism                                                                   |

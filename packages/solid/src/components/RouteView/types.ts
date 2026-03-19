@@ -8,6 +8,7 @@ export interface RouteViewProps {
 export interface MatchProps {
   readonly segment: string;
   readonly exact?: boolean;
+  readonly fallback?: JSX.Element;
   readonly children: JSX.Element;
 }
 

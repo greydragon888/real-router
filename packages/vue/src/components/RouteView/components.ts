@@ -1,6 +1,6 @@
 import { defineComponent } from "vue";
 
-import type { PropType } from "vue";
+import type { PropType, VNode } from "vue";
 
 function renderNull() {
   return null;
@@ -16,6 +16,10 @@ export const Match = defineComponent({
     exact: {
       type: Boolean,
       default: false,
+    },
+    fallback: {
+      type: [Object, Function] as PropType<VNode | (() => VNode)>,
+      default: undefined,
     },
   },
   render: renderNull,

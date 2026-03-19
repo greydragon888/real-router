@@ -9,6 +9,7 @@ export interface MatchMarker {
   $$type: typeof MATCH_MARKER;
   segment: string;
   exact: boolean;
+  fallback?: JSX.Element;
   children: JSX.Element;
 }
 
@@ -24,6 +25,7 @@ export function Match(props: MatchProps): JSX.Element {
     $$type: MATCH_MARKER,
     segment: props.segment,
     exact: props.exact ?? false,
+    fallback: props.fallback,
     get children(): JSX.Element {
       return props.children;
     },

@@ -1,6 +1,7 @@
 import { UNKNOWN_ROUTE } from "@real-router/core";
 import { startsWithSegment } from "@real-router/route-utils";
 import { Fragment, isValidElement, toChildArray } from "preact";
+import { Suspense } from "preact/compat";
 
 import { Match, NotFound } from "./components";
 
@@ -54,18 +55,22 @@ export function buildRenderList(
       continue;
     }
 
-    const { segment, exact = false } = child.props as MatchProps;
+    const { segment, exact = false, fallback } = child.props as MatchProps;
     const fullSegmentName = nodeName ? `${nodeName}.${segment}` : segment;
     const isActive =
       !activeMatchFound && isSegmentMatch(routeName, fullSegmentName, exact);
 
     if (isActive) {
       activeMatchFound = true;
-      rendered.push(
-        <Fragment key={fullSegmentName}>
-          {(child.props as MatchProps).children}
-        </Fragment>,
-      );
+      const matchChildren = (child.props as MatchProps).children;
+      const content =
+        fallback === undefined ? (
+          matchChildren
+        ) : (
+          <Suspense fallback={fallback}>{matchChildren}</Suspense>
+        );
+
+      rendered.push(<Fragment key={fullSegmentName}>{content}</Fragment>);
     }
   }
 

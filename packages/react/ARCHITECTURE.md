@@ -84,11 +84,11 @@ RouterProvider
 
 **Why three contexts, not one:**
 
-| Context            | Value                                 | Changes                      | Consumers                    |
-| ------------------ | ------------------------------------- | ---------------------------- | ---------------------------- |
+| Context            | Value                                 | Changes                      | Consumers                                           |
+| ------------------ | ------------------------------------- | ---------------------------- | --------------------------------------------------- |
 | `RouterContext`    | `Router` instance                     | Never (same reference)       | `useRouter`, `useRouteUtils`, `useRouterTransition` |
-| `NavigatorContext` | `Navigator`                           | Never (memoized from router) | `useNavigator`               |
-| `RouteContext`     | `{ navigator, route, previousRoute }` | Every navigation             | `useRoute`                   |
+| `NavigatorContext` | `Navigator`                           | Never (memoized from router) | `useNavigator`                                      |
+| `RouteContext`     | `{ navigator, route, previousRoute }` | Every navigation             | `useRoute`                                          |
 
 If merged into one context, every `useRouter()` call would re-render on every navigation. Splitting eliminates unnecessary re-renders for imperative-only consumers.
 
@@ -129,6 +129,8 @@ Link (memo + areLinkPropsEqual)
 ```
 
 **Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `JSON.stringify` for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`.
+
+**RouteView.Match with `fallback`:** When `fallback` prop is provided, `Match` wraps its children in a `<Suspense>` boundary with that fallback. Use this with `React.lazy()` to code-split route components. Works seamlessly with `keepAlive` — the `<Activity>` wrapper preserves the entire `<Suspense>` boundary including the fallback state.
 
 **Navigation:** Fire-and-forget `void router.navigate(...)`. No success/error callbacks — users should call `router.navigate()` directly with `await` for per-navigation result handling.
 
@@ -189,14 +191,14 @@ tests/
 
 6 performance test suites in `tests/performance/` verify render budgets via `vitest-react-profiler`:
 
-| Component / Hook | What is verified |
-|------------------|-----------------|
-| **RouterProvider** | 1 mount per init; 1 re-render per navigation; memo'd children without context skip re-renders; RouterContext consumers skip re-renders (stable ref); RouteContext consumers re-render on navigation |
-| **Link** | 1 mount; memo skips parent re-renders; 100 links meet budget (100 mounts, 0 updates); active class toggles exactly 1 re-render; unrelated navigations skip re-render; `useStableValue` prevents re-render on identical inline objects |
-| **RouteView** | Sibling isolation (navigation doesn't re-render siblings); only matched child renders; keepAlive lazy activation (never-visited children have 0 renders); hidden keepAlive children don't re-render on sibling navigation; hide/show cycle meets ≤2 re-render budget |
-| **useRoute** | Re-renders on every navigation (no filtering); linear render count (N navigations = N re-renders); stable navigator ref across re-renders |
-| **useRouteNode** | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes |
-| **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders |
+| Component / Hook        | What is verified                                                                                                                                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RouterProvider**      | 1 mount per init; 1 re-render per navigation; memo'd children without context skip re-renders; RouterContext consumers skip re-renders (stable ref); RouteContext consumers re-render on navigation                                                                  |
+| **Link**                | 1 mount; memo skips parent re-renders; 100 links meet budget (100 mounts, 0 updates); active class toggles exactly 1 re-render; unrelated navigations skip re-render; `useStableValue` prevents re-render on identical inline objects                                |
+| **RouteView**           | Sibling isolation (navigation doesn't re-render siblings); only matched child renders; keepAlive lazy activation (never-visited children have 0 renders); hidden keepAlive children don't re-render on sibling navigation; hide/show cycle meets ≤2 re-render budget |
+| **useRoute**            | Re-renders on every navigation (no filtering); linear render count (N navigations = N re-renders); stable navigator ref across re-renders                                                                                                                            |
+| **useRouteNode**        | Re-renders only when node activates/deactivates; skips unrelated navigations (0 re-renders); skips sibling node navigations; root node re-renders on all changes                                                                                                     |
+| **useRouterTransition** | Sync navigation: 0 extra re-renders (no TRANSITION_START); async navigation: exactly 2 re-renders per transition (start + end); N async transitions = 2N re-renders (linear scaling); `navigateToNotFound()` causes 0 re-renders                                     |
 
 ## See Also
 

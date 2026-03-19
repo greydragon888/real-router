@@ -185,6 +185,8 @@ Link (.svelte)
 
 **`{@render children?.()}` for children:** Svelte 5 snippets replace slots. Children are passed as a `Snippet` prop and rendered with `{@render children?.()}`.
 
+**Lazy loading with `Lazy.svelte`:** Since Svelte has no `<Suspense>` component, a dedicated `Lazy.svelte` component exists for code-splitting route content. It accepts `loader` (async import function) and `fallback` (component to show while loading) props. Use this inside `RouteView` snippets to lazy-load route components.
+
 ```
 RouteView (.svelte)
 ├── useRouteNode(nodeName) — { route: { current }, ... }
