@@ -132,7 +132,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 
 ### Key Features
 
-- **Framework-agnostic** — React, Vue, Angular, or vanilla JS
+- **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, or vanilla JS
 - **Universal** — client-side and server-side rendering ([SSR example](examples/ssr-react))
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
@@ -212,9 +212,13 @@ function App() {
 
 ### Framework Integration
 
-| Package                                | Version                                                                                                                           | Description                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| [`@real-router/react`](packages/react) | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react) | React 19.2+ (`RouterProvider`, hooks, `Link`, `RouteView`). React 18+ via `./legacy` |
+| Package                                  | Version                                                                                                                           | Description                                                        |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [`@real-router/react`](packages/react)   | [![npm](https://img.shields.io/npm/v/@real-router/react.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/react) | React 19.2+ (hooks, `RouteView`, `Link`). React 18+ via `./legacy` |
+| [`@real-router/preact`](packages/preact) |                                                                                                                                   | Preact (hooks, `RouteView`, `Link`, Suspense)                      |
+| [`@real-router/solid`](packages/solid)   |                                                                                                                                   | Solid.js (signals, `RouteView`, `Link`, store-based state)         |
+| [`@real-router/vue`](packages/vue)       |                                                                                                                                   | Vue 3 (composables, `RouteView`, `Link`, `KeepAlive`, `v-link`)    |
+| [`@real-router/svelte`](packages/svelte) |                                                                                                                                   | Svelte 5 (runes, `RouteView` with snippets, `Lazy`, `use:link`)    |
 
 ### Plugins
 
@@ -254,6 +258,10 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 ### React
 
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link) · [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator)
+
+### Preact / Solid / Vue / Svelte
+
+- [Solid Integration](https://github.com/greydragon888/real-router/wiki/Solid-Integration) · [Vue Integration](https://github.com/greydragon888/real-router/wiki/Vue-Integration) · [Svelte Integration](https://github.com/greydragon888/real-router/wiki/Svelte-Integration)
 
 ### Plugins
 

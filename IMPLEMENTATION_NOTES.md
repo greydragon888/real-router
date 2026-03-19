@@ -715,6 +715,48 @@ Full test suite runs against the main entry point. Legacy entry gets a single sm
 
 Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHITECTURE.md)
 
+## Framework Adapter Build Strategies
+
+### Build Tool Per Adapter
+
+| Adapter | Build Tool                  | Reason                                          | Output               |
+| ------- | --------------------------- | ----------------------------------------------- | -------------------- |
+| React   | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| Preact  | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| Solid   | rollup + babel-preset-solid | Solid's JSX needs babel transform               | Dual ESM/CJS bundle  |
+| Vue     | tsup                        | Pure `.ts` with `defineComponent` + `h()`       | Dual ESM/CJS bundle  |
+| Svelte  | svelte-package              | `.svelte` and `.svelte.ts` need Svelte compiler | ESM individual files |
+
+### Svelte Package Specifics
+
+`@real-router/svelte` uses `@sveltejs/package` (not tsup):
+
+- `.svelte` files are copied as-is (consumer's bundler compiles them)
+- `.svelte.ts` files are compiled to `.svelte.js` (runes processed)
+- `.ts` files are transpiled to `.js`
+- ESM only (standard for Svelte ecosystem)
+- Type-checking via `svelte-check` (not `tsc`)
+
+### Solid Package Specifics
+
+`@real-router/solid` uses rollup + `babel-preset-solid`:
+
+- Solid's JSX is compiled by babel-preset-solid (not standard JSX transform)
+- rollup-plugin-dts for bundled type declarations
+- Coverage: `branches: 90` threshold due to babel-generated phantom branches
+
+### Coverage Threshold Exceptions
+
+Framework compilers generate code that v8 coverage tracks but tests can't reach:
+
+| Adapter | Exception                     | Cause                                                   |
+| ------- | ----------------------------- | ------------------------------------------------------- |
+| Solid   | `branches: 90, functions: 97` | babel-preset-solid phantom branches, `.catch(() => {})` |
+| Vue     | `branches: 95, functions: 95` | `defineComponent` internal type guards                  |
+| Svelte  | `branches: 96, functions: 93` | Svelte compiler `$derived`/`$props` transforms          |
+| React   | None                          | tsup preserves original code                            |
+| Preact  | None                          | tsup preserves original code                            |
+
 ## Module Resolution: `customConditions` + `development` Export Condition
 
 ### Problem

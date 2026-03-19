@@ -22,6 +22,7 @@ real-router/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
 │   ├── react/                     # React integration (dual entry: main for 19.2+, /legacy for 18+)
+│   ├── preact/                     # Preact integration (hooks, components, Suspense)
 │   ├── solid/                     # Solid.js integration (hooks, components, directives)
 │   ├── vue/                       # Vue 3 integration (composables, components, directives)
 │   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
@@ -43,7 +44,7 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
 
@@ -108,6 +109,26 @@ graph TD
     REACT -->|dep| CORE
     REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
+
+    PREACT["preact"]
+    PREACT -->|dep| CORE
+    PREACT -->|dep| SOURCES
+    PREACT -->|dep| ROUTEUTILS
+
+    SOLID["solid"]
+    SOLID -->|dep| CORE
+    SOLID -->|dep| SOURCES
+    SOLID -->|dep| ROUTEUTILS
+
+    VUE["vue"]
+    VUE -->|dep| CORE
+    VUE -->|dep| SOURCES
+    VUE -->|dep| ROUTEUTILS
+
+    SVELTE["svelte"]
+    SVELTE -->|dep| CORE
+    SVELTE -->|dep| SOURCES
+    SVELTE -->|dep| ROUTEUTILS
 
     RX -->|dep| CORE
 
@@ -298,7 +319,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Consumer Packages                            │
 ├──────────────────────────────────────────────────────────────────┤
-│ react │ browser-plugin │ hash-plugin │ logger-plugin │ rx │ .... │
+│ react │ preact │ solid │ vue │ svelte │ browser-plugin │ ... │
 ├──────────────────────────────────────────────────────────────────┤
 │                           Core                                   │
 ├──────────────────────────────────────────────────────────────────┤
