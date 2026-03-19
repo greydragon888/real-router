@@ -5,6 +5,9 @@ export { default as Link } from "./components/Link.svelte";
 
 export { default as Lazy } from "./components/Lazy.svelte";
 
+// Reactive Primitives
+export { createReactiveSource } from "./createReactiveSource.svelte";
+
 // Composables
 export { useRouter } from "./composables/useRouter.svelte";
 

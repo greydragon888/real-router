@@ -232,6 +232,30 @@ Factory function that creates a low-level action for adding navigation to any el
 
 The action automatically adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility. It handles click events and Enter key navigation.
 
+## Reactive Primitives
+
+### `createReactiveSource`
+
+Public building block that bridges any `RouterSource<T>` to Svelte's reactivity system. Returns a `{ current: T }` getter object that lazily subscribes via `createSubscriber`.
+
+```svelte
+<script lang="ts">
+  import { createReactiveSource, useRouter } from "@real-router/svelte";
+  import { createActiveRouteSource } from "@real-router/sources";
+
+  const router = useRouter();
+  const isActive = createReactiveSource(
+    createActiveRouteSource(router, "users.profile", {})
+  );
+</script>
+
+{#if isActive.current}
+  <span class="badge">Active</span>
+{/if}
+```
+
+Use cases: custom active route indicators, domain-specific composables, integration with other reactive primitives.
+
 ## Svelte-Specific Patterns
 
 ### Reading .current in Reactive Contexts
