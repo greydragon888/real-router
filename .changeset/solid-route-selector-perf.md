@@ -1,5 +1,5 @@
 ---
-"@real-router/solid": minor
+"@real-router/solid": patch
 ---
 
 Optimize active route detection with `createSelector` for O(1) updates (#328)
