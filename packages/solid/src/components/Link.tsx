@@ -1,7 +1,8 @@
 import { createActiveRouteSource } from "@real-router/sources";
-import { createMemo, mergeProps, splitProps } from "solid-js";
+import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
+import { RouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
 import { useRouter } from "../hooks/useRouter";
 import { shouldNavigate } from "../utils";
@@ -38,13 +39,22 @@ export function Link<P extends Params = Params>(
   ]);
 
   const router = useRouter();
+  const ctx = useContext(RouterContext);
 
-  const isActive = createSignalFromSource(
-    createActiveRouteSource(router, local.routeName, local.routeParams, {
-      strict: local.activeStrict,
-      ignoreQueryParams: local.ignoreQueryParams,
-    }),
-  );
+  const useFastPath =
+    ctx?.routeSelector &&
+    !local.activeStrict &&
+    local.ignoreQueryParams &&
+    local.routeParams === EMPTY_PARAMS;
+
+  const isActive = useFastPath
+    ? () => ctx.routeSelector(local.routeName)
+    : createSignalFromSource(
+        createActiveRouteSource(router, local.routeName, local.routeParams, {
+          strict: local.activeStrict,
+          ignoreQueryParams: local.ignoreQueryParams,
+        }),
+      );
 
   const href = createMemo(() => {
     if (typeof router.buildUrl === "function") {

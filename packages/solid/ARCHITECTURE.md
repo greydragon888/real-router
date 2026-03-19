@@ -170,6 +170,12 @@ Solid's fine-grained reactivity eliminates most of the optimization work needed 
 
 The main performance primitive is `createSignalFromSource`: it creates a signal that only updates when the underlying source emits, and Solid's scheduler batches DOM updates automatically.
 
+### O(1) Active Route Detection
+
+`RouterProvider` creates a `createSelector` based on the current route name with prefix-based matching. `Link` components use this shared selector instead of per-link subscriptions. On navigation, `createSelector` notifies only the previously-active and newly-active links (2 updates instead of n).
+
+Links with `activeStrict: true`, custom `routeParams`, or `ignoreQueryParams: false` fall back to per-link `createActiveRouteSource` subscriptions since the selector only handles the default case (non-strict prefix matching, no params comparison).
+
 ## Data Flow
 
 ```

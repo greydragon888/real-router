@@ -7,6 +7,7 @@ import type { Accessor } from "solid-js";
 export interface RouterContextValue {
   router: Router;
   navigator: Navigator;
+  routeSelector: (routeName: string) => boolean;
 }
 
 export const RouterContext = createContext<RouterContextValue | null>(null);

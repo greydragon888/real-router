@@ -1,5 +1,6 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
+import { createSelector } from "solid-js";
 
 import { RouterContext, RouteContext } from "./context";
 import { createSignalFromSource } from "./createSignalFromSource";
@@ -11,6 +12,16 @@ export interface RouteProviderProps {
   router: Router;
 }
 
+function isRouteActive(
+  linkRouteName: string,
+  currentRouteName: string,
+): boolean {
+  return (
+    currentRouteName === linkRouteName ||
+    currentRouteName.startsWith(`${linkRouteName}.`)
+  );
+}
+
 export function RouterProvider(
   props: ParentProps<RouteProviderProps>,
 ): JSX.Element {
@@ -18,8 +29,15 @@ export function RouterProvider(
   const routeSource = createRouteSource(props.router);
   const routeSignal = createSignalFromSource(routeSource);
 
+  const routeSelector = createSelector(
+    () => routeSignal().route?.name ?? "",
+    isRouteActive,
+  );
+
   return (
-    <RouterContext.Provider value={{ router: props.router, navigator }}>
+    <RouterContext.Provider
+      value={{ router: props.router, navigator, routeSelector }}
+    >
       <RouteContext.Provider value={routeSignal}>
         {props.children}
       </RouteContext.Provider>
