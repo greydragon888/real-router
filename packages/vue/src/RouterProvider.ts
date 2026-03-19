@@ -3,6 +3,7 @@ import { createRouteSource } from "@real-router/sources";
 import { defineComponent, shallowRef, provide, onScopeDispose } from "vue";
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
+import { setDirectiveRouter } from "./directives/vLink";
 
 import type { Router } from "@real-router/core";
 import type { PropType } from "vue";
@@ -17,6 +18,8 @@ export const RouterProvider = defineComponent({
   },
   setup(props, { slots }) {
     const navigator = getNavigator(props.router);
+
+    setDirectiveRouter(props.router);
 
     const source = createRouteSource(props.router);
     const initialSnapshot = source.getSnapshot();

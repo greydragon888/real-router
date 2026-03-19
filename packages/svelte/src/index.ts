@@ -18,6 +18,11 @@ export { useRouteNode } from "./composables/useRouteNode.svelte";
 
 export { useRouterTransition } from "./composables/useRouterTransition.svelte";
 
+// Actions
+export { createLinkAction } from "./actions/link.svelte";
+
+export type { LinkActionParams } from "./actions/link.svelte";
+
 // Context
 export { default as RouterProvider } from "./RouterProvider.svelte";
 

@@ -22,6 +22,9 @@ real-router/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
 │   ├── react/                     # React integration (dual entry: main for 19.2+, /legacy for 18+)
+│   ├── solid/                     # Solid.js integration (hooks, components, directives)
+│   ├── vue/                       # Vue 3 integration (composables, components, directives)
+│   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
 │   ├── sources/                   # Subscription layer for UI bindings (useSyncExternalStore)
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
@@ -40,7 +43,7 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
 

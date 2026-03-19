@@ -2,6 +2,8 @@ export { RouteView } from "./components/RouteView";
 
 export { Link } from "./components/Link";
 
+export { link } from "./directives/link";
+
 export { useRouter } from "./hooks/useRouter";
 
 export { useNavigator } from "./hooks/useNavigator";
@@ -21,6 +23,8 @@ export { RouterContext, RouteContext } from "./context";
 export { createSignalFromSource } from "./createSignalFromSource";
 
 export type { LinkProps, RouteState } from "./types";
+
+export type { LinkDirectiveOptions } from "./directives/link";
 
 export type {
   RouteViewProps,

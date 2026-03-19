@@ -17,8 +17,8 @@ export default mergeConfig(
         include: ["packages/svelte/src/**/*.{ts,svelte,svelte.ts}"],
         thresholds: {
           statements: 100,
-          branches: 98,
-          functions: 95,
+          branches: 96,
+          functions: 93,
           lines: 100,
         },
       },

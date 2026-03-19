@@ -3,6 +3,9 @@ export { RouteView } from "./components/RouteView";
 
 export { Link } from "./components/Link";
 
+// Directives
+export { vLink } from "./directives/vLink";
+
 // Composables
 export { useRouter } from "./composables/useRouter";
 
@@ -23,6 +26,8 @@ export { RouterKey, NavigatorKey, RouteKey } from "./context";
 
 // Types
 export type { LinkProps } from "./types";
+
+export type { LinkDirectiveValue } from "./directives/vLink";
 
 export type {
   RouteViewProps,

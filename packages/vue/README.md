@@ -274,6 +274,60 @@ const LazyDashboard = defineAsyncComponent(() => import("./Dashboard.vue"));
 
 Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
 
+## Directives
+
+### `v-link`
+
+Low-level directive for adding navigation to any element. Automatically handles click events, keyboard navigation (Enter key), and cursor styling.
+
+```typescript
+import { vLink } from "@real-router/vue";
+
+h("a", {
+  "v-link": { name: "users.profile", params: { id: "123" } },
+});
+
+h("button", {
+  "v-link": { name: "home" },
+});
+
+h("div", {
+  "v-link": {
+    name: "settings",
+    params: {},
+    options: { replace: true },
+  },
+  role: "link",
+  tabindex: "0",
+});
+```
+
+In a template:
+
+```vue
+<a v-link="{ name: 'users.profile', params: { id: '123' } }">
+  User Profile
+</a>
+
+<button v-link="{ name: 'home' }">
+  Go Home
+</button>
+
+<div v-link="{ name: 'settings' }" role="link" tabindex="0">
+  Settings
+</div>
+```
+
+**Value:**
+
+| Property  | Type     | Default | Description                        |
+| --------- | -------- | ------- | ---------------------------------- |
+| `name`    | `string` | —       | Target route name                  |
+| `params`  | `Params` | `{}`    | Route parameters                   |
+| `options` | `object` | `{}`    | Navigation options (replace, etc.) |
+
+The directive automatically sets `cursor: pointer` and adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility.
+
 ## Vue-Specific Patterns
 
 ### Refs, Not Plain Values

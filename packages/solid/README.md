@@ -169,6 +169,50 @@ Without `fallback`, no `<Suspense>` boundary is added. The prop is optional.
 
 > **Note:** `keepAlive` is not supported. Solid has no equivalent of React's `<Activity>` API. Components dispose completely when navigating away.
 
+## Directives
+
+### `use:link`
+
+Low-level directive for adding navigation to any element. Automatically handles click events, keyboard navigation (Enter key), and active state styling.
+
+```tsx
+import { link } from "@real-router/solid";
+
+<a use:link={() => ({ routeName: "users.profile", routeParams: { id: "123" }, activeClassName: "active" })}>
+  User Profile
+</a>
+
+<button use:link={() => ({ routeName: "home" })}>
+  Go Home
+</button>
+
+<div
+  use:link={() => ({
+    routeName: "settings",
+    activeClassName: "active",
+    activeStrict: false,
+    ignoreQueryParams: true,
+  })}
+  role="link"
+  tabindex="0"
+>
+  Settings
+</div>
+```
+
+**Options:**
+
+| Option              | Type      | Default | Description                             |
+| ------------------- | --------- | ------- | --------------------------------------- |
+| `routeName`         | `string`  | —       | Target route name                       |
+| `routeParams`       | `Params`  | `{}`    | Route parameters                        |
+| `routeOptions`      | `object`  | `{}`    | Navigation options (replace, etc.)      |
+| `activeClassName`   | `string`  | —       | Class added when route is active        |
+| `activeStrict`      | `boolean` | `false` | Exact match only (no ancestor matching) |
+| `ignoreQueryParams` | `boolean` | `true`  | Query params don't affect active state  |
+
+The directive automatically sets `href` on `<a>` elements and adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility.
+
 ## Solid-Specific Patterns
 
 ### Accessors, Not Values

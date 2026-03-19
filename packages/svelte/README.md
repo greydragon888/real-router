@@ -196,6 +196,42 @@ Snippet names must be valid JavaScript identifiers and match the first segment o
 
 > **Note:** `keepAlive` is not supported. Svelte has no equivalent of React's `<Activity>` API or Vue's `<KeepAlive>`. Components are destroyed when navigating away.
 
+## Actions
+
+### `createLinkAction`
+
+Factory function that creates a low-level action for adding navigation to any element. Must be called during component initialization to capture the router context.
+
+```svelte
+<script lang="ts">
+  import { createLinkAction } from "@real-router/svelte";
+
+  const link = createLinkAction();
+</script>
+
+<a use:link={{ name: "users.profile", params: { id: "123" } }}>
+  User Profile
+</a>
+
+<button use:link={{ name: "home" }}>
+  Go Home
+</button>
+
+<div use:link={{ name: "settings", params: {}, options: { replace: true } }} role="link" tabindex="0">
+  Settings
+</div>
+```
+
+**Parameters:**
+
+| Property  | Type     | Default | Description                        |
+| --------- | -------- | ------- | ---------------------------------- |
+| `name`    | `string` | —       | Target route name                  |
+| `params`  | `Params` | `{}`    | Route parameters                   |
+| `options` | `object` | `{}`    | Navigation options (replace, etc.) |
+
+The action automatically adds `role="link"` + `tabindex="0"` to non-interactive elements for accessibility. It handles click events and Enter key navigation.
+
 ## Svelte-Specific Patterns
 
 ### Reading .current in Reactive Contexts
