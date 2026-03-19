@@ -58,14 +58,37 @@ function App() {
 
 All hooks that subscribe to route state return `Accessor<T>` — call the accessor inside a reactive context to read the current value.
 
-| Hook                    | Returns                              | Reactive?                            |
-| ----------------------- | ------------------------------------ | ------------------------------------ |
-| `useRouter()`           | `Router`                             | Never                                |
-| `useNavigator()`        | `Navigator`                          | Never                                |
-| `useRoute()`            | `Accessor<RouteState>`               | Every navigation                     |
-| `useRouteNode(name)`    | `Accessor<RouteState>`               | Only when node activates/deactivates |
-| `useRouteUtils()`       | `RouteUtils`                         | Never                                |
-| `useRouterTransition()` | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
+| Hook                      | Returns                              | Reactive?                            |
+| ------------------------- | ------------------------------------ | ------------------------------------ |
+| `useRouter()`             | `Router`                             | Never                                |
+| `useNavigator()`          | `Navigator`                          | Never                                |
+| `useRoute()`              | `Accessor<RouteState>`               | Every navigation                     |
+| `useRouteNode(name)`      | `Accessor<RouteState>`               | Only when node activates/deactivates |
+| `useRouteUtils()`         | `RouteUtils`                         | Never                                |
+| `useRouterTransition()`   | `Accessor<RouterTransitionSnapshot>` | On transition start/end              |
+| `useRouteStore()`         | `RouteState` (store)                 | Granular — per-property              |
+| `useRouteNodeStore(name)` | `RouteState` (store)                 | Granular — per-property, node-scoped |
+
+### Store-Based Hooks (Granular Reactivity)
+
+`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` for property-level reactivity. A component reading `state.route?.params.id` won't re-run when `state.route?.params.page` changes:
+
+```tsx
+import { useRouteStore } from "@real-router/solid";
+import { createEffect } from "solid-js";
+
+function UserProfile() {
+  const state = useRouteStore();
+
+  createEffect(() => {
+    console.log(state.route?.params.id);
+  });
+
+  return <h1>User: {state.route?.params.id}</h1>;
+}
+```
+
+Signal-based hooks (`useRoute`, `useRouteNode`) remain available for simpler use cases.
 
 ```tsx
 // useRouteNode — updates only when "users.*" changes

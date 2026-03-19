@@ -176,6 +176,21 @@ The main performance primitive is `createSignalFromSource`: it creates a signal 
 
 Links with `activeStrict: true`, custom `routeParams`, or `ignoreQueryParams: false` fall back to per-link `createActiveRouteSource` subscriptions since the selector only handles the default case (non-strict prefix matching, no params comparison).
 
+### Store-Based Granular Route State
+
+`useRouteStore()` and `useRouteNodeStore()` use `createStore` + `reconcile` from `solid-js/store` instead of `createSignal`. This enables property-level reactivity — a component reading `state.route?.params.id` won't re-run when `state.route?.params.page` changes.
+
+```tsx
+const state = useRouteStore();
+
+createEffect(() => {
+  // Only re-runs when params.id changes, ignores params.page/route.name/etc.
+  console.log(state.route?.params.id);
+});
+```
+
+`reconcile` performs a deep diff on each snapshot update, only patching changed properties. The existing signal-based hooks (`useRoute`, `useRouteNode`) remain available for simpler use cases.
+
 ## Data Flow
 
 ```

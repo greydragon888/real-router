@@ -14,6 +14,10 @@ export { useRoute } from "./hooks/useRoute";
 
 export { useRouteNode } from "./hooks/useRouteNode";
 
+export { useRouteStore } from "./hooks/useRouteStore";
+
+export { useRouteNodeStore } from "./hooks/useRouteNodeStore";
+
 export { useRouterTransition } from "./hooks/useRouterTransition";
 
 export { RouterProvider } from "./RouterProvider";
@@ -21,6 +25,8 @@ export { RouterProvider } from "./RouterProvider";
 export { RouterContext, RouteContext } from "./context";
 
 export { createSignalFromSource } from "./createSignalFromSource";
+
+export { createStoreFromSource } from "./createStoreFromSource";
 
 export type { LinkProps, RouteState } from "./types";
 
