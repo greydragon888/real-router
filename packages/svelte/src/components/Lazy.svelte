@@ -17,16 +17,23 @@
     loading = true;
     error = null;
     LoadedComponent = null;
+    let active = true;
 
     loader()
       .then((module) => {
+        if (!active) return;
         LoadedComponent = module.default;
         loading = false;
       })
       .catch((err) => {
+        if (!active) return;
         error = err;
         loading = false;
       });
+
+    return () => {
+      active = false;
+    };
   });
 </script>
 

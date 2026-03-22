@@ -104,7 +104,6 @@ function resolveText(
 
   const h1 = document.querySelector<HTMLElement>("h1");
   const h1Text = h1?.textContent.trim() ?? "";
-  /* v8 ignore next -- @preserve: route.name is always non-empty for valid navigations */
   const routeName = route.name.startsWith(INTERNAL_ROUTE_PREFIX)
     ? ""
     : route.name;

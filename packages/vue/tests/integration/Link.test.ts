@@ -191,6 +191,7 @@ describe("Link - Integration Tests", () => {
       );
 
       const link = wrapper.find("a");
+
       await link.trigger("click");
       await flushPromises();
 

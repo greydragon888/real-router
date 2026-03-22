@@ -526,6 +526,7 @@ describe("RouteView - Integration Tests", () => {
         ],
         { defaultRoute: "home", allowNotFound: true },
       );
+
       notFoundRouter.usePlugin(browserPluginFactory({}));
       await notFoundRouter.start("/unknown");
 
