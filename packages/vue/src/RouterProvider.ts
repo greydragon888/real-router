@@ -1,6 +1,14 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { defineComponent, shallowRef, provide, onScopeDispose } from "vue";
+import { createRouteAnnouncer } from "dom-utils";
+import {
+  defineComponent,
+  onMounted,
+  onUnmounted,
+  provide,
+  shallowRef,
+  onScopeDispose,
+} from "vue";
 
 import { NavigatorKey, RouteKey, RouterKey } from "./context";
 import { setDirectiveRouter } from "./directives/vLink";
@@ -15,8 +23,24 @@ export const RouterProvider = defineComponent({
       type: Object as PropType<Router>,
       required: true,
     },
+    announceNavigation: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props, { slots }) {
+    onMounted(() => {
+      if (!props.announceNavigation) {
+        return;
+      }
+
+      const announcer = createRouteAnnouncer(props.router);
+
+      onUnmounted(() => {
+        announcer.destroy();
+      });
+    });
+
     const navigator = getNavigator(props.router);
 
     setDirectiveRouter(props.router);

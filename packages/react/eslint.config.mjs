@@ -520,6 +520,13 @@ export default tsEslint.config(
     },
   },
 
+  {
+    files: ["tests/**/*.a11y.test.tsx"],
+    rules: {
+      "testing-library/no-node-access": "off",
+    },
+  },
+
   // ============================================
   // BENCHMARK FILES FOR .tsx
   // ============================================

@@ -59,7 +59,8 @@
   "dependencies": {
     "@real-router/core": "workspace:^",
     "@real-router/route-utils": "workspace:^",
-    "@real-router/sources": "workspace:^"
+    "@real-router/sources": "workspace:^",
+    "dom-utils": "workspace:^"
   },
   "devDependencies": {
     "@babel/core": "7.26.0",

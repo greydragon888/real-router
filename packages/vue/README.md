@@ -379,6 +379,32 @@ watch(route, (newRoute) => {
 
 All components are plain `.ts` files using `defineComponent` + `h()`. You can use them in `.vue` SFC templates or in render functions — both work.
 
+## Accessibility
+
+Enable screen reader announcements for route changes:
+
+```typescript
+h(
+  RouterProvider,
+  { router, announceNavigation: true },
+  {
+    default: () => [
+      /* Your app */
+    ],
+  },
+);
+```
+
+Or in a template:
+
+```vue
+<RouterProvider :router="router" :announceNavigation="true">
+  <!-- Your app -->
+</RouterProvider>
+```
+
+When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)

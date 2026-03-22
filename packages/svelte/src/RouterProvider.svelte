@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getNavigator } from "@real-router/core";
   import { createRouteSource } from "@real-router/sources";
+  import { createRouteAnnouncer } from "dom-utils";
   import { setContext } from "svelte";
 
   import { createReactiveSource } from "./createReactiveSource.svelte";
@@ -9,7 +10,18 @@
   import type { Router } from "@real-router/core";
   import type { Snippet } from "svelte";
 
-  let { router, children }: { router: Router; children: Snippet } = $props();
+  let {
+    router,
+    children,
+    announceNavigation,
+  }: { router: Router; children: Snippet; announceNavigation?: boolean } =
+    $props();
+
+  $effect(() => {
+    if (!announceNavigation) return;
+    const announcer = createRouteAnnouncer(router);
+    return () => announcer.destroy();
+  });
 
   const navigator = getNavigator(router);
   const source = createRouteSource(router);

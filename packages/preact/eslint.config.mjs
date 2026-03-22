@@ -432,4 +432,11 @@ export default tsEslint.config(
       "testing-library/no-node-access": "warn",
     },
   },
+
+  {
+    files: ["tests/**/*.a11y.test.tsx"],
+    rules: {
+      "testing-library/no-node-access": "off",
+    },
+  },
 );

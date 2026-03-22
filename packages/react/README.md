@@ -192,6 +192,18 @@ One import path change — all hooks and `Link` work identically:
 | `withRouter`, `withRoute`, `routeNode` (HOCs)          | Yes           | No — use hooks     |
 | `Router`, `Route`, `RouteNode` (render props)          | Yes           | No — use hooks     |
 
+## Accessibility
+
+Enable screen reader announcements for route changes:
+
+```tsx
+<RouterProvider router={router} announceNavigation>
+  {/* Your app */}
+</RouterProvider>
+```
+
+When enabled, a visually hidden `aria-live` region announces each navigation. Focus moves to the first `<h1>` on the new page. See [Accessibility guide](https://github.com/greydragon888/real-router/wiki/Accessibility) for details.
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
