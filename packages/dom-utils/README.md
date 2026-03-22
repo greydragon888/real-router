@@ -6,7 +6,10 @@
 
 ## Purpose
 
-Provides browser-specific accessibility logic shared across all Real-Router adapters. Currently implements `createRouteAnnouncer` — a WCAG-compliant aria-live announcement system for SPA route changes.
+Provides shared DOM utilities for all Real-Router framework adapters:
+
+- **Accessibility** — `createRouteAnnouncer` (WCAG-compliant aria-live announcements)
+- **Link utilities** — `shouldNavigate`, `buildHref`, `buildActiveClassName`, `applyLinkA11y` (shared by all Link components and directives)
 
 ## Consumers
 
@@ -36,9 +39,26 @@ Returns `{ destroy: () => void }`.
 | `prefix`              | `string`                   | `"Navigated to "` | Text prepended to the announcement                         |
 | `getAnnouncementText` | `(route: State) => string` | —                 | Custom text resolver; empty string suppresses announcement |
 
+### `shouldNavigate(evt: MouseEvent): boolean`
+
+Returns `true` for left-click with no modifier keys (ctrl, meta, alt, shift).
+
+### `buildHref(router, routeName, routeParams): string`
+
+Constructs href string via `router.buildUrl()` with fallback to `router.buildPath()`.
+
+### `buildActiveClassName(isActive, activeClassName, baseClassName): string | undefined`
+
+Concatenates active and base CSS class names when route is active.
+
+### `applyLinkA11y(element: HTMLElement): void`
+
+Sets `role="link"` and `tabindex="0"` on non-interactive elements (skips `<a>` and `<button>`).
+
 ## Usage (adapter pattern)
 
 ```typescript
+// RouterProvider — accessibility
 import { createRouteAnnouncer } from "dom-utils";
 
 useEffect(() => {
@@ -46,6 +66,12 @@ useEffect(() => {
   const announcer = createRouteAnnouncer(router);
   return () => announcer.destroy();
 }, [announceNavigation, router]);
+
+// Link component — shared utilities
+import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
+
+const href = buildHref(router, routeName, routeParams);
+const className = buildActiveClassName(isActive, activeClassName, baseClass);
 ```
 
 ## License

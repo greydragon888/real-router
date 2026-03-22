@@ -12,6 +12,7 @@ export function shouldNavigate(evt: MouseEvent): boolean {
 
 type BuildUrlFn = (name: string, params: Params) => string;
 
+// Lives in dom-utils (not core/utils) because buildUrl is injected by browser-plugin via extendRouter()
 export function buildHref(
   router: Router,
   routeName: string,

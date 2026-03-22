@@ -6,7 +6,7 @@
 
 `dom-utils` is an **internal, unpublished** package that provides shared DOM utilities for Real-Router framework adapters.
 
-**Key role:** Centralises browser-specific accessibility logic consumed by all framework adapters (React, Preact, Solid, Vue, Svelte). Currently contains `createRouteAnnouncer` — a singleton-based aria-live announcement system for SPA navigation events.
+**Key role:** Centralises browser-specific DOM logic consumed by all framework adapters (React, Preact, Solid, Vue, Svelte). Contains accessibility announcements (`createRouteAnnouncer`) and shared Link/directive utilities (`shouldNavigate`, `buildHref`, `buildActiveClassName`, `applyLinkA11y`).
 
 **Consumers:** `@real-router/react`, `@real-router/preact`, `@real-router/solid`, `@real-router/vue`, `@real-router/svelte`. Not published to npm — bundled into each adapter at build time.
 
@@ -16,10 +16,12 @@
 dom-utils/
 ├── src/
 │   ├── index.ts            — Public exports
-│   └── route-announcer.ts  — createRouteAnnouncer() + helpers
+│   ├── route-announcer.ts  — createRouteAnnouncer() + a11y helpers
+│   └── link-utils.ts       — shouldNavigate, buildHref, buildActiveClassName, applyLinkA11y
 └── tests/
     └── functional/
-        └── route-announcer.test.ts  — 18 tests (jsdom environment)
+        ├── route-announcer.test.ts  — 18 tests (jsdom environment)
+        └── link-utils.test.ts       — Link utility tests (jsdom environment)
 ```
 
 ## Dependencies
@@ -39,10 +41,21 @@ graph LR
 
 ## Public API
 
+### Accessibility
+
 | Export                                   | Type      | Description                                       |
 | ---------------------------------------- | --------- | ------------------------------------------------- |
 | `createRouteAnnouncer(router, options?)` | Function  | Creates route change announcer for screen readers |
 | `RouteAnnouncerOptions`                  | Interface | Configuration options                             |
+
+### Link Utilities
+
+| Export                                                           | Type     | Description                                                       |
+| ---------------------------------------------------------------- | -------- | ----------------------------------------------------------------- |
+| `shouldNavigate(evt: MouseEvent): boolean`                       | Function | Checks modifier keys (ctrl, meta, alt, shift) and left button     |
+| `buildHref(router, routeName, routeParams): string`              | Function | Constructs href via `buildUrl` → `buildPath` fallback             |
+| `buildActiveClassName(isActive, activeClassName, base): string?` | Function | Concatenates active + base class names                            |
+| `applyLinkA11y(element: HTMLElement): void`                      | Function | Sets `role="link"` and `tabindex="0"` on non-interactive elements |
 
 ## Key Design Decisions
 
