@@ -172,4 +172,29 @@ describe("Link - Integration Tests", () => {
       expect(link.attributes("tabindex")).toBe("0");
     });
   });
+
+  describe("Custom onClick handler", () => {
+    it("should not navigate when onClick calls preventDefault", async () => {
+      const initialRoute = router.getState()?.name;
+
+      const wrapper = mountWithProvider(router, () =>
+        h(
+          Link,
+          {
+            routeName: "users",
+            onClick: (evt: MouseEvent) => {
+              evt.preventDefault();
+            },
+          },
+          { default: () => "Users Link" },
+        ),
+      );
+
+      const link = wrapper.find("a");
+      await link.trigger("click");
+      await flushPromises();
+
+      expect(router.getState()?.name).toBe(initialRoute);
+    });
+  });
 });

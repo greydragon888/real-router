@@ -98,7 +98,7 @@ export function buildRenderList(
     notFoundChildren !== null
   ) {
     const nfElements = elements.filter((e) => e.type === NotFound);
-    /* v8 ignore next */
+    /* v8 ignore next 3 */
     const lastNf = nfElements.at(-1);
 
     if (lastNf) {

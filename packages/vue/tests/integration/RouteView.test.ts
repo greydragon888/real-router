@@ -516,4 +516,56 @@ describe("RouteView - Integration Tests", () => {
       expect(wrapper.find("[data-testid='about']").exists()).toBe(true);
     });
   });
+
+  describe("NotFound as active child with keepAlive", () => {
+    it("should render NotFound when it is the active match with keepAlive enabled", async () => {
+      const notFoundRouter = createRouter(
+        [
+          { name: "home", path: "/" },
+          { name: "users", path: "/users" },
+        ],
+        { defaultRoute: "home", allowNotFound: true },
+      );
+      notFoundRouter.usePlugin(browserPluginFactory({}));
+      await notFoundRouter.start("/unknown");
+
+      const wrapper = mount(
+        defineComponent({
+          setup: () => () =>
+            h(
+              RouterProvider,
+              { router: notFoundRouter },
+              {
+                default: () =>
+                  h(
+                    RouteView,
+                    { nodeName: "", keepAlive: true },
+                    {
+                      default: () => [
+                        h(
+                          RouteView.Match,
+                          { segment: "users" },
+                          {
+                            default: () =>
+                              h("div", { "data-testid": "users" }, "Users"),
+                          },
+                        ),
+                        h(RouteView.NotFound, null, {
+                          default: () =>
+                            h("div", { "data-testid": "not-found" }, "404"),
+                        }),
+                      ],
+                    },
+                  ),
+              },
+            ),
+        }),
+      );
+
+      expect(wrapper.find("[data-testid='not-found']").exists()).toBe(true);
+      expect(wrapper.find("[data-testid='users']").exists()).toBe(false);
+
+      notFoundRouter.stop();
+    });
+  });
 });

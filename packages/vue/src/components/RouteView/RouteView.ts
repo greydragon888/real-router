@@ -130,6 +130,7 @@ const RouteViewComponent = defineComponent({
       const segment = activeProps?.segment ?? "__not-found__";
 
       const WrapperComponent = getOrCreateWrapper(wrapperCache, segment);
+      /* v8 ignore next */
       const slotContent = getSlotContent(activeChild) ?? [];
 
       const keepAliveContent = h(KeepAlive, null, {

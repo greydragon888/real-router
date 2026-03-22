@@ -753,6 +753,28 @@ describe("RouteView", () => {
       expect(result).toHaveLength(1);
       expect(result[0].type).toBe(Match);
     });
+
+    it("should handle mixed array and VNode content", () => {
+      const matchVNode = h(Match, { segment: "users" });
+      const notFoundVNode = h(NotFound);
+      const result: any[] = [];
+
+      collectElements([matchVNode, [notFoundVNode]], result);
+
+      expect(result).toHaveLength(2);
+      expect(result[0].type).toBe(Match);
+      expect(result[1].type).toBe(NotFound);
+    });
+
+    it("should skip non-VNode values in arrays", () => {
+      const matchVNode = h(Match, { segment: "users" });
+      const result: any[] = [];
+
+      collectElements([matchVNode, "string", 123, null, undefined], result);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(Match);
+    });
   });
 
   describe("Match without props", () => {
@@ -816,6 +838,23 @@ describe("RouteView", () => {
         h(
           RouteView,
           { nodeName: "", keepAlive: true },
+          {
+            default: () => h(RouteView.NotFound),
+          },
+        ),
+      );
+
+      expect(wrapper.html()).toBe("");
+    });
+
+    it("should handle NotFound with no slot content in non-keepAlive mode", async () => {
+      await notFoundRouter.start("/non-existent-path");
+
+      const wrapper = mountRouteView(
+        notFoundRouter,
+        h(
+          RouteView,
+          { nodeName: "", keepAlive: false },
           {
             default: () => h(RouteView.NotFound),
           },
