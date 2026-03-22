@@ -287,15 +287,15 @@ Both symbol methods return `this`, enabling any TC39/RxJS consumer to wrap `RxOb
 
 ## Stress Test Coverage
 
-8 stress tests in `tests/stress/` validate behavior under extreme conditions:
+46 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
 
-| Category | Tests | What they verify |
-|----------|-------|-----------------|
-| Subscription | subscription-storm, concurrent-pipelines | Rapid subscribe/unsubscribe churn, parallel pipeline isolation |
-| Operators | operator-chain-depth, debounce-timer-churn, takeuntil-lifecycle | Deep pipe chains, timer cleanup, takeUntil race conditions |
-| Error handling | error-cascade | Error propagation through operator chains under load |
-| Backpressure | async-iterator-backpressure | Async iterator under slow consumer / fast producer |
-| Fan-out | events-listener-fanout | Many subscribers on single events$ stream |
+| Category       | Tests (file count) | Test count | What they verify                                               |
+| -------------- | ------------------ | ---------- | -------------------------------------------------------------- |
+| Subscription   | 2 files            | 11 tests   | Rapid subscribe/unsubscribe churn, parallel pipeline isolation |
+| Operators      | 3 files            | 18 tests   | Deep pipe chains, timer cleanup, takeUntil race conditions     |
+| Error handling | 1 file             | 6 tests    | Error propagation through operator chains under load           |
+| Backpressure   | 1 file             | 5 tests    | Async iterator under slow consumer / fast producer             |
+| Fan-out        | 1 file             | 6 tests    | Many subscribers on single events$ stream                      |
 
 ## See Also
 

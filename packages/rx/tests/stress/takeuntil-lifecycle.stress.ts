@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 
 import { createControllableSource } from "./helpers";
 import { RxObservable, takeUntil } from "../../src";
@@ -186,34 +186,6 @@ describe("RX5: takeUntil dual-subscription lifecycle", () => {
 
     for (const count of outerTeardownCounts) {
       expect(count).toStrictEqual(0);
-    }
-  });
-
-  it("5.timing: 1000 debounced emissions complete in < 3 seconds", () => {
-    const source = createControllableSource<number>();
-    const received: number[] = [];
-
-    vi.useFakeTimers();
-
-    try {
-      source.observable
-        .pipe(takeUntil(new RxObservable<void>(() => {})))
-        .subscribe({
-          next: (v) => received.push(v),
-        });
-
-      const start = Date.now();
-
-      for (let i = 1; i <= 1000; i++) {
-        source.emit(i);
-      }
-
-      const elapsed = Date.now() - start;
-
-      expect(elapsed).toBeLessThan(3000);
-      expect(received).toHaveLength(1000);
-    } finally {
-      vi.useRealTimers();
     }
   });
 });

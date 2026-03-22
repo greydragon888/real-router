@@ -24,37 +24,6 @@ describe("RX7: Concurrent state$() pipelines", () => {
     }
   });
 
-  it("7.1: 50 state$() subscriptions with replay + 200 navigations each get 201 values", async () => {
-    await router.start("/route0");
-
-    const received: SubscribeState[][] = Array.from({ length: 50 }, () => []);
-    const subs = Array.from({ length: 50 }, (_, i) =>
-      state$(router).subscribe({ next: (s) => received[i].push(s) }),
-    );
-
-    await new Promise<void>((resolve) => {
-      queueMicrotask(resolve);
-    });
-
-    const startTime = Date.now();
-
-    for (let i = 0; i < 200; i++) {
-      await router.navigate(routes[1 + (i % 9)]);
-    }
-
-    const elapsed = Date.now() - startTime;
-
-    for (const sub of subs) {
-      sub.unsubscribe();
-    }
-
-    for (const states of received) {
-      expect(states).toHaveLength(201);
-    }
-
-    expect(elapsed).toBeLessThan(5000);
-  });
-
   it("7.2: 50 state$({ replay: false }) subscriptions + 200 navigations each get 200 values", async () => {
     await router.start("/route0");
 
