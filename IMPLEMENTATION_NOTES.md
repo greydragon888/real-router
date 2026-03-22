@@ -757,6 +757,24 @@ Framework compilers generate code that v8 coverage tracks but tests can't reach:
 | React   | None                          | tsup preserves original code                            |
 | Preact  | None                          | tsup preserves original code                            |
 
+## dom-utils: Private Shared DOM Package
+
+### Problem
+
+All 5 framework adapters (React, Preact, Solid, Vue, Svelte) duplicated identical DOM utilities: `shouldNavigate` (modifier key check), `buildHref` (buildUrl/buildPath fallback), `buildActiveClassName` (CSS class concatenation), `applyLinkA11y` (role/tabindex on non-interactive elements). ~180 lines of copy-paste.
+
+Additionally, a11y route announcements (#337) required a `createRouteAnnouncer` function consumed by all adapters.
+
+### Solution
+
+Private `dom-utils` package (`"private": true`) — not published to npm, inlined into each adapter's bundle at build time. No duplication since users import only one adapter.
+
+### Why
+
+- **Not `@real-router/core/utils`** — `buildHref` uses `router.buildUrl()` which is injected by `browser-plugin` via `extendRouter()`. Core doesn't know about this method. DOM dependency also disqualifies core.
+- **Not per-adapter duplication** — 5 copies of identical code is a maintenance burden. A shared source of truth eliminates drift.
+- **Private, not published** — only one adapter is used at a time, so the code is inlined (no extra npm dependency for users).
+
 ## Module Resolution: `customConditions` + `development` Export Condition
 
 ### Problem

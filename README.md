@@ -261,7 +261,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ### Preact / Solid / Vue / Svelte
 
-- [Solid Integration](https://github.com/greydragon888/real-router/wiki/Solid-Integration) · [Vue Integration](https://github.com/greydragon888/real-router/wiki/Vue-Integration) · [Svelte Integration](https://github.com/greydragon888/real-router/wiki/Svelte-Integration)
+- [Preact Integration](https://github.com/greydragon888/real-router/wiki/Preact-Integration) · [Solid Integration](https://github.com/greydragon888/real-router/wiki/Solid-Integration) · [Vue Integration](https://github.com/greydragon888/real-router/wiki/Vue-Integration) · [Svelte Integration](https://github.com/greydragon888/real-router/wiki/Svelte-Integration)
 
 ### Plugins
 
