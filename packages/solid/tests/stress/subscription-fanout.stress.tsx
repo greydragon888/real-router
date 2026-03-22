@@ -29,7 +29,7 @@ describe("subscription-fanout stress tests", () => {
       0,
     );
 
-    function NodeSubscriber(props: { index: number }) {
+    function NodeSubscriber(props: { readonly index: number }) {
       const routeState = useRouteNode(`route${props.index}`);
 
       createEffect(() => {
@@ -97,10 +97,10 @@ describe("subscription-fanout stress tests", () => {
 
     render(() => (
       <RouterProvider router={router}>
-        {Array.from({ length: 20 }, (_, i) => (
+        {Array.from({ length: 20 }, () => (
           <RouteConsumer />
         ))}
-        {Array.from({ length: 30 }, (_, i) => (
+        {Array.from({ length: 30 }, () => (
           <RootNodeConsumer />
         ))}
       </RouterProvider>
@@ -137,7 +137,7 @@ describe("subscription-fanout stress tests", () => {
 
     render(() => (
       <RouterProvider router={router}>
-        {Array.from({ length: 50 }, (_, i) => (
+        {Array.from({ length: 50 }, () => (
           <UsersSubscriber />
         ))}
       </RouterProvider>
@@ -185,7 +185,7 @@ describe("subscription-fanout stress tests", () => {
     let cleanupCount = 0;
     const [show, setShow] = createSignal(true);
 
-    function NodeComp(props: { name: string }) {
+    function NodeComp(props: { readonly name: string }) {
       useRouteNode(props.name);
       onCleanup(() => {
         cleanupCount++;
@@ -220,7 +220,7 @@ describe("subscription-fanout stress tests", () => {
   it("1.5: 50 components subscribe, navigate 50 times, then unmount — all cleanups fire", async () => {
     let cleanupCount = 0;
 
-    function CleanupSubscriber(props: { index: number }) {
+    function CleanupSubscriber(props: { readonly index: number }) {
       useRouteNode(`route${props.index % 50}`);
       onCleanup(() => {
         cleanupCount++;

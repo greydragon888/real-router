@@ -1,19 +1,18 @@
 import { createRouter } from "@real-router/core";
 import { flushPromises } from "@vue/test-utils";
-import { defineComponent, h, nextTick } from "vue";
 import { describe, it, expect, afterEach } from "vitest";
-
-import { RouterProvider } from "../../src/RouterProvider";
-import { RouteView } from "../../src/components/RouteView";
-import { Link } from "../../src/components/Link";
-import { useRouteNode } from "../../src/composables/useRouteNode";
-import { useRouterTransition } from "../../src/composables/useRouterTransition";
+import { defineComponent, h, nextTick } from "vue";
 
 import {
   createStressRouter,
   mountWithProvider,
   createRenderCounter,
 } from "./helpers";
+import { Link } from "../../src/components/Link";
+import { RouteView } from "../../src/components/RouteView";
+import { useRouteNode } from "../../src/composables/useRouteNode";
+import { useRouterTransition } from "../../src/composables/useRouterTransition";
+import { RouterProvider } from "../../src/RouterProvider";
 
 describe("combined SPA simulation (Vue)", () => {
   afterEach(() => {
@@ -31,23 +30,46 @@ describe("combined SPA simulation (Vue)", () => {
 
     const sidebarRenders = Array.from<number>({ length: 10 }).fill(0);
 
-    const sidebarSubs = Array.from({ length: 10 }, (_, i) =>
-      defineComponent({
+    const sidebarSubs = Array.from({ length: 10 }, (_, i) => {
+      const nodeName = i < 5 ? `page${i}` : "";
+
+      return defineComponent({
         name: `SidebarSub${i}`,
         setup() {
-          const { route } = useRouteNode(i < 5 ? `page${i}` : "");
+          const { route } = useRouteNode(nodeName);
 
           return () => {
-            void route.value;
-            sidebarRenders[i]++;
+            if (route.value) {
+              sidebarRenders[i]++;
+            }
 
             return null;
           };
         },
-      }),
-    );
+      });
+    });
 
     const { mount } = await import("@vue/test-utils");
+
+    const navLinks = Array.from({ length: 30 }, (_, i) => {
+      const routeName = `page${i % 5}`;
+
+      return h(Link, { key: i, routeName }, { default: () => `Link ${i}` });
+    });
+
+    const routeMatches = routes.map((r) =>
+      h(
+        RouteView.Match,
+        { key: r.name, segment: r.name },
+        {
+          default: () => h("div", { "data-testid": r.name }, r.name),
+        },
+      ),
+    );
+
+    const sidebarElements = sidebarSubs.map((Sub, i) =>
+      h(Sub, { key: `sidebar-${i}` }),
+    );
 
     const App = defineComponent({
       name: "App",
@@ -58,36 +80,17 @@ describe("combined SPA simulation (Vue)", () => {
             { router },
             {
               default: () => [
-                h(
-                  "nav",
-                  Array.from({ length: 30 }, (_, i) =>
-                    h(
-                      Link,
-                      { key: i, routeName: `page${i % 5}` },
-                      { default: () => `Link ${i}` },
-                    ),
-                  ),
-                ),
+                h("nav", navLinks),
                 h("main", [
                   h(
                     RouteView,
                     { nodeName: "" },
                     {
-                      default: () =>
-                        routes.map((r) =>
-                          h(
-                            RouteView.Match,
-                            { key: r.name, segment: r.name },
-                            {
-                              default: () =>
-                                h("div", { "data-testid": r.name }, r.name),
-                            },
-                          ),
-                        ),
+                      default: () => routeMatches,
                     },
                   ),
                 ]),
-                ...sidebarSubs.map((Sub, i) => h(Sub, { key: `sidebar-${i}` })),
+                ...sidebarElements,
               ],
             },
           );
@@ -132,7 +135,8 @@ describe("combined SPA simulation (Vue)", () => {
         const transition = useRouterTransition();
 
         return () => {
-          void transition.value;
+          // Ensure reactivity by accessing transition.value
+          Boolean(transition.value);
           progressRenders++;
 
           return null;
@@ -142,6 +146,12 @@ describe("combined SPA simulation (Vue)", () => {
 
     const { mount } = await import("@vue/test-utils");
 
+    const navLinks2 = routes.map((r, i) => {
+      const routeName = r.name;
+
+      return h(Link, { key: i, routeName }, { default: () => r.name });
+    });
+
     const App = defineComponent({
       name: "App",
       setup() {
@@ -150,19 +160,7 @@ describe("combined SPA simulation (Vue)", () => {
             RouterProvider,
             { router },
             {
-              default: () => [
-                h(Progress),
-                h(
-                  "nav",
-                  routes.map((r, i) =>
-                    h(
-                      Link,
-                      { key: i, routeName: r.name },
-                      { default: () => r.name },
-                    ),
-                  ),
-                ),
-              ],
+              default: () => [h(Progress), h("nav", navLinks2)],
             },
           );
       },
@@ -200,6 +198,24 @@ describe("combined SPA simulation (Vue)", () => {
       createRenderCounter(`tab-${i}`),
     );
 
+    const tabNavLinks = Array.from({ length: 30 }, (_, i) =>
+      h(
+        Link,
+        { key: i, routeName: `tab${i % 5}` },
+        { default: () => `Tab ${i}` },
+      ),
+    );
+
+    const tabMatches = tabCounters.map(({ Component }, i) => {
+      const segment = `tab${i}`;
+
+      return h(
+        RouteView.Match,
+        { key: i, segment },
+        { default: () => h(Component) },
+      );
+    });
+
     const { mount } = await import("@vue/test-utils");
 
     const App = defineComponent({
@@ -211,28 +227,12 @@ describe("combined SPA simulation (Vue)", () => {
             { router },
             {
               default: () => [
-                h(
-                  "nav",
-                  Array.from({ length: 30 }, (_, i) =>
-                    h(
-                      Link,
-                      { key: i, routeName: `tab${i % 5}` },
-                      { default: () => `Tab ${i}` },
-                    ),
-                  ),
-                ),
+                h("nav", tabNavLinks),
                 h(
                   RouteView,
                   { nodeName: "", keepAlive: true },
                   {
-                    default: () =>
-                      tabCounters.map(({ Component }, i) =>
-                        h(
-                          RouteView.Match,
-                          { key: i, segment: `tab${i}` },
-                          { default: () => h(Component) },
-                        ),
-                      ),
+                    default: () => tabMatches,
                   },
                 ),
               ],

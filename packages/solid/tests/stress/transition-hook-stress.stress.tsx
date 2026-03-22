@@ -10,6 +10,40 @@ import { createStressRouter } from "./helpers";
 
 import type { RouterTransitionSnapshot } from "@real-router/solid";
 
+function makeTransitionConsumer(
+  onTransition: (t: RouterTransitionSnapshot) => void,
+) {
+  return function TransitionConsumer() {
+    const transition = useRouterTransition();
+
+    createEffect(() => {
+      onTransition(transition());
+    });
+
+    return null;
+  };
+}
+
+function createAsyncGuardFactory() {
+  let resolveGuard!: (v: boolean) => void;
+
+  function guardFactory() {
+    return function guardHandler() {
+      return new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+    };
+  }
+
+  return { guardFactory, getResolveGuard: () => resolveGuard };
+}
+
+function neverResolvingGuard() {
+  return function neverResolvingHandler() {
+    return new Promise<boolean>(() => {});
+  };
+}
+
 describe("S7 — useRouterTransition stress (Solid)", () => {
   it("7.1: 50 navigations with async guard — isTransitioning true→false each time", async () => {
     const router = createRouter(
@@ -24,15 +58,9 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
     await router.start("/");
 
     const lifecycle = getLifecycleApi(router);
-    let resolveGuard!: (v: boolean) => void;
+    const { guardFactory, getResolveGuard } = createAsyncGuardFactory();
 
-    lifecycle.addActivateGuard(
-      "target",
-      () => () =>
-        new Promise<boolean>((resolve) => {
-          resolveGuard = resolve;
-        }),
-    );
+    lifecycle.addActivateGuard("target", guardFactory);
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
@@ -40,15 +68,9 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
       fromRoute: null,
     };
 
-    function Consumer() {
-      const transition = useRouterTransition();
-
-      createEffect(() => {
-        snapshot = transition();
-      });
-
-      return null;
-    }
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
 
     render(() => (
       <RouterProvider router={router}>
@@ -63,7 +85,7 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
 
       expect(snapshot.isTransitioning).toBe(true);
 
-      resolveGuard(true);
+      getResolveGuard()(true);
       await Promise.resolve();
       await Promise.resolve();
       await Promise.resolve();
@@ -91,15 +113,9 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
       fromRoute: null,
     };
 
-    function Consumer() {
-      const transition = useRouterTransition();
-
-      createEffect(() => {
-        snapshot = transition();
-      });
-
-      return null;
-    }
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
 
     render(() => (
       <RouterProvider router={router}>
@@ -176,10 +192,7 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
 
     const lifecycle = getLifecycleApi(router);
 
-    lifecycle.addActivateGuard(
-      "guarded",
-      () => () => new Promise<boolean>(() => {}),
-    );
+    lifecycle.addActivateGuard("guarded", neverResolvingGuard);
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
@@ -187,15 +200,9 @@ describe("S7 — useRouterTransition stress (Solid)", () => {
       fromRoute: null,
     };
 
-    function Consumer() {
-      const transition = useRouterTransition();
-
-      createEffect(() => {
-        snapshot = transition();
-      });
-
-      return null;
-    }
+    const Consumer = makeTransitionConsumer((t) => {
+      snapshot = t;
+    });
 
     render(() => (
       <RouterProvider router={router}>

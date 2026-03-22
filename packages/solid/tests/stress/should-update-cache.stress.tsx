@@ -92,8 +92,11 @@ describe("S6 — shouldUpdateCache growth (Solid)", () => {
 
     await router.start("/route0");
 
+    let _mountCount = 0;
+
     function Sub(props: { index: number }) {
       useRouteNode(`route${props.index}`);
+      _mountCount++;
 
       return null;
     }

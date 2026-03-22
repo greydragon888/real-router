@@ -395,6 +395,16 @@ export default tsEslint.config(
   },
 
   // ============================================
+  // STRESS TEST CONFIGURATION
+  // ============================================
+  {
+    files: ["tests/**/*.stress.ts"],
+    rules: {
+      "unicorn/consistent-function-scoping": "off",
+    },
+  },
+
+  // ============================================
   // TESTING LIBRARY CONFIGURATION
   // ============================================
   // Using flat/dom for Vue (no React-specific rules)

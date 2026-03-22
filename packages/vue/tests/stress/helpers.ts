@@ -1,3 +1,4 @@
+/* eslint-disable unicorn/consistent-function-scoping */
 import { createRouter } from "@real-router/core";
 import { mount, flushPromises } from "@vue/test-utils";
 import { defineComponent, h, nextTick } from "vue";
@@ -39,18 +40,23 @@ export function createStressRouter(routeCount = 10): Router {
   return createRouter(routes, { defaultRoute: "route0" });
 }
 
+function createTestApp(router: Router, content: () => VNode | VNode[]) {
+  return defineComponent({
+    name: "TestApp",
+    setup() {
+      return () => h(RouterProvider, { router }, { default: content });
+    },
+  });
+}
+
 /**
  * Mounts a component tree inside RouterProvider.
  */
 export function mountWithProvider(
   router: Router,
   content: () => VNode | VNode[],
-) {
-  return mount(
-    defineComponent({
-      setup: () => () => h(RouterProvider, { router }, { default: content }),
-    }),
-  );
+): ReturnType<typeof mount> {
+  return mount(createTestApp(router, content));
 }
 
 /**
@@ -93,10 +99,12 @@ export function createRenderCounter(testId: string): {
   const Component = defineComponent({
     name: `RenderCounter-${testId}`,
     setup() {
+      const id = testId;
+
       return () => {
         count++;
 
-        return h("div", { "data-testid": testId }, `rendered: ${count}`);
+        return h("div", { "data-testid": id }, `rendered: ${count}`);
       };
     },
   });

@@ -155,7 +155,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     unmount2();
   });
 
-  it("3.4: conditional toggle 20 useRouteNode x 100 — no errors", () => {
+  it("3.4: conditional toggle 20 useRouteNode x 100 — no errors", async () => {
     const toggleRef: { current: (() => void) | null } = { current: null };
 
     const consumers = Array.from({ length: 20 }, (_, i) => {
@@ -193,7 +193,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     );
 
     for (let i = 0; i < 100; i++) {
-      act(() => {
+      await act(() => {
         toggleRef.current?.();
       });
     }
@@ -246,7 +246,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     expect(totalAfter).toBeGreaterThan(totalBefore);
   });
 
-  it("3.7: dynamic nodeName rapid switch x 100 on 20 components — no errors, final state correct", () => {
+  it("3.7: dynamic nodeName rapid switch x 100 on 20 components — no errors, final state correct", async () => {
     const nodeNameRef: { current: (name: string) => void } = {
       current: () => {},
     };
@@ -280,7 +280,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     const { container } = render(<Parent />);
 
     for (let i = 0; i < 100; i++) {
-      act(() => {
+      await act(() => {
         nodeNameRef.current(`route${i % 10}`);
       });
     }

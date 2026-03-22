@@ -13,6 +13,10 @@ import {
 import type { Router } from "@real-router/core";
 import type { FunctionComponent } from "preact";
 
+const DUPLICATE_LITERAL = 5;
+const OUTSIDE_ROUTES = ["route0", "route1", "route2", "route3", "route4"];
+const USERS_LIST_ROUTE = "users.list";
+
 describe("subscription-fanout stress tests", () => {
   let router: Router;
 
@@ -53,7 +57,7 @@ describe("subscription-fanout stress tests", () => {
     const countsAfterMount = [...renderCounts];
 
     await act(async () => {
-      await router.navigate("users.list");
+      await router.navigate(USERS_LIST_ROUTE);
     });
 
     const routeNames = Array.from({ length: 50 }, (_, i) => `route${i}`);
@@ -74,7 +78,7 @@ describe("subscription-fanout stress tests", () => {
 
   it("1.2: 20 useRoute + 30 useRouteNode('') consumers + 100 navigations — each re-renders on every navigation", async () => {
     await act(async () => {
-      await router.navigate("users.list");
+      await router.navigate(USERS_LIST_ROUTE);
     });
 
     let routeRenders = 0;
@@ -147,10 +151,10 @@ describe("subscription-fanout stress tests", () => {
     const rendersAfterMount = usersRenders;
 
     const usersRoutes = [
-      { name: "users.list" },
+      { name: USERS_LIST_ROUTE },
       { name: "users.view", params: { id: "1" } },
       { name: "users.edit", params: { id: "1" } },
-      { name: "users.list" },
+      { name: USERS_LIST_ROUTE },
       { name: "users.view", params: { id: "2" } },
     ];
 
@@ -166,10 +170,7 @@ describe("subscription-fanout stress tests", () => {
 
     expect(usersNavigationRenders).toBe(50 * 50);
 
-    const outsideRoutes = roundRobinRoutes(
-      ["route0", "route1", "route2", "route3", "route4"],
-      50,
-    );
+    const outsideRoutes = roundRobinRoutes(OUTSIDE_ROUTES, 50);
 
     const rendersBeforeOutside = usersRenders;
 
@@ -206,7 +207,7 @@ describe("subscription-fanout stress tests", () => {
           </button>
           {show &&
             Array.from({ length: 10 }, (_, i) => (
-              <NodeComp key={i} name={`route${i % 5}`} />
+              <NodeComp key={i} name={`route${i % DUPLICATE_LITERAL}`} />
             ))}
         </div>
       );
@@ -224,7 +225,7 @@ describe("subscription-fanout stress tests", () => {
       for (let i = 0; i < 10; i++) {
         await act(async () => {
           toggle.click();
-          await router.navigate(`route${(i % 5) + 1}`);
+          await router.navigate(`route${(i % DUPLICATE_LITERAL) + 1}`);
         });
       }
     } catch (error) {
@@ -277,7 +278,7 @@ describe("subscription-fanout stress tests", () => {
 
     try {
       for (let i = 0; i < 100; i++) {
-        act(() => {
+        await act(() => {
           changeBtn.click();
         });
       }

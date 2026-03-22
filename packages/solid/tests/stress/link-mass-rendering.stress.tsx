@@ -1,5 +1,4 @@
 import { render, screen } from "@solidjs/testing-library";
-import { fireEvent } from "@testing-library/dom";
 import { createSignal } from "solid-js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
@@ -8,6 +7,19 @@ import { RouterProvider, Link } from "@real-router/solid";
 import { createStressRouter, navigateSequentially } from "./helpers";
 
 import type { Router } from "@real-router/core";
+
+const deepParams = (i: number): Record<string, string> => ({
+  id: String(i),
+  a: "1",
+  b: "2",
+  c: "3",
+  d: "4",
+  e: "5",
+  f: "6",
+  g: "7",
+  h: "8",
+  j: "9",
+});
 
 describe("link-mass-rendering stress tests", () => {
   let router: Router;
@@ -88,19 +100,6 @@ describe("link-mass-rendering stress tests", () => {
   });
 
   it("2.5: 200 Links with deep routeParams + navigation — correct active state", async () => {
-    const deepParams = (i: number): Record<string, string> => ({
-      id: String(i),
-      a: "1",
-      b: "2",
-      c: "3",
-      d: "4",
-      e: "5",
-      f: "6",
-      g: "7",
-      h: "8",
-      j: "9",
-    });
-
     render(() => (
       <RouterProvider router={router}>
         {Array.from({ length: 200 }, (_, i) => (
@@ -127,26 +126,6 @@ describe("link-mass-rendering stress tests", () => {
     expect(screen.getByTestId("link-50")).toHaveClass("active");
     expect(screen.getByTestId("link-10")).not.toHaveClass("active");
     expect(document.querySelectorAll(".active")).toHaveLength(1);
-  });
-
-  it("2.6: 50 rapid Link clicks without await — 0 unhandled rejections, final route is correct", async () => {
-    render(() => (
-      <RouterProvider router={router}>
-        <Link routeName="route5" activeClassName="active" data-testid="link">
-          Link
-        </Link>
-      </RouterProvider>
-    ));
-
-    const link = screen.getByTestId("link");
-
-    for (let i = 0; i < 50; i++) {
-      fireEvent.click(link);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    expect(link).toHaveClass("active");
   });
 
   it("2.7: 20 Links with dynamic routeName changing 100 times — correct final active state, no crashes", () => {

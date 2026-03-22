@@ -14,8 +14,8 @@
     router: Router;
     routeCount: number;
     nodeCount: number;
-    onRouteRender?: () => void;
-    onNodeRender?: () => void;
+    onRouteRender?: (() => void) | undefined;
+    onNodeRender?: (() => void) | undefined;
   } = $props();
 </script>
 

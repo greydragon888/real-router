@@ -123,7 +123,9 @@ describe("S5 — deep component tree + context cascade (Solid)", () => {
     const afterMount = totalEffects;
 
     for (let nav = 0; nav < 50; nav++) {
-      await router.navigate(nav % 2 === 0 ? chain.at(-1) : "other");
+      const lastChain = chain.at(-1);
+
+      await router.navigate(nav % 2 === 0 ? (lastChain ?? "other") : "other");
     }
 
     expect(totalEffects - afterMount).toBe(0);

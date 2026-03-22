@@ -1,20 +1,21 @@
 import { createRouter } from "@real-router/core";
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent, h, nextTick } from "vue";
 import { describe, it, expect, afterEach } from "vitest";
-
-import { RouterProvider } from "../../src/RouterProvider";
-import { useRouteNode } from "../../src/composables/useRouteNode";
-import { useRoute } from "../../src/composables/useRoute";
-import { useRouter } from "../../src/composables/useRouter";
+import { defineComponent, h, nextTick } from "vue";
 
 import { mountWithProvider } from "./helpers";
+import { useRoute } from "../../src/composables/useRoute";
+import { useRouteNode } from "../../src/composables/useRouteNode";
+import { useRouter } from "../../src/composables/useRouter";
+import { RouterProvider } from "../../src/RouterProvider";
 
 import type { Route, Router } from "@real-router/core";
 
 function createDeepRouter(depth: number, breadth: number): Router {
   function buildChildren(prefix: string, level: number): Route[] {
-    if (level >= depth) return [];
+    if (level >= depth) {
+      return [];
+    }
 
     return Array.from({ length: breadth }, (_, i) => {
       const name = `${prefix}${i}`;
@@ -41,7 +42,7 @@ function buildNodeChain(depth: number): string[] {
 
   for (let d = 0; d < depth; d++) {
     seg += "0";
-    chain.push(`${chain.at(-1)!}.${seg}`);
+    chain.push(`${chain.at(-1)}.${seg}`);
   }
 
   return chain;
@@ -63,21 +64,24 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
       length: chain.length,
     }).fill(0);
 
-    const subscribers = chain.map((nodeName, i) =>
-      defineComponent({
+    const subscribers = chain.map((nodeName, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `NodeSub${i}`,
         setup() {
           const { route } = useRouteNode(nodeName);
 
           return () => {
-            void route.value;
-            renderCounts[i]++;
+            if (route.value) {
+              renderCounts[index]++;
+            }
 
             return h("div");
           };
         },
-      }),
-    );
+      });
+    });
 
     mountWithProvider(router, () =>
       subscribers.map((Sub, i) => h(Sub, { key: i })),
@@ -124,7 +128,11 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
     });
 
     mountWithProvider(router, () =>
-      Array.from({ length: 30 }, (_, i) => h(RouterUser, { key: i })),
+      Array.from({ length: 30 }, (_, i) => {
+        const key = i;
+
+        return h(RouterUser, { key });
+      }),
     );
 
     await nextTick();
@@ -133,7 +141,9 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
     const afterMount = totalRenders;
 
     for (let nav = 0; nav < 50; nav++) {
-      await router.navigate(nav % 2 === 0 ? chain.at(-1)! : "other");
+      const lastChain = chain.at(-1);
+
+      await router.navigate(nav % 2 === 0 ? (lastChain ?? "other") : "other");
       await nextTick();
       await flushPromises();
     }
@@ -156,7 +166,8 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
         const { route } = useRoute();
 
         return () => {
-          void route.value;
+          // Ensure reactivity by accessing route.value
+          Boolean(route.value);
           leafRenders++;
 
           return h("div");
@@ -165,7 +176,11 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
     });
 
     mountWithProvider(router, () =>
-      Array.from({ length: 25 }, (_, i) => h(LeafConsumer, { key: i })),
+      Array.from({ length: 25 }, (_, i) => {
+        const key = i;
+
+        return h(LeafConsumer, { key });
+      }),
     );
 
     await nextTick();
@@ -212,9 +227,10 @@ describe("V5 — deep component tree + context cascade (Vue)", () => {
         const { route } = useRouteNode("");
 
         return () => {
-          void route.value;
-          r2RouteCapture = route.value?.name;
-          r2RenderCount++;
+          if (route.value) {
+            r2RouteCapture = route.value.name;
+            r2RenderCount++;
+          }
 
           return h("div");
         };

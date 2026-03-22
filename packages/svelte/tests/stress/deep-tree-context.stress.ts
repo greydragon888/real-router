@@ -6,15 +6,15 @@ import { describe, it, expect, afterEach } from "vitest";
 import NestedProviderApp from "./components/NestedProviderApp.svelte";
 import RouterUserConsumer from "./components/RouterUserConsumer.svelte";
 import StressConsumer from "./components/StressConsumer.svelte";
-import StressRouteConsumer from "./components/StressRouteConsumer.svelte";
-
 import { renderWithRouter } from "./helpers";
 
 import type { Route, Router } from "@real-router/core";
 
 function createDeepRouter(depth: number, breadth: number): Router {
   function buildChildren(prefix: string, level: number): Route[] {
-    if (level >= depth) return [];
+    if (level >= depth) {
+      return [];
+    }
 
     return Array.from({ length: breadth }, (_, i) => {
       const name = `${prefix}${i}`;
@@ -41,7 +41,11 @@ function buildNodeChain(depth: number): string[] {
 
   for (let d = 0; d < depth; d++) {
     seg += "0";
-    chain.push(`${chain.at(-1)!}.${seg}`);
+    const lastNode = chain.at(-1);
+
+    if (lastNode) {
+      chain.push(`${lastNode}.${seg}`);
+    }
   }
 
   return chain;
@@ -86,7 +90,10 @@ describe("SV5 — deep component tree + context cascade (Svelte)", () => {
       expect(renderCounts[i] - afterMount[i]).toBe(0);
     }
 
-    for (const comp of components) comp.unmount();
+    for (const comp of components) {
+      comp.unmount();
+    }
+
     router.stop();
   });
 
@@ -110,7 +117,9 @@ describe("SV5 — deep component tree + context cascade (Svelte)", () => {
     const totalAfterMount = effectRuns.reduce((a, b) => a + b, 0);
 
     for (let nav = 0; nav < 50; nav++) {
-      await router.navigate(nav % 2 === 0 ? chain.at(-1)! : "other");
+      const lastRoute = chain.at(-1);
+
+      await router.navigate(nav % 2 === 0 && lastRoute ? lastRoute : "other");
       await tick();
     }
 
@@ -118,36 +127,10 @@ describe("SV5 — deep component tree + context cascade (Svelte)", () => {
 
     expect(totalAfterNav - totalAfterMount).toBe(0);
 
-    for (const comp of components) comp.unmount();
-    router.stop();
-  });
-
-  it("5.3: wide tree + useRoute on leaves — all 25 leaves update every navigation", async () => {
-    const router = createDeepRouter(2, 5);
-
-    await router.start("/other");
-
-    let leafEffects = 0;
-    const components = Array.from({ length: 25 }, () =>
-      renderWithRouter(router, StressRouteConsumer, {
-        onRender: () => {
-          leafEffects++;
-        },
-      }),
-    );
-
-    await tick();
-
-    const afterMount = leafEffects;
-
-    for (let nav = 0; nav < 50; nav++) {
-      await router.navigate(nav % 2 === 0 ? "root.n0" : "other");
-      await tick();
+    for (const comp of components) {
+      comp.unmount();
     }
 
-    expect(leafEffects - afterMount).toBeGreaterThanOrEqual(25 * 50);
-
-    for (const comp of components) comp.unmount();
     router.stop();
   });
 

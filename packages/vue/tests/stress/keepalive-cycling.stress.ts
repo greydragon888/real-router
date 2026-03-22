@@ -1,12 +1,11 @@
 import { createRouter } from "@real-router/core";
 import { flushPromises } from "@vue/test-utils";
-import { defineComponent, h, nextTick } from "vue";
 import { describe, it, expect, afterEach } from "vitest";
-
-import { RouterProvider } from "../../src/RouterProvider";
-import { RouteView } from "../../src/components/RouteView";
+import { defineComponent, h, nextTick } from "vue";
 
 import { createRenderCounter } from "./helpers";
+import { RouteView } from "../../src/components/RouteView";
+import { RouterProvider } from "../../src/RouterProvider";
 
 describe("keepAlive cycling stress tests (Vue)", () => {
   afterEach(() => {
@@ -105,13 +104,15 @@ describe("keepAlive cycling stress tests (Vue)", () => {
                   { nodeName: "", keepAlive: true },
                   {
                     default: () =>
-                      counters.map(({ Component }, i) =>
-                        h(
+                      counters.map(({ Component }, i) => {
+                        const segment = `seg${i}`;
+
+                        return h(
                           RouteView.Match,
-                          { key: i, segment: `seg${i}` },
+                          { key: i, segment },
                           { default: () => h(Component) },
-                        ),
-                      ),
+                        );
+                      }),
                   },
                 ),
             },
@@ -177,13 +178,15 @@ describe("keepAlive cycling stress tests (Vue)", () => {
                   { nodeName: "", keepAlive: true },
                   {
                     default: () =>
-                      keepAliveCounters.map(({ Component }, i) =>
-                        h(
+                      keepAliveCounters.map(({ Component }, i) => {
+                        const segment = `seg${i}`;
+
+                        return h(
                           RouteView.Match,
-                          { key: `ka-${i}`, segment: `seg${i}` },
+                          { key: `ka-${i}`, segment },
                           { default: () => h(Component) },
-                        ),
-                      ),
+                        );
+                      }),
                   },
                 ),
                 h(
@@ -191,13 +194,15 @@ describe("keepAlive cycling stress tests (Vue)", () => {
                   { nodeName: "" },
                   {
                     default: () =>
-                      regularCounters.map(({ Component }, i) =>
-                        h(
+                      regularCounters.map(({ Component }, i) => {
+                        const segment = `seg${10 + i}`;
+
+                        return h(
                           RouteView.Match,
-                          { key: `reg-${i}`, segment: `seg${10 + i}` },
+                          { key: `reg-${i}`, segment },
                           { default: () => h(Component) },
-                        ),
-                      ),
+                        );
+                      }),
                   },
                 ),
               ],
@@ -268,13 +273,15 @@ describe("keepAlive cycling stress tests (Vue)", () => {
                     { nodeName: "", keepAlive: true },
                     {
                       default: () =>
-                        counters.map(({ Component }, i) =>
-                          h(
+                        counters.map(({ Component }, i) => {
+                          const segment = `seg${i}`;
+
+                          return h(
                             RouteView.Match,
-                            { key: i, segment: `seg${i}` },
+                            { key: i, segment },
                             { default: () => h(Component) },
-                          ),
-                        ),
+                          );
+                        }),
                     },
                   ),
                 ]),

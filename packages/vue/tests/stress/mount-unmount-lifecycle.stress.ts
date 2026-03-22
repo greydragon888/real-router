@@ -1,11 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
-import { defineComponent, h, ref, nextTick } from "vue";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
-import { useRouteNode } from "../../src/composables/useRouteNode";
-import { useRoute } from "../../src/composables/useRoute";
-import { useRouterTransition } from "../../src/composables/useRouterTransition";
-import { Link } from "../../src/components/Link";
+import { defineComponent, h, ref, nextTick } from "vue";
 
 import {
   createStressRouter,
@@ -13,6 +8,10 @@ import {
   takeHeapSnapshot,
   MB,
 } from "./helpers";
+import { Link } from "../../src/components/Link";
+import { useRoute } from "../../src/composables/useRoute";
+import { useRouteNode } from "../../src/composables/useRouteNode";
+import { useRouterTransition } from "../../src/composables/useRouterTransition";
 
 import type { Router } from "@real-router/core";
 
@@ -77,20 +76,22 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
   it("3.3: 50 components mount → navigate × 10 → unmount → remount → navigate × 10", async () => {
     const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
 
-    const consumers = Array.from({ length: 50 }, (_, i) =>
-      defineComponent({
+    const consumers = Array.from({ length: 50 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `Consumer${i}`,
         setup() {
           useRouteNode(`route${i}`);
 
           return () => {
-            renderCounts[i]++;
+            renderCounts[index]++;
 
             return h("div");
           };
         },
-      }),
-    );
+      });
+    });
 
     const wrapper = mountWithProvider(router, () =>
       consumers.map((C, i) => h(C, { key: i })),
@@ -132,22 +133,30 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
   it("3.4: conditional toggle 20 useRouteNode × 100 — no errors", async () => {
     const showRef = ref(true);
 
-    const consumers = Array.from({ length: 20 }, (_, i) =>
-      defineComponent({
+    const consumers = Array.from({ length: 20 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `ToggleConsumer${i}`,
         setup() {
-          useRouteNode(`route${i}`);
+          useRouteNode(`route${index}`);
 
           return () => h("div");
         },
-      }),
-    );
+      });
+    });
 
     const Toggle = defineComponent({
       name: "Toggle",
       setup() {
         return () =>
-          showRef.value ? consumers.map((C, i) => h(C, { key: i })) : null;
+          showRef.value
+            ? consumers.map((C, i) => {
+                const key = i;
+
+                return h(C, { key });
+              })
+            : null;
       },
     });
 
@@ -164,21 +173,24 @@ describe("mount/unmount subscription lifecycle (Vue)", () => {
   it("3.5: router stop/restart while 50 components mounted — components receive post-restart navigations", async () => {
     const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
 
-    const consumers = Array.from({ length: 50 }, (_, i) =>
-      defineComponent({
+    const consumers = Array.from({ length: 50 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `RestartConsumer${i}`,
         setup() {
           const { route } = useRouteNode(`route${i}`);
 
           return () => {
-            void route.value;
-            renderCounts[i]++;
+            if (route.value) {
+              renderCounts[index]++;
+            }
 
             return h("div");
           };
         },
-      }),
-    );
+      });
+    });
 
     mountWithProvider(router, () => consumers.map((C, i) => h(C, { key: i })));
 

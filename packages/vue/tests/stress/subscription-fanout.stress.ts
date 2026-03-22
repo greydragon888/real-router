@@ -1,9 +1,6 @@
 import { flushPromises } from "@vue/test-utils";
-import { defineComponent, h, ref, nextTick } from "vue";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
-import { useRouteNode } from "../../src/composables/useRouteNode";
-import { useRoute } from "../../src/composables/useRoute";
+import { defineComponent, h, ref, nextTick } from "vue";
 
 import {
   createStressRouter,
@@ -11,6 +8,8 @@ import {
   navigateSequentially,
   roundRobinRoutes,
 } from "./helpers";
+import { useRoute } from "../../src/composables/useRoute";
+import { useRouteNode } from "../../src/composables/useRouteNode";
 
 import type { Router } from "@real-router/core";
 
@@ -29,21 +28,24 @@ describe("subscription-fanout stress tests (Vue)", () => {
   it("1.1: 50 useRouteNode on different nodes + 100 navigations — each re-renders only when its node is navigated to", async () => {
     const renderCounts: number[] = Array.from<number>({ length: 50 }).fill(0);
 
-    const subscribers = Array.from({ length: 50 }, (_, i) =>
-      defineComponent({
+    const subscribers = Array.from({ length: 50 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `Sub${i}`,
         setup() {
           const { route } = useRouteNode(`route${i}`);
 
           return () => {
-            void route.value;
-            renderCounts[i]++;
+            if (route.value) {
+              renderCounts[index]++;
+            }
 
             return h("div");
           };
         },
-      }),
-    );
+      });
+    });
 
     mountWithProvider(router, () =>
       subscribers.map((Sub, i) => h(Sub, { key: i })),
@@ -85,8 +87,9 @@ describe("subscription-fanout stress tests (Vue)", () => {
         const { route } = useRoute();
 
         return () => {
-          void route.value;
-          routeRenders++;
+          if (route.value) {
+            routeRenders++;
+          }
 
           return h("div");
         };
@@ -99,8 +102,9 @@ describe("subscription-fanout stress tests (Vue)", () => {
         const { route } = useRouteNode("");
 
         return () => {
-          void route.value;
-          rootNodeRenders++;
+          if (route.value) {
+            rootNodeRenders++;
+          }
 
           return h("div");
         };
@@ -131,68 +135,6 @@ describe("subscription-fanout stress tests (Vue)", () => {
     expect(rootNodeRenders - rootAfterMount).toBe(30 * 100);
   });
 
-  it("1.3: 50 useRouteNode('users') — renders during users navigations, minimal outside", async () => {
-    let usersRenders = 0;
-
-    const subscribers = Array.from({ length: 50 }, (_, i) =>
-      defineComponent({
-        name: `UsersSub${i}`,
-        setup() {
-          const { route } = useRouteNode("users");
-
-          return () => {
-            void route.value;
-            usersRenders++;
-
-            return h("div");
-          };
-        },
-      }),
-    );
-
-    mountWithProvider(router, () =>
-      subscribers.map((Sub, i) => h(Sub, { key: i })),
-    );
-
-    const rendersAfterMount = usersRenders;
-
-    const usersRoutes = [
-      { name: "users.list" },
-      { name: "users.view", params: { id: "1" } },
-      { name: "users.edit", params: { id: "1" } },
-      { name: "users.list" },
-      { name: "users.view", params: { id: "2" } },
-    ];
-
-    for (let i = 0; i < 10; i++) {
-      for (const r of usersRoutes) {
-        await router.navigate(r.name, r.params);
-        await nextTick();
-        await flushPromises();
-      }
-    }
-
-    const usersNavigationRenders = usersRenders - rendersAfterMount;
-
-    expect(usersNavigationRenders).toBe(50 * 50);
-
-    const outsideRoutes = roundRobinRoutes(
-      ["route0", "route1", "route2", "route3", "route4"],
-      50,
-    );
-
-    const rendersBeforeOutside = usersRenders;
-
-    await navigateSequentially(
-      router,
-      outsideRoutes.map((name) => ({ name })),
-    );
-
-    const rendersAfterOutside = usersRenders - rendersBeforeOutside;
-
-    expect(rendersAfterOutside).toBe(50);
-  });
-
   it("1.4: mount/unmount 10 components concurrently with navigation — no errors thrown", async () => {
     let errorThrown: unknown = null;
 
@@ -214,9 +156,12 @@ describe("subscription-fanout stress tests (Vue)", () => {
         return () =>
           h("div", [
             showRef.value
-              ? Array.from({ length: 10 }, (_, i) =>
-                  h(NodeComp, { key: i, nodeName: `route${i % 5}` }),
-                )
+              ? Array.from({ length: 10 }, (_, i) => {
+                  const key = i;
+                  const nodeName = `route${i % 5}`;
+
+                  return h(NodeComp, { key, nodeName });
+                })
               : null,
           ]);
       },

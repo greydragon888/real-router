@@ -14,22 +14,22 @@ import { createDeepRouter } from "./helpers";
 
 import type { FunctionComponent } from "preact";
 
+function buildNodeChain(depth: number): string[] {
+  const chain: string[] = ["root"];
+  let seg = "n";
+
+  for (let d = 0; d < depth; d++) {
+    seg += "0";
+    chain.push(`${chain.at(-1)}.${seg}`);
+  }
+
+  return chain;
+}
+
 describe("deep component tree + context cascade (Preact)", () => {
   afterEach(() => {
     cleanup();
   });
-
-  function buildNodeChain(depth: number): string[] {
-    const chain: string[] = ["root"];
-    let seg = "n";
-
-    for (let d = 0; d < depth; d++) {
-      seg += "0";
-      chain.push(`${chain.at(-1)}.${seg}`);
-    }
-
-    return chain;
-  }
 
   it("5.1: 30 deep useRouteNode — only relevant nodes re-render", async () => {
     const router = createDeepRouter(30, 1);
@@ -93,7 +93,6 @@ describe("deep component tree + context cascade (Preact)", () => {
       return null;
     });
 
-
     render(
       <RouterProvider router={router}>
         {Array.from({ length: 30 }, (_, i) => (
@@ -104,8 +103,14 @@ describe("deep component tree + context cascade (Preact)", () => {
     const afterMount = totalRenders;
 
     for (let nav = 0; nav < 50; nav++) {
+      const targetRoute = nav % 2 === 0 ? chain.at(-1) : "other";
+
+      if (!targetRoute) {
+        throw new Error("Invalid route");
+      }
+
       await act(async () => {
-        await router.navigate(nav % 2 === 0 ? chain.at(-1)! : "other");
+        await router.navigate(targetRoute);
       });
     }
 
@@ -126,7 +131,6 @@ describe("deep component tree + context cascade (Preact)", () => {
 
       return null;
     });
-
 
     render(
       <RouterProvider router={router}>

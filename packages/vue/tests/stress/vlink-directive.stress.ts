@@ -1,11 +1,10 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent, h, nextTick, withDirectives } from "vue";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
-import { RouterProvider } from "../../src/RouterProvider";
-import { vLink } from "../../src/directives/vLink";
+import { defineComponent, h, nextTick, withDirectives } from "vue";
 
 import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
+import { vLink } from "../../src/directives/vLink";
+import { RouterProvider } from "../../src/RouterProvider";
 
 import type { Router } from "@real-router/core";
 
@@ -32,16 +31,16 @@ describe("v-link directive stress tests (Vue)", () => {
             { router },
             {
               default: () =>
-                Array.from({ length: 200 }, (_, i) =>
-                  withDirectives(
-                    h(
-                      "div",
-                      { key: i, "data-testid": `vlink-${i}` },
-                      `Link ${i}`,
-                    ),
-                    [[vLink, { name: `route${i % 50}` }]],
-                  ),
-                ),
+                Array.from({ length: 200 }, (_, i) => {
+                  const key = i;
+                  const testid = `vlink-${i}`;
+                  const routeName = `route${i % 50}`;
+
+                  return withDirectives(
+                    h("div", { key, "data-testid": testid }, `Link ${i}`),
+                    [[vLink, { name: routeName }]],
+                  );
+                }),
             },
           );
       },
@@ -78,11 +77,14 @@ describe("v-link directive stress tests (Vue)", () => {
               { router },
               {
                 default: () =>
-                  Array.from({ length: 200 }, (_, i) =>
-                    withDirectives(h("div", { key: i }, `Link ${i}`), [
-                      [vLink, { name: `route${i % 50}` }],
-                    ]),
-                  ),
+                  Array.from({ length: 200 }, (_, i) => {
+                    const key = i;
+                    const routeName = `route${i % 50}`;
+
+                    return withDirectives(h("div", { key }, `Link ${i}`), [
+                      [vLink, { name: routeName }],
+                    ]);
+                  }),
               },
             );
         },
@@ -147,12 +149,16 @@ describe("v-link directive stress tests (Vue)", () => {
             { router },
             {
               default: () =>
-                Array.from({ length: 50 }, (_, i) =>
-                  withDirectives(
-                    h("div", { key: i, "data-testid": `nav-${i}` }, `Nav ${i}`),
-                    [[vLink, { name: `route${i}` }]],
-                  ),
-                ),
+                Array.from({ length: 50 }, (_, i) => {
+                  const key = i;
+                  const testid = `nav-${i}`;
+                  const routeName = `route${i}`;
+
+                  return withDirectives(
+                    h("div", { key, "data-testid": testid }, `Nav ${i}`),
+                    [[vLink, { name: routeName }]],
+                  );
+                }),
             },
           );
       },

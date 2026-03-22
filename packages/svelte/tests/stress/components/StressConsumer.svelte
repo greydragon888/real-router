@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useRouteNode } from "../../../src/composables/useRouteNode.svelte";
 
-  let { nodeName, onRender }: { nodeName: string; onRender?: () => void } = $props();
+  let { nodeName, onRender }: { nodeName: string; onRender?: (() => void) | undefined } = $props();
 
   const { route } = useRouteNode(nodeName);
 

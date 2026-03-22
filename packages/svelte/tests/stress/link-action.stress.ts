@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import ManyLinkActions from "./components/ManyLinkActions.svelte";
 import StressLinkAction from "./components/StressLinkAction.svelte";
-
 import {
   createStressRouter,
   renderWithRouter,
@@ -33,13 +32,11 @@ describe("link-action stress tests (Svelte)", () => {
     await tick();
 
     for (let i = 0; i < 50; i++) {
-      const el = container.querySelector(
-        `[data-testid='action-${i}']`,
-      ) as HTMLElement;
+      const el = container.querySelector(`[data-testid='action-${i}']`);
 
-      expect(el).toBeTruthy();
-      expect(el.getAttribute("role")).toBe("link");
-      expect(el.getAttribute("tabindex")).toBe("0");
+      expect(el).not.toBeNull();
+      expect(el?.getAttribute("role")).toBe("link");
+      expect(el?.getAttribute("tabindex")).toBe("0");
     }
 
     unmount();
@@ -68,20 +65,24 @@ describe("link-action stress tests (Svelte)", () => {
 
     await tick();
 
-    const el5 = container.querySelector(
-      "[data-testid='action-5']",
-    ) as HTMLElement;
+    const el5 = container.querySelector("[data-testid='action-5']");
 
-    el5.click();
+    expect(el5).not.toBeNull();
+    expect(el5).toBeInstanceOf(HTMLElement);
+
+    (el5 as HTMLElement).click();
+
     await tick();
 
     expect(router.getState()?.name).toBe("route5");
 
-    const el10 = container.querySelector(
-      "[data-testid='action-10']",
-    ) as HTMLElement;
+    const el10 = container.querySelector("[data-testid='action-10']");
 
-    el10.click();
+    expect(el10).not.toBeNull();
+    expect(el10).toBeInstanceOf(HTMLElement);
+
+    (el10 as HTMLElement).click();
+
     await tick();
 
     expect(router.getState()?.name).toBe("route10");

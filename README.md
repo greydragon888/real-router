@@ -283,7 +283,7 @@ Real-Router treats testing as a first-class engineering concern, not an aftertho
 - **100% code coverage** — enforced in CI across all packages, no exceptions
 - **Static analysis** — SonarCloud quality gate on every PR: zero bugs, zero vulnerabilities, zero code smells
 - **Property-based testing** — [fast-check](https://fast-check.dev/) generates thousands of random inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations)
-- **Stress testing** — 99 dedicated stress tests: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, 50+ heap snapshots confirming zero memory leaks
+- **Stress testing** — 413 dedicated stress tests across core and all framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations for React, Preact, Solid, Vue, and Svelte
 - **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
 
 ## Development

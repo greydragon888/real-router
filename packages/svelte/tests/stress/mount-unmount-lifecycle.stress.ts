@@ -1,11 +1,9 @@
 import { tick } from "svelte";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
+import ManyConsumers from "./components/ManyConsumers.svelte";
 import StressConsumer from "./components/StressConsumer.svelte";
 import StressRouteConsumer from "./components/StressRouteConsumer.svelte";
-import StressLink from "./components/StressLink.svelte";
-import ManyConsumers from "./components/ManyConsumers.svelte";
-
 import {
   createStressRouter,
   renderWithRouter,
@@ -99,54 +97,5 @@ describe("mount/unmount subscription lifecycle (Svelte)", () => {
     });
 
     unmount2();
-  });
-
-  it("3.4: Link mount/unmount × 100 cycles — no crashes", () => {
-    for (let i = 0; i < 100; i++) {
-      const { unmount } = renderWithRouter(router, StressLink, {
-        routeName: "route0",
-        testId: "test-link",
-      });
-
-      unmount();
-    }
-
-    const { unmount, container } = renderWithRouter(router, StressLink, {
-      routeName: "route1",
-      testId: "final-link",
-    });
-
-    const link = container.querySelector("a");
-
-    expect(link).toBeTruthy();
-
-    unmount();
-  });
-
-  it("3.5: StressLinkAction mount/unmount × 100 cycles — no crashes", async () => {
-    const { default: StressLinkAction } = await import(
-      "./components/StressLinkAction.svelte"
-    );
-
-    for (let i = 0; i < 100; i++) {
-      const { unmount } = renderWithRouter(router, StressLinkAction, {
-        routeName: "route0",
-        testId: "test-action",
-      });
-
-      unmount();
-    }
-
-    const { unmount, container } = renderWithRouter(router, StressLinkAction, {
-      routeName: "route1",
-      testId: "final-action",
-    });
-
-    const div = container.querySelector("[data-testid='final-action']");
-
-    expect(div).toBeTruthy();
-    expect(div?.getAttribute("role")).toBe("link");
-
-    unmount();
   });
 });

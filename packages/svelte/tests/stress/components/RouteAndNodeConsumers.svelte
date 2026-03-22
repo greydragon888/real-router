@@ -10,8 +10,8 @@
   }: {
     routeCount: number;
     nodeCount: number;
-    onRouteRender?: () => void;
-    onNodeRender?: () => void;
+    onRouteRender?: (() => void) | undefined;
+    onNodeRender?: (() => void) | undefined;
   } = $props();
 
   const routeItems = Array.from({ length: routeCount }, (_, i) => i);

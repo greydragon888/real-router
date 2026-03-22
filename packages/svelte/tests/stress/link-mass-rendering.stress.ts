@@ -2,7 +2,6 @@ import { tick } from "svelte";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import ManyLinks from "./components/ManyLinks.svelte";
-
 import {
   createStressRouter,
   renderWithRouter,

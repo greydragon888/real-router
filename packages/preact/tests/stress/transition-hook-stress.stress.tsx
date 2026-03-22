@@ -9,6 +9,26 @@ import { createStressRouter } from "./helpers";
 
 import type { FunctionComponent } from "preact";
 
+function asyncGuard() {
+  return new Promise<boolean>((resolve) => {
+    asyncGuardResolve = resolve;
+  });
+}
+
+function asyncGuardFactory() {
+  return asyncGuard;
+}
+
+function neverResolveGuard() {
+  return new Promise<boolean>(() => {});
+}
+
+function neverResolveGuardFactory() {
+  return neverResolveGuard;
+}
+
+let asyncGuardResolve!: (v: boolean) => void;
+
 const makeTransitionConsumer = (
   onTransition: (t: { isTransitioning: boolean }) => void,
 ): FunctionComponent => {
@@ -39,15 +59,8 @@ describe("useRouterTransition stress (Preact)", () => {
     await router.start("/");
 
     const lifecycle = getLifecycleApi(router);
-    let resolveGuard!: (v: boolean) => void;
 
-    lifecycle.addActivateGuard(
-      "target",
-      () => () =>
-        new Promise<boolean>((resolve) => {
-          resolveGuard = resolve;
-        }),
-    );
+    lifecycle.addActivateGuard("target", asyncGuardFactory);
 
     let snapshot = { isTransitioning: false };
 
@@ -70,7 +83,7 @@ describe("useRouterTransition stress (Preact)", () => {
       expect(snapshot.isTransitioning).toBe(true);
 
       await act(async () => {
-        resolveGuard(true);
+        asyncGuardResolve(true);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -181,10 +194,7 @@ describe("useRouterTransition stress (Preact)", () => {
 
     const lifecycle = getLifecycleApi(router);
 
-    lifecycle.addActivateGuard(
-      "guarded",
-      () => () => new Promise<boolean>(() => {}),
-    );
+    lifecycle.addActivateGuard("guarded", neverResolveGuardFactory);
 
     let snapshot = { isTransitioning: false };
 

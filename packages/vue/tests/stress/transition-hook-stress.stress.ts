@@ -1,12 +1,11 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 import { flushPromises } from "@vue/test-utils";
-import { defineComponent, h, nextTick } from "vue";
 import { describe, it, expect, afterEach } from "vitest";
-
-import { useRouterTransition } from "../../src/composables/useRouterTransition";
+import { defineComponent, h, nextTick } from "vue";
 
 import { createStressRouter, mountWithProvider } from "./helpers";
+import { useRouterTransition } from "../../src/composables/useRouterTransition";
 
 import type { RouterTransitionSnapshot } from "@real-router/sources";
 
@@ -30,13 +29,12 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (v: boolean) => void;
 
-    lifecycle.addActivateGuard(
-      "target",
-      () => () =>
+    lifecycle.addActivateGuard("target", () => {
+      return () =>
         new Promise<boolean>((resolve) => {
           resolveGuard = resolve;
-        }),
-    );
+        });
+    });
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
@@ -141,20 +139,22 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
         fromRoute: null,
       });
 
-    const subscribers = Array.from({ length: 20 }, (_, i) =>
-      defineComponent({
+    const subscribers = Array.from({ length: 20 }, (_, i) => {
+      const index = i;
+
+      return defineComponent({
         name: `TransSub${i}`,
         setup() {
           const transition = useRouterTransition();
 
           return () => {
-            snapshots[i] = transition.value;
+            snapshots[index] = transition.value;
 
             return h("div");
           };
         },
-      }),
-    );
+      });
+    });
 
     mountWithProvider(router, () =>
       subscribers.map((Sub, i) => h(Sub, { key: i })),
@@ -191,10 +191,9 @@ describe("V7 — useRouterTransition stress (Vue)", () => {
 
     const lifecycle = getLifecycleApi(router);
 
-    lifecycle.addActivateGuard(
-      "guarded",
-      () => () => new Promise<boolean>(() => {}),
-    );
+    lifecycle.addActivateGuard("guarded", () => {
+      return () => new Promise<boolean>(() => {});
+    });
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,

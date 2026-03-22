@@ -227,6 +227,21 @@ tests/
 
 **Coverage:** 100% required (enforced in vitest.config).
 
+## Stress Test Coverage
+
+41 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+
+| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                                             |
+| ----------------------- | ------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle | 1 file             | 7 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100 with onCleanup tracking; router stop/restart                        |
+| Subscription fanout     | 1 file             | 5 tests    | 30 useRouteNode on different nodes — signals track correctly; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount; cleanup on unmount (50 onCleanup calls) |
+| Link mass rendering     | 1 file             | 5 tests    | 200 Links mount — no render loops; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks; dynamic routeName × 100                                                                               |
+| Link directive          | 1 file             | 3 tests    | 100 use:link elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap + onCleanup fires; activeClassName toggle; click navigation; 50 rapid clicks; `<a>` href + no a11y override               |
+| Store granularity       | 1 file             | 5 tests    | useRouteStore — route.name effect fires only on name changes; route.params.id — only on id changes; useRouteNodeStore — scoped + granular; 20 consumers tracking different properties; 10 nodes × 50 navs — isolated         |
+| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                                                       |
+| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                                               |
+| Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; remount after unmount; RouteView match correctness × 100                                                                                     |
+
 ## See Also
 
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents (hooks table, gotchas, Solid-specific patterns)

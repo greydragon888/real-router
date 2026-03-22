@@ -1,14 +1,13 @@
 import { flushPromises } from "@vue/test-utils";
-import { h, nextTick } from "vue";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
-import { Link } from "../../src/components/Link";
+import { h, nextTick } from "vue";
 
 import {
   createStressRouter,
   mountWithProvider,
   navigateSequentially,
 } from "./helpers";
+import { Link } from "../../src/components/Link";
 
 import type { Router } from "@real-router/core";
 
@@ -114,14 +113,18 @@ describe("link-mass-rendering stress tests (Vue)", () => {
   });
 
   it("2.4: 200 Links with deep routeParams + navigation — correct active state", async () => {
-    const deepParams = (i: number): Record<string, string> => ({
-      id: String(i),
-      a: "1",
-      b: "2",
-      c: "3",
-      d: "4",
-      e: "5",
-    });
+    const deepParams = (i: number): Record<string, string> => {
+      const id = String(i);
+
+      return {
+        id,
+        a: "1",
+        b: "2",
+        c: "3",
+        d: "4",
+        e: "5",
+      };
+    };
 
     const wrapper = mountWithProvider(router, () =>
       Array.from({ length: 200 }, (_, i) =>

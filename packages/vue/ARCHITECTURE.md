@@ -217,6 +217,22 @@ tests/
 
 **Coverage:** 100% required (enforced in vitest.config).
 
+## Stress Test Coverage
+
+37 stress tests across 9 files in `tests/stress/` validate behavior under extreme conditions:
+
+| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                        |
+| ----------------------- | ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle | 1 file             | 7 tests    | useRouteNode/useRoute/Link/useRouterTransition × 200 mount/unmount cycles — bounded heap; 50 components remount + re-subscribe; conditional toggle × 100; router stop/restart           |
+| Subscription fanout     | 1 file             | 3 tests    | 50 useRouteNode on different nodes — only relevant re-render; 20 useRoute + 30 useRouteNode('') — all update; 50 useRouteNode('users') — granular scoping; concurrent mount/unmount     |
+| Link mass rendering     | 1 file             | 5 tests    | 200 Links mount — correct DOM; active class toggle; 50 round-robin navigations; deep routeParams; 50 rapid clicks                                                                       |
+| keepAlive cycling       | 1 file             | 4 tests    | 10 keepAlive segments × 100 round-robin navs — state preserved via Vue `<KeepAlive>`; wrapper cache bounded (markRaw reuse); mixed keepAlive/non-keepAlive; DOM element count stability |
+| v-link directive        | 1 file             | 4 tests    | 200 v-link elements — cursor:pointer + role + tabindex; mount/unmount × 100 cycles — bounded heap (WeakMap cleanup); v-link update × 100; click navigation after mass mount             |
+| Deep tree context       | 1 file             | 4 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                  |
+| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                          |
+| shouldUpdateCache       | 1 file             | 2 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                         |
+| Combined SPA            | 1 file             | 4 tests    | Full app with RouteView + Links + useRouteNode + 200 navs; transition progress; keepAlive tabs + 30 Links; remount after unmount                                                        |
+
 ## See Also
 
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents (composables table, gotchas, Vue-specific patterns)

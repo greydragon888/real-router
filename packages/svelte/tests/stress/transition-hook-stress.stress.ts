@@ -4,10 +4,11 @@ import { tick } from "svelte";
 import { describe, it, expect, afterEach } from "vitest";
 
 import TransitionConsumer from "./components/TransitionConsumer.svelte";
-
 import { createStressRouter, renderWithRouter } from "./helpers";
 
 import type { RouterTransitionSnapshot } from "@real-router/sources";
+
+const neverResolveGuard = () => new Promise<boolean>(() => {});
 
 describe("SV7 — useRouterTransition stress (Svelte)", () => {
   afterEach(() => {
@@ -29,13 +30,12 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
     const lifecycle = getLifecycleApi(router);
     let resolveGuard!: (v: boolean) => void;
 
-    lifecycle.addActivateGuard(
-      "target",
-      () => () =>
-        new Promise<boolean>((resolve) => {
-          resolveGuard = resolve;
-        }),
-    );
+    const guardFactory = () =>
+      new Promise<boolean>((resolve) => {
+        resolveGuard = resolve;
+      });
+
+    lifecycle.addActivateGuard("target", () => guardFactory);
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,
@@ -143,7 +143,10 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
     expect(new Set(transitioning).size).toBe(1);
     expect(transitioning[0]).toBe(false);
 
-    for (const comp of components) comp.unmount();
+    for (const comp of components) {
+      comp.unmount();
+    }
+
     router.stop();
   });
 
@@ -161,10 +164,7 @@ describe("SV7 — useRouterTransition stress (Svelte)", () => {
 
     const lifecycle = getLifecycleApi(router);
 
-    lifecycle.addActivateGuard(
-      "guarded",
-      () => () => new Promise<boolean>(() => {}),
-    );
+    lifecycle.addActivateGuard("guarded", () => neverResolveGuard);
 
     let snapshot: RouterTransitionSnapshot = {
       isTransitioning: false,

@@ -4,7 +4,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import ManyConsumers from "./components/ManyConsumers.svelte";
 import SameNodeConsumers from "./components/SameNodeConsumers.svelte";
 import StressConsumer from "./components/StressConsumer.svelte";
-
 import { createStressRouter, renderWithRouter, forceGC } from "./helpers";
 
 describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
@@ -63,8 +62,9 @@ describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
 
     const divsAfterUsers = container.querySelectorAll("div");
 
-    expect(divsAfterUsers.length).toBe(100);
-    for (const div of Array.from(divsAfterUsers)) {
+    expect(divsAfterUsers).toHaveLength(100);
+
+    for (const div of divsAfterUsers) {
       expect(div.textContent).toBe("users.list");
     }
 
@@ -72,7 +72,7 @@ describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
     await tick();
 
     const textsAfterRoute = new Set(
-      Array.from(container.querySelectorAll("div")).map((d) => d.textContent),
+      [...container.querySelectorAll("div")].map((d) => d.textContent),
     );
 
     expect(textsAfterRoute.size).toBe(1);
@@ -133,12 +133,14 @@ describe("SV6 — shouldUpdateCache growth (Svelte)", () => {
     let r1Renders = 0;
     let r2Renders = 0;
 
-    const onRenders1 = Array.from({ length: 50 }, () => () => {
+    const incrementR1 = () => {
       r1Renders++;
-    });
-    const onRenders2 = Array.from({ length: 50 }, () => () => {
+    };
+    const incrementR2 = () => {
       r2Renders++;
-    });
+    };
+    const onRenders1 = Array.from({ length: 50 }, () => incrementR1);
+    const onRenders2 = Array.from({ length: 50 }, () => incrementR2);
 
     const comp1 = renderWithRouter(router1, ManyConsumers, {
       count: 50,

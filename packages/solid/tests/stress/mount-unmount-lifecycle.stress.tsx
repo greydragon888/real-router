@@ -67,7 +67,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
   it("3.3: 50 components mount -> navigate x 10 -> unmount -> remount -> navigate x 10", async () => {
     let cleanupCount = 0;
 
-    function TrackedConsumer(props: { index: number }) {
+    function TrackedConsumer(props: { readonly index: number }) {
       useRouteNode(`route${props.index}`);
       onCleanup(() => {
         cleanupCount++;
@@ -115,7 +115,7 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
     let cleanupCallCount = 0;
     const [show, setShow] = createSignal(true);
 
-    function ToggleConsumer(props: { index: number }) {
+    function ToggleConsumer(props: { readonly index: number }) {
       useRouteNode(`route${props.index}`);
       onCleanup(() => {
         cleanupCallCount++;
@@ -190,13 +190,13 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
       unmount();
     }
 
-    const { getByText } = render(() => (
+    const renderResult = render(() => (
       <RouterProvider router={router}>
         <Link routeName="route1">go</Link>
       </RouterProvider>
     ));
 
-    const link = getByText("go");
+    const link = renderResult.getByText("go");
 
     expect(link).toBeInTheDocument();
 
@@ -224,12 +224,11 @@ describe("R3 — mount/unmount subscription lifecycle", () => {
 
     await freshRouter.start("/t1");
 
-    let lastTransitionRoute: string | undefined;
-
     function TransitionChecker() {
       const transition = useRouterTransition();
 
-      lastTransitionRoute = transition().toRoute?.name;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      transition().toRoute?.name;
 
       return <div />;
     }

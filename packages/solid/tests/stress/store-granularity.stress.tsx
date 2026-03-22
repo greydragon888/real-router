@@ -13,6 +13,8 @@ import { createStressRouter, navigateSequentially } from "./helpers";
 import type { Router } from "@real-router/core";
 import type { JSX } from "solid-js";
 
+const USERS_VIEW_ROUTE = "users.view";
+
 describe("store-granularity stress tests", () => {
   let router: Router;
 
@@ -56,24 +58,25 @@ describe("store-granularity stress tests", () => {
 
     expect(nameEffectCount).toBe(3);
 
-    await router.navigate("users.view", { id: "1" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "1" });
 
     expect(nameEffectCount).toBe(4);
 
-    await router.navigate("users.view", { id: "2" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "2" });
 
     expect(nameEffectCount).toBe(4);
   });
 
   it("S2: useRouteStore — route.params.id effect fires only on id changes", async () => {
     let idEffectCount = 0;
+    const idKey = "id";
 
     function IdTracker(): JSX.Element {
       const state = useRouteStore();
 
       createEffect(() => {
         // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        state.route?.params?.id;
+        state.route?.params[idKey];
         idEffectCount++;
       });
 
@@ -88,16 +91,16 @@ describe("store-granularity stress tests", () => {
 
     expect(idEffectCount).toBe(1);
 
-    await router.navigate("users.view", { id: "1" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "1" });
 
     expect(idEffectCount).toBe(2);
 
-    await router.navigate("users.view", { id: "2" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "2" });
 
     expect(idEffectCount).toBe(3);
 
     // Same state — router rejects with SAME_STATES, effect must not fire
-    await router.navigate("users.view", { id: "2" }).catch(() => {});
+    await router.navigate(USERS_VIEW_ROUTE, { id: "2" }).catch(() => {});
 
     expect(idEffectCount).toBe(3);
   });
@@ -129,11 +132,11 @@ describe("store-granularity stress tests", () => {
 
     expect(nodeNameEffectCount).toBe(2);
 
-    await router.navigate("users.view", { id: "1" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "1" });
 
     expect(nodeNameEffectCount).toBe(3);
 
-    await router.navigate("users.view", { id: "2" });
+    await router.navigate(USERS_VIEW_ROUTE, { id: "2" });
 
     expect(nodeNameEffectCount).toBe(3);
 
@@ -213,7 +216,7 @@ describe("store-granularity stress tests", () => {
       routeSequence.push(
         i % 2 === 0
           ? { name: `route${i + 1}` }
-          : { name: "users.view", params: { id: String(i) } },
+          : { name: USERS_VIEW_ROUTE, params: { id: String(i) } },
       );
     }
 
@@ -232,7 +235,7 @@ describe("store-granularity stress tests", () => {
       0,
     );
 
-    function NodeStoreConsumer(props: { index: number }): JSX.Element {
+    function NodeStoreConsumer(props: { readonly index: number }): JSX.Element {
       const state = useRouteNodeStore(`route${props.index}`);
 
       createEffect(() => {

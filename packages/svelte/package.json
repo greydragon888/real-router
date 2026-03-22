@@ -27,6 +27,7 @@
   "scripts": {
     "build": "svelte-package -i src -o dist",
     "test": "vitest",
+    "test:stress": "vitest run --config vitest.config.stress.mts",
     "type-check": "svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint --cache src/ tests/ --fix --max-warnings 0"
   },

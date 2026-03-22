@@ -1,12 +1,10 @@
+import { render } from "@testing-library/svelte";
 import { tick } from "svelte";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
-import { render } from "@testing-library/svelte";
 
 import ManyConsumers from "./components/ManyConsumers.svelte";
 import RouteAndNodeApp from "./components/RouteAndNodeApp.svelte";
 import SameNodeConsumers from "./components/SameNodeConsumers.svelte";
-
 import {
   createStressRouter,
   renderWithRouter,
@@ -103,9 +101,10 @@ describe("subscription-fanout stress tests (Svelte)", () => {
 
   it("1.3: 30 useRouteNode('users') — renders during users navigations, minimal outside", async () => {
     let usersRenders = 0;
-    const onRenders = Array.from({ length: 30 }, () => () => {
+    const incrementUsersRenders = () => {
       usersRenders++;
-    });
+    };
+    const onRenders = Array.from({ length: 30 }, () => incrementUsersRenders);
 
     const { unmount } = renderWithRouter(router, SameNodeConsumers, {
       count: 30,

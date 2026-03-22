@@ -267,6 +267,21 @@ tests/
 
 **Coverage:** 100% required (enforced in vitest.config).
 
+## Stress Test Coverage
+
+29 stress tests across 8 files in `tests/stress/` validate behavior under extreme conditions:
+
+| Category                | Tests (file count) | Test count | What they verify                                                                                                                                                                                |
+| ----------------------- | ------------------ | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Mount/unmount lifecycle | 1 file             | 3 tests    | useRouteNode/useRoute/Link/createLinkAction × 100 mount/unmount cycles — bounded heap (createSubscriber cleanup); 30 components remount + re-subscribe                                          |
+| Subscription fanout     | 1 file             | 4 tests    | 30 useRouteNode on different nodes — $effect fires only when node active; 15 useRoute + 15 useRouteNode('') — all update; 30 useRouteNode('users') — granular scoping; concurrent mount/unmount |
+| Link mass rendering     | 1 file             | 4 tests    | 100 Links mount — correct DOM; active class toggle; 50 round-robin navigations; active state after sequential navigations                                                                       |
+| Link action             | 1 file             | 4 tests    | 50 createLinkAction elements — a11y attributes (role, tabindex); mount/unmount × 50 cycles — bounded heap (destroy cleanup); click navigation after mass mount; repeated action creation        |
+| Deep tree context       | 1 file             | 3 tests    | 30-deep useRouteNode — only relevant nodes re-render; useRouter — 0 re-renders; wide tree 25 leaves — all re-render; nested RouterProviders — isolated                                          |
+| Transition hook         | 1 file             | 4 tests    | 50 async guard cycles — isTransitioning true→false; 50 concurrent — last wins; 20 consumers — consistent; navigate + cancel × 50 — never stuck                                                  |
+| shouldUpdateCache       | 1 file             | 4 tests    | 200 unique node names — cache scales; 100 same-node — cache hit; router stop + GC + new router; 2 routers × 50 nodes — isolated                                                                 |
+| Combined SPA            | 1 file             | 3 tests    | 30 Links + 10 useRouteNode consumers + 100 navs; 50 Links + correct final active state; mount/unmount/remount with root consumer                                                                |
+
 ## See Also
 
 - [CLAUDE.md](CLAUDE.md) — Quick reference for AI agents (composables table, gotchas, Svelte-specific patterns)

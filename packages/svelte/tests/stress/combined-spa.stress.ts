@@ -5,7 +5,6 @@ import { describe, it, expect, afterEach } from "vitest";
 import ManyConsumers from "./components/ManyConsumers.svelte";
 import ManyLinks from "./components/ManyLinks.svelte";
 import StressConsumer from "./components/StressConsumer.svelte";
-
 import {
   createStressRouter,
   renderWithRouter,
@@ -100,7 +99,7 @@ describe("combined SPA simulation (Svelte)", () => {
       routeNames.map((name) => ({ name })),
     );
 
-    const finalRoute = routeNames[routeNames.length - 1];
+    const finalRoute = routeNames.at(-1);
 
     expect(router.getState()?.name).toBe(finalRoute);
 
