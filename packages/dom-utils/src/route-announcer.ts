@@ -3,6 +3,7 @@ import type { Router, State } from "@real-router/core";
 const CLEAR_DELAY = 7000;
 const SAFARI_READY_DELAY = 100;
 const ANNOUNCER_ATTR = "data-real-router-announcer";
+const INTERNAL_ROUTE_PREFIX = "@@";
 
 export interface RouteAnnouncerOptions {
   prefix?: string;
@@ -18,6 +19,7 @@ export function createRouteAnnouncer(
 
   let isInitialNavigation = true;
   let isReady = false;
+  let isDestroyed = false;
   let lastAnnouncedText = "";
   let clearTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -36,6 +38,10 @@ export function createRouteAnnouncer(
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
+        if (isDestroyed) {
+          return;
+        }
+
         const text = resolveText(route, prefix, getCustomText);
 
         if (text && text !== lastAnnouncedText && isReady) {
@@ -44,16 +50,18 @@ export function createRouteAnnouncer(
           announcer.textContent = text;
           clearTimeoutId = setTimeout(() => {
             announcer.textContent = "";
+            lastAnnouncedText = "";
           }, CLEAR_DELAY);
-        }
 
-        manageFocus();
+          manageFocus();
+        }
       });
     });
   });
 
   return {
     destroy() {
+      isDestroyed = true;
       unsubscribe();
       clearTimeout(clearTimeoutId);
       clearTimeout(safariTimeoutId);
@@ -69,27 +77,20 @@ function getOrCreateAnnouncer(): HTMLElement {
     return existing;
   }
 
-  const wrapper = document.createElement("div");
+  const element = document.createElement("div");
 
-  applyVisuallyHiddenStyles(wrapper);
+  applyVisuallyHiddenStyles(element);
+  element.setAttribute("aria-live", "assertive");
+  element.setAttribute("aria-atomic", "true");
+  element.setAttribute(ANNOUNCER_ATTR, "");
 
-  const region = document.createElement("div");
+  document.body.prepend(element);
 
-  region.setAttribute("aria-live", "assertive");
-  region.setAttribute("aria-atomic", "true");
-  region.setAttribute("role", "log");
-  region.setAttribute(ANNOUNCER_ATTR, "");
-
-  wrapper.append(region);
-  document.body.prepend(wrapper);
-
-  return region;
+  return element;
 }
 
 function removeAnnouncer(): void {
-  const region = document.querySelector(`[${ANNOUNCER_ATTR}]`);
-
-  region?.parentElement?.remove();
+  document.querySelector(`[${ANNOUNCER_ATTR}]`)?.remove();
 }
 
 function resolveText(
@@ -102,8 +103,13 @@ function resolveText(
   }
 
   const h1 = document.querySelector<HTMLElement>("h1");
-  const h1Text = h1 === null ? "" : h1.textContent.trim();
-  const rawText = h1Text || document.title || route.name;
+  const h1Text = h1?.textContent.trim() ?? "";
+  /* v8 ignore next -- @preserve: route.name is always non-empty for valid navigations */
+  const routeName = route.name.startsWith(INTERNAL_ROUTE_PREFIX)
+    ? ""
+    : route.name;
+  const rawText =
+    h1Text || document.title || routeName || globalThis.location.pathname;
 
   return `${prefix}${rawText}`;
 }

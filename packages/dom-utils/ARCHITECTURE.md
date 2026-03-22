@@ -61,11 +61,11 @@ graph LR
 
 ### Singleton via `data-real-router-announcer`
 
-The live region is a DOM singleton tracked by the `data-real-router-announcer` attribute. Multiple `createRouteAnnouncer` calls reuse the same element. Rationale: screen readers lose the "identity" of live regions that are recreated; the element must pre-exist before text is inserted.
+The live region is a single DOM element (no wrapper) tracked by the `data-real-router-announcer` attribute. Multiple `createRouteAnnouncer` calls reuse the same element. Rationale: screen readers lose the "identity" of live regions that are recreated; the element must pre-exist before text is inserted.
 
-### `aria-live="assertive"` + `aria-atomic="true"`
+### `aria-live="assertive"` + `aria-atomic="true"` (no `role`)
 
-Route change is a **context switch**, not a background update. `assertive` interrupts immediately. `aria-atomic` guarantees the full text is read, not just the changed portion.
+Route change is a **context switch**, not a background update. `assertive` interrupts immediately. `aria-atomic` guarantees the full text is read, not just the changed portion. No `role` attribute — `role="log"` has implicit `aria-live="polite"` which conflicts with explicit `assertive`.
 
 ### Double `requestAnimationFrame`
 
@@ -89,14 +89,22 @@ route.name                  → dot-notation route name
 window.location.pathname    → last resort
 ```
 
-### `manageFocus()` with `preventScroll`
+### `manageFocus()` inside announcement guard
 
-After navigation, the first `<h1>` receives programmatic focus (`tabindex="-1"` if not already present). `preventScroll: true` avoids unwanted scroll jump — the user already sees the new content. Existing `tabindex` values are preserved.
+After navigation, the first `<h1>` receives programmatic focus (`tabindex="-1"` if not already present). `preventScroll: true` avoids unwanted scroll jump. Focus only moves when an announcement is actually made — not during Safari delay, not on deduplicated navigations. Existing `tabindex` values are preserved.
+
+### `isDestroyed` flag guards rAF callbacks
+
+`destroy()` sets `isDestroyed = true`. Pending `requestAnimationFrame` callbacks check this flag before executing. Prevents text/focus changes after unmount.
+
+### Internal route name filtering
+
+Route names starting with `@@` (e.g., `@@router/UNKNOWN_ROUTE`) are filtered from the fallback chain. Prevents screen readers from announcing internal identifiers.
 
 ### Deduplication via `lastAnnouncedText`
 
-Repeated announcements of identical text are suppressed. This prevents redundant announcements when navigating back and forth between two routes with the same page title.
+Repeated announcements of identical text are suppressed. This prevents redundant announcements when navigating back and forth between two routes with the same page title. `lastAnnouncedText` resets on auto-clear — same text can be re-announced after 7 seconds.
 
 ### Auto-clear after 7 seconds
 
-`announcer.textContent` is cleared 7 seconds after announcement. Prevents stale text from being re-read when the screen reader focus enters the live region later.
+`announcer.textContent` is cleared 7 seconds after announcement. `lastAnnouncedText` is also reset, allowing the same text to be announced again. Prevents stale text from being re-read when the screen reader focus enters the live region later.

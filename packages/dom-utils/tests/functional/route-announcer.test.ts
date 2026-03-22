@@ -400,4 +400,140 @@ describe("createRouteAnnouncer", () => {
     ann.destroy();
     router.stop();
   });
+
+  it("19 — resolveText uses location.pathname as last fallback (no h1, no title, internal route filtered)", async () => {
+    const router = makeRouter();
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    document.title = "";
+    router.navigateToNotFound("/missing-page");
+
+    expect(getAnnouncerElement()?.textContent).toBe(
+      `Navigated to ${location.pathname}`,
+    );
+
+    ann.destroy();
+    router.stop();
+  });
+
+  it("20 — manageFocus NOT called when announcement text is deduplicated", async () => {
+    const router = makeRouter();
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    const h1 = document.createElement("h1");
+
+    h1.textContent = "About";
+    document.body.append(h1);
+    const focusSpy = vi.spyOn(h1, "focus");
+
+    await router.navigate("about");
+
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+
+    await router.navigate("about", {}, { reload: true });
+
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+
+    ann.destroy();
+    router.stop();
+  });
+
+  it("21 — manageFocus NOT called during Safari delay (isReady=false)", async () => {
+    const router = makeRouter();
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+
+    const h1 = document.createElement("h1");
+
+    h1.textContent = "About";
+    document.body.append(h1);
+    const focusSpy = vi.spyOn(h1, "focus");
+
+    document.title = "About";
+    await router.navigate("about");
+
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(getAnnouncerElement()?.textContent).toBe("");
+
+    ann.destroy();
+    router.stop();
+  });
+
+  it("22 — rAF callbacks are no-ops after destroy() (isDestroyed guard)", async () => {
+    const router = makeRouter();
+
+    const pendingInnerCallbacks: FrameRequestCallback[] = [];
+    let rafNestLevel = 0;
+
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      if (rafNestLevel === 0) {
+        rafNestLevel++;
+        cb(0);
+        rafNestLevel--;
+      } else {
+        pendingInnerCallbacks.push(cb);
+      }
+
+      return 0;
+    });
+
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    const h1 = document.createElement("h1");
+
+    h1.textContent = "About";
+    document.body.append(h1);
+    const focusSpy = vi.spyOn(h1, "focus");
+
+    document.title = "About";
+    await router.navigate("about");
+
+    expect(pendingInnerCallbacks).toHaveLength(1);
+    expect(getAnnouncerElement()?.textContent).toBe("");
+
+    ann.destroy();
+
+    for (const cb of pendingInnerCallbacks) {
+      cb(0);
+    }
+
+    expect(getAnnouncerElement()).toBeNull();
+    expect(focusSpy).not.toHaveBeenCalled();
+
+    router.stop();
+  });
+
+  it("23 — re-announces same text after auto-clear timeout resets lastAnnouncedText", async () => {
+    const router = makeRouter();
+    const ann = setupAnnouncer(router);
+
+    await router.start("/");
+    vi.advanceTimersByTime(100);
+
+    document.title = "About";
+    await router.navigate("about");
+
+    expect(getAnnouncerElement()?.textContent).toBe("Navigated to About");
+
+    vi.advanceTimersByTime(7001);
+
+    expect(getAnnouncerElement()?.textContent).toBe("");
+
+    await router.navigate("about", {}, { reload: true });
+
+    expect(getAnnouncerElement()?.textContent).toBe("Navigated to About");
+
+    ann.destroy();
+    router.stop();
+  });
 });
