@@ -16,7 +16,9 @@
     "**/*.bench.ts",
     "**/*.spec.ts",
     "**/*.properties.ts",
-    "packages/router-benchmarks/**"
+    "packages/router-benchmarks/**",
+    "packages/preact/src/**",
+    "packages/hash-plugin/src/**"
   ],
   "format": ["typescript", "tsx"],
   "absolute": false,
