@@ -27,7 +27,7 @@ describe("RouterProvider — announceNavigation", () => {
     router.stop();
     vi.useRealTimers();
     vi.unstubAllGlobals();
-    document.querySelector(ANNOUNCER_SEL)?.parentElement?.remove();
+    document.querySelector(ANNOUNCER_SEL)?.remove();
   });
 
   it("no announceNavigation prop — no announcer element in DOM", () => {
