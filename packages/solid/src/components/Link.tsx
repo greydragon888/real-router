@@ -1,11 +1,11 @@
 import { createActiveRouteSource } from "@real-router/sources";
+import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { createMemo, mergeProps, splitProps, useContext } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { RouterContext } from "../context";
 import { createSignalFromSource } from "../createSignalFromSource";
 import { useRouter } from "../hooks/useRouter";
-import { shouldNavigate } from "../utils";
 
 import type { LinkProps } from "../types";
 import type { Params } from "@real-router/core";
@@ -56,13 +56,9 @@ export function Link<P extends Params = Params>(
         }),
       );
 
-  const href = createMemo(() => {
-    if (typeof router.buildUrl === "function") {
-      return router.buildUrl(local.routeName, local.routeParams);
-    }
-
-    return router.buildPath(local.routeName, local.routeParams);
-  });
+  const href = createMemo(() =>
+    buildHref(router, local.routeName, local.routeParams),
+  );
 
   const handleClick = (evt: MouseEvent) => {
     if (local.onClick) {
@@ -83,15 +79,9 @@ export function Link<P extends Params = Params>(
       .catch(() => {});
   };
 
-  const finalClassName = createMemo(() => {
-    if (isActive() && local.activeClassName) {
-      return local.class
-        ? `${local.class} ${local.activeClassName}`.trim()
-        : local.activeClassName;
-    }
-
-    return local.class ?? undefined;
-  });
+  const finalClassName = createMemo(() =>
+    buildActiveClassName(isActive(), local.activeClassName, local.class),
+  );
 
   return (
     <a {...rest} href={href()} class={finalClassName()} onClick={handleClick}>

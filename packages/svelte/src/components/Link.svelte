@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useIsActiveRoute } from "../composables/useIsActiveRoute.svelte";
   import { useRouter } from "../composables/useRouter.svelte";
-  import { shouldNavigate } from "../utils";
+  import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 
   import type { NavigationOptions, Params } from "@real-router/core";
   import type { Snippet } from "svelte";
@@ -40,18 +40,10 @@
     ignoreQueryParams,
   );
 
-  const href = $derived(
-    typeof router.buildUrl === "function"
-      ? router.buildUrl(routeName, routeParams)
-      : router.buildPath(routeName, routeParams),
-  );
+  const href = $derived(buildHref(router, routeName, routeParams));
 
   const finalClassName = $derived(
-    activeState.current && activeClassName
-      ? className
-        ? `${className} ${activeClassName}`.trim()
-        : activeClassName
-      : className ?? undefined,
+    buildActiveClassName(activeState.current, activeClassName, className),
   );
 
   function handleClick(evt: MouseEvent) {

@@ -1,4 +1,4 @@
-import { shouldNavigate } from "../utils";
+import { shouldNavigate, applyLinkA11y } from "dom-utils";
 
 import type { Router, NavigationOptions, Params } from "@real-router/core";
 import type { Directive } from "vue";
@@ -96,17 +96,7 @@ export const vLink: Directive<HTMLElement, LinkDirectiveValue> = {
   mounted(el, binding) {
     const router = getDirectiveRouter();
 
-    if (
-      !(el instanceof HTMLAnchorElement) &&
-      !(el instanceof HTMLButtonElement)
-    ) {
-      if (!el.getAttribute("role")) {
-        el.setAttribute("role", "link");
-      }
-      if (!el.getAttribute("tabindex")) {
-        el.setAttribute("tabindex", "0");
-      }
-    }
+    applyLinkA11y(el);
 
     el.style.cursor = "pointer";
 

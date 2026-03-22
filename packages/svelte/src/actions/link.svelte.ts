@@ -2,7 +2,7 @@ import { getContext } from "svelte";
 import type { ActionReturn } from "svelte/action";
 import type { Router, Params, NavigationOptions } from "@real-router/core";
 import { ROUTER_KEY } from "../context";
-import { shouldNavigate } from "../utils";
+import { shouldNavigate, applyLinkA11y } from "dom-utils";
 
 export interface LinkActionParams {
   name: string;
@@ -44,18 +44,7 @@ export function createLinkAction(): (
   ): ActionReturn<LinkActionParams> {
     let currentParams = params;
 
-    // A11y: set role and tabindex for non-interactive elements
-    if (
-      !(node instanceof HTMLAnchorElement) &&
-      !(node instanceof HTMLButtonElement)
-    ) {
-      if (!node.getAttribute("role")) {
-        node.setAttribute("role", "link");
-      }
-      if (!node.getAttribute("tabindex")) {
-        node.setAttribute("tabindex", "0");
-      }
-    }
+    applyLinkA11y(node);
 
     function handleClick(evt: MouseEvent) {
       if (!shouldNavigate(evt)) return;

@@ -1,3 +1,4 @@
+import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { memo } from "preact/compat";
 import { useCallback, useMemo } from "preact/hooks";
 
@@ -5,7 +6,6 @@ import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 import { useStableValue } from "../hooks/useStableValue";
-import { shouldNavigate } from "../utils";
 
 import type { LinkProps } from "../types";
 import type { FunctionComponent, JSX } from "preact";
@@ -55,13 +55,10 @@ export const Link: FunctionComponent<LinkProps> = memo(
       ignoreQueryParams,
     );
 
-    const href = useMemo(() => {
-      if (typeof router.buildUrl === "function") {
-        return router.buildUrl(routeName, stableParams);
-      }
-
-      return router.buildPath(routeName, stableParams);
-    }, [router, routeName, stableParams]);
+    const href = useMemo(
+      () => buildHref(router, routeName, stableParams),
+      [router, routeName, stableParams],
+    );
 
     const handleClick = useCallback(
       (evt: JSX.TargetedMouseEvent<HTMLAnchorElement>) => {
@@ -83,15 +80,10 @@ export const Link: FunctionComponent<LinkProps> = memo(
       [onClick, target, router, routeName, stableParams, stableOptions],
     );
 
-    const finalClassName = useMemo(() => {
-      if (isActive && activeClassName) {
-        return className
-          ? `${className} ${activeClassName}`.trim()
-          : activeClassName;
-      }
-
-      return className ?? undefined;
-    }, [isActive, className, activeClassName]);
+    const finalClassName = useMemo(
+      () => buildActiveClassName(isActive, activeClassName, className),
+      [isActive, activeClassName, className],
+    );
 
     return (
       <a

@@ -1,9 +1,9 @@
+import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { defineComponent, h, computed } from "vue";
 
 import { useIsActiveRoute } from "../composables/useIsActiveRoute";
 import { useRouter } from "../composables/useRouter";
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
-import { shouldNavigate } from "../utils";
 
 import type { Params, NavigationOptions } from "@real-router/core";
 import type { PropType } from "vue";
@@ -54,23 +54,13 @@ export const Link = defineComponent({
       props.ignoreQueryParams,
     );
 
-    const href = computed(() => {
-      if (typeof router.buildUrl === "function") {
-        return router.buildUrl(props.routeName, props.routeParams);
-      }
+    const href = computed(() =>
+      buildHref(router, props.routeName, props.routeParams),
+    );
 
-      return router.buildPath(props.routeName, props.routeParams);
-    });
-
-    const finalClassName = computed(() => {
-      if (isActive.value && props.activeClassName) {
-        return props.class
-          ? `${props.class} ${props.activeClassName}`.trim()
-          : props.activeClassName;
-      }
-
-      return props.class ?? undefined;
-    });
+    const finalClassName = computed(() =>
+      buildActiveClassName(isActive.value, props.activeClassName, props.class),
+    );
 
     const handleClick = (evt: MouseEvent) => {
       if (attrs.onClick && typeof attrs.onClick === "function") {

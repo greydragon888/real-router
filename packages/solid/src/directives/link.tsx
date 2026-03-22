@@ -1,10 +1,10 @@
 import { createActiveRouteSource } from "@real-router/sources";
+import { shouldNavigate, applyLinkA11y } from "dom-utils";
 import { createEffect, onCleanup } from "solid-js";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { createSignalFromSource } from "../createSignalFromSource";
 import { useRouter } from "../hooks/useRouter";
-import { shouldNavigate } from "../utils";
 
 import type { Params } from "@real-router/core";
 
@@ -32,18 +32,7 @@ export function link<P extends Params = Params>(
     );
   }
 
-  // A11y for non-focusable elements
-  if (
-    !(element instanceof HTMLAnchorElement) &&
-    !(element instanceof HTMLButtonElement)
-  ) {
-    if (!element.getAttribute("role")) {
-      element.setAttribute("role", "link");
-    }
-    if (!element.getAttribute("tabindex")) {
-      element.setAttribute("tabindex", "0");
-    }
-  }
+  applyLinkA11y(element);
 
   // Active class tracking (reactive)
   if (options.activeClassName) {
