@@ -5,11 +5,14 @@
   "description": "Solid.js integration for Real-Router",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.mjs",
-  "types": "./dist/types/index.d.ts",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
       "development": "./src/index.tsx",
-      "types": "./dist/types/index.d.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
       "import": "./dist/esm/index.mjs",
       "require": "./dist/cjs/index.js"
     }
