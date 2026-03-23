@@ -60,7 +60,7 @@
   "devDependencies": {
     "@testing-library/jest-dom": "6.9.1",
     "browser-env": "workspace:^",
-    "jsdom": "28.1.0",
+    "jsdom": "29.0.1",
     "type-guards": "workspace:^"
   }
 }
