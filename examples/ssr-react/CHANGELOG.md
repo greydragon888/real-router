@@ -1,5 +1,12 @@
 # ssr-react-example
 
+## 0.0.2
+
+### Patch Changes
+
+- Updated dependencies [[`042c10b`](https://github.com/greydragon888/real-router/commit/042c10b2f0383e9cf3c1fe71b1ad00965c1c4ccc), [`042c10b`](https://github.com/greydragon888/real-router/commit/042c10b2f0383e9cf3c1fe71b1ad00965c1c4ccc), [`042c10b`](https://github.com/greydragon888/real-router/commit/042c10b2f0383e9cf3c1fe71b1ad00965c1c4ccc)]:
+  - @real-router/react@0.13.0
+
 ## 0.0.1
 
 ### Patch Changes
