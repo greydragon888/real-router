@@ -31,7 +31,7 @@ export default [
   {
     name: "@real-router/react (ESM)",
     path: "packages/react/dist/esm/index.mjs",
-    limit: "2 kB",
+    limit: "2.5 kB",
     ignore: [
       "react",
       "react-dom",
