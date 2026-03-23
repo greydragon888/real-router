@@ -1,6 +1,7 @@
 # Allow-list of acceptable licenses (deny-licenses is deprecated)
-# Excludes strong copyleft licenses (GPL, AGPL) that would require open-sourcing derivative works
-# LGPL is allowed for devDependencies (linters, build tools) as they don't link with production code
+# Excludes strong copyleft licenses (AGPL) that would require open-sourcing derivative works
+# GPL/LGPL are allowed for devDependencies (build tools) as they don't link with production code
+# Current GPL devDependencies: rollup-plugin-dts (Solid adapter DTS bundling)
 allow-licenses:
   - MIT
   - MIT-0
@@ -15,3 +16,5 @@ allow-licenses:
   - BlueOak-1.0.0
   - Python-2.0
   - LGPL-3.0-only
+  - GPL-3.0-only
+  - GPL-3.0-or-later
