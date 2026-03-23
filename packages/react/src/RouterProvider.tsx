@@ -1,6 +1,7 @@
 import { getNavigator } from "@real-router/core";
 import { createRouteSource } from "@real-router/sources";
-import { useMemo, useSyncExternalStore } from "react";
+import { createRouteAnnouncer } from "dom-utils";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { NavigatorContext, RouteContext, RouterContext } from "./context";
 
@@ -10,12 +11,26 @@ import type { FC, ReactNode } from "react";
 export interface RouteProviderProps {
   router: Router;
   children: ReactNode;
+  announceNavigation?: boolean;
 }
 
 export const RouterProvider: FC<RouteProviderProps> = ({
   router,
   children,
+  announceNavigation,
 }) => {
+  useEffect(() => {
+    if (!announceNavigation) {
+      return;
+    }
+
+    const announcer = createRouteAnnouncer(router);
+
+    return () => {
+      announcer.destroy();
+    };
+  }, [announceNavigation, router]);
+
   const navigator = useMemo(() => getNavigator(router), [router]);
 
   // useSyncExternalStore manages the router subscription lifecycle:

@@ -9,6 +9,7 @@ export default mergeConfig(
       include: ["./tests/stress/**/*.stress.ts"],
       coverage: { enabled: false },
       pool: "forks",
+      execArgv: ["--expose-gc"],
       maxWorkers: 2,
       testTimeout: 30000,
       hookTimeout: 15000,

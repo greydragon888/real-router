@@ -431,16 +431,18 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Stress Test Coverage
 
-25 stress tests in `tests/stress/` validate behavior under extreme conditions:
+103 stress tests across 25 files in `tests/stress/` validate behavior under extreme conditions:
 
-| Category              | Tests                                                                                   | What they verify                                                            |
-| --------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Memory & leaks        | navigation-memory, plugin-lifecycle-memory, event-listener-memory, dispose-completeness | Heap stable across thousands of navigations; dispose releases all resources |
-| Concurrent navigation | fire-and-forget, abort-signal-stress, combined-stress                                   | Fire-and-forget storm, AbortController churn, mixed concurrent operations   |
-| Guards under load     | guards-stress, guard-removal-stress, error-path-storm                                   | Guard execution under load, removal mid-execution, 1000+ error cycles       |
-| Route CRUD            | route-crud-stress, replace-atomicity-stress, route-tree-scaling                         | Add/remove/replace under load, atomic replace, 1000+ route trees            |
-| Lifecycle             | stop-start-cycles, fsm-transitions-stress                                               | Rapid start/stop cycles, FSM transition correctness under churn             |
-| Edge cases            | forward-to-chains, navigate-to-not-found, navigate-to-default, hot-path-utilities       | Deep forwarding chains, unknown route handling, utility function stress     |
+| Category              | Tests (file count) | Test count | What they verify                                                            |
+| --------------------- | ------------------ | ---------- | --------------------------------------------------------------------------- |
+| Memory & leaks        | 4 files            | 19 tests   | Heap stable across thousands of navigations; dispose releases all resources |
+| Concurrent navigation | 3 files            | 14 tests   | Fire-and-forget storm, AbortController churn, mixed concurrent operations   |
+| Guards under load     | 3 files            | 12 tests   | Guard execution under load, removal mid-execution, 1000+ error cycles       |
+| Route CRUD            | 3 files            | 12 tests   | Add/remove/replace under load, atomic replace, 1000+ route trees            |
+| Lifecycle             | 2 files            | 10 tests   | Rapid start/stop cycles, FSM transition correctness under churn             |
+| Edge cases            | 4 files            | 14 tests   | Deep forwarding chains, unknown route handling, utility function stress     |
+| FSM & Events          | 3 files            | 13 tests   | Event depth limits, listener cleanup, FSM state correctness                 |
+| Utilities & Helpers   | 4 files            | 9 tests    | Hot path utilities, navigator caching, state equality, active route checks  |
 
 ## See Also
 

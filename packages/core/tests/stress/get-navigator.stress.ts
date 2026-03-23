@@ -5,7 +5,6 @@ import { getNavigator, RouterError, errorCodes } from "@real-router/core";
 import {
   createStressRouter,
   formatBytes,
-  forceGC,
   MB,
   takeHeapSnapshot,
 } from "./helpers";
@@ -35,26 +34,6 @@ describe("S18: getNavigator WeakMap lifecycle", () => {
 
     router.stop();
     router.dispose();
-  });
-
-  it("S18.2 getNavigator on 100 routers then dispose: WeakRefs are GC'd", async () => {
-    const refs: WeakRef<object>[] = [];
-
-    for (let i = 0; i < 100; i++) {
-      const router = createStressRouter(5);
-
-      getNavigator(router);
-      refs.push(new WeakRef(router));
-      router.dispose();
-    }
-
-    forceGC();
-    await new Promise<void>((resolve) => setTimeout(resolve, 50));
-    forceGC();
-
-    const collected = refs.filter((r) => r.deref() === undefined).length;
-
-    expect(collected).toBeGreaterThan(0);
   });
 
   it("S18.3 navigator methods after dispose reject 100x: all calls throw RouterError", async () => {

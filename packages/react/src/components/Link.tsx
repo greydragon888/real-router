@@ -1,10 +1,10 @@
+import { shouldNavigate, buildHref, buildActiveClassName } from "dom-utils";
 import { memo, useCallback, useMemo } from "react";
 
 import { EMPTY_PARAMS, EMPTY_OPTIONS } from "../constants";
 import { useIsActiveRoute } from "../hooks/useIsActiveRoute";
 import { useRouter } from "../hooks/useRouter";
 import { useStableValue } from "../hooks/useStableValue";
-import { shouldNavigate } from "../utils";
 
 import type { LinkProps } from "../types";
 import type { FC, MouseEvent } from "react";
@@ -54,13 +54,10 @@ export const Link: FC<LinkProps> = memo(
       ignoreQueryParams,
     );
 
-    const href = useMemo(() => {
-      if (typeof router.buildUrl === "function") {
-        return router.buildUrl(routeName, stableParams);
-      }
-
-      return router.buildPath(routeName, stableParams);
-    }, [router, routeName, stableParams]);
+    const href = useMemo(
+      () => buildHref(router, routeName, stableParams),
+      [router, routeName, stableParams],
+    );
 
     const handleClick = useCallback(
       (evt: MouseEvent<HTMLAnchorElement>) => {
@@ -72,7 +69,7 @@ export const Link: FC<LinkProps> = memo(
           }
         }
 
-        if (!shouldNavigate(evt) || target === "_blank") {
+        if (!shouldNavigate(evt.nativeEvent) || target === "_blank") {
           return;
         }
 
@@ -82,15 +79,10 @@ export const Link: FC<LinkProps> = memo(
       [onClick, target, router, routeName, stableParams, stableOptions],
     );
 
-    const finalClassName = useMemo(() => {
-      if (isActive && activeClassName) {
-        return className
-          ? `${className} ${activeClassName}`.trim()
-          : activeClassName;
-      }
-
-      return className ?? undefined;
-    }, [isActive, className, activeClassName]);
+    const finalClassName = useMemo(
+      () => buildActiveClassName(isActive, activeClassName, className),
+      [isActive, activeClassName, className],
+    );
 
     return (
       <a

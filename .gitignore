@@ -25,6 +25,8 @@ git-diff-report.md
 .bundle-cache/
 logs/*.log
 
+.svelte-kit
+
 CLAUDE.md
 
 # TypeScript compiled artifacts

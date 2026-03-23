@@ -16,7 +16,7 @@ export default [
   {
     name: "@real-router/core (ESM)",
     path: "packages/core/dist/esm/index.mjs",
-    limit: "25 kB",
+    limit: "20 kB",
     modifyEsbuildConfig: addDevelopmentCondition,
   },
   {
@@ -31,7 +31,7 @@ export default [
   {
     name: "@real-router/react (ESM)",
     path: "packages/react/dist/esm/index.mjs",
-    limit: "2 kB",
+    limit: "2.5 kB",
     ignore: [
       "react",
       "react-dom",
@@ -41,6 +41,48 @@ export default [
     ],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
+  {
+    name: "@real-router/preact (ESM)",
+    path: "packages/preact/dist/esm/index.mjs",
+    limit: "2.5 kB",
+    ignore: [
+      "preact",
+      "preact/hooks",
+      "preact/compat",
+      "@real-router/core",
+      "@real-router/route-utils",
+      "@real-router/sources",
+    ],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "@real-router/solid (ESM)",
+    path: "packages/solid/dist/esm/index.mjs",
+    limit: "2.5 kB",
+    ignore: [
+      "solid-js",
+      "solid-js/store",
+      "solid-js/web",
+      "@real-router/core",
+      "@real-router/route-utils",
+      "@real-router/sources",
+    ],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  {
+    name: "@real-router/vue (ESM)",
+    path: "packages/vue/dist/esm/index.mjs",
+    limit: "3 kB",
+    ignore: [
+      "vue",
+      "@real-router/core",
+      "@real-router/route-utils",
+      "@real-router/sources",
+    ],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+  // Note: @real-router/svelte uses svelte-package (individual files),
+  // not a single ESM bundle — cannot be measured by size-limit/esbuild.
   {
     name: "@real-router/sources (ESM)",
     path: "packages/sources/dist/esm/index.mjs",
@@ -85,6 +127,14 @@ export default [
     modifyEsbuildConfig: addDevelopmentCondition,
   },
 
+  {
+    name: "@real-router/ssr-data-plugin (ESM)",
+    path: "packages/ssr-data-plugin/dist/esm/index.mjs",
+    limit: "0.5 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
+
   // ── Utilities ─────────────────────────────────────────────────────
   {
     name: "@real-router/route-utils (ESM)",
@@ -108,6 +158,13 @@ export default [
   },
 
   // ── Internal (bundled into consumers) ─────────────────────────────
+  {
+    name: "dom-utils (ESM)",
+    path: "packages/dom-utils/dist/esm/index.mjs",
+    limit: "1 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
   {
     name: "route-tree (ESM)",
     path: "packages/route-tree/dist/esm/index.mjs",

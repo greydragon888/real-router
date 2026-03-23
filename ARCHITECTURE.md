@@ -22,6 +22,10 @@ real-router/
 │   ├── core/                      # Router implementation (facade + namespaces)
 │   ├── core-types/                # @real-router/types — shared TypeScript types
 │   ├── react/                     # React integration (dual entry: main for 19.2+, /legacy for 18+)
+│   ├── preact/                     # Preact integration (hooks, components, Suspense)
+│   ├── solid/                     # Solid.js integration (hooks, components, directives)
+│   ├── vue/                       # Vue 3 integration (composables, components, directives)
+│   ├── svelte/                    # Svelte 5 integration (composables, components, actions)
 │   ├── sources/                   # Subscription layer for UI bindings (useSyncExternalStore)
 │   ├── rx/                        # Reactive Observable API (state$, events$, operators)
 │   ├── browser-plugin/            # Browser History API synchronization
@@ -32,6 +36,7 @@ real-router/
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
+│   ├── dom-utils/                 # Shared DOM utilities for adapters: route announcer, link helpers (internal)
 │   ├── browser-env/               # Shared browser abstractions for plugins (internal)
 │   ├── event-emitter/             # Generic typed event emitter (internal)
 │   ├── route-tree/                # Route tree building, validation, matcher facade (internal)
@@ -40,9 +45,9 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
 
-**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`
+**Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
 ## Package Dependencies
 
@@ -101,10 +106,38 @@ graph TD
     SOURCES -->|dep| ROUTEUTILS
     SOURCES -->|dep| CORE
 
+    DOMUTILS["dom-utils<br/>(internal)"]
+    DOMUTILS -->|dep| CORE
+
     REACT["react<br/>(main + /legacy)"]
     REACT -->|dep| CORE
     REACT -->|dep| SOURCES
     REACT -->|dep| ROUTEUTILS
+    REACT -->|dep| DOMUTILS
+
+    PREACT["preact"]
+    PREACT -->|dep| CORE
+    PREACT -->|dep| SOURCES
+    PREACT -->|dep| ROUTEUTILS
+    PREACT -->|dep| DOMUTILS
+
+    SOLID["solid"]
+    SOLID -->|dep| CORE
+    SOLID -->|dep| SOURCES
+    SOLID -->|dep| ROUTEUTILS
+    SOLID -->|dep| DOMUTILS
+
+    VUE["vue"]
+    VUE -->|dep| CORE
+    VUE -->|dep| SOURCES
+    VUE -->|dep| ROUTEUTILS
+    VUE -->|dep| DOMUTILS
+
+    SVELTE["svelte"]
+    SVELTE -->|dep| CORE
+    SVELTE -->|dep| SOURCES
+    SVELTE -->|dep| ROUTEUTILS
+    SVELTE -->|dep| DOMUTILS
 
     RX -->|dep| CORE
 
@@ -295,7 +328,7 @@ These are deliberately designed constraints. Violating them will break the syste
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Consumer Packages                            │
 ├──────────────────────────────────────────────────────────────────┤
-│ react │ browser-plugin │ hash-plugin │ logger-plugin │ rx │ .... │
+│ react │ preact │ solid │ vue │ svelte │ browser-plugin │ ... │
 ├──────────────────────────────────────────────────────────────────┤
 │                           Core                                   │
 ├──────────────────────────────────────────────────────────────────┤

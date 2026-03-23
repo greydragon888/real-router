@@ -18,6 +18,26 @@
       "entry": ["src/**/*.ts"],
       "project": ["src/**/*.{ts,tsx}"]
     },
+    "packages/solid": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      },
+      "ignoreDependencies": ["@babel/preset-typescript", "babel-preset-solid"]
+    },
+    "packages/vue": {
+      "project": ["src/**/*.ts"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      }
+    },
+    "packages/svelte": {
+      "project": ["src/**/*.{ts,svelte,svelte.ts}"],
+      "vitest": {
+        "config": ["vitest.config.mts"]
+      },
+      "ignoreDependencies": ["@real-router/browser-plugin"]
+    },
     "packages/*": {
       "project": ["src/**/*.{ts,tsx}"],
       "vitest": {
@@ -30,11 +50,7 @@
   },
   "ignoreWorkspaces": ["examples/*"],
   "ignore": [],
-  "ignoreDependencies": [
-    "@real-router/browser-plugin",
-    "@stryker-mutator/api",
-    "jsdom"
-  ],
+  "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
   "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk"],
   "ignoreExportsUsedInFile": true
 }

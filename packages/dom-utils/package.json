@@ -1,0 +1,48 @@
+{
+  "name": "dom-utils",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Shared DOM utilities for Real-Router framework adapters",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.mjs",
+  "types": "./dist/esm/index.d.mts",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "types": {
+        "import": "./dist/esm/index.d.mts",
+        "require": "./dist/cjs/index.d.ts"
+      },
+      "import": "./dist/esm/index.mjs",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/greydragon888/real-router.git"
+  },
+  "author": {
+    "name": "Oleg Ivanov",
+    "email": "greydragon888@gmail.com",
+    "url": "https://github.com/greydragon888"
+  },
+  "license": "MIT",
+  "scripts": {
+    "build": "tsup",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint --cache --ext .ts src/ tests/ --fix --max-warnings 0",
+    "test": "vitest run",
+    "test:properties": "vitest run --config vitest.config.properties.mts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@real-router/core": "workspace:^"
+  },
+  "devDependencies": {
+    "jsdom": "28.1.0"
+  }
+}

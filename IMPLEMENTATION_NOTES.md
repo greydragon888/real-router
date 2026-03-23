@@ -715,6 +715,66 @@ Full test suite runs against the main entry point. Legacy entry gets a single sm
 
 Architecture and design: [`packages/react/ARCHITECTURE.md`](packages/react/ARCHITECTURE.md)
 
+## Framework Adapter Build Strategies
+
+### Build Tool Per Adapter
+
+| Adapter | Build Tool                  | Reason                                          | Output               |
+| ------- | --------------------------- | ----------------------------------------------- | -------------------- |
+| React   | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| Preact  | tsup                        | Standard — pure `.tsx`                          | Dual ESM/CJS bundle  |
+| Solid   | rollup + babel-preset-solid | Solid's JSX needs babel transform               | Dual ESM/CJS bundle  |
+| Vue     | tsup                        | Pure `.ts` with `defineComponent` + `h()`       | Dual ESM/CJS bundle  |
+| Svelte  | svelte-package              | `.svelte` and `.svelte.ts` need Svelte compiler | ESM individual files |
+
+### Svelte Package Specifics
+
+`@real-router/svelte` uses `@sveltejs/package` (not tsup):
+
+- `.svelte` files are copied as-is (consumer's bundler compiles them)
+- `.svelte.ts` files are compiled to `.svelte.js` (runes processed)
+- `.ts` files are transpiled to `.js`
+- ESM only (standard for Svelte ecosystem)
+- Type-checking via `svelte-check` (not `tsc`)
+
+### Solid Package Specifics
+
+`@real-router/solid` uses rollup + `babel-preset-solid`:
+
+- Solid's JSX is compiled by babel-preset-solid (not standard JSX transform)
+- rollup-plugin-dts for bundled type declarations
+- Coverage: `branches: 90` threshold due to babel-generated phantom branches
+
+### Coverage Threshold Exceptions
+
+Framework compilers generate code that v8 coverage tracks but tests can't reach:
+
+| Adapter | Exception                     | Cause                                                   |
+| ------- | ----------------------------- | ------------------------------------------------------- |
+| Solid   | `branches: 90, functions: 97` | babel-preset-solid phantom branches, `.catch(() => {})` |
+| Vue     | `branches: 95, functions: 95` | `defineComponent` internal type guards                  |
+| Svelte  | `branches: 96, functions: 93` | Svelte compiler `$derived`/`$props` transforms          |
+| React   | None                          | tsup preserves original code                            |
+| Preact  | None                          | tsup preserves original code                            |
+
+## dom-utils: Private Shared DOM Package
+
+### Problem
+
+All 5 framework adapters (React, Preact, Solid, Vue, Svelte) duplicated identical DOM utilities: `shouldNavigate` (modifier key check), `buildHref` (buildUrl/buildPath fallback), `buildActiveClassName` (CSS class concatenation), `applyLinkA11y` (role/tabindex on non-interactive elements). ~180 lines of copy-paste.
+
+Additionally, a11y route announcements (#337) required a `createRouteAnnouncer` function consumed by all adapters.
+
+### Solution
+
+Private `dom-utils` package (`"private": true`) — not published to npm, inlined into each adapter's bundle at build time. No duplication since users import only one adapter.
+
+### Why
+
+- **Not `@real-router/core/utils`** — `buildHref` uses `router.buildUrl()` which is injected by `browser-plugin` via `extendRouter()`. Core doesn't know about this method. DOM dependency also disqualifies core.
+- **Not per-adapter duplication** — 5 copies of identical code is a maintenance burden. A shared source of truth eliminates drift.
+- **Private, not published** — only one adapter is used at a time, so the code is inlined (no extra npm dependency for users).
+
 ## Module Resolution: `customConditions` + `development` Export Condition
 
 ### Problem

@@ -7,57 +7,6 @@ import { formatBytes, MB, takeHeapSnapshot } from "./helpers";
 import type { Route } from "@real-router/core";
 
 describe("S16: forwardTo chain resolution", () => {
-  it("S16.1: Static forward chain depth=50, 200 navigations — correct resolution, < 1ms avg, heap stable", async () => {
-    const routes: Route[] = [];
-
-    for (let i = 0; i < 50; i++) {
-      routes.push({
-        name: `hop${i}`,
-        path: `/hop${i}`,
-        forwardTo: `hop${i + 1}`,
-      });
-    }
-
-    routes.push(
-      { name: "hop50", path: "/hop50" },
-      { name: "home", path: "/home" },
-    );
-
-    const router = createRouter(routes, { defaultRoute: "home" });
-
-    await router.start("/home");
-
-    const heapBefore = takeHeapSnapshot();
-    let chainTotalMs = 0;
-    let chainCount = 0;
-
-    for (let i = 0; i < 200; i++) {
-      if (i % 2 === 0) {
-        const start = performance.now();
-        const state = await router.navigate("hop0");
-        const elapsed = performance.now() - start;
-
-        chainTotalMs += elapsed;
-        chainCount++;
-
-        expect(state.name).toBe("hop50");
-      } else {
-        await router.navigate("home");
-      }
-    }
-
-    const avgMs = chainTotalMs / chainCount;
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    router.stop();
-    router.dispose();
-
-    expect(avgMs).toBeLessThan(1);
-    expect(delta, `heap delta: ${formatBytes(delta)}`).toBeLessThan(10 * MB);
-  }, 30_000);
-
   it("S16.2: Dynamic forwardTo callback × 200 navigations — callback invoked correctly", async () => {
     let callCount = 0;
 

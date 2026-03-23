@@ -10,6 +10,7 @@ export default mergeConfig(
       setupFiles: "./tests/setup.ts",
       coverage: { enabled: false },
       pool: "forks",
+      execArgv: ["--expose-gc"],
       maxWorkers: 2,
       testTimeout: 30000,
       hookTimeout: 15000,

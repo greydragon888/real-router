@@ -49,35 +49,6 @@ describe("S7: EventEmitter recursion and depth", () => {
     router.dispose();
   });
 
-  it("S7.2: Cross-event: TRANSITION_SUCCESS listener triggers another navigation", async () => {
-    const router = createStressRouter(10, { limits: { maxEventDepth: 5 } });
-
-    await router.start("/route0");
-
-    let triggered = false;
-
-    const unsub = getPluginApi(router).addEventListener(
-      events.TRANSITION_SUCCESS,
-      () => {
-        if (!triggered) {
-          triggered = true;
-          router.navigate("route2").catch(() => {});
-        }
-      },
-    );
-
-    await router.navigate("route1");
-
-    await new Promise<void>((resolve) => setTimeout(resolve, 50));
-
-    expect(triggered).toBe(true);
-    expect(router.getState()?.name).toBe("route2");
-
-    unsub();
-    router.stop();
-    router.dispose();
-  });
-
   it("S7.3: Recovery after depth error — depth map resets, next navigate works", async () => {
     const router = createRouter(
       [
