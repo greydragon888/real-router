@@ -4,6 +4,8 @@ const CLEAR_DELAY = 7000;
 const SAFARI_READY_DELAY = 100;
 const ANNOUNCER_ATTR = "data-real-router-announcer";
 const INTERNAL_ROUTE_PREFIX = "@@";
+const VISUALLY_HIDDEN =
+  "position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);white-space:nowrap;border:0";
 
 export interface RouteAnnouncerOptions {
   prefix?: string;
@@ -79,7 +81,7 @@ function getOrCreateAnnouncer(): HTMLElement {
 
   const element = document.createElement("div");
 
-  applyVisuallyHiddenStyles(element);
+  element.setAttribute("style", VISUALLY_HIDDEN);
   element.setAttribute("aria-live", "assertive");
   element.setAttribute("aria-atomic", "true");
   element.setAttribute(ANNOUNCER_ATTR, "");
@@ -125,19 +127,4 @@ function manageFocus(): void {
   }
 
   h1.focus({ preventScroll: true });
-}
-
-function applyVisuallyHiddenStyles(element: HTMLElement): void {
-  Object.assign(element.style, {
-    position: "absolute",
-    width: "1px",
-    height: "1px",
-    padding: "0",
-    margin: "-1px",
-    overflow: "hidden",
-    clip: "rect(0, 0, 0, 0)",
-    clipPath: "inset(50%)",
-    whiteSpace: "nowrap",
-    border: "0",
-  });
 }
