@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 
 import { getLifecycleApi } from "@real-router/core/api";
 
@@ -11,6 +11,10 @@ import {
 } from "./helpers";
 
 describe("S8: FSM transitions", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("S8.1: start → 500 navigate → stop → start → 500 navigate — isActive() always correct", async () => {
     const router = createStressRouter(10);
 

@@ -1,0 +1,31 @@
+import { defineComponent } from "vue";
+
+import type { PropType, VNode } from "vue";
+
+function renderNull() {
+  return null;
+}
+
+export const Match = defineComponent({
+  name: "RouteView.Match",
+  props: {
+    segment: {
+      type: String as PropType<string>,
+      required: true,
+    },
+    exact: {
+      type: Boolean,
+      default: false,
+    },
+    fallback: {
+      type: [Object, Function] as PropType<VNode | (() => VNode)>,
+      default: undefined,
+    },
+  },
+  render: renderNull,
+});
+
+export const NotFound = defineComponent({
+  name: "RouteView.NotFound",
+  render: renderNull,
+});

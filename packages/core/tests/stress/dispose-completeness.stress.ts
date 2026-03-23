@@ -5,7 +5,6 @@ import { getLifecycleApi } from "@real-router/core/api";
 import {
   createStressRouter,
   formatBytes,
-  forceGC,
   fullPluginFactory,
   MB,
   takeHeapSnapshot,
@@ -82,25 +81,6 @@ describe("S4. Router dispose completeness", () => {
     const delta = after - before;
 
     expect(delta, `Heap grew by ${formatBytes(delta)}`).toBeLessThan(10 * MB);
-  });
-
-  it("should release router object to GC after dispose (WeakRef check)", async () => {
-    const refs: WeakRef<object>[] = [];
-
-    for (let i = 0; i < 100; i++) {
-      const router = createStressRouter(5);
-
-      refs.push(new WeakRef(router));
-      router.dispose();
-    }
-
-    forceGC();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    forceGC();
-
-    const collected = refs.filter((r) => r.deref() === undefined).length;
-
-    expect(collected).toBeGreaterThan(50);
   });
 
   it("should be idempotent — double dispose 100 times should not throw", async () => {

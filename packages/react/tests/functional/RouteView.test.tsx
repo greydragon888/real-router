@@ -2,7 +2,7 @@ import { browserPluginFactory } from "@real-router/browser-plugin";
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
 import { render, screen, act } from "@testing-library/react";
-import { useEffect, useRef } from "react";
+import { lazy, useEffect, useRef } from "react";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { RouteView, RouterProvider } from "@real-router/react";
@@ -858,6 +858,50 @@ describe("RouteView", () => {
       expect(screen.getByTestId("content-users")).not.toBeVisible();
       expect(screen.getByTestId("nav-about")).toBeVisible();
       expect(screen.getByTestId("content-about")).toBeVisible();
+    });
+  });
+
+  describe("Suspense fallback", () => {
+    it("should wrap children in Suspense when fallback is provided", async () => {
+      const LazyComponent = lazy(() =>
+        Promise.resolve({
+          default: () => <div data-testid="lazy-content">Lazy Content</div>,
+        }),
+      );
+
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match
+              segment="users"
+              fallback={<div data-testid="fallback">Loading...</div>}
+            >
+              <LazyComponent />
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("fallback")).toBeInTheDocument();
+    });
+
+    it("should not wrap children in Suspense when fallback is not provided", async () => {
+      await router.start("/users/list");
+
+      render(
+        <RouterProvider router={router}>
+          <RouteView nodeName="">
+            <RouteView.Match segment="users">
+              <div data-testid="content">Content</div>
+            </RouteView.Match>
+          </RouteView>
+        </RouterProvider>,
+      );
+
+      expect(screen.getByTestId("content")).toBeInTheDocument();
+      expect(screen.queryByTestId("fallback")).not.toBeInTheDocument();
     });
   });
 });

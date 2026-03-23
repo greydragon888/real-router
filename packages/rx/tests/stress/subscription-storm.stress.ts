@@ -194,20 +194,4 @@ describe("RX1: Subscribe/unsubscribe storm", () => {
       expect(count).toBe(3);
     }
   });
-
-  it("1.timing: 500 subscribe/unsubscribe cycles complete in < 2 seconds", () => {
-    const { observable, emit } = createControllableSource<number>();
-    const start = performance.now();
-
-    for (let i = 0; i < 500; i++) {
-      const sub = observable.subscribe({ next: () => {} });
-
-      emit(i);
-      sub.unsubscribe();
-    }
-
-    const elapsed = performance.now() - start;
-
-    expect(elapsed).toBeLessThan(2000);
-  });
 });

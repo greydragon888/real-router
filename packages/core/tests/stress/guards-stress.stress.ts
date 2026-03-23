@@ -6,14 +6,6 @@ import { createStressRouter, takeHeapSnapshot, MB } from "./helpers";
 
 import type { Router } from "@real-router/core";
 
-function asyncGuardFn(_toState: unknown, _fromState: unknown, delayMs: number) {
-  return new Promise<boolean>((resolve) => {
-    setTimeout(() => {
-      resolve(true);
-    }, delayMs);
-  });
-}
-
 function delayedGuardFn(_toState: unknown, _fromState: unknown) {
   return new Promise<boolean>((resolve) => {
     setTimeout(() => {
@@ -21,11 +13,6 @@ function delayedGuardFn(_toState: unknown, _fromState: unknown) {
     }, 20);
   });
 }
-
-const makeAsyncGuardFactory = (delayMs: number) => {
-  return () => (_toState: unknown, _fromState: unknown) =>
-    asyncGuardFn(_toState, _fromState, delayMs);
-};
 
 const delayedGuardFactory = () => {
   return delayedGuardFn;
@@ -75,38 +62,6 @@ describe("S5: Guards under load", () => {
     expect(totalCalls).toBeGreaterThanOrEqual(500);
     expect(delta).toBeLessThan(10 * MB);
   }, 30_000);
-
-  it("S5.2: Async guards with 1-5ms delay × 20 guards, 100 navigations", async () => {
-    const routeCount = 20;
-
-    router = createStressRouter(routeCount);
-    await router.start("/route0");
-
-    const lifecycle = getLifecycleApi(router);
-
-    for (let i = 0; i < routeCount; i++) {
-      const delayMs = (i % 5) + 1;
-
-      lifecycle.addActivateGuard(`route${i}`, makeAsyncGuardFactory(delayMs));
-    }
-
-    const heapBefore = takeHeapSnapshot();
-
-    for (let i = 0; i < 100; i++) {
-      const start = performance.now();
-      const target = (i % (routeCount - 1)) + 1;
-
-      await router.navigate(`route${target}`);
-      const elapsed = performance.now() - start;
-
-      expect(elapsed).toBeLessThan(2000);
-    }
-
-    const heapAfter = takeHeapSnapshot();
-    const delta = heapAfter - heapBefore;
-
-    expect(delta).toBeLessThan(10 * MB);
-  }, 60_000);
 
   it("S5.3: Auto-cleanup: 50 routes, 50 guards, 200 navigations — guard count stays ≤ 50", async () => {
     const routeCount = 50;

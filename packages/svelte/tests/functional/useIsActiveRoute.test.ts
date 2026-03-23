@@ -1,0 +1,149 @@
+import { getRoutesApi } from "@real-router/core/api";
+import { flushSync } from "svelte";
+import { describe, beforeEach, afterEach, it, expect } from "vitest";
+
+import {
+  createTestRouterWithADefaultRouter,
+  renderWithRouter,
+} from "../helpers";
+import ActiveRouteCapture from "../helpers/ActiveRouteCapture.svelte";
+
+import type { Router } from "@real-router/core";
+
+describe("useIsActiveRoute", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createTestRouterWithADefaultRouter();
+    await router.start("/users/123");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("should check if route is active", () => {
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "users.view",
+      routeParams: { id: "123" },
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(true);
+  });
+
+  it("should handle non-strict mode", () => {
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "users",
+      routeParams: {},
+      strict: false,
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(true);
+  });
+
+  it("should handle strict mode", () => {
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "users",
+      routeParams: {},
+      strict: true,
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(false);
+  });
+
+  it("should update when route changes", async () => {
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "users.view",
+      routeParams: { id: "123" },
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(true);
+
+    await router.navigate("home");
+    flushSync();
+
+    expect(result.current).toBe(false);
+  });
+
+  it("should handle empty parameters", async () => {
+    router.stop();
+    await router.start("/users/list");
+
+    let result: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "users.list",
+      routeParams: {},
+      onCapture: (r: unknown) => {
+        result = r;
+      },
+    });
+
+    expect(result.current).toBe(true);
+  });
+
+  it("should correctly check parent route with nested active route", async () => {
+    getRoutesApi(router).add([
+      {
+        name: "settings",
+        path: "/settings",
+        children: [
+          {
+            name: "profile",
+            path: "/profile",
+            children: [{ name: "edit", path: "/edit" }],
+          },
+        ],
+      },
+    ]);
+
+    await router.navigate("settings.profile.edit");
+    flushSync();
+
+    let nonStrictResult: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "settings",
+      routeParams: {},
+      strict: false,
+      onCapture: (r: unknown) => {
+        nonStrictResult = r;
+      },
+    });
+
+    expect(nonStrictResult.current).toBe(true);
+
+    let strictResult: any;
+
+    renderWithRouter(router, ActiveRouteCapture, {
+      routeName: "settings",
+      routeParams: {},
+      strict: true,
+      onCapture: (r: unknown) => {
+        strictResult = r;
+      },
+    });
+
+    expect(strictResult.current).toBe(false);
+  });
+});

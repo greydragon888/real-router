@@ -747,7 +747,9 @@ export default tsEslint.config(
       "**/tests/**/*.test.tsx",
       "**/tests/**/*.properties.ts",
       "**/tests/**/helpers.ts",
+      "**/tests/**/helpers.tsx",
       "**/tests/**/*.stress.ts",
+      "**/tests/**/*.stress.tsx",
     ],
     plugins: {
       vitest: vitestPlugin,

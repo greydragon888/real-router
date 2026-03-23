@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals", "node", "@testing-library/jest-dom"],
+    "verbatimModuleSyntax": true
+  },
+  "include": ["src/**/*", "tests/**/*"]
+}
