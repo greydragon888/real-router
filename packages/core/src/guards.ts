@@ -54,7 +54,8 @@ export function guardNoAsyncCallbacks(route: Route): void {
   }
 }
 
-export function guardRouteStructure(routes: Route[]): void {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts any Route type
+export function guardRouteStructure(routes: Route<any>[]): void {
   for (const route of routes) {
     const r: unknown = route;
     if (r === null || typeof r !== "object" || Array.isArray(r)) {
