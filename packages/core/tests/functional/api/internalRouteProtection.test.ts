@@ -116,7 +116,7 @@ describe("core/internal-route-protection", () => {
     let noValidateRoutes: RoutesApi;
 
     beforeEach(async () => {
-      noValidateRouter = createTestRouter({ noValidate: true });
+      noValidateRouter = createTestRouter();
       noValidateRoutes = getRoutesApi(noValidateRouter);
       await noValidateRouter.start("/home");
     });

@@ -8,7 +8,6 @@
 import { getTypeDescription, isObjKey } from "type-guards";
 
 import { EVENTS_MAP } from "./constants";
-import { DEFAULT_LIMITS } from "../../constants";
 
 import type { PluginFactory } from "../../types";
 import type { DefaultDependencies, Plugin } from "@real-router/types";
@@ -56,28 +55,5 @@ export function validatePlugin(plugin: Plugin): void {
           `Plugin must only contain event handlers and optional teardown.`,
       );
     }
-  }
-}
-
-/**
- * Validates that adding new plugins won't exceed the hard limit.
- */
-export function validatePluginLimit(
-  currentCount: number,
-  newCount: number,
-  maxPlugins: number = DEFAULT_LIMITS.maxPlugins,
-): void {
-  if (maxPlugins === 0) {
-    return;
-  }
-
-  const totalCount = currentCount + newCount;
-
-  if (totalCount > maxPlugins) {
-    throw new Error(
-      `[router.usePlugin] Plugin limit exceeded (${maxPlugins}). ` +
-        `Current: ${currentCount}, Attempting to add: ${newCount}. ` +
-        `This indicates an architectural problem. Consider consolidating plugins.`,
-    );
   }
 }

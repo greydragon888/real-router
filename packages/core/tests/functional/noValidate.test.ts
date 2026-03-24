@@ -47,13 +47,13 @@ describe("core/noValidate option", () => {
     });
   });
 
-  describe("noValidate: true", () => {
+  describe("without validation plugin", () => {
     let router: Router;
     let routesApi: RoutesApi;
     let lifecycle: ReturnType<typeof getLifecycleApi>;
 
     beforeEach(() => {
-      router = createTestRouter({ noValidate: true });
+      router = createTestRouter();
       routesApi = getRoutesApi(router);
       lifecycle = getLifecycleApi(router);
     });
@@ -262,71 +262,20 @@ describe("core/noValidate option", () => {
   });
 
   describe("constructor validation", () => {
-    it("should always validate options in constructor (validates noValidate itself)", () => {
-      // Invalid noValidate value should throw
-      expect(() => createRouter([], { noValidate: "yes" as any })).toThrow(
-        TypeError,
-      );
-    });
-
-    it("should skip dependencies validation when noValidate is true", () => {
-      // Array instead of object - would throw without noValidate
-      expect(() =>
-        createRouter([], { noValidate: true }, [] as any),
-      ).not.toThrow();
-    });
-
-    it("should validate dependencies when noValidate is false", () => {
+    it("should validate dependencies", () => {
       // Array instead of object - should throw
-      expect(() => createRouter([], { noValidate: false }, [] as any)).toThrow(
-        TypeError,
-      );
+      expect(() => createRouter([], {}, [] as any)).toThrow(TypeError);
     });
   });
 
-  describe("noValidate option value", () => {
-    it("should default to false", () => {
-      const testRouter = createRouter([{ name: "test", path: "/test" }]);
+  describe("forwardMap caching", () => {
+    it("should cache forwardTo chains", () => {
+      const router = createRouter([
+        { name: "a", path: "/a", forwardTo: "b" },
+        { name: "b", path: "/b", forwardTo: "c" },
+        { name: "c", path: "/c" },
+      ]);
 
-      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(false);
-
-      testRouter.stop();
-    });
-
-    it("should accept true", () => {
-      const testRouter = createRouter([{ name: "test", path: "/test" }], {
-        noValidate: true,
-      });
-
-      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(true);
-
-      testRouter.stop();
-    });
-
-    it("should accept false", () => {
-      const testRouter = createRouter([{ name: "test", path: "/test" }], {
-        noValidate: false,
-      });
-
-      expect(getPluginApi(testRouter).getOptions().noValidate).toBe(false);
-
-      testRouter.stop();
-    });
-  });
-
-  describe("forwardMap caching with noValidate", () => {
-    it("should cache forwardTo chains without validation", () => {
-      // Create router with forwardTo chain (a → b → c)
-      const router = createRouter(
-        [
-          { name: "a", path: "/a", forwardTo: "b" },
-          { name: "b", path: "/b", forwardTo: "c" },
-          { name: "c", path: "/c" },
-        ],
-        { noValidate: true },
-      );
-
-      // forwardState should resolve through chain a → b → c
       const result = getPluginApi(router).forwardState("a", {});
 
       expect(result.name).toBe("c");
@@ -334,73 +283,53 @@ describe("core/noValidate option", () => {
       router.stop();
     });
 
-    it("should refresh forward cache when routes are added (noValidate: true)", () => {
-      // Start with a simple forwardTo
-      const router = createRouter(
-        [
-          { name: "a", path: "/a", forwardTo: "b" },
-          { name: "b", path: "/b" },
-        ],
-        { noValidate: true },
-      );
+    it("should refresh forward cache when routes are added", () => {
+      const router = createRouter([
+        { name: "a", path: "/a", forwardTo: "b" },
+        { name: "b", path: "/b" },
+      ]);
       const routesApi = getRoutesApi(router);
 
-      // Verify initial forwardTo works
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
-      // Add another route with forwardTo - this triggers cache refresh
       routesApi.add({ name: "d", path: "/d", forwardTo: "a" });
 
-      // d → a → b
       expect(getPluginApi(router).forwardState("d", {}).name).toBe("b");
 
       router.stop();
     });
 
-    it("should refresh forward cache when routes are removed (noValidate: true)", () => {
-      // Create router with multiple forwardTo routes
-      const router = createRouter(
-        [
-          { name: "a", path: "/a", forwardTo: "b" },
-          { name: "b", path: "/b", forwardTo: "c" },
-          { name: "c", path: "/c" },
-          { name: "d", path: "/d", forwardTo: "c" },
-        ],
-        { noValidate: true },
-      );
+    it("should refresh forward cache when routes are removed", () => {
+      const router = createRouter([
+        { name: "a", path: "/a", forwardTo: "b" },
+        { name: "b", path: "/b", forwardTo: "c" },
+        { name: "c", path: "/c" },
+        { name: "d", path: "/d", forwardTo: "c" },
+      ]);
       const routesApi = getRoutesApi(router);
 
-      // Verify initial chains work
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
       expect(getPluginApi(router).forwardState("d", {}).name).toBe("c");
 
-      // Remove route 'd' - triggers cache refresh
       routesApi.remove("d");
 
-      // Remaining chain should still work
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
 
       router.stop();
     });
 
-    it("should refresh forward cache when forwardTo is updated (noValidate: true)", () => {
-      const router = createRouter(
-        [
-          { name: "a", path: "/a", forwardTo: "b" },
-          { name: "b", path: "/b" },
-          { name: "c", path: "/c" },
-        ],
-        { noValidate: true },
-      );
+    it("should refresh forward cache when forwardTo is updated", () => {
+      const router = createRouter([
+        { name: "a", path: "/a", forwardTo: "b" },
+        { name: "b", path: "/b" },
+        { name: "c", path: "/c" },
+      ]);
       const routesApi = getRoutesApi(router);
 
-      // Initial: a → b
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("b");
 
-      // Update forwardTo: a → c (triggers cache refresh)
       routesApi.update("a", { forwardTo: "c" });
 
-      // Now: a → c
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
 
       router.stop();
@@ -408,18 +337,16 @@ describe("core/noValidate option", () => {
   });
 
   describe("validation comparison", () => {
-    it("should throw validation error with noValidate: false for empty route name", () => {
-      const testRouter = createTestRouter({ noValidate: false });
+    it("should throw validation error for invalid route name type", () => {
+      const testRouter = createTestRouter();
 
-      // navigate doesn't throw directly, but validation happens internally
-      // Test getRoute instead which does throw for validation errors
       expect(() => getRoutesApi(testRouter).get(123 as any)).toThrow(TypeError);
 
       testRouter.stop();
     });
 
-    it("should reject async forwardTo even with noValidate: true", () => {
-      const testRouter = createTestRouter({ noValidate: true });
+    it("should reject async forwardTo", () => {
+      const testRouter = createTestRouter();
       const testRoutesApi = getRoutesApi(testRouter);
 
       expect(() => {

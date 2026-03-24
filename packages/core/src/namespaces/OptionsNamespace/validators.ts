@@ -12,9 +12,8 @@ import {
   VALID_OPTION_VALUES,
   VALID_QUERY_PARAMS,
 } from "./constants";
-import { LIMIT_BOUNDS } from "../../constants";
 
-import type { LimitsConfig, Options } from "@real-router/types";
+import type { Options } from "@real-router/types";
 
 /**
  * Validates that value is a plain object without getters.
@@ -148,20 +147,8 @@ export function validateOptionValue(
   }
 }
 
-/**
- * Validates optional fields not in defaultOptions.
- * Note: logger is handled before validateOptions in Router constructor.
- */
-function validateOptionalField(
-  key: string,
-  value: unknown,
-  methodName: string,
-): boolean {
+function validateOptionalField(key: string, methodName: string): boolean {
   if (key === "limits") {
-    if (value !== undefined) {
-      validateLimits(value, methodName);
-    }
-
     return true;
   }
 
@@ -189,7 +176,7 @@ export function validateOptions(
   for (const [key, value] of Object.entries(options)) {
     // Skip optional fields that aren't in defaultOptions (limits, logger, etc.)
     if (!isObjKey(key, defaultOptions)) {
-      validateOptionalField(key, value, methodName);
+      validateOptionalField(key, methodName);
       continue;
     }
 
@@ -199,54 +186,5 @@ export function validateOptions(
     }
 
     validateOptionValue(key, value, methodName);
-  }
-}
-
-/**
- * Validates that a limit value is within bounds.
- */
-export function validateLimitValue(
-  limitName: keyof LimitsConfig,
-  value: unknown,
-  methodName: string,
-): void {
-  if (typeof value !== "number" || !Number.isInteger(value)) {
-    throw new TypeError(
-      `[router.${methodName}]: limit "${limitName}" must be an integer, got ${String(value)}`,
-    );
-  }
-
-  const bounds = LIMIT_BOUNDS[limitName];
-
-  if (value < bounds.min || value > bounds.max) {
-    throw new RangeError(
-      `[router.${methodName}]: limit "${limitName}" must be between ${bounds.min} and ${bounds.max}, got ${value}`,
-    );
-  }
-}
-
-/**
- * Validates a partial limits object.
- */
-export function validateLimits(
-  limits: unknown,
-  methodName: string,
-): asserts limits is Partial<LimitsConfig> {
-  if (!limits || typeof limits !== "object" || limits.constructor !== Object) {
-    throw new TypeError(
-      `[router.${methodName}]: invalid limits: expected plain object, got ${typeof limits}`,
-    );
-  }
-
-  for (const [key, value] of Object.entries(limits)) {
-    if (!Object.hasOwn(LIMIT_BOUNDS, key)) {
-      throw new TypeError(`[router.${methodName}]: unknown limit: "${key}"`);
-    }
-
-    if (value === undefined) {
-      continue;
-    }
-
-    validateLimitValue(key as keyof LimitsConfig, value, methodName);
   }
 }

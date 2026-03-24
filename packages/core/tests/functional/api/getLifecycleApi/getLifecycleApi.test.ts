@@ -81,7 +81,7 @@ describe("getLifecycleApi", () => {
     });
 
     it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -143,7 +143,7 @@ describe("getLifecycleApi", () => {
     });
 
     it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -189,7 +189,7 @@ describe("getLifecycleApi", () => {
     });
 
     it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -235,7 +235,7 @@ describe("getLifecycleApi", () => {
     });
 
     it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {

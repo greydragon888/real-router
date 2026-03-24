@@ -669,9 +669,7 @@ describe("core/routes/replaceRoutes", () => {
 
   describe("noValidate mode", () => {
     it("should preserve external guards in noValidate mode", async () => {
-      const nvRouter = createRouter([{ name: "home", path: "/home" }], {
-        noValidate: true,
-      });
+      const nvRouter = createRouter([{ name: "home", path: "/home" }]);
 
       await nvRouter.start("/home");
 

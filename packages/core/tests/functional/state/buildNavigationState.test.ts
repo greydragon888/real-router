@@ -216,7 +216,7 @@ describe("getPluginApi().buildNavigationState()", () => {
 
   describe("noValidate mode", () => {
     it("should skip validation and return undefined for invalid input", async () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
 
       await noValidateRouter.start("/home");
 

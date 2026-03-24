@@ -3,11 +3,7 @@
 import { logger } from "@real-router/logger";
 
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
-import {
-  validatePlugin,
-  validatePluginLimit,
-  validateUsePluginArgs,
-} from "./validators";
+import { validatePlugin, validateUsePluginArgs } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
@@ -47,14 +43,6 @@ export class PluginsNamespace<
 
   static validatePlugin(plugin: Plugin): void {
     validatePlugin(plugin);
-  }
-
-  static validatePluginLimit(
-    currentCount: number,
-    newCount: number,
-    maxPlugins?: number,
-  ): void {
-    validatePluginLimit(currentCount, newCount, maxPlugins);
   }
 
   static validateNoDuplicatePlugins<D extends DefaultDependencies>(

@@ -140,7 +140,7 @@ describe("getRoutesApi()", () => {
     let noValidateApi: RoutesApi;
 
     beforeEach(() => {
-      noValidateRouter = createTestRouter({ noValidate: true });
+      noValidateRouter = createTestRouter();
       noValidateApi = getRoutesApi(noValidateRouter);
     });
 

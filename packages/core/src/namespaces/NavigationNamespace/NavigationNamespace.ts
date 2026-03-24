@@ -10,11 +10,6 @@ import {
 import { completeTransition } from "./transition/completeTransition";
 import { routeTransitionError } from "./transition/errorHandling";
 import { executeGuardPipeline } from "./transition/guardPhase";
-import {
-  validateNavigateArgs,
-  validateNavigateToDefaultArgs,
-  validateNavigationOptions,
-} from "./validators";
 import { errorCodes, constants } from "../../constants";
 import { RouterError } from "../../RouterError";
 import { getTransitionPath, nameToIDs } from "../../transitionPath";
@@ -72,26 +67,6 @@ export class NavigationNamespace {
   #deps!: NavigationDependencies;
   #currentController: AbortController | null = null;
   #navigationId = 0;
-
-  // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // Proxy to functions in validators.ts for separation of concerns
-  // =========================================================================
-
-  static validateNavigateArgs(name: unknown): asserts name is string {
-    validateNavigateArgs(name);
-  }
-
-  static validateNavigateToDefaultArgs(opts: unknown): void {
-    validateNavigateToDefaultArgs(opts);
-  }
-
-  static validateNavigationOptions(
-    opts: unknown,
-    methodName: string,
-  ): asserts opts is NavigationOptions {
-    validateNavigationOptions(opts, methodName);
-  }
 
   // =========================================================================
   // Dependency injection
