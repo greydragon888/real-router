@@ -43,24 +43,6 @@ describe("createRouter", () => {
       expect(() => router.buildPath("unknown")).toThrow();
     });
 
-    it("should throw if route names are duplicated", () => {
-      expect(() =>
-        createRouter([
-          { name: "home", path: "/home" },
-          { name: "home", path: "/duplicate" },
-        ]),
-      ).toThrow();
-    });
-
-    it("should throw if routes share the same path but have different names", () => {
-      expect(() =>
-        createRouter([
-          { name: "home", path: "/home" },
-          { name: "dashboard", path: "/home" },
-        ]),
-      ).toThrow();
-    });
-
     it("should throw when building a path for an unknown route", () => {
       const router = createRouter([{ name: "home", path: "/home" }]);
 

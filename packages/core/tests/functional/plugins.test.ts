@@ -291,23 +291,6 @@ describe("core/plugins", () => {
 
     // 🔴 CRITICAL: Duplicate protection
     describe("duplicate protection", () => {
-      it("should throw error when registering same factory twice", async () => {
-        const tracker = createTrackingPlugin();
-        const factory = tracker.factory;
-
-        router.stop();
-        router.usePlugin(factory);
-
-        expect(() => {
-          router.usePlugin(factory);
-        }).toThrow("Plugin factory already registered");
-
-        // Original plugin should remain registered - verify by starting router
-        await router.start("/home");
-
-        expect(tracker.getCalls().onStart).toBe(1);
-      });
-
       it("should allow different factory references even with same plugin structure", async () => {
         const tracker1 = createTrackingPlugin();
         const tracker2 = createTrackingPlugin();
@@ -486,15 +469,6 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Type validation
     describe("type validation", () => {
-      it("should throw TypeError for non-function parameter", () => {
-        expect(() => {
-          router.usePlugin(null as any);
-        }).toThrow(TypeError);
-        expect(() => {
-          router.usePlugin(null as any);
-        }).toThrow("Expected plugin factory function");
-      });
-
       it("should throw TypeError when factory returns non-object", () => {
         const invalidFactory = () => "not a plugin" as any;
 

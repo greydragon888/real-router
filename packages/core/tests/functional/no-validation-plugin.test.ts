@@ -15,39 +15,8 @@ import type { Router } from "@real-router/core";
 import type { DependenciesApi, RoutesApi } from "@real-router/core/api";
 import type { EventName } from "@real-router/types";
 
-describe("core/noValidate option", () => {
-  describe("default behavior (noValidate: false)", () => {
-    let router: Router;
-    let routesApi: RoutesApi;
-
-    beforeEach(() => {
-      router = createTestRouter();
-      routesApi = getRoutesApi(router);
-    });
-
-    afterEach(() => {
-      router.stop();
-    });
-
-    it("should validate by default", () => {
-      // getRoute with invalid type throws TypeError
-      expect(() => routesApi.get(123 as any)).toThrow(TypeError);
-    });
-
-    it("should validate route names", () => {
-      expect(() => routesApi.get(123 as any)).toThrow(TypeError);
-
-      expect(() => routesApi.has(123 as any)).toThrow(TypeError);
-    });
-
-    it("should validate dependencies", () => {
-      const deps = getDependenciesApi(router);
-
-      expect(() => deps.get("nonexistent" as never)).toThrow(ReferenceError);
-    });
-  });
-
-  describe("without validation plugin", () => {
+describe("core/without validation plugin", () => {
+  describe("router works without plugin (graceful behavior)", () => {
     let router: Router;
     let routesApi: RoutesApi;
     let lifecycle: ReturnType<typeof getLifecycleApi>;
@@ -62,127 +31,108 @@ describe("core/noValidate option", () => {
       router.stop();
     });
 
-    // Route Management
     describe("route management", () => {
-      it("should skip validation in addRoute", () => {
-        // Empty name would fail validation with noValidate: false
+      it("should handle addRoute without validation errors", () => {
         expect(() => {
           routesApi.add({ name: "a", path: "/test-new" });
         }).not.toThrow();
       });
 
-      it("should skip validation in removeRoute", () => {
-        // Empty string would fail validation with noValidate: false
+      it("should handle removeRoute with empty string gracefully", () => {
         expect(() => {
           routesApi.remove("");
         }).not.toThrow();
       });
 
-      it("should skip validation in getRoute", () => {
-        // Empty string would fail validation with noValidate: false
+      it("should handle getRoute with empty string gracefully", () => {
         expect(() => routesApi.get("")).not.toThrow();
       });
 
-      it("should skip validation in hasRoute", () => {
-        // Empty string would fail validation with noValidate: false
+      it("should handle hasRoute with empty string gracefully", () => {
         expect(() => routesApi.has("")).not.toThrow();
       });
 
-      it("should skip validation in updateRoute", () => {
+      it("should handle updateRoute without validation errors", () => {
         routesApi.add({ name: "test", path: "/test" });
 
-        // Empty forwardTo would fail validation with noValidate: false
         expect(() => {
           routesApi.update("test", { forwardTo: "" });
         }).not.toThrow();
       });
     });
 
-    // Path & State Building
     describe("path and state building", () => {
-      it("should skip validation in isActiveRoute", () => {
-        // Empty string would normally warn, but not throw validation error
+      it("should handle isActiveRoute with empty string gracefully", () => {
         expect(() => router.isActiveRoute("")).not.toThrow();
       });
 
-      it("should skip validation in buildPath", () => {
-        // Valid route name - tests that validation doesn't throw
+      it("should handle buildPath without throwing", () => {
         expect(() => router.buildPath("home")).not.toThrow();
       });
 
-      it("should skip validation in matchPath", () => {
-        // Empty string would fail validation with noValidate: false
+      it("should handle matchPath with empty string gracefully", () => {
         expect(() => getPluginApi(router).matchPath("")).not.toThrow();
       });
 
-      it("should skip validation in setRootPath", () => {
+      it("should handle setRootPath with empty string gracefully", () => {
         expect(() => {
           getPluginApi(router).setRootPath("");
         }).not.toThrow();
       });
 
-      it("should skip validation in makeState", () => {
-        // Valid route name - tests that validation doesn't throw
+      it("should handle makeState without throwing", () => {
         expect(() => getPluginApi(router).makeState("home")).not.toThrow();
       });
 
-      it("should skip validation in areStatesEqual", () => {
+      it("should handle areStatesEqual with undefined gracefully", () => {
         expect(() => router.areStatesEqual(undefined, undefined)).not.toThrow();
       });
 
-      it("should skip validation in forwardState", () => {
+      it("should handle forwardState without throwing", () => {
         expect(() =>
           getPluginApi(router).forwardState("home", {}),
         ).not.toThrow();
       });
 
-      it("should skip validation in buildState", () => {
+      it("should handle buildState without throwing", () => {
         expect(() => getPluginApi(router).buildState("home", {})).not.toThrow();
       });
 
-      it("should skip validation in shouldUpdateNode", () => {
-        // Empty string would fail validation with noValidate: false
+      it("should handle shouldUpdateNode with empty string gracefully", () => {
         expect(() => router.shouldUpdateNode("")).not.toThrow();
       });
     });
 
-    // Lifecycle
     describe("lifecycle", () => {
-      it("should skip validation in start", () => {
+      it("should handle start without throwing", () => {
         expect(() => router.start("/home")).not.toThrow();
       });
 
-      it("should skip validation in canDeactivate", () => {
-        // Valid handler
+      it("should handle canDeactivate guard without throwing", () => {
         expect(() => {
           lifecycle.addDeactivateGuard("home", () => () => true);
         }).not.toThrow();
       });
 
-      it("should skip validation in canActivate", () => {
-        // Valid handler
+      it("should handle canActivate guard without throwing", () => {
         expect(() => {
           lifecycle.addActivateGuard("home", () => () => true);
         }).not.toThrow();
       });
 
-      it("should skip validation in canNavigateTo", async () => {
+      it("should handle canNavigateTo with invalid type gracefully", async () => {
         await router.start("/home");
 
-        // Invalid type would throw TypeError with noValidate: false
         expect(() => router.canNavigateTo(123 as any)).not.toThrow();
       });
     });
 
-    // Plugins & Middleware
     describe("plugins and middleware", () => {
-      it("should skip validation in usePlugin", () => {
-        // Valid plugin
+      it("should handle usePlugin without throwing", () => {
         expect(() => router.usePlugin(() => ({}))).not.toThrow();
       });
     });
 
-    // Dependencies (via getDependenciesApi)
     describe("dependencies", () => {
       let deps: DependenciesApi;
 
@@ -190,7 +140,7 @@ describe("core/noValidate option", () => {
         deps = getDependenciesApi(router);
       });
 
-      it("should skip validation in set", () => {
+      it("should handle set without throwing", () => {
         expect(() => {
           (deps as DependenciesApi<{ testDep: string }>).set(
             "testDep",
@@ -199,31 +149,29 @@ describe("core/noValidate option", () => {
         }).not.toThrow();
       });
 
-      it("should skip validation in setAll", () => {
+      it("should handle setAll without throwing", () => {
         expect(() => {
           deps.setAll({ testDep: "value" } as object);
         }).not.toThrow();
       });
 
-      it("should skip validation in get for nonexistent", () => {
+      it("should handle get for nonexistent dependency gracefully", () => {
         expect(() => deps.get("nonexistent" as never)).not.toThrow();
       });
 
-      it("should skip validation in remove", () => {
+      it("should handle remove without throwing", () => {
         expect(() => {
           deps.remove("testDep" as never);
         }).not.toThrow();
       });
 
-      it("should skip validation in has", () => {
+      it("should handle has without throwing", () => {
         expect(() => deps.has("testDep" as never)).not.toThrow();
       });
     });
 
-    // Events
     describe("events", () => {
-      it("should skip validation in addEventListener (via getPluginApi)", () => {
-        // Invalid event name would throw with noValidate: false
+      it("should handle addEventListener with invalid event name gracefully", () => {
         expect(() =>
           getPluginApi(router).addEventListener(
             "invalidEvent" as unknown as EventName,
@@ -232,39 +180,95 @@ describe("core/noValidate option", () => {
         ).not.toThrow();
       });
 
-      it("should skip validation in subscribe", () => {
+      it("should handle subscribe without throwing", () => {
         expect(() => router.subscribe(() => {})).not.toThrow();
       });
     });
 
-    // Navigation
     describe("navigation", () => {
-      it("should skip validation in navigate", async () => {
+      it("should handle navigate with empty route name gracefully", async () => {
         await router.start("/home");
 
-        // Empty route name would throw with noValidate: false
         expect(() => router.navigate("").catch(() => {})).not.toThrow();
       });
 
-      it("should skip validation in navigateToDefault", async () => {
+      it("should handle navigateToDefault without throwing", async () => {
         await router.start("/home");
 
         expect(() => router.navigateToDefault().catch(() => {})).not.toThrow();
       });
     });
 
-    // Cloning
     describe("cloning", () => {
-      it("should skip validation in clone", () => {
+      it("should handle clone without throwing", () => {
         expect(() => cloneRouter(router)).not.toThrow();
       });
     });
   });
 
-  describe("constructor validation", () => {
-    it("should validate dependencies", () => {
-      // Array instead of object - should throw
+  describe("crash guards (always run, no plugin needed)", () => {
+    it("should throw when dependencies is an array", () => {
       expect(() => createRouter([], {}, [] as any)).toThrow(TypeError);
+    });
+
+    it("should throw when dependencies has getters", () => {
+      const depsWithGetters = {};
+
+      Object.defineProperty(depsWithGetters, "myService", {
+        get() {
+          return {};
+        },
+        enumerable: true,
+      });
+
+      expect(() => createRouter([], {}, depsWithGetters as any)).toThrow(
+        TypeError,
+      );
+    });
+
+    it("should reject async forwardTo in createRouter", () => {
+      expect(() => {
+        createRouter([
+          {
+            name: "async-route",
+            path: "/async",
+            forwardTo: (async () => "target") as any,
+          },
+        ]);
+      }).toThrow(TypeError);
+
+      expect(() => {
+        createRouter([
+          {
+            name: "async-route",
+            path: "/async",
+            forwardTo: (async () => "target") as any,
+          },
+        ]);
+      }).toThrow(/cannot be async/);
+    });
+
+    it("should reject async forwardTo via addRoute", () => {
+      const testRouter = createTestRouter();
+      const testRoutesApi = getRoutesApi(testRouter);
+
+      expect(() => {
+        testRoutesApi.add({
+          name: "async-no-validate",
+          path: "/async-no-validate",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrow(TypeError);
+
+      expect(() => {
+        testRoutesApi.add({
+          name: "async-no-validate",
+          path: "/async-no-validate",
+          forwardTo: (async () => "target") as any,
+        });
+      }).toThrow(/cannot be async/);
+
+      testRouter.stop();
     });
   });
 
@@ -333,39 +337,6 @@ describe("core/noValidate option", () => {
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
 
       router.stop();
-    });
-  });
-
-  describe("validation comparison", () => {
-    it("should throw validation error for invalid route name type", () => {
-      const testRouter = createTestRouter();
-
-      expect(() => getRoutesApi(testRouter).get(123 as any)).toThrow(TypeError);
-
-      testRouter.stop();
-    });
-
-    it("should reject async forwardTo", () => {
-      const testRouter = createTestRouter();
-      const testRoutesApi = getRoutesApi(testRouter);
-
-      expect(() => {
-        testRoutesApi.add({
-          name: "async-no-validate",
-          path: "/async-no-validate",
-          forwardTo: (async () => "target") as any,
-        });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        testRoutesApi.add({
-          name: "async-no-validate",
-          path: "/async-no-validate",
-          forwardTo: (async () => "target") as any,
-        });
-      }).toThrow(/cannot be async/);
-
-      testRouter.stop();
     });
   });
 });

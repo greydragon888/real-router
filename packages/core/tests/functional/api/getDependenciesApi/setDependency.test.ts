@@ -48,24 +48,6 @@ describe("core/dependencies/setDependency", () => {
     expect(deps.has("newKey" as "foo")).toBe(false);
   });
 
-  it("should throw TypeError for invalid key even when value is undefined", () => {
-    // Key validation happens BEFORE undefined check - consistent validation
-    expect(() => {
-      // @ts-expect-error: testing invalid key with undefined
-      deps.set(null, undefined);
-    }).toThrow(TypeError);
-
-    expect(() => {
-      // @ts-expect-error: testing invalid key with undefined
-      deps.set(123, undefined);
-    }).toThrow(TypeError);
-
-    expect(() => {
-      // @ts-expect-error: testing invalid key with undefined
-      deps.set({}, undefined);
-    }).toThrow(TypeError);
-  });
-
   it("should allow conditional setup with undefined", () => {
     const isDev = false;
 
@@ -76,37 +58,6 @@ describe("core/dependencies/setDependency", () => {
     expect(deps.has("devLogger" as "foo")).toBe(false);
   });
 
-  // 🔴 CRITICAL: Key validation
-  it("should throw TypeError for non-string keys", () => {
-    expect(() => {
-      // @ts-expect-error: testing number key
-      deps.set(123, "value");
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing number key
-      deps.set(123, "value");
-    }).toThrow("dependency name must be a string, got number");
-  });
-
-  it("should throw TypeError for null key", () => {
-    expect(() => {
-      // @ts-expect-error: testing null key
-      deps.set(null, "value");
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing null key
-      deps.set(null, "value");
-    }).toThrow("dependency name must be a string, got object");
-  });
-
-  it("should throw TypeError for object key", () => {
-    expect(() => {
-      // @ts-expect-error: testing object key
-      deps.set({}, "value");
-    }).toThrow(TypeError);
-  });
-
-  // 🟡 IMPORTANT: Warning on overwrite
   it("should warn when overwriting existing dependency", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
