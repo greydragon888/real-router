@@ -269,7 +269,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ## Examples
 
-68 runnable examples across 5 frameworks — each is a standalone Vite app:
+Many runnable examples across the most popular frameworks — each is a standalone Vite app:
 
 | Feature                 | [React](examples/react)                                                                                        | [Preact](examples/preact)                              | [Solid](examples/solid)                                                                                                                                               | [Vue](examples/vue)                                                                                                                               | [Svelte](examples/svelte)                                                                                                                                                                                        |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -297,6 +297,7 @@ Real-Router is an **independent project** — not a fork. Built from scratch wit
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=greydragon888_real-router&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=greydragon888_real-router)
 [![Mutation testing badge](https://img.shields.io/endpoint?style=flat-square&url=https%3A%2F%2Fbadge-api.stryker-mutator.io%2Fgithub.com%2Fgreydragon888%2Freal-router%2Fmaster)](https://dashboard.stryker-mutator.io/reports/github.com/greydragon888/real-router/master)
 [![Vitest](https://img.shields.io/badge/tested%20with-vitest-6E9F18?style=flat-square&logo=vitest)](https://vitest.dev/)
+[![Playwright](https://img.shields.io/badge/e2e-playwright-2EAD33?style=flat-square&logo=playwright)](https://playwright.dev/)
 [![Property-Based Testing](https://img.shields.io/badge/PBT-fast--check-FF4785?style=flat-square)](https://fast-check.dev/)
 
 Real-Router treats testing as a first-class engineering concern, not an afterthought.
@@ -304,7 +305,8 @@ Real-Router treats testing as a first-class engineering concern, not an aftertho
 - **100% code coverage** — enforced in CI across all packages, no exceptions
 - **Static analysis** — SonarCloud quality gate on every PR: zero bugs, zero vulnerabilities, zero code smells
 - **Property-based testing** — [fast-check](https://fast-check.dev/) generates thousands of random inputs to verify invariants that hand-written tests miss (URL encoding, parameter serialization, route tree operations)
-- **Stress testing** — 413 dedicated stress tests across core and all framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations for React, Preact, Solid, Vue, and Svelte
+- **Stress testing** — 310 dedicated stress tests across core and all framework adapters: thousands of concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, mount/unmount lifecycle validation, subscription fanout granularity, and full SPA simulations
+- **Playwright e2e testing** — 522 end-to-end test cases across 41 Playwright suites covering all 5 framework adapters (React, Preact, Solid, Vue, Svelte). Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, and async guards
 - **Mutation testing** — [Stryker](https://stryker-mutator.io/) mutates source code and verifies that tests catch every mutation, ensuring test suite quality beyond line coverage
 
 ## Development
@@ -313,10 +315,14 @@ This is a pnpm monorepo with [Turborepo](https://turbo.build/repo) for task orch
 
 ```bash
 pnpm install          # Install all dependencies
-pnpm build            # Build all packages
-pnpm test -- --run    # Run tests once
+pnpm build            # Build all packages (errors-only output)
+pnpm build:verbose    # Build with full output (debugging)
+pnpm test -- --run    # Run tests once (errors-only output)
+pnpm test:verbose     # Tests with full output (debugging)
 pnpm type-check       # TypeScript type checking
 pnpm lint             # ESLint
+pnpm lint:e2e         # Verify e2e directories have spec files
+pnpm lint:unused      # Check for unused code (knip)
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development setup, coding standards, and PR guidelines.

@@ -43,6 +43,13 @@ real-router/
 │   ├── path-matcher/              # Segment Trie URL matching and path building (internal)
 │   ├── search-params/             # Query string handling (internal)
 │   └── type-guards/               # Runtime type validation (internal)
+├── examples/
+│   ├── shared/                    # Shared store, API, abilities, styles
+│   ├── react/    (14 examples)    # React 19.2+ examples + 8 e2e suites
+│   ├── preact/   (11 examples)    # Preact examples + 8 e2e suites
+│   ├── solid/    (14 examples)    # Solid.js examples + 8 e2e suites
+│   ├── vue/      (14 examples)    # Vue 3 SFC examples + 8 e2e suites
+│   └── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
 ```
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
@@ -371,12 +378,14 @@ All navigation errors are `RouterError` instances with typed `code` from `errorC
 
 - **100% code coverage** enforced in CI across all packages
 - **Property-based testing** (fast-check) for URL encoding, parameter serialization, route tree operations
-- **99 stress tests** — concurrent navigations, guard removal mid-execution, route CRUD under load, 50+ heap snapshots confirming zero memory leaks
+- **310 stress tests** — concurrent navigations, guard removal mid-execution, route CRUD under load, heap snapshots confirming zero memory leaks, SPA simulations for Vue and Svelte adapters
+- **Playwright e2e testing** — 522 test cases across 41 suites covering all 5 framework adapters. Tests verify real browser behavior: navigation, guards, data loading, error handling, hash routing, nested routes, dynamic routes, async guards. Turbo-cached via `test:e2e` task.
 - **Mutation testing** (Stryker) validates test suite quality beyond line coverage
+- **`lint:e2e`** pre-commit check — verifies every example with `playwright.config.ts` has at least one spec file
 
 ### Build System
 
-pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsup. Internal packages are bundled into consumers — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies.
+pnpm monorepo with Turborepo for task orchestration. Dual ESM/CJS output via tsup. Internal packages are bundled into consumers — not separate npm artifacts. `workspace:^` protocol for inter-package dependencies. All turbo tasks use `outputLogs: "errors-only"` — silent on success, full output on failure. `build:verbose`/`test:verbose` scripts override to full output for debugging. Turbo `test:e2e` task caches Playwright results based on source + spec + config inputs.
 
 ### Performance Hot Path
 

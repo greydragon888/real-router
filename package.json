@@ -138,7 +138,8 @@
       "ajv@8": "~8.18.0",
       "underscore": ">=1.13.8",
       "http-proxy-agent": "7.0.2",
-      "undici": ">=7.24.0"
+      "undici": ">=7.24.0",
+      "flatted": ">=3.4.2"
     }
   },
   "packageManager": "pnpm@10.24.0"
