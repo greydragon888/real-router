@@ -8,6 +8,7 @@ export default createIsomorphicConfig({
       index: "src/index.ts",
       api: "src/api/index.ts",
       utils: "src/utils/index.ts",
+      validation: "src/validation.ts",
     },
   },
 });

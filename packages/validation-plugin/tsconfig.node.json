@@ -1,12 +1,7 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.node.json",
   "compilerOptions": {
-    "noEmit": true,
-    "lib": ["ES2023"]
+    "tsBuildInfoFile": "./.tsbuildinfo-node"
   },
-  "include": [
-    "tsup.config.mts",
-    "vitest.config.mts",
-    "vitest.config.properties.mts"
-  ]
+  "include": ["*.mts", "../../*.mts"]
 }

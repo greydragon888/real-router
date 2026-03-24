@@ -43,6 +43,15 @@
       },
       "import": "./dist/esm/utils.mjs",
       "require": "./dist/cjs/utils.js"
+    },
+    "./validation": {
+      "development": "./src/validation.ts",
+      "types": {
+        "import": "./dist/esm/validation.d.mts",
+        "require": "./dist/cjs/validation.d.ts"
+      },
+      "import": "./dist/esm/validation.mjs",
+      "require": "./dist/cjs/validation.js"
     }
   },
   "files": [
