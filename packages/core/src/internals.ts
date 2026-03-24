@@ -70,7 +70,7 @@ export interface RouterInternals<
 
   readonly noValidate: boolean;
 
-  readonly validator: RouterValidator | null;
+  validator: RouterValidator | null;
 
   // Dependencies (issue #172)
   readonly dependenciesGetStore: () => DependenciesStore<D>;

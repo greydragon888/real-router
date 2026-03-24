@@ -312,15 +312,15 @@ export function validateForwardToConsistency(store: unknown): void {
  * @throws {TypeError} If any defaultParams is not a plain object
  * @throws {TypeError} If any forwardTo callback is async
  */
-export function validateRouteProperties(store: unknown): void {
-  const s = assertRoutesStore(store, "validateRouteProperties");
+export function validateRoutePropertiesStore(store: unknown): void {
+  const s = assertRoutesStore(store, "validateRoutePropertiesStore");
   const { config } = s;
 
   // Validate decoders — must be non-async functions (sync required for matchPath/buildPath)
   for (const [routeName, decoder] of Object.entries(config.decoders)) {
     if (typeof decoder !== "function") {
       throw new TypeError(
-        `[validation-plugin] validateRouteProperties: route "${routeName}" decoder must be a function, got ${typeof decoder}`,
+        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" decoder must be a function, got ${typeof decoder}`,
       );
     }
 
@@ -331,7 +331,7 @@ export function validateRouteProperties(store: unknown): void {
   for (const [routeName, encoder] of Object.entries(config.encoders)) {
     if (typeof encoder !== "function") {
       throw new TypeError(
-        `[validation-plugin] validateRouteProperties: route "${routeName}" encoder must be a function, got ${typeof encoder}`,
+        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" encoder must be a function, got ${typeof encoder}`,
       );
     }
 
@@ -346,7 +346,7 @@ export function validateRouteProperties(store: unknown): void {
       Array.isArray(params)
     ) {
       throw new TypeError(
-        `[validation-plugin] validateRouteProperties: route "${routeName}" defaultParams must be a plain object, got ${Array.isArray(params) ? "array" : typeof params}`,
+        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" defaultParams must be a plain object, got ${Array.isArray(params) ? "array" : typeof params}`,
       );
     }
   }
@@ -355,7 +355,7 @@ export function validateRouteProperties(store: unknown): void {
   for (const [routeName, callback] of Object.entries(config.forwardFnMap)) {
     if (typeof callback !== "function") {
       throw new TypeError(
-        `[validation-plugin] validateRouteProperties: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`,
+        `[validation-plugin] validateRoutePropertiesStore: route "${routeName}" forwardTo callback must be a function, got ${typeof callback}`,
       );
     }
 
@@ -375,14 +375,14 @@ export function validateRouteProperties(store: unknown): void {
  * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
  * @throws {Error} If any forwardTo target route does not exist in the tree
  */
-export function validateForwardToTargets(store: unknown): void {
-  const s = assertRoutesStore(store, "validateForwardToTargets");
+export function validateForwardToTargetsStore(store: unknown): void {
+  const s = assertRoutesStore(store, "validateForwardToTargetsStore");
   const { config, tree } = s;
 
   for (const [fromRoute, targetRoute] of Object.entries(config.forwardMap)) {
     if (!routeExistsInTree(tree, targetRoute)) {
       throw new Error(
-        `[validation-plugin] validateForwardToTargets: forwardTo target "${targetRoute}" ` +
+        `[validation-plugin] validateForwardToTargetsStore: forwardTo target "${targetRoute}" ` +
           `does not exist for route "${fromRoute}"`,
       );
     }
