@@ -269,50 +269,7 @@ describe("core/routes/routeTree/getRoute", () => {
 
   describe("validation", () => {
     it("should return undefined for empty string (root node)", () => {
-      // Empty string represents the root node, which is not a named route
       expect(routesApi.get("")).toBeUndefined();
-    });
-
-    it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() => routesApi.get(".gr-users")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (trailing dot)", () => {
-      expect(() => routesApi.get("gr-users.")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (consecutive dots)", () => {
-      expect(() => routesApi.get("gr-users..profile")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string argument (number)", () => {
-      expect(() => routesApi.get(123 as never)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string argument (null)", () => {
-      expect(() => routesApi.get(null as never)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string argument (undefined)", () => {
-      expect(() => routesApi.get(undefined as never)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string argument (object)", () => {
-      expect(() => routesApi.get({} as never)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for whitespace-only string", () => {
-      expect(() => routesApi.get("   ")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for segment starting with number", () => {
-      expect(() => routesApi.get("123users")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name exceeding max length", () => {
-      const longName = "a".repeat(10_001);
-
-      expect(() => routesApi.get(longName)).toThrow(TypeError);
     });
   });
 
@@ -339,57 +296,11 @@ describe("core/routes/routeTree/getRoute", () => {
 
   describe("edge cases", () => {
     describe("input validation edge cases", () => {
-      it("should throw TypeError for Unicode characters in name", () => {
-        expect(() => routesApi.get("маршрут")).toThrow(TypeError);
-        expect(() => routesApi.get("route-αβγ")).toThrow(TypeError);
-        expect(() => routesApi.get("路由")).toThrow(TypeError);
-      });
-
-      it("should work with boundary length name (10,000 characters)", () => {
+      it("should work with long name (10,000 characters)", () => {
         const boundaryName = "a".repeat(10_000);
 
-        // Should not throw - validates successfully
         expect(() => routesApi.get(boundaryName)).not.toThrow();
-
-        // Returns undefined since route doesn't exist
         expect(routesApi.get(boundaryName)).toBeUndefined();
-      });
-
-      it("should throw TypeError for Object with toString method", () => {
-        const objWithToString = {
-          toString: () => "validroute",
-        };
-
-        expect(() => routesApi.get(objWithToString as never)).toThrow(
-          TypeError,
-        );
-      });
-
-      it("should throw TypeError for Proxy object mimicking string", () => {
-        // Proxy that tries to mimic string behavior via valueOf/toString
-        const proxyObj = new Proxy(
-          {
-            valueOf: () => "validroute",
-            toString: () => "validroute",
-            [Symbol.toPrimitive]: () => "validroute",
-          },
-          {},
-        );
-
-        expect(() => routesApi.get(proxyObj as never)).toThrow(TypeError);
-      });
-
-      it("should throw TypeError for String object (boxed string)", () => {
-        // eslint-disable-next-line sonarjs/no-primitive-wrappers, unicorn/new-for-builtins -- Testing boxed string edge case
-        const boxedString = new String("validroute");
-
-        expect(() => routesApi.get(boxedString as never)).toThrow(TypeError);
-      });
-
-      it("should block adding routes with @@ prefix", () => {
-        expect(() => {
-          routesApi.add({ name: "@@system", path: "/system" });
-        }).toThrow(/reserved "@@" prefix/);
       });
 
       it("should allow reading @@ prefix routes via get", () => {

@@ -159,50 +159,12 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       }).toThrow(TypeError);
     });
 
-    it("should throw TypeError for invalid route names", () => {
-      // Whitespace-only (empty string is valid root node)
-      expect(() => {
-        lifecycle.addDeactivateGuard("   ", true);
-      }).toThrow(TypeError);
-
-      // Route name with spaces
-      expect(() => {
-        lifecycle.addDeactivateGuard("route name", true);
-      }).toThrow(TypeError);
-
-      // Route name starting with number
-      expect(() => {
-        lifecycle.addDeactivateGuard("1route", true);
-      }).toThrow(TypeError);
-
-      // Route name with special characters
-      expect(() => {
-        lifecycle.addDeactivateGuard("route#name", true);
-      }).toThrow(TypeError);
-
-      // Route name ending with dot
-      expect(() => {
-        lifecycle.addDeactivateGuard("route.", true);
-      }).toThrow(TypeError);
-
-      // Consecutive dots
-      expect(() => {
-        lifecycle.addDeactivateGuard("route..name", true);
-      }).toThrow(TypeError);
-    });
-
-    it("should handle very long route names correctly", () => {
-      const longButValidName = "a".repeat(10_000);
+    it("should handle long route names without throwing", () => {
+      const longName = "a".repeat(10_000);
 
       expect(() => {
-        lifecycle.addDeactivateGuard(longButValidName, true);
+        lifecycle.addDeactivateGuard(longName, true);
       }).not.toThrow();
-
-      const tooLongName = "a".repeat(10_001);
-
-      expect(() => {
-        lifecycle.addDeactivateGuard(tooLongName, true);
-      }).toThrow(TypeError);
     });
 
     it("should allow system routes with @@ prefix", () => {

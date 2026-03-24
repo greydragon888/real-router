@@ -76,19 +76,13 @@ describe("core/dependencies/resetDependencies", () => {
     expect(deps.getAll()).toStrictEqual({});
   });
 
-  it("should cause getDependency to throw after reset", () => {
+  it("should cause hasDependency to return false after reset", () => {
     deps.setAll({ foo: 1, bar: "test" });
 
     deps.reset();
 
-    // All previous dependencies should throw when accessed
-    expect(() => {
-      deps.get("foo");
-    }).toThrow(ReferenceError);
-
-    expect(() => {
-      deps.get("bar");
-    }).toThrow(ReferenceError);
+    expect(deps.has("foo")).toBe(false);
+    expect(deps.has("bar")).toBe(false);
   });
 
   it("should handle special keys correctly", () => {

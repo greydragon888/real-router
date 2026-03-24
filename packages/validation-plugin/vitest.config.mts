@@ -10,7 +10,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: "node",
-      setupFiles: [],
+      setupFiles: ["./tests/setup.ts"],
     },
   }),
 );

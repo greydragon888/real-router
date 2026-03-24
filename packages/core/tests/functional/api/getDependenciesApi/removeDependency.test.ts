@@ -25,9 +25,6 @@ describe("core/dependencies/removeDependency", () => {
     deps.remove("foo");
 
     expect(deps.has("foo")).toBe(false);
-    expect(() => {
-      deps.get("foo");
-    }).toThrow(ReferenceError);
   });
 
   it("should warn when removing non-existent dependency", () => {
@@ -80,26 +77,6 @@ describe("core/dependencies/removeDependency", () => {
     expect(warnSpy).toHaveBeenCalledTimes(2);
 
     warnSpy.mockRestore();
-  });
-
-  it("should throw TypeError for non-string parameters", () => {
-    // Number parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing number parameter
-      deps.remove(123);
-    }).toThrow(TypeError);
-
-    // null parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing null parameter
-      deps.remove(null);
-    }).toThrow(TypeError);
-
-    // undefined parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing undefined parameter
-      deps.remove(undefined);
-    }).toThrow(TypeError);
   });
 
   it("should handle empty string as valid key", () => {

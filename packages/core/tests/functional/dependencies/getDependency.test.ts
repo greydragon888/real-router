@@ -23,28 +23,6 @@ describe("core/dependencies/getDependency", () => {
     expect(deps.get("foo")).toBe(1);
   });
 
-  it("should throw ReferenceError if dependency not found", () => {
-    expect(() => {
-      deps.get("nonexistent" as "foo");
-    }).toThrow(ReferenceError);
-    expect(() => {
-      deps.get("nonexistent" as "foo");
-    }).toThrow('[router.getDependency]: dependency "nonexistent" not found');
-  });
-
-  it("should throw TypeError if name is not a string", () => {
-    expect(() => {
-      // @ts-expect-error: testing invalid input
-      deps.get(123);
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing invalid input
-      deps.get(123);
-    }).toThrow(
-      "[router.getDependency]: dependency name must be a string, got number",
-    );
-  });
-
   it("should return falsy values correctly", () => {
     deps.set("foo", 0 as number);
 
@@ -119,27 +97,7 @@ describe("core/dependencies/getDependency", () => {
     expect(deps.get("")).toBe("empty-key-value");
   });
 
-  it("should handle exotic objects with throwing toString", () => {
-    const exoticKey = {
-      toString() {
-        throw new Error("toString failed");
-      },
-    };
-
-    expect(() => {
-      // @ts-expect-error: testing exotic object
-      deps.get(exoticKey);
-    }).toThrow(TypeError);
-  });
-
-  it("should throw ReferenceError even for undefined value", () => {
-    // undefined means "not set", even if explicitly set
-    expect(() => {
-      deps.get("notSet" as "foo");
-    }).toThrow(ReferenceError);
-  });
-
-  it("should work after setDependency and fail after removeDependency", () => {
+  it("should work after setDependency and return undefined after removeDependency", () => {
     // @ts-expect-error: testing new key
     deps.set("temp", "value");
 
@@ -149,10 +107,7 @@ describe("core/dependencies/getDependency", () => {
     // @ts-expect-error: testing new key
     deps.remove("temp");
 
-    expect(() => {
-      // @ts-expect-error: testing new key
-      deps.get("temp");
-    }).toThrow(ReferenceError);
+    expect(deps.has("temp" as "foo")).toBe(false);
   });
 
   // 🟢 Edge cases: special string keys

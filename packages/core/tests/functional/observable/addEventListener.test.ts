@@ -278,54 +278,6 @@ describe("core/observable/addEventListener", () => {
     });
   });
 
-  // 🟡 IMPORTANT: Parameter validation
-  describe("parameter validation", () => {
-    it("should throw TypeError when callback is not a function", () => {
-      expect(() => {
-        getPluginApi(router).addEventListener(events.ROUTER_START, null as any);
-      }).toThrow(TypeError);
-      expect(() => {
-        getPluginApi(router).addEventListener(events.ROUTER_START, null as any);
-      }).toThrow("Expected callback to be a function");
-    });
-
-    it("should throw TypeError for non-function types", () => {
-      expect(() => {
-        getPluginApi(router).addEventListener(
-          events.ROUTER_START,
-          "string" as any,
-        );
-      }).toThrow(TypeError);
-
-      expect(() => {
-        getPluginApi(router).addEventListener(events.ROUTER_START, 123 as any);
-      }).toThrow(TypeError);
-
-      expect(() => {
-        getPluginApi(router).addEventListener(events.ROUTER_START, {} as any);
-      }).toThrow(TypeError);
-
-      expect(() => {
-        getPluginApi(router).addEventListener(events.ROUTER_START, [] as any);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw Error for invalid event name", () => {
-      expect(() => {
-        getPluginApi(router).addEventListener("INVALID_EVENT" as any, () => {});
-      }).toThrow("Invalid event name");
-    });
-
-    it("should validate both parameters", () => {
-      expect(() => {
-        getPluginApi(router).addEventListener(
-          "INVALID_EVENT" as any,
-          "not-function" as any,
-        );
-      }).toThrow(); // Should throw for invalid event name first
-    });
-  });
-
   // 🟡 IMPORTANT: Execution order
   describe("execution order", () => {
     it("should call listeners in registration order", async () => {

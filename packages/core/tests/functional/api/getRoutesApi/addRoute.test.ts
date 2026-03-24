@@ -184,63 +184,6 @@ describe("core/routes/addRoute", () => {
     expect(path).toBe("/encode-fallback/456");
   });
 
-  it("should validate nested children before adding (invalid name type)", async () => {
-    expect(() => {
-      routesApi.add({
-        name: "parent-test-1",
-        path: "/parent-test-1",
-        children: [{ name: 123 as unknown as string, path: "/invalid" }],
-      });
-    }).toThrow("[router.addRoute] Route name must be a string");
-  });
-
-  it("should throw when route name is empty string", async () => {
-    expect(() => {
-      routesApi.add({
-        name: "",
-        path: "/empty-name",
-      });
-    }).toThrow(/Route name cannot be empty/i);
-  });
-
-  it("should validate deeply nested children", async () => {
-    expect(() => {
-      routesApi.add({
-        name: "deep-a",
-        path: "/deep-a",
-        children: [
-          {
-            name: "deep-b",
-            path: "/deep-b",
-            children: [{ name: null as unknown as string, path: "/c" }],
-          },
-        ],
-      });
-    }).toThrow(TypeError);
-  });
-
-  it("should throw if route is not an object", async () => {
-    expect(() => {
-      routesApi.add(null as unknown as []);
-    }).toThrow("[router.addRoute] Route must be an object, got null");
-
-    expect(() => {
-      routesApi.add("string-route" as unknown as []);
-    }).toThrow("[router.addRoute] Route must be an object, got string");
-  });
-
-  it("should throw if children is not an array", async () => {
-    expect(() => {
-      routesApi.add({
-        name: "parent-test-2",
-        path: "/parent-test-2",
-        children: "not-an-array" as unknown as [],
-      });
-    }).toThrow(
-      '[router.addRoute] Route "parent-test-2" children must be an array',
-    );
-  });
-
   it("should add route with valid children successfully", async () => {
     routesApi.add({
       name: "valid-section",
@@ -254,87 +197,6 @@ describe("core/routes/addRoute", () => {
     const path = router.buildPath("valid-section.page");
 
     expect(path).toBe("/valid-section/page");
-  });
-
-  it("should throw on duplicate route name", async () => {
-    routesApi.add({ name: "dup-test", path: "/dup-test" });
-
-    expect(() => {
-      routesApi.add({ name: "dup-test", path: "/other" });
-    }).toThrow('[router.addRoute] Route "dup-test" already exists');
-  });
-
-  it("should throw on duplicate name within same batch (cross-batch detection)", async () => {
-    expect(() => {
-      routesApi.add([
-        { name: "batch-dup", path: "/batch-dup-1" },
-        { name: "batch-dup", path: "/batch-dup-2" },
-      ]);
-    }).toThrow('[router.addRoute] Duplicate route "batch-dup" in batch');
-  });
-
-  it("should throw on duplicate before modifying config (atomicity)", async () => {
-    routesApi.add({ name: "first-dup", path: "/first-dup" });
-
-    expect(() => {
-      routesApi.add([
-        {
-          name: "new-before-dup",
-          path: "/new-before-dup",
-          canActivate: () => () => true,
-        },
-        { name: "first-dup", path: "/first-dup" },
-      ]);
-    }).toThrow('[router.addRoute] Route "first-dup" already exists');
-
-    // new-before-dup should NOT be registered (atomicity preserved)
-    expect(routesApi.has("new-before-dup")).toBe(false);
-  });
-
-  it("should throw on duplicate nested child route", async () => {
-    routesApi.add({
-      name: "dup-parent",
-      path: "/dup-parent",
-      children: [{ name: "child", path: "/child" }],
-    });
-
-    expect(() => {
-      routesApi.add(
-        { name: "child", path: "/other" },
-        { parent: "dup-parent" },
-      );
-    }).toThrow('[router.addRoute] Route "dup-parent.child" already exists');
-  });
-
-  it("should reject batch on path conflict (pre-validation atomicity)", async () => {
-    routesApi.add({
-      name: "path-conflict-existing",
-      path: "/path-conflict",
-    });
-
-    expect(() => {
-      routesApi.add([
-        {
-          name: "pre-validation-test",
-          path: "/pre-validation-test",
-          canActivate: () => () => true,
-          decodeParams: (p) => p,
-        },
-        { name: "conflict-route", path: "/path-conflict" },
-      ]);
-    }).toThrow('[router.addRoute] Path "/path-conflict" is already defined');
-
-    // pre-validation-test should NOT be registered (pre-validation rejects entire batch)
-    expect(routesApi.has("pre-validation-test")).toBe(false);
-  });
-
-  it("should throw on duplicate path within same batch", async () => {
-    expect(() => {
-      routesApi.add([
-        { name: "batch-path-a", path: "/same-path" },
-        { name: "batch-path-b", path: "/same-path" },
-      ]);
-    }).toThrow('[router.addRoute] Path "/same-path" is already defined');
   });
 
   describe("children handlers registration", () => {
@@ -542,15 +404,6 @@ describe("core/routes/addRoute", () => {
       );
     });
 
-    it("should throw when { parent } option references non-existent parent", () => {
-      expect(() => {
-        routesApi.add(
-          { name: "orphan", path: "/orphan" },
-          { parent: "nonexistent" },
-        );
-      }).toThrow('[router.addRoute] Parent route "nonexistent" does not exist');
-    });
-
     it("should add multiple routes with same { parent } in batch", () => {
       routesApi.add({ name: "dashboard", path: "/dashboard" });
 
@@ -605,81 +458,9 @@ describe("core/routes/addRoute", () => {
 
       expect(path).toBe("/api/v1");
     });
-
-    it("should validate { parent } option value", () => {
-      expect(() => {
-        routesApi.add({ name: "child", path: "/child" }, { parent: "" as any });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        routesApi.add(
-          { name: "child", path: "/child" },
-          { parent: 123 as any },
-        );
-      }).toThrow(TypeError);
-    });
-  });
-
-  describe("dot-notation rejection", () => {
-    it("should throw TypeError when route name contains dots", () => {
-      expect(() => {
-        routesApi.add({ name: "users.profile", path: "/:id" });
-      }).toThrow(TypeError);
-    });
-
-    it("should include helpful error message for dot-notation", () => {
-      expect(() => {
-        routesApi.add({ name: "users.profile", path: "/:id" });
-      }).toThrow(
-        '[router.addRoute] Route name "users.profile" cannot contain dots. Use children array or { parent } option in addRoute() instead.',
-      );
-    });
-
-    it("should reject multi-level dot-notation", () => {
-      expect(() => {
-        routesApi.add({ name: "a.b.c", path: "/c" });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        routesApi.add({ name: "a.b.c", path: "/c" });
-      }).toThrow(/cannot contain dots/);
-    });
   });
 
   describe("encodeParams/decodeParams validation", () => {
-    it("should throw when decodeParams is not a function", async () => {
-      expect(() => {
-        routesApi.add({
-          name: "bad-decoder",
-          path: "/bad-decoder",
-
-          decodeParams: "not a function" as any,
-        });
-      }).toThrow(/decodeparams must be a function/i);
-    });
-
-    it("should throw when encodeParams is not a function", async () => {
-      expect(() => {
-        routesApi.add({
-          name: "bad-encoder",
-          path: "/bad-encoder",
-
-          encodeParams: { wrong: "type" } as any,
-        });
-      }).toThrow(/encodeparams must be a function/i);
-    });
-
-    it("should throw when decodeParams is null", async () => {
-      expect(() => {
-        routesApi.add({
-          name: "null-decoder",
-          path: "/null-decoder",
-
-          decodeParams: null as any,
-        });
-      }).toThrow(/decodeparams must be a function/i);
-    });
-
     it("should accept valid function for decodeParams", async () => {
       expect(() => {
         routesApi.add({
@@ -698,23 +479,6 @@ describe("core/routes/addRoute", () => {
           encodeParams: (params) => ({ ...params, encoded: true }),
         });
       }).not.toThrow();
-    });
-
-    it("should validate encodeParams/decodeParams in children", async () => {
-      expect(() => {
-        routesApi.add({
-          name: "parent-with-bad-child",
-          path: "/parent",
-          children: [
-            {
-              name: "bad-child",
-              path: "/child",
-
-              decodeParams: 123 as any,
-            },
-          ],
-        });
-      }).toThrow(/decodeparams must be a function/i);
     });
 
     it("should throw when decodeParams is an async function", async () => {
@@ -1032,16 +796,6 @@ describe("core/routes/addRoute", () => {
 
       expect(state.name).toBe("newfiles");
       expect(state.params).toStrictEqual({ filepath: "docs/readme.md" });
-    });
-
-    it("should throw if forwardTo target is missing required params", async () => {
-      // Target route requires :id param, but source has no params
-      expect(() => {
-        routesApi.add([
-          { name: "noparams", path: "/noparams", forwardTo: "withparams" },
-          { name: "withparams", path: "/withparams/:id" },
-        ]);
-      }).toThrow(/forwardTo target.*requires params.*not available in source/);
     });
 
     it("should allow adding forwards dynamically via updateRoute()", async () => {

@@ -85,52 +85,8 @@ describe("core/routes/routeTree/hasRoute", () => {
   });
 
   describe("validation", () => {
-    it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() => routesApi.has(".hr-invalid")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (trailing dot)", () => {
-      expect(() => routesApi.has("hr-invalid.")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (consecutive dots)", () => {
-      expect(() => routesApi.has("hr-a..b")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (number)", () => {
-      expect(() => routesApi.has(123 as unknown as string)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (null)", () => {
-      expect(() => routesApi.has(null as unknown as string)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (undefined)", () => {
-      expect(() => routesApi.has(undefined as unknown as string)).toThrow(
-        TypeError,
-      );
-    });
-
-    it("should throw TypeError for non-string input (object)", () => {
-      expect(() =>
-        routesApi.has({ name: "test" } as unknown as string),
-      ).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for whitespace-only input", () => {
-      expect(() => routesApi.has("   ")).toThrow(TypeError);
-      expect(() => routesApi.has("\t\n")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for segment starting with number", () => {
-      expect(() => routesApi.has("123invalid")).toThrow(TypeError);
-      expect(() => routesApi.has("valid.123child")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name exceeding max length", () => {
-      const longName = "a".repeat(10_001);
-
-      expect(() => routesApi.has(longName)).toThrow(TypeError);
+    it("should return false for empty string (root node not a named route)", () => {
+      expect(routesApi.has("")).toBe(false);
     });
   });
 
@@ -160,10 +116,9 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has("CASESENSITIVE")).toBe(false);
     });
 
-    it("should throw TypeError for Unicode characters", () => {
-      expect(() => routesApi.has("пользователи")).toThrow(TypeError);
-      expect(() => routesApi.has("用户")).toThrow(TypeError);
-      expect(() => routesApi.has("café")).toThrow(TypeError);
+    it("should return false for non-existent route names including unicode", () => {
+      expect(routesApi.has("пользователи")).toBe(false);
+      expect(routesApi.has("用户")).toBe(false);
     });
 
     it("should pass validation for system routes (@@)", () => {

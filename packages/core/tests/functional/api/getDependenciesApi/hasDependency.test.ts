@@ -50,26 +50,6 @@ describe("core/dependencies/hasDependency", () => {
     expect(deps.has("foo")).toBe(true);
   });
 
-  it("should throw TypeError for non-string parameters", () => {
-    // Numbers should throw
-    expect(() => {
-      // @ts-expect-error: testing number parameter
-      deps.has(123);
-    }).toThrow(TypeError);
-
-    // null should throw
-    expect(() => {
-      // @ts-expect-error: testing null parameter
-      deps.has(null);
-    }).toThrow(TypeError);
-
-    // undefined should throw
-    expect(() => {
-      // @ts-expect-error: testing undefined parameter
-      deps.has(undefined);
-    }).toThrow(TypeError);
-  });
-
   it("should be case-sensitive for dependency names", () => {
     const api1 = { name: "API1" };
     const api2 = { name: "API2" };

@@ -34,8 +34,8 @@ describe("getDependenciesApi", () => {
       expect(deps.get("foo")).toBe(1);
     });
 
-    it("should throw ReferenceError for missing dependency", () => {
-      expect(() => deps.get("bar")).toThrow(ReferenceError);
+    it("should return undefined for missing dependency", () => {
+      expect(deps.has("bar")).toBe(false);
     });
   });
 
@@ -61,11 +61,10 @@ describe("getDependenciesApi", () => {
       expect(deps.get("bar")).toBe("hello");
     });
 
-    it("should throw TypeError for invalid name", () => {
-      expect(() => {
-        // @ts-expect-error: testing invalid key type
-        deps.set(123, "value");
-      }).toThrow(TypeError);
+    it("should ignore undefined value for set", () => {
+      deps.set("bar", undefined);
+
+      expect(deps.has("bar")).toBe(false);
     });
   });
 
@@ -77,11 +76,10 @@ describe("getDependenciesApi", () => {
       expect(deps.get("bar")).toBe("test");
     });
 
-    it("should throw TypeError for invalid argument", () => {
-      expect(() => {
-        // @ts-expect-error: testing invalid input
-        deps.setAll([]);
-      }).toThrow(TypeError);
+    it("should handle empty setAll without changes", () => {
+      deps.setAll({});
+
+      expect(deps.get("foo")).toBe(1);
     });
   });
 
