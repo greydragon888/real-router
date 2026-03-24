@@ -25,6 +25,19 @@
       "outputLogs": "errors-only",
       "cache": true
     },
+    "build:dist-only": {
+      "dependsOn": ["^build:dist-only"],
+      "outputs": ["dist/**"],
+      "inputs": [
+        "src/**/*.{ts,tsx,vue,svelte}",
+        "tsup.config.*",
+        "tsconfig.json",
+        "package.json"
+      ],
+      "env": ["NODE_ENV"],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
     "test:e2e": {
       "dependsOn": ["^build"],
       "outputs": [],
