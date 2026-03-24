@@ -12,3 +12,5 @@ export const DEFAULT_ROUTE_NAME = "";
  * validity is independent of router instance.
  */
 export const validatedRouteNames = new Set<string>();
+
+export const INTERNAL_ROUTE_PREFIX = "@@";

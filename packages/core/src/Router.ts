@@ -257,6 +257,7 @@ export class Router<
       getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
       noValidate,
+      validator: null,
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)

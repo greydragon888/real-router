@@ -4,7 +4,7 @@ import { logger } from "@real-router/logger";
 import { createMatcher, createRouteTree, nodeToDefinition } from "route-tree";
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import { resolveForwardChain } from "./forwardToValidation";
+import { resolveForwardChain } from "./forwardChain";
 import { createEmptyConfig, sanitizeRoute } from "./helpers";
 import { validateRoutes } from "./validators";
 

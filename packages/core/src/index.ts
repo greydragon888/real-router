@@ -10,6 +10,8 @@ export type {
   RouteConfigUpdate,
 } from "./types";
 
+export type { RouterValidator } from "./types/RouterValidator";
+
 // Router class (replaces Router interface from core-types)
 export { Router } from "./Router";
 
@@ -43,5 +45,7 @@ export { RouterError } from "./RouterError";
 export { createRouter } from "./createRouter";
 
 export { getNavigator } from "./getNavigator";
+
+export { resolveForwardChain } from "./namespaces/RoutesNamespace/forwardChain";
 
 export type { RouteTree } from "route-tree";

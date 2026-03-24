@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2023"]
+  },
+  "include": [
+    "tsup.config.mts",
+    "vitest.config.mts",
+    "vitest.config.properties.mts"
+  ]
+}

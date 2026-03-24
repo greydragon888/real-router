@@ -14,12 +14,14 @@ import {
   registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
 import {
+  validateClearRoutes,
+  validateRemoveRoute,
+} from "../namespaces/RoutesNamespace/routeGuards";
+import {
   throwIfInternalRoute,
   throwIfInternalRouteInArray,
   validateAddRouteArgs,
-  validateClearRoutes,
   validateParentOption,
-  validateRemoveRoute,
   validateRemoveRouteArgs,
   validateUpdateRoute,
   validateUpdateRouteBasicArgs,

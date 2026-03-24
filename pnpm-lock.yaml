@@ -2693,6 +2693,19 @@ importers:
         specifier: workspace:^
         version: link:../core-types
 
+  packages/validation-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+    devDependencies:
+      route-tree:
+        specifier: workspace:^
+        version: link:../route-tree
+      type-guards:
+        specifier: workspace:^
+        version: link:../type-guards
+
   packages/vue:
     dependencies:
       '@real-router/core':

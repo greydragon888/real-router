@@ -7,7 +7,6 @@
  * Extracted from RoutesNamespace class for better separation of concerns.
  */
 
-import { logger } from "@real-router/logger";
 import { validateRoute } from "route-tree";
 import {
   isString,
@@ -16,11 +15,12 @@ import {
   getTypeDescription,
 } from "type-guards";
 
+import { resolveForwardChain } from "./forwardChain";
 import {
-  resolveForwardChain,
   validateForwardToTargets,
   validateRouteProperties,
 } from "./forwardToValidation";
+import { INTERNAL_ROUTE_PREFIX } from "./constants";
 
 import type { RouteConfig } from "./types";
 import type { Route, RouteConfigUpdate } from "../../types";
@@ -29,10 +29,6 @@ import type {
   ForwardToCallback,
 } from "@real-router/types";
 import type { Matcher, RouteTree } from "route-tree";
-
-// SECURITY: Reserved prefix for system routes (e.g., @@router/UNKNOWN_ROUTE).
-// Internal code (RouterWiringBuilder, routesStore) bypasses this check.
-const INTERNAL_ROUTE_PREFIX = "@@";
 
 export function throwIfInternalRoute(name: string, methodName: string): void {
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
@@ -387,68 +383,7 @@ function collectUrlParams(segments: readonly RouteTree[]): Set<string> {
   return params;
 }
 
-/**
- * Validates removeRoute constraints.
- * Returns false if removal should be blocked (route is active).
- * Logs warnings for edge cases.
- *
- * @param name - Route name to remove
- * @param currentStateName - Current active route name (or undefined)
- * @param isNavigating - Whether navigation is in progress
- * @returns true if removal can proceed, false if blocked
- */
-export function validateRemoveRoute(
-  name: string,
-  currentStateName: string | undefined,
-  isNavigating: boolean,
-): boolean {
-  // Check if trying to remove currently active route (or its parent)
-  if (currentStateName) {
-    const isExactMatch = currentStateName === name;
-    const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
-
-    if (isExactMatch || isParentOfCurrent) {
-      const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
-
-      logger.warn(
-        "router.removeRoute",
-        `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
-      );
-
-      return false;
-    }
-  }
-
-  // Warn if navigation is in progress (but allow removal)
-  if (isNavigating) {
-    logger.warn(
-      "router.removeRoute",
-      `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
-    );
-  }
-
-  return true;
-}
-
-/**
- * Validates clearRoutes operation.
- * Returns false if operation should be blocked (navigation in progress).
- *
- * @param isNavigating - Whether navigation is in progress
- * @returns true if clearRoutes can proceed, false if blocked
- */
-export function validateClearRoutes(isNavigating: boolean): boolean {
-  if (isNavigating) {
-    logger.error(
-      "router.clearRoutes",
-      "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
-    );
-
-    return false;
-  }
-
-  return true;
-}
+export { validateClearRoutes, validateRemoveRoute } from "./routeGuards";
 
 /**
  * Validates that forwardTo target doesn't require params that source doesn't have.
