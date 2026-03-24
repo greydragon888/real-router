@@ -252,6 +252,9 @@ jobs:
           ref: ${{ github.base_ref }}
           clean: false
 
+      - name: Restore turbo.json from PR (has build:dist-only task)
+        run: git checkout ${{ github.event.pull_request.head.sha }} -- turbo.json
+
       - name: Install base dependencies
         run: pnpm install --frozen-lockfile
 
