@@ -1,13 +1,7 @@
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
-import { validateListenerArgs } from "../namespaces/EventBusNamespace/validators";
-import {
-  validateMatchPathArgs,
-  validateSetRootPathArgs,
-  validateStateBuilderArgs,
-} from "../namespaces/RoutesNamespace/validators";
-import { validateMakeStateArgs } from "../namespaces/StateNamespace/validators";
+import { validateSetRootPathArgs } from "../namespaces/RoutesNamespace/validators";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -20,9 +14,7 @@ export function getPluginApi<
 
   return {
     makeState: (name, params, path, meta, forceId) => {
-      if (!ctx.noValidate) {
-        validateMakeStateArgs(name, params, path, forceId);
-      }
+      ctx.validator?.state.validateMakeStateArgs(name, params, path, forceId);
 
       return ctx.makeState(
         name,
@@ -35,9 +27,11 @@ export function getPluginApi<
       );
     },
     buildState: (routeName, routeParams) => {
-      if (!ctx.noValidate) {
-        validateStateBuilderArgs(routeName, routeParams, "buildState");
-      }
+      ctx.validator?.routes.validateStateBuilderArgs(
+        routeName,
+        routeParams,
+        "buildState",
+      );
 
       const { name, params } = ctx.forwardState(routeName, routeParams);
 
@@ -47,25 +41,23 @@ export function getPluginApi<
       routeName: string,
       routeParams: P,
     ) => {
-      if (!ctx.noValidate) {
-        validateStateBuilderArgs(routeName, routeParams, "forwardState");
-      }
+      ctx.validator?.routes.validateStateBuilderArgs(
+        routeName,
+        routeParams,
+        "forwardState",
+      );
 
       return ctx.forwardState(routeName, routeParams);
     },
     matchPath: (path) => {
-      if (!ctx.noValidate) {
-        validateMatchPathArgs(path);
-      }
+      ctx.validator?.routes.validateMatchPathArgs(path);
 
       return ctx.matchPath(path, ctx.getOptions());
     },
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateSetRootPathArgs(rootPath);
-      }
+      validateSetRootPathArgs(rootPath);
 
       ctx.setRootPath(rootPath);
     },
@@ -73,16 +65,16 @@ export function getPluginApi<
     addEventListener: (eventName, cb) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateListenerArgs(eventName, cb);
-      }
+      ctx.validator?.eventBus.validateListenerArgs(eventName, cb);
 
       return ctx.addEventListener(eventName, cb);
     },
     buildNavigationState: (name, params = {}) => {
-      if (!ctx.noValidate) {
-        validateStateBuilderArgs(name, params, "buildNavigationState");
-      }
+      ctx.validator?.routes.validateStateBuilderArgs(
+        name,
+        params,
+        "buildNavigationState",
+      );
 
       const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
         name,

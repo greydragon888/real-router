@@ -48,9 +48,7 @@ export function cloneRouter<
     throw new RouterError(errorCodes.ROUTER_DISPOSED);
   }
 
-  if (!ctx.noValidate) {
-    validateCloneArgs(dependencies);
-  }
+  validateCloneArgs(dependencies);
 
   // Get source store directly
   const sourceStore = ctx.routeGetStore();

@@ -1,8 +1,5 @@
-import { validateRouteName } from "type-guards";
-
 import { throwIfDisposed } from "./helpers";
 import { getInternals } from "../internals";
-import { validateHandler } from "../namespaces/RouteLifecycleNamespace/validators";
 
 import type { LifecycleApi } from "./types";
 import type { DefaultDependencies, Router } from "@real-router/types";
@@ -18,10 +15,8 @@ export function getLifecycleApi<
     addActivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "addActivateGuard");
-        validateHandler(handler, "addActivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
+      ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
       lifecycleNamespace.addCanActivate(name, handler, ctx.noValidate);
     },
@@ -29,10 +24,8 @@ export function getLifecycleApi<
     addDeactivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "addDeactivateGuard");
-        validateHandler(handler, "addDeactivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
+      ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
       lifecycleNamespace.addCanDeactivate(name, handler, ctx.noValidate);
     },
@@ -40,9 +33,7 @@ export function getLifecycleApi<
     removeActivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "removeActivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "removeActivateGuard");
 
       lifecycleNamespace.clearCanActivate(name);
     },
@@ -50,9 +41,7 @@ export function getLifecycleApi<
     removeDeactivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "removeDeactivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "removeDeactivateGuard");
 
       lifecycleNamespace.clearCanDeactivate(name);
     },

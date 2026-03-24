@@ -4,13 +4,6 @@ import { getTypeDescription } from "type-guards";
 import { throwIfDisposed } from "./helpers";
 import { computeThresholds } from "../helpers";
 import { getInternals } from "../internals";
-import {
-  validateDependenciesObject,
-  validateDependencyExists,
-  validateDependencyLimit,
-  validateDependencyName,
-  validateSetDependencyArgs,
-} from "../namespaces/DependenciesNamespace/validators";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
@@ -129,18 +122,17 @@ export function getDependenciesApi<
 
   return {
     get: (name) => {
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "getDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(name, "getDependency");
 
       const store = ctx.dependenciesGetStore();
       const value = (store.dependencies as Record<string, unknown>)[
         name as string
       ];
 
-      if (!ctx.noValidate) {
-        validateDependencyExists(value, name as string);
-      }
+      ctx.validator?.dependencies.validateDependencyExists(
+        name as string,
+        store,
+      );
 
       return value as Dependencies[typeof name];
     },
@@ -148,9 +140,11 @@ export function getDependenciesApi<
     set: (name, value) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateSetDependencyArgs(name);
-      }
+      ctx.validator?.dependencies.validateSetDependencyArgs(
+        name,
+        value,
+        "setDependency",
+      );
 
       setDependency(ctx.dependenciesGetStore(), name as string, value);
     },
@@ -159,24 +153,21 @@ export function getDependenciesApi<
 
       const store = ctx.dependenciesGetStore();
 
-      if (!ctx.noValidate) {
-        validateDependenciesObject(deps, "setDependencies");
-        validateDependencyLimit(
-          Object.keys(store.dependencies).length,
-          Object.keys(deps).length,
-          "setDependencies",
-          store.limits.maxDependencies,
-        );
-      }
+      ctx.validator?.dependencies.validateDependenciesObject(
+        deps,
+        "setDependencies",
+      );
+      ctx.validator?.dependencies.validateDependencyLimit(store, store.limits);
 
       setMultipleDependencies(store, deps as Record<string, unknown>);
     },
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "removeDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(
+        name,
+        "removeDependency",
+      );
 
       const store = ctx.dependenciesGetStore();
 
@@ -196,9 +187,7 @@ export function getDependenciesApi<
       store.dependencies = Object.create(null) as Partial<Dependencies>;
     },
     has: (name) => {
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "hasDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");
 
       return Object.hasOwn(
         ctx.dependenciesGetStore().dependencies,
