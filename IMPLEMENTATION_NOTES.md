@@ -233,6 +233,7 @@ Enforces conventional commits. Types and scopes defined in `commitlint.config.mj
 - `pnpm test` (includes type-check and lint via turbo pipeline)
 - `pnpm lint:unused` (knip - dead code detection)
 - `pnpm lint:duplicates` (jscpd - copy-paste detection)
+- `pnpm lint:e2e` (verifies example e2e directories have spec files)
 
 ### Pre-push
 
@@ -311,6 +312,10 @@ concurrency:
 
 Cancels in-progress runs when new commit pushed.
 
+### pnpm/action-setup v5
+
+All CI workflows migrated from `pnpm/action-setup@v4` to `pnpm/action-setup@v5` (`ci.yml`, `changesets.yml`, `danger.yml`). v5 auto-detects pnpm version from `packageManager` field in root `package.json` — no explicit `version` input needed.
+
 ### Additional Workflows
 
 | Workflow             | File                       | Purpose                              |
@@ -328,11 +333,13 @@ Cancels in-progress runs when new commit pushed.
 
 ### Bundle Size Reporting
 
-`.github/workflows/size.yml` compares bundle sizes between PR and base branch:
+`.github/workflows/size.yml` (part of `ci.yml`) compares bundle sizes between PR and base branch:
 
 - Creates/updates PR comment with size diff table
 - Shows per-package sizes and total
 - Warns if size limit exceeded
+
+**Optimization:** PR sizes use dist artifacts downloaded from the prepare job (no rebuild). Base branch uses `build:dist-only` task (skips tests/lint). The PR's `turbo.json` is saved before checking out base and restored after — ensures `build:dist-only` task definition is available even on older base branches.
 
 ### Security Scanning
 
@@ -443,7 +450,7 @@ React package ignores `react`, `react-dom`, `@real-router/core`, `@real-router/r
 
 ### knip Configuration
 
-Uses knip v5.85+ with **configuration hints** enabled (built-in since v5.84.0) — warns about unused `ignore`/`ignoreDependencies` entries.
+Uses knip v6+ (migrated from v5). Schema URL updated to `https://unpkg.com/knip@6/schema.json`.
 
 `knip.json` ignores:
 
@@ -453,7 +460,7 @@ Uses knip v5.85+ with **configuration hints** enabled (built-in since v5.84.0) �
 
 `ignore` array is intentionally empty — knip excludes `dist/`, `coverage/`, and `*.d.ts` by default.
 
-`ignoreWorkspaces: ["examples/*"]` — examples have different dependency structures (Express, Vite, Playwright) that would trigger false positives in knip analysis.
+`ignoreWorkspaces: ["examples/**"]` — examples have different dependency structures (Express, Vite, Playwright) that would trigger false positives in knip analysis. Uses `**` glob to match the nested `examples/{framework}/{app}` directory structure.
 
 ### syncpack Configuration
 
@@ -473,7 +480,7 @@ Uses syncpack v14 (Rust rewrite). `syncpack.config.mjs` enforces:
 
 ## Turbo Configuration
 
-Uses turbo v2.8.12+.
+Uses turbo v2.8.20+.
 
 **v2.8.11 migration:** Removed `"daemon": false` from `turbo.json` — daemon was removed from `turbo run` in v2.8.11 (option deprecated, daemon only used for `turbo watch`).
 
@@ -550,6 +557,69 @@ Build only runs after tests pass.
 
 **Rule:** Always add `!**/node_modules/**` when using `**/*.{ext}` patterns in turbo.json inputs.
 
+### `outputLogs: "errors-only"` for All Tasks
+
+**Problem:** With 25 packages + 68 example applications, turbo output was noisy — successful tasks printed verbose logs, making it hard to spot failures.
+
+**Solution:** Added `"outputLogs": "errors-only"` to every task in `turbo.json`. Tasks are silent on success; full output appears only on failure.
+
+**Verbose mode:** Root `package.json` provides `build:verbose` and `test:verbose` scripts that override with `--output-logs=full` for debugging:
+
+```bash
+pnpm build:verbose      # Build with full output
+pnpm test:verbose       # Tests with full output
+```
+
+### Input Patterns for Vue and Svelte
+
+**Problem:** Turbo `inputs` patterns only covered `*.{ts,tsx}`. Vue SFCs (`.vue`) and Svelte components (`.svelte`) were not tracked — turbo could miss cache invalidation for changes in these files.
+
+**Solution:** Extended input patterns in `build` and `type-check` tasks:
+
+```json
+// Before
+"src/**/*.{ts,tsx}"
+"**/*.{ts,tsx}"
+
+// After
+"src/**/*.{ts,tsx,vue,svelte}"
+"**/*.{ts,tsx,vue,svelte}"
+```
+
+### `build:dist-only` Task
+
+**Problem:** CI bundle size comparison ran `pnpm build` on the base branch, which triggers the full pipeline (type-check → lint → test → build) due to `build`'s `dependsOn`. This wasted CI time since only `dist/` output is needed for size comparison.
+
+**Solution:** New `build:dist-only` task that only depends on `^build:dist-only` (upstream packages), skipping tests and linting. Used exclusively in the CI size comparison workflow.
+
+```json
+"build:dist-only": {
+  "dependsOn": ["^build:dist-only"],
+  "outputs": ["dist/**"],
+  "inputs": ["src/**/*.{ts,tsx,vue,svelte}", "tsup.config.*", "tsconfig.json", "package.json"]
+}
+```
+
+### `test:e2e` Task
+
+New turbo task for Playwright e2e tests in example applications:
+
+```json
+"test:e2e": {
+  "dependsOn": ["^build"],
+  "inputs": [
+    "src/**/*.{ts,tsx,vue,svelte}",
+    "e2e/**/*.{ts,tsx}",
+    "playwright.config.*",
+    "index.html",
+    "vite.config.*",
+    "package.json"
+  ]
+}
+```
+
+Depends on `^build` to ensure packages are compiled before examples run e2e tests.
+
 ## macOS Development Setup
 
 ### Spotlight Exclusion
@@ -617,6 +687,16 @@ minimum-release-age=1440
 Blocks installation of npm packages published less than 24 hours ago. Protects against compromised packages being installed before the community detects them.
 
 **Temporary exclusions:** When updating to a package released within the last 24 hours, add version-pinned entries to `minimumReleaseAgeExclude` in `pnpm-workspace.yaml` with a `TODO: remove after` comment. Include transitive dependencies (e.g., platform binaries for `turbo`). Glob patterns with version unions are not supported — list each package explicitly.
+
+### Security Overrides
+
+`pnpm.overrides` in root `package.json` pins transitive dependencies to patched versions:
+
+```json
+"flatted": ">=3.4.2"
+```
+
+`flatted` override addresses a prototype pollution vulnerability in older versions. Override ensures all transitive consumers use the patched version.
 
 ### Dependency License Review
 
@@ -856,13 +936,36 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 ### Examples Workspace
 
-`pnpm-workspace.yaml` includes `examples/*` as a workspace glob. Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.
+68 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte). Organized by framework:
+
+```
+examples/
+├── preact/{app-name}/
+├── react/{app-name}/
+├── solid/{app-name}/
+├── svelte/{app-name}/
+└── vue/{app-name}/
+```
+
+`pnpm-workspace.yaml` includes both `examples/*` and `examples/*/*` as workspace globs. Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.
 
 **Turbo exclusion:** Examples use `build:app` instead of `build` in their scripts to avoid triggering turbo's `build` pipeline. `turbo run build` only matches packages with a `build` script — examples are excluded.
 
-**knip exclusion:** `ignoreWorkspaces: ["examples/*"]` prevents false positives from example-specific dependencies.
+**knip exclusion:** `ignoreWorkspaces: ["examples/**"]` prevents false positives from example-specific dependencies. Uses `**` glob to match the nested directory structure.
 
 **syncpack exclusion:** `syncpack.config.mjs` `source` only covers `packages/*/package.json` — examples are automatically excluded from version consistency checks.
+
+### E2e Spec Lint Check
+
+**Problem:** Examples with `playwright.config.ts` but empty or missing `e2e/` directories pass CI silently — the e2e test task finds nothing to run and reports success.
+
+**Solution:** `scripts/check-e2e-specs.sh` iterates over `examples/*/*/playwright.config.ts`, verifies each has an `e2e/` directory with at least one `*.spec.ts` file. Exits with error if any violations found.
+
+```bash
+pnpm lint:e2e    # runs scripts/check-e2e-specs.sh
+```
+
+Added to pre-commit hook to catch missing specs before push.
 
 ### knip: Router Benchmarks Entry
 
