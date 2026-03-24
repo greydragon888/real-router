@@ -246,6 +246,9 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       # ── Base sizes: build:dist-only (no tests) ──
+      - name: Save turbo.json from PR
+        run: cp turbo.json /tmp/turbo.json.pr
+
       - name: Checkout base branch
         uses: actions/checkout@v6
         with:
@@ -253,7 +256,7 @@ jobs:
           clean: false
 
       - name: Restore turbo.json from PR (has build:dist-only task)
-        run: git checkout ${{ github.event.pull_request.head.sha }} -- turbo.json
+        run: cp /tmp/turbo.json.pr turbo.json
 
       - name: Install base dependencies
         run: pnpm install --frozen-lockfile
