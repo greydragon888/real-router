@@ -16,12 +16,27 @@
       "dependsOn": ["^build", "test", "test:properties", "test:stress"],
       "outputs": ["dist/**"],
       "inputs": [
-        "src/**/*.{ts,tsx}",
+        "src/**/*.{ts,tsx,vue,svelte}",
         "tsup.config.*",
         "tsconfig.json",
         "package.json"
       ],
       "env": ["NODE_ENV"],
+      "outputLogs": "errors-only",
+      "cache": true
+    },
+    "test:e2e": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "inputs": [
+        "src/**/*.{ts,tsx,vue,svelte}",
+        "e2e/**/*.{ts,tsx}",
+        "playwright.config.*",
+        "index.html",
+        "vite.config.*",
+        "package.json"
+      ],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "test:stress": {
@@ -32,6 +47,7 @@
         "vitest.config.stress.*",
         "!**/node_modules/**"
       ],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "test:properties": {
@@ -42,6 +58,7 @@
         "vitest.config.properties.*",
         "!**/node_modules/**"
       ],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "test": {
@@ -57,6 +74,7 @@
       ],
       "env": ["NODE_ENV"],
       "passThroughEnv": ["CI"],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "lint": {
@@ -69,18 +87,20 @@
         "!**/node_modules/**",
         "eslint.config.*"
       ],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "type-check": {
       "dependsOn": ["^build"],
       "outputs": [],
       "inputs": [
-        "**/*.{ts,tsx}",
+        "**/*.{ts,tsx,vue,svelte}",
         "!dist/**",
         "!**/node_modules/**",
         "tsconfig.json",
         "**/tsconfig.json"
       ],
+      "outputLogs": "errors-only",
       "cache": true
     },
     "lint:package": {

@@ -295,6 +295,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
+## Examples
+
+14 runnable examples — each is a standalone Vite app. Run: `cd examples/solid/basic && pnpm dev`
+
+[basic](../../examples/solid/basic) · [nested-routes](../../examples/solid/nested-routes) · [auth-guards](../../examples/solid/auth-guards) · [data-loading](../../examples/solid/data-loading) · [lazy-loading](../../examples/solid/lazy-loading) · [async-guards](../../examples/solid/async-guards) · [hash-routing](../../examples/solid/hash-routing) · [persistent-params](../../examples/solid/persistent-params) · [error-handling](../../examples/solid/error-handling) · [dynamic-routes](../../examples/solid/dynamic-routes) · [store-based-state](../../examples/solid/store-based-state) · [use-link-directive](../../examples/solid/use-link-directive) · [signal-primitives](../../examples/solid/signal-primitives) · [combined](../../examples/solid/combined)
+
 ## Related Packages
 
 | Package                                                                                  | Description                          |

@@ -337,6 +337,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
+## Examples
+
+15 runnable examples — each is a standalone Vite app. Run: `cd examples/svelte/basic && pnpm dev`
+
+[basic](../../examples/svelte/basic) · [nested-routes](../../examples/svelte/nested-routes) · [auth-guards](../../examples/svelte/auth-guards) · [data-loading](../../examples/svelte/data-loading) · [lazy-loading](../../examples/svelte/lazy-loading) · [async-guards](../../examples/svelte/async-guards) · [hash-routing](../../examples/svelte/hash-routing) · [persistent-params](../../examples/svelte/persistent-params) · [error-handling](../../examples/svelte/error-handling) · [dynamic-routes](../../examples/svelte/dynamic-routes) · [link-action](../../examples/svelte/link-action) · [lazy-loading-svelte](../../examples/svelte/lazy-loading-svelte) · [snippets-routing](../../examples/svelte/snippets-routing) · [reactive-source](../../examples/svelte/reactive-source) · [combined](../../examples/svelte/combined)
+
 ## Related Packages
 
 | Package                                                                                  | Description                          |

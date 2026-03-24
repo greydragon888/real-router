@@ -1,0 +1,9 @@
+{
+  "name": "svelte-examples-shared",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@real-router/svelte": "workspace:^",
+    "svelte": "5.54.0"
+  }
+}

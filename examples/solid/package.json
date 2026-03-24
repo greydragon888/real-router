@@ -1,0 +1,9 @@
+{
+  "name": "solid-examples-shared",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@real-router/solid": "workspace:^",
+    "solid-js": "1.9.5"
+  }
+}

@@ -1,0 +1,83 @@
+import { useState } from "react";
+
+import { api } from "../../../../shared/api";
+
+import type { User } from "../../../../shared/api";
+import type { JSX } from "react";
+
+interface LoginProps {
+  readonly onLogin: (user: User) => Promise<void>;
+}
+
+export function Login({ onLogin }: LoginProps): JSX.Element {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (event: { preventDefault: () => void }) => {
+    event.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const user = await api.login(email, password);
+
+      if (!user) {
+        setError(
+          "Invalid credentials. Try alice@example.com or bob@example.com",
+        );
+
+        return;
+      }
+
+      await onLogin(user);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Login</h1>
+      <form onSubmit={(event) => void handleSubmit(event)}>
+        <div className="form-group">
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+            }}
+            placeholder="alice@example.com"
+            required
+          />
+        </div>
+        <div className="form-group">
+          <label>Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(event) => {
+              setPassword(event.target.value);
+            }}
+            placeholder="any password"
+            required
+          />
+        </div>
+        {error && <div className="toast error">{error}</div>}
+        <button type="submit" className="primary" disabled={loading}>
+          {loading ? "Logging in…" : "Login"}
+        </button>
+      </form>
+      <div className="card" style={{ marginTop: "16px" }}>
+        <p>
+          <strong>Try these accounts:</strong>
+        </p>
+        <p>alice@example.com — Admin</p>
+        <p>bob@example.com — Editor</p>
+        <p>carol@example.com — Viewer</p>
+        <p>Any password works.</p>
+      </div>
+    </div>
+  );
+}

@@ -18,4 +18,8 @@ pnpm lint:unused
 echo "📋 Checking for code duplication..."
 pnpm lint:duplicates
 
+# Check that e2e directories have specs
+echo "🎭 Checking e2e specs..."
+pnpm lint:e2e
+
 echo "✅ Pre-commit checks passed!"

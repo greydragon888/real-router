@@ -1,0 +1,12 @@
+{
+  "name": "react-examples-shared",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@real-router/react": "workspace:^",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.14"
+  }
+}

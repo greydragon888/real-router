@@ -5,7 +5,9 @@
   "description": "A real router. Just routing, nothing else.",
   "scripts": {
     "build": "turbo run build",
+    "build:verbose": "turbo run build --output-logs=full",
     "test": "turbo run test",
+    "test:verbose": "turbo run test --output-logs=full",
     "test:stress": "turbo run test:stress",
     "test:properties": "turbo run test:properties",
     "test:coverage": "turbo run test -- --coverage",
@@ -19,6 +21,7 @@
     "lint:package": "turbo run lint:package",
     "lint:unused": "knip",
     "lint:duplicates": "jscpd packages/*/src/",
+    "lint:e2e": "bash scripts/check-e2e-specs.sh",
     "lint:deps": "syncpack lint",
     "lint:deps:fix": "syncpack fix && pnpm dedupe && pnpm install",
     "lint:dedupe": "pnpm dedupe --check",

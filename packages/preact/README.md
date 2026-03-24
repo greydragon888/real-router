@@ -176,6 +176,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
+## Examples
+
+11 runnable examples — each is a standalone Vite app. Run: `cd examples/preact/basic && pnpm dev`
+
+[basic](../../examples/preact/basic) · [nested-routes](../../examples/preact/nested-routes) · [auth-guards](../../examples/preact/auth-guards) · [data-loading](../../examples/preact/data-loading) · [lazy-loading](../../examples/preact/lazy-loading) · [async-guards](../../examples/preact/async-guards) · [hash-routing](../../examples/preact/hash-routing) · [persistent-params](../../examples/preact/persistent-params) · [error-handling](../../examples/preact/error-handling) · [dynamic-routes](../../examples/preact/dynamic-routes) · [combined](../../examples/preact/combined)
+
 ## Related Packages
 
 | Package                                                                                  | Description                          |

@@ -1,0 +1,24 @@
+{
+  "name": "preact-data-loading-example",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@real-router/browser-plugin": "workspace:^",
+    "@real-router/core": "workspace:^",
+    "@real-router/preact": "workspace:^",
+    "preact": "10.28.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.52.0",
+    "@preact/preset-vite": "2.10.5",
+    "typescript": "5.8.3",
+    "vite": "7.2.0"
+  }
+}

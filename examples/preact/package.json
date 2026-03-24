@@ -1,0 +1,9 @@
+{
+  "name": "preact-examples-shared",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@real-router/preact": "workspace:^",
+    "preact": "10.28.2"
+  }
+}

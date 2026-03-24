@@ -1,0 +1,21 @@
+import { browserPluginFactory } from "@real-router/browser-plugin";
+import { createRouter } from "@real-router/core";
+import { loggerPluginFactory } from "@real-router/logger-plugin";
+import { persistentParamsPluginFactory } from "@real-router/persistent-params-plugin";
+
+import { dataLoaderPluginFactory } from "./dataLoader";
+import { publicRoutes } from "./routes";
+
+import type { AppDependencies } from "./types";
+
+export const router = createRouter<AppDependencies>(publicRoutes, {
+  defaultRoute: "home",
+  allowNotFound: true,
+});
+
+router.usePlugin(
+  browserPluginFactory(),
+  persistentParamsPluginFactory({ lang: "en" }),
+  loggerPluginFactory(),
+  dataLoaderPluginFactory(),
+);

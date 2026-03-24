@@ -412,6 +412,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
+## Examples
+
+14 runnable examples — each is a standalone Vite app. Run: `cd examples/vue/basic && pnpm dev`
+
+[basic](../../examples/vue/basic) · [nested-routes](../../examples/vue/nested-routes) · [auth-guards](../../examples/vue/auth-guards) · [data-loading](../../examples/vue/data-loading) · [lazy-loading](../../examples/vue/lazy-loading) · [async-guards](../../examples/vue/async-guards) · [hash-routing](../../examples/vue/hash-routing) · [persistent-params](../../examples/vue/persistent-params) · [error-handling](../../examples/vue/error-handling) · [dynamic-routes](../../examples/vue/dynamic-routes) · [plugin-installation](../../examples/vue/plugin-installation) · [v-link-directive](../../examples/vue/v-link-directive) · [keep-alive](../../examples/vue/keep-alive) · [combined](../../examples/vue/combined)
+
 ## Related Packages
 
 | Package                                                                                  | Description                          |

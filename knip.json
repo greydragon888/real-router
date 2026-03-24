@@ -48,7 +48,7 @@
       }
     }
   },
-  "ignoreWorkspaces": ["examples/*"],
+  "ignoreWorkspaces": ["examples/**"],
   "ignore": [],
   "ignoreDependencies": ["@stryker-mutator/api", "jsdom"],
   "ignoreBinaries": ["tree", "tsx", "open", "ps", "awk"],

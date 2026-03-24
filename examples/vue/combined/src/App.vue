@@ -1,0 +1,135 @@
+<script setup lang="ts">
+import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import { RouteView, useNavigator } from "@real-router/vue";
+import {
+  computed,
+  defineAsyncComponent,
+  onMounted,
+  onUnmounted,
+  shallowRef,
+} from "vue";
+
+import ProgressBar from "./components/ProgressBar.vue";
+import Admin from "./pages/Admin.vue";
+import Checkout from "./pages/Checkout.vue";
+import Home from "./pages/Home.vue";
+import Login from "./pages/Login.vue";
+import ProductDetail from "./pages/ProductDetail.vue";
+import ProductList from "./pages/ProductList.vue";
+import Settings from "./pages/Settings.vue";
+import UsersLayout from "./pages/UsersLayout.vue";
+import { router } from "./router";
+import { publicRoutes, privateRoutes } from "./routes";
+import { defineAbilities } from "../../../shared/abilities";
+import { store } from "../../../shared/store";
+import Layout from "../../shared/Layout.vue";
+
+import type { User } from "../../../shared/api";
+
+const LazyDashboard = defineAsyncComponent(
+  () => import("./pages/Dashboard.vue"),
+);
+
+const navigator = useNavigator();
+
+const user = shallowRef<User | null>(store.get("user") as User | null);
+let unsub: (() => void) | undefined;
+
+onMounted(() => {
+  unsub = store.subscribe(() => {
+    user.value = store.get("user") as User | null;
+  });
+});
+
+onUnmounted(() => {
+  unsub?.();
+});
+
+const privateLinks = [
+  { routeName: "dashboard", label: "Dashboard" },
+  { routeName: "products", label: "Products" },
+  { routeName: "users", label: "Users" },
+  { routeName: "settings", label: "Settings" },
+  { routeName: "admin", label: "Admin" },
+  { routeName: "checkout", label: "Checkout" },
+];
+
+const publicLinks = [
+  { routeName: "home", label: "Home" },
+  { routeName: "login", label: "Login" },
+];
+
+const links = computed(() => (user.value ? privateLinks : publicLinks));
+
+async function onLogin(loggedInUser: User) {
+  store.set("user", loggedInUser);
+  getDependenciesApi(router).set(
+    "abilities",
+    defineAbilities(loggedInUser.role),
+  );
+  const routesApi = getRoutesApi(router);
+
+  routesApi.clear();
+  routesApi.add(privateRoutes);
+  await navigator.navigate("dashboard");
+}
+
+async function onLogout() {
+  store.set("user", null);
+  getDependenciesApi(router).set("abilities", []);
+  const routesApi = getRoutesApi(router);
+
+  routesApi.clear();
+  routesApi.add(publicRoutes);
+  await navigator.navigate("home");
+}
+</script>
+
+<template>
+  <Layout title="Real-Router — Combined" :links="links">
+    <ProgressBar />
+    <RouteView nodeName="">
+      <RouteView.Match segment="home">
+        <Home />
+      </RouteView.Match>
+      <RouteView.Match segment="login">
+        <Login @login="onLogin" />
+      </RouteView.Match>
+      <RouteView.Match segment="dashboard" keepAlive>
+        <Suspense>
+          <LazyDashboard @logout="onLogout" />
+          <template #fallback>
+            <span class="spinner" />
+          </template>
+        </Suspense>
+      </RouteView.Match>
+      <RouteView.Match segment="products">
+        <RouteView nodeName="products">
+          <RouteView.Match segment="list">
+            <ProductList />
+          </RouteView.Match>
+          <RouteView.Match segment="detail">
+            <ProductDetail />
+          </RouteView.Match>
+        </RouteView>
+      </RouteView.Match>
+      <RouteView.Match segment="users">
+        <UsersLayout />
+      </RouteView.Match>
+      <RouteView.Match segment="settings">
+        <Settings />
+      </RouteView.Match>
+      <RouteView.Match segment="admin">
+        <Admin />
+      </RouteView.Match>
+      <RouteView.Match segment="checkout">
+        <Checkout />
+      </RouteView.Match>
+      <RouteView.NotFound>
+        <h1>404 — Page Not Found</h1>
+        <p>The page you are looking for does not exist.</p>
+        <p>Try logging in — available routes change based on auth state.</p>
+      </RouteView.NotFound>
+    </RouteView>
+  </Layout>
+</template>

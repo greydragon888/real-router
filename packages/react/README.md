@@ -211,6 +211,12 @@ Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 - [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
+## Examples
+
+14 runnable examples — each is a standalone Vite app. Run: `cd examples/react/basic && pnpm dev`
+
+[basic](../../examples/react/basic) · [nested-routes](../../examples/react/nested-routes) · [auth-guards](../../examples/react/auth-guards) · [data-loading](../../examples/react/data-loading) · [lazy-loading](../../examples/react/lazy-loading) · [async-guards](../../examples/react/async-guards) · [hash-routing](../../examples/react/hash-routing) · [persistent-params](../../examples/react/persistent-params) · [error-handling](../../examples/react/error-handling) · [dynamic-routes](../../examples/react/dynamic-routes) · [keep-alive](../../examples/react/keep-alive) · [legacy-entry](../../examples/react/legacy-entry) · [hmr](../../examples/react/hmr) · [combined](../../examples/react/combined)
+
 ## Related Packages
 
 | Package                                                                                  | Description                          |
