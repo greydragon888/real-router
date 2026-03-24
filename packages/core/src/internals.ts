@@ -68,8 +68,6 @@ export interface RouterInternals<
 
   readonly isDisposed: () => boolean;
 
-  readonly noValidate: boolean;
-
   validator: RouterValidator | null;
 
   // Dependencies (issue #172)

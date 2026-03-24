@@ -236,7 +236,7 @@ function addRoutes<
     parentName ?? "",
   );
 
-  store.treeOperations.commitTreeChanges(store, false);
+  store.treeOperations.commitTreeChanges(store);
 }
 
 /**
@@ -274,7 +274,7 @@ function replaceRoutes<
   );
 
   // Step 5: One tree rebuild
-  store.treeOperations.commitTreeChanges(store, false);
+  store.treeOperations.commitTreeChanges(store);
 
   // Step 6: Revalidate state
   if (currentPath !== undefined) {
@@ -310,7 +310,7 @@ function removeRoute<
     store.lifecycleNamespace!,
   );
 
-  store.treeOperations.commitTreeChanges(store, false);
+  store.treeOperations.commitTreeChanges(store);
 
   return true;
 }
@@ -335,7 +335,7 @@ function updateRouteConfig<
       name,
       updates.forwardTo,
       store.config,
-      (config) => refreshForwardMap(config, false),
+      (config) => refreshForwardMap(config),
     );
   }
 
@@ -491,12 +491,7 @@ export function getRoutesApi<
           store.lifecycleNamespace!.clearCanActivate(name);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanActivate(
-            name,
-            canActivate,
-            false,
-            true,
-          );
+          store.lifecycleNamespace!.addCanActivate(name, canActivate, true);
         }
       }
 
@@ -506,12 +501,7 @@ export function getRoutesApi<
           store.lifecycleNamespace!.clearCanDeactivate(name);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanDeactivate(
-            name,
-            canDeactivate,
-            false,
-            true,
-          );
+          store.lifecycleNamespace!.addCanDeactivate(name, canDeactivate, true);
         }
       }
     },

@@ -135,7 +135,6 @@ export class Router<
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
-      false,
       deriveMatcherOptions(this.#options.get()),
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
@@ -234,7 +233,6 @@ export class Router<
       getRootPath: () => this.#routes.getStore().rootPath,
       getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
-      noValidate: false,
       validator: null,
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,

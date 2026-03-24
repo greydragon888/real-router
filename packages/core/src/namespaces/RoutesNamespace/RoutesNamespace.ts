@@ -89,10 +89,9 @@ export class RoutesNamespace<
 
   constructor(
     routes: Route<Dependencies>[] = [],
-    noValidate = false,
     matcherOptions?: CreateMatcherOptions,
   ) {
-    this.#store = createRoutesStore(routes, noValidate, matcherOptions);
+    this.#store = createRoutesStore(routes, matcherOptions);
   }
 
   /**

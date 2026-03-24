@@ -3,7 +3,6 @@
 import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
 
-import { validateHandlerLimit, validateNotRegistering } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
 import { computeThresholds } from "../../helpers";
 
@@ -74,17 +73,15 @@ export class RouteLifecycleNamespace<
 
   /**
    * Adds a canActivate guard for a route.
-   * Handles state-dependent validation, overwrite detection, and registration.
+   * Handles overwrite detection and registration.
    *
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
-   * @param skipValidation - True when called during route config building (#noValidate)
    * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanActivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    skipValidation: boolean,
     isFromDefinition = false,
   ): void {
     if (isFromDefinition) {
@@ -92,23 +89,8 @@ export class RouteLifecycleNamespace<
     } else {
       this.#definitionActivateGuardNames.delete(name);
     }
-    if (!skipValidation) {
-      validateNotRegistering(
-        this.#registering.has(name),
-        name,
-        "addActivateGuard",
-      );
-    }
 
     const isOverwrite = this.#canActivateFactories.has(name);
-
-    if (!isOverwrite && !skipValidation) {
-      validateHandlerLimit(
-        this.#canActivateFactories.size + 1,
-        "addActivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
 
     this.#registerHandler(
       "activate",
@@ -123,17 +105,15 @@ export class RouteLifecycleNamespace<
 
   /**
    * Adds a canDeactivate guard for a route.
-   * Handles state-dependent validation, overwrite detection, and registration.
+   * Handles overwrite detection and registration.
    *
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
-   * @param skipValidation - True when called during route config building (#noValidate)
    * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanDeactivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    skipValidation: boolean,
     isFromDefinition = false,
   ): void {
     if (isFromDefinition) {
@@ -141,23 +121,8 @@ export class RouteLifecycleNamespace<
     } else {
       this.#definitionDeactivateGuardNames.delete(name);
     }
-    if (!skipValidation) {
-      validateNotRegistering(
-        this.#registering.has(name),
-        name,
-        "addDeactivateGuard",
-      );
-    }
 
     const isOverwrite = this.#canDeactivateFactories.has(name);
-
-    if (!isOverwrite && !skipValidation) {
-      validateHandlerLimit(
-        this.#canDeactivateFactories.size + 1,
-        "addDeactivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
 
     this.#registerHandler(
       "deactivate",

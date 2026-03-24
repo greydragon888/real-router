@@ -18,7 +18,7 @@ export function getLifecycleApi<
       ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
-      lifecycleNamespace.addCanActivate(name, handler, ctx.noValidate);
+      lifecycleNamespace.addCanActivate(name, handler);
     },
 
     addDeactivateGuard(name, handler) {
@@ -27,7 +27,7 @@ export function getLifecycleApi<
       ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
-      lifecycleNamespace.addCanDeactivate(name, handler, ctx.noValidate);
+      lifecycleNamespace.addCanDeactivate(name, handler);
     },
 
     removeActivateGuard(name) {

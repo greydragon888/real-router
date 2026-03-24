@@ -145,14 +145,6 @@ export interface Options {
    * @default DEFAULT_LIMITS (from LimitsNamespace)
    */
   limits?: Partial<LimitsConfig>;
-
-  /**
-   * Disables argument validation in public router methods.
-   * Use in production for performance. Keep false in development for early error detection.
-   *
-   * @default false
-   */
-  noValidate?: boolean;
 }
 
 export type GuardFn = (
