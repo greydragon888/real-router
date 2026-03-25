@@ -2,7 +2,7 @@
 "@real-router/core": minor
 ---
 
-Breaking: remove `noValidate` option — validation is now opt-in via plugin
+Breaking: remove `noValidate` option — validation is now opt-in via plugin (#334)
 
 The `noValidate: true` router option has been removed. Validation is now disabled by default and enabled by registering `@real-router/validation-plugin`.
 

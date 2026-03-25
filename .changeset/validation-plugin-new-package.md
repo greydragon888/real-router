@@ -2,7 +2,7 @@
 "@real-router/validation-plugin": minor
 ---
 
-New package: extract DX validation from core into opt-in plugin
+New package: extract DX validation from core into opt-in plugin (#334)
 
 `@real-router/validation-plugin` provides the full validation layer previously built into `@real-router/core`. Register before `router.start()` to enable descriptive type errors and argument checks across all router operations.
 
