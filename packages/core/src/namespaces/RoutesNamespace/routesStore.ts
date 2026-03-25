@@ -170,7 +170,6 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
     );
   }
 
-  // Async validation ALWAYS runs (even with noValidate=true)
   if (typeof route.forwardTo === "function") {
     const isNativeAsync =
       (route.forwardTo as { constructor: { name: string } }).constructor
