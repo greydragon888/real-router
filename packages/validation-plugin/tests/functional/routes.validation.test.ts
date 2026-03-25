@@ -91,6 +91,19 @@ describe("routes API validation — with validationPlugin", () => {
       }).toThrow();
     });
 
+    it("should throw when decodeParams is async", () => {
+      expect(() => {
+        routes.add([
+          {
+            name: "bad",
+            path: "/bad/:id",
+            // @ts-expect-error testing async function (not allowed by type)
+            decodeParams: async () => ({}),
+          },
+        ]);
+      }).toThrow(TypeError);
+    });
+
     it("should throw when encodeParams is not a function", () => {
       expect(() => {
         routes.add([
@@ -101,6 +114,32 @@ describe("routes API validation — with validationPlugin", () => {
           },
         ]);
       }).toThrow();
+    });
+
+    it("should throw when encodeParams is async", () => {
+      expect(() => {
+        routes.add([
+          {
+            name: "bad",
+            path: "/bad/:id",
+            // @ts-expect-error testing async function (not allowed by type)
+            encodeParams: async () => ({}),
+          },
+        ]);
+      }).toThrow(TypeError);
+    });
+
+    it("should throw when forwardTo callback is async", () => {
+      expect(() => {
+        routes.add([
+          {
+            name: "bad",
+            path: "/bad",
+            // @ts-expect-error testing async function (not allowed by type)
+            forwardTo: async () => "home",
+          },
+        ]);
+      }).toThrow(TypeError);
     });
 
     it("should throw on path with spaces", () => {
@@ -242,6 +281,58 @@ describe("routes API validation — with validationPlugin", () => {
       expect(() => {
         raw.update(null, {});
       }).toThrow();
+    });
+
+    it("should throw when encodeParams is async", () => {
+      const raw = routes as unknown as {
+        update: (n: string, u: unknown) => void;
+      };
+
+      expect(() => {
+        raw.update("home", { encodeParams: async () => ({}) });
+      }).toThrow(TypeError);
+
+      expect(() => {
+        raw.update("home", { encodeParams: async () => ({}) });
+      }).toThrow(/cannot be an async function/);
+    });
+
+    it("should throw when decodeParams is async", () => {
+      const raw = routes as unknown as {
+        update: (n: string, u: unknown) => void;
+      };
+
+      expect(() => {
+        raw.update("home", { decodeParams: async () => ({}) });
+      }).toThrow(TypeError);
+    });
+
+    it("should throw when forwardTo callback is async", () => {
+      const raw = routes as unknown as {
+        update: (n: string, u: unknown) => void;
+      };
+
+      expect(() => {
+        raw.update("home", { forwardTo: async () => "home" });
+      }).toThrow(TypeError);
+    });
+
+    it("should throw when encodeParams has __awaiter in toString (transpiled async branch)", () => {
+      const raw = routes as unknown as {
+        update: (n: string, u: unknown) => void;
+      };
+
+      function transpiledEncoder() {
+        return "__awaiter";
+      }
+
+      expect(() => {
+        raw.update("home", { encodeParams: transpiledEncoder });
+      }).toThrow(TypeError);
+
+      expect(() => {
+        raw.update("home", { encodeParams: transpiledEncoder });
+      }).toThrow(/cannot be an async function/);
     });
   });
 

@@ -65,6 +65,7 @@ import {
   validateRoutes,
   validateRemoveRouteArgs,
   validateUpdateRouteBasicArgs,
+  validateUpdateRoutePropertyTypes,
   validateUpdateRoute,
   validateParentOption as validateParentOptionRaw,
   throwIfInternalRoute,
@@ -108,8 +109,16 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       },
       validateRemoveRouteArgs,
       validateUpdateRouteBasicArgs,
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateUpdateRoutePropertyTypes(_name, _updates) {},
+      validateUpdateRoutePropertyTypes(_name, updates) {
+        const upd = updates as Record<string, unknown>;
+
+        validateUpdateRoutePropertyTypes(
+          upd.forwardTo,
+          upd.defaultParams,
+          upd.decodeParams,
+          upd.encodeParams,
+        );
+      },
       validateUpdateRoute(name, updates, store) {
         const typedStore = store as {
           matcher: {

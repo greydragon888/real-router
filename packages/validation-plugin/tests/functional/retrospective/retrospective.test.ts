@@ -492,6 +492,22 @@ describe("validateRoutePropertiesStore", () => {
       validateRoutePropertiesStore(store);
     }).not.toThrow();
   });
+
+  it("throws when decoder has __awaiter in toString (transpiled async branch)", () => {
+    function transpiledDecoder() {
+      return "__awaiter";
+    }
+
+    const store = makeStore({ decoders: { home: transpiledDecoder } });
+
+    expect(() => {
+      validateRoutePropertiesStore(store);
+    }).toThrow(TypeError);
+
+    expect(() => {
+      validateRoutePropertiesStore(store);
+    }).toThrow(/cannot be async/);
+  });
 });
 
 describe("validateForwardToTargetsStore", () => {

@@ -113,3 +113,7 @@ If the retrospective pass throws, `ctx.validator` is set back to `null`. This pr
 ### No module augmentation
 
 The plugin doesn't extend the router's public API. It only affects internal behavior via `ctx.validator`. No `declare module` augmentation, no `extendRouter()` calls.
+
+## See Also
+
+- [INVARIANTS.md](INVARIANTS.md) — Property-based test invariants (validateOptions, validateCloneArgs)

@@ -1,17 +1,11 @@
 /**
- * Validation plugin exports
+ * Subpath export for @real-router/validation-plugin.
  *
- * This subpath export provides types and utilities needed by the validation plugin
- * to validate router state and operations.
+ * Provides access to router internals so the plugin can install
+ * ctx.validator and run retrospective validation at registration time.
  */
 
 export type { RouterValidator } from "./types/RouterValidator";
-
-export { resolveForwardChain } from "./namespaces/RoutesNamespace/forwardChain";
-
-export { INTERNAL_ROUTE_PREFIX } from "./namespaces/RoutesNamespace/constants";
-
-export type { RoutesStore } from "./namespaces/RoutesNamespace/routesStore";
 
 export { getInternals } from "./internals";
 

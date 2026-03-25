@@ -109,6 +109,21 @@ describe("validationPlugin", () => {
 
       expect(() => r.usePlugin(validationPlugin())).toThrow(RangeError);
     });
+
+    it("throws TypeError during retrospective when route has async forwardTo callback", () => {
+      router = createRouter([
+        { name: "home", path: "/home" },
+        { name: "about", path: "/about" },
+      ]);
+      const routes = getRoutesApi(router);
+
+      routes.update("home", {
+        // @ts-expect-error testing async forwardTo (not allowed by type)
+        forwardTo: async () => "about",
+      });
+
+      expect(() => router.usePlugin(validationPlugin())).toThrow(TypeError);
+    });
   });
 
   describe("validation enabled after registration", () => {

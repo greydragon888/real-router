@@ -830,5 +830,21 @@ describe("Phase 2 routes validators", () => {
         guardNoAsyncCallbacks({ forwardTo: "some.route" });
       }).not.toThrow();
     });
+
+    it("throws when decodeParams has __awaiter in toString (transpiled async branch)", () => {
+      // Simulate transpiled async code: regular function (not AsyncFunction) whose
+      // toString() contains "__awaiter" — same pattern TypeScript emits when targeting ES5
+      function transpiledDecoder() {
+        return "__awaiter";
+      }
+
+      expect(() => {
+        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder });
+      }).toThrow(TypeError);
+
+      expect(() => {
+        guardNoAsyncCallbacks({ decodeParams: transpiledDecoder });
+      }).toThrow("decodeParams cannot be async");
+    });
   });
 });

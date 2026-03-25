@@ -198,7 +198,6 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
     toString: () => string;
   };
 
-  /* v8 ignore next -- @preserve: transpiled async (__awaiter) branch */
   if (
     function_.constructor.name === "AsyncFunction" ||
     function_.toString().includes("__awaiter")

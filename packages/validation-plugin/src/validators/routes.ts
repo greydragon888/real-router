@@ -85,7 +85,6 @@ export function validateSetRootPathArgs(
   }
 }
 
-/* v8 ignore next 4 -- @preserve: transpiled async (__awaiter) branch only reachable with transpiled code */
 function isAsyncFunction(fn: unknown): boolean {
   return (
     (fn as { constructor: { name: string } }).constructor.name ===
@@ -275,7 +274,6 @@ export function validateUpdateRouteBasicArgs<
  * Asserts that a function is not async (native or transpiled).
  * Checks both constructor name and toString() for __awaiter pattern.
  */
-/* v8 ignore next 12 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- needs constructor.name access
 function assertNotAsync(value: Function, paramName: string): void {
   if (
