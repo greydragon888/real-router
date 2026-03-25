@@ -75,9 +75,6 @@ export function validateRemoveRouteArgs(name: unknown): asserts name is string {
   validateRouteName(name, "removeRoute");
 }
 
-/**
- * Validates setRootPath arguments.
- */
 export function validateSetRootPathArgs(
   rootPath: unknown,
 ): asserts rootPath is string {
@@ -85,6 +82,46 @@ export function validateSetRootPathArgs(
     throw new TypeError(
       `[router.setRootPath] rootPath must be a string, got ${getTypeDescription(rootPath)}`,
     );
+  }
+}
+
+/* v8 ignore next 4 -- @preserve: transpiled async (__awaiter) branch only reachable with transpiled code */
+function isAsyncFunction(fn: unknown): boolean {
+  return (
+    (fn as { constructor: { name: string } }).constructor.name ===
+      "AsyncFunction" || String(fn).includes("__awaiter")
+  );
+}
+
+export function guardRouteCallbacks(route: unknown): void {
+  const r = route as { canActivate?: unknown; canDeactivate?: unknown };
+
+  if (r.canActivate !== undefined && typeof r.canActivate !== "function") {
+    throw new TypeError("[router.addRoute] canActivate must be a function");
+  }
+
+  if (r.canDeactivate !== undefined && typeof r.canDeactivate !== "function") {
+    throw new TypeError("[router.addRoute] canDeactivate must be a function");
+  }
+}
+
+export function guardNoAsyncCallbacks(route: unknown): void {
+  const r = route as {
+    decodeParams?: unknown;
+    encodeParams?: unknown;
+    forwardTo?: unknown;
+  };
+
+  if (r.decodeParams !== undefined && isAsyncFunction(r.decodeParams)) {
+    throw new TypeError("[router.addRoute] decodeParams cannot be async");
+  }
+
+  if (r.encodeParams !== undefined && isAsyncFunction(r.encodeParams)) {
+    throw new TypeError("[router.addRoute] encodeParams cannot be async");
+  }
+
+  if (typeof r.forwardTo === "function" && isAsyncFunction(r.forwardTo)) {
+    throw new TypeError("[router.addRoute] forwardTo callback cannot be async");
   }
 }
 

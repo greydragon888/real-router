@@ -115,9 +115,7 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     const result = router.canNavigateTo("admin");
 
     expect(result).toBe(false);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("Sync check cannot resolve async guards"),
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

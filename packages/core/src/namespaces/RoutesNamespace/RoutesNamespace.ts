@@ -1,8 +1,6 @@
 // packages/core/src/namespaces/RoutesNamespace/RoutesNamespace.ts
 
-import { isString, validateRouteName } from "type-guards";
-
-import { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
+import { DEFAULT_ROUTE_NAME } from "./constants";
 import { paramsMatch, paramsMatchExcluding } from "./helpers";
 import {
   createRoutesStore,
@@ -199,7 +197,7 @@ export class RoutesNamespace<
    */
   buildPath(route: string, params?: Params, options?: Options): string {
     if (route === constants.UNKNOWN_ROUTE) {
-      return isString(params?.path) ? params.path : "";
+      return typeof params?.path === "string" ? params.path : "";
     }
 
     const paramsWithDefault = Object.hasOwn(
@@ -373,12 +371,6 @@ export class RoutesNamespace<
     strictEquality = false,
     ignoreQueryParams = true,
   ): boolean {
-    // Fast path: skip regex validation for already-validated route names
-    if (!validatedRouteNames.has(name)) {
-      validateRouteName(name, "isActiveRoute");
-      validatedRouteNames.add(name);
-    }
-
     // Note: empty string check is handled by Router.ts facade
     const activeState = this.#deps.getState();
 

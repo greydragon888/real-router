@@ -70,18 +70,23 @@ describe("core/limits — with validationPlugin", () => {
     });
 
     it("should enforce custom maxDependencies limit", () => {
-      const r = createRouter<NumDeps>([], { limits: { maxDependencies: 1 } });
+      type NumDeps = Record<string, number>;
+      const r = createRouter<NumDeps>([], { limits: { maxDependencies: 3 } });
 
       r.usePlugin(validationPlugin());
       const deps = getDependenciesApi(r);
 
       expect(() => {
+        deps.set("dep0", 0);
         deps.set("dep1", 1);
+        deps.set("dep2", 2);
       }).not.toThrow();
 
       expect(() => {
-        deps.set("dep2", 2);
+        deps.set("dep3", 3);
       }).toThrow("Dependency limit exceeded");
+
+      r.stop();
     });
 
     it("should enforce custom maxListeners limit", () => {
@@ -190,25 +195,23 @@ describe("core/limits — with validationPlugin", () => {
     });
 
     it("should enforce default maxDependencies limit (100)", () => {
+      type NumDeps = Record<string, number>;
       const r = createRouter<NumDeps>([]);
 
       r.usePlugin(validationPlugin());
       const deps = getDependenciesApi(r);
 
-      const deps99: NumDeps = {};
-
-      for (let i = 0; i < 99; i++) {
-        deps99[`dep${i}`] = i;
-      }
-
       expect(() => {
-        deps.setAll(deps99);
+        for (let i = 0; i < 100; i++) {
+          deps.set(`dep${i}`, i);
+        }
       }).not.toThrow();
 
       expect(() => {
-        deps.set("dep99", 99);
         deps.set("dep100", 100);
       }).toThrow("Dependency limit exceeded");
+
+      r.stop();
     });
 
     it("should enforce default maxListeners limit (10000)", () => {

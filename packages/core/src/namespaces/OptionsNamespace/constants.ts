@@ -19,22 +19,3 @@ export const defaultOptions: Options = {
   allowNotFound: true,
   rewritePathOnMatch: true,
 } satisfies Options;
-
-/**
- * Valid values for string enum options.
- * Used for runtime validation in constructor options.
- */
-export const VALID_OPTION_VALUES = {
-  trailingSlash: ["strict", "never", "always", "preserve"] as const,
-  queryParamsMode: ["default", "strict", "loose"] as const,
-  urlParamsEncoding: ["default", "uri", "uriComponent", "none"] as const,
-} as const;
-
-/**
- * Valid keys and values for queryParams option.
- */
-export const VALID_QUERY_PARAMS = {
-  arrayFormat: ["none", "brackets", "index", "comma"] as const,
-  booleanFormat: ["none", "string", "empty-true"] as const,
-  nullFormat: ["default", "hidden"] as const,
-} as const;

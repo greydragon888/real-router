@@ -46,22 +46,20 @@ describe("core/limits (integration via public API)", () => {
 
   // 🔴 CRITICAL: Custom limits enforced (hard limit — facade validators)
   describe("custom limits enforced", () => {
-    it("should enforce custom maxDependencies limit", () => {
+    it("should NOT enforce maxDependencies limit without validation plugin", () => {
       const router = createRouter<{ dep1?: number; dep2?: number }>([], {
         limits: { maxDependencies: 1 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 1 dependency - should succeed
       expect(() => {
         deps.set("dep1", 1);
       }).not.toThrow();
 
-      // 2nd dependency should throw
       expect(() => {
         deps.set("dep2", 2);
-      }).toThrow("Dependency limit exceeded");
+      }).not.toThrow();
     });
 
     it("should enforce custom maxListeners limit", () => {
@@ -182,64 +180,42 @@ describe("core/limits (integration via public API)", () => {
 
   // 🟡 IMPORTANT: Warn/error threshold logging for dependencies
   describe("dependency thresholds", () => {
-    it("should log warning at warn threshold (20% of maxDependencies)", async () => {
+    it("should NOT log warning at warn threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
-      // Check happens BEFORE adding, so we need 20 existing deps to trigger warn
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 20 dependencies - no warning yet (count is checked before add)
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i <= 20; i++) {
         deps.set(`dep${i}`, i);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // 21st dependency should trigger warning (count === 20 at check time)
-      deps.set("dep20", 20);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.setDependency",
-        expect.stringContaining("20 dependencies"),
-      );
-
       warnSpy.mockRestore();
     });
 
-    it("should log error at error threshold (50% of maxDependencies)", async () => {
+    it("should NOT log error at error threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-      // Custom limit of 100 means error at 50
-      // Check happens BEFORE adding, so we need 50 existing deps to trigger error
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 50 dependencies - no error yet (count is checked before add)
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i <= 50; i++) {
         deps.set(`dep${i}`, i);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
-
-      // 51st dependency should trigger error log (count === 50 at check time)
-      deps.set("dep50", 50);
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "router.setDependency",
-        expect.stringContaining("50 dependencies"),
-      );
 
       errorSpy.mockRestore();
     });
@@ -247,58 +223,38 @@ describe("core/limits (integration via public API)", () => {
 
   // 🟡 IMPORTANT: Warn/error threshold logging for lifecycle handlers
   describe("lifecycle handler thresholds", () => {
-    it("should log warning at warn threshold (20% of maxLifecycleHandlers)", async () => {
+    it("should NOT log warning at warn threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },
       });
 
-      // Register 19 handlers - no warning
-      for (let i = 0; i < 19; i++) {
+      for (let i = 0; i < 20; i++) {
         getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // 20th handler should trigger warning
-      getLifecycleApi(router).addActivateGuard("route19", true);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.canActivate",
-        expect.stringContaining("20 lifecycle handlers"),
-      );
-
       warnSpy.mockRestore();
     });
 
-    it("should log error at error threshold (50% of maxLifecycleHandlers)", async () => {
+    it("should NOT log error at error threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-      // Custom limit of 100 means error at 50
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },
       });
 
-      // Register 49 handlers - no error
-      for (let i = 0; i < 49; i++) {
+      for (let i = 0; i < 50; i++) {
         getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
-
-      // 50th handler should trigger error log
-      getLifecycleApi(router).addActivateGuard("route49", true);
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "router.canActivate",
-        expect.stringContaining("50 lifecycle handlers"),
-      );
 
       errorSpy.mockRestore();
     });

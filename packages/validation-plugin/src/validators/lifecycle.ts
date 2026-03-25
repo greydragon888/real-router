@@ -1,6 +1,9 @@
 // packages/validation-plugin/src/validators/lifecycle.ts
 
+import { logger } from "@real-router/logger";
 import { isBoolean, getTypeDescription } from "type-guards";
+
+import { computeThresholds } from "../helpers";
 
 import type { GuardFnFactory, DefaultDependencies } from "@real-router/core";
 
@@ -46,4 +49,46 @@ export function validateHandlerLimit(
         `Consider using plugins for cross-cutting concerns.`,
     );
   }
+}
+
+export function validateLifecycleCountThresholds(
+  count: number,
+  methodName: string,
+  maxHandlers: number,
+): void {
+  if (maxHandlers === 0) {
+    return;
+  }
+
+  const { warn, error } = computeThresholds(maxHandlers);
+
+  if (count >= error) {
+    logger.error(
+      `router.${methodName}`,
+      `${count} lifecycle handlers registered! This is excessive. Hard limit at ${maxHandlers}.`,
+    );
+  } else if (count >= warn) {
+    logger.warn(
+      `router.${methodName}`,
+      `${count} lifecycle handlers registered. Consider consolidating logic.`,
+    );
+  }
+}
+
+export function warnOverwrite(
+  name: string,
+  type: string,
+  methodName: string,
+): void {
+  logger.warn(
+    `router.${methodName}`,
+    `Overwriting existing ${type} handler for route "${name}"`,
+  );
+}
+
+export function warnAsyncGuardSync(name: string, methodName: string): void {
+  logger.warn(
+    `router.${methodName}`,
+    `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
+  );
 }

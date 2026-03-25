@@ -8,8 +8,6 @@ export {
   deepFreeze,
   defaultOptions,
   OptionsNamespace,
-  VALID_OPTION_VALUES,
-  VALID_QUERY_PARAMS,
 } from "./OptionsNamespace";
 
 export { StateNamespace } from "./StateNamespace";
@@ -25,7 +23,6 @@ export { RouteLifecycleNamespace } from "./RouteLifecycleNamespace";
 export {
   RoutesNamespace,
   DEFAULT_ROUTE_NAME,
-  validatedRouteNames,
   createEmptyConfig,
 } from "./RoutesNamespace";
 

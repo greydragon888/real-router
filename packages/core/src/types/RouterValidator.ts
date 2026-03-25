@@ -44,6 +44,9 @@ export interface RouterValidator {
     // Retrospective validation
     validateExistingRoutes: (store: unknown) => void;
     validateForwardToConsistency: (store: unknown) => void;
+    validateSetRootPathArgs: (rootPath: unknown) => void;
+    guardRouteCallbacks: (route: unknown) => void;
+    guardNoAsyncCallbacks: (route: unknown) => void;
   };
 
   /**
@@ -52,6 +55,7 @@ export interface RouterValidator {
   options: {
     validateLimitValue: (name: string, value: unknown) => void;
     validateLimits: (limits: unknown) => void;
+    validateOptions: (options: unknown, methodName: string) => void;
   };
 
   /**
@@ -69,6 +73,11 @@ export interface RouterValidator {
     validateDependencyLimit: (store: unknown, limits: unknown) => void;
     // Retrospective validation
     validateDependenciesStructure: (store: unknown) => void;
+    validateDependencyCount: (store: unknown, methodName: string) => void;
+    validateCloneArgs: (dependencies: unknown) => void;
+    warnOverwrite: (name: string, methodName: string) => void;
+    warnBatchOverwrite: (keys: string[], methodName: string) => void;
+    warnRemoveNonExistent: (name: unknown) => void;
   };
 
   /**
@@ -80,6 +89,11 @@ export interface RouterValidator {
       factory: unknown,
       factories: unknown[],
     ) => void;
+    validatePluginKeys: (plugin: unknown) => void;
+    validateCountThresholds: (count: number) => void;
+    warnBatchDuplicates: (plugins: unknown[]) => void;
+    warnPluginMethodType: (methodName: string) => void;
+    warnPluginAfterStart: (methodName: string) => void;
   };
 
   /**
@@ -97,6 +111,9 @@ export interface RouterValidator {
       limits: unknown,
       caller: string,
     ) => void;
+    validateCountThresholds: (count: number, methodName: string) => void;
+    warnOverwrite: (name: string, type: string, methodName: string) => void;
+    warnAsyncGuardSync: (name: string, methodName: string) => void;
   };
 
   /**

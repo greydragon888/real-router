@@ -130,7 +130,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing factory returning null
         lifecycle.addActivateGuard("route", () => null);
-      }).toThrow(/Factory must return a function.*got null/);
+      }).toThrow(/Factory must return a function.*got object/);
 
       expect(() => {
         // @ts-expect-error: testing factory returning string
@@ -352,7 +352,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
   });
 
   describe("overwriting guards", () => {
-    it("should log warning when overwriting existing guard", async () => {
+    it("should NOT log warning when overwriting existing guard (no validation plugin)", async () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       lifecycle.addActivateGuard("route", true);
@@ -360,14 +360,9 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       // First registration - no warning
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // Second registration - should warn
       lifecycle.addActivateGuard("route", false);
 
-      // Logger format: logger.warn(context, message)
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.canActivate",
-        expect.stringContaining("Overwriting"),
-      );
+      expect(warnSpy).not.toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });
@@ -411,18 +406,11 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         lifecycle.addActivateGuard("hasOwnProperty", true);
       }).not.toThrow();
 
-      // All registered correctly - can overwrite them without "no handler" warning
-      // (overwrite triggers warning only if handler exists, so no error = was registered)
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
-
-      lifecycle.addActivateGuard("__proto__", false);
-      lifecycle.addActivateGuard("constructor", false);
-      lifecycle.addActivateGuard("hasOwnProperty", false);
-
-      // Should have logged overwrite warnings (meaning guards were registered)
-      expect(warnSpy).toHaveBeenCalledTimes(3);
-
-      warnSpy.mockRestore();
+      expect(() => {
+        lifecycle.addActivateGuard("__proto__", false);
+        lifecycle.addActivateGuard("constructor", false);
+        lifecycle.addActivateGuard("hasOwnProperty", false);
+      }).not.toThrow();
     });
   });
 
@@ -438,7 +426,7 @@ describe("core/route-lifecycle/addActivateGuard", () => {
       expect(() => {
         // @ts-expect-error: testing async as direct handler
         lifecycle.addActivateGuard("route", asyncHandler);
-      }).toThrow(/Factory must return a function.*got Promise/);
+      }).toThrow(/Factory must return a function.*got object/);
     });
 
     it("should reject generator function as factory", async () => {
@@ -531,18 +519,12 @@ describe("core/route-lifecycle/addActivateGuard", () => {
         "parent.child3",
       ]);
 
-      // Verify all guards work by checking overwrite warnings
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
-
-      lifecycle.addActivateGuard("parent", false);
-      lifecycle.addActivateGuard("parent.child1", false);
-      lifecycle.addActivateGuard("parent.child2", true);
-      lifecycle.addActivateGuard("parent.child3", false);
-
-      // All 4 overwrites should trigger warnings
-      expect(warnSpy).toHaveBeenCalledTimes(4);
-
-      warnSpy.mockRestore();
+      expect(() => {
+        lifecycle.addActivateGuard("parent", false);
+        lifecycle.addActivateGuard("parent.child1", false);
+        lifecycle.addActivateGuard("parent.child2", true);
+        lifecycle.addActivateGuard("parent.child3", false);
+      }).not.toThrow();
     });
 
     it("should allow nested factory registration (factory within factory)", async () => {

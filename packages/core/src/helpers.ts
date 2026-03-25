@@ -5,8 +5,6 @@ import { DEFAULT_LIMITS } from "./constants";
 import type { Limits } from "./types";
 import type { State, LimitsConfig } from "@real-router/types";
 
-export { getTypeDescription } from "type-guards";
-
 // =============================================================================
 // State Helpers
 // =============================================================================
@@ -168,21 +166,6 @@ export function freezeStateInPlace<T extends State>(state: T): T {
   frozenRoots.add(state);
 
   return state;
-}
-
-/**
- * Computes warning and error thresholds for a given limit.
- * WARN threshold: 20% of limit
- * ERROR threshold: 50% of limit
- */
-export function computeThresholds(limit: number): {
-  warn: number;
-  error: number;
-} {
-  return {
-    warn: Math.floor(limit * 0.2),
-    error: Math.floor(limit * 0.5),
-  };
 }
 
 /**

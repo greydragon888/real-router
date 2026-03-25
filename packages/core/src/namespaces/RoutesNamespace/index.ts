@@ -2,7 +2,7 @@
 
 export { RoutesNamespace } from "./RoutesNamespace";
 
-export { DEFAULT_ROUTE_NAME, validatedRouteNames } from "./constants";
+export { DEFAULT_ROUTE_NAME } from "./constants";
 
 export { createEmptyConfig } from "./helpers";
 

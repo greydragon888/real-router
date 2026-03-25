@@ -3,12 +3,12 @@
 import { logger } from "@real-router/logger";
 
 import { EVENTS_MAP, EVENT_METHOD_NAMES, LOGGER_CONTEXT } from "./constants";
-import { validatePlugin, validateUsePluginArgs } from "./validators";
+import { validatePlugin } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
-import { computeThresholds } from "../../helpers";
 
 import type { PluginsDependencies } from "./types";
 import type { Limits, PluginFactory } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   Plugin,
@@ -29,17 +29,12 @@ export class PluginsNamespace<
 
   #deps!: PluginsDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
+  #getValidator: (() => RouterValidator | null) | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
   // Proxy to functions in validators.ts for separation of concerns
   // =========================================================================
-
-  static validateUsePluginArgs<D extends DefaultDependencies>(
-    plugins: unknown[],
-  ): asserts plugins is PluginFactory<D>[] {
-    validateUsePluginArgs<D>(plugins);
-  }
 
   static validatePlugin(plugin: Plugin): void {
     validatePlugin(plugin);
@@ -69,6 +64,12 @@ export class PluginsNamespace<
 
   setLimits(limits: Limits): void {
     this.#limits = limits;
+    // eslint-disable-next-line sonarjs/void-use -- @preserve: limits passed to validator via RouterInternals; void suppresses TS6133 until plugin implements validateCountThresholds
+    void this.#limits;
+  }
+
+  setValidatorGetter(getter: () => RouterValidator | null): void {
+    this.#getValidator = getter;
   }
 
   // =========================================================================
@@ -93,7 +94,9 @@ export class PluginsNamespace<
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
     // Emit warnings for count thresholds (not validation, just warnings)
-    this.#checkCountThresholds(factories.length);
+    this.#getValidator?.()?.plugins.validateCountThresholds(
+      this.#plugins.size + factories.length,
+    );
 
     // Fast path for single plugin (common case)
     if (factories.length === 1) {
@@ -223,32 +226,6 @@ export class PluginsNamespace<
   // Private methods
   // =========================================================================
 
-  #checkCountThresholds(newCount: number): void {
-    const maxPlugins = this.#limits.maxPlugins;
-
-    if (maxPlugins === 0) {
-      return;
-    }
-
-    const totalCount = newCount + this.#plugins.size;
-
-    const { warn, error } = computeThresholds(maxPlugins);
-
-    if (totalCount >= error) {
-      logger.error(
-        LOGGER_CONTEXT,
-        `${totalCount} plugins registered! ` +
-          `This is excessive and will impact performance. ` +
-          `Hard limit at ${maxPlugins}.`,
-      );
-    } else if (totalCount >= warn) {
-      logger.warn(
-        LOGGER_CONTEXT,
-        `${totalCount} plugins registered. ` + `Consider if all are necessary.`,
-      );
-    }
-  }
-
   /**
    * Deduplicates batch with warning for duplicates within batch.
    * Validation (existing duplicates) is done by facade.
@@ -260,10 +237,7 @@ export class PluginsNamespace<
 
     for (const plugin of plugins) {
       if (seenInBatch.has(plugin)) {
-        logger.warn(
-          LOGGER_CONTEXT,
-          "Duplicate factory in batch, will be registered once",
-        );
+        this.#getValidator?.()?.plugins.warnBatchDuplicates(plugins);
       } else {
         seenInBatch.add(plugin);
       }
@@ -276,6 +250,7 @@ export class PluginsNamespace<
     const appliedPlugin = this.#deps.compileFactory(pluginFactory);
 
     PluginsNamespace.validatePlugin(appliedPlugin);
+    this.#getValidator?.()?.plugins.validatePluginKeys(appliedPlugin);
 
     Object.freeze(appliedPlugin);
 
@@ -294,16 +269,10 @@ export class PluginsNamespace<
           );
 
           if (methodName === "onStart" && this.#deps.canNavigate()) {
-            logger.warn(
-              LOGGER_CONTEXT,
-              "Router already started, onStart will not be called",
-            );
+            this.#getValidator?.()?.plugins.warnPluginAfterStart(methodName);
           }
         } else {
-          logger.warn(
-            LOGGER_CONTEXT,
-            `Property '${methodName}' is not a function, skipping`,
-          );
+          this.#getValidator?.()?.plugins.warnPluginMethodType(methodName);
         }
       }
     }

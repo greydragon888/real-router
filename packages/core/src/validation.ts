@@ -14,3 +14,5 @@ export { INTERNAL_ROUTE_PREFIX } from "./namespaces/RoutesNamespace/constants";
 export type { RoutesStore } from "./namespaces/RoutesNamespace/routesStore";
 
 export { getInternals } from "./internals";
+
+export type { RouterInternals } from "./internals";

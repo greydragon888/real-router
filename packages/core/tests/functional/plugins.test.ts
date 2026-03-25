@@ -192,24 +192,22 @@ describe("core/plugins", () => {
         expect(tracker.getCalls().onStart).toBe(0);
       });
 
-      it("should rollback all plugins if any returns invalid structure", async () => {
+      it("without validation plugin, plugin with unknown properties does NOT throw (no rollback)", async () => {
         const tracker = createTrackingPlugin();
         const validPlugin = tracker.factory;
         const invalidPlugin = () => ({ unknownMethod: vi.fn() }) as any;
 
         router.stop();
 
+        // Without validation plugin, unknown properties don't cause a throw
         expect(() => {
           router.usePlugin(validPlugin, invalidPlugin);
-        }).toThrow(TypeError);
-        expect(() => {
-          router.usePlugin(validPlugin, invalidPlugin);
-        }).toThrow("Unknown property");
+        }).not.toThrow();
 
-        // Rollback should leave state unchanged - verify by starting router
+        // Both plugins registered (no rollback)
         await router.start("/home");
 
-        expect(tracker.getCalls().onStart).toBe(0);
+        expect(tracker.getCalls().onStart).toBe(1);
       });
 
       it("should rollback when error occurs in middle of batch", async () => {
@@ -309,7 +307,7 @@ describe("core/plugins", () => {
         expect(tracker2.getCalls().onStart).toBe(1);
       });
 
-      it("should warn and deduplicate factory in same batch", async () => {
+      it("should deduplicate factory in same batch (without validation plugin, no warn)", async () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         const tracker = createTrackingPlugin();
@@ -317,35 +315,32 @@ describe("core/plugins", () => {
 
         router.stop();
 
-        // Deduplicates with warning
         const unsub = router.usePlugin(factory, factory);
 
-        // Warning issued for duplicate
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
           "Duplicate factory in batch, will be registered once",
         );
 
-        // Only one factory registered - verify by starting router
         await router.start("/home");
 
-        // onStart should be called exactly once (not twice)
         expect(tracker.getCalls().onStart).toBe(1);
 
         unsub();
         warnSpy.mockRestore();
       });
 
-      it("should warn for each duplicate in batch", () => {
+      it("without validation plugin, duplicates in batch do NOT log warn", () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         const factory = () => ({});
 
-        // f, f, f → 2 warnings (second and third are duplicates)
         router.usePlugin(factory, factory, factory);
 
-        expect(warnSpy).toHaveBeenCalledTimes(2);
+        expect(warnSpy).not.toHaveBeenCalledWith(
+          "router.usePlugin",
+          "Duplicate factory in batch, will be registered once",
+        );
 
         warnSpy.mockRestore();
       });
@@ -521,7 +516,7 @@ describe("core/plugins", () => {
         expect(() => router.usePlugin({} as any)).toThrow(TypeError);
       });
 
-      it("should throw when plugin contains unknown properties", () => {
+      it("without validation plugin, plugin with unknown properties does NOT throw", () => {
         const factory = () =>
           ({
             onStart: vi.fn(),
@@ -530,10 +525,7 @@ describe("core/plugins", () => {
 
         expect(() => {
           router.usePlugin(factory);
-        }).toThrow(TypeError);
-        expect(() => {
-          router.usePlugin(factory);
-        }).toThrow("Unknown property");
+        }).not.toThrow();
       });
 
       it("should throw TypeError when factory returns Promise (async factory)", () => {
@@ -702,18 +694,16 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Non-function plugin methods (warning + skip)
     describe("non-function plugin methods", () => {
-      it("should warn and skip non-function onStart property", async () => {
+      it("should skip non-function onStart property (without validation plugin, no warn)", async () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         const factory = () => ({ onStart: "not a function" }) as any;
 
-        // Should not throw - property is in whitelist but skipped during subscription
         expect(() => {
           router.usePlugin(factory);
         }).not.toThrow();
 
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
           "Property 'onStart' is not a function, skipping",
         );
@@ -721,7 +711,7 @@ describe("core/plugins", () => {
         warnSpy.mockRestore();
       });
 
-      it("should warn for each non-function method", async () => {
+      it("without validation plugin, non-function methods do NOT log warn", async () => {
         router.stop();
 
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
@@ -735,29 +725,18 @@ describe("core/plugins", () => {
 
         router.usePlugin(factory);
 
-        // Should warn for each non-function property
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
           "Property 'onStart' is not a function, skipping",
         );
-        expect(warnSpy).toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Property 'onStop' is not a function, skipping",
-        );
-        expect(warnSpy).toHaveBeenCalledWith(
-          "router.usePlugin",
-          "Property 'onTransitionSuccess' is not a function, skipping",
-        );
 
-        // Should not throw when events are emitted
         router.start("/home").catch(() => {});
         router.stop();
 
         warnSpy.mockRestore();
       });
 
-      it("should subscribe only function methods and warn for non-functions", async () => {
+      it("should subscribe only function methods (without validation plugin, no warn for non-functions)", async () => {
         router.stop();
 
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
@@ -766,18 +745,15 @@ describe("core/plugins", () => {
         const factory = () =>
           ({
             onStart: onStartFn,
-            onStop: "not a function", // Should be skipped with warning
+            onStop: "not a function",
           }) as any;
 
         router.usePlugin(factory);
         await router.start("/home");
 
-        // onStart function should be called
         expect(onStartFn).toHaveBeenCalled();
 
-        // onStop should have warning
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
           "Property 'onStop' is not a function, skipping",
         );
@@ -788,41 +764,41 @@ describe("core/plugins", () => {
 
     // 🟡 IMPORTANT: Warning messages
     describe("warning messages", () => {
-      it("should warn at 10+ plugins", () => {
+      it("without validation plugin, registering 10+ plugins does NOT log warn", () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-        // Register 10 plugins (crosses WARN threshold)
+        // Register 10 plugins (would cross WARN threshold with plugin)
         const factories = Array.from({ length: 10 }, () => () => ({}));
 
         factories.forEach((f) => router.usePlugin(f));
 
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        // Without validation plugin, no threshold warning is emitted
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
-          "10 plugins registered. Consider if all are necessary.",
+          expect.stringContaining("plugins registered"),
         );
 
         warnSpy.mockRestore();
       });
 
-      it("should error at 25+ plugins", () => {
+      it("without validation plugin, registering 25+ plugins does NOT log error", () => {
         const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-        // Register 25 plugins (crosses ERROR threshold)
+        // Register 25 plugins (would cross ERROR threshold with plugin)
         const factories = Array.from({ length: 25 }, () => () => ({}));
 
         factories.forEach((f) => router.usePlugin(f));
 
-        // Logger format: logger.error(context, message)
-        expect(errorSpy).toHaveBeenCalledWith(
+        // Without validation plugin, no threshold error is emitted
+        expect(errorSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
-          "25 plugins registered! This is excessive and will impact performance. Hard limit at 50.",
+          expect.stringContaining("plugins registered"),
         );
 
         errorSpy.mockRestore();
       });
 
-      it("should warn when registering onStart after router is already started", () => {
+      it("without validation plugin, registering onStart after start does NOT log warn", () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
         // Router is already started in beforeEach
@@ -832,8 +808,7 @@ describe("core/plugins", () => {
 
         router.usePlugin(factory);
 
-        // Logger format: logger.warn(context, message)
-        expect(warnSpy).toHaveBeenCalledWith(
+        expect(warnSpy).not.toHaveBeenCalledWith(
           "router.usePlugin",
           "Router already started, onStart will not be called",
         );

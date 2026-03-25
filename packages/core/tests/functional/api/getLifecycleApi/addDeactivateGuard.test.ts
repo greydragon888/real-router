@@ -226,22 +226,16 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   describe("overwriting guards", () => {
-    it("should log warning when overwriting existing guard", () => {
+    it("should NOT log warning when overwriting existing guard (no validation plugin)", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       lifecycle.addDeactivateGuard("route", true);
 
-      // First registration - no warning
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // Second registration - should warn
       lifecycle.addDeactivateGuard("route", false);
 
-      // Logger format: logger.warn(context, message)
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.canDeactivate",
-        expect.stringContaining("Overwriting"),
-      );
+      expect(warnSpy).not.toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });

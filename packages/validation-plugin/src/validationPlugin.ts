@@ -14,20 +14,39 @@ import {
   validateSetDependencyArgs as validateSetDependencyArgsRaw,
   validateDependenciesObject,
   validateDependencyExists as validateDependencyExistsRaw,
+  validateDependencyCount,
+  validateCloneArgs,
+  warnOverwrite as warnDepsOverwrite,
+  warnBatchOverwrite,
+  warnRemoveNonExistent,
 } from "./validators/dependencies";
 import { validateEventName, validateListenerArgs } from "./validators/eventBus";
 import {
   validateHandler,
   validateNotRegistering,
   validateHandlerLimit,
+  validateLifecycleCountThresholds,
+  warnOverwrite as warnLifecycleOverwrite,
+  warnAsyncGuardSync,
 } from "./validators/lifecycle";
 import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
   validateNavigationOptions,
 } from "./validators/navigation";
-import { validateLimitValue, validateLimits } from "./validators/options";
-import { validatePluginLimit } from "./validators/plugins";
+import {
+  validateLimitValue,
+  validateLimits,
+  validateOptions,
+} from "./validators/options";
+import {
+  validatePluginLimit,
+  validatePluginKeys,
+  validateCountThresholds as validatePluginCountThresholds,
+  warnBatchDuplicates,
+  warnPluginMethodType,
+  warnPluginAfterStart,
+} from "./validators/plugins";
 import {
   validateExistingRoutes,
   validateForwardToConsistency,
@@ -50,12 +69,16 @@ import {
   validateParentOption as validateParentOptionRaw,
   throwIfInternalRoute,
   throwIfInternalRouteInArray,
+  validateSetRootPathArgs,
+  guardRouteCallbacks,
+  guardNoAsyncCallbacks,
 } from "./validators/routes";
 import { validateMakeStateArgs } from "./validators/state";
 
 import type { PluginFactory, RouterValidator } from "@real-router/core";
+import type { RouterInternals } from "@real-router/core/validation";
 
-function buildValidatorObject(): RouterValidator {
+function buildValidatorObject(ctx: RouterInternals): RouterValidator {
   return {
     routes: {
       validateBuildPathArgs,
@@ -138,6 +161,9 @@ function buildValidatorObject(): RouterValidator {
       },
       validateExistingRoutes,
       validateForwardToConsistency,
+      validateSetRootPathArgs,
+      guardRouteCallbacks,
+      guardNoAsyncCallbacks,
     },
     options: {
       validateLimitValue(name, value) {
@@ -147,6 +173,7 @@ function buildValidatorObject(): RouterValidator {
       validateLimits(limits) {
         validateLimits(limits, "validate");
       },
+      validateOptions,
     },
     dependencies: {
       validateDependencyName,
@@ -163,6 +190,11 @@ function buildValidatorObject(): RouterValidator {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateDependencyLimit(_store, _limits) {},
       validateDependenciesStructure,
+      validateDependencyCount,
+      validateCloneArgs,
+      warnOverwrite: warnDepsOverwrite,
+      warnBatchOverwrite,
+      warnRemoveNonExistent,
     },
     plugins: {
       validatePluginLimit(count, limits) {
@@ -171,6 +203,15 @@ function buildValidatorObject(): RouterValidator {
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
+      validatePluginKeys,
+      validateCountThresholds(count) {
+        const maxPlugins = ctx.getOptions().limits?.maxPlugins ?? 50;
+
+        validatePluginCountThresholds(count, maxPlugins);
+      },
+      warnBatchDuplicates,
+      warnPluginMethodType,
+      warnPluginAfterStart,
     },
     lifecycle: {
       validateHandler,
@@ -185,6 +226,14 @@ function buildValidatorObject(): RouterValidator {
           (limits as any)?.maxLifecycleHandlers,
         );
       },
+      validateCountThresholds(count, methodName) {
+        const maxHandlers =
+          ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
+
+        validateLifecycleCountThresholds(count, methodName, maxHandlers);
+      },
+      warnOverwrite: warnLifecycleOverwrite,
+      warnAsyncGuardSync,
     },
     navigation: {
       validateNavigateArgs,
@@ -234,7 +283,7 @@ export function validationPlugin(): PluginFactory {
     }
 
     // RouterInternals.validator is now mutable — direct assignment works
-    ctx.validator = buildValidatorObject();
+    ctx.validator = buildValidatorObject(ctx);
 
     try {
       const store = ctx.routeGetStore();
@@ -247,6 +296,10 @@ export function validationPlugin(): PluginFactory {
       validateForwardToTargetsStore(store);
       validateDependenciesStructure(deps);
       validateLimitsConsistency(options, store, deps);
+      ctx.validator.options.validateOptions(
+        options as unknown,
+        "constructor (retrospective)",
+      );
     } catch (error) {
       ctx.validator = null;
 
