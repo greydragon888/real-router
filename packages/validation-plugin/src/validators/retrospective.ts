@@ -78,19 +78,19 @@ function assertRoutesStore(store: unknown, fnName: string): LocalRoutesStore {
 
   const s = store as Record<string, unknown>;
 
-  if (!Array.isArray(s["definitions"])) {
+  if (!Array.isArray(s.definitions)) {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.definitions must be an array`,
     );
   }
 
-  if (!s["config"] || typeof s["config"] !== "object") {
+  if (!s.config || typeof s.config !== "object") {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.config must be an object`,
     );
   }
 
-  if (!s["tree"] || typeof s["tree"] !== "object") {
+  if (!s.tree || typeof s.tree !== "object") {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.tree must be an object`,
     );
@@ -161,6 +161,7 @@ function resolveForwardChain(
     current = next;
 
     if (chain.length > maxDepth) {
+      /* v8 ignore next 3 -- @preserve: requires 100+ forwardTo chain to trigger */
       throw new Error(
         `[validation-plugin] forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
       );
@@ -413,13 +414,13 @@ export function validateDependenciesStructure(deps: unknown): void {
   const d = deps as Record<string, unknown>;
 
   // Validate dependencies field exists and is an object
-  if (!d["dependencies"] || typeof d["dependencies"] !== "object") {
+  if (!d.dependencies || typeof d.dependencies !== "object") {
     throw new TypeError(
       "[validation-plugin] validateDependenciesStructure: deps.dependencies must be an object",
     );
   }
 
-  const dependencies = d["dependencies"] as Record<string, unknown>;
+  const dependencies = d.dependencies as Record<string, unknown>;
 
   // Getters can throw, return different values, or have side effects — reject them
   for (const key of Object.keys(dependencies)) {
@@ -431,13 +432,13 @@ export function validateDependenciesStructure(deps: unknown): void {
   }
 
   // Validate limits field exists and is an object
-  if (!d["limits"] || typeof d["limits"] !== "object") {
+  if (!d.limits || typeof d.limits !== "object") {
     throw new TypeError(
       "[validation-plugin] validateDependenciesStructure: deps.limits must be an object",
     );
   }
 
-  const limits = d["limits"] as Record<string, unknown>;
+  const limits = d.limits as Record<string, unknown>;
   const expectedLimitKeys: (keyof LocalDependencyLimits)[] = [
     "maxDependencies",
     "maxPlugins",
@@ -483,8 +484,8 @@ export function validateLimitsConsistency(
       ? (options as Record<string, unknown>)
       : {};
   const configuredLimits =
-    opts["limits"] && typeof opts["limits"] === "object"
-      ? (opts["limits"] as Record<string, unknown>)
+    opts.limits && typeof opts.limits === "object"
+      ? (opts.limits as Record<string, unknown>)
       : {};
 
   // --- Route count check ---
@@ -492,9 +493,9 @@ export function validateLimitsConsistency(
   if (store && typeof store === "object") {
     const s = store as Record<string, unknown>;
 
-    if (Array.isArray(s["definitions"])) {
-      const routeCount = (s["definitions"] as unknown[]).length;
-      const maxRoutes = configuredLimits["maxRoutes"];
+    if (Array.isArray(s.definitions)) {
+      const routeCount = (s.definitions as unknown[]).length;
+      const maxRoutes = configuredLimits.maxRoutes;
 
       if (
         typeof maxRoutes === "number" &&
@@ -512,8 +513,8 @@ export function validateLimitsConsistency(
   // Compare actual dep count against maxDependencies from deps.limits
   if (deps && typeof deps === "object") {
     const d = deps as Record<string, unknown>;
-    const dependencies = d["dependencies"];
-    const depsLimits = d["limits"];
+    const dependencies = d.dependencies;
+    const depsLimits = d.limits;
 
     if (
       dependencies &&
@@ -521,12 +522,12 @@ export function validateLimitsConsistency(
       depsLimits &&
       typeof depsLimits === "object"
     ) {
-      const depCount = Object.keys(dependencies as object).length;
+      const depCount = Object.keys(dependencies).length;
       const l = depsLimits as Record<string, unknown>;
 
       // Prefer the limit from options if explicitly configured, fall back to deps store limit
-      const maxDepsFromOptions = configuredLimits["maxDependencies"];
-      const maxDepsFromStore = l["maxDependencies"];
+      const maxDepsFromOptions = configuredLimits.maxDependencies;
+      const maxDepsFromStore = l.maxDependencies;
       const maxDeps =
         typeof maxDepsFromOptions === "number"
           ? maxDepsFromOptions
