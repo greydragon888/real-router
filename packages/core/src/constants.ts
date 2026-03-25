@@ -1,7 +1,6 @@
 // packages/core/src/constants.ts
 
 import type {
-  EventName,
   EventToNameMap,
   EventToPluginMap,
   ErrorCodeToValueMap,
@@ -74,22 +73,6 @@ export const events: EventToNameMap = {
   TRANSITION_ERROR: "$$error", // Emitted when navigation fails
 };
 
-/**
- * Valid event names for validation.
- */
-export const validEventNames = new Set<EventName>([
-  events.ROUTER_START,
-  events.TRANSITION_START,
-  events.TRANSITION_SUCCESS,
-  events.TRANSITION_ERROR,
-  events.TRANSITION_CANCEL,
-  events.ROUTER_STOP,
-]);
-
-/**
- * Default limits configuration for the router.
- * These values match the hardcoded constants from the current codebase.
- */
 export const DEFAULT_LIMITS = {
   maxDependencies: 100,
   maxPlugins: 50,
@@ -100,16 +83,3 @@ export const DEFAULT_LIMITS = {
 } as const;
 
 export const EMPTY_PARAMS: Readonly<Record<string, never>> = Object.freeze({});
-
-/**
- * Bounds for each limit - defines min and max allowed values.
- * Used for runtime validation in setLimit/withLimits.
- */
-export const LIMIT_BOUNDS = {
-  maxDependencies: { min: 0, max: 10_000 },
-  maxPlugins: { min: 0, max: 1000 },
-  maxListeners: { min: 0, max: 100_000 },
-  warnListeners: { min: 0, max: 100_000 },
-  maxEventDepth: { min: 0, max: 100 },
-  maxLifecycleHandlers: { min: 0, max: 10_000 },
-} as const;

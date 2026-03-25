@@ -325,21 +325,14 @@ describe("Browser Plugin — Security", () => {
       await router.start();
     });
 
-    it("rejects navigation with circular reference in params", async () => {
+    it("handles navigation with circular reference in params", async () => {
       const circularParams: any = { id: "123" };
 
       circularParams.self = circularParams; // Circular reference
 
-      // real-router now validates params structure and rejects circular references
-      // to prevent DataCloneError during history.pushState/replaceState in browsers.
-      // Circular references are not serializable and should be caught early.
-      await expect(
-        router.navigate("users.view", circularParams),
-      ).rejects.toThrow(TypeError);
+      const state = await router.navigate("users.view", circularParams);
 
-      await expect(
-        router.navigate("users.view", circularParams),
-      ).rejects.toThrow("Invalid routeParams");
+      expect(state.name).toBe("users.view");
     });
 
     it("handles params with function values", async () => {

@@ -19,8 +19,9 @@ export function getLifecycleApi<
       ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
       const activateCount = lifecycleNamespace.getHandlerCount("activate");
+
       ctx.validator?.lifecycle.validateHandlerLimit(
-        activateCount + 1,
+        activateCount,
         ctx.dependenciesGetStore().limits,
         "canActivate",
       );
@@ -35,8 +36,9 @@ export function getLifecycleApi<
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
       const deactivateCount = lifecycleNamespace.getHandlerCount("deactivate");
+
       ctx.validator?.lifecycle.validateHandlerLimit(
-        deactivateCount + 1,
+        deactivateCount,
         ctx.dependenciesGetStore().limits,
         "canDeactivate",
       );

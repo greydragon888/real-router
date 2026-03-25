@@ -691,14 +691,12 @@ describe("Persistent params plugin", () => {
       });
 
       it("should reject functions as parameter values", async () => {
-        // Note: real-router core validates params in buildStateWithSegments before
-        // plugin's forwardState interception, so error message comes from real-router
         await expect(
           router.navigate("route1", {
             id: "1",
             mode: (() => "dev") as unknown as string,
           }),
-        ).rejects.toThrow(/Invalid routeParams/);
+        ).rejects.toThrow(/must be a primitive value/);
       });
 
       it("should reject null as parameter value", async () => {
@@ -743,18 +741,15 @@ describe("Persistent params plugin", () => {
       });
 
       it("should only process own properties", async () => {
-        // Note: real-router core now validates that params have standard prototype
-        // (null or Object.prototype) in isParams(). Objects created with
-        // Object.create(customProto) are rejected before plugin processing.
-        // This test verifies that real-router rejects such objects.
         const params = Object.create({ inherited: "value" });
 
         params.mode = "dev";
         params.id = "1";
 
-        await expect(router.navigate("route1", params)).rejects.toThrow(
-          /Invalid routeParams/,
-        );
+        const state = await router.navigate("route1", params);
+
+        expect(state).toBeDefined();
+        expect(state.params.mode).toBe("dev");
       });
     });
   });
