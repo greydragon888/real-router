@@ -38,29 +38,32 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
 
-**Facade methods** validate via standalone validator functions (with `noValidate` guard):
+Validation is **opt-in** via `@real-router/validation-plugin`. Core ships with zero validation code — the plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
+
+**Facade methods** and **standalone API functions** call through the optional validator using optional chaining:
 
 ```typescript
 // Router.ts (facade)
 buildPath(route: string, params?: Params): string {
-  if (!this.#noValidate) {
-    validateBuildPathArgs(route);           // standalone function from validators.ts
-  }
-  return getInternals(this).buildPath(route, params); // via WeakMap — applies interceptor pipeline
+  ctx.validator?.routes.validateBuildPathArgs(route);  // no-op if plugin not registered
+  return getInternals(this).buildPath(route, params);  // via WeakMap — applies interceptor pipeline
+}
+
+// api/getRoutesApi.ts (standalone API)
+add(routes) {
+  ctx.validator?.routes.validateAddRouteArgs(routes);  // no-op if plugin not registered
+  addRoutes(store, routes);
 }
 ```
 
-**Standalone API functions** validate via standalone validator functions from `validators.ts`:
+The `validator` object is namespaced by concern (`routes`, `navigation`, `state`, `lifecycle`, `dependencies`, `plugins`, `options`, `eventBus`). Each namespace maps to a group of validator functions.
 
-```typescript
-// api/getDependenciesApi.ts
-set(name, value) {
-  validateSetDependencyArgs(name, value, "set");  // from validators.ts
-  setDependency(store, name, value);              // module-private CRUD
-}
-```
+**Plugin lifecycle:**
+- `validationPlugin()` is registered before `router.start()` — throws `VALIDATION_PLUGIN_AFTER_START` otherwise
+- On registration: installs validator + runs retrospective validation on existing routes/deps/options
+- On teardown (`unsubscribe()`): sets `ctx.validator = null` — validation silently disabled
 
-Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) regardless of whether they're called by the facade or standalone API.
+Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) and are imported by the plugin, not by core itself.
 
 ### Namespace Folder Structure
 
@@ -424,14 +427,20 @@ router.usePlugin(myPlugin); // onStart won't be called!
 **Facade methods** (on Router class):
 1. Add **validator** to `namespaces/XxxNamespace/validators.ts` (if new validation needed)
 2. Add **instance method** to namespace (business logic)
-3. Add **facade method** to Router.ts (validate with `noValidate` guard → delegate)
+3. Add **facade method** to Router.ts (`ctx.validator?.ns.fn()` → delegate)
 4. Bind method in Router constructor if it accesses private fields
 
 **Standalone API methods** (on `get*Api()` return objects):
 1. Add **validator** to `namespaces/XxxNamespace/validators.ts`
 2. Add **CRUD logic** as module-private function in `api/get*Api.ts`
-3. Add **method** to the returned API object (validate → CRUD)
+3. Add **method** to the returned API object (`ctx.validator?.ns.fn()` → CRUD)
 4. Access internals via `getInternals(router)` WeakMap
+
+**Adding validation to a new method:**
+- Call `ctx.validator?.ns.validateXxxArgs(...)` — optional chaining means no-op when plugin is absent
+- Add the corresponding method to `RouterValidator` in `src/types/RouterValidator.ts`
+- Implement the validator function in `namespaces/XxxNamespace/validators.ts`
+- Wire it up in `validationPlugin.ts` (in the `@real-router/validation-plugin` package)
 
 ### Modifying Existing Methods
 
@@ -480,3 +489,9 @@ Key types:
 Cancellation: Pass `{ signal }` via `NavigationOptions` for external `AbortController` cancellation. `router.stop()`, `router.dispose()`, and concurrent navigation abort the internal controller automatically. 
 Guards receive `signal` as optional 3rd parameter for cooperative cancellation (e.g., `fetch(url, { signal })`). 
 `AbortError` thrown in guards is auto-converted to `TRANSITION_CANCELLED`.
+
+## See Also
+
+- [packages/validation-plugin/CLAUDE.md](../validation-plugin/CLAUDE.md) — Validation plugin architecture and validator namespaces
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System design and package structure
+- [IMPLEMENTATION_NOTES.md](../../IMPLEMENTATION_NOTES.md) — Infrastructure decisions

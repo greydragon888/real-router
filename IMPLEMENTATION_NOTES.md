@@ -1264,24 +1264,63 @@ src/
 
 **Two entry points, same validators:**
 
-1. **Facade methods** (Router.ts) — validate via static methods on namespace classes
-2. **Standalone API** (`api/get*Api.ts`) — validate via standalone functions from `validators.ts`
+1. **Facade methods** (Router.ts) — call through `ctx.validator?.ns.fn()` (optional chaining)
+2. **Standalone API** (`api/get*Api.ts`) — same pattern
 
 ```typescript
 // Router.ts (facade path)
 buildPath(route: string, params?: Params): string {
-  RoutesNamespace.validateBuildPathArgs(route);
-  return this.#routes.buildPath(route, params, this.#options.get());
+  ctx.validator?.routes.validateBuildPathArgs(route);  // no-op if plugin absent
+  return getInternals(this).buildPath(route, params);
 }
 
-// api/getDependenciesApi.ts (standalone API path)
-set(name, value) {
-  validateSetDependencyArgs(name, value, "set");
-  setDependency(store, name, value);
+// api/getRoutesApi.ts (standalone API path)
+add(routes) {
+  ctx.validator?.routes.validateAddRouteArgs(routes);  // no-op if plugin absent
+  addRoutes(store, routes);
 }
 ```
 
-Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) regardless of caller. Some validators are shared between facade and API (e.g., `validateDependenciesObject` used in both Router.ts constructor and getDependenciesApi).
+Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) and are imported by `@real-router/validation-plugin`, not by core itself. Core only defines the `RouterValidator` interface in `src/types/RouterValidator.ts`.
+
+### Validation Plugin Extraction
+
+**Problem:** Validation code accounted for roughly 25% of the core bundle. It was always included — even in production builds where argument errors are impossible (TypeScript enforces call sites). Users had no way to opt out.
+
+**Solution:** `@real-router/validation-plugin` — a standalone opt-in plugin. Core ships with zero validation logic. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time. All call sites in core use `ctx.validator?.ns.fn()` — a no-op when the plugin is absent.
+
+**Before:**
+
+```typescript
+// Router.ts — validation always ran, bundled unconditionally
+buildPath(route: string, params?: Params): string {
+  if (!this.#noValidate) {
+    validateBuildPathArgs(route);  // always in the bundle
+  }
+  return this.#routes.buildPath(route, params, this.#options.get());
+}
+```
+
+**After:**
+
+```typescript
+// Router.ts — validation is a no-op when plugin is not registered
+buildPath(route: string, params?: Params): string {
+  ctx.validator?.routes.validateBuildPathArgs(route);  // tree-shaken if unused
+  return getInternals(this).buildPath(route, params);
+}
+
+// App setup — opt in explicitly
+router.usePlugin(validationPlugin());
+```
+
+**Why this approach:**
+
+- **Preact debug pattern** — Preact ships `preact/debug` as a separate opt-in import. Same idea: DX tooling is separate from the runtime.
+- **User control** — production builds skip the plugin entirely. Development builds register it. No `__DEV__` flags, no build-time conditionals, no bundler magic required.
+- **Runtime-agnostic** — works identically in browser, Node.js, and edge runtimes. No environment detection.
+- **Retrospective validation** — the plugin validates already-registered routes and dependencies on install, catching mistakes made before the plugin was registered.
+- **Atomic rollback** — if retrospective validation fails, `ctx.validator` is reset to `null` before the error propagates. The router stays in a consistent state.
 
 ### Plugin Interception Pattern
 

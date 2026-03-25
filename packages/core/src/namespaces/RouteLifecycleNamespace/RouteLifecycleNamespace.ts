@@ -67,6 +67,12 @@ export class RouteLifecycleNamespace<
     this.#limits = limits;
   }
 
+  getHandlerCount(type: "activate" | "deactivate"): number {
+    return type === "activate"
+      ? this.#canActivateFactories.size
+      : this.#canDeactivateFactories.size;
+  }
+
   // =========================================================================
   // Instance methods
   // =========================================================================

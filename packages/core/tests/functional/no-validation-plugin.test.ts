@@ -8,6 +8,9 @@ import {
   getPluginApi,
   getRoutesApi,
 } from "@real-router/core/api";
+import { EventBusNamespace } from "../../src/namespaces/EventBusNamespace";
+import { PluginsNamespace } from "../../src/namespaces/PluginsNamespace";
+import { StateNamespace } from "../../src/namespaces/StateNamespace";
 
 import { createTestRouter } from "../helpers";
 
@@ -335,6 +338,65 @@ describe("core/without validation plugin", () => {
       routesApi.update("a", { forwardTo: "c" });
 
       expect(getPluginApi(router).forwardState("a", {}).name).toBe("c");
+
+      router.stop();
+    });
+  });
+
+  describe("internal validator static methods (coverage for validators still in core)", () => {
+    it("should throw TypeError when plugin is not a function (validateUsePluginArgs)", () => {
+      expect(() => PluginsNamespace.validateUsePluginArgs([null])).toThrow(
+        TypeError,
+      );
+    });
+
+    it("should throw when same factory registered twice (validateNoDuplicatePlugins)", () => {
+      const factory = () => ({});
+
+      expect(() =>
+        PluginsNamespace.validateNoDuplicatePlugins(
+          [factory],
+          (f) => f === factory,
+        ),
+      ).toThrow();
+    });
+
+    it("should throw TypeError when subscribe listener is not a function (validateSubscribeListener)", () => {
+      expect(() => EventBusNamespace.validateSubscribeListener(null)).toThrow(
+        TypeError,
+      );
+    });
+
+    it("should throw TypeError for invalid state in areStatesEqual (validateAreStatesEqualArgs)", () => {
+      expect(() =>
+        StateNamespace.validateAreStatesEqualArgs("invalid", null, null),
+      ).toThrow(TypeError);
+    });
+
+    it("should throw TypeError for non-boolean ignoreQueryParams (validateAreStatesEqualArgs)", () => {
+      expect(() =>
+        StateNamespace.validateAreStatesEqualArgs(null, null, "true"),
+      ).toThrow(TypeError);
+    });
+
+    it("should throw TypeError for non-string rootPath (validateSetRootPathArgs)", () => {
+      const router = createTestRouter();
+
+      expect(() => getPluginApi(router).setRootPath(123 as any)).toThrow(
+        TypeError,
+      );
+
+      router.stop();
+    });
+
+    it("should return plugin count (count method)", () => {
+      const router = createTestRouter();
+
+      router.usePlugin(() => ({}));
+
+      const pluginApi = getPluginApi(router);
+
+      expect(typeof pluginApi.getOptions).toBe("function");
 
       router.stop();
     });

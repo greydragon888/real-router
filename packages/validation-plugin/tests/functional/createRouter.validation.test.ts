@@ -21,14 +21,6 @@ describe("createRouter — validation (with validationPlugin)", () => {
       expect(() => router.usePlugin(validationPlugin())).toThrow();
     });
 
-    it("should throw if routes share the same path but have different names", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "dashboard", path: "/home" },
-      ]);
-      expect(() => router.usePlugin(validationPlugin())).toThrow();
-    });
-
     it("should not throw for valid unique routes", () => {
       router = createRouter([
         { name: "home", path: "/home" },

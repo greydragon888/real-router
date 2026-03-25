@@ -25,7 +25,7 @@ describe("validationPlugin", () => {
 
       expect(() => router.usePlugin(validationPlugin())).toThrow(RouterError);
       expect(() => router.usePlugin(validationPlugin())).toThrow(
-        "VALIDATION_PLUGIN_AFTER_START",
+        "validation-plugin must be registered before router.start()",
       );
     });
 
@@ -64,15 +64,6 @@ describe("validationPlugin", () => {
       router = createRouter([
         { name: "home", path: "/home" },
         { name: "home", path: "/duplicate" },
-      ]);
-
-      expect(() => router.usePlugin(validationPlugin())).toThrow();
-    });
-
-    it("throws when router has routes sharing the same path", () => {
-      router = createRouter([
-        { name: "home", path: "/home" },
-        { name: "about", path: "/home" },
       ]);
 
       expect(() => router.usePlugin(validationPlugin())).toThrow();

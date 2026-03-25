@@ -33,6 +33,7 @@ real-router/
 │   ├── logger-plugin/             # Development logging with timing and param diffs
 │   ├── persistent-params-plugin/  # Parameter persistence across navigations
 │   ├── ssr-data-plugin/           # SSR per-route data loading via start() interceptor
+│   ├── validation-plugin/         # Opt-in argument validation (DX-only, 100% tree-shakeable)
 │   ├── route-utils/               # Route tree queries and segment testing
 │   ├── logger/                    # Isomorphic structured logging
 │   ├── fsm/                       # Finite state machine engine (internal, published by accident)
@@ -52,7 +53,7 @@ real-router/
 │   └── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
 ```
 
-**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `route-utils`, `logger`
+**Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `validation-plugin`, `route-utils`, `logger`
 
 **Internal packages** (bundled into consumers, not on npm): `route-tree`, `path-matcher`, `search-params`, `type-guards`, `event-emitter`, `browser-env`, `dom-utils`
 
@@ -153,6 +154,9 @@ graph TD
 
     SDP["ssr-data-plugin"]
     SDP -->|dep| CORE
+
+    VP["validation-plugin"]
+    VP -->|dep| CORE
 
     ROUTEUTILS -->|dep| TYPES
 ```

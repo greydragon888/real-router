@@ -96,6 +96,8 @@ function setMultipleDependencies(
     if (deps[key] !== undefined) {
       if (Object.hasOwn(store.dependencies, key)) {
         overwrittenKeys.push(key);
+      } else {
+        checkDependencyCount(store, "setDependencies");
       }
 
       (store.dependencies as Record<string, unknown>)[key] = deps[key];

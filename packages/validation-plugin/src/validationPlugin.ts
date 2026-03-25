@@ -4,6 +4,13 @@ import { RouterError } from "@real-router/core";
 import { getInternals } from "@real-router/core/validation";
 import type { PluginFactory, RouterValidator } from "@real-router/core";
 
+import {
+  validateRouteName,
+  isState,
+  isBoolean,
+  getTypeDescription,
+} from "type-guards";
+
 import * as routesV from "./validators/routes";
 import * as optionsV from "./validators/options";
 import * as depsV from "./validators/dependencies";
@@ -27,15 +34,26 @@ function buildValidatorObject(): RouterValidator {
         routesV.validateAddRouteArgs(routes as any);
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      validateRoutes(routes, tree) {
-        routesV.validateRoutes(routes as any, tree as any);
+      validateRoutes(routes, store) {
+        const s = store as {
+          tree?: unknown;
+          config?: { forwardMap?: Record<string, string> };
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        routesV.validateRoutes(
+          routes as any,
+          s.tree as any,
+          s.config?.forwardMap,
+        );
       },
       validateRemoveRouteArgs: routesV.validateRemoveRouteArgs,
       validateUpdateRouteBasicArgs: routesV.validateUpdateRouteBasicArgs,
       validateUpdateRoutePropertyTypes(_name, _updates) {},
       validateUpdateRoute(_name, _updates, _tree) {},
       validateParentOption: routesV.validateParentOption,
-      validateRouteName(_name, _caller) {},
+      validateRouteName(name, caller) {
+        validateRouteName(name, caller);
+      },
       throwIfInternalRoute: routesV.throwIfInternalRoute,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       throwIfInternalRouteInArray(routes, caller) {
@@ -59,7 +77,9 @@ function buildValidatorObject(): RouterValidator {
         depsV.validateSetDependencyArgs(_name);
       },
       validateDependenciesObject: depsV.validateDependenciesObject,
-      validateDependencyExists(_name, _store) {},
+      validateDependencyExists(value, name) {
+        depsV.validateDependencyExists(value, name as string);
+      },
       validateDependencyLimit(_store, _limits) {},
       validateDependenciesStructure: retroV.validateDependenciesStructure,
     },
@@ -91,7 +111,23 @@ function buildValidatorObject(): RouterValidator {
     },
     state: {
       validateMakeStateArgs: stateV.validateMakeStateArgs,
-      validateAreStatesEqualArgs(_s1, _s2, _ignoreQP) {},
+      validateAreStatesEqualArgs(s1, s2, ignoreQP) {
+        if (!isState(s1)) {
+          throw new TypeError(
+            `[router.areStatesEqual] Invalid state1: ${getTypeDescription(s1)}. Expected State object.`,
+          );
+        }
+        if (!isState(s2)) {
+          throw new TypeError(
+            `[router.areStatesEqual] Invalid state2: ${getTypeDescription(s2)}. Expected State object.`,
+          );
+        }
+        if (ignoreQP !== undefined && !isBoolean(ignoreQP)) {
+          throw new TypeError(
+            `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQP)}. Expected boolean.`,
+          );
+        }
+      },
     },
     eventBus: {
       validateEventName: eventBusV.validateEventName,

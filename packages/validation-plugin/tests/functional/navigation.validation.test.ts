@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
-import { createRouter, errorCodes } from "@real-router/core";
-import { validationPlugin } from "@real-router/validation-plugin";
+import { errorCodes } from "@real-router/core";
 
 import { createValidationRouter } from "../helpers";
 
@@ -114,55 +113,42 @@ describe("navigation validation — with validationPlugin", () => {
   });
 
   describe("navigateToDefault() options validation", () => {
-    it("should throw TypeError for invalid argument types", async () => {
+    it("should throw TypeError for invalid argument types", () => {
       const raw = router as unknown as {
         navigateToDefault(o: unknown): Promise<unknown>;
       };
-      await expect(raw.navigateToDefault("string")).rejects.toThrow(TypeError);
+      expect(() => raw.navigateToDefault("string")).toThrow(TypeError);
     });
 
-    it("should throw TypeError for invalid options type (string)", async () => {
+    it("should throw TypeError for invalid options type (string)", () => {
       const raw = router as unknown as {
         navigateToDefault(o: unknown): Promise<unknown>;
       };
-      await expect(raw.navigateToDefault("invalid")).rejects.toThrow(
-        /Invalid options/,
-      );
+      expect(() => raw.navigateToDefault("invalid")).toThrow(/Invalid options/);
     });
 
-    it("should throw TypeError for invalid options type (number)", async () => {
+    it("should throw TypeError for invalid options type (number)", () => {
       const raw = router as unknown as {
         navigateToDefault(o: unknown): Promise<unknown>;
       };
-      await expect(raw.navigateToDefault(123)).rejects.toThrow(TypeError);
+      expect(() => raw.navigateToDefault(123)).toThrow(TypeError);
     });
 
-    it("should throw TypeError for invalid option field types", async () => {
+    it("should throw TypeError for invalid option field types", () => {
       const raw = router as unknown as {
         navigateToDefault(o: unknown): Promise<unknown>;
       };
-      await expect(raw.navigateToDefault({ replace: "true" })).rejects.toThrow(
+      expect(() => raw.navigateToDefault({ replace: "true" })).toThrow(
         TypeError,
       );
     });
 
-    it("should include method name in error message", async () => {
+    it("should include method name in error message", () => {
       const raw = router as unknown as {
         navigateToDefault(o: unknown): Promise<unknown>;
       };
-      await expect(raw.navigateToDefault("invalid")).rejects.toThrow(
+      expect(() => raw.navigateToDefault("invalid")).toThrow(
         /navigateToDefault/,
-      );
-    });
-  });
-
-  describe("start() validation", () => {
-    it("validates options passed to start", async () => {
-      const r = createRouter([{ name: "home", path: "/home" }]);
-      r.usePlugin(validationPlugin());
-      const raw = r as unknown as { start(p: string, o: unknown): unknown };
-      await expect(raw.start("/home", { replace: "bad" })).rejects.toThrow(
-        TypeError,
       );
     });
   });

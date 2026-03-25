@@ -18,6 +18,13 @@ export function getLifecycleApi<
       ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
+      const activateCount = lifecycleNamespace.getHandlerCount("activate");
+      ctx.validator?.lifecycle.validateHandlerLimit(
+        activateCount + 1,
+        ctx.dependenciesGetStore().limits,
+        "canActivate",
+      );
+
       lifecycleNamespace.addCanActivate(name, handler);
     },
 
@@ -26,6 +33,13 @@ export function getLifecycleApi<
 
       ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
       ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
+
+      const deactivateCount = lifecycleNamespace.getHandlerCount("deactivate");
+      ctx.validator?.lifecycle.validateHandlerLimit(
+        deactivateCount + 1,
+        ctx.dependenciesGetStore().limits,
+        "canDeactivate",
+      );
 
       lifecycleNamespace.addCanDeactivate(name, handler);
     },

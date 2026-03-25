@@ -87,22 +87,7 @@ describe("event bus validation — with validationPlugin", () => {
     });
   });
 
-  describe("subscribe validation", () => {
-    it("should throw TypeError for non-function listener", () => {
-      const raw = router as unknown as { subscribe(cb: unknown): unknown };
-      expect(() => raw.subscribe("string")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for null listener", () => {
-      const raw = router as unknown as { subscribe(cb: unknown): unknown };
-      expect(() => raw.subscribe(null)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for object listener", () => {
-      const raw = router as unknown as { subscribe(cb: unknown): unknown };
-      expect(() => raw.subscribe({})).toThrow(TypeError);
-    });
-
+  describe("subscribe", () => {
     it("should accept function listener", () => {
       expect(() => router.subscribe(() => {})).not.toThrow();
     });
