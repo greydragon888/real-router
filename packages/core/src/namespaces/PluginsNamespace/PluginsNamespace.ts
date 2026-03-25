@@ -94,7 +94,9 @@ export class PluginsNamespace<
    */
   use(...factories: PluginFactory<Dependencies>[]): Unsubscribe {
     // Emit warnings for count thresholds (not validation, just warnings)
-    this.#getValidator?.()?.plugins.validateCountThresholds(factories.length);
+    this.#getValidator?.()?.plugins.validateCountThresholds(
+      this.#plugins.size + factories.length,
+    );
 
     // Fast path for single plugin (common case)
     if (factories.length === 1) {

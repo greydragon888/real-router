@@ -20,8 +20,9 @@ import * as routesV from "./validators/routes";
 import * as stateV from "./validators/state";
 
 import type { PluginFactory, RouterValidator } from "@real-router/core";
+import type { RouterInternals } from "@real-router/core/validation";
 
-function buildValidatorObject(): RouterValidator {
+function buildValidatorObject(ctx: RouterInternals): RouterValidator {
   return {
     routes: {
       validateBuildPathArgs: routesV.validateBuildPathArgs,
@@ -104,14 +105,9 @@ function buildValidatorObject(): RouterValidator {
       },
       validateExistingRoutes: retroV.validateExistingRoutes,
       validateForwardToConsistency: retroV.validateForwardToConsistency,
-      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateSetRootPathArgs(_rootPath) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      guardRouteCallbacks(_route) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      guardNoAsyncCallbacks(_route) {},
-      /* v8 ignore stop */
+      validateSetRootPathArgs: routesV.validateSetRootPathArgs,
+      guardRouteCallbacks: routesV.guardRouteCallbacks,
+      guardNoAsyncCallbacks: routesV.guardNoAsyncCallbacks,
     },
     options: {
       validateLimitValue(name, value) {
@@ -121,10 +117,7 @@ function buildValidatorObject(): RouterValidator {
       validateLimits(limits) {
         optionsV.validateLimits(limits, "validate");
       },
-      /* v8 ignore start -- @preserve: Phase 2 stub; call site added in tasks 2-7 */
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateOptions(_options, _methodName) {},
-      /* v8 ignore stop */
+      validateOptions: optionsV.validateOptions,
     },
     dependencies: {
       validateDependencyName: depsV.validateDependencyName,
@@ -141,18 +134,11 @@ function buildValidatorObject(): RouterValidator {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateDependencyLimit(_store, _limits) {},
       validateDependenciesStructure: retroV.validateDependenciesStructure,
-      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateDependencyCount(_store, _methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateCloneArgs(_dependencies) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnOverwrite(_name, _methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnBatchOverwrite(_keys, _methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnRemoveNonExistent(_name) {},
-      /* v8 ignore stop */
+      validateDependencyCount: depsV.validateDependencyCount,
+      validateCloneArgs: depsV.validateCloneArgs,
+      warnOverwrite: depsV.warnOverwrite,
+      warnBatchOverwrite: depsV.warnBatchOverwrite,
+      warnRemoveNonExistent: depsV.warnRemoveNonExistent,
     },
     plugins: {
       validatePluginLimit(count, limits) {
@@ -161,18 +147,17 @@ function buildValidatorObject(): RouterValidator {
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
-      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validatePluginKeys(_plugin) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateCountThresholds(_count) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnBatchDuplicates(_plugins) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnPluginMethodType(_methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnPluginAfterStart(_methodName) {},
-      /* v8 ignore stop */
+      validatePluginKeys: pluginsV.validatePluginKeys,
+      validateCountThresholds(count) {
+        const maxPlugins = ctx.getOptions().limits?.maxPlugins ?? 50;
+
+        pluginsV.validateCountThresholds(count, maxPlugins);
+      },
+      warnBatchDuplicates(_plugins) {
+        pluginsV.warnBatchDuplicates();
+      },
+      warnPluginMethodType: pluginsV.warnPluginMethodType,
+      warnPluginAfterStart: pluginsV.warnPluginAfterStart,
     },
     lifecycle: {
       validateHandler: lifecycleV.validateHandler,
@@ -187,14 +172,18 @@ function buildValidatorObject(): RouterValidator {
           (limits as any)?.maxLifecycleHandlers,
         );
       },
-      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      validateCountThresholds(_count, _methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnOverwrite(_name, _type, _methodName) {},
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      warnAsyncGuardSync(_name, _methodName) {},
-      /* v8 ignore stop */
+      validateCountThresholds(count, methodName) {
+        const maxHandlers =
+          ctx.getOptions().limits?.maxLifecycleHandlers ?? 200;
+
+        lifecycleV.validateLifecycleCountThresholds(
+          count,
+          methodName,
+          maxHandlers,
+        );
+      },
+      warnOverwrite: lifecycleV.warnOverwrite,
+      warnAsyncGuardSync: lifecycleV.warnAsyncGuardSync,
     },
     navigation: {
       validateNavigateArgs: navV.validateNavigateArgs,
@@ -243,7 +232,7 @@ export function validationPlugin(): PluginFactory {
       });
     }
 
-    const validator = buildValidatorObject();
+    const validator = buildValidatorObject(ctx);
 
     // RouterInternals.validator is now mutable — direct assignment works
     ctx.validator = validator;
@@ -259,6 +248,10 @@ export function validationPlugin(): PluginFactory {
       retroV.validateForwardToTargetsStore(store);
       retroV.validateDependenciesStructure(deps);
       retroV.validateLimitsConsistency(options, store, deps);
+      validator.options.validateOptions(
+        options as unknown,
+        "constructor (retrospective)",
+      );
     } catch (error) {
       ctx.validator = null;
 

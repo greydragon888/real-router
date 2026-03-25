@@ -2698,6 +2698,9 @@ importers:
       '@real-router/core':
         specifier: workspace:^
         version: link:../core
+      '@real-router/logger':
+        specifier: workspace:^
+        version: link:../logger
     devDependencies:
       route-tree:
         specifier: workspace:^
