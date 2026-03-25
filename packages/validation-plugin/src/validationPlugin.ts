@@ -9,30 +9,64 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import * as depsV from "./validators/dependencies";
-import * as eventBusV from "./validators/eventBus";
-import * as lifecycleV from "./validators/lifecycle";
-import * as navV from "./validators/navigation";
-import * as optionsV from "./validators/options";
-import * as pluginsV from "./validators/plugins";
-import * as retroV from "./validators/retrospective";
-import * as routesV from "./validators/routes";
-import * as stateV from "./validators/state";
+import {
+  validateDependencyName,
+  validateSetDependencyArgs as validateSetDependencyArgsRaw,
+  validateDependenciesObject,
+  validateDependencyExists as validateDependencyExistsRaw,
+} from "./validators/dependencies";
+import { validateEventName, validateListenerArgs } from "./validators/eventBus";
+import {
+  validateHandler,
+  validateNotRegistering,
+  validateHandlerLimit,
+} from "./validators/lifecycle";
+import {
+  validateNavigateArgs,
+  validateNavigateToDefaultArgs,
+  validateNavigationOptions,
+} from "./validators/navigation";
+import { validateLimitValue, validateLimits } from "./validators/options";
+import { validatePluginLimit } from "./validators/plugins";
+import {
+  validateExistingRoutes,
+  validateForwardToConsistency,
+  validateRoutePropertiesStore,
+  validateForwardToTargetsStore,
+  validateDependenciesStructure,
+  validateLimitsConsistency,
+} from "./validators/retrospective";
+import {
+  validateBuildPathArgs,
+  validateMatchPathArgs,
+  validateIsActiveRouteArgs,
+  validateShouldUpdateNodeArgs,
+  validateStateBuilderArgs,
+  validateAddRouteArgs,
+  validateRoutes,
+  validateRemoveRouteArgs,
+  validateUpdateRouteBasicArgs,
+  validateUpdateRoute,
+  validateParentOption as validateParentOptionRaw,
+  throwIfInternalRoute,
+  throwIfInternalRouteInArray,
+} from "./validators/routes";
+import { validateMakeStateArgs } from "./validators/state";
 
 import type { PluginFactory, RouterValidator } from "@real-router/core";
 
 function buildValidatorObject(): RouterValidator {
   return {
     routes: {
-      validateBuildPathArgs: routesV.validateBuildPathArgs,
-      validateMatchPathArgs: routesV.validateMatchPathArgs,
-      validateIsActiveRouteArgs: routesV.validateIsActiveRouteArgs,
-      validateShouldUpdateNodeArgs: routesV.validateShouldUpdateNodeArgs,
-      validateStateBuilderArgs: routesV.validateStateBuilderArgs,
+      validateBuildPathArgs,
+      validateMatchPathArgs,
+      validateIsActiveRouteArgs,
+      validateShouldUpdateNodeArgs,
+      validateStateBuilderArgs,
 
       validateAddRouteArgs(routes) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        routesV.validateAddRouteArgs(routes as any);
+        validateAddRouteArgs(routes as any);
       },
 
       validateRoutes(routes, store) {
@@ -41,7 +75,7 @@ function buildValidatorObject(): RouterValidator {
           config?: { forwardMap?: Record<string, string> };
         };
 
-        routesV.validateRoutes(
+        validateRoutes(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           routes as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
@@ -49,8 +83,8 @@ function buildValidatorObject(): RouterValidator {
           s.config?.forwardMap,
         );
       },
-      validateRemoveRouteArgs: routesV.validateRemoveRouteArgs,
-      validateUpdateRouteBasicArgs: routesV.validateUpdateRouteBasicArgs,
+      validateRemoveRouteArgs,
+      validateUpdateRouteBasicArgs,
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateUpdateRoutePropertyTypes(_name, _updates) {},
       validateUpdateRoute(name, updates, store) {
@@ -63,7 +97,7 @@ function buildValidatorObject(): RouterValidator {
         };
         const forwardTo = (updates as Record<string, unknown>).forwardTo;
 
-        routesV.validateUpdateRoute(
+        validateUpdateRoute(
           name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           forwardTo as any,
@@ -74,7 +108,7 @@ function buildValidatorObject(): RouterValidator {
         );
       },
       validateParentOption(parent, tree) {
-        routesV.validateParentOption(parent as string);
+        validateParentOptionRaw(parent as string);
         let node = tree as { children: Map<string, unknown> };
 
         for (const segment of (parent as string).split(".")) {
@@ -95,56 +129,56 @@ function buildValidatorObject(): RouterValidator {
         validateRouteName(name, caller);
       },
       throwIfInternalRoute(name, caller) {
-        routesV.throwIfInternalRoute(name as string, caller);
+        throwIfInternalRoute(name as string, caller);
       },
 
       throwIfInternalRouteInArray(routes, caller) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        routesV.throwIfInternalRouteInArray(routes as any, caller);
+        throwIfInternalRouteInArray(routes as any, caller);
       },
-      validateExistingRoutes: retroV.validateExistingRoutes,
-      validateForwardToConsistency: retroV.validateForwardToConsistency,
+      validateExistingRoutes,
+      validateForwardToConsistency,
     },
     options: {
       validateLimitValue(name, value) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-        optionsV.validateLimitValue(name as any, value, "validate");
+        validateLimitValue(name as any, value, "validate");
       },
       validateLimits(limits) {
-        optionsV.validateLimits(limits, "validate");
+        validateLimits(limits, "validate");
       },
     },
     dependencies: {
-      validateDependencyName: depsV.validateDependencyName,
+      validateDependencyName,
       validateSetDependencyArgs(_name, _value, _caller) {
-        depsV.validateSetDependencyArgs(_name);
+        validateSetDependencyArgsRaw(_name);
       },
-      validateDependenciesObject: depsV.validateDependenciesObject,
+      validateDependenciesObject,
       validateDependencyExists(name, store) {
         const s = store as { dependencies?: Record<string, unknown> };
         const value = s.dependencies?.[name];
 
-        depsV.validateDependencyExists(value, name);
+        validateDependencyExistsRaw(value, name);
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateDependencyLimit(_store, _limits) {},
-      validateDependenciesStructure: retroV.validateDependenciesStructure,
+      validateDependenciesStructure,
     },
     plugins: {
       validatePluginLimit(count, limits) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
-        pluginsV.validatePluginLimit(count, 1, (limits as any)?.maxPlugins);
+        validatePluginLimit(count, 1, (limits as any)?.maxPlugins);
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
     },
     lifecycle: {
-      validateHandler: lifecycleV.validateHandler,
+      validateHandler,
       validateNotRegistering(name, _guards, caller) {
-        lifecycleV.validateNotRegistering(false, name, caller);
+        validateNotRegistering(false, name, caller);
       },
       validateHandlerLimit(count, limits, caller) {
-        lifecycleV.validateHandlerLimit(
+        validateHandlerLimit(
           count,
           caller,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
@@ -153,12 +187,12 @@ function buildValidatorObject(): RouterValidator {
       },
     },
     navigation: {
-      validateNavigateArgs: navV.validateNavigateArgs,
-      validateNavigateToDefaultArgs: navV.validateNavigateToDefaultArgs,
-      validateNavigationOptions: navV.validateNavigationOptions,
+      validateNavigateArgs,
+      validateNavigateToDefaultArgs,
+      validateNavigationOptions,
     },
     state: {
-      validateMakeStateArgs: stateV.validateMakeStateArgs,
+      validateMakeStateArgs,
       validateAreStatesEqualArgs(s1, s2, ignoreQP) {
         if (!isState(s1)) {
           throw new TypeError(
@@ -178,11 +212,11 @@ function buildValidatorObject(): RouterValidator {
       },
     },
     eventBus: {
-      validateEventName: eventBusV.validateEventName,
+      validateEventName,
 
       validateListenerArgs(name, cb) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        eventBusV.validateListenerArgs(name as any, cb as any);
+        validateListenerArgs(name as any, cb as any);
       },
     },
   };
@@ -199,22 +233,20 @@ export function validationPlugin(): PluginFactory {
       });
     }
 
-    const validator = buildValidatorObject();
-
     // RouterInternals.validator is now mutable — direct assignment works
-    ctx.validator = validator;
+    ctx.validator = buildValidatorObject();
 
     try {
       const store = ctx.routeGetStore();
       const deps = ctx.dependenciesGetStore();
       const options = ctx.getOptions();
 
-      retroV.validateExistingRoutes(store);
-      retroV.validateForwardToConsistency(store);
-      retroV.validateRoutePropertiesStore(store);
-      retroV.validateForwardToTargetsStore(store);
-      retroV.validateDependenciesStructure(deps);
-      retroV.validateLimitsConsistency(options, store, deps);
+      validateExistingRoutes(store);
+      validateForwardToConsistency(store);
+      validateRoutePropertiesStore(store);
+      validateForwardToTargetsStore(store);
+      validateDependenciesStructure(deps);
+      validateLimitsConsistency(options, store, deps);
     } catch (error) {
       ctx.validator = null;
 

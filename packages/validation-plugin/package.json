@@ -1,6 +1,6 @@
 {
   "name": "@real-router/validation-plugin",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "type": "commonjs",
   "description": "Route validation plugin with type guards and parameter validation",
   "main": "./dist/cjs/index.js",
