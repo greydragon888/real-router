@@ -159,14 +159,13 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has(maxName)).toBe(false);
     });
 
-    it("should throw TypeError for String object", () => {
-      // Intentionally testing boxed String object behavior
+    it("should return false for boxed String object (no throw without plugin)", () => {
       // eslint-disable-next-line unicorn/new-for-builtins, sonarjs/no-primitive-wrappers
       const nameObject = new String("hr-test");
 
-      expect(() => routesApi.has(nameObject as unknown as string)).toThrow(
-        TypeError,
-      );
+      expect(() =>
+        routesApi.has(nameObject as unknown as string),
+      ).not.toThrow();
     });
 
     it("should return false for partial name match", () => {
@@ -198,11 +197,9 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has("page2section3")).toBe(true);
     });
 
-    it("should throw TypeError for special characters", () => {
-      expect(() => routesApi.has("user profile")).toThrow(TypeError);
-      expect(() => routesApi.has("user@home")).toThrow(TypeError);
-      expect(() => routesApi.has("user/path")).toThrow(TypeError);
-      expect(() => routesApi.has("user#anchor")).toThrow(TypeError);
+    it("should return false for special character names (no throw without plugin)", () => {
+      expect(routesApi.has("user profile")).toBe(false);
+      expect(routesApi.has("user@home")).toBe(false);
     });
   });
 

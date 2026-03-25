@@ -74,21 +74,6 @@ describe("core/routes/routePath/buildPath", () => {
 
       expect(path).toBe("/base/home");
     });
-
-    it("should throw TypeError for non-string rootPath", () => {
-      expect(() => {
-        getPluginApi(router).setRootPath(123 as unknown as string);
-      }).toThrow(TypeError);
-      expect(() => {
-        getPluginApi(router).setRootPath(123 as unknown as string);
-      }).toThrow("[router.setRootPath] rootPath must be a string, got number");
-    });
-
-    it("should throw TypeError for null rootPath", () => {
-      expect(() => {
-        getPluginApi(router).setRootPath(null as unknown as string);
-      }).toThrow("[router.setRootPath] rootPath must be a string, got null");
-    });
   });
 
   describe("getRootPath", () => {
@@ -220,33 +205,6 @@ describe("core/routes/routePath/buildPath", () => {
   });
 
   describe("buildPath error handling", () => {
-    describe("invalid route parameter", () => {
-      it("should throw TypeError when route is undefined", () => {
-        expect(() => router.buildPath(undefined as unknown as string)).toThrow(
-          TypeError,
-        );
-      });
-
-      it("should throw TypeError when route is null", () => {
-        expect(() => router.buildPath(null as unknown as string)).toThrow(
-          TypeError,
-        );
-      });
-
-      it("should throw TypeError when route is not a string", () => {
-        expect(() => router.buildPath(123 as unknown as string)).toThrow(
-          TypeError,
-        );
-        expect(() => router.buildPath({} as unknown as string)).toThrow(
-          TypeError,
-        );
-      });
-
-      it("should throw when route is empty string", () => {
-        expect(() => router.buildPath("")).toThrow();
-      });
-    });
-
     describe("route not found", () => {
       it("should throw when route does not exist", () => {
         expect(() => router.buildPath("nonexistent")).toThrow(
@@ -594,24 +552,6 @@ describe("core/routes/routePath/buildPath", () => {
 
     describe("unusual but valid inputs", () => {
       describe("route name validation", () => {
-        it("should reject Cyrillic route names (ASCII only)", () => {
-          expect(() => {
-            routesApi.add({ name: "пользователи", path: "/users" });
-          }).toThrow(/Invalid route name/);
-        });
-
-        it("should reject emoji route names", () => {
-          expect(() => {
-            routesApi.add({ name: "🚀", path: "/launch" });
-          }).toThrow(/Invalid route name/);
-        });
-
-        it("should reject route names with unicode characters", () => {
-          expect(() => {
-            routesApi.add({ name: "café", path: "/cafe" });
-          }).toThrow(/Invalid route name/);
-        });
-
         it("should accept route names with underscores and hyphens", () => {
           routesApi.add({ name: "user_profile", path: "/user-profile" });
 

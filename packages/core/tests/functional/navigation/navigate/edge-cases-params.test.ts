@@ -174,39 +174,6 @@ describe("router.navigate() - edge cases params", () => {
     // -------------------------------------------------------------------------
 
     describe("special numeric values in params", () => {
-      it("should reject NaN in params (not serializable)", async () => {
-        // NaN is rejected by isParams validation (not finite)
-        // This ensures params can be serialized to JSON
-        await expect(
-          router.navigate(
-            "users.view",
-            { id: Number.NaN as unknown as number },
-            {},
-          ),
-        ).rejects.toThrow(TypeError);
-      });
-
-      it("should reject Infinity in params (not serializable)", async () => {
-        // Infinity is rejected by isParams validation (not finite)
-        await expect(
-          router.navigate(
-            "users.view",
-            { id: Infinity as unknown as number },
-            {},
-          ),
-        ).rejects.toThrow(TypeError);
-      });
-
-      it("should reject -Infinity in params (not serializable)", async () => {
-        await expect(
-          router.navigate(
-            "users.view",
-            { id: -Infinity as unknown as number },
-            {},
-          ),
-        ).rejects.toThrow(TypeError);
-      });
-
       it("should handle -0 in params (finite, converts to '0')", async () => {
         const negativeZero = -0;
 

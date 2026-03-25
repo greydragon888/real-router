@@ -353,35 +353,6 @@ describe("core/routes/routeQuery/isActiveRoute", () => {
     });
 
     describe("inherited properties", () => {
-      it("should reject Object.create() params with custom prototype", async () => {
-        await router.navigate("users.view", { id: "123" });
-
-        // Create object with inherited property via Object.create()
-        const proto = { id: "123" };
-        const params = Object.create(proto) as { id: string };
-
-        // Objects with custom prototype are rejected by validateParams
-        // (isSerializable checks Object.getPrototypeOf(value) === Object.prototype)
-        expect(() => {
-          router.isActiveRoute("users.view", params);
-        }).toThrow("[router.isActiveRoute] Invalid params structure");
-      });
-
-      it("should reject Object.create() params even with own properties", async () => {
-        await router.navigate("users.view", { id: "123" });
-
-        // Own property shadows inherited, but still rejected due to prototype
-        const proto = { id: "456" };
-        const params = Object.create(proto) as { id: string };
-
-        params.id = "123";
-
-        // Objects with custom prototype are always rejected regardless of properties
-        expect(() => {
-          router.isActiveRoute("users.view", params);
-        }).toThrow("[router.isActiveRoute] Invalid params structure");
-      });
-
       it("should ignore non-enumerable properties", async () => {
         await router.navigate("users.view", { id: "123" });
 

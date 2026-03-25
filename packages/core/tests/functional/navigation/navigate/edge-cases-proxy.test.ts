@@ -21,21 +21,6 @@ describe("router.navigate() - edge cases proxy", () => {
 
   describe("edge cases - section 12 analysis", () => {
     describe("throwing getter in opts", () => {
-      it("should propagate exception when opts getter throws (isNavigationOptions validation)", () => {
-        const evilOpts = {
-          get replace(): boolean {
-            throw new Error("Evil getter!");
-          },
-        };
-
-        // 🔴 CRITICAL EDGE CASE: Getter exceptions propagate up
-        // isNavigationOptions reads each field, triggering the getter
-        // This documents current behavior - exceptions are NOT caught
-        expect(() => {
-          void router.navigate("users", {}, evilOpts);
-        }).toThrow("Evil getter!");
-      });
-
       it("should handle opts with non-throwing getters", async () => {
         const optsWithGetter = {
           get replace(): boolean {

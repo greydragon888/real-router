@@ -1101,29 +1101,14 @@ describe("core/routes/removeRoute", () => {
     });
 
     // 12.7: Unicode characters in name
-    it("should throw TypeError for Cyrillic characters in name", async () => {
-      expect(() => {
-        routesApi.remove("маршрут");
-      }).toThrow(TypeError);
-    });
+    it("should handle unicode route names gracefully (no throw without plugin)", async () => {
+      const { logger } = await import("@real-router/logger");
+      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    it("should throw TypeError for emoji in name", async () => {
-      expect(() => {
-        routesApi.remove("route_🚀");
-      }).toThrow(TypeError);
-    });
+      expect(() => routesApi.remove("маршрут")).not.toThrow();
+      expect(() => routesApi.remove("route_🚀")).not.toThrow();
 
-    it("should throw TypeError for CJK characters in name", async () => {
-      expect(() => {
-        routesApi.remove("route.日本語");
-      }).toThrow(TypeError);
-    });
-
-    // 12.8: System routes (@@prefix) — blocked by internal route protection
-    it("should throw when trying to remove @@ prefix route", () => {
-      expect(() => {
-        routesApi.remove("@@real-router/UNKNOWN");
-      }).toThrow(/reserved "@@" prefix/);
+      warnSpy.mockRestore();
     });
 
     // 12.9: Deep nesting (10+ levels)
@@ -1333,103 +1318,6 @@ describe("core/routes/removeRoute", () => {
       );
 
       warnSpy.mockRestore();
-    });
-  });
-
-  describe("input validation", () => {
-    it("should throw TypeError for null name", async () => {
-      expect(() => {
-        routesApi.remove(null as unknown as string);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for undefined name", async () => {
-      expect(() => {
-        routesApi.remove(undefined as unknown as string);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for number name", async () => {
-      expect(() => {
-        routesApi.remove(123 as unknown as string);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for object name", async () => {
-      expect(() => {
-        routesApi.remove({} as unknown as string);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for Proxy with overridden toString (12.14)", async () => {
-      // Proxy that tries to masquerade as a string via toString/valueOf
-      const maliciousProxy = new Proxy(
-        { value: "realRoute" },
-        {
-          get(target, prop) {
-            if (prop === Symbol.toPrimitive) {
-              return () => "home";
-            }
-            if (prop === "toString" || prop === "valueOf") {
-              return () => "home";
-            }
-
-            return Reflect.get(target, prop);
-          },
-        },
-      );
-
-      // typeof Proxy === "object", so it should be rejected BEFORE any coercion
-      expect(() => {
-        routesApi.remove(maliciousProxy as unknown as string);
-      }).toThrow(TypeError);
-
-      // Original route should remain untouched
-      expect(getPluginApi(router).matchPath("/")).toBeDefined();
-    });
-
-    it("should throw TypeError for String wrapper object (12.16)", async () => {
-      // new String() creates an object, not a primitive string
-      // eslint-disable-next-line unicorn/new-for-builtins, sonarjs/no-primitive-wrappers
-      const stringWrapper = new String("home");
-
-      // typeof stringWrapper === "object", not "string"
-      expect(() => {
-        routesApi.remove(stringWrapper as unknown as string);
-      }).toThrow(TypeError);
-
-      // Original route should remain untouched
-      expect(getPluginApi(router).matchPath("/")).toBeDefined();
-    });
-
-    it("should throw TypeError for whitespace-only name", async () => {
-      expect(() => {
-        routesApi.remove("   ");
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name with leading dot", async () => {
-      expect(() => {
-        routesApi.remove(".invalid");
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name with trailing dot", async () => {
-      expect(() => {
-        routesApi.remove("invalid.");
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name starting with number", async () => {
-      expect(() => {
-        routesApi.remove("123invalid");
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name with consecutive dots", async () => {
-      expect(() => {
-        routesApi.remove("invalid..name");
-      }).toThrow(TypeError);
     });
   });
 });
