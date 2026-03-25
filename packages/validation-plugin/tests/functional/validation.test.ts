@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
 import { createRouter } from "@real-router/core";
 import {
   getRoutesApi,
   getDependenciesApi,
   getPluginApi,
 } from "@real-router/core/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { validationPlugin } from "../../src";
 
 import type { Router } from "@real-router/core";
@@ -76,6 +76,7 @@ describe("validation-plugin — representative validation tests", () => {
   describe("addRoute() input validation", () => {
     it("should throw when route name is empty string", () => {
       const routesApi = getRoutesApi(router);
+
       expect(() => {
         routesApi.add({ name: "", path: "/empty" });
       }).toThrow();
@@ -83,6 +84,7 @@ describe("validation-plugin — representative validation tests", () => {
 
     it("should throw on duplicate route name", () => {
       const routesApi = getRoutesApi(router);
+
       expect(() => {
         routesApi.add({ name: "home", path: "/home-dup" });
       }).toThrow();
@@ -114,6 +116,7 @@ describe("validation-plugin — representative validation tests", () => {
   describe("limits validation", () => {
     it("should enforce plugin limit when plugin is registered", () => {
       const r = createRouter([], { limits: { maxPlugins: 3 } });
+
       r.usePlugin(validationPlugin());
 
       expect(() => {
@@ -129,6 +132,7 @@ describe("validation-plugin — representative validation tests", () => {
     it("should accept valid limits config", () => {
       expect(() => {
         const r = createRouter([], { limits: { maxPlugins: 10 } });
+
         r.usePlugin(validationPlugin());
       }).not.toThrow();
     });
@@ -137,6 +141,7 @@ describe("validation-plugin — representative validation tests", () => {
   describe("getDependenciesApi() validation", () => {
     it("should throw TypeError for invalid dependency name", () => {
       const deps = getDependenciesApi(router);
+
       expect(() => {
         // @ts-expect-error testing runtime validation
         deps.set(123, "value");
@@ -149,6 +154,7 @@ describe("validation-plugin — representative validation tests", () => {
           typeof getDependenciesApi<{ myService: string }>
         >[0],
       );
+
       expect(() => {
         deps.set("myService", "value");
       }).not.toThrow();

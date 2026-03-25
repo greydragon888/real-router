@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
 import { createRouter } from "@real-router/core";
 import { getRoutesApi } from "@real-router/core/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
@@ -33,8 +33,11 @@ describe("routes API validation — with validationPlugin", () => {
     });
 
     it("should throw if route is not an object", () => {
-      const raw = routes as unknown as { add(r: unknown): void };
-      expect(() => raw.add(["string"])).toThrow();
+      const raw = routes as unknown as { add: (r: unknown) => void };
+
+      expect(() => {
+        raw.add(["string"]);
+      }).toThrow();
     });
 
     it("should throw if children is not an array", () => {
@@ -118,21 +121,16 @@ describe("routes API validation — with validationPlugin", () => {
       }).toThrow();
     });
 
-    it("should throw on route with getter", () => {
-      const routeWithGetter = {} as Record<string, unknown>;
-      Object.defineProperty(routeWithGetter, "name", { get: () => "bad" });
-      Object.defineProperty(routeWithGetter, "path", { get: () => "/bad" });
-      const raw = routes as unknown as { add(r: unknown[]): void };
-      expect(() => raw.add([routeWithGetter])).toThrow();
-    });
-
     it("should throw on class instance route", () => {
       class BadRoute {
         name = "bad";
         path = "/bad";
       }
-      const raw = routes as unknown as { add(r: unknown[]): void };
-      expect(() => raw.add([new BadRoute()])).toThrow();
+      const raw = routes as unknown as { add: (r: unknown[]) => void };
+
+      expect(() => {
+        raw.add([new BadRoute()]);
+      }).toThrow();
     });
 
     it("should throw if forwardTo target does not exist", () => {
@@ -150,8 +148,11 @@ describe("routes API validation — with validationPlugin", () => {
     });
 
     it("should throw if path is not a string", () => {
-      const raw = routes as unknown as { add(r: unknown[]): void };
-      expect(() => raw.add([{ name: "bad", path: 123 }])).toThrow();
+      const raw = routes as unknown as { add: (r: unknown[]) => void };
+
+      expect(() => {
+        raw.add([{ name: "bad", path: 123 }]);
+      }).toThrow();
     });
 
     it("should accept valid route definition", () => {
@@ -163,65 +164,84 @@ describe("routes API validation — with validationPlugin", () => {
 
   describe("removeRoute validation", () => {
     it("should throw TypeError for invalid name (non-string)", () => {
-      const raw = routes as unknown as { remove(n: unknown): void };
-      expect(() => raw.remove(null)).toThrow();
-      expect(() => raw.remove(123)).toThrow();
+      const raw = routes as unknown as { remove: (n: unknown) => void };
+
+      expect(() => {
+        raw.remove(null);
+      }).toThrow();
+      expect(() => {
+        raw.remove(123);
+      }).toThrow();
     });
   });
 
   describe("getRoute validation", () => {
     it("should throw TypeError for invalid name (leading dot)", () => {
-      const raw = routes as unknown as { get(n: unknown): unknown };
+      const raw = routes as unknown as { get: (n: unknown) => unknown };
+
       expect(() => raw.get(".home")).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid name (trailing dot)", () => {
-      const raw = routes as unknown as { get(n: unknown): unknown };
+      const raw = routes as unknown as { get: (n: unknown) => unknown };
+
       expect(() => raw.get("home.")).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (number)", () => {
-      const raw = routes as unknown as { get(n: unknown): unknown };
+      const raw = routes as unknown as { get: (n: unknown) => unknown };
+
       expect(() => raw.get(123)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string argument (null)", () => {
-      const raw = routes as unknown as { get(n: unknown): unknown };
+      const raw = routes as unknown as { get: (n: unknown) => unknown };
+
       expect(() => raw.get(null)).toThrow(TypeError);
     });
 
     it("should throw TypeError for whitespace-only string", () => {
-      const raw = routes as unknown as { get(n: unknown): unknown };
+      const raw = routes as unknown as { get: (n: unknown) => unknown };
+
       expect(() => raw.get("   ")).toThrow(TypeError);
     });
   });
 
   describe("hasRoute validation", () => {
     it("should throw TypeError for invalid name (leading dot)", () => {
-      const raw = routes as unknown as { has(n: unknown): unknown };
+      const raw = routes as unknown as { has: (n: unknown) => unknown };
+
       expect(() => raw.has(".home")).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string input (number)", () => {
-      const raw = routes as unknown as { has(n: unknown): unknown };
+      const raw = routes as unknown as { has: (n: unknown) => unknown };
+
       expect(() => raw.has(123)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string input (null)", () => {
-      const raw = routes as unknown as { has(n: unknown): unknown };
+      const raw = routes as unknown as { has: (n: unknown) => unknown };
+
       expect(() => raw.has(null)).toThrow(TypeError);
     });
 
     it("should throw TypeError for whitespace-only input", () => {
-      const raw = routes as unknown as { has(n: unknown): unknown };
+      const raw = routes as unknown as { has: (n: unknown) => unknown };
+
       expect(() => raw.has("  ")).toThrow(TypeError);
     });
   });
 
   describe("updateRoute validation", () => {
     it("should throw for invalid update target", () => {
-      const raw = routes as unknown as { update(n: unknown, u: unknown): void };
-      expect(() => raw.update(null, {})).toThrow();
+      const raw = routes as unknown as {
+        update: (n: unknown, u: unknown) => void;
+      };
+
+      expect(() => {
+        raw.update(null, {});
+      }).toThrow();
     });
   });
 

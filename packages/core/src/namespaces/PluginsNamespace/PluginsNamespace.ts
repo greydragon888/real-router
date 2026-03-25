@@ -79,6 +79,7 @@ export class PluginsNamespace<
    * Returns the number of registered plugins.
    * Used by facade for limit validation.
    */
+  /* v8 ignore next 3 -- @preserve: only called via validator interface (ctx.validator?.plugins.validatePluginLimit), not reachable without validation plugin */
   count(): number {
     return this.#plugins.size;
   }
@@ -197,6 +198,7 @@ export class PluginsNamespace<
    * Checks if a plugin factory is registered.
    * Used internally by validation to avoid array allocation.
    */
+  /* v8 ignore next 3 -- @preserve: only called via validator interface, not reachable without validation plugin */
   has(factory: PluginFactory<Dependencies>): boolean {
     return this.#plugins.has(factory);
   }

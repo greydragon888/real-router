@@ -73,6 +73,14 @@ describe("core/routes", () => {
             predicate(currentState);
           }).not.toThrow();
         });
+
+        it("should throw TypeError when toState is null (crash guard)", () => {
+          const predicate = router.shouldUpdateNode("home");
+
+          expect(() => {
+            predicate(null as any);
+          }).toThrow(TypeError);
+        });
       });
 
       describe("fromState validation", () => {

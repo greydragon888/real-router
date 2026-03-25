@@ -1,4 +1,5 @@
 import { createRouter } from "@real-router/core";
+
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Options, Route, Router } from "@real-router/core";
@@ -35,6 +36,8 @@ export function createValidationRouter(options?: Partial<Options>): Router {
     defaultRoute: "home",
     ...options,
   });
+
   router.usePlugin(validationPlugin());
+
   return router;
 }

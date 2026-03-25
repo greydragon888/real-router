@@ -1,0 +1,128 @@
+import { createRouter } from "@real-router/core";
+import { getInternals } from "@real-router/core/validation";
+import { describe, it, expect, afterEach } from "vitest";
+
+import { validationPlugin } from "@real-router/validation-plugin";
+
+import type { Router } from "@real-router/core";
+
+describe("retrospective validation — triggered at usePlugin() time", () => {
+  let router: Router;
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("valid routes with forwardTo pass retrospective", () => {
+    router = createRouter([
+      { name: "home", path: "/home" },
+      { name: "about", path: "/about" },
+      { name: "legacy", path: "/old", forwardTo: "home" },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+
+  it("valid nested routes pass retrospective", () => {
+    router = createRouter([
+      { name: "home", path: "/home" },
+      {
+        name: "users",
+        path: "/users",
+        children: [{ name: "profile", path: "/:id" }],
+      },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+
+  it("duplicate route names caught at usePlugin — throws with duplicate message", () => {
+    router = createRouter([
+      { name: "home", path: "/home" },
+      { name: "home", path: "/home2" },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).toThrow(/duplicate/i);
+  });
+
+  it("nested duplicate route names caught at usePlugin", () => {
+    router = createRouter([
+      {
+        name: "section",
+        path: "/section",
+        children: [{ name: "item", path: "/item" }],
+      },
+      {
+        name: "section",
+        path: "/section2",
+        children: [{ name: "item", path: "/item2" }],
+      },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).toThrow(/duplicate/i);
+  });
+
+  it("rollback confirmed — after retrospective failure ctx.validator is null", () => {
+    router = createRouter([
+      { name: "home", path: "/home" },
+      { name: "home", path: "/dup" },
+    ]);
+    const ctx = getInternals(router);
+
+    expect(() => router.usePlugin(validationPlugin())).toThrow();
+    expect(ctx.validator).toBeNull();
+  });
+
+  it("router with decoders passes retrospective", () => {
+    router = createRouter([
+      {
+        name: "product",
+        path: "/product/:id",
+        decodeParams: (params) => ({ id: Number(params.id) }),
+        encodeParams: (params) => ({ ...params }),
+      },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+
+  it("valid forwardTo chain passes retrospective", () => {
+    router = createRouter([
+      { name: "a", path: "/a" },
+      { name: "b", path: "/b", forwardTo: "a" },
+      { name: "c", path: "/c", forwardTo: "b" },
+    ]);
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+
+  it("existing dependencies pass retrospective", () => {
+    const r = createRouter<{ api: string }>(
+      [{ name: "home", path: "/home" }],
+      {},
+      { api: "http://example.com" },
+    );
+
+    expect(() => r.usePlugin(validationPlugin())).not.toThrow();
+
+    r.stop();
+  });
+
+  it("dependency count at limit triggers RangeError on usePlugin", () => {
+    const deps: Record<string, number> = {};
+
+    for (let i = 0; i < 5; i++) {
+      deps[`dep${i}`] = i;
+    }
+
+    const r = createRouter<Record<string, number>>(
+      [],
+      { limits: { maxDependencies: 3 } },
+      deps,
+    );
+
+    expect(() => r.usePlugin(validationPlugin())).toThrow(RangeError);
+
+    r.stop();
+  });
+});

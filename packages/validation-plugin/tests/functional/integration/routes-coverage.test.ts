@@ -24,25 +24,6 @@ import {
 import type { Router } from "@real-router/core";
 import type { RoutesApi } from "@real-router/core/api";
 
-let router: Router;
-let routes: RoutesApi;
-
-beforeEach(() => {
-  router = createRouter(
-    [
-      { name: "home", path: "/home" },
-      { name: "items", path: "/items/:id" },
-    ],
-    { defaultRoute: "home" },
-  );
-  router.usePlugin(validationPlugin());
-  routes = getRoutesApi(router);
-});
-
-afterEach(() => {
-  router.stop();
-});
-
 describe("throwIfInternalRoute — direct", () => {
   it("throws when name starts with @@", () => {
     expect(() => {
@@ -347,7 +328,13 @@ describe("validateRoutes — direct calls", () => {
   });
 
   it("passes when parentName resolves in tree — uses real router tree", () => {
-    const ctx = getInternals(router);
+    const r = createRouter([
+      { name: "home", path: "/home" },
+      { name: "items", path: "/items/:id" },
+    ]);
+
+    r.usePlugin(validationPlugin());
+    const ctx = getInternals(r);
     const store = ctx.routeGetStore();
 
     expect(() => {
@@ -358,6 +345,8 @@ describe("validateRoutes — direct calls", () => {
         "home",
       );
     }).not.toThrow();
+
+    r.stop();
   });
 });
 
@@ -567,7 +556,26 @@ describe("validateUpdateRoute — direct", () => {
 });
 
 describe("routes validators — via router API integration", () => {
-  it("throwIfInternalRoute wrapper — remove internal route throws", async () => {
+  let router: Router;
+  let routes: RoutesApi;
+
+  beforeEach(() => {
+    router = createRouter(
+      [
+        { name: "home", path: "/home" },
+        { name: "items", path: "/items/:id" },
+      ],
+      { defaultRoute: "home" },
+    );
+    router.usePlugin(validationPlugin());
+    routes = getRoutesApi(router);
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throwIfInternalRoute wrapper — remove internal route throws", () => {
     const raw = routes as unknown as { remove: (n: unknown) => void };
 
     expect(() => {
@@ -575,7 +583,7 @@ describe("routes validators — via router API integration", () => {
     }).toThrow();
   });
 
-  it("throwIfInternalRoute wrapper — update internal route throws", async () => {
+  it("throwIfInternalRoute wrapper — update internal route throws", () => {
     expect(() => {
       routes.update("@@internal", {});
     }).toThrow();

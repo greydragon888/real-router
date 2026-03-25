@@ -226,7 +226,7 @@ export function validateExistingRoutes(store: unknown): void {
   walkDefinitions(s.definitions, (def, fullName) => {
     if (typeof def.name !== "string" || !def.name) {
       throw new TypeError(
-        `[validation-plugin] validateExistingRoutes: route has invalid name: ${String(def.name)}`,
+        `[validation-plugin] validateExistingRoutes: route has invalid name: ${def.name}`,
       );
     }
 
@@ -468,76 +468,92 @@ export function validateDependenciesStructure(deps: unknown): void {
  * Adapted from: validateLimits() in OptionsNamespace/validators.ts
  *
  * @param options - Router options (typed as unknown to avoid core coupling)
- * @param store - RoutesStore instance (typed as unknown to avoid core coupling)
- * @param deps - DependenciesStore instance (typed as unknown to avoid core coupling)
  * @throws {RangeError} If dependency count reaches or exceeds maxDependencies limit
  * @throws {RangeError} If route count exceeds a configured maxRoutes limit in options
  */
+function extractConfiguredLimits(options: unknown): Record<string, unknown> {
+  const opts =
+    options && typeof options === "object"
+      ? (options as Record<string, unknown>)
+      : {};
+
+  return opts.limits && typeof opts.limits === "object"
+    ? (opts.limits as Record<string, unknown>)
+    : {};
+}
+
+function checkRouteCountLimit(
+  store: unknown,
+  configuredLimits: Record<string, unknown>,
+): void {
+  if (!store || typeof store !== "object") {
+    return;
+  }
+
+  const s = store as Record<string, unknown>;
+
+  if (!Array.isArray(s.definitions)) {
+    return;
+  }
+
+  const routeCount = (s.definitions as unknown[]).length;
+  const maxRoutes = configuredLimits.maxRoutes;
+
+  if (
+    typeof maxRoutes === "number" &&
+    maxRoutes > 0 &&
+    routeCount > maxRoutes
+  ) {
+    throw new RangeError(
+      `[validation-plugin] validateLimitsConsistency: route count (${routeCount}) exceeds configured limit (${maxRoutes})`,
+    );
+  }
+}
+
+function checkDepCountLimit(
+  deps: unknown,
+  configuredLimits: Record<string, unknown>,
+): void {
+  if (!deps || typeof deps !== "object") {
+    return;
+  }
+
+  const d = deps as Record<string, unknown>;
+  const dependencies = d.dependencies;
+  const depsLimits = d.limits;
+
+  if (
+    !dependencies ||
+    typeof dependencies !== "object" ||
+    !depsLimits ||
+    typeof depsLimits !== "object"
+  ) {
+    return;
+  }
+
+  const depCount = Object.keys(dependencies).length;
+  const l = depsLimits as Record<string, unknown>;
+  const maxDepsFromOptions = configuredLimits.maxDependencies;
+  const maxDepsFromStore = l.maxDependencies;
+  const maxDeps =
+    typeof maxDepsFromOptions === "number"
+      ? maxDepsFromOptions
+      : maxDepsFromStore;
+
+  if (typeof maxDeps === "number" && maxDeps > 0 && depCount >= maxDeps) {
+    throw new RangeError(
+      `[validation-plugin] validateLimitsConsistency: dependency count (${depCount}) reaches or exceeds maxDependencies limit (${maxDeps})`,
+    );
+  }
+}
+
 export function validateLimitsConsistency(
   options: unknown,
   store: unknown,
   deps: unknown,
 ): void {
-  // Extract any limits configured in options (validation-plugin or router options)
-  const opts =
-    options && typeof options === "object"
-      ? (options as Record<string, unknown>)
-      : {};
-  const configuredLimits =
-    opts.limits && typeof opts.limits === "object"
-      ? (opts.limits as Record<string, unknown>)
-      : {};
+  const configuredLimits = extractConfiguredLimits(options);
 
-  // --- Route count check ---
-  // Core does not define a maxRoutes limit, but check against any custom limit in options
-  if (store && typeof store === "object") {
-    const s = store as Record<string, unknown>;
-
-    if (Array.isArray(s.definitions)) {
-      const routeCount = (s.definitions as unknown[]).length;
-      const maxRoutes = configuredLimits.maxRoutes;
-
-      if (
-        typeof maxRoutes === "number" &&
-        maxRoutes > 0 &&
-        routeCount > maxRoutes
-      ) {
-        throw new RangeError(
-          `[validation-plugin] validateLimitsConsistency: route count (${routeCount}) exceeds configured limit (${maxRoutes})`,
-        );
-      }
-    }
-  }
-
-  // --- Dependency count check ---
-  // Compare actual dep count against maxDependencies from deps.limits
-  if (deps && typeof deps === "object") {
-    const d = deps as Record<string, unknown>;
-    const dependencies = d.dependencies;
-    const depsLimits = d.limits;
-
-    if (
-      dependencies &&
-      typeof dependencies === "object" &&
-      depsLimits &&
-      typeof depsLimits === "object"
-    ) {
-      const depCount = Object.keys(dependencies).length;
-      const l = depsLimits as Record<string, unknown>;
-
-      // Prefer the limit from options if explicitly configured, fall back to deps store limit
-      const maxDepsFromOptions = configuredLimits.maxDependencies;
-      const maxDepsFromStore = l.maxDependencies;
-      const maxDeps =
-        typeof maxDepsFromOptions === "number"
-          ? maxDepsFromOptions
-          : maxDepsFromStore;
-
-      if (typeof maxDeps === "number" && maxDeps > 0 && depCount >= maxDeps) {
-        throw new RangeError(
-          `[validation-plugin] validateLimitsConsistency: dependency count (${depCount}) reaches or exceeds maxDependencies limit (${maxDeps})`,
-        );
-      }
-    }
-  }
+  checkRouteCountLimit(store, configuredLimits);
+  checkDepCountLimit(deps, configuredLimits);
 }

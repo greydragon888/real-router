@@ -4,14 +4,14 @@ import type { Plugin } from "@real-router/core";
 
 // Local types — mirrors EventName and EventMethodMap from @real-router/types
 // (@real-router/types is not a direct dependency of this package)
-type EventMethodMap = {
+interface EventMethodMap {
   $start: "onStart";
   $stop: "onStop";
   $$start: "onTransitionStart";
   $$cancel: "onTransitionCancel";
   $$success: "onTransitionSuccess";
   $$error: "onTransitionError";
-};
+}
 
 type EventName = keyof EventMethodMap;
 

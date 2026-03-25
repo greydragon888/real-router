@@ -48,7 +48,6 @@ export function validateDependencyExists(
   value: unknown,
   dependencyName: string,
 ): asserts value is NonNullable<unknown> {
-  /* v8 ignore next 3 -- @preserve: covered by plugin-lifecycle.test.ts validateDependencyExists test */
   if (value === undefined) {
     throw new ReferenceError(
       `[router.getDependency]: dependency "${dependencyName}" not found`,

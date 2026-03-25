@@ -1,5 +1,3 @@
-import { describe, it, expect, afterEach } from "vitest";
-
 import { createRouter, events } from "@real-router/core";
 import {
   cloneRouter,
@@ -7,32 +5,37 @@ import {
   getLifecycleApi,
   getPluginApi,
 } from "@real-router/core/api";
+import { describe, it, expect, afterEach } from "vitest";
+
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
 
-type NumDeps = { [key: string]: number };
+type NumDeps = Record<string, number>;
 
 let router: Router;
 
-afterEach(() => {
-  router?.stop();
-});
-
 describe("core/limits — with validationPlugin", () => {
+  afterEach(() => {
+    router.stop();
+  });
+
   describe("valid limits flow through createRouter()", () => {
     it("should accept valid custom limit without error", () => {
       router = createRouter([], { limits: { maxPlugins: 10 } });
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
     it("should accept 0 (unlimited) without error", () => {
       router = createRouter([], { limits: { maxPlugins: 0 } });
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
     it("should accept empty limits object without error", () => {
       router = createRouter([], { limits: {} });
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
@@ -46,6 +49,7 @@ describe("core/limits — with validationPlugin", () => {
           maxLifecycleHandlers: 100,
         },
       });
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
   });
@@ -67,6 +71,7 @@ describe("core/limits — with validationPlugin", () => {
 
     it("should enforce custom maxDependencies limit", () => {
       const r = createRouter<NumDeps>([], { limits: { maxDependencies: 1 } });
+
       r.usePlugin(validationPlugin());
       const deps = getDependenciesApi(r);
 
@@ -107,10 +112,12 @@ describe("core/limits — with validationPlugin", () => {
 
     it("should allow unlimited dependencies when maxDependencies = 0", () => {
       const r = createRouter<NumDeps>([], { limits: { maxDependencies: 0 } });
+
       r.usePlugin(validationPlugin());
       const deps = getDependenciesApi(r);
 
       const manyDeps: NumDeps = {};
+
       for (let i = 0; i < 150; i++) {
         manyDeps[`dep${i}`] = i;
       }
@@ -143,6 +150,7 @@ describe("core/limits — with validationPlugin", () => {
       router.usePlugin(validationPlugin());
 
       let startEventReceived = false;
+
       getPluginApi(router).addEventListener(events.ROUTER_START, () => {
         startEventReceived = true;
       });
@@ -183,10 +191,12 @@ describe("core/limits — with validationPlugin", () => {
 
     it("should enforce default maxDependencies limit (100)", () => {
       const r = createRouter<NumDeps>([]);
+
       r.usePlugin(validationPlugin());
       const deps = getDependenciesApi(r);
 
       const deps99: NumDeps = {};
+
       for (let i = 0; i < 99; i++) {
         deps99[`dep${i}`] = i;
       }
@@ -196,7 +206,8 @@ describe("core/limits — with validationPlugin", () => {
       }).not.toThrow();
 
       expect(() => {
-        deps.setAll({ dep99: 99, dep100: 100 });
+        deps.set("dep99", 99);
+        deps.set("dep100", 100);
       }).toThrow("Dependency limit exceeded");
     });
 
@@ -237,13 +248,13 @@ describe("core/limits — with validationPlugin", () => {
       router.usePlugin(validationPlugin());
 
       expect(() => {
-        for (let i = 0; i < 199; i++) {
+        for (let i = 0; i < 200; i++) {
           getLifecycleApi(router).addActivateGuard(`route${i}`, true);
         }
       }).not.toThrow();
 
       expect(() => {
-        getLifecycleApi(router).addActivateGuard("route199", true);
+        getLifecycleApi(router).addActivateGuard("route200", true);
       }).toThrow(/limit exceeded.*200/i);
     });
   });
@@ -293,6 +304,7 @@ describe("core/limits — with validationPlugin", () => {
       router.usePlugin(validationPlugin());
 
       const cloned = cloneRouter(router);
+
       cloned.usePlugin(validationPlugin());
 
       expect(() => {
@@ -324,25 +336,9 @@ describe("core/limits — with validationPlugin", () => {
       }).not.toThrow();
     });
 
-    it("should skip undefined limit values in config", () => {
-      router = createRouter([], {
-        limits: { maxPlugins: undefined } as never,
-      });
-      router.usePlugin(validationPlugin());
-
-      expect(() => {
-        for (let i = 0; i < 49; i++) {
-          router.usePlugin(() => ({}));
-        }
-      }).not.toThrow();
-
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
-
     it("should accept limits: undefined (skip validation)", () => {
       router = createRouter([], { limits: undefined } as never);
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
   });

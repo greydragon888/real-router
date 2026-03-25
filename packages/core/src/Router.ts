@@ -329,7 +329,9 @@ export class Router<
 
   buildPath(route: string, params?: Params): string {
     const ctx = getInternals(this);
+
     ctx.validator?.routes.validateBuildPathArgs(route);
+
     return ctx.buildPath(route, params);
   }
 
@@ -459,6 +461,7 @@ export class Router<
 
   canNavigateTo(name: string, params?: Params): boolean {
     const ctx = getInternals(this);
+
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
@@ -488,6 +491,7 @@ export class Router<
 
   usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
     const ctx = getInternals(this);
+
     ctx.validator?.plugins.validatePluginLimit(
       this.#plugins.count(),
       this.#limits,
@@ -520,9 +524,11 @@ export class Router<
     options?: NavigationOptions,
   ): Promise<State> {
     const ctx = getInternals(this);
+
     ctx.validator?.navigation.validateNavigateArgs(routeName);
 
     const opts = options ?? EMPTY_OPTS;
+
     ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
     const promiseState = this.#navigation.navigate(
@@ -545,9 +551,11 @@ export class Router<
 
   navigateToDefault(options?: NavigationOptions): Promise<State> {
     const ctx = getInternals(this);
+
     ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
 
     const opts = options ?? EMPTY_OPTS;
+
     ctx.validator?.navigation.validateNavigationOptions(
       opts,
       "navigateToDefault",

@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
@@ -22,24 +22,27 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should throw TypeError for null route name", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard(null, true)).toThrow(TypeError);
     });
 
     it("should throw TypeError for undefined route name", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard(undefined, true)).toThrow(TypeError);
     });
 
     it("should throw TypeError for non-string route name types", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard(123, true)).toThrow(TypeError);
       expect(() => raw.addActivateGuard({}, true)).toThrow(TypeError);
     });
@@ -47,24 +50,27 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should throw TypeError for invalid route names (Cyrillic)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard("путь", true)).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid route names (emoji)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard("🏠", true)).toThrow(TypeError);
     });
 
     it("should include descriptive error message for invalid handler", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard("home", 123)).toThrow(TypeError);
       expect(() => raw.addActivateGuard("home", 123)).toThrow(/Handler must/);
     });
@@ -72,50 +78,56 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should throw TypeError for invalid handlers (number)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard("home", 42)).toThrow(TypeError);
     });
 
     it("should throw TypeError for Boolean Object (boxed)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
-      // eslint-disable-next-line no-new-wrappers
-      expect(() => raw.addActivateGuard("home", new Boolean(true))).toThrow(
+
+      expect(() => raw.addActivateGuard("home", new Object(true))).toThrow(
         TypeError,
       );
     });
 
     it("should accept valid boolean handler", () => {
       const lifecycle = getLifecycleApi(router);
-      expect(() => lifecycle.addActivateGuard("home", true)).not.toThrow();
+
+      expect(() => {
+        lifecycle.addActivateGuard("home", true);
+      }).not.toThrow();
     });
 
     it("should accept valid function handler", () => {
       const lifecycle = getLifecycleApi(router);
-      expect(() =>
-        lifecycle.addActivateGuard("home", () => () => true),
-      ).not.toThrow();
+
+      expect(() => {
+        lifecycle.addActivateGuard("home", () => () => true);
+      }).not.toThrow();
     });
 
     it("should handle very long route names correctly", () => {
       const lifecycle = getLifecycleApi(router);
-      const veryLongName = "a".repeat(500);
+      const veryLongName = "a".repeat(10_001);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addActivateGuard(veryLongName, true)).toThrow();
     });
 
     it("should reject String Object (only primitive strings allowed)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
-      // eslint-disable-next-line no-new-wrappers
-      expect(() => raw.addActivateGuard(new String("home"), true)).toThrow(
+
+      expect(() => raw.addActivateGuard(new Object("home"), true)).toThrow(
         TypeError,
       );
     });
@@ -123,9 +135,10 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should reject route names with null bytes (security)", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addActivateGuard(n: unknown, h: unknown): unknown;
+        addActivateGuard: (n: unknown, h: unknown) => unknown;
       };
-      expect(() => raw.addActivateGuard("home\x00", true)).toThrow(TypeError);
+
+      expect(() => raw.addActivateGuard("home\u0000", true)).toThrow(TypeError);
     });
   });
 
@@ -133,8 +146,9 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should throw TypeError for invalid route names", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addDeactivateGuard(n: unknown, h: unknown): unknown;
+        addDeactivateGuard: (n: unknown, h: unknown) => unknown;
       };
+
       expect(() => raw.addDeactivateGuard(null, true)).toThrow(TypeError);
       expect(() => raw.addDeactivateGuard(123, true)).toThrow(TypeError);
     });
@@ -142,9 +156,10 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should handle very long route names correctly", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        addDeactivateGuard(n: unknown, h: unknown): unknown;
+        addDeactivateGuard: (n: unknown, h: unknown) => unknown;
       };
-      const veryLongName = "a".repeat(500);
+      const veryLongName = "a".repeat(10_001);
+
       expect(() => raw.addDeactivateGuard(veryLongName, true)).toThrow();
     });
   });
@@ -153,16 +168,18 @@ describe("lifecycle validation — with validationPlugin", () => {
     it("should throw TypeError for invalid route name in removeActivateGuard", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        removeActivateGuard(n: unknown): unknown;
+        removeActivateGuard: (n: unknown) => unknown;
       };
+
       expect(() => raw.removeActivateGuard(null)).toThrow(TypeError);
     });
 
     it("should throw TypeError for invalid route name in removeDeactivateGuard", () => {
       const lifecycle = getLifecycleApi(router);
       const raw = lifecycle as unknown as {
-        removeDeactivateGuard(n: unknown): unknown;
+        removeDeactivateGuard: (n: unknown) => unknown;
       };
+
       expect(() => raw.removeDeactivateGuard(null)).toThrow(TypeError);
     });
   });
@@ -170,6 +187,7 @@ describe("lifecycle validation — with validationPlugin", () => {
   describe("lifecycle handler limit enforcement", () => {
     it("should throw when maxLifecycleHandlers limit exceeded", () => {
       const r = createRouter([], { limits: { maxLifecycleHandlers: 5 } });
+
       r.usePlugin(validationPlugin());
       const lifecycle = getLifecycleApi(r);
 

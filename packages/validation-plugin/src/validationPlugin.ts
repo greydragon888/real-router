@@ -2,8 +2,6 @@
 
 import { RouterError } from "@real-router/core";
 import { getInternals } from "@real-router/core/validation";
-import type { PluginFactory, RouterValidator } from "@real-router/core";
-
 import {
   validateRouteName,
   isState,
@@ -11,15 +9,17 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import * as routesV from "./validators/routes";
-import * as optionsV from "./validators/options";
 import * as depsV from "./validators/dependencies";
+import * as eventBusV from "./validators/eventBus";
 import * as lifecycleV from "./validators/lifecycle";
 import * as navV from "./validators/navigation";
-import * as stateV from "./validators/state";
-import * as retroV from "./validators/retrospective";
+import * as optionsV from "./validators/options";
 import * as pluginsV from "./validators/plugins";
-import * as eventBusV from "./validators/eventBus";
+import * as retroV from "./validators/retrospective";
+import * as routesV from "./validators/routes";
+import * as stateV from "./validators/state";
+
+import type { PluginFactory, RouterValidator } from "@real-router/core";
 
 function buildValidatorObject(): RouterValidator {
   return {
@@ -29,34 +29,77 @@ function buildValidatorObject(): RouterValidator {
       validateIsActiveRouteArgs: routesV.validateIsActiveRouteArgs,
       validateShouldUpdateNodeArgs: routesV.validateShouldUpdateNodeArgs,
       validateStateBuilderArgs: routesV.validateStateBuilderArgs,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       validateAddRouteArgs(routes) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         routesV.validateAddRouteArgs(routes as any);
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       validateRoutes(routes, store) {
         const s = store as {
           tree?: unknown;
           config?: { forwardMap?: Record<string, string> };
         };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
         routesV.validateRoutes(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           routes as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           s.tree as any,
           s.config?.forwardMap,
         );
       },
       validateRemoveRouteArgs: routesV.validateRemoveRouteArgs,
       validateUpdateRouteBasicArgs: routesV.validateUpdateRouteBasicArgs,
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateUpdateRoutePropertyTypes(_name, _updates) {},
-      validateUpdateRoute(_name, _updates, _tree) {},
-      validateParentOption: routesV.validateParentOption,
+      validateUpdateRoute(name, updates, store) {
+        const s = store as {
+          matcher: {
+            hasRoute: (n: string) => boolean;
+            getSegmentsByName: (n: string) => unknown;
+          };
+          config: { forwardMap: Record<string, string> };
+        };
+        const forwardTo = (updates as Record<string, unknown>).forwardTo;
+
+        routesV.validateUpdateRoute(
+          name,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+          forwardTo as any,
+          (n: string) => s.matcher.hasRoute(n),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
+          s.matcher as any,
+          s.config,
+        );
+      },
+      validateParentOption(parent, tree) {
+        routesV.validateParentOption(parent as string);
+        let node = tree as { children: Map<string, unknown> };
+
+        for (const segment of (parent as string).split(".")) {
+          const child = node.children.get(segment) as
+            | { children: Map<string, unknown> }
+            | undefined;
+
+          if (!child) {
+            throw new Error(
+              `[router.addRoute] Parent route "${parent as string}" does not exist`,
+            );
+          }
+
+          node = child;
+        }
+      },
       validateRouteName(name, caller) {
         validateRouteName(name, caller);
       },
-      throwIfInternalRoute: routesV.throwIfInternalRoute,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      throwIfInternalRoute(name, caller) {
+        routesV.throwIfInternalRoute(name as string, caller);
+      },
+
       throwIfInternalRouteInArray(routes, caller) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         routesV.throwIfInternalRouteInArray(routes as any, caller);
       },
       validateExistingRoutes: retroV.validateExistingRoutes,
@@ -64,7 +107,7 @@ function buildValidatorObject(): RouterValidator {
     },
     options: {
       validateLimitValue(name, value) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
         optionsV.validateLimitValue(name as any, value, "validate");
       },
       validateLimits(limits) {
@@ -77,17 +120,22 @@ function buildValidatorObject(): RouterValidator {
         depsV.validateSetDependencyArgs(_name);
       },
       validateDependenciesObject: depsV.validateDependenciesObject,
-      validateDependencyExists(value, name) {
-        depsV.validateDependencyExists(value, name as string);
+      validateDependencyExists(name, store) {
+        const s = store as { dependencies?: Record<string, unknown> };
+        const value = s.dependencies?.[name];
+
+        depsV.validateDependencyExists(value, name);
       },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateDependencyLimit(_store, _limits) {},
       validateDependenciesStructure: retroV.validateDependenciesStructure,
     },
     plugins: {
       validatePluginLimit(count, limits) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
         pluginsV.validatePluginLimit(count, 1, (limits as any)?.maxPlugins);
       },
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
     },
     lifecycle: {
@@ -96,10 +144,10 @@ function buildValidatorObject(): RouterValidator {
         lifecycleV.validateNotRegistering(false, name, caller);
       },
       validateHandlerLimit(count, limits, caller) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         lifecycleV.validateHandlerLimit(
           count,
           caller,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
           (limits as any)?.maxLifecycleHandlers,
         );
       },
@@ -131,12 +179,17 @@ function buildValidatorObject(): RouterValidator {
     },
     eventBus: {
       validateEventName: eventBusV.validateEventName,
-      validateListenerArgs: eventBusV.validateListenerArgs,
+
+      validateListenerArgs(name, cb) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        eventBusV.validateListenerArgs(name as any, cb as any);
+      },
     },
   };
 }
 
 export function validationPlugin(): PluginFactory {
+  // eslint-disable-next-line unicorn/consistent-function-scoping
   return (router) => {
     const ctx = getInternals(router);
 
@@ -164,6 +217,7 @@ export function validationPlugin(): PluginFactory {
       retroV.validateLimitsConsistency(options, store, deps);
     } catch (error) {
       ctx.validator = null;
+
       throw error;
     }
 

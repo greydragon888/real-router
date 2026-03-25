@@ -42,7 +42,7 @@ describe("core/crash guards (always enforced, no plugin required)", () => {
     });
 
     it("should accept undefined deps", () => {
-      expect(() => createRouter([], {}, undefined)).not.toThrow();
+      expect(() => createRouter([], {})).not.toThrow();
     });
   });
 

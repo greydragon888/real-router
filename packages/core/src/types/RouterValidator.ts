@@ -13,108 +13,123 @@ export interface RouterValidator {
    * Route validation methods
    */
   routes: {
-    validateBuildPathArgs(route: unknown): void;
-    validateMatchPathArgs(path: unknown): void;
-    validateIsActiveRouteArgs(
+    validateBuildPathArgs: (route: unknown) => void;
+    validateMatchPathArgs: (path: unknown) => void;
+    validateIsActiveRouteArgs: (
       name: unknown,
       params: unknown,
       strict: unknown,
       ignoreQP: unknown,
-    ): void;
-    validateShouldUpdateNodeArgs(name: unknown): void;
-    validateStateBuilderArgs(
+    ) => void;
+    validateShouldUpdateNodeArgs: (name: unknown) => void;
+    validateStateBuilderArgs: (
       name: unknown,
       params: unknown,
       caller: string,
-    ): void;
-    validateAddRouteArgs(routes: unknown): void;
-    validateRoutes(routes: unknown[], tree: unknown): void;
-    validateRemoveRouteArgs(name: unknown): void;
-    validateUpdateRouteBasicArgs(name: unknown, updates: unknown): void;
-    validateUpdateRoutePropertyTypes(name: string, updates: unknown): void;
-    validateUpdateRoute(name: string, updates: unknown, tree: unknown): void;
-    validateParentOption(parent: unknown, tree: unknown): void;
-    validateRouteName(name: unknown, caller: string): void;
-    throwIfInternalRoute(name: unknown, caller: string): void;
-    throwIfInternalRouteInArray(routes: unknown[], caller: string): void;
+    ) => void;
+    validateAddRouteArgs: (routes: unknown) => void;
+    validateRoutes: (routes: unknown[], tree: unknown) => void;
+    validateRemoveRouteArgs: (name: unknown) => void;
+    validateUpdateRouteBasicArgs: (name: unknown, updates: unknown) => void;
+    validateUpdateRoutePropertyTypes: (name: string, updates: unknown) => void;
+    validateUpdateRoute: (
+      name: string,
+      updates: unknown,
+      tree: unknown,
+    ) => void;
+    validateParentOption: (parent: unknown, tree: unknown) => void;
+    validateRouteName: (name: unknown, caller: string) => void;
+    throwIfInternalRoute: (name: unknown, caller: string) => void;
+    throwIfInternalRouteInArray: (routes: unknown[], caller: string) => void;
     // Retrospective validation
-    validateExistingRoutes(store: unknown): void;
-    validateForwardToConsistency(store: unknown): void;
+    validateExistingRoutes: (store: unknown) => void;
+    validateForwardToConsistency: (store: unknown) => void;
   };
 
   /**
    * Options validation methods
    */
   options: {
-    validateLimitValue(name: string, value: unknown): void;
-    validateLimits(limits: unknown): void;
+    validateLimitValue: (name: string, value: unknown) => void;
+    validateLimits: (limits: unknown) => void;
   };
 
   /**
    * Dependencies validation methods
    */
   dependencies: {
-    validateDependencyName(name: unknown, caller: string): void;
-    validateSetDependencyArgs(
+    validateDependencyName: (name: unknown, caller: string) => void;
+    validateSetDependencyArgs: (
       name: unknown,
       value: unknown,
       caller: string,
-    ): void;
-    validateDependenciesObject(deps: unknown, caller: string): void;
-    validateDependencyExists(name: string, store: unknown): void;
-    validateDependencyLimit(store: unknown, limits: unknown): void;
+    ) => void;
+    validateDependenciesObject: (deps: unknown, caller: string) => void;
+    validateDependencyExists: (name: string, store: unknown) => void;
+    validateDependencyLimit: (store: unknown, limits: unknown) => void;
     // Retrospective validation
-    validateDependenciesStructure(store: unknown): void;
+    validateDependenciesStructure: (store: unknown) => void;
   };
 
   /**
    * Plugin validation methods
    */
   plugins: {
-    validatePluginLimit(count: number, limits: unknown): void;
-    validateNoDuplicatePlugins(factory: unknown, factories: unknown[]): void;
+    validatePluginLimit: (count: number, limits: unknown) => void;
+    validateNoDuplicatePlugins: (
+      factory: unknown,
+      factories: unknown[],
+    ) => void;
   };
 
   /**
    * Lifecycle guard validation methods
    */
   lifecycle: {
-    validateHandler(handler: unknown, caller: string): void;
-    validateNotRegistering(name: string, guards: unknown, caller: string): void;
-    validateHandlerLimit(count: number, limits: unknown, caller: string): void;
+    validateHandler: (handler: unknown, caller: string) => void;
+    validateNotRegistering: (
+      name: string,
+      guards: unknown,
+      caller: string,
+    ) => void;
+    validateHandlerLimit: (
+      count: number,
+      limits: unknown,
+      caller: string,
+    ) => void;
   };
 
   /**
    * Navigation validation methods
    */
   navigation: {
-    validateNavigateArgs(name: unknown): void;
-    validateNavigateToDefaultArgs(options: unknown): void;
-    validateNavigationOptions(options: unknown, caller: string): void;
+    validateNavigateArgs: (name: unknown) => void;
+    validateNavigateToDefaultArgs: (options: unknown) => void;
+    validateNavigationOptions: (options: unknown, caller: string) => void;
   };
 
   /**
    * State validation methods
    */
   state: {
-    validateMakeStateArgs(
+    validateMakeStateArgs: (
       name: unknown,
       params: unknown,
       path: unknown,
       forceId: unknown,
-    ): void;
-    validateAreStatesEqualArgs(
+    ) => void;
+    validateAreStatesEqualArgs: (
       s1: unknown,
       s2: unknown,
       ignoreQP: unknown,
-    ): void;
+    ) => void;
   };
 
   /**
    * Event bus validation methods
    */
   eventBus: {
-    validateEventName(name: unknown): void;
-    validateListenerArgs(name: unknown, cb: unknown): void;
+    validateEventName: (name: unknown) => void;
+    validateListenerArgs: (name: unknown, cb: unknown) => void;
   };
 }

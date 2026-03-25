@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
 import { createRouter, RouterError } from "@real-router/core";
 import { getDependenciesApi, getRoutesApi } from "@real-router/core/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
@@ -10,12 +10,13 @@ let router: Router;
 
 describe("validationPlugin", () => {
   afterEach(() => {
-    router?.stop();
+    router.stop();
   });
 
   describe("registration", () => {
     it("registers before start without error", () => {
       router = createRouter([{ name: "home", path: "/home" }]);
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
@@ -43,6 +44,7 @@ describe("validationPlugin", () => {
     it("removes validator on teardown - navigate no longer validates", async () => {
       router = createRouter([{ name: "home", path: "/home" }]);
       const unsubscribe = router.usePlugin(validationPlugin());
+
       await router.start("/home");
 
       expect(() => {
@@ -94,7 +96,10 @@ describe("validationPlugin", () => {
 
     it("throws when existing dependencies exceed limit", () => {
       const deps: Record<string, number> = {};
-      for (let i = 0; i < 5; i++) deps[`dep${i}`] = i;
+
+      for (let i = 0; i < 5; i++) {
+        deps[`dep${i}`] = i;
+      }
 
       const r = createRouter<Record<string, number>>(
         [],
@@ -121,6 +126,7 @@ describe("validationPlugin", () => {
 
     it("validates getDependenciesApi.set key", () => {
       const deps = getDependenciesApi(router);
+
       expect(() => {
         // @ts-expect-error testing runtime validation
         deps.set(null, "value");
@@ -130,6 +136,7 @@ describe("validationPlugin", () => {
     it("validates getRoutesApi.add routes", async () => {
       await router.start("/home");
       const routes = getRoutesApi(router);
+
       expect(() => {
         // @ts-expect-error testing runtime validation
         routes.add([{ name: null, path: "/bad" }]);

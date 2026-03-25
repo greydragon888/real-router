@@ -1,22 +1,22 @@
 import { logger } from "@real-router/logger";
 
 import { throwIfDisposed } from "./helpers";
-import { getInternals } from "../internals";
 import { guardRouteStructure } from "../guards";
+import { getInternals } from "../internals";
 import {
   clearConfigEntries,
   removeFromDefinitions,
   sanitizeRoute,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
+  validateClearRoutes,
+  validateRemoveRoute,
+} from "../namespaces/RoutesNamespace/routeGuards";
+import {
   clearRouteData,
   refreshForwardMap,
   registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
-import {
-  validateClearRoutes,
-  validateRemoveRoute,
-} from "../namespaces/RoutesNamespace/routeGuards";
 
 import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";

@@ -58,13 +58,17 @@ export function guardNoAsyncCallbacks(route: Route): void {
 export function guardRouteStructure(routes: Route<any>[]): void {
   for (const route of routes) {
     const r: unknown = route;
+
     if (r === null || typeof r !== "object" || Array.isArray(r)) {
       throw new TypeError("route must be a non-array object");
     }
-    guardRouteCallbacks(route);
-    guardNoAsyncCallbacks(route);
-    if (route.children) {
-      guardRouteStructure(route.children);
+
+    guardRouteCallbacks(route as Route);
+    guardNoAsyncCallbacks(route as Route);
+    const children = (route as Route).children;
+
+    if (children) {
+      guardRouteStructure(children);
     }
   }
 }

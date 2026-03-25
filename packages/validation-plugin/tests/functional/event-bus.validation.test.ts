@@ -1,8 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-
 import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
-import { validationPlugin } from "@real-router/validation-plugin";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { createValidationRouter } from "../helpers";
 
@@ -23,8 +21,9 @@ describe("event bus validation — with validationPlugin", () => {
     it("should throw TypeError when callback is not a function", () => {
       const api = getPluginApi(router);
       const raw = api as unknown as {
-        addEventListener(e: unknown, cb: unknown): unknown;
+        addEventListener: (event: unknown, cb: unknown) => unknown;
       };
+
       expect(() => raw.addEventListener(events.ROUTER_START, "not-fn")).toThrow(
         TypeError,
       );
@@ -33,8 +32,9 @@ describe("event bus validation — with validationPlugin", () => {
     it("should throw TypeError for non-function types", () => {
       const api = getPluginApi(router);
       const raw = api as unknown as {
-        addEventListener(e: unknown, cb: unknown): unknown;
+        addEventListener: (event: unknown, cb: unknown) => unknown;
       };
+
       expect(() => raw.addEventListener(events.ROUTER_START, 123)).toThrow(
         TypeError,
       );
@@ -46,8 +46,9 @@ describe("event bus validation — with validationPlugin", () => {
     it("should throw Error for invalid event name", () => {
       const api = getPluginApi(router);
       const raw = api as unknown as {
-        addEventListener(e: unknown, cb: unknown): unknown;
+        addEventListener: (event: unknown, cb: unknown) => unknown;
       };
+
       expect(() => raw.addEventListener("invalidEvent", () => {})).toThrow(
         Error,
       );
@@ -59,13 +60,15 @@ describe("event bus validation — with validationPlugin", () => {
     it("should validate both parameters", () => {
       const api = getPluginApi(router);
       const raw = api as unknown as {
-        addEventListener(e: unknown, cb: unknown): unknown;
+        addEventListener: (event: unknown, cb: unknown) => unknown;
       };
+
       expect(() => raw.addEventListener("bad-event", "bad-fn")).toThrow();
     });
 
     it("should accept valid event and callback", () => {
       const api = getPluginApi(router);
+
       expect(() =>
         api.addEventListener(events.ROUTER_START, () => {}),
       ).not.toThrow();
@@ -81,6 +84,7 @@ describe("event bus validation — with validationPlugin", () => {
         events.TRANSITION_SUCCESS,
         events.TRANSITION_ERROR,
       ];
+
       for (const evt of validEvents) {
         expect(() => api.addEventListener(evt, () => {})).not.toThrow();
       }

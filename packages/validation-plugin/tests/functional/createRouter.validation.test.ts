@@ -1,6 +1,6 @@
+import { createRouter } from "@real-router/core";
 import { describe, it, expect, afterEach } from "vitest";
 
-import { createRouter } from "@real-router/core";
 import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
@@ -9,7 +9,7 @@ let router: Router;
 
 describe("createRouter — validation (with validationPlugin)", () => {
   afterEach(() => {
-    router?.stop();
+    router.stop();
   });
 
   describe("with routes", () => {
@@ -18,6 +18,7 @@ describe("createRouter — validation (with validationPlugin)", () => {
         { name: "home", path: "/home" },
         { name: "home", path: "/duplicate" },
       ]);
+
       expect(() => router.usePlugin(validationPlugin())).toThrow();
     });
 
@@ -26,11 +27,13 @@ describe("createRouter — validation (with validationPlugin)", () => {
         { name: "home", path: "/home" },
         { name: "about", path: "/about" },
       ]);
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
     it("should not throw for empty routes", () => {
       router = createRouter([]);
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
 
@@ -45,6 +48,7 @@ describe("createRouter — validation (with validationPlugin)", () => {
           ],
         },
       ]);
+
       expect(() => router.usePlugin(validationPlugin())).not.toThrow();
     });
   });

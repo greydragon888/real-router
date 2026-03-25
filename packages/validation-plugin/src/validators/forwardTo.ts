@@ -1,9 +1,8 @@
 // packages/validation-plugin/src/validators/forwardTo.ts
 
+import { resolveForwardChain } from "@real-router/core";
 import { getSegmentsByName } from "route-tree";
 import { getTypeDescription } from "type-guards";
-
-import { resolveForwardChain } from "@real-router/core";
 
 import type { Route, DefaultDependencies } from "@real-router/core";
 import type { RouteTree } from "route-tree";

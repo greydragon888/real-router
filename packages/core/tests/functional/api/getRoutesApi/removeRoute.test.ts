@@ -1105,8 +1105,12 @@ describe("core/routes/removeRoute", () => {
       const { logger } = await import("@real-router/logger");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      expect(() => routesApi.remove("маршрут")).not.toThrow();
-      expect(() => routesApi.remove("route_🚀")).not.toThrow();
+      expect(() => {
+        routesApi.remove("маршрут");
+      }).not.toThrow();
+      expect(() => {
+        routesApi.remove("route_🚀");
+      }).not.toThrow();
 
       warnSpy.mockRestore();
     });

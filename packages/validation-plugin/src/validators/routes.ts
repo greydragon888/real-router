@@ -6,6 +6,7 @@
  * (excludes validateRemoveRoute/validateClearRoutes — those are in routeGuards.ts)
  */
 
+import { resolveForwardChain } from "@real-router/core";
 import { validateRoute } from "route-tree";
 import {
   isString,
@@ -14,7 +15,6 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import { resolveForwardChain } from "@real-router/core";
 import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
 
 import type {

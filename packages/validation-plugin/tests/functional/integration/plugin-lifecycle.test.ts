@@ -7,13 +7,13 @@ import { validationPlugin } from "@real-router/validation-plugin";
 
 import type { Router } from "@real-router/core";
 
-let router: Router;
-
-afterEach(() => {
-  router?.stop();
-});
-
 describe("validationPlugin — lifecycle integration", () => {
+  let router: Router;
+
+  afterEach(() => {
+    router.stop();
+  });
+
   it("router without plugin works normally — start resolves", async () => {
     router = createRouter([{ name: "home", path: "/home" }], {
       defaultRoute: "home",
@@ -105,7 +105,7 @@ describe("validationPlugin — lifecycle integration", () => {
     expect(ctx.validator).toBeNull();
   });
 
-  it("throwIfInternalRoute wrapper — remove internal route throws Error", async () => {
+  it("throwIfInternalRoute wrapper — remove internal route throws Error", () => {
     router = createRouter([{ name: "home", path: "/home" }]);
     router.usePlugin(validationPlugin());
     const routes = getRoutesApi(router);
@@ -116,7 +116,7 @@ describe("validationPlugin — lifecycle integration", () => {
     }).toThrow();
   });
 
-  it("throwIfInternalRoute wrapper — update internal route throws Error", async () => {
+  it("throwIfInternalRoute wrapper — update internal route throws Error", () => {
     router = createRouter([{ name: "home", path: "/home" }]);
     router.usePlugin(validationPlugin());
     const routes = getRoutesApi(router);
