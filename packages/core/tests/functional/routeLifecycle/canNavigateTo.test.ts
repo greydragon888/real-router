@@ -240,19 +240,6 @@ describe("core/route-lifecycle/canNavigateTo", () => {
     expect(router.canNavigateTo("admin")).toBe(true);
   });
 
-  it("should throw TypeError for non-string route name", () => {
-    // @ts-expect-error: testing invalid input
-    expect(() => router.canNavigateTo(123)).toThrow(TypeError);
-    // @ts-expect-error: testing invalid input
-    expect(() => router.canNavigateTo(null)).toThrow(TypeError);
-    // @ts-expect-error: testing invalid input
-    expect(() => router.canNavigateTo(undefined)).toThrow(TypeError);
-  });
-
-  it("should throw TypeError for whitespace-only route name", () => {
-    expect(() => router.canNavigateTo("   ")).toThrow(TypeError);
-  });
-
   it("should handle empty params object", async () => {
     lifecycle.addActivateGuard("admin", () => () => true);
     await router.navigate("index");

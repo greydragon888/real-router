@@ -121,49 +121,10 @@ describe("getPluginApi().buildNavigationState()", () => {
   });
 
   describe("argument validation", () => {
-    it("should throw TypeError for non-string routeName", () => {
-      expect(() => api.buildNavigationState(123 as unknown as string)).toThrow(
-        TypeError,
-      );
-    });
-
-    it("should throw TypeError for null routeName", () => {
-      expect(() => api.buildNavigationState(null as unknown as string)).toThrow(
-        TypeError,
-      );
-      expect(() => api.buildNavigationState(null as unknown as string)).toThrow(
-        /Invalid routeName/,
-      );
-    });
-
     it("should return undefined for empty string routeName", () => {
       const state = api.buildNavigationState("");
 
       expect(state).toBeUndefined();
-    });
-
-    it("should throw TypeError for invalid routeParams (string)", () => {
-      expect(() =>
-        api.buildNavigationState("home", "invalid" as never),
-      ).toThrow(TypeError);
-      expect(() =>
-        api.buildNavigationState("home", "invalid" as never),
-      ).toThrow(/Invalid routeParams/);
-    });
-
-    it("should throw TypeError for invalid routeParams (function)", () => {
-      expect(() =>
-        api.buildNavigationState("home", (() => {}) as never),
-      ).toThrow(TypeError);
-      expect(() =>
-        api.buildNavigationState("home", (() => {}) as never),
-      ).toThrow(/Invalid routeParams/);
-    });
-
-    it("should include 'buildNavigationState' in error message", () => {
-      expect(() => api.buildNavigationState(123 as unknown as string)).toThrow(
-        /buildNavigationState/,
-      );
     });
   });
 

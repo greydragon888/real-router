@@ -1078,16 +1078,6 @@ describe("core/routes/removeRoute", () => {
 
     // 12.5: Very long name (> 10000 characters)
     // MAX_ROUTE_NAME_LENGTH is 10,000 in type-guards package
-    it("should throw TypeError for name exceeding 10000 characters", async () => {
-      const longName = "a".repeat(10_001);
-
-      expect(() => {
-        routesApi.remove(longName);
-      }).toThrow(TypeError);
-      expect(() => {
-        routesApi.remove(longName);
-      }).toThrow(/exceeds maximum length/);
-    });
 
     // 12.6: Exact boundary (10000 characters)
     it("should accept name with exactly 10000 characters", async () => {

@@ -217,11 +217,6 @@ export class Router<
       start: createInterceptable(
         "start",
         (path: string) => {
-          getInternals(this).validator?.navigation.validateNavigationOptions(
-            path,
-            "start",
-          );
-
           return this.#lifecycle.start(path);
         },
         interceptorsMap,
