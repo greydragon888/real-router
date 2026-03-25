@@ -5,8 +5,6 @@ import { DEFAULT_LIMITS } from "./constants";
 import type { Limits } from "./types";
 import type { State, LimitsConfig } from "@real-router/types";
 
-export { getTypeDescription } from "type-guards";
-
 // =============================================================================
 // State Helpers
 // =============================================================================

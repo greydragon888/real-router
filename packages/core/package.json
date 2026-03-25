@@ -103,7 +103,6 @@
   },
   "devDependencies": {
     "event-emitter": "workspace:^",
-    "route-tree": "workspace:^",
-    "type-guards": "workspace:^"
+    "route-tree": "workspace:^"
   }
 }

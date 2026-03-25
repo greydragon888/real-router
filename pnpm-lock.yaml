@@ -2371,9 +2371,6 @@ importers:
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/core-types: {}
 

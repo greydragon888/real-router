@@ -2,7 +2,7 @@ import { createIsomorphicConfig } from "../../tsup.base.mjs";
 
 // Bundle private dependencies into the output
 export default createIsomorphicConfig({
-  noExternal: ["event-emitter", "type-guards", "route-tree"],
+  noExternal: ["event-emitter", "route-tree"],
   custom: {
     entry: {
       index: "src/index.ts",
