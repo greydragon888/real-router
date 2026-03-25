@@ -412,7 +412,7 @@ export function getRoutesApi<
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
 
-      guardRouteStructure(routeArray);
+      guardRouteStructure(routeArray, ctx.validator);
 
       if (parentName !== undefined) {
         ctx.validator?.routes.validateParentOption(parentName, store.tree);
@@ -545,7 +545,7 @@ export function getRoutesApi<
         return;
       }
 
-      guardRouteStructure(routeArray);
+      guardRouteStructure(routeArray, ctx.validator);
 
       ctx.validator?.routes.throwIfInternalRouteInArray(
         routeArray,

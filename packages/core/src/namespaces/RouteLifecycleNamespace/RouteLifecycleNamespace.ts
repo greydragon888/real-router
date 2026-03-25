@@ -1,10 +1,6 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
-import { logger } from "@real-router/logger";
-import { isBoolean, getTypeDescription } from "type-guards";
-
 import { DEFAULT_LIMITS } from "../../constants";
-import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { GuardFnFactory, Limits } from "../../types";
@@ -67,12 +63,12 @@ export class RouteLifecycleNamespace<
    */
   setLimits(limits: Limits): void {
     this.#limits = limits;
+    // eslint-disable-next-line sonarjs/void-use -- @preserve: Wave 3 validator reads limits via RouterInternals; void suppresses TS6133 until then
+    void this.#limits;
   }
 
   setValidatorGetter(getter: () => RouterValidator | null): void {
     this.#getValidator = getter;
-    // eslint-disable-next-line sonarjs/void-use -- @preserve: Phase 2 call sites will read this field; void suppresses TS6133 until then
-    void this.#getValidator;
   }
 
   getHandlerCount(type: "activate" | "deactivate"): number {
@@ -300,18 +296,19 @@ export class RouteLifecycleNamespace<
   ): void {
     // Emit warnings
     if (isOverwrite) {
-      logger.warn(
-        `router.${methodName}`,
-        `Overwriting existing ${type} handler for route "${name}"`,
-      );
+      this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
-      this.#checkCountThresholds(factories.size + 1, methodName);
+      this.#getValidator?.()?.lifecycle.validateCountThresholds(
+        factories.size + 1,
+        methodName,
+      );
     }
 
     // Convert boolean to factory if needed
-    const factory = isBoolean(handler)
-      ? booleanToFactory<Dependencies>(handler)
-      : handler;
+    const factory =
+      typeof handler === "boolean"
+        ? booleanToFactory<Dependencies>(handler)
+        : handler;
 
     // Store factory
     factories.set(name, factory);
@@ -324,7 +321,7 @@ export class RouteLifecycleNamespace<
 
       if (typeof fn !== "function") {
         throw new TypeError(
-          `[router.${methodName}] Factory must return a function, got ${getTypeDescription(fn)}`,
+          `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
         );
       }
 
@@ -370,44 +367,11 @@ export class RouteLifecycleNamespace<
         return result;
       }
 
-      logger.warn(
-        `router.${methodName}`,
-        `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
-      );
+      this.#getValidator?.()?.lifecycle.warnAsyncGuardSync(name, methodName);
 
       return false;
     } catch {
       return false;
-    }
-  }
-
-  /**
-   * Emits warn/error log messages when handler count approaches the configured limit.
-   *
-   * @param currentSize - Current handler count (after adding the new one)
-   * @param methodName - Public API method name for warning messages
-   */
-  #checkCountThresholds(currentSize: number, methodName: string): void {
-    const maxLifecycleHandlers = this.#limits.maxLifecycleHandlers;
-
-    if (maxLifecycleHandlers === 0) {
-      return;
-    }
-
-    const { warn, error } = computeThresholds(maxLifecycleHandlers);
-
-    if (currentSize >= error) {
-      logger.error(
-        `router.${methodName}`,
-        `${currentSize} lifecycle handlers registered! ` +
-          `This is excessive. Hard limit at ${maxLifecycleHandlers}.`,
-      );
-    } else if (currentSize >= warn) {
-      logger.warn(
-        `router.${methodName}`,
-        `${currentSize} lifecycle handlers registered. ` +
-          `Consider consolidating logic.`,
-      );
     }
   }
 }

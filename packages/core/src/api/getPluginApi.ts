@@ -1,7 +1,6 @@
 import { throwIfDisposed } from "./helpers";
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
-import { validateSetRootPathArgs } from "../namespaces/RoutesNamespace/validators";
 import { RouterError } from "../RouterError";
 
 import type { PluginApi } from "./types";
@@ -57,7 +56,7 @@ export function getPluginApi<
     setRootPath: (rootPath) => {
       throwIfDisposed(ctx.isDisposed);
 
-      validateSetRootPathArgs(rootPath);
+      ctx.validator?.routes.validateSetRootPathArgs(rootPath);
 
       ctx.setRootPath(rootPath);
     },

@@ -1,5 +1,4 @@
 import { routeTreeToDefinitions } from "route-tree";
-import { getTypeDescription } from "type-guards";
 
 import { errorCodes } from "../constants";
 import { getInternals } from "../internals";
@@ -9,32 +8,6 @@ import { getLifecycleApi } from "./getLifecycleApi";
 
 import type { Route } from "../types";
 import type { DefaultDependencies, Router } from "@real-router/types";
-
-function validateCloneArgs(dependencies: unknown): void {
-  if (dependencies === undefined) {
-    return;
-  }
-
-  if (
-    !(
-      dependencies &&
-      typeof dependencies === "object" &&
-      dependencies.constructor === Object
-    )
-  ) {
-    throw new TypeError(
-      `[cloneRouter] Invalid dependencies: expected plain object or undefined, received ${getTypeDescription(dependencies)}`,
-    );
-  }
-
-  for (const key in dependencies) {
-    if (Object.getOwnPropertyDescriptor(dependencies, key)?.get) {
-      throw new TypeError(
-        `[cloneRouter] Getters not allowed in dependencies: "${key}"`,
-      );
-    }
-  }
-}
 
 export function cloneRouter<
   Dependencies extends DefaultDependencies = DefaultDependencies,
@@ -48,7 +21,7 @@ export function cloneRouter<
     throw new RouterError(errorCodes.ROUTER_DISPOSED);
   }
 
-  validateCloneArgs(dependencies);
+  ctx.validator?.dependencies.validateCloneArgs(dependencies);
 
   // Get source store directly
   const sourceStore = ctx.routeGetStore();

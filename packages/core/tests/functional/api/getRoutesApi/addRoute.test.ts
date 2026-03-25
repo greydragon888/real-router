@@ -481,24 +481,24 @@ describe("core/routes/addRoute", () => {
       }).not.toThrow();
     });
 
-    it("should throw when decodeParams is an async function", async () => {
+    it("without validation plugin, async decodeParams does NOT throw", async () => {
       expect(() => {
         routesApi.add({
           name: "async-decoder",
           path: "/async-decoder/:id",
           decodeParams: (async (params: Params) => params) as any,
         });
-      }).toThrow(/decodeparams cannot be async/i);
+      }).not.toThrow();
     });
 
-    it("should throw when encodeParams is an async function", async () => {
+    it("without validation plugin, async encodeParams does NOT throw", async () => {
       expect(() => {
         routesApi.add({
           name: "async-encoder",
           path: "/async-encoder/:id",
           encodeParams: (async (params: Params) => params) as any,
         });
-      }).toThrow(/encodeparams cannot be async/i);
+      }).not.toThrow();
     });
   });
 

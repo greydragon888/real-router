@@ -59,8 +59,14 @@ export class RouterWiringBuilder<
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
     this.routeLifecycle.setValidatorGetter(
-      /* v8 ignore next -- @preserve: getter not invoked until Phase 2 adds validator call sites */
-      () => getInternals(this.router).validator,
+      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
+      () => {
+        try {
+          return getInternals(this.router).validator;
+        } catch {
+          return null;
+        }
+      },
     );
   }
 
@@ -106,8 +112,14 @@ export class RouterWiringBuilder<
 
     this.plugins.setDependencies(pluginsDeps);
     this.plugins.setValidatorGetter(
-      /* v8 ignore next -- @preserve: getter not invoked until Phase 2 adds validator call sites */
-      () => getInternals(this.router).validator,
+      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
+      () => {
+        try {
+          return getInternals(this.router).validator;
+        } catch {
+          return null;
+        }
+      },
     );
   }
 

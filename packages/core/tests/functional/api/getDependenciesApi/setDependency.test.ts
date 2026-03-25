@@ -58,7 +58,7 @@ describe("core/dependencies/setDependency", () => {
     expect(deps.has("devLogger" as "foo")).toBe(false);
   });
 
-  it("should warn when overwriting existing dependency", () => {
+  it("should NOT warn via logger when overwriting existing dependency (no validation plugin)", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     deps.set("foo", 1);
@@ -66,14 +66,7 @@ describe("core/dependencies/setDependency", () => {
 
     deps.set("foo", 2);
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-
-    const callArgs = warnSpy.mock.calls[0];
-
-    // Logger format: logger.warn(context, message, ...args)
-    expect(callArgs[0]).toBe("router.setDependency");
-    expect(callArgs[1]).toContain("overwritten");
-    expect(callArgs[2]).toBe("foo");
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

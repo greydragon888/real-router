@@ -11,7 +11,6 @@ import {
 
 import { EventBusNamespace } from "../../src/namespaces/EventBusNamespace";
 import { PluginsNamespace } from "../../src/namespaces/PluginsNamespace";
-import { StateNamespace } from "../../src/namespaces/StateNamespace";
 import { createTestRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
@@ -229,7 +228,7 @@ describe("core/without validation plugin", () => {
       );
     });
 
-    it("should reject async forwardTo in createRouter", () => {
+    it("should throw for async forwardTo in createRouter (crash guard in routesStore, always enforced)", () => {
       expect(() => {
         createRouter([
           {
@@ -238,20 +237,10 @@ describe("core/without validation plugin", () => {
             forwardTo: (async () => "target") as any,
           },
         ]);
-      }).toThrow(TypeError);
-
-      expect(() => {
-        createRouter([
-          {
-            name: "async-route",
-            path: "/async",
-            forwardTo: (async () => "target") as any,
-          },
-        ]);
-      }).toThrow(/cannot be async/);
+      }).toThrow();
     });
 
-    it("should reject async forwardTo via addRoute", () => {
+    it("should throw for async forwardTo via addRoute (crash guard in routesStore, always enforced)", () => {
       const testRouter = createTestRouter();
       const testRoutesApi = getRoutesApi(testRouter);
 
@@ -261,15 +250,7 @@ describe("core/without validation plugin", () => {
           path: "/async-no-validate",
           forwardTo: (async () => "target") as any,
         });
-      }).toThrow(TypeError);
-
-      expect(() => {
-        testRoutesApi.add({
-          name: "async-no-validate",
-          path: "/async-no-validate",
-          forwardTo: (async () => "target") as any,
-        });
-      }).toThrow(/cannot be async/);
+      }).toThrow();
 
       testRouter.stop();
     });
@@ -344,18 +325,6 @@ describe("core/without validation plugin", () => {
   });
 
   describe("internal validator static methods (coverage for validators still in core)", () => {
-    it("should throw TypeError when plugin is not a function (validateUsePluginArgs)", () => {
-      expect(() => {
-        PluginsNamespace.validateUsePluginArgs([null]);
-      }).toThrow(TypeError);
-    });
-
-    it("should not throw when all plugins are functions (validateUsePluginArgs)", () => {
-      expect(() => {
-        PluginsNamespace.validateUsePluginArgs([() => ({})]);
-      }).not.toThrow();
-    });
-
     it("should throw when same factory registered twice (validateNoDuplicatePlugins)", () => {
       const factory = () => ({});
 
@@ -387,36 +356,12 @@ describe("core/without validation plugin", () => {
       }).not.toThrow();
     });
 
-    it("should throw TypeError for invalid state1 in areStatesEqual (validateAreStatesEqualArgs)", () => {
-      expect(() => {
-        StateNamespace.validateAreStatesEqualArgs("invalid", null, null);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid state2 in areStatesEqual (validateAreStatesEqualArgs)", () => {
-      expect(() => {
-        StateNamespace.validateAreStatesEqualArgs(null, "invalid", null);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-boolean ignoreQueryParams (validateAreStatesEqualArgs)", () => {
-      expect(() => {
-        StateNamespace.validateAreStatesEqualArgs(null, null, "true");
-      }).toThrow(TypeError);
-    });
-
-    it("should not throw for valid areStatesEqual args (validateAreStatesEqualArgs)", () => {
-      expect(() => {
-        StateNamespace.validateAreStatesEqualArgs(null, null, undefined);
-      }).not.toThrow();
-    });
-
-    it("should throw TypeError for non-string rootPath (validateSetRootPathArgs)", () => {
+    it("should throw for non-string setRootPath (runtime crash when path.startsWith fails)", () => {
       const router = createTestRouter();
 
       expect(() => {
         getPluginApi(router).setRootPath(123 as any);
-      }).toThrow(TypeError);
+      }).toThrow();
 
       router.stop();
     });

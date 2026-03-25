@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/PluginsNamespace/constants.ts
 
-import { isObjKey } from "type-guards";
-
 import {
   events as EVENTS_CONST,
   plugins as PLUGINS_CONST,
@@ -27,9 +25,8 @@ export const EVENTS_MAP = {
 /**
  * Plugin method names that correspond to router events.
  */
-export const EVENT_METHOD_NAMES = Object.keys(EVENTS_MAP).filter(
-  (eventName): eventName is keyof typeof EVENTS_MAP =>
-    isObjKey<typeof EVENTS_MAP>(eventName, EVENTS_MAP),
-);
+export const EVENT_METHOD_NAMES = Object.keys(
+  EVENTS_MAP,
+) as (keyof typeof EVENTS_MAP)[];
 
 export const LOGGER_CONTEXT = "router.usePlugin";

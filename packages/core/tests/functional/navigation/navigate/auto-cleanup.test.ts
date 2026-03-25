@@ -1,13 +1,12 @@
-import { logger } from "@real-router/logger";
 import { describe, beforeEach, afterEach, it, expect, vi } from "vitest";
 
 import { createRouter, errorCodes } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
 
+import { getInternals } from "../../../../src/internals";
+
 import type { Router } from "@real-router/core";
 import type { LifecycleApi } from "@real-router/core/api";
-
-const noop = () => undefined;
 
 describe("router.navigate() - auto cleanup", () => {
   describe("navigation with options.autoCleanUp === true", () => {
@@ -15,8 +14,6 @@ describe("router.navigate() - auto cleanup", () => {
     let lifecycle: LifecycleApi;
 
     beforeEach(async () => {
-      vi.spyOn(logger, "error").mockImplementation(noop);
-
       router = createRouter(
         [
           { name: "home", path: "/" },
@@ -60,26 +57,11 @@ describe("router.navigate() - auto cleanup", () => {
       router.stop();
     });
 
-    /**
-     * Helper to check if a canDeactivate guard exists for a route.
-     * Uses overwrite warning detection: if guard exists, registering new one triggers warning.
-     */
     function hasCanDeactivate(routeName: string): boolean {
-      const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
+      const [deactivateFactories] =
+        getInternals(router).getLifecycleFactories();
 
-      // Try to register a guard - if one exists, it will trigger overwrite warning
-      lifecycle.addDeactivateGuard(routeName, true);
-
-      const hadGuard = warnSpy.mock.calls.some(
-        (call) =>
-          call[0] === "router.canDeactivate" &&
-          typeof call[1] === "string" &&
-          call[1].includes("Overwriting"),
-      );
-
-      warnSpy.mockRestore();
-
-      return hadGuard;
+      return routeName in deactivateFactories;
     }
 
     describe("basic autoCleanUp functionality", () => {

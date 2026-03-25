@@ -36,7 +36,7 @@ describe("core/dependencies/setDependencies", () => {
     expect(deps.get("bar")).toBe("value");
   });
 
-  it("should warn with single message when overwriting multiple dependencies", () => {
+  it("should NOT warn via logger when overwriting multiple dependencies (no validation plugin)", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     deps.setAll({ foo: 1, bar: "initial" });
@@ -44,16 +44,7 @@ describe("core/dependencies/setDependencies", () => {
 
     deps.setAll({ foo: 2, bar: "new" });
 
-    // Single warning with both keys
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-
-    const callArgs = warnSpy.mock.calls[0];
-
-    // Logger format: logger.warn(context, message, ...args)
-    expect(callArgs[0]).toBe("router.setDependencies");
-    expect(callArgs[1]).toBe("Overwritten:");
-    expect(callArgs[2]).toContain("foo");
-    expect(callArgs[2]).toContain("bar");
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

@@ -115,7 +115,7 @@ export class Router<
     // =========================================================================
 
     // Always validate options
-    OptionsNamespace.validateOptions(options, "constructor");
+    OptionsNamespace.validateOptionsIsObject(options);
 
     // Unconditional guard-level validation before creating namespaces
     guardDependencies(dependencies);
@@ -307,6 +307,11 @@ export class Router<
       params,
       strictEquality,
       ignoreQueryParams,
+    );
+
+    getInternals(this).validator?.routes.validateRouteName(
+      name,
+      "isActiveRoute",
     );
 
     // Empty string is special case - warn and return false (root node is not a parent)

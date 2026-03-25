@@ -187,7 +187,7 @@ describe("core/route-lifecycle/guard-api", () => {
       lifecycle.addActivateGuard("admin", () => () => Promise.resolve(true));
 
       expect(router.canNavigateTo("admin")).toBe(false);
-      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });

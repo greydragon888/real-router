@@ -236,49 +236,40 @@ describe("core/options", () => {
   describe("constructor validation", () => {
     // 🔴 CRITICAL: Type validation
     describe("type validation", () => {
-      it("should throw TypeError for wrong primitive type - string", () => {
-        expect(() => createRouter([], { trailingSlash: true as any })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { defaultRoute: 123 as any })).toThrow(
-          TypeError,
-        );
+      it("without validation plugin, invalid field types do NOT throw", () => {
+        expect(() =>
+          createRouter([], { trailingSlash: true as any }),
+        ).not.toThrow();
+        expect(() =>
+          createRouter([], { defaultRoute: 123 as any }),
+        ).not.toThrow();
       });
 
-      it("should throw TypeError for null value", () => {
-        expect(() => createRouter([], { defaultRoute: null as any })).toThrow(
-          TypeError,
-        );
+      it("without validation plugin, null field value does NOT throw", () => {
+        expect(() =>
+          createRouter([], { defaultRoute: null as any }),
+        ).not.toThrow();
       });
     });
 
     // 🔴 CRITICAL: Enum validation for string options
     describe("enum validation", () => {
-      it("should throw TypeError for invalid trailingSlash value", () => {
+      it("without validation plugin, invalid trailingSlash value does NOT throw", () => {
         expect(() =>
           createRouter([], { trailingSlash: "INVALID" as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { trailingSlash: "INVALID" as any }),
-        ).toThrow('expected one of "strict", "never", "always", "preserve"');
+        ).not.toThrow();
       });
 
-      it("should throw TypeError for invalid queryParamsMode value", () => {
+      it("without validation plugin, invalid queryParamsMode value does NOT throw", () => {
         expect(() =>
           createRouter([], { queryParamsMode: "INVALID" as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParamsMode: "INVALID" as any }),
-        ).toThrow('expected one of "default", "strict", "loose"');
+        ).not.toThrow();
       });
 
-      it("should throw TypeError for invalid urlParamsEncoding value", () => {
+      it("without validation plugin, invalid urlParamsEncoding value does NOT throw", () => {
         expect(() =>
           createRouter([], { urlParamsEncoding: "INVALID" as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { urlParamsEncoding: "INVALID" as any }),
-        ).toThrow('expected one of "default", "uri", "uriComponent", "none"');
+        ).not.toThrow();
       });
 
       it("should accept all valid trailingSlash values", () => {
@@ -315,47 +306,43 @@ describe("core/options", () => {
         }
       });
 
-      it("should include invalid value in error message", () => {
+      it("without validation plugin, invalid enum value does NOT throw", () => {
         expect(() =>
           createRouter([], { trailingSlash: "typo-value" as any }),
-        ).toThrow('got "typo-value"');
+        ).not.toThrow();
       });
     });
 
     // 🔴 CRITICAL: Object validation
     describe("object validation", () => {
-      it("should reject array for object options", () => {
-        expect(() => createRouter([], { queryParams: [] as any })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { queryParams: [] as any })).toThrow(
-          "expected plain object",
-        );
-
-        expect(() => createRouter([], { defaultParams: [] as any })).toThrow(
-          TypeError,
-        );
+      it("without validation plugin, array field value does NOT throw", () => {
+        expect(() =>
+          createRouter([], { queryParams: [] as any }),
+        ).not.toThrow();
+        expect(() =>
+          createRouter([], { defaultParams: [] as any }),
+        ).not.toThrow();
       });
 
-      it("should reject Date instance for object options", () => {
+      it("without validation plugin, Date field value does NOT throw", () => {
         expect(() =>
           createRouter([], { queryParams: new Date() as any }),
-        ).toThrow(TypeError);
+        ).not.toThrow();
         expect(() =>
           createRouter([], { defaultParams: new Date() as any }),
-        ).toThrow(TypeError);
+        ).not.toThrow();
       });
 
-      it("should reject null for object options", () => {
-        expect(() => createRouter([], { queryParams: null as any })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { defaultParams: null as any })).toThrow(
-          TypeError,
-        );
+      it("without validation plugin, null field value does NOT throw", () => {
+        expect(() =>
+          createRouter([], { queryParams: null as any }),
+        ).not.toThrow();
+        expect(() =>
+          createRouter([], { defaultParams: null as any }),
+        ).not.toThrow();
       });
 
-      it("should reject class instances for object options", () => {
+      it("without validation plugin, class instance field value does NOT throw", () => {
         class CustomClass {
           value = "test";
         }
@@ -363,21 +350,21 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: instance as any }),
-        ).toThrow(TypeError);
+        ).not.toThrow();
         expect(() =>
           createRouter([], { defaultParams: instance as any }),
-        ).toThrow(TypeError);
+        ).not.toThrow();
       });
 
-      it("should reject Object.create(null) for object options", () => {
+      it("without validation plugin, Object.create(null) field value does NOT throw", () => {
         const nullProto = Object.create(null);
 
-        expect(() => createRouter([], { queryParams: nullProto })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { defaultParams: nullProto })).toThrow(
-          TypeError,
-        );
+        expect(() =>
+          createRouter([], { queryParams: nullProto }),
+        ).not.toThrow();
+        expect(() =>
+          createRouter([], { defaultParams: nullProto }),
+        ).not.toThrow();
       });
 
       it("should accept plain objects for object options", () => {
@@ -391,22 +378,19 @@ describe("core/options", () => {
         ).not.toThrow();
       });
 
-      it("should reject objects with getters", () => {
+      it("without validation plugin, objects with getters do NOT throw", () => {
         const withGetter = {
           get id() {
             return "123";
           },
         };
 
-        expect(() => createRouter([], { defaultParams: withGetter })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { defaultParams: withGetter })).toThrow(
-          'Getters not allowed in "defaultParams": "id"',
-        );
+        expect(() =>
+          createRouter([], { defaultParams: withGetter }),
+        ).not.toThrow();
       });
 
-      it("should reject objects with getters in queryParams", () => {
+      it("without validation plugin, queryParams with getters does NOT throw", () => {
         const withGetter = {
           get arrayFormat() {
             return "bracket";
@@ -415,13 +399,10 @@ describe("core/options", () => {
 
         expect(() =>
           createRouter([], { queryParams: withGetter as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParams: withGetter as any }),
-        ).toThrow("Getters not allowed");
+        ).not.toThrow();
       });
 
-      it("should accept objects with regular properties alongside rejected getters", () => {
+      it("without validation plugin, mixed getter objects do NOT throw", () => {
         const mixed = {
           normalProp: "value",
           get dangerousProp() {
@@ -429,50 +410,33 @@ describe("core/options", () => {
           },
         };
 
-        expect(() => createRouter([], { defaultParams: mixed })).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { defaultParams: mixed })).toThrow(
-          'Getters not allowed in "defaultParams": "dangerousProp"',
-        );
+        expect(() => createRouter([], { defaultParams: mixed })).not.toThrow();
       });
 
       // 🔴 CRITICAL: queryParams key validation
-      it("should reject unknown keys in queryParams", () => {
+      it("without validation plugin, unknown queryParams keys do NOT throw", () => {
         expect(() =>
           createRouter([], { queryParams: { unknownKey: "value" } as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParams: { unknownKey: "value" } as any }),
-        ).toThrow('Unknown queryParams key: "unknownKey"');
+        ).not.toThrow();
       });
 
       // 🔴 CRITICAL: queryParams value validation
-      it("should reject invalid arrayFormat value", () => {
+      it("without validation plugin, invalid arrayFormat value does NOT throw", () => {
         expect(() =>
           createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParams: { arrayFormat: "invalid" } as any }),
-        ).toThrow('expected one of "none", "brackets", "index", "comma"');
+        ).not.toThrow();
       });
 
-      it("should reject invalid booleanFormat value", () => {
+      it("without validation plugin, invalid booleanFormat value does NOT throw", () => {
         expect(() =>
           createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParams: { booleanFormat: "wrong" } as any }),
-        ).toThrow('expected one of "none", "string", "empty-true"');
+        ).not.toThrow();
       });
 
-      it("should reject invalid nullFormat value", () => {
+      it("without validation plugin, invalid nullFormat value does NOT throw", () => {
         expect(() =>
           createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { queryParams: { nullFormat: "bad" } as any }),
-        ).toThrow('expected one of "default", "hidden"');
+        ).not.toThrow();
       });
 
       it("should accept all valid queryParams combinations", () => {
@@ -513,21 +477,13 @@ describe("core/options", () => {
 
     // 🔴 CRITICAL: Non-existent option
     describe("non-existent options", () => {
-      it("should throw TypeError for unknown option name", () => {
-        expect(() => createRouter([], { unknownOption: true } as any)).toThrow(
-          TypeError,
-        );
-        expect(() => createRouter([], { unknownOption: true } as any)).toThrow(
-          'Unknown option: "unknownOption"',
-        );
+      it("without validation plugin, unknown option name does NOT throw", () => {
+        expect(() =>
+          createRouter([], { unknownOption: true } as any),
+        ).not.toThrow();
       });
 
-      it("should reject prototype pollution keys", () => {
-        // constructor is caught by the "expected plain object" check
-        // Other keys are caught by the "Unknown option" check
-        // __proto__ is safe: isObjKey uses `in` operator which finds it
-        // in defaultOptions prototype chain, so it's treated as known
-        // and its value is ignored in the options spread
+      it("without validation plugin, prototype pollution keys do NOT throw", () => {
         const dangerousKeys = [
           "constructor",
           "hasOwnProperty",
@@ -536,7 +492,7 @@ describe("core/options", () => {
         ];
 
         for (const key of dangerousKeys) {
-          expect(() => createRouter([], { [key]: {} } as any)).toThrow();
+          expect(() => createRouter([], { [key]: {} } as any)).not.toThrow();
         }
       });
     });
@@ -561,7 +517,7 @@ describe("core/options", () => {
         expect(getPluginApi(r).getOptions().defaultParams).toStrictEqual({});
       });
 
-      it("should safely reject object with throwing toString for string option", () => {
+      it("without validation plugin, object with throwing toString does NOT throw on construction", () => {
         const evilValue = {
           toString() {
             throw new Error("toString bomb");
@@ -571,19 +527,15 @@ describe("core/options", () => {
           },
         };
 
-        // typeof check happens before any coercion
         expect(() =>
           createRouter([], { defaultRoute: evilValue as any }),
-        ).toThrow(TypeError);
-        expect(() =>
-          createRouter([], { defaultRoute: evilValue as any }),
-        ).toThrow("expected string, got object");
+        ).not.toThrow();
       });
 
-      it("should reject number for string option", () => {
-        expect(() => createRouter([], { trailingSlash: 1 as any })).toThrow(
-          TypeError,
-        );
+      it("without validation plugin, number for string option does NOT throw", () => {
+        expect(() =>
+          createRouter([], { trailingSlash: 1 as any }),
+        ).not.toThrow();
       });
 
       it("should accept frozen object for defaultParams", () => {
@@ -606,37 +558,29 @@ describe("core/options", () => {
     });
   });
 
-  describe("options.ts edge cases (lines 31, 73, 79)", () => {
-    it("should throw TypeError for unknown option in createRouter (line 73)", () => {
-      expect(() => createRouter([], { unknownOption: "value" } as any)).toThrow(
-        TypeError,
-      );
-      expect(() => createRouter([], { unknownOption: "value" } as any)).toThrow(
-        'Unknown option: "unknownOption"',
-      );
+  describe("options.ts edge cases", () => {
+    it("without validation plugin, unknown option does NOT throw", () => {
+      expect(() =>
+        createRouter([], { unknownOption: "value" } as any),
+      ).not.toThrow();
     });
 
-    it("should throw TypeError for array as options in createRouter (line 194)", () => {
+    it("crash guard: array as options throws TypeError", () => {
       expect(() => createRouter([], [] as any)).toThrow(TypeError);
       expect(() => createRouter([], [] as any)).toThrow(
-        "Invalid options: expected plain object, got array",
+        "options must be a plain object",
       );
     });
 
-    it("should throw TypeError for class instance as options in createRouter (line 194)", () => {
+    it("without validation plugin, class instance as options does NOT throw", () => {
       class CustomOptions {
         allowNotFound = true;
       }
 
-      expect(() => createRouter([], new CustomOptions() as any)).toThrow(
-        TypeError,
-      );
-      expect(() => createRouter([], new CustomOptions() as any)).toThrow(
-        "Invalid options: expected plain object, got CustomOptions",
-      );
+      expect(() => createRouter([], new CustomOptions() as any)).not.toThrow();
     });
 
-    it("should skip validation for undefined option values (line 229)", () => {
+    it("should skip validation for undefined option values", () => {
       // When an option has undefined value, validation is skipped (no error thrown)
       // The undefined value is still assigned via spread, overriding the default
       // This allows conditional configuration like: { trailingSlash: condition ? "always" : undefined }
@@ -743,12 +687,12 @@ describe("core/options", () => {
       customRouter.stop();
     });
 
-    it("should reject callback functions for other options", () => {
+    it("without validation plugin, callback for non-callback option does NOT throw", () => {
       expect(() => {
         createTestRouter({
           trailingSlash: (() => "never") as never,
         });
-      }).toThrow(TypeError);
+      }).not.toThrow();
     });
 
     it("navigateToDefault resolves callback defaultRoute via getDependency", async () => {
