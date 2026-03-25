@@ -9,6 +9,7 @@ import { computeThresholds } from "../../helpers";
 
 import type { PluginsDependencies } from "./types";
 import type { Limits, PluginFactory } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type {
   DefaultDependencies,
   Plugin,
@@ -29,6 +30,7 @@ export class PluginsNamespace<
 
   #deps!: PluginsDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
+  #getValidator: (() => RouterValidator | null) | null = null;
 
   // =========================================================================
   // Static validation methods (called by facade before instance methods)
@@ -69,6 +71,12 @@ export class PluginsNamespace<
 
   setLimits(limits: Limits): void {
     this.#limits = limits;
+  }
+
+  setValidatorGetter(getter: () => RouterValidator | null): void {
+    this.#getValidator = getter;
+    // eslint-disable-next-line sonarjs/void-use -- @preserve: Phase 2 call sites will read this field; void suppresses TS6133 until then
+    void this.#getValidator;
   }
 
   // =========================================================================

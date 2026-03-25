@@ -104,6 +104,14 @@ function buildValidatorObject(): RouterValidator {
       },
       validateExistingRoutes: retroV.validateExistingRoutes,
       validateForwardToConsistency: retroV.validateForwardToConsistency,
+      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateSetRootPathArgs(_rootPath) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      guardRouteCallbacks(_route) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      guardNoAsyncCallbacks(_route) {},
+      /* v8 ignore stop */
     },
     options: {
       validateLimitValue(name, value) {
@@ -113,6 +121,10 @@ function buildValidatorObject(): RouterValidator {
       validateLimits(limits) {
         optionsV.validateLimits(limits, "validate");
       },
+      /* v8 ignore start -- @preserve: Phase 2 stub; call site added in tasks 2-7 */
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateOptions(_options, _methodName) {},
+      /* v8 ignore stop */
     },
     dependencies: {
       validateDependencyName: depsV.validateDependencyName,
@@ -129,6 +141,18 @@ function buildValidatorObject(): RouterValidator {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateDependencyLimit(_store, _limits) {},
       validateDependenciesStructure: retroV.validateDependenciesStructure,
+      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateDependencyCount(_store, _methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateCloneArgs(_dependencies) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnOverwrite(_name, _methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnBatchOverwrite(_keys, _methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnRemoveNonExistent(_name) {},
+      /* v8 ignore stop */
     },
     plugins: {
       validatePluginLimit(count, limits) {
@@ -137,6 +161,18 @@ function buildValidatorObject(): RouterValidator {
       },
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateNoDuplicatePlugins(_factory, _factories) {},
+      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validatePluginKeys(_plugin) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateCountThresholds(_count) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnBatchDuplicates(_plugins) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnPluginMethodType(_methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnPluginAfterStart(_methodName) {},
+      /* v8 ignore stop */
     },
     lifecycle: {
       validateHandler: lifecycleV.validateHandler,
@@ -151,6 +187,14 @@ function buildValidatorObject(): RouterValidator {
           (limits as any)?.maxLifecycleHandlers,
         );
       },
+      /* v8 ignore start -- @preserve: Phase 2 stubs; call sites added in tasks 2-7 */
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      validateCountThresholds(_count, _methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnOverwrite(_name, _type, _methodName) {},
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
+      warnAsyncGuardSync(_name, _methodName) {},
+      /* v8 ignore stop */
     },
     navigation: {
       validateNavigateArgs: navV.validateNavigateArgs,

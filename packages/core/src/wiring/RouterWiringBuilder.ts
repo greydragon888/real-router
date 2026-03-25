@@ -58,6 +58,10 @@ export class RouterWiringBuilder<
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
+    this.routeLifecycle.setValidatorGetter(
+      /* v8 ignore next -- @preserve: getter not invoked until Phase 2 adds validator call sites */
+      () => getInternals(this.router).validator,
+    );
   }
 
   wireRoutesDeps(): void {
@@ -101,6 +105,10 @@ export class RouterWiringBuilder<
     };
 
     this.plugins.setDependencies(pluginsDeps);
+    this.plugins.setValidatorGetter(
+      /* v8 ignore next -- @preserve: getter not invoked until Phase 2 adds validator call sites */
+      () => getInternals(this.router).validator,
+    );
   }
 
   wireNavigationDeps(): void {

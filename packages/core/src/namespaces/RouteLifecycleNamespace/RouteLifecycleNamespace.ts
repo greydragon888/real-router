@@ -8,6 +8,7 @@ import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { GuardFnFactory, Limits } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
 /**
@@ -53,6 +54,7 @@ export class RouteLifecycleNamespace<
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
+  #getValidator: (() => RouterValidator | null) | null = null;
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
@@ -65,6 +67,12 @@ export class RouteLifecycleNamespace<
    */
   setLimits(limits: Limits): void {
     this.#limits = limits;
+  }
+
+  setValidatorGetter(getter: () => RouterValidator | null): void {
+    this.#getValidator = getter;
+    // eslint-disable-next-line sonarjs/void-use -- @preserve: Phase 2 call sites will read this field; void suppresses TS6133 until then
+    void this.#getValidator;
   }
 
   getHandlerCount(type: "activate" | "deactivate"): number {
