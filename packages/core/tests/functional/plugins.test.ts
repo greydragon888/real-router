@@ -508,12 +508,30 @@ describe("core/plugins", () => {
         }).toThrow("must return an object");
       });
 
-      it("should validate all types: null, undefined, number, string, object", () => {
-        expect(() => router.usePlugin(null as any)).toThrow(TypeError);
-        expect(() => router.usePlugin(undefined as any)).toThrow(TypeError);
-        expect(() => router.usePlugin(123 as any)).toThrow(TypeError);
-        expect(() => router.usePlugin("str" as any)).toThrow(TypeError);
-        expect(() => router.usePlugin({} as any)).toThrow(TypeError);
+      it("should silently skip null, undefined, false (falsy plugin values)", () => {
+        expect(() => router.usePlugin(null)).not.toThrow();
+        expect(() => router.usePlugin(undefined)).not.toThrow();
+        expect(() => router.usePlugin(false)).not.toThrow();
+        expect(() => router.usePlugin(null, undefined, false)).not.toThrow();
+      });
+
+      it("should return noop unsubscribe when all plugins are falsy", () => {
+        const unsub = router.usePlugin(null, false, undefined);
+
+        expect(unsub).toBeTypeOf("function");
+        expect(() => {
+          unsub();
+        }).not.toThrow();
+      });
+
+      it("should register valid plugins and skip falsy in mixed call", async () => {
+        router.stop();
+        const tracker = createTrackingPlugin();
+
+        router.usePlugin(false, tracker.factory, null, undefined);
+        await router.start("/home");
+
+        expect(tracker.getCalls().onStart).toBe(1);
       });
 
       it("without validation plugin, plugin with unknown properties does NOT throw", () => {

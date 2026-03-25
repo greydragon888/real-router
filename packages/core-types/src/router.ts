@@ -271,7 +271,9 @@ export interface Router<D extends DefaultDependencies = DefaultDependencies> {
 
   canNavigateTo: (name: string, params?: Params) => boolean;
 
-  usePlugin: (...plugins: PluginFactory<D>[]) => Unsubscribe;
+  usePlugin: (
+    ...plugins: (PluginFactory<D> | false | null | undefined)[]
+  ) => Unsubscribe;
 
   subscribe: (listener: SubscribeFn) => Unsubscribe;
 

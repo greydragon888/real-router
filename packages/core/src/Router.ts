@@ -494,21 +494,29 @@ export class Router<
   // Plugins
   // ============================================================================
 
-  usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
+  usePlugin(
+    ...plugins: (PluginFactory<Dependencies> | false | null | undefined)[]
+  ): Unsubscribe {
+    const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
+
+    if (filtered.length === 0) {
+      return () => {};
+    }
+
     const ctx = getInternals(this);
 
     ctx.validator?.plugins.validatePluginLimit(
       this.#plugins.count(),
       this.#limits,
     );
-    for (const plugin of plugins) {
+    for (const plugin of filtered) {
       ctx.validator?.plugins.validateNoDuplicatePlugins(
         plugin,
         this.#plugins.getAll(),
       );
     }
 
-    return this.#plugins.use(...plugins);
+    return this.#plugins.use(...filtered);
   }
 
   // ============================================================================
