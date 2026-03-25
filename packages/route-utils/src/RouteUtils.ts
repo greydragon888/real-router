@@ -117,12 +117,16 @@ export class RouteUtils {
     // Build siblings for all children of this node
     // Siblings = nonAbsoluteChildren excluding the child itself
     // Absolute children also get siblings (all nonAbsoluteChildren)
-    const nonAbsoluteNames = node.nonAbsoluteChildren.map((c) => c.fullName);
+    const nonAbsoluteNames = node.nonAbsoluteChildren.map(
+      (child) => child.fullName,
+    );
 
     for (const child of node.nonAbsoluteChildren) {
       this.#siblingsCache.set(
         child.fullName,
-        Object.freeze(nonAbsoluteNames.filter((n) => n !== child.fullName)),
+        Object.freeze(
+          nonAbsoluteNames.filter((name) => name !== child.fullName),
+        ),
       );
     }
 

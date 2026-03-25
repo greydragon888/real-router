@@ -22,7 +22,7 @@ export default [
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "25 kB",
+    limit: "20 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },

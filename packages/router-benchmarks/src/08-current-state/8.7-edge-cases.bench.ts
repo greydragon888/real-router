@@ -60,8 +60,8 @@ function getBuildState(
 {
   const router = createSimpleRouter();
   const makeState = getMakeState(router);
-  const state1 = makeState("home", { a: "1", b: "2" }, "/");
-  const state2 = makeState("home", { b: "2", a: "1" }, "/");
+  const state1 = makeState("home", { paramA: "1", paramB: "2" }, "/");
+  const state2 = makeState("home", { paramB: "2", paramA: "1" }, "/");
 
   bench(
     "8.7.4 Comparing states with identical parameters but different structure",

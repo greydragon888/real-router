@@ -390,19 +390,19 @@ export function validateRoute(
 ): asserts route is RouteDefinition {
   validateRouteType(route, methodName);
 
-  const r = route;
+  const routeDef = route;
 
   // Validate that name is a non-empty string
-  validateRouteName(r, methodName);
+  validateRouteName(routeDef, methodName);
 
   // Validate path structure
-  validateRoutePath(r.path, r.name, methodName, rootNode);
+  validateRoutePath(routeDef.path, routeDef.name, methodName, rootNode);
 
   // Validate optional function properties
-  validateEncodeParams(r, methodName);
-  validateDecodeParams(r, methodName);
+  validateEncodeParams(routeDef, methodName);
+  validateDecodeParams(routeDef, methodName);
 
-  const routeName = r.name;
+  const routeName = routeDef.name;
   const fullName = parentName ? `${parentName}.${routeName}` : routeName;
 
   // Check for duplicate name in existing tree
@@ -415,7 +415,7 @@ export function validateRoute(
     checkBatchNameDuplicate(seenNames, fullName, methodName);
   }
 
-  const routePath = r.path;
+  const routePath = routeDef.path;
   const pathCheckParent = parentName;
 
   // Check for duplicate path in existing tree
@@ -434,14 +434,14 @@ export function validateRoute(
   }
 
   // Validate children recursively
-  if (r.children !== undefined) {
-    if (!Array.isArray(r.children)) {
+  if (routeDef.children !== undefined) {
+    if (!Array.isArray(routeDef.children)) {
       throw new TypeError(
-        `[router.${methodName}] Route "${routeName}" children must be an array, got ${getTypeDescription(r.children)}`,
+        `[router.${methodName}] Route "${routeName}" children must be an array, got ${getTypeDescription(routeDef.children)}`,
       );
     }
 
-    for (const child of r.children) {
+    for (const child of routeDef.children) {
       validateRoute(
         child,
         methodName,

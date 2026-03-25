@@ -27,9 +27,9 @@ export function ssrDataPluginFactory(loaders: DataLoaderMap): PluginFactory {
 
     const removeExtensions = api.extendRouter({
       getRouteData(state?: State): unknown {
-        const s = state ?? router.getState();
+        const routeState = state ?? router.getState();
 
-        return s ? (dataStore.get(s) ?? null) : null;
+        return routeState ? (dataStore.get(routeState) ?? null) : null;
       },
     });
 

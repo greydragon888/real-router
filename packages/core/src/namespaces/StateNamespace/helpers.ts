@@ -36,7 +36,7 @@ export function areParamValuesEqual(val1: unknown, val2: unknown): boolean {
       return false;
     }
 
-    return val1.every((v, i) => areParamValuesEqual(v, val2[i]));
+    return val1.every((value, i) => areParamValuesEqual(value, val2[i]));
   }
 
   return false;

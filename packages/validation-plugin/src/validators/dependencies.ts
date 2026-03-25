@@ -82,17 +82,18 @@ export function validateDependencyCount(
   store: unknown,
   methodName: string,
 ): void {
-  const s = store as {
+  const typedStore = store as {
     dependencies: Record<string, unknown>;
     limits?: { maxDependencies?: number };
   };
-  const maxDependencies = s.limits?.maxDependencies ?? DEFAULT_MAX_DEPENDENCIES;
+  const maxDependencies =
+    typedStore.limits?.maxDependencies ?? DEFAULT_MAX_DEPENDENCIES;
 
   if (maxDependencies === 0) {
     return;
   }
 
-  const currentCount = Object.keys(s.dependencies).length;
+  const currentCount = Object.keys(typedStore.dependencies).length;
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {

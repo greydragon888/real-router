@@ -94,33 +94,48 @@ function isAsyncFunction(fn: unknown): boolean {
 }
 
 export function guardRouteCallbacks(route: unknown): void {
-  const r = route as { canActivate?: unknown; canDeactivate?: unknown };
+  const routeObj = route as { canActivate?: unknown; canDeactivate?: unknown };
 
-  if (r.canActivate !== undefined && typeof r.canActivate !== "function") {
+  if (
+    routeObj.canActivate !== undefined &&
+    typeof routeObj.canActivate !== "function"
+  ) {
     throw new TypeError("[router.addRoute] canActivate must be a function");
   }
 
-  if (r.canDeactivate !== undefined && typeof r.canDeactivate !== "function") {
+  if (
+    routeObj.canDeactivate !== undefined &&
+    typeof routeObj.canDeactivate !== "function"
+  ) {
     throw new TypeError("[router.addRoute] canDeactivate must be a function");
   }
 }
 
 export function guardNoAsyncCallbacks(route: unknown): void {
-  const r = route as {
+  const routeObj = route as {
     decodeParams?: unknown;
     encodeParams?: unknown;
     forwardTo?: unknown;
   };
 
-  if (r.decodeParams !== undefined && isAsyncFunction(r.decodeParams)) {
+  if (
+    routeObj.decodeParams !== undefined &&
+    isAsyncFunction(routeObj.decodeParams)
+  ) {
     throw new TypeError("[router.addRoute] decodeParams cannot be async");
   }
 
-  if (r.encodeParams !== undefined && isAsyncFunction(r.encodeParams)) {
+  if (
+    routeObj.encodeParams !== undefined &&
+    isAsyncFunction(routeObj.encodeParams)
+  ) {
     throw new TypeError("[router.addRoute] encodeParams cannot be async");
   }
 
-  if (typeof r.forwardTo === "function" && isAsyncFunction(r.forwardTo)) {
+  if (
+    typeof routeObj.forwardTo === "function" &&
+    isAsyncFunction(routeObj.forwardTo)
+  ) {
     throw new TypeError("[router.addRoute] forwardTo callback cannot be async");
   }
 }

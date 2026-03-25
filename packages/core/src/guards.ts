@@ -25,9 +25,13 @@ export function guardRouteStructure(
 ): void {
   /* eslint-enable @typescript-eslint/no-explicit-any */
   for (const route of routes) {
-    const r: unknown = route;
+    const routeValue: unknown = route;
 
-    if (r === null || typeof r !== "object" || Array.isArray(r)) {
+    if (
+      routeValue === null ||
+      typeof routeValue !== "object" ||
+      Array.isArray(routeValue)
+    ) {
       throw new TypeError("route must be a non-array object");
     }
 

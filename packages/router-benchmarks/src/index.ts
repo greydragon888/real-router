@@ -40,11 +40,11 @@ function warmupJIT(): void {
   // Suppress unhandled rejection for real-router's async start().
   // router5/router6 start() returns the router object (not a Promise) — .catch() would crash.
   const safeStart = IS_REAL_ROUTER
-    ? (r: ReturnType<typeof createSimpleRouter>, path: string) => {
-        r.start(path).catch(() => {});
+    ? (router: ReturnType<typeof createSimpleRouter>, path: string) => {
+        router.start(path).catch(() => {});
       }
-    : (r: ReturnType<typeof createSimpleRouter>, path: string) => {
-        void r.start(path);
+    : (router: ReturnType<typeof createSimpleRouter>, path: string) => {
+        void router.start(path);
       };
 
   for (let i = 0; i < JIT_WARMUP_ITERATIONS; i++) {
@@ -128,8 +128,8 @@ function getRequestedSections(): number[] {
 
   return sectionsEnv
     .split(",")
-    .map((s) => Number.parseInt(s.trim(), 10))
-    .filter((n) => !Number.isNaN(n));
+    .map((section) => Number.parseInt(section.trim(), 10))
+    .filter((num) => !Number.isNaN(num));
 }
 
 // Dynamic import of benchmark sections
@@ -147,8 +147,8 @@ async function importSections(): Promise<void> {
   }
 
   // Filter to valid sections only
-  const validSections = requestedSections.filter((s) =>
-    availableSections.includes(s),
+  const validSections = requestedSections.filter((section) =>
+    availableSections.includes(section),
   );
 
   // Import requested sections
@@ -240,7 +240,8 @@ function calculateRME(samples: number[], avg: number): number {
   }
 
   const variance =
-    samples.reduce((sum, x) => sum + (x - avg) ** 2, 0) / (samples.length - 1);
+    samples.reduce((sum, sample) => sum + (sample - avg) ** 2, 0) /
+    (samples.length - 1);
   const stdDev = Math.sqrt(variance);
   const stdError = stdDev / Math.sqrt(samples.length);
 
@@ -262,32 +263,32 @@ function processResults(results: MitataResults): void {
   // Group benchmarks by section
   const sectionResults = new Map<number, BenchmarkResult[]>();
 
-  for (const b of results.benchmarks) {
-    const firstRun = b.runs?.[0];
-    const s = firstRun?.stats;
+  for (const benchmark of results.benchmarks) {
+    const firstRun = benchmark.runs?.[0];
+    const stats = firstRun?.stats;
 
-    if (!s) {
+    if (!stats) {
       continue;
     }
 
-    const sectionNumber = extractSectionNumber(b.alias);
+    const sectionNumber = extractSectionNumber(benchmark.alias);
 
     if (sectionNumber === null) {
-      console.error(`Warning: Cannot parse section from "${b.alias}"`);
+      console.error(`Warning: Cannot parse section from "${benchmark.alias}"`);
       continue;
     }
 
-    const heap = s.heap ?? { avg: 0, min: 0, max: 0 };
+    const heap = stats.heap ?? { avg: 0, min: 0, max: 0 };
 
     const result: BenchmarkResult = {
-      name: b.alias,
-      group: b.group,
+      name: benchmark.alias,
+      group: benchmark.group,
       stats: {
-        avg: s.avg,
-        p50: s.p50,
-        p99: s.p99,
-        max: s.max,
-        rme: calculateRME(s.samples ?? [], s.avg),
+        avg: stats.avg,
+        p50: stats.p50,
+        p99: stats.p99,
+        max: stats.max,
+        rme: calculateRME(stats.samples ?? [], stats.avg),
         heap: {
           avg: heap.avg,
         },

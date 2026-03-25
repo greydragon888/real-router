@@ -73,8 +73,8 @@ function clearRouteConfigurations<
   routeCustomFields: Record<string, Record<string, unknown>>,
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies>,
 ): void {
-  const shouldClear = (n: string): boolean =>
-    n === routeName || n.startsWith(`${routeName}.`);
+  const shouldClear = (name: string): boolean =>
+    name === routeName || name.startsWith(`${routeName}.`);
 
   clearConfigEntries(config.decoders, shouldClear);
   clearConfigEntries(config.encoders, shouldClear);
@@ -92,15 +92,15 @@ function clearRouteConfigurations<
   const [canDeactivateFactories, canActivateFactories] =
     lifecycleNamespace.getFactories();
 
-  for (const n of Object.keys(canActivateFactories)) {
-    if (shouldClear(n)) {
-      lifecycleNamespace.clearCanActivate(n);
+  for (const name of Object.keys(canActivateFactories)) {
+    if (shouldClear(name)) {
+      lifecycleNamespace.clearCanActivate(name);
     }
   }
 
-  for (const n of Object.keys(canDeactivateFactories)) {
-    if (shouldClear(n)) {
-      lifecycleNamespace.clearCanDeactivate(n);
+  for (const name of Object.keys(canDeactivateFactories)) {
+    if (shouldClear(name)) {
+      lifecycleNamespace.clearCanDeactivate(name);
     }
   }
 }

@@ -68,6 +68,7 @@ export default tsEslint.config(
       "sonarjs/function-return-type": "off",
       // Empty function for mitata measure() API setup fixture
       "@typescript-eslint/no-empty-function": "off",
+      "id-length": "off",
     },
   },
 );

@@ -128,7 +128,7 @@ function executeInterceptorChain<T>(
   for (const interceptor of interceptors) {
     const prev = chain;
 
-    chain = (...a: any[]) => interceptor(prev, ...a);
+    chain = (...chainArgs: any[]) => interceptor(prev, ...chainArgs);
   }
 
   return chain(...args) as T;
@@ -161,14 +161,14 @@ export function createInterceptable2<A, B, R>(
     ((next: (...args: any[]) => any, ...args: any[]) => any)[]
   >,
 ): (a: A, b: B) => R {
-  return (a: A, b: B) => {
+  return (arg1: A, arg2: B) => {
     const chain = interceptors.get(name);
 
     if (!chain || chain.length === 0) {
-      return original(a, b);
+      return original(arg1, arg2);
     }
 
-    return executeInterceptorChain(chain, original, [a, b]);
+    return executeInterceptorChain(chain, original, [arg1, arg2]);
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-argument */

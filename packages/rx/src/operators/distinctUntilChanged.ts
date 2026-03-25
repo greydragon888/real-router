@@ -8,7 +8,7 @@ export function distinctUntilChanged<T>(
   return createStatefulOperator<T, T>((source, observer) => {
     let hasLast = false;
     let last: T;
-    const compare = comparator ?? ((a: T, b: T) => a === b);
+    const compare = comparator ?? ((prev: T, curr: T) => prev === curr);
 
     const subscription = source.subscribe({
       next: (value) => {

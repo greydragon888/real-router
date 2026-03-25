@@ -60,7 +60,7 @@ import type { Route } from "../helpers";
 {
   const routes: Route[] = [
     { name: "home", path: "/" },
-    { name: "search", path: "/search?q&category&page" },
+    { name: "search", path: "/search?query&category&page" },
   ];
   const router = createRouter(routes, { queryParamsMode: "loose" });
   // Alternate pages to avoid SAME_STATES short-circuit
@@ -71,7 +71,7 @@ import type { Route } from "../helpers";
 
   bench("1.1.4 Navigation with query parameters", () => {
     router.navigate("search", {
-      q: "test",
+      query: "test",
       category: "books",
       page: pages[index++ % 2],
     });

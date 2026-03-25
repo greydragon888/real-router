@@ -110,7 +110,7 @@ function validateStringEnum(
   }
 
   if (typeof value !== "string" || !validValues.includes(value)) {
-    const validList = validValues.map((v) => `"${v}"`).join(", ");
+    const validList = validValues.map((val) => `"${val}"`).join(", ");
     const display = typeof value === "string" ? value : `(${typeof value})`;
 
     throw new TypeError(
@@ -202,32 +202,39 @@ function validateLoggerOption(loggerOpt: unknown, methodName: string): void {
     );
   }
 
-  const l = loggerOpt as Record<string, unknown>;
+  const loggerOptions = loggerOpt as Record<string, unknown>;
 
   if (
-    l.level !== undefined &&
+    loggerOptions.level !== undefined &&
     !VALID_LOGGER_LEVELS.includes(
-      l.level as (typeof VALID_LOGGER_LEVELS)[number],
+      loggerOptions.level as (typeof VALID_LOGGER_LEVELS)[number],
     )
   ) {
-    const validLevelList = VALID_LOGGER_LEVELS.map((v) => `"${v}"`).join(", ");
+    const validLevelList = VALID_LOGGER_LEVELS.map((val) => `"${val}"`).join(
+      ", ",
+    );
     const levelDisplay =
-      typeof l.level === "string" ? l.level : `(${typeof l.level})`;
+      typeof loggerOptions.level === "string"
+        ? loggerOptions.level
+        : `(${typeof loggerOptions.level})`;
 
     throw new TypeError(
       `[router.${methodName}] Invalid "logger.level": "${levelDisplay}". Must be one of: ${validLevelList}`,
     );
   }
 
-  if (l.callback !== undefined && typeof l.callback !== "function") {
+  if (
+    loggerOptions.callback !== undefined &&
+    typeof loggerOptions.callback !== "function"
+  ) {
     throw new TypeError(
       `[router.${methodName}] Invalid "logger.callback": expected function`,
     );
   }
 
   if (
-    l.callbackIgnoresLevel !== undefined &&
-    typeof l.callbackIgnoresLevel !== "boolean"
+    loggerOptions.callbackIgnoresLevel !== undefined &&
+    typeof loggerOptions.callbackIgnoresLevel !== "boolean"
   ) {
     throw new TypeError(
       `[router.${methodName}] Invalid "logger.callbackIgnoresLevel": expected boolean`,

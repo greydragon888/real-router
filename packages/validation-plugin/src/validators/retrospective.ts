@@ -76,27 +76,27 @@ function assertRoutesStore(store: unknown, fnName: string): LocalRoutesStore {
     );
   }
 
-  const s = store as Record<string, unknown>;
+  const storeRecord = store as Record<string, unknown>;
 
-  if (!Array.isArray(s.definitions)) {
+  if (!Array.isArray(storeRecord.definitions)) {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.definitions must be an array`,
     );
   }
 
-  if (!s.config || typeof s.config !== "object") {
+  if (!storeRecord.config || typeof storeRecord.config !== "object") {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.config must be an object`,
     );
   }
 
-  if (!s.tree || typeof s.tree !== "object") {
+  if (!storeRecord.tree || typeof storeRecord.tree !== "object") {
     throw new TypeError(
       `[validation-plugin] ${fnName}: store.tree must be an object`,
     );
   }
 
-  return s as unknown as LocalRoutesStore;
+  return storeRecord as unknown as LocalRoutesStore;
 }
 
 function walkDefinitions(
@@ -193,12 +193,15 @@ function collectUrlParams(segments: readonly LocalRouteSegment[]): Set<string> {
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- needs constructor.name access
 function assertNotAsync(fn: Function, label: string, routeName: string): void {
-  const f = fn as { constructor: { name: string }; toString: () => string };
+  const function_ = fn as {
+    constructor: { name: string };
+    toString: () => string;
+  };
 
   /* v8 ignore next -- @preserve: transpiled async (__awaiter) branch */
   if (
-    f.constructor.name === "AsyncFunction" ||
-    f.toString().includes("__awaiter")
+    function_.constructor.name === "AsyncFunction" ||
+    function_.toString().includes("__awaiter")
   ) {
     throw new TypeError(
       `[validation-plugin] Route "${routeName}" ${label} cannot be async`,
@@ -220,10 +223,10 @@ function assertNotAsync(fn: Function, label: string, routeName: string): void {
  * @throws {Error} If duplicate route names are detected
  */
 export function validateExistingRoutes(store: unknown): void {
-  const s = assertRoutesStore(store, "validateExistingRoutes");
+  const routesStore = assertRoutesStore(store, "validateExistingRoutes");
   const seenNames = new Set<string>();
 
-  walkDefinitions(s.definitions, (def, fullName) => {
+  walkDefinitions(routesStore.definitions, (def, fullName) => {
     if (typeof def.name !== "string" || !def.name) {
       throw new TypeError(
         `[validation-plugin] validateExistingRoutes: route has invalid name: ${def.name}`,
@@ -261,8 +264,8 @@ export function validateExistingRoutes(store: unknown): void {
  * @throws {Error} If a circular forwardTo chain is detected
  */
 export function validateForwardToConsistency(store: unknown): void {
-  const s = assertRoutesStore(store, "validateForwardToConsistency");
-  const { config, tree, matcher } = s;
+  const routesStore = assertRoutesStore(store, "validateForwardToConsistency");
+  const { config, tree, matcher } = routesStore;
 
   // Check target existence and param compatibility for each static mapping
   for (const [fromRoute, targetRoute] of Object.entries(config.forwardMap)) {
@@ -281,7 +284,7 @@ export function validateForwardToConsistency(store: unknown): void {
       const sourceParams = collectUrlParams(sourceSegments);
       const targetParams = collectUrlParams(targetSegments);
       const missingParams = [...targetParams].filter(
-        (p) => !sourceParams.has(p),
+        (param) => !sourceParams.has(param),
       );
 
       if (missingParams.length > 0) {
@@ -314,8 +317,8 @@ export function validateForwardToConsistency(store: unknown): void {
  * @throws {TypeError} If any forwardTo callback is async
  */
 export function validateRoutePropertiesStore(store: unknown): void {
-  const s = assertRoutesStore(store, "validateRoutePropertiesStore");
-  const { config } = s;
+  const routesStore = assertRoutesStore(store, "validateRoutePropertiesStore");
+  const { config } = routesStore;
 
   // Validate decoders — must be non-async functions (sync required for matchPath/buildPath)
   for (const [routeName, decoder] of Object.entries(config.decoders)) {
@@ -377,8 +380,8 @@ export function validateRoutePropertiesStore(store: unknown): void {
  * @throws {Error} If any forwardTo target route does not exist in the tree
  */
 export function validateForwardToTargetsStore(store: unknown): void {
-  const s = assertRoutesStore(store, "validateForwardToTargetsStore");
-  const { config, tree } = s;
+  const routesStore = assertRoutesStore(store, "validateForwardToTargetsStore");
+  const { config, tree } = routesStore;
 
   for (const [fromRoute, targetRoute] of Object.entries(config.forwardMap)) {
     if (!routeExistsInTree(tree, targetRoute)) {
@@ -411,16 +414,16 @@ export function validateDependenciesStructure(deps: unknown): void {
     );
   }
 
-  const d = deps as Record<string, unknown>;
+  const depsRecord = deps as Record<string, unknown>;
 
   // Validate dependencies field exists and is an object
-  if (!d.dependencies || typeof d.dependencies !== "object") {
+  if (!depsRecord.dependencies || typeof depsRecord.dependencies !== "object") {
     throw new TypeError(
       "[validation-plugin] validateDependenciesStructure: deps.dependencies must be an object",
     );
   }
 
-  const dependencies = d.dependencies as Record<string, unknown>;
+  const dependencies = depsRecord.dependencies as Record<string, unknown>;
 
   // Getters can throw, return different values, or have side effects — reject them
   for (const key of Object.keys(dependencies)) {
@@ -432,13 +435,13 @@ export function validateDependenciesStructure(deps: unknown): void {
   }
 
   // Validate limits field exists and is an object
-  if (!d.limits || typeof d.limits !== "object") {
+  if (!depsRecord.limits || typeof depsRecord.limits !== "object") {
     throw new TypeError(
       "[validation-plugin] validateDependenciesStructure: deps.limits must be an object",
     );
   }
 
-  const limits = d.limits as Record<string, unknown>;
+  const limits = depsRecord.limits as Record<string, unknown>;
   const expectedLimitKeys: (keyof LocalDependencyLimits)[] = [
     "maxDependencies",
     "maxPlugins",
@@ -490,13 +493,13 @@ function checkRouteCountLimit(
     return;
   }
 
-  const s = store as Record<string, unknown>;
+  const storeRecord = store as Record<string, unknown>;
 
-  if (!Array.isArray(s.definitions)) {
+  if (!Array.isArray(storeRecord.definitions)) {
     return;
   }
 
-  const routeCount = (s.definitions as unknown[]).length;
+  const routeCount = (storeRecord.definitions as unknown[]).length;
   const maxRoutes = configuredLimits.maxRoutes;
 
   if (
@@ -518,9 +521,9 @@ function checkDepCountLimit(
     return;
   }
 
-  const d = deps as Record<string, unknown>;
-  const dependencies = d.dependencies;
-  const depsLimits = d.limits;
+  const depsRecord = deps as Record<string, unknown>;
+  const dependencies = depsRecord.dependencies;
+  const depsLimits = depsRecord.limits;
 
   if (
     !dependencies ||
@@ -532,9 +535,9 @@ function checkDepCountLimit(
   }
 
   const depCount = Object.keys(dependencies).length;
-  const l = depsLimits as Record<string, unknown>;
+  const limitsRecord = depsLimits as Record<string, unknown>;
   const maxDepsFromOptions = configuredLimits.maxDependencies;
-  const maxDepsFromStore = l.maxDependencies;
+  const maxDepsFromStore = limitsRecord.maxDependencies;
   const maxDeps =
     typeof maxDepsFromOptions === "number"
       ? maxDepsFromOptions

@@ -214,7 +214,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
     "defaultParams",
   ]);
   const customFields = Object.fromEntries(
-    Object.entries(route).filter(([k]) => !standardKeys.has(k)),
+    Object.entries(route).filter(([key]) => !standardKeys.has(key)),
   );
 
   if (Object.keys(customFields).length > 0) {

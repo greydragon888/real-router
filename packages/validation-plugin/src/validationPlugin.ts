@@ -93,7 +93,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       },
 
       validateRoutes(routes, store) {
-        const s = store as {
+        const typedStore = store as {
           tree?: unknown;
           config?: { forwardMap?: Record<string, string> };
         };
@@ -102,8 +102,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           routes as any,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          s.tree as any,
-          s.config?.forwardMap,
+          typedStore.tree as any,
+          typedStore.config?.forwardMap,
         );
       },
       validateRemoveRouteArgs,
@@ -111,10 +111,10 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       validateUpdateRoutePropertyTypes(_name, _updates) {},
       validateUpdateRoute(name, updates, store) {
-        const s = store as {
+        const typedStore = store as {
           matcher: {
-            hasRoute: (n: string) => boolean;
-            getSegmentsByName: (n: string) => unknown;
+            hasRoute: (routeName: string) => boolean;
+            getSegmentsByName: (routeName: string) => unknown;
           };
           config: { forwardMap: Record<string, string> };
         };
@@ -124,10 +124,10 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
           name,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
           forwardTo as any,
-          (n: string) => s.matcher.hasRoute(n),
+          (routeName: string) => typedStore.matcher.hasRoute(routeName),
           // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-argument
-          s.matcher as any,
-          s.config,
+          typedStore.matcher as any,
+          typedStore.config,
         );
       },
       validateParentOption(parent, tree) {
@@ -182,8 +182,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       },
       validateDependenciesObject,
       validateDependencyExists(name, store) {
-        const s = store as { dependencies?: Record<string, unknown> };
-        const value = s.dependencies?.[name];
+        const typedStore = store as { dependencies?: Record<string, unknown> };
+        const value = typedStore.dependencies?.[name];
 
         validateDependencyExistsRaw(value, name);
       },

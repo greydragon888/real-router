@@ -225,10 +225,10 @@ export class RxObservable<T> {
         latestValue = value;
         hasValue = true;
         if (resolve) {
-          const r = resolve;
+          const resolveCallback = resolve;
 
           resolve = null;
-          r();
+          resolveCallback();
         }
       },
       /* v8 ignore start -- v8 coverage can't track branches inside suspended async generators */
@@ -236,19 +236,19 @@ export class RxObservable<T> {
         error = err;
         completed = true;
         if (resolve) {
-          const r = resolve;
+          const resolveCallback = resolve;
 
           resolve = null;
-          r();
+          resolveCallback();
         }
       },
       complete: () => {
         completed = true;
         if (resolve) {
-          const r = resolve;
+          const resolveCallback = resolve;
 
           resolve = null;
-          r();
+          resolveCallback();
         }
       },
       /* v8 ignore stop */

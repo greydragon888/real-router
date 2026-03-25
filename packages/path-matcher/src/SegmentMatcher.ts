@@ -273,13 +273,13 @@ export class SegmentMatcher {
     }
 
     if (queryParamsMode === "loose") {
-      for (const p in params) {
+      for (const paramKey in params) {
         if (
-          Object.hasOwn(params, p) &&
-          !route.declaredQueryParamsSet.has(p) &&
-          !route.buildParamNamesSet.has(p)
+          Object.hasOwn(params, paramKey) &&
+          !route.declaredQueryParamsSet.has(paramKey) &&
+          !route.buildParamNamesSet.has(paramKey)
         ) {
-          queryObj[p] = params[p];
+          queryObj[paramKey] = params[paramKey];
           hasKeys = true;
         }
       }
@@ -451,17 +451,17 @@ export class SegmentMatcher {
     const decode = DECODING_METHODS[encoding];
 
     for (const key in params) {
-      const v = params[key];
+      const value = params[key];
 
-      if (!v.includes("%")) {
+      if (!value.includes("%")) {
         continue;
       }
 
-      if (!validatePercentEncoding(v)) {
+      if (!validatePercentEncoding(value)) {
         return false;
       }
 
-      params[key] = decode(v);
+      params[key] = decode(value);
     }
 
     return true;
