@@ -1,6 +1,6 @@
 // packages/router-benchmarks/src/helpers/router-adapter.ts
 
-import { BENCH_NO_VALIDATE, ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
+import { ROUTER_NAME, UNIFIED_OPTIONS } from "./constants";
 
 import type {
   Router,
@@ -85,6 +85,4 @@ export const getPluginApi: PluginApiFn | null =
 export const getRoutesApi: RoutesApiFn | null =
   realRouterApiModule?.getRoutesApi ?? null;
 
-console.error(
-  `Using router: ${ROUTER_NAME}${BENCH_NO_VALIDATE ? " (noValidate: true)" : ""}`,
-);
+console.error(`Using router: ${ROUTER_NAME}`);
