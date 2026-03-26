@@ -1,5 +1,17 @@
 # router-benchmarks
 
+## 0.3.36
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - @real-router/types@0.26.0
+
 ## 0.3.35
 
 ### Patch Changes

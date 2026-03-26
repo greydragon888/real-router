@@ -1,5 +1,17 @@
 # @real-router/react
 
+## 0.13.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
 ## 0.13.0
 
 ### Minor Changes

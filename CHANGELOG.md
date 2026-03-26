@@ -5,6 +5,238 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2026-03-26]
+
+### @real-router/core@0.39.0
+
+### Minor Changes
+
+- d1ebff8: `usePlugin()` silently skips `false`, `null`, and `undefined` values (#341)
+
+  Enables inline conditional plugin registration:
+
+  ```typescript
+  router.usePlugin(
+    browserPlugin(),
+    __DEV__ && loggerPlugin(),
+    hasConsent && analyticsPlugin(),
+  );
+  ```
+
+  Falsy values are filtered before validation. If all values are falsy, returns a noop unsubscribe function.
+
+- d1ebff8: Breaking: remove `noValidate` option — validation is now opt-in via plugin (#334)
+
+  The `noValidate: true` router option has been removed. Validation is now disabled by default and enabled by registering `@real-router/validation-plugin`.
+
+  **Before:**
+
+  ```typescript
+  const router = createRouter(routes, { noValidate: true }); // disable validation
+  ```
+
+  **After:**
+
+  ```typescript
+  const router = createRouter(routes); // validation off by default
+  router.usePlugin(validationPlugin()); // opt in
+  ```
+
+  Core now ships with lightweight crash guards only (`guardDependencies`, `guardRouteStructure`). Full DX validation (descriptive errors, argument shape checks, forwardTo cycle detection) requires the plugin.
+
+  The `resolveForwardChain` function is now always used in `refreshForwardMap` (previously conditional on `noValidate`). This is a behavioral change: forward chain resolution now always runs, which is the correct behavior.
+
+### Patch Changes
+
+- d1ebff8: Extract remaining DX validators behind `ctx.validator` and remove `type-guards` from bundle (#334)
+
+  Phase 2 of validation extraction: 17 new `RouterValidator` slots, setter injection for `PluginsNamespace` and `RouteLifecycleNamespace`, `type-guards` removed from `noExternal` (no longer bundled). Core bundle reduced by ~3.6 kB (brotli).
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/types@0.26.0
+
+### @real-router/types@0.26.0
+
+### Minor Changes
+
+- d1ebff8: `usePlugin()` accepts `false | null | undefined` in type signature (#341)
+
+  The `Router.usePlugin()` type signature now accepts falsy values alongside `PluginFactory`, enabling `__DEV__ && plugin()` patterns.
+
+- d1ebff8: Breaking: remove `noValidate` from `RouterOptions` (#334)
+
+  The `noValidate` field has been removed from the `RouterOptions` interface. Validation is now opt-in via `@real-router/validation-plugin` rather than opt-out via a router option.
+
+### @real-router/types@0.25.0
+
+### Minor Changes
+
+- Remove `noValidate` option from `Options` interface. Runtime validation is now opt-in via `@real-router/validation-plugin` instead of opt-out via router option.
+
+- Update `usePlugin` signature to accept falsy values (`false | null | undefined`). Enables inline conditional plugin registration: `router.usePlugin(browserPlugin(), isDev && validationPlugin())`.
+
+### @real-router/validation-plugin@0.1.0
+
+### Minor Changes
+
+- d1ebff8: Implement Phase 2 validator slots: options, dependencies, plugins, lifecycle, routes (#334)
+
+  17 new validator implementations: `validateOptions` (retrospective), `validateDependencyCount`, `validateCloneArgs`, `validatePluginKeys`, threshold warnings, overwrite warnings, async guard detection. Property-based tests verify invariants across ~58k generated inputs.
+
+- d1ebff8: New package: extract DX validation from core into opt-in plugin (#334)
+
+  `@real-router/validation-plugin` provides the full validation layer previously built into `@real-router/core`. Register before `router.start()` to enable descriptive type errors and argument checks across all router operations.
+
+  ```typescript
+  import { validationPlugin } from "@real-router/validation-plugin";
+
+  const router = createRouter(routes);
+  router.usePlugin(validationPlugin()); // opt in to DX validation
+  await router.start();
+  ```
+
+  The plugin runs retrospective validation at registration time, catching route tree errors that occurred before `usePlugin()` was called.
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/browser-plugin@0.10.4
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/hash-plugin@0.2.4
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/logger-plugin@0.3.4
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/persistent-params-plugin@0.1.43
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/preact@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
+### @real-router/react@0.13.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
+### @real-router/route-utils@0.1.6
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/types@0.26.0
+
+### @real-router/rx@0.1.31
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/solid@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
+### @real-router/sources@0.2.6
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - @real-router/route-utils@0.1.6
+
+### @real-router/ssr-data-plugin@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
+### @real-router/svelte@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
+### @real-router/vue@0.1.1
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - dom-utils@0.2.1
+  - @real-router/sources@0.2.6
+  - @real-router/route-utils@0.1.6
+
 ## [2026-03-23]
 
 ### @real-router/preact@0.1.0

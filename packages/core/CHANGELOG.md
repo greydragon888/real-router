@@ -1,5 +1,54 @@
 # @real-router/core
 
+## 0.39.0
+
+### Minor Changes
+
+- d1ebff8: `usePlugin()` silently skips `false`, `null`, and `undefined` values (#341)
+
+  Enables inline conditional plugin registration:
+
+  ```typescript
+  router.usePlugin(
+    browserPlugin(),
+    __DEV__ && loggerPlugin(),
+    hasConsent && analyticsPlugin(),
+  );
+  ```
+
+  Falsy values are filtered before validation. If all values are falsy, returns a noop unsubscribe function.
+
+- d1ebff8: Breaking: remove `noValidate` option — validation is now opt-in via plugin (#334)
+
+  The `noValidate: true` router option has been removed. Validation is now disabled by default and enabled by registering `@real-router/validation-plugin`.
+
+  **Before:**
+
+  ```typescript
+  const router = createRouter(routes, { noValidate: true }); // disable validation
+  ```
+
+  **After:**
+
+  ```typescript
+  const router = createRouter(routes); // validation off by default
+  router.usePlugin(validationPlugin()); // opt in
+  ```
+
+  Core now ships with lightweight crash guards only (`guardDependencies`, `guardRouteStructure`). Full DX validation (descriptive errors, argument shape checks, forwardTo cycle detection) requires the plugin.
+
+  The `resolveForwardChain` function is now always used in `refreshForwardMap` (previously conditional on `noValidate`). This is a behavioral change: forward chain resolution now always runs, which is the correct behavior.
+
+### Patch Changes
+
+- d1ebff8: Extract remaining DX validators behind `ctx.validator` and remove `type-guards` from bundle (#334)
+
+  Phase 2 of validation extraction: 17 new `RouterValidator` slots, setter injection for `PluginsNamespace` and `RouteLifecycleNamespace`, `type-guards` removed from `noExternal` (no longer bundled). Core bundle reduced by ~3.6 kB (brotli).
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/types@0.26.0
+
 ## 0.38.0
 
 ### Minor Changes

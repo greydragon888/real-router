@@ -1,5 +1,17 @@
 # @real-router/types
 
+## 0.26.0
+
+### Minor Changes
+
+- d1ebff8: `usePlugin()` accepts `false | null | undefined` in type signature (#341)
+
+  The `Router.usePlugin()` type signature now accepts falsy values alongside `PluginFactory`, enabling `__DEV__ && plugin()` patterns.
+
+- d1ebff8: Breaking: remove `noValidate` from `RouterOptions` (#334)
+
+  The `noValidate` field has been removed from the `RouterOptions` interface. Validation is now opt-in via `@real-router/validation-plugin` rather than opt-out via a router option.
+
 ## 0.25.0
 
 ### Minor Changes

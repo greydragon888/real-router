@@ -1,5 +1,15 @@
 # @real-router/sources
 
+## 0.2.6
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - @real-router/route-utils@0.1.6
+
 ## 0.2.5
 
 ### Patch Changes
