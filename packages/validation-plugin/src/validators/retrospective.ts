@@ -1,5 +1,7 @@
 // packages/validation-plugin/src/validators/retrospective.ts
 
+import { resolveForwardChain as coreResolveForwardChain } from "@real-router/core";
+
 /**
  * Retrospective validators — run AFTER the route tree is already built.
  * Called by the validation plugin at usePlugin() time, in a try/catch with rollback.
@@ -131,44 +133,21 @@ function routeExistsInTree(tree: LocalRouteTree, routeName: string): boolean {
 }
 
 /**
- * Resolves a forwardTo chain to its final destination.
- * Detects cycles and enforces max depth.
- * Adapted from: resolveForwardChain() in forwardToValidation.ts
+ * Wraps core's resolveForwardChain with [validation-plugin] prefix on errors.
+ * Core's version throws plain Error messages; retrospective validation
+ * needs the [validation-plugin] prefix for consistency.
  */
-function resolveForwardChain(
+function resolveForwardChainWithPrefix(
   startRoute: string,
   forwardMap: Record<string, string>,
-  maxDepth = 100,
 ): string {
-  const visited = new Set<string>();
-  const chain: string[] = [startRoute];
-  let current = startRoute;
-
-  while (forwardMap[current]) {
-    const next = forwardMap[current];
-
-    if (visited.has(next)) {
-      const cycleStart = chain.indexOf(next);
-      const cycle = [...chain.slice(cycleStart), next];
-
-      throw new Error(
-        `[validation-plugin] Circular forwardTo: ${cycle.join(" → ")}`,
-      );
-    }
-
-    visited.add(current);
-    chain.push(next);
-    current = next;
-
-    if (chain.length > maxDepth) {
-      /* v8 ignore next 3 -- @preserve: requires 100+ forwardTo chain to trigger */
-      throw new Error(
-        `[validation-plugin] forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
-      );
-    }
+  try {
+    return coreResolveForwardChain(startRoute, forwardMap);
+  } catch (error) {
+    throw new Error(`[validation-plugin] ${(error as Error).message}`, {
+      cause: error,
+    });
   }
-
-  return current;
 }
 
 function collectUrlParams(segments: readonly LocalRouteSegment[]): Set<string> {
@@ -297,7 +276,7 @@ export function validateForwardToConsistency(store: unknown): void {
 
   // Detect cycles in the full forwardMap (catches multi-hop cycles)
   for (const fromRoute of Object.keys(config.forwardMap)) {
-    resolveForwardChain(fromRoute, config.forwardMap);
+    resolveForwardChainWithPrefix(fromRoute, config.forwardMap);
   }
 }
 
