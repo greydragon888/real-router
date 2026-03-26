@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 26 packages + 68 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 26 packages + 70 example applications. Run `pnpm install` after cloning.
 
 ## Rules
 

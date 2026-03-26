@@ -1020,6 +1020,104 @@ importers:
         specifier: 7.2.0
         version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  examples/react/ssg:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../../packages/react
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/ssr-data-plugin
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/node':
+        specifier: 25.5.0
+        version: 25.5.0
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 5.2.0
+        version: 5.2.0(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
+
+  examples/react/ssr:
+    dependencies:
+      '@real-router/browser-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/browser-plugin
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../../../packages/core
+      '@real-router/react':
+        specifier: workspace:^
+        version: link:../../../packages/react
+      '@real-router/ssr-data-plugin':
+        specifier: workspace:^
+        version: link:../../../packages/ssr-data-plugin
+      express:
+        specifier: 5.1.0
+        version: 5.1.0
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+    devDependencies:
+      '@playwright/test':
+        specifier: 1.58.2
+        version: 1.58.2
+      '@types/express':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 25.5.0
+        version: 25.5.0
+      '@types/react':
+        specifier: 19.2.14
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: 19.2.3
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: 5.2.0
+        version: 5.2.0(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vite:
+        specifier: 7.2.0
+        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
+
   examples/solid:
     dependencies:
       '@real-router/solid':
@@ -1414,58 +1512,6 @@ importers:
       vite-plugin-solid:
         specifier: 2.11.11
         version: 2.11.11(@testing-library/jest-dom@6.9.1)(solid-js@1.9.5)(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  examples/ssr-react:
-    dependencies:
-      '@real-router/browser-plugin':
-        specifier: workspace:^
-        version: link:../../packages/browser-plugin
-      '@real-router/core':
-        specifier: workspace:^
-        version: link:../../packages/core
-      '@real-router/react':
-        specifier: workspace:^
-        version: link:../../packages/react
-      '@real-router/ssr-data-plugin':
-        specifier: workspace:^
-        version: link:../../packages/ssr-data-plugin
-      express:
-        specifier: 5.1.0
-        version: 5.1.0
-      react:
-        specifier: 19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: 19.2.0
-        version: 19.2.0(react@19.2.0)
-    devDependencies:
-      '@playwright/test':
-        specifier: 1.58.2
-        version: 1.58.2
-      '@types/express':
-        specifier: 5.0.6
-        version: 5.0.6
-      '@types/node':
-        specifier: 25.5.0
-        version: 25.5.0
-      '@types/react':
-        specifier: 19.2.14
-        version: 19.2.14
-      '@types/react-dom':
-        specifier: 19.2.3
-        version: 19.2.3(@types/react@19.2.14)
-      '@vitejs/plugin-react':
-        specifier: 5.2.0
-        version: 5.2.0(vite@7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2))
-      tsx:
-        specifier: 4.21.0
-        version: 4.21.0
-      typescript:
-        specifier: 5.8.3
-        version: 5.8.3
-      vite:
-        specifier: 7.2.0
-        version: 7.2.0(@types/node@25.5.0)(jiti@2.6.1)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.2)
 
   examples/svelte:
     dependencies:
