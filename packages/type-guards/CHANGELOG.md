@@ -1,5 +1,13 @@
 # type-guards
 
+## 0.3.8
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/types@0.26.0
+
 ## 0.3.7
 
 ### Patch Changes

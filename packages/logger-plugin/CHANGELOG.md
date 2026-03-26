@@ -1,5 +1,14 @@
 # @real-router/logger-plugin
 
+## 0.3.4
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
 ## 0.3.3
 
 ### Patch Changes

@@ -1,5 +1,14 @@
 # @real-router/rx
 
+## 0.1.31
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+
 ## 0.1.30
 
 ### Patch Changes

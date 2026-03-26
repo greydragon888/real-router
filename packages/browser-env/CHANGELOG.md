@@ -1,5 +1,15 @@
 # browser-env
 
+## 0.1.6
+
+### Patch Changes
+
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+- Updated dependencies [d1ebff8]
+  - @real-router/core@0.39.0
+  - type-guards@0.3.8
+
 ## 0.1.5
 
 ### Patch Changes
