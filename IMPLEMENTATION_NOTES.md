@@ -559,7 +559,7 @@ Build only runs after tests pass.
 
 ### `outputLogs: "errors-only"` for All Tasks
 
-**Problem:** With 25 packages + 68 example applications, turbo output was noisy — successful tasks printed verbose logs, making it hard to spot failures.
+**Problem:** With 25 packages + 70 example applications, turbo output was noisy — successful tasks printed verbose logs, making it hard to spot failures.
 
 **Solution:** Added `"outputLogs": "errors-only"` to every task in `turbo.json`. Tasks are silent on success; full output appears only on failure.
 
@@ -704,7 +704,7 @@ Blocks installation of npm packages published less than 24 hours ago. Protects a
 
 **Allowed licenses:** MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD, Unlicense, CC0-1.0, CC-BY-4.0, BlueOak-1.0.0, Python-2.0, MS-PL, LGPL-3.0-only.
 
-**Allowed packages:** Express 5 transitive dependencies (`unpipe`, `toidentifier`, `escape-html`, `ee-first`, `depd`, `cookie-signature`) are allowlisted via `allow-packages` — they have low OpenSSF Scorecard (< 3) but are well-established Express ecosystem utilities. Used only in `examples/ssr-react` (private).
+**Allowed packages:** Express 5 transitive dependencies (`unpipe`, `toidentifier`, `escape-html`, `ee-first`, `depd`, `cookie-signature`) are allowlisted via `allow-packages` — they have low OpenSSF Scorecard (< 3) but are well-established Express ecosystem utilities. Used only in `examples/react/ssr` (private).
 
 ## ESLint React Plugin Migration
 
@@ -936,7 +936,7 @@ Removed `clearMocks: true` from `vitest.config.common.mts`. `restoreMocks: true`
 
 ### Examples Workspace
 
-68 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte). Organized by framework:
+70 example applications across 5 framework adapters (React, Preact, Solid, Vue, Svelte) plus standalone SSR/SSG examples. Organized by framework:
 
 ```
 examples/
@@ -944,7 +944,11 @@ examples/
 ├── react/{app-name}/
 ├── solid/{app-name}/
 ├── svelte/{app-name}/
-└── vue/{app-name}/
+├── vue/{app-name}/
+└── react/
+    ├── ...               # 14 SPA examples
+    ├── ssr/              # Server-side rendering with Express + Vite
+    └── ssg/              # Static site generation with Vite
 ```
 
 `pnpm-workspace.yaml` includes both `examples/*` and `examples/*/*` as workspace globs. Examples are private packages (`"private": true`) that use workspace packages via `workspace:^`.

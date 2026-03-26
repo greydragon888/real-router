@@ -114,18 +114,27 @@ import {
 
 ## Utilities
 
-SSR helpers imported from `@real-router/core/utils`.
+SSR/SSG helpers imported from `@real-router/core/utils`.
 
 ```typescript
-import { serializeState } from "@real-router/core/utils";
+import { getStaticPaths, serializeState } from "@real-router/core/utils";
 
+// SSR: XSS-safe data embedding
 const json = serializeState({ name: "home", path: "/" });
 const html = `<script>window.__STATE__=${json}</script>`;
+
+// SSG: enumerate all URLs for pre-rendering
+const paths = await getStaticPaths(router, {
+  "users.profile": async () => [{ id: "1" }, { id: "2" }],
+});
+// → ["/", "/users", "/users/1", "/users/2"]
 ```
 
-| Function               | Purpose                                                           |
-| ---------------------- | ----------------------------------------------------------------- |
-| `serializeState(data)` | XSS-safe JSON serialization for embedding in HTML `<script>` tags |
+| Function                           | Purpose                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------- |
+| `serializeState(data)`             | XSS-safe JSON serialization for embedding in HTML `<script>` tags                           |
+| `getStaticPaths(router, entries?)` | Enumerate leaf routes and build URLs for SSG pre-rendering                                  |
+| `StaticPathEntries` (type)         | Type for the `entries` parameter: `Record<string, () => Promise<Record<string, string>[]>>` |
 
 ### `getNavigator(router)` (main entry)
 

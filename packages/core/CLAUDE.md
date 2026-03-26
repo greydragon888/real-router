@@ -27,8 +27,9 @@ api/ (standalone functions — tree-shakeable)
     ├── getPluginApi(router)      — plugin management
     └── cloneRouter(router, deps) — SSR cloning
 
-utils/ (SSR helpers — separate subpath export)
-    └── serializeState(data)      — XSS-safe JSON for embedding in HTML <script> tags
+utils/ (SSR/SSG helpers — separate subpath export)
+    ├── serializeState(data)      — XSS-safe JSON for embedding in HTML <script> tags
+    └── getStaticPaths(router, entries?) — enumerate leaf routes and build URLs for SSG pre-rendering
 ```
 
 **RouterFSM states**: `IDLE → STARTING → READY ⇄ TRANSITIONING (+ NAVIGATE self-loop) → IDLE | DISPOSED`

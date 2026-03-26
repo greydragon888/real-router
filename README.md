@@ -96,7 +96,7 @@ No other router offers `update()` for modifying guards, redirects, or defaults o
 Platform-agnostic core — no DOM, no React, no History API in the routing layer.
 All platform concerns live in plugins.
 
-This means SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up — no special SSR mode, no framework-specific adapters. Data loading plugs in via interceptors without touching the transition pipeline. See the [SSR example](examples/ssr-react).
+This means SSR works naturally: `cloneRouter()` per request, `start(url)` to resolve, `dispose()` to clean up — no special SSR mode, no framework-specific adapters. Data loading plugs in via interceptors without touching the transition pipeline. SSG is the same loop at build time — `getStaticPaths()` enumerates routes, `cloneRouter()` + `renderToString()` per URL. See the [SSR example](examples/react/ssr) and [SSG example](examples/react/ssg).
 
 Result: **minimal allocations per navigation**, optimized independently from the external API.
 See [Recipes](https://github.com/greydragon888/real-router/wiki/recipes) for plugin patterns: data lifecycle, analytics, scroll restoration.
@@ -133,7 +133,7 @@ Custom **Segment Trie** matcher — O(segments) traversal, O(1) for static route
 ### Key Features
 
 - **Framework-agnostic** — React, Preact, Solid, Vue, Svelte, or vanilla JS
-- **Universal** — client-side and server-side rendering ([SSR example](examples/ssr-react))
+- **Universal** — client-side, server-side rendering ([SSR example](examples/react/ssr)), and static site generation ([SSG example](examples/react/ssg))
 - **Named nested routes** — dot-notation hierarchy (`users.profile`)
 - **Lifecycle guards** — `canActivate` / `canDeactivate` per route or globally
 - **AbortController** — cancel navigations via standard `AbortSignal`
@@ -215,7 +215,7 @@ function App() {
 | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | [`@real-router/core`](packages/core)        | [![npm](https://img.shields.io/npm/v/@real-router/core.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/core)   | Router implementation                                                                                              |
 | `@real-router/core/api`                     |                                                                                                                                   | Tree-shakeable modular API: `getRoutesApi`, `getDependenciesApi`, `getLifecycleApi`, `getPluginApi`, `cloneRouter` |
-| `@real-router/core/utils`                   |                                                                                                                                   | Utility functions: `serializeState` (XSS-safe JSON for SSR)                                                        |
+| `@real-router/core/utils`                   |                                                                                                                                   | Utility functions: `serializeState` (XSS-safe JSON for SSR), `getStaticPaths` (static path generation for SSG)     |
 | [`@real-router/types`](packages/core-types) | [![npm](https://img.shields.io/npm/v/@real-router/types.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/types) | Shared TypeScript type definitions                                                                                 |
 
 ### Framework Integration
@@ -294,6 +294,8 @@ Many runnable examples across the most popular frameworks — each is a standalo
 | Dynamic routes          | [dynamic-routes](examples/react/dynamic-routes)                                                                | [dynamic-routes](examples/preact/dynamic-routes)       | [dynamic-routes](examples/solid/dynamic-routes)                                                                                                                       | [dynamic-routes](examples/vue/dynamic-routes)                                                                                                     | [dynamic-routes](examples/svelte/dynamic-routes)                                                                                                                                                                 |
 | Combined (all features) | [combined](examples/react/combined)                                                                            | [combined](examples/preact/combined)                   | [combined](examples/solid/combined)                                                                                                                                   | [combined](examples/vue/combined)                                                                                                                 | [combined](examples/svelte/combined)                                                                                                                                                                             |
 | **Framework-specific**  | [keepAlive](examples/react/keep-alive), [legacy-entry](examples/react/legacy-entry), [hmr](examples/react/hmr) | —                                                      | [store-based-state](examples/solid/store-based-state), [use-link-directive](examples/solid/use-link-directive), [signal-primitives](examples/solid/signal-primitives) | [plugin-installation](examples/vue/plugin-installation), [v-link-directive](examples/vue/v-link-directive), [keep-alive](examples/vue/keep-alive) | [link-action](examples/svelte/link-action), [lazy-loading-svelte](examples/svelte/lazy-loading-svelte), [snippets-routing](examples/svelte/snippets-routing), [reactive-source](examples/svelte/reactive-source) |
+
+| **Server rendering** | [ssr](examples/react/ssr) — Express + Vite SSR, [ssg](examples/react/ssg) — Static site generation |
 
 Run any example: `cd examples/react/basic && pnpm dev`
 

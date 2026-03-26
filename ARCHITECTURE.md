@@ -46,11 +46,13 @@ real-router/
 │   └── type-guards/               # Runtime type validation (internal)
 ├── examples/
 │   ├── shared/                    # Shared store, API, abilities, styles
-│   ├── react/    (14 examples)    # React 19.2+ examples + 8 e2e suites
+│   ├── react/    (16 examples)    # React 19.2+ examples + 8 e2e suites
 │   ├── preact/   (11 examples)    # Preact examples + 8 e2e suites
 │   ├── solid/    (14 examples)    # Solid.js examples + 8 e2e suites
 │   ├── vue/      (14 examples)    # Vue 3 SFC examples + 8 e2e suites
-│   └── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
+│   ├── svelte/   (15 examples)    # Svelte 5 examples + 8 e2e suites
+│   │   ├── ssr/                    # Server-side rendering with Express + Vite
+│   │   └── ssg/                   # Static site generation with Vite
 ```
 
 **Public packages** (published to npm): `core`, `core-types`, `react`, `preact`, `solid`, `vue`, `svelte`, `sources`, `rx`, `browser-plugin`, `hash-plugin`, `logger-plugin`, `persistent-params-plugin`, `ssr-data-plugin`, `validation-plugin`, `route-utils`, `logger`
