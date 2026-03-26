@@ -34,7 +34,7 @@
     "size": "size-limit",
     "commit": "czg",
     "changeset": "changeset",
-    "version": "changeset version && node .changeset/sync-version.mjs && node .changeset/aggregate-changelog.mjs",
+    "version": "changeset version && node .changeset/cap-major-bumps.mjs && node .changeset/sync-version.mjs && node .changeset/aggregate-changelog.mjs",
     "release": "pnpm build && changeset publish",
     "danger:local": "danger local --dangerfile dangerfile.ts"
   },
