@@ -4,17 +4,18 @@ Tools for comparing performance between router5, router6, and @real-router/core.
 
 ## System Requirements
 
-| Requirement | Details |
-|-------------|---------|
-| **OS** | macOS (optimized for Apple Silicon) |
-| **Node.js** | 20+ |
-| **Privileges** | `sudo` required for `bench-compare.sh` |
-| **Power** | Connect to power adapter for stable results |
+| Requirement      | Details                                                 |
+| ---------------- | ------------------------------------------------------- |
+| **OS**           | macOS (optimized for Apple Silicon)                     |
+| **Node.js**      | 20+                                                     |
+| **Privileges**   | `sudo` required for `bench-compare.sh`                  |
+| **Power**        | Connect to power adapter for stable results             |
 | **Applications** | Close Chrome, Telegram, Slack, Discord for best results |
 
 ### Apple Silicon Notes
 
 The benchmark script uses `powermetrics --samplers thermal` to monitor thermal pressure levels:
+
 - `Nominal` — optimal for benchmarking
 - `Moderate`, `Heavy`, `Critical` — may affect results
 
@@ -30,9 +31,6 @@ pnpm bench:baseline
 # Run benchmarks for router6
 pnpm bench:router6
 
-# Run benchmarks with noValidate option (real-router only)
-pnpm bench:novalidate
-
 # Build @real-router/core and run benchmarks
 pnpm bench:current
 
@@ -47,18 +45,17 @@ pnpm cpu
 
 ### npm Scripts
 
-| Script                  | Description                                        |
-| ----------------------- | -------------------------------------------------- |
-| `pnpm bench`            | Run benchmarks for real-router                     |
-| `pnpm bench:baseline`   | Run benchmarks for router5                         |
-| `pnpm bench:router6`    | Run benchmarks for router6                         |
-| `pnpm bench:novalidate` | Run benchmarks with noValidate option (real-router)|
-| `pnpm bench:current`    | Build real-router and run benchmarks               |
-| `pnpm cpu`              | Show processes using >10% CPU                      |
+| Script                | Description                          |
+| --------------------- | ------------------------------------ |
+| `pnpm bench`          | Run benchmarks for real-router       |
+| `pnpm bench:baseline` | Run benchmarks for router5           |
+| `pnpm bench:router6`  | Run benchmarks for router6           |
+| `pnpm bench:current`  | Build real-router and run benchmarks |
+| `pnpm cpu`            | Show processes using >10% CPU        |
 
 ### `bench-compare.sh` - Comparative Benchmarks
 
-Automated script for running router5, router6, real-router, and real-router with noValidate benchmarks under optimal conditions.
+Automated script for running router5, router6, and real-router benchmarks under optimal conditions.
 
 **Usage:**
 
@@ -79,11 +76,11 @@ sudo COOLDOWN=120 MAX_COOLDOWN_WAIT=600 ./bench-compare.sh
 
 **Environment Variables:**
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `COOLDOWN` | 60 | Fallback cooldown in seconds (if thermal monitoring unavailable) |
-| `MAX_COOLDOWN_WAIT` | 300 | Maximum wait time for thermal cooldown (5 min) |
-| `BENCH_SECTIONS` | all | Comma-separated section numbers to run (e.g., `1,2,3`) |
+| Variable            | Default | Description                                                      |
+| ------------------- | ------- | ---------------------------------------------------------------- |
+| `COOLDOWN`          | 60      | Fallback cooldown in seconds (if thermal monitoring unavailable) |
+| `MAX_COOLDOWN_WAIT` | 300     | Maximum wait time for thermal cooldown (5 min)                   |
+| `BENCH_SECTIONS`    | all     | Comma-separated section numbers to run (e.g., `1,2,3`)           |
 
 **What the script does:**
 
@@ -102,7 +99,7 @@ sudo COOLDOWN=120 MAX_COOLDOWN_WAIT=600 ./bench-compare.sh
 3. **Benchmark execution:**
    - Runs benchmarks with high process priority (`nice -n -20`)
    - Smart cooldown between tests (waits for thermal pressure = Nominal)
-   - Tests router5, router6, real-router, and real-router with noValidate in sequence
+   - Tests router5, router6, and real-router in sequence
    - Supports filtering by section numbers
 
 4. **Cleanup (always runs, even on error/interrupt):**
@@ -113,66 +110,63 @@ sudo COOLDOWN=120 MAX_COOLDOWN_WAIT=600 ./bench-compare.sh
 **Results:**
 
 Saved to `.bench-results/`:
+
 - `YYYYMMDD_HHMMSS_router5.txt`
 - `YYYYMMDD_HHMMSS_router6.txt`
 - `YYYYMMDD_HHMMSS_real-router.txt`
-- `YYYYMMDD_HHMMSS_real-router-novalidate.txt`
 
 ### `compare.mjs` - Results Analysis
 
-Script for comparing benchmark results. Supports 2-way, 3-way, and 4-way comparisons.
+Script for comparing benchmark results. Supports 2-way and 3-way comparisons.
 
 **Usage:**
 
 ```bash
-# Automatically uses the latest set of results (quartet, triplet, or pair)
+# Automatically uses the latest set of results (triplet or pair)
 node compare.mjs
 
-# Compare specific files (2, 3, or 4 files)
+# Compare specific files (2 or 3 files)
 node compare.mjs router5.txt real-router.txt
 node compare.mjs router5.txt router6.txt real-router.txt
-node compare.mjs router5.txt router6.txt real-router.txt real-router-novalidate.txt
 ```
 
-**Output (4-way comparison):**
+**Output (3-way comparison):**
 
 ```
-=== Four-Way Benchmark Comparison ===
+=== Three-Way Benchmark Comparison ===
 
-r5     = router5 (baseline): 20260130_124553_router5.txt
-r6     = router6: 20260130_124553_router6.txt
-rr     = real-router: 20260130_124553_real-router.txt
-rr(nv) = real-router (noValidate: true): 20260130_124553_real-router-novalidate.txt
+router5 (baseline): 20260130_124553_router5.txt
+router6: 20260130_124553_router6.txt
+real-router (current): 20260130_124553_real-router.txt
 
 Performance Comparison
 ───────────────────────────────────────────────────────────────────────────────────────────
-Benchmark                                │         r5         r6         rr     rr(nv) │      rr/r5      rr/r6      nv/rr
+Benchmark                                │      router5      router6    real-router │   rr/r5   rr/r6
 ───────────────────────────────────────────────────────────────────────────────────────────
-1.1.1 Simple navigation between routes   │    0.78 µs    2.23 µs    2.70 µs    2.50 µs │   +246.4%     +21.1%      -7.4%
-1.1.2 Navigation with route parameters   │    1.51 µs    2.30 µs    2.70 µs    2.50 µs │    +78.8%     +17.4%      -7.4%
+1.1.1 Simple navigation between routes   │    0.78 µs    2.23 µs    2.50 µs │   +220.5%     +12.1%
+1.1.2 Navigation with route parameters   │    1.51 µs    2.30 µs    2.50 µs │    +65.6%      +8.7%
 ...
 
 Performance Summary:
   Total benchmarks: 286
   rr faster than r5: 85 (29.7%)
   rr faster than r6: 120 (42.0%)
-  rr(nv) faster than rr: 280 (97.9%)
 ```
 
 **Columns:**
-- **r5, r6, rr, rr(nv)** — absolute execution times
+
+- **router5, router6, real-router** — absolute execution times
 - **rr/r5** — real-router vs router5 (green = faster, red = slower)
 - **rr/r6** — real-router vs router6
-- **nv/rr** — noValidate vs regular real-router
 
 ## Benchmark Categories
 
-| #   | Category           | Description                                 |
-| --- | ------------------ | ------------------------------------------- |
-| 01  | Navigation Basic   | Simple navigation, parameters, edge cases   |
-| 07  | Path Operations    | buildPath, matchPath, setRootPath           |
-| 08  | Current State      | State creation, comparison, building        |
-| 12  | Stress Testing     | High load, scaling                          |
+| #   | Category         | Description                               |
+| --- | ---------------- | ----------------------------------------- |
+| 01  | Navigation Basic | Simple navigation, parameters, edge cases |
+| 07  | Path Operations  | buildPath, matchPath, setRootPath         |
+| 08  | Current State    | State creation, comparison, building      |
+| 12  | Stress Testing   | High load, scaling                        |
 
 ## Directory Structure
 
@@ -217,20 +211,6 @@ packages/router-benchmarks/
    - If results vary significantly between runs — check `pnpm cpu` for heavy processes
    - If thermal throttling detected — wait for system to cool down
    - Increase `MAX_COOLDOWN_WAIT` for more stable results
-
-## noValidate Option
-
-The `noValidate` option is available **only in @real-router/core**. When enabled, it skips runtime validation checks for improved performance in production environments.
-
-```bash
-# Run benchmarks with noValidate
-pnpm bench:novalidate
-
-# Or via environment variable
-BENCH_NO_VALIDATE=true pnpm bench
-```
-
-Typical performance improvement with `noValidate: true`: **5-10%** faster execution.
 
 ## Technical Details
 

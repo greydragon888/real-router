@@ -12,8 +12,6 @@ const BENCH_JSON_DIR = join(__dirname, ".bench");
 const ANOMALY_THRESHOLDS = {
   // rr slower than baseline by this % is anomalous
   rrVsR6Slowdown: 20,
-  // noValidate slower than rr by this % is anomalous (should be faster or equal)
-  nvVsRrSlowdown: 5,
   // RME threshold for unstable measurements (values are in percent, e.g., 5 = 5%)
   rmeUnstable: 5,
   rmeSuspicious: 10,
@@ -77,18 +75,10 @@ const SECTION_TO_FILE = {
  */
 function loadRmeData() {
   const rmeData = new Map();
-  const routers = [
-    "router5",
-    "router6",
-    "real-router",
-    "real-router-novalidate",
-  ];
+  const routers = ["router5", "router6", "real-router"];
 
   for (const router of routers) {
-    const routerDir =
-      router === "real-router-novalidate"
-        ? join(BENCH_JSON_DIR, "real-router") // novalidate uses same dir as real-router
-        : join(BENCH_JSON_DIR, router);
+    const routerDir = join(BENCH_JSON_DIR, router);
 
     if (!existsSync(routerDir)) continue;
 
@@ -861,369 +851,7 @@ function compareThreeBenchmarks(router5File, router6File, realRouterFile) {
 }
 
 /**
- * Compare four benchmark results (router5 → router6 → real-router → real-router-novalidate)
- */
-function compareFourBenchmarks(
-  router5File,
-  router6File,
-  realRouterFile,
-  realRouterNoValidateFile,
-) {
-  log(`${BOLD}${BLUE}=== Four-Way Benchmark Comparison ===${RESET}\n`);
-  log(`${GRAY}r5     = router5 (baseline): ${router5File}${RESET}`);
-  log(`${GRAY}r6     = router6: ${router6File}${RESET}`);
-  log(`${GRAY}rr     = real-router: ${realRouterFile}${RESET}`);
-  log(
-    `${GRAY}rr(nv) = real-router (noValidate: true): ${realRouterNoValidateFile}${RESET}\n`,
-  );
-  log(
-    `${GRAY}Legend: ${MARKER_ANOMALY} anomaly (unexpected slowdown)  ${MARKER_UNSTABLE} unstable (RME>${ANOMALY_THRESHOLDS.rmeUnstable})${RESET}\n`,
-  );
-
-  const router5Results = parseBenchmarkFile(join(RESULTS_DIR, router5File));
-  const router6Results = parseBenchmarkFile(join(RESULTS_DIR, router6File));
-  const realRouterResults = parseBenchmarkFile(
-    join(RESULTS_DIR, realRouterFile),
-  );
-  const noValidateResults = parseBenchmarkFile(
-    join(RESULTS_DIR, realRouterNoValidateFile),
-  );
-
-  // Load RME data for stability analysis
-  const rmeData = loadRmeData();
-
-  // Collect anomalies for summary
-  const anomalies = [];
-
-  // Performance comparison
-  log(`${BOLD}${CYAN}Performance Comparison${RESET}`);
-  log("─".repeat(160));
-  log(
-    `${"".padEnd(3)}${"Benchmark".padEnd(37)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
-  );
-  log("─".repeat(160));
-
-  let count = 0;
-  let rrVsR5Better = 0;
-  let rrVsR6Better = 0;
-  let nvVsRrBetter = 0;
-
-  for (const [name, r5] of router5Results) {
-    const r6 = router6Results.get(name);
-    const rr = realRouterResults.get(name);
-    const nv = noValidateResults.get(name);
-
-    if (!r6 && !rr && !nv) {
-      log(
-        `   ${YELLOW}⚠ ${name.padEnd(37)} ${RESET}${GRAY}missing in all variants${RESET}`,
-      );
-      continue;
-    }
-
-    count++;
-
-    const nameDisplay = name.length > 37 ? name.substring(0, 34) + "..." : name;
-    const r5Time = formatTime(r5.avgMicroseconds).padStart(10);
-
-    let r6Time = GRAY + "N/A".padStart(10) + RESET;
-    if (r6) {
-      r6Time = formatTime(r6.avgMicroseconds).padStart(10);
-    }
-
-    // Get RME data first for stability markers
-    const rrRme = rmeData.get("real-router")?.get(name);
-    const r6Rme = rmeData.get("router6")?.get(name);
-    const rrVsR6Unstable =
-      (rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable) ||
-      (r6Rme && r6Rme > ANOMALY_THRESHOLDS.rmeUnstable);
-    const nvVsRrUnstable = rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable;
-
-    let rrTime = GRAY + "N/A".padStart(10) + RESET;
-    let rrVsR5Diff = GRAY + "N/A".padStart(10) + RESET;
-    let rrVsR6Diff = GRAY + "N/A".padStart(10) + RESET;
-    let diffVsR6Raw = null;
-    if (rr) {
-      rrTime = formatTime(rr.avgMicroseconds).padStart(10);
-      const diffVsR5 =
-        ((rr.avgMicroseconds - r5.avgMicroseconds) / r5.avgMicroseconds) * 100;
-      rrVsR5Diff = formatDiffCompact(diffVsR5, 10);
-      if (diffVsR5 < 0) rrVsR5Better++;
-
-      if (r6) {
-        diffVsR6Raw =
-          ((rr.avgMicroseconds - r6.avgMicroseconds) / r6.avgMicroseconds) *
-          100;
-        rrVsR6Diff = formatDiffCompact(diffVsR6Raw, 10);
-        if (diffVsR6Raw < 0) rrVsR6Better++;
-        // Add unstable marker to diff
-        if (rrVsR6Unstable) {
-          rrVsR6Diff = rrVsR6Diff.replace(RESET, YELLOW + "~" + RESET);
-        }
-      }
-    }
-
-    let nvTime = GRAY + "N/A".padStart(10) + RESET;
-    let nvVsRrDiff = GRAY + "N/A".padStart(10) + RESET;
-    let diffVsRrRaw = null;
-    if (nv) {
-      nvTime = formatTime(nv.avgMicroseconds).padStart(10);
-      if (rr) {
-        diffVsRrRaw =
-          ((nv.avgMicroseconds - rr.avgMicroseconds) / rr.avgMicroseconds) *
-          100;
-        nvVsRrDiff = formatDiffCompact(diffVsRrRaw, 10);
-        if (diffVsRrRaw < 0) nvVsRrBetter++;
-        // Add unstable marker to diff
-        if (nvVsRrUnstable) {
-          nvVsRrDiff = nvVsRrDiff.replace(RESET, YELLOW + "~" + RESET);
-        }
-      }
-    }
-
-    // Check for anomalies
-    let markers = "   ";
-    const rowAnomalies = [];
-
-    // Check rr vs r6 anomaly
-    if (
-      diffVsR6Raw !== null &&
-      diffVsR6Raw > ANOMALY_THRESHOLDS.rrVsR6Slowdown
-    ) {
-      rowAnomalies.push({ type: "rrVsR6", diff: diffVsR6Raw, name });
-    }
-
-    // Check nv vs rr anomaly (noValidate should be faster or equal)
-    if (
-      diffVsRrRaw !== null &&
-      diffVsRrRaw > ANOMALY_THRESHOLDS.nvVsRrSlowdown
-    ) {
-      rowAnomalies.push({ type: "nvVsRr", diff: diffVsRrRaw, name });
-    }
-
-    // Set row marker (anomaly takes precedence)
-    if (rowAnomalies.length > 0) {
-      markers = MARKER_ANOMALY + "  ";
-      for (const a of rowAnomalies) {
-        anomalies.push({
-          ...a,
-          rrRme,
-          r6Rme,
-          unstable: rrVsR6Unstable,
-        });
-      }
-    } else if (rrVsR6Unstable) {
-      markers = MARKER_UNSTABLE + "  ";
-    }
-
-    log(
-      `${markers}${nameDisplay.padEnd(37)} │ ${r5Time} ${r6Time} ${rrTime} ${nvTime} │ ${rrVsR5Diff} ${rrVsR6Diff} ${nvVsRrDiff}`,
-    );
-  }
-
-  log("─".repeat(160));
-
-  log(`\n${BOLD}Performance Summary:${RESET}`);
-  log(`  Total benchmarks: ${count}`);
-  log(
-    `  rr faster than r5: ${rrVsR5Better > count / 2 ? GREEN : RED}${rrVsR5Better}${RESET} (${((rrVsR5Better / count) * 100).toFixed(1)}%)`,
-  );
-  log(
-    `  rr faster than r6: ${rrVsR6Better > count / 2 ? GREEN : RED}${rrVsR6Better}${RESET} (${((rrVsR6Better / count) * 100).toFixed(1)}%)`,
-  );
-  log(
-    `  rr(nv) faster than rr: ${nvVsRrBetter > count / 2 ? GREEN : RED}${nvVsRrBetter}${RESET} (${((nvVsRrBetter / count) * 100).toFixed(1)}%)`,
-  );
-
-  // Memory comparison
-  const memAnomalies = [];
-
-  log(`\n${BOLD}${CYAN}Memory Allocation Comparison${RESET}`);
-  log("─".repeat(160));
-  log(
-    `${"".padEnd(3)}${"Benchmark".padEnd(37)} │ ${"r5".padStart(10)} ${"r6".padStart(10)} ${"rr".padStart(10)} ${"rr(nv)".padStart(10)} │ ${"rr/r5".padStart(10)} ${"rr/r6".padStart(10)} ${"nv/rr".padStart(10)}`,
-  );
-  log("─".repeat(160));
-
-  let memCount = 0;
-  let rrMemVsR5Better = 0;
-  let rrMemVsR6Better = 0;
-  let nvMemVsRrBetter = 0;
-
-  for (const [name, r5] of router5Results) {
-    if (!r5.memoryKb) continue;
-
-    const r6 = router6Results.get(name);
-    const rr = realRouterResults.get(name);
-    const nv = noValidateResults.get(name);
-
-    if ((!r6 || !r6.memoryKb) && (!rr || !rr.memoryKb) && (!nv || !nv.memoryKb))
-      continue;
-
-    memCount++;
-
-    const nameDisplay = name.length > 37 ? name.substring(0, 34) + "..." : name;
-    const r5Mem = formatMemory(r5.memoryKb).padStart(10);
-
-    let r6Mem = GRAY + "N/A".padStart(10) + RESET;
-    if (r6 && r6.memoryKb) {
-      r6Mem = formatMemory(r6.memoryKb).padStart(10);
-    }
-
-    let rrMem = GRAY + "N/A".padStart(10) + RESET;
-    let rrMemVsR5 = GRAY + "N/A".padStart(10) + RESET;
-    let rrMemVsR6 = GRAY + "N/A".padStart(10) + RESET;
-    let memDiffVsR6Raw = null;
-    if (rr && rr.memoryKb) {
-      rrMem = formatMemory(rr.memoryKb).padStart(10);
-      const diffVsR5 = ((rr.memoryKb - r5.memoryKb) / r5.memoryKb) * 100;
-      rrMemVsR5 = formatDiffCompact(diffVsR5, 10);
-      if (diffVsR5 < 0) rrMemVsR5Better++;
-
-      if (r6 && r6.memoryKb) {
-        memDiffVsR6Raw = ((rr.memoryKb - r6.memoryKb) / r6.memoryKb) * 100;
-        rrMemVsR6 = formatDiffCompact(memDiffVsR6Raw, 10);
-        if (memDiffVsR6Raw < 0) rrMemVsR6Better++;
-      }
-    }
-
-    let nvMem = GRAY + "N/A".padStart(10) + RESET;
-    let nvMemVsRr = GRAY + "N/A".padStart(10) + RESET;
-    let memDiffVsRrRaw = null;
-    if (nv && nv.memoryKb) {
-      nvMem = formatMemory(nv.memoryKb).padStart(10);
-      if (rr && rr.memoryKb) {
-        memDiffVsRrRaw = ((nv.memoryKb - rr.memoryKb) / rr.memoryKb) * 100;
-        nvMemVsRr = formatDiffCompact(memDiffVsRrRaw, 10);
-        if (memDiffVsRrRaw < 0) nvMemVsRrBetter++;
-      }
-    }
-
-    // Check for memory anomalies
-    let markers = "   ";
-    const rowMemAnomalies = [];
-
-    // Check rr vs r6 memory anomaly (rr using much more memory)
-    if (
-      memDiffVsR6Raw !== null &&
-      memDiffVsR6Raw > ANOMALY_THRESHOLDS.rrVsR6Slowdown
-    ) {
-      rowMemAnomalies.push({ type: "memRrVsR6", diff: memDiffVsR6Raw, name });
-    }
-
-    // Check nv vs rr memory anomaly
-    if (
-      memDiffVsRrRaw !== null &&
-      memDiffVsRrRaw > ANOMALY_THRESHOLDS.nvVsRrSlowdown
-    ) {
-      rowMemAnomalies.push({ type: "memNvVsRr", diff: memDiffVsRrRaw, name });
-    }
-
-    // Check RME stability
-    const rrRme = rmeData.get("real-router")?.get(name);
-    const r6Rme = rmeData.get("router6")?.get(name);
-    const isUnstable =
-      (rrRme && rrRme > ANOMALY_THRESHOLDS.rmeUnstable) ||
-      (r6Rme && r6Rme > ANOMALY_THRESHOLDS.rmeUnstable);
-
-    if (rowMemAnomalies.length > 0) {
-      markers = MARKER_ANOMALY + "  ";
-      for (const a of rowMemAnomalies) {
-        memAnomalies.push({
-          ...a,
-          rrRme,
-          r6Rme,
-          unstable: isUnstable,
-        });
-      }
-    } else if (isUnstable) {
-      markers = MARKER_UNSTABLE + "  ";
-    }
-
-    log(
-      `${markers}${nameDisplay.padEnd(37)} │ ${r5Mem} ${r6Mem} ${rrMem} ${nvMem} │ ${rrMemVsR5} ${rrMemVsR6} ${nvMemVsRr}`,
-    );
-  }
-
-  log("─".repeat(160));
-
-  if (memCount > 0) {
-    log(`\n${BOLD}Memory Summary:${RESET}`);
-    log(`  Total benchmarks: ${memCount}`);
-    log(
-      `  rr uses less than r5: ${rrMemVsR5Better > memCount / 2 ? GREEN : RED}${rrMemVsR5Better}${RESET} (${((rrMemVsR5Better / memCount) * 100).toFixed(1)}%)`,
-    );
-    log(
-      `  rr uses less than r6: ${rrMemVsR6Better > memCount / 2 ? GREEN : RED}${rrMemVsR6Better}${RESET} (${((rrMemVsR6Better / memCount) * 100).toFixed(1)}%)`,
-    );
-    log(
-      `  rr(nv) uses less than rr: ${nvMemVsRrBetter > memCount / 2 ? GREEN : RED}${nvMemVsRrBetter}${RESET} (${((nvMemVsRrBetter / memCount) * 100).toFixed(1)}%)`,
-    );
-  }
-
-  // Print anomaly summary
-  const allAnomalies = [...anomalies, ...memAnomalies];
-  if (allAnomalies.length > 0) {
-    log(
-      `\n${BOLD}${RED}=== Anomalies Detected (${allAnomalies.length}) ===${RESET}`,
-    );
-    log(
-      `${GRAY}Anomaly = unexpected slowdown. Check RME for stability.${RESET}`,
-    );
-    log("─".repeat(100));
-
-    // Group by type
-    const rrVsR6Anomalies = allAnomalies.filter(
-      (a) => a.type === "rrVsR6" || a.type === "memRrVsR6",
-    );
-    const nvVsRrAnomalies = allAnomalies.filter(
-      (a) => a.type === "nvVsRr" || a.type === "memNvVsRr",
-    );
-
-    if (rrVsR6Anomalies.length > 0) {
-      log(
-        `\n${YELLOW}rr slower than r6 (threshold: >${ANOMALY_THRESHOLDS.rrVsR6Slowdown}%):${RESET}`,
-      );
-      for (const a of rrVsR6Anomalies) {
-        const typeLabel = a.type.startsWith("mem") ? "(memory)" : "(time)";
-        const rmeInfo =
-          a.rrRme !== undefined || a.r6Rme !== undefined
-            ? ` ${GRAY}[RME: rr=${a.rrRme?.toFixed(2) ?? "?"}, r6=${a.r6Rme?.toFixed(2) ?? "?"}]${RESET}`
-            : "";
-        const unstableTag = a.unstable ? ` ${YELLOW}~unstable${RESET}` : "";
-        log(
-          `  ${MARKER_ANOMALY} ${a.name.substring(0, 60).padEnd(60)} ${RED}+${a.diff.toFixed(1)}%${RESET} ${typeLabel}${rmeInfo}${unstableTag}`,
-        );
-      }
-    }
-
-    if (nvVsRrAnomalies.length > 0) {
-      log(
-        `\n${YELLOW}noValidate slower than rr (threshold: >${ANOMALY_THRESHOLDS.nvVsRrSlowdown}%):${RESET}`,
-      );
-      for (const a of nvVsRrAnomalies) {
-        const typeLabel = a.type.startsWith("mem") ? "(memory)" : "(time)";
-        const rmeInfo =
-          a.rrRme !== undefined || a.r6Rme !== undefined
-            ? ` ${GRAY}[RME: rr=${a.rrRme?.toFixed(2) ?? "?"}, r6=${a.r6Rme?.toFixed(2) ?? "?"}]${RESET}`
-            : "";
-        const unstableTag = a.unstable ? ` ${YELLOW}~unstable${RESET}` : "";
-        log(
-          `  ${MARKER_ANOMALY} ${a.name.substring(0, 60).padEnd(60)} ${RED}+${a.diff.toFixed(1)}%${RESET} ${typeLabel}${rmeInfo}${unstableTag}`,
-        );
-      }
-    }
-
-    log("─".repeat(100));
-    log(
-      `${GRAY}Note: Anomalies with high RME (>0.5) are likely measurement artifacts, not real regressions.${RESET}`,
-    );
-  } else {
-    log(`\n${GREEN}✓ No anomalies detected.${RESET}`);
-  }
-}
-
-/**
- * Get latest benchmark set (pair, triplet, or quartet)
+ * Get latest benchmark set (pair or triplet)
  */
 function getLatestBenchmarkSet() {
   const files = readdirSync(RESULTS_DIR);
@@ -1234,9 +862,9 @@ function getLatestBenchmarkSet() {
   for (const file of files) {
     if (!file.endsWith(".txt")) continue;
 
-    // Match naming: router5, router6, real-router, real-router-novalidate
+    // Match naming: router5, router6, real-router
     const match = file.match(
-      /^(\d{8}_\d{6})_(router5|router6|real-router-novalidate|real-router)\.txt$/,
+      /^(\d{8}_\d{6})_(router5|router6|real-router)\.txt$/,
     );
     if (!match) continue;
 
@@ -1249,26 +877,11 @@ function getLatestBenchmarkSet() {
     sets.get(timestamp)[version] = file;
   }
 
-  // Find latest complete set (prefer quartet, then triplet, fallback to pair)
+  // Find latest complete set (prefer triplet, fallback to pair)
   const timestamps = Array.from(sets.keys()).sort().reverse();
 
   for (const timestamp of timestamps) {
     const set = sets.get(timestamp);
-    // Quartet: all four variants
-    if (
-      set["router5"] &&
-      set["router6"] &&
-      set["real-router"] &&
-      set["real-router-novalidate"]
-    ) {
-      return {
-        router5: set["router5"],
-        router6: set["router6"],
-        realRouter: set["real-router"],
-        realRouterNoValidate: set["real-router-novalidate"],
-        type: "quartet",
-      };
-    }
     // Triplet: all three routers
     if (set["router5"] && set["router6"] && set["real-router"]) {
       return {
@@ -1313,7 +926,7 @@ const args = process.argv.slice(2);
 let timestamp = null;
 
 if (args.length === 0) {
-  // Use latest set (quartet, triplet, or pair)
+  // Use latest set (triplet or pair)
   const set = getLatestBenchmarkSet();
 
   if (!set) {
@@ -1327,14 +940,7 @@ if (args.length === 0) {
   const firstFile = set.router5 || set.baseline;
   timestamp = extractTimestamp(firstFile);
 
-  if (set.type === "quartet") {
-    compareFourBenchmarks(
-      set.router5,
-      set.router6,
-      set.realRouter,
-      set.realRouterNoValidate,
-    );
-  } else if (set.type === "triplet") {
+  if (set.type === "triplet") {
     compareThreeBenchmarks(set.router5, set.router6, set.realRouter);
   } else if (set.type === "duo") {
     compareTwoBenchmarks(
@@ -1354,16 +960,9 @@ if (args.length === 0) {
   // Three files: triplet comparison
   timestamp = extractTimestamp(args[0]);
   compareThreeBenchmarks(args[0], args[1], args[2]);
-} else if (args.length === 4) {
-  // Four files: quartet comparison
-  timestamp = extractTimestamp(args[0]);
-  compareFourBenchmarks(args[0], args[1], args[2], args[3]);
 } else {
   console.error(
-    `${RED}Usage: ${process.argv[1]} [router5 router6 real-router real-router-novalidate]${RESET}`,
-  );
-  console.error(
-    `${RED}   or: ${process.argv[1]} [router5 router6 real-router]${RESET}`,
+    `${RED}Usage: ${process.argv[1]} [router5 router6 real-router]${RESET}`,
   );
   console.error(`${RED}   or: ${process.argv[1]} [baseline current]${RESET}`);
   console.error(

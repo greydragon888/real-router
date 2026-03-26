@@ -82,7 +82,6 @@ BASELINE=router5
 ENABLE_ROUTER5=$([[ "$BASELINE" == "router5" ]] && echo true || echo false)
 ENABLE_ROUTER6=$([[ "$BASELINE" == "router6" ]] && echo true || echo false)
 ENABLE_REAL_ROUTER=true
-ENABLE_NOVALIDATE=false
 # =============================================================================
 
 # Count enabled routers for step display
@@ -90,7 +89,6 @@ TOTAL_ROUTERS=0
 [[ "$ENABLE_ROUTER5" == true ]] && ((TOTAL_ROUTERS++))
 [[ "$ENABLE_ROUTER6" == true ]] && ((TOTAL_ROUTERS++))
 [[ "$ENABLE_REAL_ROUTER" == true ]] && ((TOTAL_ROUTERS++))
-[[ "$ENABLE_NOVALIDATE" == true ]] && ((TOTAL_ROUTERS++))
 
 if [[ "$TOTAL_ROUTERS" -lt 2 ]]; then
     echo "Error: At least 2 routers must be enabled for comparison."
@@ -365,12 +363,10 @@ echo -e "${CYAN}Short cooldown between routers: ${SHORT_COOLDOWN}s${NC}"
 RESULT_FILE_ROUTER5="${RESULTS_DIR}/${TIMESTAMP}_router5.txt"
 RESULT_FILE_ROUTER6="${RESULTS_DIR}/${TIMESTAMP}_router6.txt"
 RESULT_FILE_REAL_ROUTER="${RESULTS_DIR}/${TIMESTAMP}_real-router.txt"
-RESULT_FILE_REAL_ROUTER_NOVALIDATE="${RESULTS_DIR}/${TIMESTAMP}_real-router-novalidate.txt"
 
 [[ "$ENABLE_ROUTER5" == true ]] && : > "$RESULT_FILE_ROUTER5"
 [[ "$ENABLE_ROUTER6" == true ]] && : > "$RESULT_FILE_ROUTER6"
 [[ "$ENABLE_REAL_ROUTER" == true ]] && : > "$RESULT_FILE_REAL_ROUTER"
-[[ "$ENABLE_NOVALIDATE" == true ]] && : > "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 
 # Run each section for all routers before moving to the next section
 # This ensures fair comparison within each section (similar thermal conditions)
@@ -404,26 +400,16 @@ for section in "${RUN_SECTIONS[@]}"; do
         sleep "$SHORT_COOLDOWN"
     fi
 
-    # --- real-router ---
-    if [[ "$ENABLE_REAL_ROUTER" == true ]]; then
-        ((STEP++))
-        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] real-router (section $section)...${NC}"
-        sync && sudo purge || true
-        BENCH_ROUTER=real-router BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER"
-        echo -e "${GREEN}  ✓ real-router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
-        sleep "$SHORT_COOLDOWN"
-    fi
-
-    # --- real-router (noValidate) ---
-    if [[ "$ENABLE_NOVALIDATE" == true ]]; then
-        ((STEP++))
-        echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] real-router noValidate (section $section)...${NC}"
-        sync && sudo purge || true
-        BENCH_ROUTER=real-router BENCH_NO_VALIDATE=true BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
-            nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER_NOVALIDATE"
-        echo -e "${GREEN}  ✓ real-router (noValidate) done${NC}"
-    fi
+     # --- real-router ---
+     if [[ "$ENABLE_REAL_ROUTER" == true ]]; then
+         ((STEP++))
+         echo -e "${BLUE}  [${STEP}/${TOTAL_ROUTERS}] real-router (section $section)...${NC}"
+         sync && sudo purge || true
+         BENCH_ROUTER=real-router BENCH_SECTIONS="$section" NODE_OPTIONS='--expose-gc --max-old-space-size=4096' \
+             nice -n -20 npx tsx src/index.ts 2>&1 | tee -a "$RESULT_FILE_REAL_ROUTER"
+         echo -e "${GREEN}  ✓ real-router done, cooling down ${SHORT_COOLDOWN}s...${NC}"
+         sleep "$SHORT_COOLDOWN"
+     fi
 
     # Thermal cooldown between sections (not after the last one)
     # Note: ${RUN_SECTIONS[-1]} syntax requires bash 4.0+, but macOS ships with bash 3.2
@@ -465,5 +451,4 @@ echo "Files:"
 [[ "$ENABLE_ROUTER5" == true ]] && echo "  router5 (baseline): $RESULT_FILE_ROUTER5"
 [[ "$ENABLE_ROUTER6" == true ]] && echo "  router6: $RESULT_FILE_ROUTER6"
 [[ "$ENABLE_REAL_ROUTER" == true ]] && echo "  real-router (current): $RESULT_FILE_REAL_ROUTER"
-[[ "$ENABLE_NOVALIDATE" == true ]] && echo "  real-router (noValidate): $RESULT_FILE_REAL_ROUTER_NOVALIDATE"
 echo "  comparison: ${RESULTS_DIR}/${TIMESTAMP}_comparison.txt"
