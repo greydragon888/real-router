@@ -17,11 +17,13 @@ src/
     ├── options.ts            — OptionsNamespace: limits object shape, individual limit values
     ├── dependencies.ts       — DependenciesNamespace: name format, setDependency args,
     │                           full object structure, getter rejection
-    ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit
+    ├── plugins.ts            — PluginsNamespace: count vs maxPlugins limit,
+    │                           addInterceptor args validation (method enum, function type)
     ├── lifecycle.ts          — LifecycleNamespace: handler type, not-registering guard,
     │                           count vs maxLifecycleHandlers
     ├── navigation.ts         — NavigationNamespace: navigate args, navigateToDefault args,
-    │                           NavigationOptions shape
+    │                           NavigationOptions shape, params validation (navigate/buildPath/canNavigateTo),
+    │                           start path validation
     ├── state.ts              — StateNamespace: makeState args, areStatesEqual args
     ├── eventBus.ts           — EventBusNamespace: event name format, listener args
     └── retrospective.ts      — Retrospective validators: run once at usePlugin() time
@@ -113,6 +115,66 @@ If the retrospective pass throws, `ctx.validator` is set back to `null`. This pr
 ### No module augmentation
 
 The plugin doesn't extend the router's public API. It only affects internal behavior via `ctx.validator`. No `declare module` augmentation, no `extendRouter()` calls.
+
+## Two-Tier Validation Architecture
+
+Validation in Real-Router operates at two distinct levels:
+
+**Tier 1 — Core invariant guards (~94 LOC, always active)**
+
+Core contains structural guards that run regardless of whether the plugin is installed:
+
+| Guard                       | File                             | Purpose                              |
+| --------------------------- | -------------------------------- | ------------------------------------ |
+| `guardDependencies()`       | `guards.ts`                      | Plain object + no getters            |
+| `guardRouteStructure()`     | `guards.ts`                      | Non-array objects, recursive         |
+| `validateOptionsIsObject()` | `OptionsNamespace/validators.ts` | Plain object check                   |
+| `isLoggerConfig()`          | `typeGuards.ts`                  | Logger config shape                  |
+| `validatePlugin()`          | `PluginsNamespace/validators.ts` | Object, not Promise                  |
+| `throwIfDisposed()`         | `api/helpers.ts`                 | Router not disposed (×18 call sites) |
+
+In addition, core has two **invariant guards** added specifically to prevent silent corruption and deferred crashes in user-facing API:
+
+- `validateSubscribeListener` — `subscribe(listener)`: deferred crash guard. A non-function listener is stored in the EventEmitter and crashes on the next navigation emit, with no stack trace pointing to `subscribe`. Also contains an actionable hint: `"For Observable pattern use @real-router/rx package"`.
+- `navigateToNotFound` typeof check — `navigateToNotFound(path?)`: silent corruption guard. Without this check, `navigateToNotFound(42)` sets `state.path = 42` (a number), which corrupts downstream consumers (`browser-plugin` → `pushState`, `Link` → `href`) without any immediate crash.
+
+**Criterion for adding a guard to core:** only if (a) silent corruption — invalid input does not crash but corrupts state, or (b) deferred crash in a user-facing API — the error is stored and crashes later in an unrelated location with no context pointing to the original call.
+
+**Tier 2 — Plugin DX validation layer (opt-in)**
+
+This plugin adds full argument validation for all public API methods via the `ctx.validator?` nullable slot. Core calls `ctx.validator?.ns.fn(args)` — optional chaining means zero overhead when the plugin is absent.
+
+The plugin covers everything that core's invariant guards do not: argument type checks, shape validation, enum membership, limit enforcement, and descriptive error messages with `[router.METHOD]` prefixes.
+
+### Error Message Convention
+
+All errors thrown by this plugin follow a consistent format:
+
+```
+[router.METHOD] descriptive message, got ${typeDescription}
+```
+
+Examples:
+
+```
+[router.navigate] Invalid route name: expected string, got number
+[router.navigate] params must be a plain object, got string
+[router.addInterceptor] Invalid method: "intercept". Must be one of: start, buildPath, forwardState
+```
+
+**Error type mapping:**
+
+| Error type       | When to use                                                   |
+| ---------------- | ------------------------------------------------------------- |
+| `TypeError`      | Wrong argument type or shape                                  |
+| `ReferenceError` | Resource not found (route, dependency)                        |
+| `RangeError`     | Numeric limit exceeded (`maxPlugins`, `maxLifecycleHandlers`) |
+
+Retrospective validation errors use `[validation-plugin]` prefix instead of `[router.METHOD]`, because no specific public method was called — the plugin is checking accumulated state at registration time:
+
+```
+[validation-plugin] validateExistingRoutes: duplicate route name "home"
+```
 
 ## See Also
 

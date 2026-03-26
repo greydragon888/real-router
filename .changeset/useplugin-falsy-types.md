@@ -4,4 +4,4 @@
 
 `usePlugin()` accepts `false | null | undefined` in type signature (#341)
 
-The `Router.usePlugin()` type signature now accepts falsy values alongside `PluginFactory`, enabling `isDev && plugin()` patterns.
+The `Router.usePlugin()` type signature now accepts falsy values alongside `PluginFactory`, enabling `__DEV__ && plugin()` patterns.

@@ -33,7 +33,7 @@ That's it. From this point on, every router call validates its arguments and thr
 
 ## What It Does
 
-Without this plugin, the router has lightweight crash guards that prevent null-dereference panics on obviously wrong inputs. With this plugin, you get the full DX layer:
+Without this plugin, core has structural guards (constructor, plugin registration, dispose) and two invariant guards (subscribe — deferred crash hint, navigateToNotFound — silent corruption prevention). No argument validation for navigation methods. With this plugin, you get the full DX layer:
 
 - Descriptive error messages with method names and received values
 - Argument shape checks for every public API call
@@ -93,50 +93,43 @@ router.usePlugin(validationPlugin()); // throws here
 
 If the retrospective pass fails, the plugin rolls back cleanly. The router is left without validation active, and the error propagates to your code.
 
-## Migration from `noValidate: true`
-
-The old `noValidate: true` option in `RouterOptions` is deprecated. The new model is simpler: validation is off by default and opt-in via this plugin.
-
-**Before:**
-
-```typescript
-// Old: validation was on by default, noValidate disabled it
-const router = createRouter(routes, { noValidate: true });
-```
-
-**After:**
-
-```typescript
-// New: validation is off by default, plugin enables it
-const router = createRouter(routes);
-router.usePlugin(validationPlugin()); // opt in
-```
-
-For development builds, register the plugin. For production, skip it. You can use an environment variable to conditionally register:
-
-```typescript
-const router = createRouter(routes);
-
-if (process.env.NODE_ENV !== "production") {
-  router.usePlugin(validationPlugin());
-}
-
-await router.start();
-```
-
 ## What Gets Validated
 
-| Namespace     | Validated operations                                                                                                                    |
-| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Routes        | `buildPath`, `matchPath`, `isActiveRoute`, `shouldUpdateNode`, `addRoute`, `removeRoute`, `updateRoute`, `forwardTo` targets and cycles |
-| Options       | `limits` object shape, individual limit values                                                                                          |
-| Dependencies  | `setDependency` args, dependency name format, full store structure                                                                      |
-| Plugins       | Plugin count vs `maxPlugins` limit                                                                                                      |
-| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                |
-| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape                                                                    |
-| State         | `makeState` args, `areStatesEqual` args                                                                                                 |
-| Event bus     | Event name format, listener args                                                                                                        |
-| Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency           |
+| Namespace     | Validated operations                                                                                                                                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Routes        | `buildPath`, `matchPath`, `isActiveRoute`, `shouldUpdateNode`, `addRoute`, `removeRoute`, `updateRoute`, `forwardTo` targets and cycles                 |
+| Options       | `limits` object shape, individual limit values                                                                                                          |
+| Dependencies  | `setDependency` args, dependency name format, full store structure                                                                                      |
+| Plugins       | Plugin count vs `maxPlugins` limit, `addInterceptor` args (method enum + function type)                                                                 |
+| Lifecycle     | Guard/hook handler type, count vs `maxLifecycleHandlers`                                                                                                |
+| Navigation    | `navigate` args, `navigateToDefault` args, `NavigationOptions` shape, `params` validation (navigate, buildPath, canNavigateTo), `start` path validation |
+| State         | `makeState` args, `areStatesEqual` args                                                                                                                 |
+| Event bus     | Event name format, listener args                                                                                                                        |
+| Retrospective | Existing route tree integrity, `forwardTo` consistency, decoder/encoder types, dependency store structure, limits consistency                           |
+
+## Error Messages
+
+All errors from this plugin use a `[router.METHOD]` prefix so you can immediately tell which call failed.
+
+```
+[router.navigate] Invalid route name: expected string, got number
+[router.navigate] params must be a plain object, got string
+[router.start] path must start with "/", got "users/profile"
+[router.addInterceptor] Invalid method: "intercept". Must be one of: start, buildPath, forwardState
+[router.usePlugin] Plugin limit exceeded (50). Current: 50, Attempting to add: 1.
+```
+
+**Error types:**
+
+- `TypeError` — wrong argument type or shape (`navigate(42)`, `addInterceptor("x", "notAFn")`)
+- `ReferenceError` — resource not found (`getDependency("missing")`, `updateRoute("nonexistent", ...)`)
+- `RangeError` — limit exceeded (`usePlugin()` past `maxPlugins`, `addActivateGuard()` past `maxLifecycleHandlers`)
+
+Retrospective validation errors use `[validation-plugin]` prefix instead, since no specific method was called:
+
+```
+[validation-plugin] validateExistingRoutes: duplicate route name "home"
+```
 
 ## Related Packages
 

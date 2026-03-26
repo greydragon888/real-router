@@ -3,8 +3,9 @@ import { getPluginApi } from "@real-router/core/api";
 import { logger } from "@real-router/logger";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { createValidationRouter } from "../helpers";
 import { validationPlugin } from "@real-router/validation-plugin";
+
+import { createValidationRouter } from "../helpers";
 
 import type { Router } from "@real-router/core";
 

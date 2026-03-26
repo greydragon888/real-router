@@ -41,6 +41,7 @@ pnpm lint:unused        # Check for unused code (knip)
 - Svelte examples use `vite build` only (no tsc step — Svelte compiler handles types)
 - Never use `workspace:^` for `peerDependencies` on 0.x packages — in semver `^0.x.y` is patch-only range, so any minor bump breaks the range and triggers a major bump from changesets
 - `onlyUpdatePeerDependentsWhenOutOfRange: true` is set in `.changeset/config.json` to prevent unexpected major bumps when peer deps are updated within range
+- Runtime validation is opt-in via `@real-router/validation-plugin` — core ships with structural guards and two invariant guards only (subscribe, navigateToNotFound)
 
 ## Release Process
 

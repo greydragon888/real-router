@@ -95,7 +95,9 @@
     "lint:package": "publint",
     "lint:types": "attw --pack ."
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/esm/chunk-*.mjs"
+  ],
   "dependencies": {
     "@real-router/fsm": "workspace:^",
     "@real-router/logger": "workspace:^",

@@ -38,15 +38,17 @@ No boolean flags (`#started`, `#active`, `#navigating` removed).
 
 ### Validation Pattern
 
-Validation is **opt-in** via `@real-router/validation-plugin`. Core ships with zero validation code — the plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
+Validation has two tiers: **invariant protection** in core (structural guards + 2 invariant guards) and **DX validation** opt-in via @real-router/validation-plugin. The plugin installs a `RouterValidator` object into `RouterInternals.validator` at registration time.
 
 **Facade methods** and **standalone API functions** call through the optional validator using optional chaining:
 
 ```typescript
 // Router.ts (facade)
 buildPath(route: string, params?: Params): string {
-  ctx.validator?.routes.validateBuildPathArgs(route);  // no-op if plugin not registered
-  return getInternals(this).buildPath(route, params);  // via WeakMap — applies interceptor pipeline
+  const ctx = getInternals(this);
+  ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
+  ctx.validator?.navigation.validateParams(params, "buildPath");
+  return ctx.buildPath(route, params);  // via WeakMap — applies interceptor pipeline
 }
 
 // api/getRoutesApi.ts (standalone API)
@@ -63,7 +65,16 @@ The `validator` object is namespaced by concern (`routes`, `navigation`, `state`
 - On registration: installs validator + runs retrospective validation on existing routes/deps/options
 - On teardown (`unsubscribe()`): sets `ctx.validator = null` — validation silently disabled
 
-Validators live in the namespace folder (`namespaces/XxxNamespace/validators.ts`) and are imported by the plugin, not by core itself.
+Structural guards remain in namespace folders (`OptionsNamespace/validators.ts`, `PluginsNamespace/validators.ts`). DX validators live in `@real-router/validation-plugin`, accessed via `RouterValidator` interface in `src/types/RouterValidator.ts`.
+
+### Invariant Guards (always active, no plugin required)
+
+Core contains two invariant guards that run regardless of whether validation-plugin is installed:
+
+- **`subscribe(listener)`** — validates `typeof listener === "function"`. Prevents deferred crash (non-function stored in EventEmitter, crash on next navigation). Includes actionable hint: "For Observable pattern use @real-router/rx package".
+- **`navigateToNotFound(path)`** — validates `typeof path === "string"` when path is provided. Prevents silent state corruption (`state.path = 42`).
+
+**Criterion for adding invariant guards:** (a) silent corruption — invalid input doesn't crash but corrupts state, or (b) deferred crash in user-facing API — error stored, crash later with unrelated stack trace.
 
 ### Namespace Folder Structure
 
@@ -312,6 +323,15 @@ const unsubscribe = router.usePlugin(myPlugin);
 ```
 
 **Key:** Plugins are **observers** - they react to events but cannot modify the transition.
+
+**Conditional registration:** `usePlugin()` silently skips falsy values (`undefined`, `null`, `false`), enabling inline conditionals:
+
+```typescript
+router.usePlugin(
+  browserPluginFactory(),
+  __DEV__ && validationPlugin(),   // false when __DEV__ is false — skipped
+);
+```
 
 Plugins can extend the router instance with new methods via `extendRouter()`:
 

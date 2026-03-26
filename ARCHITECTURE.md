@@ -299,6 +299,16 @@ Multiple interceptors per method execute in **LIFO** order (last-registered wrap
 
 Plugins extend the router instance with new properties via `extendRouter()` on `PluginApi`. Throws `RouterError(PLUGIN_CONFLICT)` if any key already exists (atomic validation). Extensions are tracked in `RouterInternals.routerExtensions` and cleaned up on unsubscribe or `dispose()`.
 
+### Validator Slot
+
+`@real-router/validation-plugin` uses a unique extension mechanism — not interceptors, not event listeners, but a **nullable validator slot** in `RouterInternals`:
+
+```typescript
+ctx.validator?.routes.validateBuildPathArgs(route); // no-op when null
+```
+
+The slot is typed as `RouterValidator | null`. The plugin sets it on registration, clears it on teardown. All core call sites use optional chaining — zero overhead when absent.
+
 ## Invariants
 
 These are deliberately designed constraints. Violating them will break the system in subtle ways.

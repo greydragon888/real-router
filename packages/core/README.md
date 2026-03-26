@@ -209,6 +209,19 @@ try {
 
 See [RouterError](https://github.com/greydragon888/real-router/wiki/RouterError) and [Error Codes](https://github.com/greydragon888/real-router/wiki/error-codes) for the full reference.
 
+## Validation
+
+Runtime argument validation is available via [@real-router/validation-plugin](https://www.npmjs.com/package/@real-router/validation-plugin):
+
+```typescript
+import { validationPlugin } from "@real-router/validation-plugin";
+
+router.usePlugin(validationPlugin()); // register before start()
+await router.start("/");
+```
+
+The plugin adds descriptive error messages for every public API call. Register it in development, skip in production.
+
 ## Documentation
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)

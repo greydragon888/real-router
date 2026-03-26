@@ -9,7 +9,7 @@ Enables inline conditional plugin registration:
 ```typescript
 router.usePlugin(
   browserPlugin(),
-  isDev && loggerPlugin(),
+  __DEV__ && loggerPlugin(),
   hasConsent && analyticsPlugin(),
 );
 ```
