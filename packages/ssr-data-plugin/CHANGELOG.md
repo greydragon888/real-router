@@ -9,7 +9,7 @@
 - Updated dependencies [d1ebff8]
   - @real-router/core@0.39.0
 
-## 1.0.0
+## 0.1.0
 
 ### Minor Changes
 

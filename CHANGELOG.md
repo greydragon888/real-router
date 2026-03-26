@@ -433,7 +433,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Escapes `<`, `>`, and `&` to Unicode equivalents to prevent `</script>` injection.
 
-### @real-router/ssr-data-plugin@1.0.0
+### @real-router/ssr-data-plugin@0.1.0
 
 ### Minor Changes
 
@@ -3003,7 +3003,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   `RoutesNamespace.matchPath()` called `this.forwardState()` at the namespace level, bypassing facade plugin wrappers. Injected facade's `forwardState` into `RoutesDependencies` so plugins (e.g. `persistent-params-plugin`) can intercept during startup.
 
-### @real-router/react@1.0.0
+### @real-router/react@0.4.0
 
 ### Minor Changes
 
@@ -3028,7 +3028,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - @real-router/core@0.17.0
   - @real-router/helpers@0.1.20
 
-### @real-router/react@1.0.0
+### @real-router/react@0.1.0
 
 ### Minor Changes
 
@@ -3062,7 +3062,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
   - @real-router/core@0.18.0
 
-### @real-router/react@1.0.0
+### @real-router/react@0.4.0
 
 ### Patch Changes
 
