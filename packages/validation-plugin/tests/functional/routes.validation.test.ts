@@ -1,5 +1,5 @@
 import { createRouter } from "@real-router/core";
-import { getRoutesApi } from "@real-router/core/api";
+import { getPluginApi, getRoutesApi } from "@real-router/core/api";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
@@ -345,5 +345,143 @@ describe("routes API validation — with validationPlugin", () => {
         ]);
       }).toThrow();
     });
+  });
+});
+
+describe("routes.validateSetRootPathArgs", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+    router.usePlugin(validationPlugin());
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws for non-string rootPath", () => {
+    const api = getPluginApi(router);
+    const raw = api as unknown as { setRootPath: (p: unknown) => void };
+
+    expect(() => {
+      raw.setRootPath(42);
+    }).toThrow(TypeError);
+    expect(() => {
+      raw.setRootPath(42);
+    }).toThrow("rootPath must be a string");
+  });
+
+  it("accepts valid string rootPath", () => {
+    const api = getPluginApi(router);
+
+    expect(() => {
+      api.setRootPath("/api");
+    }).not.toThrow();
+  });
+});
+
+describe("routes.guardRouteCallbacks", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+    router.usePlugin(validationPlugin());
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws when canActivate is not a function", () => {
+    const routes = getRoutesApi(router);
+
+    expect(() => {
+      routes.add([
+        { name: "bad", path: "/bad", canActivate: "not-fn" as never },
+      ]);
+    }).toThrow(TypeError);
+    expect(() => {
+      routes.add([
+        { name: "bad2", path: "/bad2", canActivate: "not-fn" as never },
+      ]);
+    }).toThrow("canActivate must be a function");
+  });
+
+  it("throws when canDeactivate is not a function", () => {
+    const routes = getRoutesApi(router);
+
+    expect(() => {
+      routes.add([{ name: "bad3", path: "/bad3", canDeactivate: 42 as never }]);
+    }).toThrow(TypeError);
+    expect(() => {
+      routes.add([{ name: "bad4", path: "/bad4", canDeactivate: 42 as never }]);
+    }).toThrow("canDeactivate must be a function");
+  });
+});
+
+describe("routes.guardNoAsyncCallbacks", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+    router.usePlugin(validationPlugin());
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws when decodeParams is async", () => {
+    const routes = getRoutesApi(router);
+
+    const asyncFn = async (p: Record<string, unknown>) => p;
+
+    expect(() => {
+      routes.add([
+        { name: "bad", path: "/bad/:id", decodeParams: asyncFn as never },
+      ]);
+    }).toThrow(TypeError);
+    expect(() => {
+      routes.add([
+        { name: "bad2", path: "/bad2/:id", decodeParams: asyncFn as never },
+      ]);
+    }).toThrow("decodeParams cannot be async");
+  });
+
+  it("throws when encodeParams is async", () => {
+    const routes = getRoutesApi(router);
+
+    const asyncFn = async (p: Record<string, unknown>) => p;
+
+    expect(() => {
+      routes.add([
+        { name: "bad3", path: "/bad3/:id", encodeParams: asyncFn as never },
+      ]);
+    }).toThrow(TypeError);
+    expect(() => {
+      routes.add([
+        { name: "bad4", path: "/bad4/:id", encodeParams: asyncFn as never },
+      ]);
+    }).toThrow("encodeParams cannot be async");
+  });
+
+  it("throws when forwardTo callback is async", () => {
+    const routes = getRoutesApi(router);
+
+    const asyncForwardTo = async () => "home";
+
+    expect(() => {
+      routes.add([
+        { name: "fwd", path: "/fwd", forwardTo: asyncForwardTo as never },
+      ]);
+    }).toThrow(TypeError);
+    expect(() => {
+      routes.add([
+        { name: "fwd2", path: "/fwd2", forwardTo: asyncForwardTo as never },
+      ]);
+    }).toThrow("forwardTo callback cannot be async");
   });
 });

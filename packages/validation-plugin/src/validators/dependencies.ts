@@ -13,7 +13,7 @@ export function validateDependencyName(
 ): asserts name is string {
   if (typeof name !== "string") {
     throw new TypeError(
-      `[router.${methodName}]: dependency name must be a string, got ${typeof name}`,
+      `[router.${methodName}] dependency name must be a string, got ${typeof name}`,
     );
   }
 }
@@ -23,7 +23,7 @@ export function validateSetDependencyArgs(
 ): asserts name is string {
   if (typeof name !== "string") {
     throw new TypeError(
-      `[router.setDependency]: dependency name must be a string, got ${typeof name}`,
+      `[router.setDependency] dependency name must be a string, got ${typeof name}`,
     );
   }
 }
@@ -53,7 +53,7 @@ export function validateDependencyExists(
 ): asserts value is NonNullable<unknown> {
   if (value === undefined) {
     throw new ReferenceError(
-      `[router.getDependency]: dependency "${dependencyName}" not found`,
+      `[router.getDependency] dependency "${dependencyName}" not found`,
     );
   }
 }
@@ -71,7 +71,7 @@ export function validateDependencyLimit(
   const totalCount = currentCount + newCount;
 
   if (totalCount >= maxDependencies) {
-    throw new Error(
+    throw new RangeError(
       `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
         `Current: ${totalCount}. This is likely a bug in your code.`,
     );
@@ -97,7 +97,7 @@ export function validateDependencyCount(
   const { warn, error } = computeThresholds(maxDependencies);
 
   if (currentCount >= maxDependencies) {
-    throw new Error(
+    throw new RangeError(
       `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). Current: ${currentCount}.`,
     );
   } else if (currentCount === error) {

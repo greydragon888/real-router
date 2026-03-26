@@ -1,6 +1,7 @@
 import { createRouter } from "@real-router/core";
-import { getDependenciesApi } from "@real-router/core/api";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { cloneRouter, getDependenciesApi } from "@real-router/core/api";
+import { logger } from "@real-router/logger";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
@@ -204,5 +205,103 @@ describe("dependencies validation — with validationPlugin", () => {
 
       expect(() => deps.get("foo")).toThrow(ReferenceError);
     });
+  });
+});
+
+describe("dependencies.validateDependencyCount — threshold logging", () => {
+  it("logs warn at 20% threshold when adding a new dependency", () => {
+    type NumDeps = Record<string, number>;
+    const r = createRouter<NumDeps>([], { limits: { maxDependencies: 100 } });
+
+    r.usePlugin(validationPlugin());
+    const deps = getDependenciesApi(r);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    for (let i = 0; i < 20; i++) {
+      deps.set(`dep${i}`, i);
+    }
+
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      "router.setDependency",
+      expect.stringContaining("dependencies"),
+    );
+
+    deps.set("dep20", 20);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.setDependency",
+      expect.stringContaining("20 dependencies"),
+    );
+
+    r.stop();
+    vi.restoreAllMocks();
+  });
+});
+
+describe("dependencies.validateCloneArgs", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+    router.usePlugin(validationPlugin());
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws for null dependencies in cloneRouter", () => {
+    expect(() => cloneRouter(router, null as never)).toThrow(TypeError);
+    expect(() => cloneRouter(router, null as never)).toThrow(
+      "expected plain object or undefined",
+    );
+  });
+
+  it("throws for array dependencies in cloneRouter", () => {
+    expect(() => cloneRouter(router, [] as never)).toThrow(TypeError);
+  });
+
+  it("throws for getter dependencies in cloneRouter", () => {
+    const objWithGetter = {} as Record<string, unknown>;
+
+    Object.defineProperty(objWithGetter, "key", {
+      get: () => "value",
+      enumerable: true,
+    });
+
+    expect(() => cloneRouter(router, objWithGetter as never)).toThrow(
+      TypeError,
+    );
+    expect(() => cloneRouter(router, objWithGetter as never)).toThrow(
+      "Getters not allowed",
+    );
+  });
+
+  it("accepts valid plain object dependencies in cloneRouter", () => {
+    expect(() => cloneRouter(router, {})).not.toThrow();
+  });
+});
+
+describe("dependencies.warnRemoveNonExistent", () => {
+  it("warns when removing a non-existent dependency", () => {
+    interface TestDeps {
+      foo?: number;
+      bar?: number;
+    }
+    const r = createRouter<TestDeps>([], {}, { foo: 1 });
+
+    r.usePlugin(validationPlugin());
+    const deps = getDependenciesApi(r);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    deps.remove("bar");
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.removeDependency",
+      expect.stringContaining("bar"),
+    );
+
+    r.stop();
+    vi.restoreAllMocks();
   });
 });

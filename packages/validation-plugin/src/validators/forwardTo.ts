@@ -253,7 +253,7 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   const existsInBatch = batchNames.has(targetRoute);
 
   if (!existsInTree && !existsInBatch) {
-    throw new Error(
+    throw new ReferenceError(
       `[router.addRoute] forwardTo target "${targetRoute}" does not exist ` +
         `for route "${fromRoute}"`,
     );

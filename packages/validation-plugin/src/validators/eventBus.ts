@@ -28,7 +28,9 @@ const validEventNames = new Set<EventName>([
 
 export function validateEventName(eventName: unknown): void {
   if (!validEventNames.has(eventName as EventName)) {
-    throw new Error(`Invalid event name: ${String(eventName)}`);
+    throw new TypeError(
+      `[router.addEventListener] Invalid event name: ${String(eventName)}. Must be one of: $start, $stop, $$start, $$cancel, $$success, $$error`,
+    );
   }
 }
 
@@ -40,7 +42,7 @@ export function validateListenerArgs<E extends EventName>(
 
   if (typeof cb !== "function") {
     throw new TypeError(
-      `Expected callback to be a function for event ${eventName}`,
+      `[router.addEventListener] callback must be a function, got ${typeof cb}`,
     );
   }
 }

@@ -99,14 +99,18 @@ export function guardRouteCallbacks(route: unknown): void {
     routeObj.canActivate !== undefined &&
     typeof routeObj.canActivate !== "function"
   ) {
-    throw new TypeError("[router.addRoute] canActivate must be a function");
+    throw new TypeError(
+      `[router.addRoute] canActivate must be a function, got ${getTypeDescription(routeObj.canActivate)}`,
+    );
   }
 
   if (
     routeObj.canDeactivate !== undefined &&
     typeof routeObj.canDeactivate !== "function"
   ) {
-    throw new TypeError("[router.addRoute] canDeactivate must be a function");
+    throw new TypeError(
+      `[router.addRoute] canDeactivate must be a function, got ${getTypeDescription(routeObj.canDeactivate)}`,
+    );
   }
 }
 
@@ -115,27 +119,35 @@ export function guardNoAsyncCallbacks(route: unknown): void {
     decodeParams?: unknown;
     encodeParams?: unknown;
     forwardTo?: unknown;
+    name?: unknown;
   };
+  const routeName = routeObj.name;
 
   if (
     routeObj.decodeParams !== undefined &&
     isAsyncFunction(routeObj.decodeParams)
   ) {
-    throw new TypeError("[router.addRoute] decodeParams cannot be async");
+    throw new TypeError(
+      `[router.addRoute] decodeParams cannot be async for route "${String(routeName)}"`,
+    );
   }
 
   if (
     routeObj.encodeParams !== undefined &&
     isAsyncFunction(routeObj.encodeParams)
   ) {
-    throw new TypeError("[router.addRoute] encodeParams cannot be async");
+    throw new TypeError(
+      `[router.addRoute] encodeParams cannot be async for route "${String(routeName)}"`,
+    );
   }
 
   if (
     typeof routeObj.forwardTo === "function" &&
     isAsyncFunction(routeObj.forwardTo)
   ) {
-    throw new TypeError("[router.addRoute] forwardTo callback cannot be async");
+    throw new TypeError(
+      `[router.addRoute] forwardTo callback cannot be async for route "${String(routeName)}"`,
+    );
   }
 }
 
@@ -188,12 +200,16 @@ export function validateIsActiveRouteArgs(
 ): void {
   // Validate name - non-string throws
   if (!isString(name)) {
-    throw new TypeError(`Route name must be a string`);
+    throw new TypeError(
+      `[router.isActiveRoute] name must be a string, got ${typeof name}`,
+    );
   }
 
   // Validate params if provided
   if (params !== undefined && !isParams(params)) {
-    throw new TypeError(`[router.isActiveRoute] Invalid params structure`);
+    throw new TypeError(
+      `[router.isActiveRoute] params must be a plain object, got ${getTypeDescription(params)}`,
+    );
   }
 
   // Validate strictEquality if provided
@@ -258,14 +274,14 @@ export function validateUpdateRouteBasicArgs<
 
   if (updates === null) {
     throw new TypeError(
-      `[real-router] updateRoute: updates must be an object, got null`,
+      `[router.updateRoute] updates must be an object, got null`,
     );
   }
 
   // Validate updates is an object (not array)
   if (typeof updates !== "object" || Array.isArray(updates)) {
     throw new TypeError(
-      `[real-router] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
+      `[router.updateRoute] updates must be an object, got ${getTypeDescription(updates)}`,
     );
   }
 }
@@ -282,7 +298,7 @@ function assertNotAsync(value: Function, paramName: string): void {
     (value as { toString: () => string }).toString().includes("__awaiter")
   ) {
     throw new TypeError(
-      `[real-router] updateRoute: ${paramName} cannot be an async function`,
+      `[router.updateRoute] ${paramName} cannot be an async function`,
     );
   }
 }
@@ -297,7 +313,7 @@ function validateFunctionParam(value: unknown, paramName: string): void {
 
   if (typeof value !== "function") {
     throw new TypeError(
-      `[real-router] updateRoute: ${paramName} must be a function or null, got ${typeof value}`,
+      `[router.updateRoute] ${paramName} must be a function or null, got ${typeof value}`,
     );
   }
 
@@ -318,7 +334,7 @@ export function validateUpdateRoutePropertyTypes(
   if (forwardTo !== undefined && forwardTo !== null) {
     if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
       throw new TypeError(
-        `[real-router] updateRoute: forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
+        `[router.updateRoute] forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
       );
     }
 
@@ -334,7 +350,7 @@ export function validateUpdateRoutePropertyTypes(
     (typeof defaultParams !== "object" || Array.isArray(defaultParams))
   ) {
     throw new TypeError(
-      `[real-router] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
+      `[router.updateRoute] defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
     );
   }
 
@@ -348,7 +364,7 @@ export function validateUpdateRoutePropertyTypes(
 export function validateBuildPathArgs(route: unknown): asserts route is string {
   if (!isString(route) || route === "") {
     throw new TypeError(
-      `[real-router] buildPath: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
+      `[router.buildPath] route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
     );
   }
 }
@@ -359,7 +375,7 @@ export function validateBuildPathArgs(route: unknown): asserts route is string {
 export function validateMatchPathArgs(path: unknown): asserts path is string {
   if (!isString(path)) {
     throw new TypeError(
-      `[real-router] matchPath: path must be a string, got ${typeof path}`,
+      `[router.matchPath] path must be a string, got ${typeof path}`,
     );
   }
 }
@@ -400,7 +416,7 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
       node = node.children.get(segment);
 
       if (!node) {
-        throw new Error(
+        throw new ReferenceError(
           `[router.addRoute] Parent route "${parentName}" does not exist`,
         );
       }
@@ -486,7 +502,7 @@ export function validateForwardToParamCompatibility(
 
   if (missingParams.length > 0) {
     throw new Error(
-      `[real-router] forwardTo target "${targetName}" requires params ` +
+      `[router.addRoute] forwardTo target "${targetName}" requires params ` +
         `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
     );
   }
@@ -537,7 +553,7 @@ export function validateUpdateRoute<
   // Validate route exists
   if (!hasRoute(name)) {
     throw new ReferenceError(
-      `[real-router] updateRoute: route "${name}" does not exist`,
+      `[router.updateRoute] route "${name}" does not exist`,
     );
   }
 
@@ -549,7 +565,7 @@ export function validateUpdateRoute<
   ) {
     if (!hasRoute(forwardTo)) {
       throw new Error(
-        `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
+        `[router.updateRoute] forwardTo target "${forwardTo}" does not exist`,
       );
     }
 

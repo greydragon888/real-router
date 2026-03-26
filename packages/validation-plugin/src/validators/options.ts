@@ -63,7 +63,7 @@ export function validateLimitValue(
 ): void {
   if (typeof value !== "number" || !Number.isInteger(value)) {
     throw new TypeError(
-      `[router.${methodName}]: limit "${limitName}" must be an integer, got ${String(value)}`,
+      `[router.${methodName}] limit "${limitName}" must be an integer, got ${String(value)}`,
     );
   }
 
@@ -71,7 +71,7 @@ export function validateLimitValue(
 
   if (value < bounds.min || value > bounds.max) {
     throw new RangeError(
-      `[router.${methodName}]: limit "${limitName}" must be between ${bounds.min} and ${bounds.max}, got ${value}`,
+      `[router.${methodName}] limit "${limitName}" must be between ${bounds.min} and ${bounds.max}, got ${value}`,
     );
   }
 }
@@ -82,13 +82,13 @@ export function validateLimits(
 ): asserts limits is Partial<LimitsConfig> {
   if (!limits || typeof limits !== "object" || limits.constructor !== Object) {
     throw new TypeError(
-      `[router.${methodName}]: invalid limits: expected plain object, got ${typeof limits}`,
+      `[router.${methodName}] invalid limits: expected plain object, got ${typeof limits}`,
     );
   }
 
   for (const [key, value] of Object.entries(limits)) {
     if (!Object.hasOwn(LIMIT_BOUNDS, key)) {
-      throw new TypeError(`[router.${methodName}]: unknown limit: "${key}"`);
+      throw new TypeError(`[router.${methodName}] unknown limit: "${key}"`);
     }
 
     if (value === undefined) {

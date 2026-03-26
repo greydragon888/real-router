@@ -43,7 +43,7 @@ export function validateHandlerLimit(
   }
 
   if (currentCount >= maxLifecycleHandlers) {
-    throw new Error(
+    throw new RangeError(
       `[router.${methodName}] Lifecycle handler limit exceeded (${maxLifecycleHandlers}). ` +
         `This indicates too many routes with individual handlers. ` +
         `Consider using plugins for cross-cutting concerns.`,

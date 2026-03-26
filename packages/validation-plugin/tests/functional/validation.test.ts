@@ -161,3 +161,25 @@ describe("validation-plugin — representative validation tests", () => {
     });
   });
 });
+
+describe("options.validateOptions — retrospective call", () => {
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("does not throw for default router options during registration", () => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+
+  it("does not throw for router with custom valid options", () => {
+    router = createRouter([{ name: "home", path: "/home" }], {
+      trailingSlash: "never",
+      queryParamsMode: "strict",
+      allowNotFound: false,
+    });
+
+    expect(() => router.usePlugin(validationPlugin())).not.toThrow();
+  });
+});

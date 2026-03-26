@@ -162,3 +162,134 @@ describe("navigation validation — with validationPlugin", () => {
     });
   });
 });
+
+describe("validateParams — navigate() params validation", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createValidationRouter();
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws TypeError when params is a string", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", "string-params")).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is a number", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", 42)).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is an array", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", [])).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is a class instance", () => {
+    class Foo {
+      readonly x = 1;
+    }
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", new Foo())).toThrow(TypeError);
+  });
+
+  it("includes method name in error message", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", "bad")).toThrow(/\[router\.navigate\]/);
+  });
+
+  it("includes 'params must be a plain object' in error message", () => {
+    const raw = router as unknown as {
+      navigate: (name: string, params: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.navigate("home", "bad")).toThrow(
+      /params must be a plain object/,
+    );
+  });
+
+  it("accepts undefined params", () => {
+    expect(() => {
+      void router.navigate("home");
+    }).not.toThrow();
+  });
+
+  it("accepts plain object params", () => {
+    expect(() => {
+      void router.navigate("home", {});
+    }).not.toThrow();
+  });
+
+  it("accepts params with string values", () => {
+    expect(() => {
+      void router.navigate("items", { id: "42" });
+    }).not.toThrow();
+  });
+});
+
+describe("validateParams — canNavigateTo() params validation", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createValidationRouter();
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws TypeError when params is a string", () => {
+    const raw = router as unknown as {
+      canNavigateTo: (name: string, params: unknown) => boolean;
+    };
+
+    expect(() => raw.canNavigateTo("home", "not-object")).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is a number", () => {
+    const raw = router as unknown as {
+      canNavigateTo: (name: string, params: unknown) => boolean;
+    };
+
+    expect(() => raw.canNavigateTo("home", 5)).toThrow(TypeError);
+  });
+
+  it("includes 'canNavigateTo' in error message", () => {
+    const raw = router as unknown as {
+      canNavigateTo: (name: string, params: unknown) => boolean;
+    };
+
+    expect(() => raw.canNavigateTo("home", "bad")).toThrow(
+      /\[router\.canNavigateTo\]/,
+    );
+  });
+
+  it("accepts undefined params", () => {
+    expect(() => router.canNavigateTo("home")).not.toThrow();
+  });
+
+  it("accepts plain object params", () => {
+    expect(() => router.canNavigateTo("home", {})).not.toThrow();
+  });
+});

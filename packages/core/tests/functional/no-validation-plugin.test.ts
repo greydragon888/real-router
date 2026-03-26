@@ -324,6 +324,66 @@ describe("core/without validation plugin", () => {
     });
   });
 
+  describe("invariant guards (silent corruption / deferred crash protection)", () => {
+    it("should throw TypeError when subscribe receives non-function", async () => {
+      const router = createTestRouter();
+
+      await router.start("/home");
+
+      expect(() => {
+        router.subscribe("not a function" as any);
+      }).toThrow(TypeError);
+
+      expect(() => {
+        router.subscribe("not a function" as any);
+      }).toThrow("Expected a function");
+
+      router.stop();
+    });
+
+    it("should throw TypeError when navigateToNotFound receives non-string path", async () => {
+      const router = createTestRouter({ allowNotFound: true });
+
+      await router.start("/home");
+
+      expect(() => {
+        router.navigateToNotFound(42 as any);
+      }).toThrow(TypeError);
+
+      expect(() => {
+        router.navigateToNotFound(42 as any);
+      }).toThrow(
+        "[router.navigateToNotFound] path must be a string, got number",
+      );
+
+      router.stop();
+    });
+
+    it("should accept valid string path in navigateToNotFound", async () => {
+      const router = createTestRouter({ allowNotFound: true });
+
+      await router.start("/home");
+
+      expect(() => {
+        router.navigateToNotFound("/valid");
+      }).not.toThrow();
+
+      router.stop();
+    });
+
+    it("should accept undefined path in navigateToNotFound (defaults to current)", async () => {
+      const router = createTestRouter({ allowNotFound: true });
+
+      await router.start("/home");
+
+      expect(() => {
+        router.navigateToNotFound();
+      }).not.toThrow();
+
+      router.stop();
+    });
+  });
+
   describe("internal validator static methods (coverage for validators still in core)", () => {
     it("should throw when same factory registered twice (validateNoDuplicatePlugins)", () => {
       const factory = () => ({});

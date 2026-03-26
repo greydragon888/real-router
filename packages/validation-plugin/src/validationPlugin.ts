@@ -33,6 +33,8 @@ import {
   validateNavigateArgs,
   validateNavigateToDefaultArgs,
   validateNavigationOptions,
+  validateNavigateParams,
+  validateStartArgs,
 } from "./validators/navigation";
 import {
   validateLimitValue,
@@ -46,6 +48,7 @@ import {
   warnBatchDuplicates,
   warnPluginMethodType,
   warnPluginAfterStart,
+  validateAddInterceptorArgs,
 } from "./validators/plugins";
 import {
   validateExistingRoutes,
@@ -149,7 +152,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
             | undefined;
 
           if (!child) {
-            throw new Error(
+            throw new ReferenceError(
               `[router.addRoute] Parent route "${parent as string}" does not exist`,
             );
           }
@@ -221,6 +224,7 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       warnBatchDuplicates,
       warnPluginMethodType,
       warnPluginAfterStart,
+      validateAddInterceptorArgs,
     },
     lifecycle: {
       validateHandler,
@@ -248,6 +252,8 @@ function buildValidatorObject(ctx: RouterInternals): RouterValidator {
       validateNavigateArgs,
       validateNavigateToDefaultArgs,
       validateNavigationOptions,
+      validateParams: validateNavigateParams,
+      validateStartArgs,
     },
     state: {
       validateMakeStateArgs,

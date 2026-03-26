@@ -1,6 +1,7 @@
 import { createRouter } from "@real-router/core";
 import { getLifecycleApi } from "@real-router/core/api";
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { logger } from "@real-router/logger";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { validationPlugin } from "@real-router/validation-plugin";
 
@@ -201,5 +202,82 @@ describe("lifecycle validation — with validationPlugin", () => {
         lifecycle.addActivateGuard("route5", true);
       }).toThrow(/limit exceeded/);
     });
+  });
+});
+
+describe("lifecycle.warnOverwrite", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createRouter([{ name: "home", path: "/home" }]);
+    router.usePlugin(validationPlugin());
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("warns when adding the same guard twice for the same route", () => {
+    const lifecycle = getLifecycleApi(router);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    lifecycle.addActivateGuard("home", true);
+    lifecycle.addActivateGuard("home", false);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.canActivate",
+      expect.stringContaining("home"),
+    );
+
+    vi.restoreAllMocks();
+  });
+
+  it("warns when overwriting deactivate guard", () => {
+    const lifecycle = getLifecycleApi(router);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    lifecycle.addDeactivateGuard("home", true);
+    lifecycle.addDeactivateGuard("home", false);
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.canDeactivate",
+      expect.stringContaining("home"),
+    );
+
+    vi.restoreAllMocks();
+  });
+});
+
+describe("lifecycle.warnAsyncGuardSync", () => {
+  let router: Router;
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("warns when canNavigateTo encounters async guard", async () => {
+    router = createRouter(
+      [
+        { name: "home", path: "/home" },
+        { name: "admin", path: "/admin" },
+      ],
+      { defaultRoute: "home" },
+    );
+    router.usePlugin(validationPlugin());
+    await router.start("/home");
+
+    const lifecycle = getLifecycleApi(router);
+    const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
+
+    lifecycle.addActivateGuard("admin", () => async () => true);
+
+    router.canNavigateTo("admin");
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      "router.canNavigateTo",
+      expect.stringContaining("admin"),
+    );
+
+    vi.restoreAllMocks();
   });
 });

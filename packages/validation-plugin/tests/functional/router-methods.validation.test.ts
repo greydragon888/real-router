@@ -240,3 +240,132 @@ describe("router methods validation — with validationPlugin", () => {
     });
   });
 });
+
+describe("validateParams — buildPath() params validation", () => {
+  let router: Router;
+
+  beforeEach(async () => {
+    router = createValidationRouter();
+    await router.start("/home");
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("throws TypeError when params is a string", () => {
+    const raw = router as unknown as {
+      buildPath: (route: string, params: unknown) => string;
+    };
+
+    expect(() => raw.buildPath("home", "not-object")).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is a number", () => {
+    const raw = router as unknown as {
+      buildPath: (route: string, params: unknown) => string;
+    };
+
+    expect(() => raw.buildPath("home", 99)).toThrow(TypeError);
+  });
+
+  it("throws TypeError when params is an array", () => {
+    const raw = router as unknown as {
+      buildPath: (route: string, params: unknown) => string;
+    };
+
+    expect(() => raw.buildPath("home", ["a", "b"])).toThrow(TypeError);
+  });
+
+  it("includes 'buildPath' in error message", () => {
+    const raw = router as unknown as {
+      buildPath: (route: string, params: unknown) => string;
+    };
+
+    expect(() => raw.buildPath("home", "bad")).toThrow(/\[router\.buildPath\]/);
+  });
+
+  it("accepts undefined params", () => {
+    expect(() => router.buildPath("home")).not.toThrow();
+  });
+
+  it("accepts plain object params", () => {
+    expect(() => router.buildPath("home", {})).not.toThrow();
+  });
+});
+
+describe("validateStartArgs — start() path validation", () => {
+  let router: Router;
+
+  beforeEach(() => {
+    router = createValidationRouter();
+  });
+
+  afterEach(() => {
+    router.stop();
+  });
+
+  it("allows undefined path (browser-plugin injects via interceptor)", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start(undefined)).not.toThrow(TypeError);
+  });
+
+  it("throws TypeError when path is a number", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start(42)).toThrow(TypeError);
+  });
+
+  it("throws TypeError when path is an object", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start({})).toThrow(TypeError);
+  });
+
+  it("includes 'path must be a string' in message for non-string", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start(123)).toThrow(/path must be a string/);
+  });
+
+  it("throws TypeError when path does not start with '/'", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start("home")).toThrow(TypeError);
+  });
+
+  it("includes the invalid path value in error message", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start("home")).toThrow(/"home"/);
+  });
+
+  it("includes 'path must start with' in error message for missing slash", () => {
+    const raw = router as unknown as {
+      start: (path: unknown) => Promise<unknown>;
+    };
+
+    expect(() => raw.start("home")).toThrow(/must start with "\/"/);
+  });
+
+  it("accepts valid path starting with '/'", async () => {
+    await expect(router.start("/home")).resolves.toBeDefined();
+  });
+
+  it("accepts empty string path", async () => {
+    await expect(router.start("")).resolves.toBeDefined();
+  });
+});

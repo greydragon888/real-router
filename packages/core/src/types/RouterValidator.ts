@@ -94,6 +94,7 @@ export interface RouterValidator {
     warnBatchDuplicates: (plugins: unknown[]) => void;
     warnPluginMethodType: (methodName: string) => void;
     warnPluginAfterStart: (methodName: string) => void;
+    validateAddInterceptorArgs: (method: unknown, fn: unknown) => void;
   };
 
   /**
@@ -123,6 +124,8 @@ export interface RouterValidator {
     validateNavigateArgs: (name: unknown) => void;
     validateNavigateToDefaultArgs: (options: unknown) => void;
     validateNavigationOptions: (options: unknown, caller: string) => void;
+    validateParams: (params: unknown, methodName: string) => void;
+    validateStartArgs: (path: unknown) => void;
   };
 
   /**

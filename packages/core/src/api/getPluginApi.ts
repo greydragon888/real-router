@@ -96,6 +96,7 @@ export function getPluginApi<
     getTree: ctx.getTree,
     addInterceptor: (method, fn) => {
       throwIfDisposed(ctx.isDisposed);
+      ctx.validator?.plugins.validateAddInterceptorArgs(method, fn);
       let list = ctx.interceptors.get(method);
 
       if (!list) {

@@ -336,6 +336,7 @@ export class Router<
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateBuildPathArgs(route);
+    ctx.validator?.navigation.validateParams(params, "buildPath");
 
     return ctx.buildPath(route, params);
   }
@@ -388,6 +389,8 @@ export class Router<
     if (!this.#eventBus.canStart()) {
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
+
+    getInternals(this).validator?.navigation.validateStartArgs(startPath);
 
     this.#eventBus.sendStart();
 
@@ -468,6 +471,7 @@ export class Router<
     const ctx = getInternals(this);
 
     ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
+    ctx.validator?.navigation.validateParams(params, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
       return false;
@@ -524,6 +528,8 @@ export class Router<
   // ============================================================================
 
   subscribe(listener: SubscribeFn): Unsubscribe {
+    EventBusNamespace.validateSubscribeListener(listener);
+
     return this.#eventBus.subscribe(listener);
   }
 
@@ -539,6 +545,7 @@ export class Router<
     const ctx = getInternals(this);
 
     ctx.validator?.navigation.validateNavigateArgs(routeName);
+    ctx.validator?.navigation.validateParams(routeParams, "navigate");
 
     const opts = options ?? EMPTY_OPTS;
 
@@ -590,6 +597,12 @@ export class Router<
   navigateToNotFound(path?: string): State {
     if (!this.#eventBus.isActive()) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+    }
+
+    if (path !== undefined && typeof path !== "string") {
+      throw new TypeError(
+        `[router.navigateToNotFound] path must be a string, got ${typeof path}`,
+      );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- isActive() guarantees state exists
