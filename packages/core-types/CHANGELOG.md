@@ -1,5 +1,13 @@
 # @real-router/types
 
+## 0.25.0
+
+### Minor Changes
+
+- Remove `noValidate` option from `Options` interface. Runtime validation is now opt-in via `@real-router/validation-plugin` instead of opt-out via router option.
+
+- Update `usePlugin` signature to accept falsy values (`false | null | undefined`). Enables inline conditional plugin registration: `router.usePlugin(browserPlugin(), isDev && validationPlugin())`.
+
 ## 0.24.0
 
 ### Minor Changes
