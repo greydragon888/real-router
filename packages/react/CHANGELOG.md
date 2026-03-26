@@ -4,13 +4,11 @@
 
 ### Patch Changes
 
-- Updated dependencies [d1ebff8]
-- Updated dependencies [d1ebff8]
-- Updated dependencies [d1ebff8]
+- Updated dependencies [[`d1ebff8`](https://github.com/greydragon888/real-router/commit/d1ebff8065cc85356a1701ba744c3b0a2d6a2669)]:
   - @real-router/core@0.39.0
-  - dom-utils@0.2.1
   - @real-router/sources@0.2.6
   - @real-router/route-utils@0.1.6
+  - dom-utils@0.2.1
 
 ## 0.13.0
 
@@ -398,16 +396,7 @@
   - @real-router/browser-plugin@0.3.1
   - @real-router/helpers@0.1.22
 
-## 1.0.0
-
-### Patch Changes
-
-- Updated dependencies [[`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7), [`2331396`](https://github.com/greydragon888/real-router/commit/233139695878503b2ddec01dab8fafa5ea150ba7)]:
-  - @real-router/core@0.18.0
-  - @real-router/browser-plugin@0.3.0
-  - @real-router/helpers@0.1.21
-
-## 1.0.0
+## 0.4.0
 
 ### Minor Changes
 
@@ -662,7 +651,7 @@
   - @real-router/browser-plugin@0.1.1
   - @real-router/helpers@0.1.1
 
-## 1.0.0
+## 0.1.0
 
 ### Minor Changes
 
