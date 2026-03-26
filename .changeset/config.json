@@ -10,9 +10,9 @@
   "access": "public",
   "baseBranch": "master",
   "updateInternalDependencies": "patch",
-  "ignore": [],
+  "ignore": ["*-example", "*-examples-shared"],
   "privatePackages": {
-    "version": false,
+    "version": true,
     "tag": false
   },
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
