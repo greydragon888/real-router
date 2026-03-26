@@ -141,7 +141,7 @@ function compileAndRegisterRoute(
     hasConstraints: constraintPatterns.size > 0,
     buildStaticParts,
     buildParamSlots,
-    buildParamNamesSet: new Set(buildParamSlots.map((s) => s.paramName)),
+    buildParamNamesSet: new Set(buildParamSlots.map((slot) => slot.paramName)),
   };
 
   state.routesByName.set(node.fullName, compiled);
@@ -394,12 +394,12 @@ function compileBuildParts(
   const allSplatParams = new Set<string>();
 
   for (const segment of segments) {
-    for (const p of segment.paramMeta.urlParams) {
-      allUrlParams.add(p);
+    for (const param of segment.paramMeta.urlParams) {
+      allUrlParams.add(param);
     }
 
-    for (const p of segment.paramMeta.spatParams) {
-      allSplatParams.add(p);
+    for (const param of segment.paramMeta.spatParams) {
+      allSplatParams.add(param);
     }
   }
 

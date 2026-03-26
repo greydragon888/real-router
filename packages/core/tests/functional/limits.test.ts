@@ -8,8 +8,6 @@ import {
   getPluginApi,
 } from "@real-router/core/api";
 
-import type { Router } from "@real-router/core";
-
 describe("core/limits (integration via public API)", () => {
   // 🔴 CRITICAL: Valid limits flow through createRouter()
   describe("valid limits flow through createRouter()", () => {
@@ -46,102 +44,22 @@ describe("core/limits (integration via public API)", () => {
     });
   });
 
-  // 🔴 CRITICAL: Invalid limits rejected at construction
-  describe("invalid limits rejected at construction", () => {
-    it("should throw TypeError for non-integer maxPlugins (string)", () => {
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: "50" as any } });
-      }).toThrow(TypeError);
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: "50" as any } });
-      }).toThrow("must be an integer");
-    });
-
-    it("should throw TypeError for non-integer maxPlugins (float)", () => {
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: 1.5 } });
-      }).toThrow(TypeError);
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: 1.5 } });
-      }).toThrow("must be an integer");
-    });
-
-    it("should throw RangeError for negative maxPlugins", () => {
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: -1 } });
-      }).toThrow(RangeError);
-      expect(() => {
-        createRouter([], { limits: { maxPlugins: -1 } });
-      }).toThrow("must be between 0 and");
-    });
-
-    it("should throw TypeError for unknown limit key", () => {
-      expect(() => {
-        createRouter([], { limits: { unknownLimit: 50 } as any });
-      }).toThrow(TypeError);
-      expect(() => {
-        createRouter([], { limits: { unknownLimit: 50 } as any });
-      }).toThrow("unknown limit");
-    });
-
-    it("should throw TypeError when limits is null", () => {
-      expect(() => {
-        createRouter([], { limits: null as any });
-      }).toThrow(TypeError);
-      expect(() => {
-        createRouter([], { limits: null as any });
-      }).toThrow("expected plain object");
-    });
-
-    it("should throw TypeError when limits is array", () => {
-      expect(() => {
-        createRouter([], { limits: [] as any });
-      }).toThrow(TypeError);
-      expect(() => {
-        createRouter([], { limits: [] as any });
-      }).toThrow("expected plain object");
-    });
-
-    it("should throw TypeError when limits is primitive", () => {
-      expect(() => {
-        createRouter([], { limits: 123 as any });
-      }).toThrow(TypeError);
-    });
-  });
-
   // 🔴 CRITICAL: Custom limits enforced (hard limit — facade validators)
   describe("custom limits enforced", () => {
-    it("should enforce custom maxPlugins limit", () => {
-      const router = createRouter([], { limits: { maxPlugins: 2 } });
-
-      // Register 2 plugins - should succeed
-      expect(() => {
-        router.usePlugin(() => ({}));
-        router.usePlugin(() => ({}));
-      }).not.toThrow();
-
-      // 3rd plugin should throw
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
-
-    it("should enforce custom maxDependencies limit", () => {
+    it("should NOT enforce maxDependencies limit without validation plugin", () => {
       const router = createRouter<{ dep1?: number; dep2?: number }>([], {
         limits: { maxDependencies: 1 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 1 dependency - should succeed
       expect(() => {
         deps.set("dep1", 1);
       }).not.toThrow();
 
-      // 2nd dependency should throw
       expect(() => {
         deps.set("dep2", 2);
-      }).toThrow("Dependency limit exceeded");
+      }).not.toThrow();
     });
 
     it("should enforce custom maxListeners limit", () => {
@@ -243,45 +161,6 @@ describe("core/limits (integration via public API)", () => {
 
   // 🟡 IMPORTANT: Default limits work (regression guard)
   describe("default limits work", () => {
-    it("should enforce default maxPlugins limit (50)", () => {
-      const router = createRouter([]);
-
-      // Register 50 plugins - should succeed
-      expect(() => {
-        for (let i = 0; i < 50; i++) {
-          router.usePlugin(() => ({}));
-        }
-      }).not.toThrow();
-
-      // 51st plugin should throw
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
-
-    it("should enforce default maxDependencies limit (100)", () => {
-      const router = createRouter<Record<string, number>>([]);
-
-      const deps = getDependenciesApi(router);
-
-      // Set 99 dependencies first
-      const deps99: Record<string, number> = {};
-
-      for (let i = 0; i < 99; i++) {
-        deps99[`dep${i}`] = i;
-      }
-
-      expect(() => {
-        deps.setAll(deps99);
-      }).not.toThrow();
-
-      // Adding 2 more via setAll should throw (would be 101 total)
-      // This tests validateDependencyLimit throw path
-      expect(() => {
-        deps.setAll({ dep99: 99, dep100: 100 });
-      }).toThrow("Dependency limit exceeded");
-    });
-
     it("should enforce default maxListeners limit (10000)", () => {
       const router = createRouter([]);
 
@@ -297,89 +176,46 @@ describe("core/limits (integration via public API)", () => {
         getPluginApi(router).addEventListener(events.ROUTER_START, () => {});
       }).toThrow("Listener limit");
     });
-
-    it("should work without explicit limits option", () => {
-      let router: Router;
-
-      // No limits option - should use defaults
-      expect(() => {
-        router = createRouter([]);
-      }).not.toThrow();
-
-      // Verify default limits are enforced by registering plugins
-      expect(() => {
-        for (let i = 0; i < 50; i++) {
-          router!.usePlugin(() => ({}));
-        }
-      }).not.toThrow();
-
-      // 51st should throw (default limit)
-      expect(() => {
-        router!.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
   });
 
   // 🟡 IMPORTANT: Warn/error threshold logging for dependencies
   describe("dependency thresholds", () => {
-    it("should log warning at warn threshold (20% of maxDependencies)", async () => {
+    it("should NOT log warning at warn threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
-      // Check happens BEFORE adding, so we need 20 existing deps to trigger warn
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 20 dependencies - no warning yet (count is checked before add)
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i <= 20; i++) {
         deps.set(`dep${i}`, i);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // 21st dependency should trigger warning (count === 20 at check time)
-      deps.set("dep20", 20);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.setDependency",
-        expect.stringContaining("20 dependencies"),
-      );
-
       warnSpy.mockRestore();
     });
 
-    it("should log error at error threshold (50% of maxDependencies)", async () => {
+    it("should NOT log error at error threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-      // Custom limit of 100 means error at 50
-      // Check happens BEFORE adding, so we need 50 existing deps to trigger error
       const router = createRouter<Record<string, number>>([], {
         limits: { maxDependencies: 100 },
       });
 
       const deps = getDependenciesApi(router);
 
-      // Set 50 dependencies - no error yet (count is checked before add)
-      for (let i = 0; i < 50; i++) {
+      for (let i = 0; i <= 50; i++) {
         deps.set(`dep${i}`, i);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
-
-      // 51st dependency should trigger error log (count === 50 at check time)
-      deps.set("dep50", 50);
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "router.setDependency",
-        expect.stringContaining("50 dependencies"),
-      );
 
       errorSpy.mockRestore();
     });
@@ -387,74 +223,38 @@ describe("core/limits (integration via public API)", () => {
 
   // 🟡 IMPORTANT: Warn/error threshold logging for lifecycle handlers
   describe("lifecycle handler thresholds", () => {
-    it("should enforce default maxLifecycleHandlers limit (200)", () => {
-      const router = createRouter([]);
-
-      // Register 199 canActivate handlers - should succeed
-      expect(() => {
-        for (let i = 0; i < 199; i++) {
-          getLifecycleApi(router).addActivateGuard(`route${i}`, true);
-        }
-      }).not.toThrow();
-
-      // 200th handler should throw
-      expect(() => {
-        getLifecycleApi(router).addActivateGuard("route199", true);
-      }).toThrow(/limit exceeded.*200/i);
-    });
-
-    it("should log warning at warn threshold (20% of maxLifecycleHandlers)", async () => {
+    it("should NOT log warning at warn threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-      // Custom limit of 100 means warn at 20 (Math.floor(100 * 0.2))
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },
       });
 
-      // Register 19 handlers - no warning
-      for (let i = 0; i < 19; i++) {
+      for (let i = 0; i < 20; i++) {
         getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // 20th handler should trigger warning
-      getLifecycleApi(router).addActivateGuard("route19", true);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.canActivate",
-        expect.stringContaining("20 lifecycle handlers"),
-      );
-
       warnSpy.mockRestore();
     });
 
-    it("should log error at error threshold (50% of maxLifecycleHandlers)", async () => {
+    it("should NOT log error at error threshold without validation plugin", async () => {
       const { logger } = await import("@real-router/logger");
       const { vi } = await import("vitest");
       const errorSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
 
-      // Custom limit of 100 means error at 50
       const router = createRouter([], {
         limits: { maxLifecycleHandlers: 100 },
       });
 
-      // Register 49 handlers - no error
-      for (let i = 0; i < 49; i++) {
+      for (let i = 0; i < 50; i++) {
         getLifecycleApi(router).addActivateGuard(`route${i}`, true);
       }
 
       expect(errorSpy).not.toHaveBeenCalled();
-
-      // 50th handler should trigger error log
-      getLifecycleApi(router).addActivateGuard("route49", true);
-
-      expect(errorSpy).toHaveBeenCalledWith(
-        "router.canActivate",
-        expect.stringContaining("50 lifecycle handlers"),
-      );
 
       errorSpy.mockRestore();
     });
@@ -462,38 +262,6 @@ describe("core/limits (integration via public API)", () => {
 
   // 🟢 DESIRABLE: Edge cases and combinations
   describe("edge cases and combinations", () => {
-    it("should handle mixed custom and default limits", () => {
-      const router = createRouter([], {
-        limits: {
-          maxPlugins: 5,
-        },
-      });
-
-      expect(() => {
-        for (let i = 0; i < 5; i++) {
-          router.usePlugin(() => ({}));
-        }
-      }).not.toThrow();
-
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
-
-    it("should handle limit of 1 (minimum non-zero)", () => {
-      const router = createRouter([], { limits: { maxPlugins: 1 } });
-
-      // 1 plugin should succeed
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).not.toThrow();
-
-      // 2nd should throw
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
-    });
-
     it("should handle very large custom limits", () => {
       const router = createRouter([], { limits: { maxPlugins: 1000 } });
 
@@ -516,10 +284,6 @@ describe("core/limits (integration via public API)", () => {
         cloned.usePlugin(() => ({}));
         cloned.usePlugin(() => ({}));
       }).not.toThrow();
-
-      expect(() => {
-        cloned.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
     });
 
     it("should handle all limits set to 0 (unlimited everything)", () => {
@@ -549,25 +313,6 @@ describe("core/limits (integration via public API)", () => {
           } as any,
         });
       }).not.toThrow();
-
-      // maxPlugins should use default (50) when undefined
-      const router = createRouter([], {
-        limits: {
-          maxPlugins: undefined,
-        } as any,
-      });
-
-      // Register 50 plugins (default limit)
-      expect(() => {
-        for (let i = 0; i < 50; i++) {
-          router.usePlugin(() => ({}));
-        }
-      }).not.toThrow();
-
-      // 51st should throw (default limit)
-      expect(() => {
-        router.usePlugin(() => ({}));
-      }).toThrow("Plugin limit exceeded");
     });
 
     it("should accept limits: undefined (skip validation)", () => {

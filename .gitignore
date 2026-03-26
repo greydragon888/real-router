@@ -27,7 +27,7 @@ logs/*.log
 
 .svelte-kit
 
-CLAUDE.md
+**/CLAUDE.md
 
 # TypeScript compiled artifacts
 vitest.config.mjs

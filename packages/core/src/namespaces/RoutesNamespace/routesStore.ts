@@ -4,9 +4,8 @@ import { logger } from "@real-router/logger";
 import { createMatcher, createRouteTree, nodeToDefinition } from "route-tree";
 
 import { DEFAULT_ROUTE_NAME } from "./constants";
-import { resolveForwardChain } from "./forwardToValidation";
+import { resolveForwardChain } from "./forwardChain";
 import { createEmptyConfig, sanitizeRoute } from "./helpers";
-import { validateRoutes } from "./validators";
 
 import type { RouteConfig, RoutesDependencies } from "./types";
 import type { GuardFnFactory, Route } from "../../types";
@@ -39,18 +38,9 @@ export interface RoutesStore<
   readonly pendingCanActivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly pendingCanDeactivate: Map<string, GuardFnFactory<Dependencies>>;
   readonly treeOperations: {
-    readonly commitTreeChanges: (
-      store: RoutesStore<Dependencies>,
-      noValidate: boolean,
-    ) => void;
+    readonly commitTreeChanges: (store: RoutesStore<Dependencies>) => void;
     readonly resetStore: (store: RoutesStore<Dependencies>) => void;
     readonly nodeToDefinition: (node: RouteTree) => RouteDefinition;
-    readonly validateRoutes: (
-      routes: Route<Dependencies>[],
-      tree?: RouteTree,
-      forwardMap?: Record<string, string>,
-      parentName?: string,
-    ) => void;
   };
 }
 
@@ -73,7 +63,7 @@ function rebuildTree(
 
 export function commitTreeChanges<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(store: RoutesStore<Dependencies>, noValidate: boolean): void {
+>(store: RoutesStore<Dependencies>): void {
   const result = rebuildTree(
     store.definitions,
     store.rootPath,
@@ -82,7 +72,7 @@ export function commitTreeChanges<
 
   store.tree = result.tree;
   store.matcher = result.matcher;
-  store.resolvedForwardMap = refreshForwardMap(store.config, noValidate);
+  store.resolvedForwardMap = refreshForwardMap(store.config);
 }
 
 export function rebuildTreeInPlace<
@@ -135,40 +125,11 @@ export function clearRouteData<
 // Forward map
 // =============================================================================
 
-export function refreshForwardMap(
-  config: RouteConfig,
-  noValidate: boolean,
-): Record<string, string> {
-  if (noValidate) {
-    return cacheForwardMap(config);
-  }
-
-  return validateAndCacheForwardMap(config);
-}
-
-function validateAndCacheForwardMap(
-  config: RouteConfig,
-): Record<string, string> {
+export function refreshForwardMap(config: RouteConfig): Record<string, string> {
   const map = Object.create(null) as Record<string, string>;
 
   for (const fromRoute of Object.keys(config.forwardMap)) {
     map[fromRoute] = resolveForwardChain(fromRoute, config.forwardMap);
-  }
-
-  return map;
-}
-
-function cacheForwardMap(config: RouteConfig): Record<string, string> {
-  const map = Object.create(null) as Record<string, string>;
-
-  for (const fromRoute of Object.keys(config.forwardMap)) {
-    let current = fromRoute;
-
-    while (config.forwardMap[current]) {
-      current = config.forwardMap[current];
-    }
-
-    map[fromRoute] = current;
   }
 
   return map;
@@ -209,7 +170,6 @@ function registerForwardTo<Dependencies extends DefaultDependencies>(
     );
   }
 
-  // Async validation ALWAYS runs (even with noValidate=true)
   if (typeof route.forwardTo === "function") {
     const isNativeAsync =
       (route.forwardTo as { constructor: { name: string } }).constructor
@@ -254,7 +214,7 @@ function registerSingleRouteHandlers<Dependencies extends DefaultDependencies>(
     "defaultParams",
   ]);
   const customFields = Object.fromEntries(
-    Object.entries(route).filter(([k]) => !standardKeys.has(k)),
+    Object.entries(route).filter(([key]) => !standardKeys.has(key)),
   );
 
   if (Object.keys(customFields).length > 0) {
@@ -342,7 +302,6 @@ export function createRoutesStore<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   routes: Route<Dependencies>[],
-  noValidate: boolean,
   matcherOptions?: CreateMatcherOptions,
 ): RoutesStore<Dependencies> {
   const definitions: RouteDefinition[] = [];
@@ -370,9 +329,7 @@ export function createRoutesStore<
     "",
   );
 
-  const resolvedForwardMap: Record<string, string> = noValidate
-    ? cacheForwardMap(config)
-    : validateAndCacheForwardMap(config);
+  const resolvedForwardMap = refreshForwardMap(config);
 
   return {
     definitions,
@@ -391,7 +348,6 @@ export function createRoutesStore<
       commitTreeChanges,
       resetStore,
       nodeToDefinition,
-      validateRoutes,
     },
   };
 }

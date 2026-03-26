@@ -529,20 +529,6 @@ describe("core/routes/replaceRoutes", () => {
   // ============================================================================
 
   describe("atomicity", () => {
-    it("should block entire operation on validation error (tree unchanged)", () => {
-      const beforeHas = routesApi.has("home");
-
-      expect(() => {
-        routesApi.replace([
-          { name: "home", path: "/home" }, // valid
-          { name: "invalid route name!", path: "/invalid" }, // invalid — has spaces
-        ]);
-      }).toThrow();
-
-      // Tree unchanged — home still exists
-      expect(routesApi.has("home")).toBe(beforeHas);
-    });
-
     it("should preserve external guards after replace([]) — unlike clear()", async () => {
       routesApi.add({ name: "ext-guarded", path: "/ext-guarded" });
       lifecycle.addActivateGuard("ext-guarded", () => () => false);
@@ -555,20 +541,6 @@ describe("core/routes/replaceRoutes", () => {
 
       // External guard is still in place (replace preserves external guards, clear does not)
       await expect(router.navigate("ext-guarded")).rejects.toThrow();
-    });
-
-    it("should block entire batch if duplicate route name is in new array", () => {
-      const hadHome = routesApi.has("home");
-
-      expect(() => {
-        routesApi.replace([
-          { name: "new-a", path: "/new-a" },
-          { name: "new-a", path: "/new-a-dup" }, // duplicate name in batch
-        ]);
-      }).toThrow();
-
-      // Original tree intact
-      expect(routesApi.has("home")).toBe(hadHome);
     });
   });
 
@@ -669,9 +641,7 @@ describe("core/routes/replaceRoutes", () => {
 
   describe("noValidate mode", () => {
     it("should preserve external guards in noValidate mode", async () => {
-      const nvRouter = createRouter([{ name: "home", path: "/home" }], {
-        noValidate: true,
-      });
+      const nvRouter = createRouter([{ name: "home", path: "/home" }]);
 
       await nvRouter.start("/home");
 

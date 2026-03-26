@@ -1,7 +1,7 @@
 import { logger } from "@real-router/logger";
-import { validateRouteName } from "type-guards";
 
 import { throwIfDisposed } from "./helpers";
+import { guardRouteStructure } from "../guards";
 import { getInternals } from "../internals";
 import {
   clearConfigEntries,
@@ -9,22 +9,14 @@ import {
   sanitizeRoute,
 } from "../namespaces/RoutesNamespace/helpers";
 import {
+  validateClearRoutes,
+  validateRemoveRoute,
+} from "../namespaces/RoutesNamespace/routeGuards";
+import {
   clearRouteData,
   refreshForwardMap,
   registerAllRouteHandlers,
 } from "../namespaces/RoutesNamespace/routesStore";
-import {
-  throwIfInternalRoute,
-  throwIfInternalRouteInArray,
-  validateAddRouteArgs,
-  validateClearRoutes,
-  validateParentOption,
-  validateRemoveRoute,
-  validateRemoveRouteArgs,
-  validateUpdateRoute,
-  validateUpdateRouteBasicArgs,
-  validateUpdateRoutePropertyTypes,
-} from "../namespaces/RoutesNamespace/validators";
 
 import type { RoutesApi } from "./types";
 import type { RouterInternals } from "../internals";
@@ -81,8 +73,8 @@ function clearRouteConfigurations<
   routeCustomFields: Record<string, Record<string, unknown>>,
   lifecycleNamespace: RouteLifecycleNamespace<Dependencies>,
 ): void {
-  const shouldClear = (n: string): boolean =>
-    n === routeName || n.startsWith(`${routeName}.`);
+  const shouldClear = (name: string): boolean =>
+    name === routeName || name.startsWith(`${routeName}.`);
 
   clearConfigEntries(config.decoders, shouldClear);
   clearConfigEntries(config.encoders, shouldClear);
@@ -100,15 +92,15 @@ function clearRouteConfigurations<
   const [canDeactivateFactories, canActivateFactories] =
     lifecycleNamespace.getFactories();
 
-  for (const n of Object.keys(canActivateFactories)) {
-    if (shouldClear(n)) {
-      lifecycleNamespace.clearCanActivate(n);
+  for (const name of Object.keys(canActivateFactories)) {
+    if (shouldClear(name)) {
+      lifecycleNamespace.clearCanActivate(name);
     }
   }
 
-  for (const n of Object.keys(canDeactivateFactories)) {
-    if (shouldClear(n)) {
-      lifecycleNamespace.clearCanDeactivate(n);
+  for (const name of Object.keys(canDeactivateFactories)) {
+    if (shouldClear(name)) {
+      lifecycleNamespace.clearCanDeactivate(name);
     }
   }
 }
@@ -123,11 +115,7 @@ function updateForwardTo<
   name: string,
   forwardTo: string | ForwardToCallback<Dependencies> | null,
   config: RouteConfig,
-  noValidate: boolean,
-  refreshForwardMapFn: (
-    config: RouteConfig,
-    noValidate: boolean,
-  ) => Record<string, string>,
+  refreshForwardMapFn: (config: RouteConfig) => Record<string, string>,
 ): Record<string, string> {
   if (forwardTo === null) {
     delete config.forwardMap[name];
@@ -140,7 +128,7 @@ function updateForwardTo<
     config.forwardFnMap[name] = forwardTo;
   }
 
-  return refreshForwardMapFn(config, noValidate);
+  return refreshForwardMapFn(config);
 }
 
 /**
@@ -220,7 +208,6 @@ function addRoutes<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  noValidate: boolean,
   routes: Route<Dependencies>[],
   parentName?: string,
 ): void {
@@ -249,7 +236,7 @@ function addRoutes<
     parentName ?? "",
   );
 
-  store.treeOperations.commitTreeChanges(store, noValidate);
+  store.treeOperations.commitTreeChanges(store);
 }
 
 /**
@@ -260,7 +247,6 @@ function replaceRoutes<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  noValidate: boolean,
   routes: Route<Dependencies>[],
   ctx: RouterInternals<Dependencies>,
   currentPath: string | undefined,
@@ -288,7 +274,7 @@ function replaceRoutes<
   );
 
   // Step 5: One tree rebuild
-  store.treeOperations.commitTreeChanges(store, noValidate);
+  store.treeOperations.commitTreeChanges(store);
 
   // Step 6: Revalidate state
   if (currentPath !== undefined) {
@@ -309,11 +295,7 @@ function replaceRoutes<
  */
 function removeRoute<
   Dependencies extends DefaultDependencies = DefaultDependencies,
->(
-  store: RoutesStore<Dependencies>,
-  noValidate: boolean,
-  name: string,
-): boolean {
+>(store: RoutesStore<Dependencies>, name: string): boolean {
   const wasRemoved = removeFromDefinitions(store.definitions, name);
 
   if (!wasRemoved) {
@@ -328,7 +310,7 @@ function removeRoute<
     store.lifecycleNamespace!,
   );
 
-  store.treeOperations.commitTreeChanges(store, noValidate);
+  store.treeOperations.commitTreeChanges(store);
 
   return true;
 }
@@ -340,7 +322,6 @@ function updateRouteConfig<
   Dependencies extends DefaultDependencies = DefaultDependencies,
 >(
   store: RoutesStore<Dependencies>,
-  noValidate: boolean,
   name: string,
   updates: {
     forwardTo?: string | ForwardToCallback<Dependencies> | null | undefined;
@@ -354,8 +335,7 @@ function updateRouteConfig<
       name,
       updates.forwardTo,
       store.config,
-      noValidate,
-      refreshForwardMap,
+      (config) => refreshForwardMap(config),
     );
   }
 
@@ -424,7 +404,6 @@ export function getRoutesApi<
   const ctx = getInternals(router);
 
   const store = ctx.routeGetStore();
-  const noValidate = ctx.noValidate;
 
   return {
     add: (routes, options) => {
@@ -433,32 +412,24 @@ export function getRoutesApi<
       const routeArray = Array.isArray(routes) ? routes : [routes];
       const parentName = options?.parent;
 
-      if (!ctx.noValidate) {
-        if (parentName !== undefined) {
-          validateParentOption(parentName);
-        }
+      guardRouteStructure(routeArray, ctx.validator);
 
-        throwIfInternalRouteInArray(routeArray, "addRoute");
-        validateAddRouteArgs(routeArray);
-
-        store.treeOperations.validateRoutes(
-          routeArray,
-          store.tree,
-          store.config.forwardMap,
-          parentName,
-        );
+      if (parentName !== undefined) {
+        ctx.validator?.routes.validateParentOption(parentName, store.tree);
       }
 
-      addRoutes(store, noValidate, routeArray, parentName);
+      ctx.validator?.routes.throwIfInternalRouteInArray(routeArray, "addRoute");
+      ctx.validator?.routes.validateAddRouteArgs(routeArray);
+      ctx.validator?.routes.validateRoutes(routeArray, store);
+
+      addRoutes(store, routeArray, parentName);
     },
 
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRemoveRouteArgs(name);
-        throwIfInternalRoute(name, "removeRoute");
-      }
+      ctx.validator?.routes.validateRemoveRouteArgs(name);
+      ctx.validator?.routes.throwIfInternalRoute(name, "removeRoute");
 
       const canRemove = validateRemoveRoute(
         name,
@@ -470,7 +441,7 @@ export function getRoutesApi<
         return;
       }
 
-      const wasRemoved = removeRoute(store, noValidate, name);
+      const wasRemoved = removeRoute(store, name);
 
       if (!wasRemoved) {
         logger.warn(
@@ -483,10 +454,8 @@ export function getRoutesApi<
     update: (name, updates) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateUpdateRouteBasicArgs(name, updates);
-        throwIfInternalRoute(name, "updateRoute");
-      }
+      ctx.validator?.routes.validateUpdateRouteBasicArgs(name, updates);
+      ctx.validator?.routes.throwIfInternalRoute(name, "updateRoute");
 
       const {
         forwardTo,
@@ -497,14 +466,7 @@ export function getRoutesApi<
         canDeactivate,
       } = updates;
 
-      if (!ctx.noValidate) {
-        validateUpdateRoutePropertyTypes(
-          forwardTo,
-          defaultParams,
-          decodeParams,
-          encodeParams,
-        );
-      }
+      ctx.validator?.routes.validateUpdateRoutePropertyTypes(name, updates);
 
       /* v8 ignore next 6 -- @preserve: race condition guard, mirrors Router.updateRoute() same-path guard tested via Router.ts unit tests */
       if (ctx.isTransitioning()) {
@@ -514,17 +476,9 @@ export function getRoutesApi<
         );
       }
 
-      if (!ctx.noValidate) {
-        validateUpdateRoute(
-          name,
-          forwardTo,
-          (n) => store.matcher.hasRoute(n),
-          store.matcher,
-          store.config,
-        );
-      }
+      ctx.validator?.routes.validateUpdateRoute(name, updates, store);
 
-      updateRouteConfig(store, noValidate, name, {
+      updateRouteConfig(store, name, {
         forwardTo,
         defaultParams,
         decodeParams,
@@ -537,12 +491,7 @@ export function getRoutesApi<
           store.lifecycleNamespace!.clearCanActivate(name);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanActivate(
-            name,
-            canActivate,
-            noValidate,
-            true,
-          );
+          store.lifecycleNamespace!.addCanActivate(name, canActivate, true);
         }
       }
 
@@ -552,12 +501,7 @@ export function getRoutesApi<
           store.lifecycleNamespace!.clearCanDeactivate(name);
         } else {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guaranteed set after wiring
-          store.lifecycleNamespace!.addCanDeactivate(
-            name,
-            canDeactivate,
-            noValidate,
-            true,
-          );
+          store.lifecycleNamespace!.addCanDeactivate(name, canDeactivate, true);
         }
       }
     },
@@ -579,17 +523,13 @@ export function getRoutesApi<
     },
 
     has: (name) => {
-      if (!ctx.noValidate) {
-        validateRouteName(name, "hasRoute");
-      }
+      ctx.validator?.routes.validateRouteName(name, "hasRoute");
 
       return store.matcher.hasRoute(name);
     },
 
     get: (name) => {
-      if (!ctx.noValidate) {
-        validateRouteName(name, "getRoute");
-      }
+      ctx.validator?.routes.validateRouteName(name, "getRoute");
 
       return getRoute(store, name);
     },
@@ -605,15 +545,18 @@ export function getRoutesApi<
         return;
       }
 
-      if (!ctx.noValidate) {
-        throwIfInternalRouteInArray(routeArray, "replaceRoutes");
-        validateAddRouteArgs(routeArray);
-        store.treeOperations.validateRoutes(routeArray);
-      }
+      guardRouteStructure(routeArray, ctx.validator);
+
+      ctx.validator?.routes.throwIfInternalRouteInArray(
+        routeArray,
+        "replaceRoutes",
+      );
+      ctx.validator?.routes.validateAddRouteArgs(routeArray);
+      ctx.validator?.routes.validateRoutes(routeArray, store);
 
       const currentPath = router.getState()?.path;
 
-      replaceRoutes(store, noValidate, routeArray, ctx, currentPath);
+      replaceRoutes(store, routeArray, ctx, currentPath);
     },
   };
 }

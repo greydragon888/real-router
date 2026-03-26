@@ -97,7 +97,7 @@ export function buildRenderList(
     routeName === UNKNOWN_ROUTE &&
     notFoundChildren !== null
   ) {
-    const nfElements = elements.filter((e) => e.type === NotFound);
+    const nfElements = elements.filter((element) => element.type === NotFound);
     /* v8 ignore next 3 */
     const lastNf = nfElements.at(-1);
 

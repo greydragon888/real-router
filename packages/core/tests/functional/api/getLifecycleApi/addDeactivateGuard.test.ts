@@ -159,50 +159,12 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
       }).toThrow(TypeError);
     });
 
-    it("should throw TypeError for invalid route names", () => {
-      // Whitespace-only (empty string is valid root node)
-      expect(() => {
-        lifecycle.addDeactivateGuard("   ", true);
-      }).toThrow(TypeError);
-
-      // Route name with spaces
-      expect(() => {
-        lifecycle.addDeactivateGuard("route name", true);
-      }).toThrow(TypeError);
-
-      // Route name starting with number
-      expect(() => {
-        lifecycle.addDeactivateGuard("1route", true);
-      }).toThrow(TypeError);
-
-      // Route name with special characters
-      expect(() => {
-        lifecycle.addDeactivateGuard("route#name", true);
-      }).toThrow(TypeError);
-
-      // Route name ending with dot
-      expect(() => {
-        lifecycle.addDeactivateGuard("route.", true);
-      }).toThrow(TypeError);
-
-      // Consecutive dots
-      expect(() => {
-        lifecycle.addDeactivateGuard("route..name", true);
-      }).toThrow(TypeError);
-    });
-
-    it("should handle very long route names correctly", () => {
-      const longButValidName = "a".repeat(10_000);
+    it("should handle long route names without throwing", () => {
+      const longName = "a".repeat(10_000);
 
       expect(() => {
-        lifecycle.addDeactivateGuard(longButValidName, true);
+        lifecycle.addDeactivateGuard(longName, true);
       }).not.toThrow();
-
-      const tooLongName = "a".repeat(10_001);
-
-      expect(() => {
-        lifecycle.addDeactivateGuard(tooLongName, true);
-      }).toThrow(TypeError);
     });
 
     it("should allow system routes with @@ prefix", () => {
@@ -264,22 +226,16 @@ describe("core/route-lifecycle/addDeactivateGuard", () => {
   });
 
   describe("overwriting guards", () => {
-    it("should log warning when overwriting existing guard", () => {
+    it("should NOT log warning when overwriting existing guard (no validation plugin)", () => {
       const warnSpy = vi.spyOn(logger, "warn").mockImplementation(noop);
 
       lifecycle.addDeactivateGuard("route", true);
 
-      // First registration - no warning
       expect(warnSpy).not.toHaveBeenCalled();
 
-      // Second registration - should warn
       lifecycle.addDeactivateGuard("route", false);
 
-      // Logger format: logger.warn(context, message)
-      expect(warnSpy).toHaveBeenCalledWith(
-        "router.canDeactivate",
-        expect.stringContaining("Overwriting"),
-      );
+      expect(warnSpy).not.toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });

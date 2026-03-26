@@ -169,6 +169,14 @@ await router.start();
 await router.navigate("users.profile", { id: "123" });
 ```
 
+> **Recommended for development:** add [`@real-router/validation-plugin`](https://www.npmjs.com/package/@real-router/validation-plugin) for descriptive runtime errors on every API call. Falsy values in `usePlugin()` are silently skipped, so inline conditionals work naturally:
+>
+> ```typescript
+> import { validationPlugin } from "@real-router/validation-plugin";
+>
+> router.usePlugin(browserPluginFactory(), __DEV__ && validationPlugin());
+> ```
+
 ### With React
 
 ```tsx
@@ -229,6 +237,7 @@ function App() {
 | [`@real-router/logger-plugin`](packages/logger-plugin)                       | [![npm](https://img.shields.io/npm/v/@real-router/logger-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/logger-plugin)                       | Development logging with transition tracking |
 | [`@real-router/persistent-params-plugin`](packages/persistent-params-plugin) | [![npm](https://img.shields.io/npm/v/@real-router/persistent-params-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/persistent-params-plugin) | Parameter persistence across navigations     |
 | [`@real-router/ssr-data-plugin`](packages/ssr-data-plugin)                   | [![npm](https://img.shields.io/npm/v/@real-router/ssr-data-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/ssr-data-plugin)                   | SSR per-route data loading via interceptor   |
+| [`@real-router/validation-plugin`](packages/validation-plugin)               | [![npm](https://img.shields.io/npm/v/@real-router/validation-plugin.svg?style=flat-square)](https://www.npmjs.com/package/@real-router/validation-plugin)               | Runtime argument validation for development  |
 
 ### Utilities
 
@@ -265,7 +274,7 @@ Full documentation is available in the [Wiki](https://github.com/greydragon888/r
 
 ### Plugins
 
-- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
+- [browser-plugin](https://github.com/greydragon888/real-router/wiki/browser-plugin) · [hash-plugin](https://github.com/greydragon888/real-router/wiki/hash-plugin) · [logger-plugin](https://github.com/greydragon888/real-router/wiki/logger-plugin) · [persistent-params-plugin](https://github.com/greydragon888/real-router/wiki/persistent-params-plugin) · [ssr-data-plugin](https://github.com/greydragon888/real-router/wiki/ssr-data-plugin) · [validation-plugin](https://github.com/greydragon888/real-router/wiki/validation-plugin) · [rx](https://github.com/greydragon888/real-router/wiki/rx-package) · [sources](https://github.com/greydragon888/real-router/wiki/sources-package) · [route-utils](https://github.com/greydragon888/real-router/wiki/route-utils)
 
 ## Examples
 

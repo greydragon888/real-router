@@ -2,7 +2,6 @@
 
 import { getInternals } from "../internals";
 import { resolveOption } from "../namespaces/OptionsNamespace";
-import { validateStateBuilderArgs } from "../namespaces/RoutesNamespace/validators";
 
 import type { EventBusNamespace } from "../namespaces";
 import type { WiringOptions } from "./types";
@@ -59,15 +58,25 @@ export class RouterWiringBuilder<
     };
 
     this.routeLifecycle.setDependencies(routeLifecycleDeps);
+    this.routeLifecycle.setValidatorGetter(
+      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
+      () => {
+        try {
+          return getInternals(this.router).validator;
+        } catch {
+          return null;
+        }
+      },
+    );
   }
 
   wireRoutesDeps(): void {
     const routesDeps: RoutesDependencies<Dependencies> = {
       addActivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanActivate(name, handler, true, true);
+        this.routeLifecycle.addCanActivate(name, handler, true);
       },
       addDeactivateGuard: (name, handler) => {
-        this.routeLifecycle.addCanDeactivate(name, handler, true, true);
+        this.routeLifecycle.addCanDeactivate(name, handler, true);
       },
       makeState: (name, params, path, meta) =>
         this.state.makeState(name, params, path, meta),
@@ -79,9 +88,11 @@ export class RouterWiringBuilder<
       forwardState: <P extends Params = Params>(name: string, params: P) => {
         const ctx = getInternals(this.router);
 
-        if (!ctx.noValidate) {
-          validateStateBuilderArgs(name, params, "forwardState");
-        }
+        ctx.validator?.routes.validateStateBuilderArgs(
+          name,
+          params,
+          "forwardState",
+        );
 
         return ctx.forwardState(name, params);
       },
@@ -100,6 +111,16 @@ export class RouterWiringBuilder<
     };
 
     this.plugins.setDependencies(pluginsDeps);
+    this.plugins.setValidatorGetter(
+      /* v8 ignore next 3 -- @preserve: returns null during construction (before registerInternals) */
+      () => {
+        try {
+          return getInternals(this.router).validator;
+        } catch {
+          return null;
+        }
+      },
+    );
   }
 
   wireNavigationDeps(): void {
@@ -113,9 +134,11 @@ export class RouterWiringBuilder<
       buildNavigateState: (routeName, routeParams) => {
         const ctx = getInternals(this.router);
 
-        if (!ctx.noValidate) {
-          validateStateBuilderArgs(routeName, routeParams, "navigate");
-        }
+        ctx.validator?.routes.validateStateBuilderArgs(
+          routeName,
+          routeParams,
+          "navigate",
+        );
 
         const { name, params } = ctx.forwardState(routeName, routeParams);
         const meta = this.routes.getMetaForState(name);

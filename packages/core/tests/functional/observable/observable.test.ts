@@ -234,42 +234,6 @@ describe("core/observable", () => {
         expect(cb2).toHaveBeenCalled();
       });
     });
-
-    describe("validation", () => {
-      it("should throw TypeError for invalid event name", () => {
-        expect(() => {
-          getPluginApi(router).addEventListener(
-            "invalid-event" as any,
-            () => {},
-          );
-        }).toThrow("Invalid event name");
-      });
-
-      it("should throw TypeError for non-function callback", () => {
-        expect(() => {
-          getPluginApi(router).addEventListener(
-            events.ROUTER_START,
-            "not-a-function" as any,
-          );
-        }).toThrow(TypeError);
-        expect(() => {
-          getPluginApi(router).addEventListener(
-            events.ROUTER_START,
-            "not-a-function" as any,
-          );
-        }).toThrow("Expected callback to be a function");
-      });
-
-      it("should throw when adding duplicate listener", () => {
-        const cb = vi.fn();
-
-        getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-
-        expect(() => {
-          getPluginApi(router).addEventListener(events.ROUTER_START, cb);
-        }).toThrow("Duplicate listener");
-      });
-    });
   });
 
   describe("subscribe", () => {
@@ -327,29 +291,6 @@ describe("core/observable", () => {
         expect(() => {
           unsubscribe();
         }).not.toThrow();
-      });
-    });
-
-    describe("validation", () => {
-      it("should throw TypeError for non-function listener", () => {
-        expect(() => {
-          router.subscribe("not-a-function" as any);
-        }).toThrow(TypeError);
-        expect(() => {
-          router.subscribe("not-a-function" as any);
-        }).toThrow("[router.subscribe] Expected a function");
-      });
-
-      it("should throw TypeError for null listener", () => {
-        expect(() => {
-          router.subscribe(null as any);
-        }).toThrow(TypeError);
-      });
-
-      it("should throw TypeError for object listener", () => {
-        expect(() => {
-          router.subscribe({ subscribe: () => {} } as any);
-        }).toThrow(TypeError);
       });
     });
   });

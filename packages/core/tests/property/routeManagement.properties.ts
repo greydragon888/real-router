@@ -92,18 +92,6 @@ describe("Route Management (getRoutesApi) Properties", () => {
     expect(routesApi.has("newB")).toBe(true);
   });
 
-  it("duplicate names in single add throws", () => {
-    const router = createFixtureRouter();
-    const routesApi = getRoutesApi(router);
-
-    expect(() => {
-      routesApi.add([
-        { name: "dupX", path: "/dup-x" },
-        { name: "dupX", path: "/dup-x2" },
-      ]);
-    }).toThrow();
-  });
-
   test.prop([arbSegmentName], { numRuns: NUM_RUNS.fast })(
     "update → get: after update, get reflects changes",
     (newForward) => {

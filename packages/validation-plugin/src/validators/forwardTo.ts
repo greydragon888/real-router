@@ -1,19 +1,16 @@
-// packages/core/src/namespaces/RoutesNamespace/forwardToValidation.ts
+// packages/validation-plugin/src/validators/forwardTo.ts
 
+import { resolveForwardChain } from "@real-router/core";
 import { getSegmentsByName } from "route-tree";
 import { getTypeDescription } from "type-guards";
 
-import type { Route } from "../../types";
-import type { DefaultDependencies } from "@real-router/types";
+import type { Route, DefaultDependencies } from "@real-router/core";
 import type { RouteTree } from "route-tree";
 
 // ============================================================================
 // Route Property Validation
 // ============================================================================
 
-/**
- * Validates forwardTo property type and async status.
- */
 function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
   if (forwardTo === undefined) {
     return;
@@ -34,20 +31,9 @@ function validateForwardToProperty(forwardTo: unknown, fullName: string): void {
   }
 }
 
-/**
- * Validates route properties for addRoute.
- * Throws TypeError if any property is invalid.
- *
- * @param route - Route to validate
- * @param fullName - Full route name (with parent prefix)
- * @throws {TypeError} If canActivate/canDeactivate is not a function
- * @throws {TypeError} If defaultParams is not a plain object
- * @throws {TypeError} If decodeParams/encodeParams is async
- */
 export function validateRouteProperties<
   Dependencies extends DefaultDependencies,
 >(route: Route<Dependencies>, fullName: string): void {
-  // Validate canActivate is a function
   if (
     route.canActivate !== undefined &&
     typeof route.canActivate !== "function"
@@ -58,7 +44,6 @@ export function validateRouteProperties<
     );
   }
 
-  // Validate canDeactivate is a function
   if (
     route.canDeactivate !== undefined &&
     typeof route.canDeactivate !== "function"
@@ -69,8 +54,6 @@ export function validateRouteProperties<
     );
   }
 
-  // Validate defaultParams is a plain object
-  // Runtime check for invalid types passed via `as any`
   if (route.defaultParams !== undefined) {
     const params: unknown = route.defaultParams;
 
@@ -86,24 +69,20 @@ export function validateRouteProperties<
     }
   }
 
-  // Validate decodeParams is not async (sync required for matchPath/buildPath)
   if (route.decodeParams?.constructor.name === "AsyncFunction") {
     throw new TypeError(
       `[router.addRoute] decodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
     );
   }
 
-  // Validate encodeParams is not async (sync required for matchPath/buildPath)
   if (route.encodeParams?.constructor.name === "AsyncFunction") {
     throw new TypeError(
       `[router.addRoute] encodeParams cannot be async for route "${fullName}". Async functions break matchPath/buildPath.`,
     );
   }
 
-  // Validate forwardTo type and async
   validateForwardToProperty(route.forwardTo, fullName);
 
-  // Recursively validate children
   if (route.children) {
     for (const child of route.children) {
       const childFullName = `${fullName}.${child.name}`;
@@ -117,10 +96,6 @@ export function validateRouteProperties<
 // ForwardTo Validation
 // ============================================================================
 
-/**
- * Extracts parameter names from a path string.
- * Matches :param and *splat patterns.
- */
 function extractParamsFromPath(path: string): Set<string> {
   const params = new Set<string>();
   const paramRegex = /[*:]([A-Z_a-z]\w*)/g;
@@ -133,9 +108,6 @@ function extractParamsFromPath(path: string): Set<string> {
   return params;
 }
 
-/**
- * Extracts all parameters from multiple path segments.
- */
 function extractParamsFromPaths(paths: readonly string[]): Set<string> {
   const params = new Set<string>();
 
@@ -148,10 +120,6 @@ function extractParamsFromPaths(paths: readonly string[]): Set<string> {
   return params;
 }
 
-/**
- * Collects all path segments for a route from batch definitions.
- * Traverses parent routes to include inherited path segments.
- */
 function collectPathsToRoute<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   routeName: string,
@@ -182,9 +150,6 @@ function collectPathsToRoute<Dependencies extends DefaultDependencies>(
   );
 }
 
-/**
- * Collects all route names from a batch of routes (including children).
- */
 function collectRouteNames<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   parentName = "",
@@ -206,10 +171,6 @@ function collectRouteNames<Dependencies extends DefaultDependencies>(
   return names;
 }
 
-/**
- * Collects all forwardTo mappings from a batch of routes (including children).
- * Only collects string forwardTo values; callbacks are handled separately.
- */
 function collectForwardMappings<Dependencies extends DefaultDependencies>(
   routes: readonly Route<Dependencies>[],
   parentName = "",
@@ -236,14 +197,10 @@ function collectForwardMappings<Dependencies extends DefaultDependencies>(
   return mappings;
 }
 
-/**
- * Extracts required path parameters from route segments.
- */
 function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
   const params = new Set<string>();
 
   for (const segment of segments) {
-    // Named routes always have parsers (null only for root without path)
     for (const param of segment.paramMeta.urlParams) {
       params.add(param);
     }
@@ -256,9 +213,6 @@ function getRequiredParams(segments: readonly RouteTree[]): Set<string> {
   return params;
 }
 
-/**
- * Checks if a route exists in the tree by navigating through children Map.
- */
 function routeExistsInTree(tree: RouteTree, routeName: string): boolean {
   const segments = routeName.split(".");
   let current: RouteTree | undefined = tree;
@@ -274,9 +228,6 @@ function routeExistsInTree(tree: RouteTree, routeName: string): boolean {
   return true;
 }
 
-/**
- * Gets the target route parameters for validation.
- */
 function getTargetParams<Dependencies extends DefaultDependencies>(
   targetRoute: string,
   existsInTree: boolean,
@@ -288,13 +239,9 @@ function getTargetParams<Dependencies extends DefaultDependencies>(
     return getRequiredParams(getSegmentsByName(tree, targetRoute) ?? []);
   }
 
-  // Target is in batch
   return extractParamsFromPaths(collectPathsToRoute(routes, targetRoute));
 }
 
-/**
- * Validates a single forward mapping for target existence and param compatibility.
- */
 function validateSingleForward<Dependencies extends DefaultDependencies>(
   fromRoute: string,
   targetRoute: string,
@@ -306,22 +253,19 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   const existsInBatch = batchNames.has(targetRoute);
 
   if (!existsInTree && !existsInBatch) {
-    throw new Error(
+    throw new ReferenceError(
       `[router.addRoute] forwardTo target "${targetRoute}" does not exist ` +
         `for route "${fromRoute}"`,
     );
   }
 
-  // Get source params
   const fromParams = extractParamsFromPaths(
     collectPathsToRoute(routes, fromRoute),
   );
 
-  // Get target params
   const toParams = getTargetParams(targetRoute, existsInTree, tree, routes);
 
-  // Check for missing params
-  const missingParams = [...toParams].filter((p) => !fromParams.has(p));
+  const missingParams = [...toParams].filter((param) => !fromParams.has(param));
 
   if (missingParams.length > 0) {
     throw new Error(
@@ -331,54 +275,6 @@ function validateSingleForward<Dependencies extends DefaultDependencies>(
   }
 }
 
-/**
- * Resolves a forwardTo chain to its final destination.
- * Detects cycles and enforces max depth.
- */
-export function resolveForwardChain(
-  startRoute: string,
-  forwardMap: Record<string, string>,
-  maxDepth = 100,
-): string {
-  const visited = new Set<string>();
-  const chain: string[] = [startRoute];
-  let current = startRoute;
-
-  while (forwardMap[current]) {
-    const next = forwardMap[current];
-
-    if (visited.has(next)) {
-      const cycleStart = chain.indexOf(next);
-      const cycle = [...chain.slice(cycleStart), next];
-
-      throw new Error(`Circular forwardTo: ${cycle.join(" → ")}`);
-    }
-
-    visited.add(current);
-    chain.push(next);
-    current = next;
-
-    if (chain.length > maxDepth) {
-      throw new Error(
-        `forwardTo chain exceeds maximum depth (${maxDepth}): ${chain.join(" → ")}`,
-      );
-    }
-  }
-
-  return current;
-}
-
-/**
- * Validates forwardTo targets and cycles BEFORE any modifications.
- * This ensures atomicity - if validation fails, no routes are added.
- *
- * @param routes - Routes to validate
- * @param existingForwardMap - Current forwardMap from router.config
- * @param tree - Current route tree
- *
- * @throws {Error} If forwardTo target doesn't exist
- * @throws {Error} If circular forwardTo is detected
- */
 export function validateForwardToTargets<
   Dependencies extends DefaultDependencies,
 >(
@@ -389,19 +285,16 @@ export function validateForwardToTargets<
   const batchNames = collectRouteNames(routes);
   const batchForwards = collectForwardMappings(routes);
 
-  // Merge with existing forwardMap for cycle detection
   const combinedForwardMap: Record<string, string> = { ...existingForwardMap };
 
   for (const [from, to] of batchForwards) {
     combinedForwardMap[from] = to;
   }
 
-  // Validate each forwardTo target exists and params are compatible
   for (const [fromRoute, targetRoute] of batchForwards) {
     validateSingleForward(fromRoute, targetRoute, routes, batchNames, tree);
   }
 
-  // Check for cycles in the combined forwardMap
   for (const fromRoute of Object.keys(combinedForwardMap)) {
     resolveForwardChain(fromRoute, combinedForwardMap);
   }

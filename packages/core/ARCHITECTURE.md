@@ -95,17 +95,17 @@ Router.ts (facade — validates and delegates)
 
 **Facade pattern flow:**
 
-1. Facade method validates inputs (via standalone validators from `namespaces/*/validators.ts`)
+1. Facade method validates inputs via `ctx.validator?.ns.fn()` (opt-in plugin pattern)
 2. Delegates to namespace instance method via `getInternals(this)` (WeakMap)
 3. Returns result to caller
 
 ```typescript
 // Router.ts — facade
 buildPath(route: string, params?: Params): string {
-  if (!this.#noValidate) {
-    validateBuildPathArgs(route);           // standalone validator
-  }
-  return getInternals(this).buildPath(route, params); // delegate via WeakMap → applies interceptor pipeline
+  const ctx = getInternals(this);
+  ctx.validator?.routes.validateBuildPathArgs(route);      // no-op if plugin absent
+  ctx.validator?.navigation.validateParams(params, "buildPath");
+  return ctx.buildPath(route, params);
 }
 ```
 
@@ -400,12 +400,12 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 - `NavigationNamespace` is the **only** namespace that orchestrates multi-namespace operations (state + routes + eventBus + lifecycle)
 - `EventBusNamespace` is the **only** namespace that holds the FSM instance and EventEmitter
 - `DependenciesStore` is a plain data interface — no class, no methods that call other namespaces
-- Validators live in namespace folders (`namespaces/*/validators.ts`) regardless of whether called by facade or standalone API
+- Structural guards remain in namespace folders (`OptionsNamespace`, `PluginsNamespace`). DX validators live in `@real-router/validation-plugin`, accessed via `ctx.validator?.`
 
 ### Facade Rules
 
 - Facade **never** contains business logic — only validation + delegation
-- Facade validation uses `#noValidate` guard for `createInterceptable()` paths (already validated by interceptor caller)
+- Facade validation uses `ctx.validator?.ns.fn()` — optional chaining means zero overhead when plugin is absent
 - All facade methods access internals via `getInternals(this)` — never via direct namespace field access
 
 ### API Function Rules
@@ -416,18 +416,18 @@ Route tree is re-built from definitions (not shared) — each clone has independ
 
 ## Performance Characteristics
 
-| Optimization                            | Purpose                                                |
-| --------------------------------------- | ------------------------------------------------------ |
-| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths          |
-| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation   |
-| `noValidate` option                     | Skips all argument validation in production            |
-| `static #onSuppressedError` callback    | One allocation per class, not per `navigate()` call    |
-| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects        |
-| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements               |
-| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                    |
-| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors |
-| Lazy event listeners                    | No allocation until first subscription                 |
-| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors     |
+| Optimization                            | Purpose                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| `nameToIDs()` fast paths (0-4 segments) | Avoids `split()` for most common route depths                           |
+| Single-entry transition path cache      | N-1 redundant computations eliminated per navigation                    |
+| validation-plugin opt-in                | DX validation via `@real-router/validation-plugin` (skip in production) |
+| `static #onSuppressedError` callback    | One allocation per class, not per `navigate()` call                     |
+| Deep freeze with WeakSet cache          | Avoids re-freezing already frozen state objects                         |
+| `Array.includes()` for segment cleanup  | Faster than `new Set()` for 1-5 elements                                |
+| FSM `canSend()` — O(1)                  | Cached `#currentTransitions` lookup                                     |
+| `createInterceptable()` fast path       | Empty-array check skips iteration when no interceptors                  |
+| Lazy event listeners                    | No allocation until first subscription                                  |
+| Cached error rejections                 | Pre-allocated `Promise.reject()` for common errors                      |
 
 ## Stress Test Coverage
 

@@ -85,52 +85,8 @@ describe("core/routes/routeTree/hasRoute", () => {
   });
 
   describe("validation", () => {
-    it("should throw TypeError for invalid name (leading dot)", () => {
-      expect(() => routesApi.has(".hr-invalid")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (trailing dot)", () => {
-      expect(() => routesApi.has("hr-invalid.")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid name (consecutive dots)", () => {
-      expect(() => routesApi.has("hr-a..b")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (number)", () => {
-      expect(() => routesApi.has(123 as unknown as string)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (null)", () => {
-      expect(() => routesApi.has(null as unknown as string)).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for non-string input (undefined)", () => {
-      expect(() => routesApi.has(undefined as unknown as string)).toThrow(
-        TypeError,
-      );
-    });
-
-    it("should throw TypeError for non-string input (object)", () => {
-      expect(() =>
-        routesApi.has({ name: "test" } as unknown as string),
-      ).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for whitespace-only input", () => {
-      expect(() => routesApi.has("   ")).toThrow(TypeError);
-      expect(() => routesApi.has("\t\n")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for segment starting with number", () => {
-      expect(() => routesApi.has("123invalid")).toThrow(TypeError);
-      expect(() => routesApi.has("valid.123child")).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for name exceeding max length", () => {
-      const longName = "a".repeat(10_001);
-
-      expect(() => routesApi.has(longName)).toThrow(TypeError);
+    it("should return false for empty string (root node not a named route)", () => {
+      expect(routesApi.has("")).toBe(false);
     });
   });
 
@@ -160,10 +116,9 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has("CASESENSITIVE")).toBe(false);
     });
 
-    it("should throw TypeError for Unicode characters", () => {
-      expect(() => routesApi.has("пользователи")).toThrow(TypeError);
-      expect(() => routesApi.has("用户")).toThrow(TypeError);
-      expect(() => routesApi.has("café")).toThrow(TypeError);
+    it("should return false for non-existent route names including unicode", () => {
+      expect(routesApi.has("пользователи")).toBe(false);
+      expect(routesApi.has("用户")).toBe(false);
     });
 
     it("should pass validation for system routes (@@)", () => {
@@ -204,14 +159,13 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has(maxName)).toBe(false);
     });
 
-    it("should throw TypeError for String object", () => {
-      // Intentionally testing boxed String object behavior
+    it("should return false for boxed String object (no throw without plugin)", () => {
       // eslint-disable-next-line unicorn/new-for-builtins, sonarjs/no-primitive-wrappers
       const nameObject = new String("hr-test");
 
-      expect(() => routesApi.has(nameObject as unknown as string)).toThrow(
-        TypeError,
-      );
+      expect(() =>
+        routesApi.has(nameObject as unknown as string),
+      ).not.toThrow();
     });
 
     it("should return false for partial name match", () => {
@@ -243,11 +197,9 @@ describe("core/routes/routeTree/hasRoute", () => {
       expect(routesApi.has("page2section3")).toBe(true);
     });
 
-    it("should throw TypeError for special characters", () => {
-      expect(() => routesApi.has("user profile")).toThrow(TypeError);
-      expect(() => routesApi.has("user@home")).toThrow(TypeError);
-      expect(() => routesApi.has("user/path")).toThrow(TypeError);
-      expect(() => routesApi.has("user#anchor")).toThrow(TypeError);
+    it("should return false for special character names (no throw without plugin)", () => {
+      expect(routesApi.has("user profile")).toBe(false);
+      expect(routesApi.has("user@home")).toBe(false);
     });
   });
 

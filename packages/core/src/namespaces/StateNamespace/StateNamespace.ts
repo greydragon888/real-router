@@ -1,7 +1,5 @@
 // packages/core/src/namespaces/StateNamespace/StateNamespace.ts
 
-import { getTypeDescription, validateState } from "type-guards";
-
 import { areParamValuesEqual, getUrlParamsFromMeta } from "./helpers";
 import { EMPTY_PARAMS } from "../../constants";
 import { freezeStateInPlace } from "../../helpers";
@@ -41,37 +39,6 @@ export class StateNamespace {
    * Cache for URL params by route name.
    */
   readonly #urlParamsCache = new Map<string, string[]>();
-
-  // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // =========================================================================
-
-  /**
-   * Validates areStatesEqual arguments.
-   */
-  static validateAreStatesEqualArgs(
-    state1: unknown,
-    state2: unknown,
-    ignoreQueryParams: unknown,
-  ): void {
-    // null/undefined are valid (represent "no state")
-    if (state1 != null) {
-      validateState(state1, "areStatesEqual");
-    }
-
-    if (state2 != null) {
-      validateState(state2, "areStatesEqual");
-    }
-
-    if (
-      ignoreQueryParams !== undefined &&
-      typeof ignoreQueryParams !== "boolean"
-    ) {
-      throw new TypeError(
-        `[router.areStatesEqual] Invalid ignoreQueryParams: ${getTypeDescription(ignoreQueryParams)}. Expected boolean.`,
-      );
-    }
-  }
 
   // =========================================================================
   // Instance methods (trust input - already validated by facade)

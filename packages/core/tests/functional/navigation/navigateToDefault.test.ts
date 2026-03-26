@@ -649,15 +649,6 @@ describe("navigateToDefault", () => {
       expect(state.name).toBe("users");
       expect(state.params).toStrictEqual({ tab: "main" });
     });
-
-    it("should throw TypeError for invalid argument types", () => {
-      const invalidArg = "invalid" as unknown;
-
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault(invalidArg);
-      }).toThrow(TypeError);
-    });
   });
 
   describe("navigation options", () => {
@@ -902,57 +893,6 @@ describe("navigateToDefault", () => {
       await expect(router.navigateToDefault()).rejects.toMatchObject({
         code: errorCodes.ROUTE_NOT_FOUND,
       });
-    });
-  });
-
-  describe("Issue #60: navigateToDefault() options validation", () => {
-    it("should throw TypeError for invalid options type (string)", () => {
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault("invalid");
-      }).toThrow(TypeError);
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault("invalid");
-      }).toThrow(/Invalid options/);
-    });
-
-    it("should throw TypeError for invalid options type (number)", () => {
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault(123);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid option field types", () => {
-      expect(() => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault({ replace: "true" });
-      }).toThrow(TypeError);
-    });
-
-    it("should accept valid NavigationOptions", () => {
-      expect(() => {
-        router
-          .navigateToDefault({ replace: true, reload: false })
-          .catch(() => {});
-      }).not.toThrow();
-    });
-
-    it("should accept empty options object", () => {
-      expect(() => {
-        router.navigateToDefault({}).catch(() => {});
-      }).not.toThrow();
-    });
-
-    it("should include method name in error message", () => {
-      const action = () => {
-        // @ts-expect-error -- testing runtime validation
-        void router.navigateToDefault({ reload: "yes" });
-      };
-
-      expect(action).toThrow(TypeError);
-      expect(action).toThrow(/\[router\.navigateToDefault\]/);
     });
   });
 });

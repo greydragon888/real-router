@@ -1,23 +1,9 @@
 // packages/core/src/typeGuards.ts
 
 /**
- * Re-export common type guards from centralized type-guards package
- */
-import type { LoggerConfig, LogLevelConfig } from "@real-router/logger";
-
-export {
-  isObjKey,
-  isString,
-  isState,
-  isParams,
-  isNavigationOptions,
-  isBoolean,
-  validateRouteName,
-} from "type-guards";
-
-/**
  * RealRouter-specific type guards for logger configuration
  */
+import type { LoggerConfig, LogLevelConfig } from "@real-router/logger";
 
 const VALID_LEVELS_SET = new Set<string>(["all", "warn-error", "error-only"]);
 

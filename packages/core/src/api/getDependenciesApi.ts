@@ -1,64 +1,20 @@
-import { logger } from "@real-router/logger";
-import { getTypeDescription } from "type-guards";
-
 import { throwIfDisposed } from "./helpers";
-import { computeThresholds } from "../helpers";
 import { getInternals } from "../internals";
-import {
-  validateDependenciesObject,
-  validateDependencyExists,
-  validateDependencyLimit,
-  validateDependencyName,
-  validateSetDependencyArgs,
-} from "../namespaces/DependenciesNamespace/validators";
 
 import type { DependenciesApi } from "./types";
 import type { DependenciesStore } from "../namespaces";
+import type { RouterValidator } from "../types/RouterValidator";
 import type { DefaultDependencies, Router } from "@real-router/types";
 
 // =============================================================================
 // Module-private CRUD functions
 // =============================================================================
 
-function checkDependencyCount(
-  store: DependenciesStore,
-  methodName: string,
-): void {
-  const maxDependencies = store.limits.maxDependencies;
-
-  if (maxDependencies === 0) {
-    return;
-  }
-
-  const currentCount = Object.keys(store.dependencies).length;
-
-  const { warn, error } = computeThresholds(maxDependencies);
-
-  if (currentCount === warn) {
-    logger.warn(
-      `router.${methodName}`,
-      `${warn} dependencies registered. ` + `Consider if all are necessary.`,
-    );
-  } else if (currentCount === error) {
-    logger.error(
-      `router.${methodName}`,
-      `${error} dependencies registered! ` +
-        `This indicates architectural problems. ` +
-        `Hard limit at ${maxDependencies}.`,
-    );
-  } else if (currentCount >= maxDependencies) {
-    throw new Error(
-      `[router.${methodName}] Dependency limit exceeded (${maxDependencies}). ` +
-        `Current: ${currentCount}. This is likely a bug in your code. ` +
-        `If you genuinely need more dependencies, your architecture needs refactoring.`,
-    );
-  }
-}
-
 function setDependency(
   store: DependenciesStore,
   dependencyName: string,
   dependencyValue: unknown,
+  validator?: RouterValidator | null,
 ): boolean {
   // undefined = "don't set" (feature for conditional setting)
   if (dependencyValue === undefined) {
@@ -69,7 +25,7 @@ function setDependency(
 
   if (isNewKey) {
     // Only check limit when adding new keys (overwrites don't increase count)
-    checkDependencyCount(store, "setDependency");
+    validator?.dependencies.validateDependencyCount(store, "setDependency");
   } else {
     const oldValue = (store.dependencies as Record<string, unknown>)[
       dependencyName
@@ -79,11 +35,7 @@ function setDependency(
     const bothAreNaN = Number.isNaN(oldValue) && Number.isNaN(dependencyValue);
 
     if (isChanging && !bothAreNaN) {
-      logger.warn(
-        "router.setDependency",
-        "Router dependency already exists and is being overwritten:",
-        dependencyName,
-      );
+      validator?.dependencies.warnOverwrite(dependencyName, "setDependency");
     }
   }
 
@@ -96,6 +48,7 @@ function setDependency(
 function setMultipleDependencies(
   store: DependenciesStore,
   deps: Record<string, unknown>,
+  validator?: RouterValidator | null,
 ): void {
   const overwrittenKeys: string[] = [];
 
@@ -103,6 +56,11 @@ function setMultipleDependencies(
     if (deps[key] !== undefined) {
       if (Object.hasOwn(store.dependencies, key)) {
         overwrittenKeys.push(key);
+      } else {
+        validator?.dependencies.validateDependencyCount(
+          store,
+          "setDependencies",
+        );
       }
 
       (store.dependencies as Record<string, unknown>)[key] = deps[key];
@@ -110,10 +68,9 @@ function setMultipleDependencies(
   }
 
   if (overwrittenKeys.length > 0) {
-    logger.warn(
-      "router.setDependencies",
-      "Overwritten:",
-      overwrittenKeys.join(", "),
+    validator?.dependencies.warnBatchOverwrite(
+      overwrittenKeys,
+      "setDependencies",
     );
   }
 }
@@ -129,18 +86,17 @@ export function getDependenciesApi<
 
   return {
     get: (name) => {
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "getDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(name, "getDependency");
 
       const store = ctx.dependenciesGetStore();
       const value = (store.dependencies as Record<string, unknown>)[
         name as string
       ];
 
-      if (!ctx.noValidate) {
-        validateDependencyExists(value, name as string);
-      }
+      ctx.validator?.dependencies.validateDependencyExists(
+        name as string,
+        store,
+      );
 
       return value as Dependencies[typeof name];
     },
@@ -148,43 +104,48 @@ export function getDependenciesApi<
     set: (name, value) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateSetDependencyArgs(name);
-      }
+      ctx.validator?.dependencies.validateSetDependencyArgs(
+        name,
+        value,
+        "setDependency",
+      );
 
-      setDependency(ctx.dependenciesGetStore(), name as string, value);
+      setDependency(
+        ctx.dependenciesGetStore(),
+        name as string,
+        value,
+        ctx.validator,
+      );
     },
     setAll: (deps) => {
       throwIfDisposed(ctx.isDisposed);
 
       const store = ctx.dependenciesGetStore();
 
-      if (!ctx.noValidate) {
-        validateDependenciesObject(deps, "setDependencies");
-        validateDependencyLimit(
-          Object.keys(store.dependencies).length,
-          Object.keys(deps).length,
-          "setDependencies",
-          store.limits.maxDependencies,
-        );
-      }
+      ctx.validator?.dependencies.validateDependenciesObject(
+        deps,
+        "setDependencies",
+      );
+      ctx.validator?.dependencies.validateDependencyLimit(store, store.limits);
 
-      setMultipleDependencies(store, deps as Record<string, unknown>);
+      setMultipleDependencies(
+        store,
+        deps as Record<string, unknown>,
+        ctx.validator,
+      );
     },
     remove: (name) => {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "removeDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(
+        name,
+        "removeDependency",
+      );
 
       const store = ctx.dependenciesGetStore();
 
       if (!Object.hasOwn(store.dependencies, name as string)) {
-        logger.warn(
-          `router.removeDependency`,
-          `Attempted to remove non-existent dependency: "${getTypeDescription(name)}"`,
-        );
+        ctx.validator?.dependencies.warnRemoveNonExistent(name);
       }
 
       delete (store.dependencies as Record<string, unknown>)[name as string];
@@ -196,9 +157,7 @@ export function getDependenciesApi<
       store.dependencies = Object.create(null) as Partial<Dependencies>;
     },
     has: (name) => {
-      if (!ctx.noValidate) {
-        validateDependencyName(name, "hasDependency");
-      }
+      ctx.validator?.dependencies.validateDependencyName(name, "hasDependency");
 
       return Object.hasOwn(
         ctx.dependenciesGetStore().dependencies,

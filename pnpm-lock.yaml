@@ -2371,9 +2371,6 @@ importers:
       route-tree:
         specifier: workspace:^
         version: link:../route-tree
-      type-guards:
-        specifier: workspace:^
-        version: link:../type-guards
 
   packages/core-types: {}
 
@@ -2692,6 +2689,22 @@ importers:
       '@real-router/types':
         specifier: workspace:^
         version: link:../core-types
+
+  packages/validation-plugin:
+    dependencies:
+      '@real-router/core':
+        specifier: workspace:^
+        version: link:../core
+      '@real-router/logger':
+        specifier: workspace:^
+        version: link:../logger
+    devDependencies:
+      route-tree:
+        specifier: workspace:^
+        version: link:../route-tree
+      type-guards:
+        specifier: workspace:^
+        version: link:../type-guards
 
   packages/vue:
     dependencies:

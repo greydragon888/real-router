@@ -610,6 +610,13 @@ export default tsEslint.config(
       // ============================================
       // DISABLED RULES (too strict or unsuitable)
       // ============================================
+      "id-length": [
+        "error",
+        {
+          min: 2,
+          exceptions: ["_", "i", "j"],
+        },
+      ],
       "unicorn/prevent-abbreviations": [
         "error",
         {
@@ -807,6 +814,7 @@ export default tsEslint.config(
       "prefer-rest-params": "off",
       // JSDoc rules relaxed for test files
       "jsdoc/informative-docs": "off",
+      "id-length": "off",
     },
   },
 
@@ -877,6 +885,7 @@ export default tsEslint.config(
       "import-x/no-extraneous-dependencies": "off",
       // JSDoc rules relaxed for benchmarks
       "jsdoc/informative-docs": "off",
+      "id-length": "off",
     },
   },
 

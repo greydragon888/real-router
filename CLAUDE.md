@@ -2,7 +2,7 @@
 
 > Simple, powerful, view-agnostic, modular and extensible router
 
-pnpm monorepo with 25 packages + 68 example applications. Run `pnpm install` after cloning.
+pnpm monorepo with 26 packages + 68 example applications. Run `pnpm install` after cloning.
 
 ## Rules
 
@@ -41,6 +41,7 @@ pnpm lint:unused        # Check for unused code (knip)
 - Svelte examples use `vite build` only (no tsc step — Svelte compiler handles types)
 - Never use `workspace:^` for `peerDependencies` on 0.x packages — in semver `^0.x.y` is patch-only range, so any minor bump breaks the range and triggers a major bump from changesets
 - `onlyUpdatePeerDependentsWhenOutOfRange: true` is set in `.changeset/config.json` to prevent unexpected major bumps when peer deps are updated within range
+- Runtime validation is opt-in via `@real-router/validation-plugin` — core ships with structural guards and two invariant guards only (subscribe, navigateToNotFound)
 
 ## Release Process
 
@@ -111,6 +112,7 @@ When adding packages or features, keep these root files in sync:
 - [packages/logger-plugin/CLAUDE.md](packages/logger-plugin/CLAUDE.md) — Logger plugin architecture
 - [packages/persistent-params-plugin/CLAUDE.md](packages/persistent-params-plugin/CLAUDE.md) — Persistent params plugin architecture
 - [packages/ssr-data-plugin/CLAUDE.md](packages/ssr-data-plugin/CLAUDE.md) — SSR data plugin architecture
+- [packages/validation-plugin/CLAUDE.md](packages/validation-plugin/CLAUDE.md) — Validation plugin architecture
 - [packages/dom-utils/.claude/CLAUDE.md](packages/dom-utils/CLAUDE.md) — DOM utilities (route announcer, link helpers)
 - [packages/fsm/CLAUDE.md](packages/fsm/CLAUDE.md) — FSM engine internals
 - [packages/router-benchmarks/CLAUDE.md](packages/router-benchmarks/CLAUDE.md) — Benchmark suite

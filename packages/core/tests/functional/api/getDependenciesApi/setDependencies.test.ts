@@ -32,124 +32,11 @@ describe("core/dependencies/setDependencies", () => {
     // @ts-expect-error: wrong values for test
     deps.setAll({ foo: undefined, bar: "value" });
 
-    expect(deps.get("foo")).toBe(1); // initial value
+    expect(deps.get("foo")).toBe(1);
     expect(deps.get("bar")).toBe("value");
   });
 
-  // 🔴 CRITICAL: Plain object validation
-  it("should reject null with TypeError", () => {
-    expect(() => {
-      // @ts-expect-error: testing null
-      deps.setAll(null);
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing null
-      deps.setAll(null);
-    }).toThrow("expected plain object, received null");
-  });
-
-  it("should reject arrays with TypeError", () => {
-    expect(() => {
-      // @ts-expect-error: testing array
-      deps.setAll([]);
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing array
-      deps.setAll(["dep1", "dep2"]);
-    }).toThrow(/expected plain object.*array/i);
-  });
-
-  it("should reject class instances with TypeError", () => {
-    class MyClass {
-      dep = "value";
-    }
-    const instance = new MyClass();
-
-    expect(() => {
-      // @ts-expect-error: testing class instance
-      deps.setAll(instance);
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing class instance
-      deps.setAll(instance);
-    }).toThrow(/expected plain object.*myclass/i);
-  });
-
-  it("should reject Date objects with TypeError", () => {
-    expect(() => {
-      // @ts-expect-error: testing Date
-      deps.setAll(new Date());
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing Date
-      deps.setAll(new Date());
-    }).toThrow(/expected plain object.*date/i);
-  });
-
-  // 🔴 CRITICAL: Getters prohibition
-  it("should reject objects with getters", () => {
-    const withGetter = {
-      normal: "value",
-      // Intentionally unused getter - testing validation
-      get computed() {
-        return "computed value";
-      },
-    };
-
-    expect(() => {
-      // @ts-expect-error: testing getter
-      deps.setAll(withGetter);
-    }).toThrow(TypeError);
-    expect(() => {
-      // @ts-expect-error: testing getter
-      deps.setAll(withGetter);
-    }).toThrow(/getters not allowed.*computed/i);
-  });
-
-  it("should not invoke getters during validation", () => {
-    let getterCalled = false;
-    const malicious = {
-      safe: "value",
-      // Intentionally unused getter - testing that it's not invoked
-      get dangerous() {
-        getterCalled = true;
-
-        throw new Error("This should never be thrown");
-      },
-    };
-
-    expect(() => {
-      // @ts-expect-error: testing getter
-      deps.setAll(malicious);
-    }).toThrow(TypeError);
-
-    // Getter should not have been invoked
-    expect(getterCalled).toBe(false);
-  });
-
-  // 🔴 CRITICAL: Atomicity
-  it("should be atomic - no changes if validation fails", () => {
-    deps.setAll({ foo: 1, bar: "initial" });
-
-    const withGetter = {
-      foo: 999,
-      bar: "new",
-      get invalid() {
-        return "value";
-      },
-    };
-
-    expect(() => {
-      deps.setAll(withGetter);
-    }).toThrow(TypeError);
-
-    // State should remain unchanged
-    expect(deps.get("foo")).toBe(1);
-    expect(deps.get("bar")).toBe("initial");
-  });
-
-  // 🟡 IMPORTANT: Warnings for overwrites
-  it("should warn with single message when overwriting multiple dependencies", () => {
+  it("should NOT warn via logger when overwriting multiple dependencies (no validation plugin)", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     deps.setAll({ foo: 1, bar: "initial" });
@@ -157,16 +44,7 @@ describe("core/dependencies/setDependencies", () => {
 
     deps.setAll({ foo: 2, bar: "new" });
 
-    // Single warning with both keys
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-
-    const callArgs = warnSpy.mock.calls[0];
-
-    // Logger format: logger.warn(context, message, ...args)
-    expect(callArgs[0]).toBe("router.setDependencies");
-    expect(callArgs[1]).toBe("Overwritten:");
-    expect(callArgs[2]).toContain("foo");
-    expect(callArgs[2]).toContain("bar");
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });
@@ -194,7 +72,6 @@ describe("core/dependencies/setDependencies", () => {
     expect(Number.isNaN(value!)).toBe(true);
   });
 
-  // 🟡 IMPORTANT: Symbol-keys behavior
   it("should silently ignore Symbol keys", () => {
     const symbolKey = Symbol("dep");
     const depsObj = {
@@ -206,10 +83,6 @@ describe("core/dependencies/setDependencies", () => {
     deps.setAll(depsObj);
 
     expect(deps.get("normal" as "foo")).toBe("value");
-
-    // Symbol key should be ignored
-    // @ts-expect-error: testing symbol access
-    expect(() => deps.get(symbolKey)).toThrow();
   });
 
   // 🟢 DESIRABLE: Empty object

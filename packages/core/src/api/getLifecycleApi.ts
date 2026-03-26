@@ -1,8 +1,5 @@
-import { validateRouteName } from "type-guards";
-
 import { throwIfDisposed } from "./helpers";
 import { getInternals } from "../internals";
-import { validateHandler } from "../namespaces/RouteLifecycleNamespace/validators";
 
 import type { LifecycleApi } from "./types";
 import type { DefaultDependencies, Router } from "@real-router/types";
@@ -18,31 +15,41 @@ export function getLifecycleApi<
     addActivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "addActivateGuard");
-        validateHandler(handler, "addActivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "addActivateGuard");
+      ctx.validator?.lifecycle.validateHandler(handler, "addActivateGuard");
 
-      lifecycleNamespace.addCanActivate(name, handler, ctx.noValidate);
+      const activateCount = lifecycleNamespace.getHandlerCount("activate");
+
+      ctx.validator?.lifecycle.validateHandlerLimit(
+        activateCount,
+        ctx.dependenciesGetStore().limits,
+        "canActivate",
+      );
+
+      lifecycleNamespace.addCanActivate(name, handler);
     },
 
     addDeactivateGuard(name, handler) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "addDeactivateGuard");
-        validateHandler(handler, "addDeactivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "addDeactivateGuard");
+      ctx.validator?.lifecycle.validateHandler(handler, "addDeactivateGuard");
 
-      lifecycleNamespace.addCanDeactivate(name, handler, ctx.noValidate);
+      const deactivateCount = lifecycleNamespace.getHandlerCount("deactivate");
+
+      ctx.validator?.lifecycle.validateHandlerLimit(
+        deactivateCount,
+        ctx.dependenciesGetStore().limits,
+        "canDeactivate",
+      );
+
+      lifecycleNamespace.addCanDeactivate(name, handler);
     },
 
     removeActivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "removeActivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "removeActivateGuard");
 
       lifecycleNamespace.clearCanActivate(name);
     },
@@ -50,9 +57,7 @@ export function getLifecycleApi<
     removeDeactivateGuard(name) {
       throwIfDisposed(ctx.isDisposed);
 
-      if (!ctx.noValidate) {
-        validateRouteName(name, "removeDeactivateGuard");
-      }
+      ctx.validator?.routes.validateRouteName(name, "removeDeactivateGuard");
 
       lifecycleNamespace.clearCanDeactivate(name);
     },

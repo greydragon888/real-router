@@ -25,23 +25,14 @@ describe("core/dependencies/removeDependency", () => {
     deps.remove("foo");
 
     expect(deps.has("foo")).toBe(false);
-    expect(() => {
-      deps.get("foo");
-    }).toThrow(ReferenceError);
   });
 
-  it("should warn when removing non-existent dependency", () => {
+  it("should NOT warn via logger when removing non-existent dependency (no validation plugin)", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
     deps.remove("nonexistent" as "foo");
 
-    // Logger format: logger.warn(context, message)
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining(
-        'Attempted to remove non-existent dependency: "string"',
-      ),
-    );
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });
@@ -59,47 +50,16 @@ describe("core/dependencies/removeDependency", () => {
   it("should be idempotent - safe to call multiple times", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    // First removal - should succeed
     deps.remove("foo");
 
     expect(deps.has("foo")).toBe(false);
 
-    // Second removal - should warn but not throw
+    deps.remove("foo");
     deps.remove("foo");
 
-    // Logger format: logger.warn(context, message)
-    expect(warnSpy).toHaveBeenCalledWith(
-      "router.removeDependency",
-      expect.stringContaining("Attempted to remove non-existent dependency"),
-    );
-
-    // Third removal - still safe
-    deps.remove("foo");
-
-    // Should have warned twice (second and third calls)
-    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
-  });
-
-  it("should throw TypeError for non-string parameters", () => {
-    // Number parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing number parameter
-      deps.remove(123);
-    }).toThrow(TypeError);
-
-    // null parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing null parameter
-      deps.remove(null);
-    }).toThrow(TypeError);
-
-    // undefined parameter should throw
-    expect(() => {
-      // @ts-expect-error: testing undefined parameter
-      deps.remove(undefined);
-    }).toThrow(TypeError);
   });
 
   it("should handle empty string as valid key", () => {
@@ -154,21 +114,17 @@ describe("core/dependencies/removeDependency", () => {
   it("should allow safe cleanup without existence checks", () => {
     const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
 
-    // Cleanup pattern - no need to check if dependencies exist
     const cleanupDeps = ["dep1", "dep2", "dep3"] as const;
 
     deps.set("dep1" as "foo", 1 as number);
-    // dep2 and dep3 don't exist, but removal should be safe
 
-    // Should not throw, even if some don't exist
     expect(() => {
       cleanupDeps.forEach((dep) => {
         deps.remove(dep as "foo");
       });
     }).not.toThrow();
 
-    // Should have warned for non-existent dependencies
-    expect(warnSpy).toHaveBeenCalledTimes(2); // dep2 and dep3
+    expect(warnSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
   });

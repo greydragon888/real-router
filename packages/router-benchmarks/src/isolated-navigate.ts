@@ -137,9 +137,9 @@ async function main(): Promise<void> {
     void router.start("/");
 
     await isolatedMeasure("Navigate nested (alternating)", () => {
-      const t = targets[index++ % 2];
+      const target = targets[index++ % 2];
 
-      void router.navigate(t.name, t.params);
+      void router.navigate(target.name, target.params);
     });
   }
 
@@ -177,9 +177,9 @@ async function main(): Promise<void> {
     void router.start("/");
 
     await isolatedMeasure("Navigate multi-param (alternating)", () => {
-      const t = targets[index++ % 2];
+      const target = targets[index++ % 2];
 
-      void router.navigate(t.name, t.params);
+      void router.navigate(target.name, target.params);
     });
   }
 

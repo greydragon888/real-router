@@ -13,6 +13,9 @@
       ],
       "utils": [
         "./dist/cjs/utils.d.ts"
+      ],
+      "validation": [
+        "./dist/cjs/validation.d.ts"
       ]
     }
   },
@@ -43,6 +46,15 @@
       },
       "import": "./dist/esm/utils.mjs",
       "require": "./dist/cjs/utils.js"
+    },
+    "./validation": {
+      "development": "./src/validation.ts",
+      "types": {
+        "import": "./dist/esm/validation.d.mts",
+        "require": "./dist/cjs/validation.d.ts"
+      },
+      "import": "./dist/esm/validation.mjs",
+      "require": "./dist/cjs/validation.js"
     }
   },
   "files": [
@@ -86,7 +98,9 @@
     "lint:package": "publint",
     "lint:types": "attw --pack ."
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/esm/chunk-*.mjs"
+  ],
   "dependencies": {
     "@real-router/fsm": "workspace:^",
     "@real-router/logger": "workspace:^",
@@ -94,7 +108,6 @@
   },
   "devDependencies": {
     "event-emitter": "workspace:^",
-    "route-tree": "workspace:^",
-    "type-guards": "workspace:^"
+    "route-tree": "workspace:^"
   }
 }

@@ -158,9 +158,9 @@ export class EventBusNamespace {
   }
 
   isActive(): boolean {
-    const s = this.#fsm.getState();
+    const fsmState = this.#fsm.getState();
 
-    return s !== routerStates.IDLE && s !== routerStates.DISPOSED;
+    return fsmState !== routerStates.IDLE && fsmState !== routerStates.DISPOSED;
   }
 
   isDisposed(): boolean {

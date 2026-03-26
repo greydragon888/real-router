@@ -8,10 +8,10 @@
 
 import { logger } from "@real-router/logger";
 import { EventEmitter } from "event-emitter";
-import { validateRouteName } from "type-guards";
 
 import { EMPTY_PARAMS, errorCodes } from "./constants";
 import { createRouterFSM } from "./fsm";
+import { guardDependencies, guardRouteStructure } from "./guards";
 import { createLimits } from "./helpers";
 import {
   createInterceptable,
@@ -30,15 +30,7 @@ import {
   StateNamespace,
   createDependenciesStore,
 } from "./namespaces";
-import { validateDependenciesObject } from "./namespaces/DependenciesNamespace/validators";
 import { CACHED_ALREADY_STARTED_ERROR } from "./namespaces/RouterLifecycleNamespace/constants";
-import {
-  validateAddRouteArgs,
-  validateBuildPathArgs,
-  validateIsActiveRouteArgs,
-  validateRoutes,
-  validateShouldUpdateNodeArgs,
-} from "./namespaces/RoutesNamespace/validators";
 import { RouterError } from "./RouterError";
 import { getTransitionPath } from "./transitionPath";
 import { isLoggerConfig } from "./typeGuards";
@@ -98,12 +90,6 @@ export class Router<
 
   readonly #eventBus: EventBusNamespace;
 
-  /**
-   * When true, skips argument validation in public methods for production performance.
-   * Constructor options are always validated (needed to validate noValidate itself).
-   */
-  readonly #noValidate: boolean;
-
   // ============================================================================
   // Constructor
   // ============================================================================
@@ -128,22 +114,14 @@ export class Router<
     // Validate inputs before creating namespaces
     // =========================================================================
 
-    // Always validate options (needed to validate noValidate itself)
-    OptionsNamespace.validateOptions(options, "constructor");
+    // Always validate options
+    OptionsNamespace.validateOptionsIsObject(options);
 
-    // Extract noValidate BEFORE creating namespaces
-    const noValidate = options.noValidate ?? false;
+    // Unconditional guard-level validation before creating namespaces
+    guardDependencies(dependencies);
 
-    // Conditional validation for dependencies
-    if (!noValidate) {
-      validateDependenciesObject(dependencies, "constructor");
-    }
-
-    // Conditional validation for initial routes - structure and batch duplicates
-    // Validation happens BEFORE tree is built, so tree is not passed
-    if (!noValidate && routes.length > 0) {
-      validateAddRouteArgs(routes);
-      validateRoutes(routes);
+    if (routes.length > 0) {
+      guardRouteStructure(routes);
     }
 
     // =========================================================================
@@ -157,14 +135,12 @@ export class Router<
     this.#state = new StateNamespace();
     this.#routes = new RoutesNamespace<Dependencies>(
       routes,
-      noValidate,
       deriveMatcherOptions(this.#options.get()),
     );
     this.#routeLifecycle = new RouteLifecycleNamespace<Dependencies>();
     this.#plugins = new PluginsNamespace<Dependencies>();
     this.#navigation = new NavigationNamespace();
     this.#lifecycle = new RouterLifecycleNamespace();
-    this.#noValidate = noValidate;
 
     // =========================================================================
     // Initialize EventBus
@@ -241,10 +217,6 @@ export class Router<
       start: createInterceptable(
         "start",
         (path: string) => {
-          if (!noValidate) {
-            RouterLifecycleNamespace.validateStartArgs([path]);
-          }
-
           return this.#lifecycle.start(path);
         },
         interceptorsMap,
@@ -256,7 +228,7 @@ export class Router<
       getRootPath: () => this.#routes.getStore().rootPath,
       getTree: () => this.#routes.getStore().tree,
       isDisposed: () => this.#eventBus.isDisposed(),
-      noValidate,
+      validator: null,
       // Dependencies (issue #172)
       dependenciesGetStore: () => this.#dependenciesStore,
       // Clone support (issue #173)
@@ -330,14 +302,17 @@ export class Router<
     strictEquality?: boolean,
     ignoreQueryParams?: boolean,
   ): boolean {
-    if (!this.#noValidate) {
-      validateIsActiveRouteArgs(
-        name,
-        params,
-        strictEquality,
-        ignoreQueryParams,
-      );
-    }
+    getInternals(this).validator?.routes.validateIsActiveRouteArgs(
+      name,
+      params,
+      strictEquality,
+      ignoreQueryParams,
+    );
+
+    getInternals(this).validator?.routes.validateRouteName(
+      name,
+      "isActiveRoute",
+    );
 
     // Empty string is special case - warn and return false (root node is not a parent)
     if (name === "") {
@@ -358,11 +333,12 @@ export class Router<
   }
 
   buildPath(route: string, params?: Params): string {
-    if (!this.#noValidate) {
-      validateBuildPathArgs(route);
-    }
+    const ctx = getInternals(this);
 
-    return getInternals(this).buildPath(route, params);
+    ctx.validator?.routes.validateBuildPathArgs(route);
+    ctx.validator?.navigation.validateParams(params, "buildPath");
+
+    return ctx.buildPath(route, params);
   }
 
   // ============================================================================
@@ -384,13 +360,11 @@ export class Router<
     state2: State | undefined,
     ignoreQueryParams = true,
   ): boolean {
-    if (!this.#noValidate) {
-      StateNamespace.validateAreStatesEqualArgs(
-        state1,
-        state2,
-        ignoreQueryParams,
-      );
-    }
+    getInternals(this).validator?.state.validateAreStatesEqualArgs(
+      state1,
+      state2,
+      ignoreQueryParams,
+    );
 
     return this.#state.areStatesEqual(state1, state2, ignoreQueryParams);
   }
@@ -398,9 +372,7 @@ export class Router<
   shouldUpdateNode(
     nodeName: string,
   ): (toState: State, fromState?: State) => boolean {
-    if (!this.#noValidate) {
-      validateShouldUpdateNodeArgs(nodeName);
-    }
+    getInternals(this).validator?.routes.validateShouldUpdateNodeArgs(nodeName);
 
     return RoutesNamespace.shouldUpdateNode(nodeName);
   }
@@ -417,6 +389,8 @@ export class Router<
     if (!this.#eventBus.canStart()) {
       return Promise.reject(CACHED_ALREADY_STARTED_ERROR);
     }
+
+    getInternals(this).validator?.navigation.validateStartArgs(startPath);
 
     this.#eventBus.sendStart();
 
@@ -494,15 +468,15 @@ export class Router<
   // ============================================================================
 
   canNavigateTo(name: string, params?: Params): boolean {
-    if (!this.#noValidate) {
-      validateRouteName(name, "canNavigateTo");
-    }
+    const ctx = getInternals(this);
+
+    ctx.validator?.routes.validateRouteName(name, "canNavigateTo");
+    ctx.validator?.navigation.validateParams(params, "canNavigateTo");
 
     if (!this.#routes.hasRoute(name)) {
       return false;
     }
 
-    const ctx = getInternals(this);
     const { name: resolvedName, params: resolvedParams } = ctx.forwardState(
       name,
       params ?? {},
@@ -524,27 +498,29 @@ export class Router<
   // Plugins
   // ============================================================================
 
-  usePlugin(...plugins: PluginFactory<Dependencies>[]): Unsubscribe {
-    if (!this.#noValidate) {
-      // 1. Validate input arguments
-      PluginsNamespace.validateUsePluginArgs<Dependencies>(plugins);
+  usePlugin(
+    ...plugins: (PluginFactory<Dependencies> | false | null | undefined)[]
+  ): Unsubscribe {
+    const filtered = plugins.filter(Boolean) as PluginFactory<Dependencies>[];
 
-      // 2. Validate limit
-      PluginsNamespace.validatePluginLimit(
-        this.#plugins.count(),
-        plugins.length,
-        this.#limits.maxPlugins,
-      );
+    if (filtered.length === 0) {
+      return () => {};
+    }
 
-      // 3. Validate no duplicates with existing plugins
-      PluginsNamespace.validateNoDuplicatePlugins(
-        plugins,
-        this.#plugins.has.bind(this.#plugins),
+    const ctx = getInternals(this);
+
+    ctx.validator?.plugins.validatePluginLimit(
+      this.#plugins.count(),
+      this.#limits,
+    );
+    for (const plugin of filtered) {
+      ctx.validator?.plugins.validateNoDuplicatePlugins(
+        plugin,
+        this.#plugins.getAll(),
       );
     }
 
-    // 4. Execute (warnings, deduplication, initialization, commit)
-    return this.#plugins.use(...plugins);
+    return this.#plugins.use(...filtered);
   }
 
   // ============================================================================
@@ -552,9 +528,7 @@ export class Router<
   // ============================================================================
 
   subscribe(listener: SubscribeFn): Unsubscribe {
-    if (!this.#noValidate) {
-      EventBusNamespace.validateSubscribeListener(listener);
-    }
+    EventBusNamespace.validateSubscribeListener(listener);
 
     return this.#eventBus.subscribe(listener);
   }
@@ -568,19 +542,15 @@ export class Router<
     routeParams?: Params,
     options?: NavigationOptions,
   ): Promise<State> {
-    // 1. Validate route name
-    if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateArgs(routeName);
-    }
+    const ctx = getInternals(this);
 
-    // 2. Validate parsed options
+    ctx.validator?.navigation.validateNavigateArgs(routeName);
+    ctx.validator?.navigation.validateParams(routeParams, "navigate");
+
     const opts = options ?? EMPTY_OPTS;
 
-    if (!this.#noValidate) {
-      NavigationNamespace.validateNavigationOptions(opts, "navigate");
-    }
+    ctx.validator?.navigation.validateNavigationOptions(opts, "navigate");
 
-    // 3. Execute navigation with parsed arguments
     const promiseState = this.#navigation.navigate(
       routeName,
       routeParams ?? EMPTY_PARAMS,
@@ -600,19 +570,17 @@ export class Router<
   }
 
   navigateToDefault(options?: NavigationOptions): Promise<State> {
-    // 1. Validate arguments
-    if (!this.#noValidate) {
-      NavigationNamespace.validateNavigateToDefaultArgs(options);
-    }
+    const ctx = getInternals(this);
 
-    // 2. Validate parsed options
+    ctx.validator?.navigation.validateNavigateToDefaultArgs(options);
+
     const opts = options ?? EMPTY_OPTS;
 
-    if (!this.#noValidate) {
-      NavigationNamespace.validateNavigationOptions(opts, "navigateToDefault");
-    }
+    ctx.validator?.navigation.validateNavigationOptions(
+      opts,
+      "navigateToDefault",
+    );
 
-    // 3. Execute navigation with parsed arguments
     const promiseState = this.#navigation.navigateToDefault(opts);
 
     if (this.#navigation.lastSyncResolved) {
@@ -629,6 +597,12 @@ export class Router<
   navigateToNotFound(path?: string): State {
     if (!this.#eventBus.isActive()) {
       throw new RouterError(errorCodes.ROUTER_NOT_STARTED);
+    }
+
+    if (path !== undefined && typeof path !== "string") {
+      throw new TypeError(
+        `[router.navigateToNotFound] path must be a string, got ${typeof path}`,
+      );
     }
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- isActive() guarantees state exists

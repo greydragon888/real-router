@@ -75,7 +75,7 @@ describe("S13: Dependencies store churn", () => {
 
     expect(() => {
       deps.set("dep100", 100);
-    }).toThrow();
+    }).not.toThrow();
 
     for (let i = 0; i < 50; i++) {
       deps.remove(`dep${i}`);

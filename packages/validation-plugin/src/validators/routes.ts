@@ -1,13 +1,12 @@
-// packages/core/src/namespaces/RoutesNamespace/validators.ts
+// packages/validation-plugin/src/validators/routes.ts
 
 /**
- * Static validation functions for RoutesNamespace.
- * Called by Router facade before instance methods.
- *
- * Extracted from RoutesNamespace class for better separation of concerns.
+ * DX-only validator functions for RoutesNamespace.
+ * Copied from packages/core/src/namespaces/RoutesNamespace/validators.ts
+ * (excludes validateRemoveRoute/validateClearRoutes — those are in routeGuards.ts)
  */
 
-import { logger } from "@real-router/logger";
+import { resolveForwardChain } from "@real-router/core";
 import { validateRoute } from "route-tree";
 import {
   isString,
@@ -16,23 +15,33 @@ import {
   getTypeDescription,
 } from "type-guards";
 
-import {
-  resolveForwardChain,
-  validateForwardToTargets,
-  validateRouteProperties,
-} from "./forwardToValidation";
+import { validateForwardToTargets, validateRouteProperties } from "./forwardTo";
 
-import type { RouteConfig } from "./types";
-import type { Route, RouteConfigUpdate } from "../../types";
 import type {
+  Route,
+  RouteConfigUpdate,
   DefaultDependencies,
-  ForwardToCallback,
-} from "@real-router/types";
+  Params,
+} from "@real-router/core";
 import type { Matcher, RouteTree } from "route-tree";
 
-// SECURITY: Reserved prefix for system routes (e.g., @@router/UNKNOWN_ROUTE).
-// Internal code (RouterWiringBuilder, routesStore) bypasses this check.
+// Internal constant (matches core's INTERNAL_ROUTE_PREFIX)
 const INTERNAL_ROUTE_PREFIX = "@@";
+
+// Minimal local type — only the forwardMap field used by this file
+// (RouteConfig from core is not exported from @real-router/core public API)
+interface RouteConfigLike {
+  forwardMap: Record<string, string>;
+}
+
+// Local type - matches ForwardToCallback from @real-router/types
+// (@real-router/types is not a direct dependency of this package)
+type ForwardToCallback<
+  Dependencies extends DefaultDependencies = DefaultDependencies,
+> = (
+  getDependency: <K extends keyof Dependencies>(name: K) => Dependencies[K],
+  params: Params,
+) => string;
 
 export function throwIfInternalRoute(name: string, methodName: string): void {
   if (name.startsWith(INTERNAL_ROUTE_PREFIX)) {
@@ -66,15 +75,78 @@ export function validateRemoveRouteArgs(name: unknown): asserts name is string {
   validateRouteName(name, "removeRoute");
 }
 
-/**
- * Validates setRootPath arguments.
- */
 export function validateSetRootPathArgs(
   rootPath: unknown,
 ): asserts rootPath is string {
   if (typeof rootPath !== "string") {
     throw new TypeError(
       `[router.setRootPath] rootPath must be a string, got ${getTypeDescription(rootPath)}`,
+    );
+  }
+}
+
+function isAsyncFunction(fn: unknown): boolean {
+  return (
+    (fn as { constructor: { name: string } }).constructor.name ===
+      "AsyncFunction" || String(fn).includes("__awaiter")
+  );
+}
+
+export function guardRouteCallbacks(route: unknown): void {
+  const routeObj = route as { canActivate?: unknown; canDeactivate?: unknown };
+
+  if (
+    routeObj.canActivate !== undefined &&
+    typeof routeObj.canActivate !== "function"
+  ) {
+    throw new TypeError(
+      `[router.addRoute] canActivate must be a function, got ${getTypeDescription(routeObj.canActivate)}`,
+    );
+  }
+
+  if (
+    routeObj.canDeactivate !== undefined &&
+    typeof routeObj.canDeactivate !== "function"
+  ) {
+    throw new TypeError(
+      `[router.addRoute] canDeactivate must be a function, got ${getTypeDescription(routeObj.canDeactivate)}`,
+    );
+  }
+}
+
+export function guardNoAsyncCallbacks(route: unknown): void {
+  const routeObj = route as {
+    decodeParams?: unknown;
+    encodeParams?: unknown;
+    forwardTo?: unknown;
+    name?: unknown;
+  };
+  const routeName = routeObj.name;
+
+  if (
+    routeObj.decodeParams !== undefined &&
+    isAsyncFunction(routeObj.decodeParams)
+  ) {
+    throw new TypeError(
+      `[router.addRoute] decodeParams cannot be async for route "${String(routeName)}"`,
+    );
+  }
+
+  if (
+    routeObj.encodeParams !== undefined &&
+    isAsyncFunction(routeObj.encodeParams)
+  ) {
+    throw new TypeError(
+      `[router.addRoute] encodeParams cannot be async for route "${String(routeName)}"`,
+    );
+  }
+
+  if (
+    typeof routeObj.forwardTo === "function" &&
+    isAsyncFunction(routeObj.forwardTo)
+  ) {
+    throw new TypeError(
+      `[router.addRoute] forwardTo callback cannot be async for route "${String(routeName)}"`,
     );
   }
 }
@@ -128,12 +200,16 @@ export function validateIsActiveRouteArgs(
 ): void {
   // Validate name - non-string throws
   if (!isString(name)) {
-    throw new TypeError(`Route name must be a string`);
+    throw new TypeError(
+      `[router.isActiveRoute] name must be a string, got ${typeof name}`,
+    );
   }
 
   // Validate params if provided
   if (params !== undefined && !isParams(params)) {
-    throw new TypeError(`[router.isActiveRoute] Invalid params structure`);
+    throw new TypeError(
+      `[router.isActiveRoute] params must be a plain object, got ${getTypeDescription(params)}`,
+    );
   }
 
   // Validate strictEquality if provided
@@ -198,14 +274,14 @@ export function validateUpdateRouteBasicArgs<
 
   if (updates === null) {
     throw new TypeError(
-      `[real-router] updateRoute: updates must be an object, got null`,
+      `[router.updateRoute] updates must be an object, got null`,
     );
   }
 
   // Validate updates is an object (not array)
   if (typeof updates !== "object" || Array.isArray(updates)) {
     throw new TypeError(
-      `[real-router] updateRoute: updates must be an object, got ${getTypeDescription(updates)}`,
+      `[router.updateRoute] updates must be an object, got ${getTypeDescription(updates)}`,
     );
   }
 }
@@ -214,7 +290,6 @@ export function validateUpdateRouteBasicArgs<
  * Asserts that a function is not async (native or transpiled).
  * Checks both constructor name and toString() for __awaiter pattern.
  */
-/* v8 ignore next 12 -- @preserve: transpiled async (__awaiter) branch tested in addRoute */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- needs constructor.name access
 function assertNotAsync(value: Function, paramName: string): void {
   if (
@@ -223,7 +298,7 @@ function assertNotAsync(value: Function, paramName: string): void {
     (value as { toString: () => string }).toString().includes("__awaiter")
   ) {
     throw new TypeError(
-      `[real-router] updateRoute: ${paramName} cannot be an async function`,
+      `[router.updateRoute] ${paramName} cannot be an async function`,
     );
   }
 }
@@ -238,7 +313,7 @@ function validateFunctionParam(value: unknown, paramName: string): void {
 
   if (typeof value !== "function") {
     throw new TypeError(
-      `[real-router] updateRoute: ${paramName} must be a function or null, got ${typeof value}`,
+      `[router.updateRoute] ${paramName} must be a function or null, got ${typeof value}`,
     );
   }
 
@@ -259,7 +334,7 @@ export function validateUpdateRoutePropertyTypes(
   if (forwardTo !== undefined && forwardTo !== null) {
     if (typeof forwardTo !== "string" && typeof forwardTo !== "function") {
       throw new TypeError(
-        `[real-router] updateRoute: forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
+        `[router.updateRoute] forwardTo must be a string, function, or null, got ${getTypeDescription(forwardTo)}`,
       );
     }
 
@@ -275,7 +350,7 @@ export function validateUpdateRoutePropertyTypes(
     (typeof defaultParams !== "object" || Array.isArray(defaultParams))
   ) {
     throw new TypeError(
-      `[real-router] updateRoute: defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
+      `[router.updateRoute] defaultParams must be an object or null, got ${getTypeDescription(defaultParams)}`,
     );
   }
 
@@ -289,7 +364,7 @@ export function validateUpdateRoutePropertyTypes(
 export function validateBuildPathArgs(route: unknown): asserts route is string {
   if (!isString(route) || route === "") {
     throw new TypeError(
-      `[real-router] buildPath: route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
+      `[router.buildPath] route must be a non-empty string, got ${typeof route === "string" ? '""' : typeof route}`,
     );
   }
 }
@@ -300,7 +375,7 @@ export function validateBuildPathArgs(route: unknown): asserts route is string {
 export function validateMatchPathArgs(path: unknown): asserts path is string {
   if (!isString(path)) {
     throw new TypeError(
-      `[real-router] matchPath: path must be a string, got ${typeof path}`,
+      `[router.matchPath] path must be a string, got ${typeof path}`,
     );
   }
 }
@@ -341,7 +416,7 @@ export function validateRoutes<Dependencies extends DefaultDependencies>(
       node = node.children.get(segment);
 
       if (!node) {
-        throw new Error(
+        throw new ReferenceError(
           `[router.addRoute] Parent route "${parentName}" does not exist`,
         );
       }
@@ -388,69 +463,6 @@ function collectUrlParams(segments: readonly RouteTree[]): Set<string> {
 }
 
 /**
- * Validates removeRoute constraints.
- * Returns false if removal should be blocked (route is active).
- * Logs warnings for edge cases.
- *
- * @param name - Route name to remove
- * @param currentStateName - Current active route name (or undefined)
- * @param isNavigating - Whether navigation is in progress
- * @returns true if removal can proceed, false if blocked
- */
-export function validateRemoveRoute(
-  name: string,
-  currentStateName: string | undefined,
-  isNavigating: boolean,
-): boolean {
-  // Check if trying to remove currently active route (or its parent)
-  if (currentStateName) {
-    const isExactMatch = currentStateName === name;
-    const isParentOfCurrent = currentStateName.startsWith(`${name}.`);
-
-    if (isExactMatch || isParentOfCurrent) {
-      const suffix = isExactMatch ? "" : ` (current: "${currentStateName}")`;
-
-      logger.warn(
-        "router.removeRoute",
-        `Cannot remove route "${name}" — it is currently active${suffix}. Navigate away first.`,
-      );
-
-      return false;
-    }
-  }
-
-  // Warn if navigation is in progress (but allow removal)
-  if (isNavigating) {
-    logger.warn(
-      "router.removeRoute",
-      `Route "${name}" removed while navigation is in progress. This may cause unexpected behavior.`,
-    );
-  }
-
-  return true;
-}
-
-/**
- * Validates clearRoutes operation.
- * Returns false if operation should be blocked (navigation in progress).
- *
- * @param isNavigating - Whether navigation is in progress
- * @returns true if clearRoutes can proceed, false if blocked
- */
-export function validateClearRoutes(isNavigating: boolean): boolean {
-  if (isNavigating) {
-    logger.error(
-      "router.clearRoutes",
-      "Cannot clear routes while navigation is in progress. Wait for navigation to complete.",
-    );
-
-    return false;
-  }
-
-  return true;
-}
-
-/**
  * Validates that forwardTo target doesn't require params that source doesn't have.
  *
  * @param sourceName - Source route name
@@ -490,7 +502,7 @@ export function validateForwardToParamCompatibility(
 
   if (missingParams.length > 0) {
     throw new Error(
-      `[real-router] forwardTo target "${targetName}" requires params ` +
+      `[router.addRoute] forwardTo target "${targetName}" requires params ` +
         `[${missingParams.join(", ")}] that are not available in source route "${sourceName}"`,
     );
   }
@@ -508,7 +520,7 @@ export function validateForwardToParamCompatibility(
 export function validateForwardToCycle(
   sourceName: string,
   targetName: string,
-  config: RouteConfig,
+  config: RouteConfigLike,
 ): void {
   // Create a test map with the new entry to validate BEFORE mutation
   const testMap = {
@@ -536,12 +548,12 @@ export function validateUpdateRoute<
   forwardTo: string | ForwardToCallback<Dependencies> | null | undefined,
   hasRoute: (n: string) => boolean,
   matcher: Matcher,
-  config: RouteConfig,
+  config: RouteConfigLike,
 ): void {
   // Validate route exists
   if (!hasRoute(name)) {
     throw new ReferenceError(
-      `[real-router] updateRoute: route "${name}" does not exist`,
+      `[router.updateRoute] route "${name}" does not exist`,
     );
   }
 
@@ -553,7 +565,7 @@ export function validateUpdateRoute<
   ) {
     if (!hasRoute(forwardTo)) {
       throw new Error(
-        `[real-router] updateRoute: forwardTo target "${forwardTo}" does not exist`,
+        `[router.updateRoute] forwardTo target "${forwardTo}" does not exist`,
       );
     }
 

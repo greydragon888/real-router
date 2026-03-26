@@ -68,7 +68,7 @@ function isSerializable(
     }
 
     // Recursively check all values
-    return Object.values(value).every((v) => isSerializable(v, visited));
+    return Object.values(value).every((val) => isSerializable(val, visited));
   }
 
   return false;

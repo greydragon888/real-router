@@ -29,51 +29,11 @@ describe("core/routes/routePath/matchPath", () => {
     });
   });
 
-  describe("input validation", () => {
-    it("should throw TypeError for null path", () => {
-      expect(() =>
-        getPluginApi(router).matchPath(null as unknown as string),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).matchPath(null as unknown as string),
-      ).toThrow("[real-router] matchPath: path must be a string, got object");
-    });
-
-    it("should throw TypeError for undefined path", () => {
-      expect(() =>
-        getPluginApi(router).matchPath(undefined as unknown as string),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).matchPath(undefined as unknown as string),
-      ).toThrow(
-        "[real-router] matchPath: path must be a string, got undefined",
-      );
-    });
-
-    it("should throw TypeError for number path", () => {
-      expect(() =>
-        getPluginApi(router).matchPath(123 as unknown as string),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).matchPath(123 as unknown as string),
-      ).toThrow("[real-router] matchPath: path must be a string, got number");
-    });
-
-    it("should throw TypeError for object path", () => {
-      expect(() =>
-        getPluginApi(router).matchPath({} as unknown as string),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).matchPath({} as unknown as string),
-      ).toThrow("[real-router] matchPath: path must be a string, got object");
-    });
-
-    it("should accept empty string (matches root route)", () => {
-      // Empty string is a valid string input, matches "/" (root)
-      expect(() => getPluginApi(router).matchPath("")).not.toThrow();
-      // Empty string matches index route (path: "/")
-      expect(getPluginApi(router).matchPath("")?.name).toBe("index");
-    });
+  it("should accept empty string (matches root route)", () => {
+    // Empty string is a valid string input, matches "/" (root)
+    expect(() => getPluginApi(router).matchPath("")).not.toThrow();
+    // Empty string matches index route (path: "/")
+    expect(getPluginApi(router).matchPath("")?.name).toBe("index");
   });
 
   describe("matchPath", () => {

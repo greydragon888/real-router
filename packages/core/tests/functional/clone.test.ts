@@ -295,34 +295,29 @@ describe("cloneRouter()", () => {
   // ============================================
 
   describe("argument validation", () => {
-    it("should throw TypeError for invalid dependencies (array)", async () => {
+    it("should NOT throw for invalid dependencies without validation plugin (array)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, [] as never)).toThrow(TypeError);
-      expect(() => cloneRouter(router, [] as never)).toThrow(
-        /Invalid dependencies/,
-      );
+      // Validation is opt-in via plugin — core does not validate
+      expect(() => cloneRouter(router, [] as never)).not.toThrow();
     });
 
-    it("should throw TypeError for invalid dependencies (null)", async () => {
+    it("should NOT throw for invalid dependencies without validation plugin (null)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, null as never)).toThrow(TypeError);
-      expect(() => cloneRouter(router, null as never)).toThrow(
-        /Invalid dependencies/,
-      );
+      // Validation is opt-in via plugin — core does not validate
+      expect(() => cloneRouter(router, null as never)).not.toThrow();
     });
 
-    it("should throw TypeError for invalid dependencies (primitive)", async () => {
+    it("should NOT throw for invalid dependencies without validation plugin (primitive)", async () => {
       const router = createTestRouter();
 
-      expect(() => cloneRouter(router, "string" as never)).toThrow(TypeError);
-      expect(() => cloneRouter(router, 123 as never)).toThrow(
-        /Invalid dependencies/,
-      );
+      // Validation is opt-in via plugin — core does not validate
+      expect(() => cloneRouter(router, "string" as never)).not.toThrow();
+      expect(() => cloneRouter(router, 123 as never)).not.toThrow();
     });
 
-    it("should throw TypeError for dependencies with getters", async () => {
+    it("should NOT throw for dependencies with getters without validation plugin", async () => {
       const router = createTestRouter();
       const depsWithGetter = {};
 
@@ -333,12 +328,8 @@ describe("cloneRouter()", () => {
         enumerable: true,
       });
 
-      expect(() => cloneRouter(router, depsWithGetter as never)).toThrow(
-        TypeError,
-      );
-      expect(() => cloneRouter(router, depsWithGetter as never)).toThrow(
-        /Getters not allowed/,
-      );
+      // Validation is opt-in via plugin — core does not validate
+      expect(() => cloneRouter(router, depsWithGetter as never)).not.toThrow();
     });
   });
 

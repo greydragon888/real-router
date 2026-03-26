@@ -95,7 +95,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("skips validation when noValidate is true", async () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
 
       await noValidateRouter.start("/home");
       getLifecycleApi(noValidateRouter).addActivateGuard("admin", false);
@@ -118,7 +118,7 @@ describe("core/route-lifecycle/guard-api", () => {
     });
 
     it("skips validation when noValidate is true", async () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
 
       await noValidateRouter.start("/home");
       getLifecycleApi(noValidateRouter).addDeactivateGuard("admin", false);
@@ -187,7 +187,7 @@ describe("core/route-lifecycle/guard-api", () => {
       lifecycle.addActivateGuard("admin", () => () => Promise.resolve(true));
 
       expect(router.canNavigateTo("admin")).toBe(false);
-      expect(warnSpy).toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
 
       warnSpy.mockRestore();
     });

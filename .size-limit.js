@@ -22,7 +22,7 @@ export default [
   {
     name: "@real-router/core/api (ESM)",
     path: "packages/core/dist/esm/api.mjs",
-    limit: "25 kB",
+    limit: "20 kB",
     ignore: ["@real-router/core"],
     modifyEsbuildConfig: addDevelopmentCondition,
   },
@@ -99,6 +99,13 @@ export default [
   },
 
   // ── Plugins ───────────────────────────────────────────────────────
+  {
+    name: "@real-router/validation-plugin (ESM)",
+    path: "packages/validation-plugin/dist/esm/index.mjs",
+    limit: "10 kB",
+    ignore: ["@real-router/core"],
+    modifyEsbuildConfig: addDevelopmentCondition,
+  },
   {
     name: "@real-router/browser-plugin (ESM)",
     path: "packages/browser-plugin/dist/esm/index.mjs",

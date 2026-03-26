@@ -394,8 +394,8 @@ async function main(): Promise<void> {
   console.log("\n── 8.7.4 areStatesEqual identical params ──");
   {
     const router = createSimpleRouter();
-    const state1 = router.makeState("home", { a: "1", b: "2" }, "/");
-    const state2 = router.makeState("home", { b: "2", a: "1" }, "/");
+    const state1 = router.makeState("home", { paramA: "1", paramB: "2" }, "/");
+    const state2 = router.makeState("home", { paramB: "2", paramA: "1" }, "/");
 
     await isolatedMeasure(
       "8.7.4 areStatesEqual identical params diff order (×100)",

@@ -165,23 +165,27 @@ These invariants cover the FSM-driven lifecycle of the router. Each state transi
 
 `getRoutesApi(router)` provides CRUD operations on the route tree. These invariants verify that add, remove, update, replace, and clear operations behave atomically and consistently.
 
-| #   | Invariant                  | Description                                                                                                                        |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | add then has               | After `add(route)`, `has(route.name) === true`. A newly added route is immediately visible.                                        |
-| 2   | add then get               | After `add(route)`, `get(route.name).path === route.path`. The stored route config matches what was added.                         |
-| 3   | remove then has            | After `remove(name)`, `has(name) === false`. A removed route is no longer present.                                                 |
-| 4   | Cyclic forwardTo throws    | Adding routes with a circular `forwardTo` chain throws an error. Cycles in the forwarding graph are rejected at registration time. |
-| 5   | replace atomicity          | After `replace(newRoutes)`, all old routes are absent and all new routes are present. Replacement is all-or-nothing.               |
-| 6   | Duplicate names throw      | Adding two routes with the same name in a single `add()` call throws an error. Route names must be unique.                         |
-| 7   | update then get            | After `update(name, { forwardTo: "x" })`, `get(name).forwardTo === "x"`. Updates are reflected immediately in `get()`.             |
-| 8   | clear then has             | After `clear()`, `has(name) === false` for every previously registered route. `clear()` removes all routes.                        |
-| 9   | add with parent            | `add(child, { parent: "users" })` makes the child accessible as `"users.child"`. The dot-notation name is derived from the parent. |
-| 10  | getRouteConfig returns fields   | After `add({ name, path, myField })`, `getPluginApi(router).getRouteConfig(name).myField` returns the custom field. Route config metadata is preserved. |
-| 11  | getRouteConfig unknown          | `getPluginApi(router).getRouteConfig("nonexistent")` returns `undefined` for routes not in the tree.                                                    |
-| 12  | update canActivate guard   | After `update(name, { canActivate: () => () => false })`, `canNavigateTo(name) === false`. Definition guards block navigation.     |
-| 13  | update canActivate null    | After `update(name, { canActivate: null })`, any previously set definition guard is removed and navigation is allowed again.       |
-| 14  | replace during navigation  | `replace()` called during an active navigation returns silently without modifying routes. It is a silent no-op.                    |
-| 15  | replace preserves external | `replace()` clears definition guards (from route config) but preserves external guards (from `getLifecycleApi`).                   |
+**Crash-preventing guards** (always enforced by core, regardless of plugins): `guardRouteStructure` rejects non-object routes, non-function `canActivate`/`canDeactivate`, and async `encodeParams`/`decodeParams`/`forwardTo`. `guardDependencies` rejects non-plain-object dependency maps. Circular `forwardTo` chains are detected by `resolveForwardChain` at registration time. These guards prevent silent state corruption and always throw, even without the validation-plugin.
+
+**Invariants requiring `@real-router/validation-plugin`** are marked _(validation-plugin only)_.
+
+| #   | Invariant                                        | Description                                                                                                                                                                   |
+| --- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | add then has                                     | After `add(route)`, `has(route.name) === true`. A newly added route is immediately visible.                                                                                   |
+| 2   | add then get                                     | After `add(route)`, `get(route.name).path === route.path`. The stored route config matches what was added.                                                                    |
+| 3   | remove then has                                  | After `remove(name)`, `has(name) === false`. A removed route is no longer present.                                                                                            |
+| 4   | Cyclic forwardTo throws                          | Adding routes with a circular `forwardTo` chain throws an error. Cycles in the forwarding graph are rejected at registration time (crash-preventing core guard).              |
+| 5   | replace atomicity                                | After `replace(newRoutes)`, all old routes are absent and all new routes are present. Replacement is all-or-nothing.                                                          |
+| 6   | Duplicate names throw _(validation-plugin only)_ | Adding two routes with the same name in a single `add()` call throws an error when the validation-plugin is registered. Without the plugin, no uniqueness check is performed. |
+| 7   | update then get                                  | After `update(name, { forwardTo: "x" })`, `get(name).forwardTo === "x"`. Updates are reflected immediately in `get()`.                                                        |
+| 8   | clear then has                                   | After `clear()`, `has(name) === false` for every previously registered route. `clear()` removes all routes.                                                                   |
+| 9   | add with parent                                  | `add(child, { parent: "users" })` makes the child accessible as `"users.child"`. The dot-notation name is derived from the parent.                                            |
+| 10  | getRouteConfig returns fields                    | After `add({ name, path, myField })`, `getPluginApi(router).getRouteConfig(name).myField` returns the custom field. Route config metadata is preserved.                       |
+| 11  | getRouteConfig unknown                           | `getPluginApi(router).getRouteConfig("nonexistent")` returns `undefined` for routes not in the tree.                                                                          |
+| 12  | update canActivate guard                         | After `update(name, { canActivate: () => () => false })`, `canNavigateTo(name) === false`. Definition guards block navigation.                                                |
+| 13  | update canActivate null                          | After `update(name, { canActivate: null })`, any previously set definition guard is removed and navigation is allowed again.                                                  |
+| 14  | replace during navigation                        | `replace()` called during an active navigation returns silently without modifying routes. It is a silent no-op.                                                               |
+| 15  | replace preserves external                       | `replace()` clears definition guards (from route config) but preserves external guards (from `getLifecycleApi`).                                                              |
 
 ## Guards + navigate Interaction
 
@@ -454,7 +458,7 @@ Guards registered via `getLifecycleApi(router)` run during the transition pipeli
 | `tests/property/navigateToNotFound.properties.ts`       | 8          | Synchronous unknown-route setter              |
 | `tests/property/navigateToDefault.properties.ts`        | 4          | Default route navigation                      |
 | `tests/property/forwarding.properties.ts`               | 4          | forwardTo chain resolution                    |
-| `tests/property/routeManagement.properties.ts`          | 15         | Route CRUD via getRoutesApi                   |
+| `tests/property/routeManagement.properties.ts`          | 14         | Route CRUD via getRoutesApi                   |
 | `tests/property/guards.properties.ts`                   | 7          | Guard and navigate interaction                |
 | `tests/property/canNavigateTo.properties.ts`            | 4          | Synchronous navigation predicate              |
 | `tests/property/subscribe.properties.ts`                | 4          | Event delivery to subscribers                 |

@@ -150,40 +150,6 @@ describe("areStatesEqual", () => {
         router.areStatesEqual(null as never, validState),
       ).not.toThrow();
     });
-
-    it("throws TypeError for invalid state1", () => {
-      const validState = getPluginApi(router).makeState("home", {}, "/home");
-
-      expect(() =>
-        router.areStatesEqual("invalid" as never, validState),
-      ).toThrow(TypeError);
-      expect(() =>
-        router.areStatesEqual({ name: "x" } as never, validState),
-      ).toThrow(/Invalid state/);
-    });
-
-    it("throws TypeError for invalid state2", () => {
-      const validState = getPluginApi(router).makeState("home", {}, "/home");
-
-      expect(() =>
-        router.areStatesEqual(validState, "invalid" as never),
-      ).toThrow(TypeError);
-      expect(() => router.areStatesEqual(validState, 123 as never)).toThrow(
-        /Invalid state/,
-      );
-    });
-
-    it("throws TypeError for invalid ignoreQueryParams", () => {
-      const s1 = getPluginApi(router).makeState("home", {}, "/home");
-      const s2 = getPluginApi(router).makeState("home", {}, "/home");
-
-      expect(() => router.areStatesEqual(s1, s2, "true" as never)).toThrow(
-        TypeError,
-      );
-      expect(() => router.areStatesEqual(s1, s2, 1 as never)).toThrow(
-        /Invalid ignoreQueryParams/,
-      );
-    });
   });
 
   describe("edge cases - issue #515 (different keys with same length)", () => {

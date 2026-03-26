@@ -17,8 +17,8 @@ export function createTransitionSource(
 ): RouterSource<RouterTransitionSnapshot> {
   const source = new BaseSource(IDLE_SNAPSHOT, {
     onDestroy: () => {
-      unsubs.forEach((u) => {
-        u();
+      unsubs.forEach((unsub) => {
+        unsub();
       });
     },
   });

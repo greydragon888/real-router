@@ -55,20 +55,6 @@ describe("getLifecycleApi", () => {
       expect(router.canNavigateTo("admin")).toBe(false);
     });
 
-    it("should throw TypeError for invalid route name", () => {
-      expect(() => {
-        // @ts-expect-error: testing null route name
-        lifecycle.addActivateGuard(null, true);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid handler", () => {
-      expect(() => {
-        // @ts-expect-error: testing null handler
-        lifecycle.addActivateGuard("home", null);
-      }).toThrow(TypeError);
-    });
-
     it("should throw ROUTER_DISPOSED after dispose", () => {
       const freshRouter = createTestRouter();
       const freshLifecycle = getLifecycleApi(freshRouter);
@@ -80,8 +66,8 @@ describe("getLifecycleApi", () => {
       }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+    it("should work without validation plugin (any route name)", () => {
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -117,20 +103,6 @@ describe("getLifecycleApi", () => {
       expect(router.canNavigateTo("admin")).toBe(true);
     });
 
-    it("should throw TypeError for invalid route name", () => {
-      expect(() => {
-        // @ts-expect-error: testing null route name
-        lifecycle.addDeactivateGuard(null, true);
-      }).toThrow(TypeError);
-    });
-
-    it("should throw TypeError for invalid handler", () => {
-      expect(() => {
-        // @ts-expect-error: testing null handler
-        lifecycle.addDeactivateGuard("home", null);
-      }).toThrow(TypeError);
-    });
-
     it("should throw ROUTER_DISPOSED after dispose", () => {
       const freshRouter = createTestRouter();
       const freshLifecycle = getLifecycleApi(freshRouter);
@@ -142,8 +114,8 @@ describe("getLifecycleApi", () => {
       }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+    it("should work without validation plugin (any route name)", () => {
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -170,13 +142,6 @@ describe("getLifecycleApi", () => {
       expect(router.canNavigateTo("admin")).toBe(true);
     });
 
-    it("should throw TypeError for invalid route name", () => {
-      expect(() => {
-        // @ts-expect-error: testing null route name
-        lifecycle.removeActivateGuard(null);
-      }).toThrow(TypeError);
-    });
-
     it("should throw ROUTER_DISPOSED after dispose", () => {
       const freshRouter = createTestRouter();
       const freshLifecycle = getLifecycleApi(freshRouter);
@@ -188,8 +153,8 @@ describe("getLifecycleApi", () => {
       }).toThrow(errorCodes.ROUTER_DISPOSED);
     });
 
-    it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+    it("should work without validation plugin (any route name)", () => {
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {
@@ -216,13 +181,6 @@ describe("getLifecycleApi", () => {
       expect(router.canNavigateTo("admin")).toBe(true);
     });
 
-    it("should throw TypeError for invalid route name", () => {
-      expect(() => {
-        // @ts-expect-error: testing null route name
-        lifecycle.removeDeactivateGuard(null);
-      }).toThrow(TypeError);
-    });
-
     it("should throw ROUTER_DISPOSED after dispose", () => {
       const freshRouter = createTestRouter();
       const freshLifecycle = getLifecycleApi(freshRouter);
@@ -235,7 +193,7 @@ describe("getLifecycleApi", () => {
     });
 
     it("should skip validation in noValidate mode", () => {
-      const noValidateRouter = createTestRouter({ noValidate: true });
+      const noValidateRouter = createTestRouter();
       const noValidateLifecycle = getLifecycleApi(noValidateRouter);
 
       expect(() => {

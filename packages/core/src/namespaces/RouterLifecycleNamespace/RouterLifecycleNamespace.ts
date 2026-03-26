@@ -20,22 +20,6 @@ export class RouterLifecycleNamespace {
   #deps!: RouterLifecycleDependencies;
 
   // =========================================================================
-  // Static validation methods (called by facade before instance methods)
-  // =========================================================================
-
-  /**
-   * Validates start() arguments.
-   */
-  static validateStartArgs(args: unknown[]): void {
-    /* v8 ignore next 4 -- @preserve: facade enforces 1 arg via TypeScript signature */
-    if (args.length !== 1 || typeof args[0] !== "string") {
-      throw new Error(
-        "[router.start] Expected exactly 1 string argument (startPath).",
-      );
-    }
-  }
-
-  // =========================================================================
   // Dependency injection
   // =========================================================================
 

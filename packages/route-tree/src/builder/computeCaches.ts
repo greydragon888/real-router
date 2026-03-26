@@ -144,12 +144,12 @@ function buildParamTypeMap(paramMeta: {
 }): Record<string, "url" | "query"> {
   const map: Record<string, "url" | "query"> = {};
 
-  for (const p of paramMeta.urlParams) {
-    map[p] = "url";
+  for (const param of paramMeta.urlParams) {
+    map[param] = "url";
   }
 
-  for (const p of paramMeta.queryParams) {
-    map[p] = "query";
+  for (const param of paramMeta.queryParams) {
+    map[param] = "query";
   }
 
   return map;

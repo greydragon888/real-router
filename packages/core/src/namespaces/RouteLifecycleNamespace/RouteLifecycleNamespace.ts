@@ -1,14 +1,10 @@
 // packages/core/src/namespaces/RouteLifecycleNamespace/RouteLifecycleNamespace.ts
 
-import { logger } from "@real-router/logger";
-import { isBoolean, getTypeDescription } from "type-guards";
-
-import { validateHandlerLimit, validateNotRegistering } from "./validators";
 import { DEFAULT_LIMITS } from "../../constants";
-import { computeThresholds } from "../../helpers";
 
 import type { RouteLifecycleDependencies } from "./types";
 import type { GuardFnFactory, Limits } from "../../types";
+import type { RouterValidator } from "../../types/RouterValidator";
 import type { DefaultDependencies, GuardFn, State } from "@real-router/types";
 
 /**
@@ -54,6 +50,7 @@ export class RouteLifecycleNamespace<
 
   #deps!: RouteLifecycleDependencies<Dependencies>;
   #limits: Limits = DEFAULT_LIMITS;
+  #getValidator: (() => RouterValidator | null) | null = null;
 
   setDependencies(deps: RouteLifecycleDependencies<Dependencies>): void {
     this.#deps = deps;
@@ -66,6 +63,18 @@ export class RouteLifecycleNamespace<
    */
   setLimits(limits: Limits): void {
     this.#limits = limits;
+    // eslint-disable-next-line sonarjs/void-use -- @preserve: Wave 3 validator reads limits via RouterInternals; void suppresses TS6133 until then
+    void this.#limits;
+  }
+
+  setValidatorGetter(getter: () => RouterValidator | null): void {
+    this.#getValidator = getter;
+  }
+
+  getHandlerCount(type: "activate" | "deactivate"): number {
+    return type === "activate"
+      ? this.#canActivateFactories.size
+      : this.#canDeactivateFactories.size;
   }
 
   // =========================================================================
@@ -74,17 +83,15 @@ export class RouteLifecycleNamespace<
 
   /**
    * Adds a canActivate guard for a route.
-   * Handles state-dependent validation, overwrite detection, and registration.
+   * Handles overwrite detection and registration.
    *
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
-   * @param skipValidation - True when called during route config building (#noValidate)
    * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanActivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    skipValidation: boolean,
     isFromDefinition = false,
   ): void {
     if (isFromDefinition) {
@@ -92,23 +99,8 @@ export class RouteLifecycleNamespace<
     } else {
       this.#definitionActivateGuardNames.delete(name);
     }
-    if (!skipValidation) {
-      validateNotRegistering(
-        this.#registering.has(name),
-        name,
-        "addActivateGuard",
-      );
-    }
 
     const isOverwrite = this.#canActivateFactories.has(name);
-
-    if (!isOverwrite && !skipValidation) {
-      validateHandlerLimit(
-        this.#canActivateFactories.size + 1,
-        "addActivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
 
     this.#registerHandler(
       "activate",
@@ -123,17 +115,15 @@ export class RouteLifecycleNamespace<
 
   /**
    * Adds a canDeactivate guard for a route.
-   * Handles state-dependent validation, overwrite detection, and registration.
+   * Handles overwrite detection and registration.
    *
    * @param name - Route name (input-validated by facade)
    * @param handler - Guard function or boolean (input-validated by facade)
-   * @param skipValidation - True when called during route config building (#noValidate)
    * @param isFromDefinition - True when guard comes from route definition (tracked for HMR replace)
    */
   addCanDeactivate(
     name: string,
     handler: GuardFnFactory<Dependencies> | boolean,
-    skipValidation: boolean,
     isFromDefinition = false,
   ): void {
     if (isFromDefinition) {
@@ -141,23 +131,8 @@ export class RouteLifecycleNamespace<
     } else {
       this.#definitionDeactivateGuardNames.delete(name);
     }
-    if (!skipValidation) {
-      validateNotRegistering(
-        this.#registering.has(name),
-        name,
-        "addDeactivateGuard",
-      );
-    }
 
     const isOverwrite = this.#canDeactivateFactories.has(name);
-
-    if (!isOverwrite && !skipValidation) {
-      validateHandlerLimit(
-        this.#canDeactivateFactories.size + 1,
-        "addDeactivateGuard",
-        this.#limits.maxLifecycleHandlers,
-      );
-    }
 
     this.#registerHandler(
       "deactivate",
@@ -321,18 +296,19 @@ export class RouteLifecycleNamespace<
   ): void {
     // Emit warnings
     if (isOverwrite) {
-      logger.warn(
-        `router.${methodName}`,
-        `Overwriting existing ${type} handler for route "${name}"`,
-      );
+      this.#getValidator?.()?.lifecycle.warnOverwrite(name, type, methodName);
     } else {
-      this.#checkCountThresholds(factories.size + 1, methodName);
+      this.#getValidator?.()?.lifecycle.validateCountThresholds(
+        factories.size + 1,
+        methodName,
+      );
     }
 
     // Convert boolean to factory if needed
-    const factory = isBoolean(handler)
-      ? booleanToFactory<Dependencies>(handler)
-      : handler;
+    const factory =
+      typeof handler === "boolean"
+        ? booleanToFactory<Dependencies>(handler)
+        : handler;
 
     // Store factory
     factories.set(name, factory);
@@ -345,7 +321,7 @@ export class RouteLifecycleNamespace<
 
       if (typeof fn !== "function") {
         throw new TypeError(
-          `[router.${methodName}] Factory must return a function, got ${getTypeDescription(fn)}`,
+          `[router.${methodName}] Factory must return a function, got ${typeof fn}`,
         );
       }
 
@@ -391,44 +367,11 @@ export class RouteLifecycleNamespace<
         return result;
       }
 
-      logger.warn(
-        `router.${methodName}`,
-        `Guard for "${name}" returned a Promise. Sync check cannot resolve async guards — returning false.`,
-      );
+      this.#getValidator?.()?.lifecycle.warnAsyncGuardSync(name, methodName);
 
       return false;
     } catch {
       return false;
-    }
-  }
-
-  /**
-   * Emits warn/error log messages when handler count approaches the configured limit.
-   *
-   * @param currentSize - Current handler count (after adding the new one)
-   * @param methodName - Public API method name for warning messages
-   */
-  #checkCountThresholds(currentSize: number, methodName: string): void {
-    const maxLifecycleHandlers = this.#limits.maxLifecycleHandlers;
-
-    if (maxLifecycleHandlers === 0) {
-      return;
-    }
-
-    const { warn, error } = computeThresholds(maxLifecycleHandlers);
-
-    if (currentSize >= error) {
-      logger.error(
-        `router.${methodName}`,
-        `${currentSize} lifecycle handlers registered! ` +
-          `This is excessive. Hard limit at ${maxLifecycleHandlers}.`,
-      );
-    } else if (currentSize >= warn) {
-      logger.warn(
-        `router.${methodName}`,
-        `${currentSize} lifecycle handlers registered. ` +
-          `Consider consolidating logic.`,
-      );
     }
   }
 }

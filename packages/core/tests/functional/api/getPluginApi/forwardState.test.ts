@@ -85,24 +85,4 @@ describe("forwardState", () => {
     expect(state.name).toBe("dstWithDefaults");
     expect(state.params).toStrictEqual({ b: 2, c: 3 });
   });
-
-  describe("argument validation", () => {
-    it("throws TypeError for non-string routeName", () => {
-      expect(() =>
-        getPluginApi(router).forwardState(123 as unknown as string, {}),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).forwardState(null as unknown as string, {}),
-      ).toThrow(/Invalid routeName/);
-    });
-
-    it("throws TypeError for invalid routeParams", () => {
-      expect(() =>
-        getPluginApi(router).forwardState("home", "invalid" as never),
-      ).toThrow(TypeError);
-      expect(() =>
-        getPluginApi(router).forwardState("home", (() => {}) as never),
-      ).toThrow(/Invalid routeParams/);
-    });
-  });
 });

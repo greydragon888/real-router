@@ -136,20 +136,10 @@ describe("core/dependencies (integration)", () => {
       expect(service.count).toBe(42);
     });
 
-    it("should handle error cases gracefully", () => {
+    it("should handle missing dependency gracefully without plugin", () => {
       const deps = getDependenciesApi(router);
 
-      expect(() => {
-        deps.get("nonexistent" as "foo");
-      }).toThrow(ReferenceError);
-
-      expect(() => {
-        deps.set(123 as any, "value");
-      }).toThrow(TypeError);
-
-      expect(() => {
-        deps.setAll([] as any);
-      }).toThrow(TypeError);
+      expect(deps.has("nonexistent" as "foo")).toBe(false);
     });
   });
 });

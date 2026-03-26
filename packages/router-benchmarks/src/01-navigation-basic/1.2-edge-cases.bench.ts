@@ -38,7 +38,7 @@ if (!IS_ROUTER5) {
 if (!IS_ROUTER5) {
   const routes: Route[] = [
     { name: "home", path: "/" },
-    { name: "test", path: "/test?a&b&c&d&e" },
+    { name: "test", path: "/test?paramA&paramB&paramC&paramD&paramE" },
   ];
   const router = createRouter(routes, { queryParamsMode: "loose" });
   let index = 0;
@@ -48,11 +48,11 @@ if (!IS_ROUTER5) {
   bench("1.2.2 Navigation with null parameter values", () => {
     if (index++ % 2 === 0) {
       router.navigate("test", {
-        a: null,
-        b: undefined,
-        c: 0,
-        d: false,
-        e: "",
+        paramA: null,
+        paramB: undefined,
+        paramC: 0,
+        paramD: false,
+        paramE: "",
       });
     } else {
       router.navigate("home");
