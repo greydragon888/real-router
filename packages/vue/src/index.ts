@@ -3,6 +3,8 @@ export { RouteView } from "./components/RouteView";
 
 export { Link } from "./components/Link";
 
+export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
+
 // Directives
 export { vLink } from "./directives/vLink";
 
@@ -29,6 +31,8 @@ export { RouterKey, NavigatorKey, RouteKey } from "./context";
 
 // Types
 export type { LinkProps } from "./types";
+
+export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
 export type { LinkDirectiveValue } from "./directives/vLink";
 
