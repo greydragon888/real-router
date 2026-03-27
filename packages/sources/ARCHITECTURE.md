@@ -10,12 +10,13 @@ src/
 ├── createRouteNodeSource.ts   — Node-scoped source with lazy-connection pattern + shouldUpdateNode filter
 ├── createActiveRouteSource.ts — Boolean active-route source using areRoutesRelated filter
 ├── createTransitionSource.ts  — Transition lifecycle source (isTransitioning, toRoute, fromRoute)
+├── createErrorSource.ts      — Error lifecycle source (error, toRoute, fromRoute, version)
 ├── BaseSource.ts              — Internal Set-based listener management (not exported)
 ├── computeSnapshot.ts        — Same-reference snapshot optimization for route nodes
 ├── stabilizeState.ts         — Path-based State ref stabilization (not exported)
 ├── shouldUpdateCache.ts      — WeakMap<Router, Map<string, fn>> two-level cache
-├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, RouterTransitionSnapshot, ActiveRouteSourceOptions
-└── index.ts                  — Public exports (4 factories + types)
+├── types.ts                  — RouterSource, RouteSnapshot, RouteNodeSnapshot, RouterTransitionSnapshot, RouterErrorSnapshot, ActiveRouteSourceOptions
+└── index.ts                  — Public exports (5 factories + types)
 ```
 
 ## Two Source Patterns
@@ -30,7 +31,7 @@ Because the subscription is driven by listener count, a mount/unmount/remount cy
 
 No `destroy()` call is required. The source cleans itself up automatically when the last listener unsubscribes. `destroy()` is still available for explicit teardown.
 
-### 2. Eager-Connection (`createActiveRouteSource`, `createTransitionSource`)
+### 2. Eager-Connection (`createActiveRouteSource`, `createTransitionSource`, `createErrorSource`)
 
 The factory subscribes to the router immediately via `router.subscribe()` and delegates listener management to `BaseSource`. The router subscription is active for the lifetime of the source, regardless of how many listeners are attached.
 
@@ -132,6 +133,7 @@ On first access for a given router+nodeName combination, the predicate is create
 | `createRouteSource` creation       | O(1), no caching needed                           |
 | `createRouteNodeSource` creation   | O(1), single Map lookup for cached `shouldUpdate` |
 | `createActiveRouteSource` creation | O(1), no caching needed                           |
+| `createErrorSource` creation       | O(1), no caching needed (caching in React layer)  |
 | Subscription notification          | O(k), k = number of listeners                     |
 | `shouldUpdate` filter              | O(1), cached predicate                            |
 | `computeSnapshot`                  | O(1), reference comparison                        |
@@ -141,7 +143,7 @@ On first access for a given router+nodeName combination, the predicate is create
 ## Code Conventions
 
 - 100% test coverage required
-- Tests cover only the public API (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`, `createTransitionSource`)
+- Tests cover only the public API (`createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource`, `createTransitionSource`, `createErrorSource`)
 - `v8 ignore @preserve` used for defensive guards that are unreachable via the public API
 - Benchmarks use the mitata engine, not vitest bench
 

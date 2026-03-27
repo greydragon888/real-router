@@ -38,20 +38,21 @@ const unsubscribe = source.subscribe(() => {
 
 ## Source Factories
 
-| Factory | Snapshot | Updates when |
-|---------|----------|--------------|
-| `createRouteSource(router)` | `{ route, previousRoute }` | Every navigation |
-| `createRouteNodeSource(router, node)` | `{ route, previousRoute }` | Only when node activates/deactivates |
-| `createActiveRouteSource(router, name, params?, opts?)` | `boolean` | Route active status changes |
-| `createTransitionSource(router)` | `{ isTransitioning, toRoute, fromRoute }` | Transition start/end/cancel/error |
+| Factory                                                 | Snapshot                                  | Updates when                                        |
+| ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------- |
+| `createRouteSource(router)`                             | `{ route, previousRoute }`                | Every navigation                                    |
+| `createRouteNodeSource(router, node)`                   | `{ route, previousRoute }`                | Only when node activates/deactivates                |
+| `createActiveRouteSource(router, name, params?, opts?)` | `boolean`                                 | Route active status changes                         |
+| `createTransitionSource(router)`                        | `{ isTransitioning, toRoute, fromRoute }` | Transition start/end/cancel/error                   |
+| `createErrorSource(router)`                             | `{ error, toRoute, fromRoute, version }`  | Navigation error (guard rejection, route not found) |
 
 All factories return a `RouterSource<T>`:
 
 ```typescript
 interface RouterSource<T> {
-  subscribe(listener: () => void): () => void;  // useSyncExternalStore-compatible
-  getSnapshot(): T;                              // current value, synchronous
-  destroy(): void;                               // teardown, remove router subscription
+  subscribe(listener: () => void): () => void; // useSyncExternalStore-compatible
+  getSnapshot(): T; // current value, synchronous
+  destroy(): void; // teardown, remove router subscription
 }
 ```
 
@@ -59,12 +60,13 @@ interface RouterSource<T> {
 
 - `createRouteSource`, `createRouteNodeSource`, `createActiveRouteSource` — **lazy**: subscribe to the router on first listener, unsubscribe when all removed
 - `createTransitionSource` — **eager**: subscribes immediately (needs to track `TRANSITION_START`)
+- `createErrorSource` — **eager**: subscribes immediately (needs to track `TRANSITION_ERROR`)
 
 ### `createActiveRouteSource` Options
 
 ```typescript
 const source = createActiveRouteSource(router, "users", undefined, {
-  strict: false,          // default: false — match descendants too
+  strict: false, // default: false — match descendants too
   ignoreQueryParams: true, // default: true
 });
 ```
@@ -118,17 +120,32 @@ source.subscribe(() => {
 });
 ```
 
+### Error Tracking
+
+```typescript
+import { createErrorSource } from "@real-router/sources";
+
+const source = createErrorSource(router);
+
+source.subscribe(() => {
+  const { error, toRoute } = source.getSnapshot();
+  if (error) {
+    console.error(`Navigation to ${toRoute?.name} failed: ${error.code}`);
+  }
+});
+```
+
 ## Documentation
 
 Full documentation: [Wiki — sources](https://github.com/greydragon888/real-router/wiki/sources-package)
 
 ## Related Packages
 
-| Package | Description |
-|---------|-------------|
-| [@real-router/core](https://www.npmjs.com/package/@real-router/core) | Core router (required dependency) |
+| Package                                                                | Description                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------- |
+| [@real-router/core](https://www.npmjs.com/package/@real-router/core)   | Core router (required dependency)           |
 | [@real-router/react](https://www.npmjs.com/package/@real-router/react) | React integration (uses sources internally) |
-| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx) | Observable API (`state$`, `events$`) |
+| [@real-router/rx](https://www.npmjs.com/package/@real-router/rx)       | Observable API (`state$`, `events$`)        |
 
 ## Contributing
 
