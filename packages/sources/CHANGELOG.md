@@ -1,5 +1,18 @@
 # @real-router/sources
 
+## 0.2.8
+
+### Patch Changes
+
+- [#365](https://github.com/greydragon888/real-router/pull/365) [`ae85a49`](https://github.com/greydragon888/real-router/commit/ae85a49b77f2945f1943cdb44b74281a53f0981e) Thanks [@greydragon888](https://github.com/greydragon888)! - Add `stabilizeState` to prevent unnecessary re-renders across all frameworks ([#339](https://github.com/greydragon888/real-router/issues/339))
+
+  Path-based State reference stabilization: when `prev.path === next.path`, returns the previous State reference instead of creating a new snapshot. O(1) string comparison — no recursive object traversal.
+
+  Integrated into `computeSnapshot`, `createRouteSource`, and `createTransitionSource`. Guards before `updateSnapshot` prevent unnecessary listener notifications.
+
+- Updated dependencies [[`ae85a49`](https://github.com/greydragon888/real-router/commit/ae85a49b77f2945f1943cdb44b74281a53f0981e)]:
+  - @real-router/core@0.40.1
+
 ## 0.2.7
 
 ### Patch Changes
