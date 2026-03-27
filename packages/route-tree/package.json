@@ -48,7 +48,8 @@
     "test": "vitest run",
     "test:properties": "vitest --config vitest.config.properties.mts --run",
     "test:mutation": "stryker run",
-    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts"
+    "bench": "NODE_OPTIONS='--expose-gc --max-old-space-size=4096' npx tsx tests/benchmarks/index.ts",
+    "build:dist-only": "tsup"
   },
   "sideEffects": false,
   "dependencies": {
