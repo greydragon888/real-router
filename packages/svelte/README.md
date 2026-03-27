@@ -196,6 +196,30 @@ Snippet names must be valid JavaScript identifiers and match the first segment o
 
 > **Note:** `keepAlive` is not supported. Svelte has no equivalent of React's `<Activity>` API or Vue's `<KeepAlive>`. Components are destroyed when navigating away.
 
+### `<RouterErrorBoundary>`
+
+Declarative error handling for navigation errors. Shows a fallback **alongside** children (not instead of) when a guard rejects or a route is not found.
+
+```svelte
+<script lang="ts">
+  import { RouterErrorBoundary } from "@real-router/svelte";
+</script>
+
+<RouterErrorBoundary
+  onError={(error) => analytics.track("nav_error", { code: error.code })}
+>
+  {#snippet fallback(error, resetError)}
+    <div class="toast">
+      {error.code} <button onclick={resetError}>Dismiss</button>
+    </div>
+  {/snippet}
+
+  <Link routeName="protected">Go to Protected</Link>
+</RouterErrorBoundary>
+```
+
+Auto-resets on next successful navigation. Works with both `<Link>` and imperative `router.navigate()`.
+
 ## Actions
 
 ### `createLinkAction`
@@ -334,7 +358,7 @@ When enabled, a visually hidden `aria-live` region announces each navigation. Fo
 
 Full documentation: [Wiki](https://github.com/greydragon888/real-router/wiki)
 
-- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
+- [RouterProvider](https://github.com/greydragon888/real-router/wiki/RouterProvider) · [RouteView](https://github.com/greydragon888/real-router/wiki/RouteView) · [RouterErrorBoundary](https://github.com/greydragon888/real-router/wiki/RouterErrorBoundary) · [Link](https://github.com/greydragon888/real-router/wiki/Link)
 - [useRouter](https://github.com/greydragon888/real-router/wiki/useRouter) · [useRoute](https://github.com/greydragon888/real-router/wiki/useRoute) · [useRouteNode](https://github.com/greydragon888/real-router/wiki/useRouteNode) · [useNavigator](https://github.com/greydragon888/real-router/wiki/useNavigator) · [useRouteUtils](https://github.com/greydragon888/real-router/wiki/useRouteUtils) · [useRouterTransition](https://github.com/greydragon888/real-router/wiki/useRouterTransition)
 
 ## Examples

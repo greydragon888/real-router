@@ -1,5 +1,5 @@
 import { RouterError } from "@real-router/core";
-import { useNavigator } from "@real-router/solid";
+import { Link, RouterErrorBoundary, useNavigator } from "@real-router/solid";
 import { createSignal, Show } from "solid-js";
 
 import { cartState } from "../cart-state";
@@ -84,6 +84,26 @@ export function Home(): JSX.Element {
           CANNOT_ACTIVATE toast. Cancellation: second navigation aborts the
           first → TRANSITION_CANCELLED.
         </p>
+      </div>
+
+      <div class="card" style={{ "margin-top": "16px" }}>
+        <h3>Declarative approach — RouterErrorBoundary</h3>
+        <p style={{ "font-size": "13px", color: "#888" }}>
+          Click "Checkout" with empty cart — error toast appears automatically.
+          Dismiss manually or navigate successfully to auto-reset.
+        </p>
+        <RouterErrorBoundary
+          fallback={(error, resetError) => (
+            <div class="toast error" style={{ position: "relative" }}>
+              {error.code}: cart is empty{" "}
+              <button onClick={resetError} style={{ "margin-left": "8px" }}>
+                ✕
+              </button>
+            </div>
+          )}
+        >
+          <Link routeName="checkout">Go to Checkout (declarative)</Link>
+        </RouterErrorBoundary>
       </div>
 
       <Show when={toast()}>

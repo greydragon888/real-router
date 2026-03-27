@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterError } from "@real-router/core";
-import { useNavigator } from "@real-router/vue";
-import { ref } from "vue";
+import { Link, RouterErrorBoundary, useNavigator } from "@real-router/vue";
+import { h, ref } from "vue";
 
 import { cartState } from "../cart-state";
 
@@ -41,6 +41,14 @@ function toggleCart() {
   cartHasItems.value = next;
   cartState.hasItems = next;
 }
+
+function errorFallback(error: RouterError, resetError: () => void) {
+  return h("div", { class: "toast error", style: { position: "relative" } }, [
+    `${error.code}: cart is empty`,
+    " ",
+    h("button", { onClick: resetError, style: { marginLeft: "8px" } }, "✕"),
+  ]);
+}
 </script>
 
 <template>
@@ -75,6 +83,17 @@ function toggleCart() {
         CANNOT_ACTIVATE toast. Cancellation: second navigation aborts the first
         → TRANSITION_CANCELLED.
       </p>
+    </div>
+
+    <div class="card" :style="{ marginTop: '16px' }">
+      <h3>Declarative approach — RouterErrorBoundary</h3>
+      <p :style="{ fontSize: '13px', color: '#888' }">
+        Click "Checkout" with empty cart — error toast appears automatically.
+        Dismiss manually or navigate successfully to auto-reset.
+      </p>
+      <RouterErrorBoundary :fallback="errorFallback">
+        <Link routeName="checkout">Go to Checkout (declarative)</Link>
+      </RouterErrorBoundary>
     </div>
 
     <div v-if="toast" :class="['toast', toast.type]">{{ toast.msg }}</div>
