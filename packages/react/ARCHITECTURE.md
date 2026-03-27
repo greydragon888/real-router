@@ -7,7 +7,7 @@
 ```
 @real-router/react
 ├── @real-router/core         # Router instance, Navigator, State types
-├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource)
+├── @real-router/sources      # Subscription layer (createRouteSource, createRouteNodeSource, createActiveRouteSource, createTransitionSource, createErrorSource)
 └── @real-router/route-utils  # Route tree queries (getRouteUtils, getChain, getSiblings)
 ```
 
@@ -58,9 +58,11 @@ src/
 │   ├── useIsActiveRoute.tsx    # Active state subscription (internal — used by Link)
 │   ├── useRouteUtils.tsx       # RouteUtils from route tree (never re-renders)
 │   ├── useRouterTransition.tsx # Transition lifecycle (isTransitioning, toRoute, fromRoute)
+│   ├── useRouterError.tsx    # Internal — error subscription (used by RouterErrorBoundary)
 │   └── useStableValue.tsx      # JSON-based reference stabilization
 └── components/
     ├── Link.tsx                # memo'd link with custom areLinkPropsEqual + active state
+    ├── RouterErrorBoundary.tsx  # Declarative navigation error handling
     └── modern/
         └── RouteView/          # React 19.2-only — declarative route matching with keepAlive
             ├── index.ts        # Barrel re-exports
@@ -110,6 +112,7 @@ These three hooks use `useContext()` — works in both React 18 and 19. (`use()`
 useRouteNode(name)              — createRouteNodeSource(router, name)
 useRouterTransition()           — createTransitionSource(router)
 useIsActiveRoute(name, params)  — createActiveRouteSource(router, name, params, opts)  [internal]
+useRouterError()  [internal]        — createErrorSource(router) with WeakMap cache
 RouterProvider                  — createRouteSource(router)
 ```
 
@@ -126,6 +129,12 @@ Link (memo + areLinkPropsEqual)
 ├── useIsActiveRoute() — subscription for active/inactive CSS (internal hook)
 ├── href = router.buildUrl() || router.buildPath()
 └── onClick → void router.navigate(...)   # fire-and-forget
+
+RouterErrorBoundary
+├── useRouterError() — error subscription via createErrorSource (internal, cached)
+├── dismissedVersion state — tracks manually dismissed errors (version-based)
+├── onErrorRef — useRef for callback stability (avoids closure churn)
+└── Renders: children + fallback(error, resetError) via Fragment
 ```
 
 **Custom comparator (`areLinkPropsEqual`):** Explicitly compares all Link-specific props — `JSON.stringify` for `routeParams` and `routeOptions` (objects), strict equality (`===`) for primitives (`routeName`, `className`, `activeClassName`, `activeStrict`, `ignoreQueryParams`, `onClick`, `target`, `children`). Prevents re-renders from inline object literals `<Link routeParams={{ id: 123 }} />`.
@@ -165,9 +174,13 @@ router emits TRANSITION_SUCCESS
     │       └──► if node relevant: new snapshot → useSyncExternalStore triggers re-render
     │               └──► useRouteNode("users") consumers re-render
     │
-    └──► createActiveRouteSource.subscribe callback → boolean snapshot
-            └──► if changed: useSyncExternalStore triggers re-render
-                    └──► Link active CSS updates (via internal useIsActiveRoute)
+    ├──► createActiveRouteSource.subscribe callback → boolean snapshot
+    │       └──► if changed: useSyncExternalStore triggers re-render
+    │               └──► Link active CSS updates (via internal useIsActiveRoute)
+    │
+    └──► createErrorSource.subscribe callback → error snapshot { error, toRoute, fromRoute, version }
+            └──► useSyncExternalStore triggers RouterErrorBoundary re-render
+                    └──► if error && version > dismissedVersion: render fallback alongside children
 ```
 
 ## Testing Strategy
