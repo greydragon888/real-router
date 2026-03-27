@@ -3,6 +3,8 @@
 // Components
 export { Link } from "./components/Link";
 
+export { RouterErrorBoundary } from "./components/RouterErrorBoundary";
+
 // Hooks
 export { useRouteNode } from "./hooks/useRouteNode";
 
@@ -21,6 +23,8 @@ export { RouterProvider } from "./RouterProvider";
 
 // Types
 export type { LinkProps } from "./types";
+
+export type { RouterErrorBoundaryProps } from "./components/RouterErrorBoundary";
 
 export type { Navigator } from "@real-router/core";
 
