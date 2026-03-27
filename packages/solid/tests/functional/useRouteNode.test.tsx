@@ -164,7 +164,7 @@ describe("useRouteNode", () => {
       await router.navigate("users.list", {}, { reload: true });
 
       expect(result().route?.name).toBe("users.list");
-      expect(result().route).not.toBe(initialRoute);
+      expect(result().route).toBe(initialRoute);
     });
   });
 

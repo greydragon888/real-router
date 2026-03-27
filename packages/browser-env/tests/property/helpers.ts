@@ -3,12 +3,7 @@
 import { fc } from "@fast-check/vitest";
 
 import type { Browser } from "../../src";
-import type {
-  NavigationOptions,
-  Params,
-  Router,
-  State,
-} from "@real-router/core";
+import type { NavigationOptions, Params, State } from "@real-router/core";
 import type { PluginApi } from "@real-router/core/api";
 
 export const NUM_RUNS = {
@@ -92,10 +87,6 @@ const arbRouteName: fc.Arbitrary<string> = fc.stringMatching(
 export const arbState: fc.Arbitrary<State> = fc
   .tuple(arbRouteName, arbUrlPath)
   .map(([name, path]) => makeMinimalState(name, path));
-
-export function makeMockRouter(equal: boolean): Router {
-  return { areStatesEqual: () => equal } as unknown as Router;
-}
 
 // --- B11-B13: createOptionsValidator ---
 

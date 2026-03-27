@@ -2,6 +2,7 @@ import { events } from "@real-router/core";
 import { getPluginApi } from "@real-router/core/api";
 
 import { BaseSource } from "./BaseSource";
+import { stabilizeState } from "./stabilizeState.js";
 
 import type { RouterTransitionSnapshot, RouterSource } from "./types.js";
 import type { Router, State } from "@real-router/core";
@@ -34,11 +35,21 @@ export function createTransitionSource(
     api.addEventListener(
       events.TRANSITION_START,
       (toState: State, fromState?: State) => {
-        source.updateSnapshot({
-          isTransitioning: true,
-          toRoute: toState,
-          fromRoute: fromState ?? null,
-        });
+        const prev = source.getSnapshot();
+        const newToRoute = stabilizeState(prev.toRoute, toState);
+        const newFromRoute = stabilizeState(prev.fromRoute, fromState ?? null);
+
+        if (
+          !prev.isTransitioning ||
+          newToRoute !== prev.toRoute ||
+          newFromRoute !== prev.fromRoute
+        ) {
+          source.updateSnapshot({
+            isTransitioning: true,
+            toRoute: newToRoute,
+            fromRoute: newFromRoute,
+          });
+        }
       },
     ),
     api.addEventListener(events.TRANSITION_SUCCESS, resetToIdle),

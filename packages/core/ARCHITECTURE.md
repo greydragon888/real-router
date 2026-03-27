@@ -206,7 +206,7 @@ fsm.on("TRANSITIONING", "CANCEL", (p) =>
 ┌──────────────────────┐
 │  Build target state  │  buildStateWithSegments() (internally calls forwardState())
 │  + force replace     │  forceReplaceFromUnknown(opts, fromState)
-│  + SAME_STATES check │  areStatesEqual(from, to, false) — compares ALL params incl. query
+│  + SAME_STATES check │  fromState.path === toState.path — canonical path comparison
 └──────────┬───────────┘
            │
            ▼

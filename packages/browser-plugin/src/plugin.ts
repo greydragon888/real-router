@@ -100,7 +100,6 @@ export class BrowserPlugin {
           navOptions,
           toState,
           fromState,
-          this.#router,
         );
 
         const url = this.#router.buildUrl(toState.name, toState.params);

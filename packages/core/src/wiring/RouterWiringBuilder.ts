@@ -151,8 +151,6 @@ export class RouterWiringBuilder<
 
         return this.state.makeState(name, params, path, meta, undefined, true);
       },
-      areStatesEqual: (state1, state2, ignoreQueryParams) =>
-        this.state.areStatesEqual(state1, state2, ignoreQueryParams),
       resolveDefault: () => {
         const options = this.options.get();
 

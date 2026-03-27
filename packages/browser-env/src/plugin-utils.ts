@@ -51,10 +51,9 @@ export function shouldReplaceHistory(
   navOptions: NavigationOptions,
   toState: State,
   fromState: State | undefined,
-  router: Router,
 ): boolean {
   return (
     (navOptions.replace ?? !fromState) ||
-    (!!navOptions.reload && router.areStatesEqual(toState, fromState, false))
+    (!!navOptions.reload && toState.path === fromState.path)
   );
 }

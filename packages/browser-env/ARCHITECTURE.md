@@ -257,11 +257,11 @@ Creates `router.replaceHistoryState(name, params)` — updates URL in-place with
 
 Throws if the route name is unknown (not a `RouterError` — callers should validate first).
 
-### `shouldReplaceHistory(navOptions, toState, fromState, router): boolean`
+### `shouldReplaceHistory(navOptions, toState, fromState): boolean`
 
 ```typescript
 return (navOptions.replace ?? !fromState)      // replace if explicitly set or no fromState (first nav)
-    || (!!navOptions.reload && router.areStatesEqual(toState, fromState, false));
+    || (!!navOptions.reload && toState.path === fromState?.path);
                                                 // replace on same-state reload (avoid duplicate history entries)
 ```
 

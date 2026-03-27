@@ -42,13 +42,12 @@ function isSameNavigation(
   fromState: State | undefined,
   opts: NavigationOptions,
   toState: State,
-  areStatesEqual: (a: State, b: State, ignoreQuery: boolean) => boolean,
 ): boolean {
   return (
     !!fromState &&
     !opts.reload &&
     !opts.force &&
-    areStatesEqual(fromState, toState, false)
+    fromState.path === toState.path
   );
 }
 
@@ -118,7 +117,7 @@ export class NavigationNamespace {
       fromState = deps.getState();
       opts = forceReplaceFromUnknown(opts, fromState);
 
-      if (isSameNavigation(fromState, opts, toState, deps.areStatesEqual)) {
+      if (isSameNavigation(fromState, opts, toState)) {
         deps.emitTransitionError(toState, fromState, CACHED_SAME_STATES_ERROR);
         this.lastSyncRejected = true;
 

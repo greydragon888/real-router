@@ -126,7 +126,7 @@ describe("snapshot tracking", () => {
   );
 
   test.prop([arbNavigationSeq], { numRuns: NUM_RUNS.async })(
-    "source listener is called exactly once per navigation",
+    "source listener is called at most once per navigation",
     async (navigations) => {
       fc.pre(
         navigations[0].name !== "home" &&
@@ -146,7 +146,10 @@ describe("snapshot tracking", () => {
 
       await executeNavigations(router, navigations);
 
-      expect(listener).toHaveBeenCalledTimes(navigations.length);
+      expect(listener.mock.calls.length).toBeLessThanOrEqual(
+        navigations.length,
+      );
+      expect(listener.mock.calls.length).toBeGreaterThanOrEqual(1);
 
       unsub();
       router.stop();

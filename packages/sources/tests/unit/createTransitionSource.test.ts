@@ -307,6 +307,46 @@ describe("createTransitionSource", () => {
     expect(source.getSnapshot().isTransitioning).toBe(false);
   });
 
+  it("skip update when reentrant navigation produces TRANSITION_START with same paths", async () => {
+    const lifecycle = getLifecycleApi(router);
+    const resolvers: ((value: boolean) => void)[] = [];
+
+    lifecycle.addActivateGuard("dashboard", () => () => {
+      return new Promise<boolean>((resolve) => {
+        resolvers.push(resolve);
+      });
+    });
+
+    let reentrantDone = false;
+
+    router.usePlugin(() => ({
+      onTransitionStart() {
+        if (!reentrantDone) {
+          reentrantDone = true;
+          void router.navigate("dashboard");
+        }
+      },
+    }));
+
+    const source = createTransitionSource(router);
+
+    source.subscribe(() => {});
+
+    void router.navigate("dashboard").catch(() => {});
+
+    for (const resolve of resolvers) {
+      resolve(true);
+    }
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(source.getSnapshot().isTransitioning).toBe(false);
+
+    source.destroy();
+  });
+
   it("repeated IDLE_SNAPSHOT (success after success) is idempotent", async () => {
     const source = createTransitionSource(router);
     const listener = vi.fn();

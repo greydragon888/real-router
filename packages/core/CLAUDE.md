@@ -214,7 +214,7 @@ All navigation methods return `Promise<State>`. The pipeline uses **optimistic s
 router.navigate(name, params, opts)
   │
   ├── Build target state (buildNavigateState)
-  ├── Same-state check (areStatesEqual)
+  ├── Same-state check (path comparison)
   ├── FSM forceState(TRANSITIONING) + emitTransitionStart()
   │
   ├── Guard pipeline (executeGuardPipeline)

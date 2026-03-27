@@ -39,9 +39,15 @@ export function createRouteNodeSource(
         // Reconcile snapshot with current router state before connecting.
         // Covers reconnection after Activity hide/show cycles where the
         // source was disconnected and missed navigation events.
-        source.updateSnapshot(
-          computeSnapshot(source.getSnapshot(), router, nodeName),
+        const reconciled = computeSnapshot(
+          source.getSnapshot(),
+          router,
+          nodeName,
         );
+
+        if (!Object.is(reconciled, source.getSnapshot())) {
+          source.updateSnapshot(reconciled);
+        }
 
         // Connect to router on first subscription
         routerUnsubscribe = router.subscribe((next) => {
@@ -56,7 +62,6 @@ export function createRouteNodeSource(
             next,
           );
 
-          /* v8 ignore next 3 -- @preserve: dedup guard; shouldUpdateNode filters accurately so computeSnapshot always returns new ref */
           if (!Object.is(source.getSnapshot(), newSnapshot)) {
             source.updateSnapshot(newSnapshot);
           }

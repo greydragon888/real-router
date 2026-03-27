@@ -294,8 +294,8 @@ router.navigate(name, params, opts)
         ▼
   Plugin.onTransitionSuccess(toState, fromState, navOptions)
         │
-        ├── shouldReplaceHistory(navOptions, toState, fromState, router)
-        │     (from browser-env: replace ?? !fromState || reload && statesEqual)
+        ├── shouldReplaceHistory(navOptions, toState, fromState)
+        │     (from browser-env: replace ?? !fromState || reload && path match)
         │
         ├── url = router.buildUrl(toState.name, toState.params)
         │         └── router.buildPath() + buildUrl(path, base)

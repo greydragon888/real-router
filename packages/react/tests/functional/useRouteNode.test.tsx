@@ -244,8 +244,8 @@ describe("useRouteNode", () => {
 
       // Node should update even though it's the same route
       expect(result.current.route?.name).toBe("users.list");
-      // Route object should be different due to reload
-      expect(result.current.route).not.toBe(initialRoute);
+      // Route ref stabilized by stabilizeState (same path → same ref)
+      expect(result.current.route).toBe(initialRoute);
     });
   });
 
