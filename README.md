@@ -12,7 +12,7 @@
 </div>
 
 <p align="center">
-  <b>Data-first router for JavaScript — URLs map to state, not components.</b>
+  <b>Data-first router for JavaScript — the most declarative router for client applications</b>
 </p>
 
 <p align="center">
@@ -45,12 +45,23 @@ The router becomes a **data provider**: it tells you _where_ the user is, and yo
 
 ### One-Way Data Flow
 
-Routing state arrives as external data — components don't manage it. No `useParams()` + `useEffect()` + `fetch()` chains.
-The router tells you _where_ the user is; plugins handle data loading, titles, analytics outside the component tree. Components just render.
+Other routers push data fetching into components — `useParams()` + `useEffect()` + `fetch()` is imperative boilerplate that every page repeats.
 
-### Config = Full Specification
+Real-Router inverts this: routing state arrives as external data, plugins handle data loading, titles, analytics outside the component tree. Components just render what they receive.
 
-Route config is the **single source of truth** for the entire application — not just routing.
+### Declarative Route Config
+
+One config object declares everything — routing, access control, data loading, and any custom concern. No logic scattered across component files.
+
+Compare where routing logic lives across routers:
+
+```
+React Router v7:   guards in loaders, meta in page files — one route module per file
+Vue Router v4:     guards in beforeEach(), data in components, titles wired manually
+TanStack Router:   beforeLoad + loader + head per route file, scattered across file tree
+Real-Router:       guards + data + titles + any router related logic in one config object → generic plugins
+```
+
 Guards control access, custom fields drive data loading, titles, and any other concern through generic plugins:
 
 ```typescript
